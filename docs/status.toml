@@ -238,7 +238,7 @@ notes = "11 infected crates. Highest priority: icn-trust (cascades infections), 
 [summary]
 total_subsystems = 10
 total_tests = 2287
-total_crates = "34 crates + 4 apps + 3 binaries = 41 workspace members"
+total_crates = "37 crates + 4 apps + 3 binaries = 44 workspace members"
 loc_approx = "414K"
 deployment = "K3s cluster 10.8.30.40-42 (3 nodes), running since Dec 2025"
 last_full_verification = "2026-03-17"

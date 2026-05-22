@@ -1,10 +1,67 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-05-16
+Last Reviewed: 2026-05-22
 ---
 
 # ICN State (living doc)
+
+<!-- [sync edit] 2026-05-22 (post #1834 → #1901 cycle: stale-count fix, governance:write decomposition design + class-level scope constants, governance production guard, appliance Debian-13 real smoke, Civic Shell v0 spec, Claude Design protocol + truth-label appendix + icon candidate review + federation operator surface concept + member-shell action-card refinements, NYCN/Launch strategy reframes, SECURITY.md + issue templates + cross-repo map, two Dependabot dev-deps bumps):
+     Truth-sync recording 28 PRs merged between 2026-05-17 and 2026-05-22. **Mixed truth class** (this is not pure docs/control-plane): #1901 is real Rust runtime change in `icn/apps/governance/src/http/configure.rs` (new `GovernanceContextBuildMode` enum + `ICN_GOVERNANCE_BUILD_MODE` env var + fail-closed Production-mode validation + warn-only Bootstrap/Test); #1881 is real Rust change in `icn/crates/icn-rpc/src/auth.rs` (seven new class-level governance write-scope constants + `GOVERNANCE_CLASS_WRITE` slice + wire-string assertion tests). Everything else in this batch is docs/control-plane only. No new contract URN, no new ADR, no new RFC, no new ADR-0026 receipt class, no kernel/gateway/runtime API surface widening, no K3s/DNS/Forgejo mutation, no NYCN partner data, no production-readiness claim, no live-federation claim, no formal NYCN pilot claim, no Phase 2 completion claim.
+
+     Phase 2 deliverables list extended to record:
+       - #1878 docs(strategy): fix stale crate count in Thursday brief and CLAUDE.md. Two-line correction to align with the actual `[workspace].members` count.
+       - #1879 docs(appliance): reconcile README with landed scaffold + real build/smoke. Drift fix after #1865/#1866 landed.
+       - #1880 docs(design): governance:write decomposition — pick hybrid path (Refs #1868). Design doc landed at `docs/design/governance/governance-write-decomposition.md` picking the hybrid path (class-level scopes plus app-side MandateGate for higher-risk actions). Enumerates 38 affected handlers. Non-claims on production. Does not migrate any handler; does not retire broad `governance:write`; does not introduce MandateGate in code.
+       - #1881 feat(rpc,gateway): mint governance class-level scope constants (#1868 step 1). Seven new constants minted in `icn/crates/icn-rpc/src/auth.rs:966-972`: `GOVERNANCE_CHARTER_WRITE`, `GOVERNANCE_PROPOSAL_WRITE`, `GOVERNANCE_STEWARD_WRITE`, `GOVERNANCE_FEDERATION_WRITE`, `GOVERNANCE_MEETING_WRITE`, `GOVERNANCE_ACTIVITY_WRITE`, `GOVERNANCE_COMMENT_WRITE`, plus a `GOVERNANCE_CLASS_WRITE: &[&str]` slice and wire-string assertion tests. Gateway allowlist entries added. Comment at `auth.rs:963`: "`GOVERNANCE_WRITE` remains in place during the migration." First implementation slice of #1868 decomposition. Does NOT migrate handlers (41 broad `require_scope::<BasicClaims>(&http_req, "governance:write")` call sites in `icn/apps/governance/src/http/handlers.rs` are unchanged); does NOT retire broad `governance:write`; does NOT add MandateGate. #1868 remains open.
+       - #1882 docs(strategy): retarget Thursday packet to formation-to-governance conversation. Internal strategy reframe.
+       - #1883 docs(strategy): NYCN/Summit as ICN reference institution. Strategy doc positioning NYCN as case-study institution; preserves NYCN-not-activated non-claim.
+       - #1885 docs(design): Claude Design seed review and handoff protocol. Adds `docs/design/CLAUDE_DESIGN_REVIEW_PROTOCOL.md`, handoff template, `MUST_NOT_SHIP.md` floor, seed directory workflow. Design-process scaffold only; no design system promotion.
+       - #1886 docs(design): candidate icon family review package. Adds `docs/design/icons/CANDIDATES.md` plus contact sheet. Candidate icons proposed for promotion; no icons promoted.
+       - #1887 docs(design): truth-label and rejected-pattern appendix. Adds appendix documenting truth labels and anti-patterns.
+       - #1888 docs(spec): clarify member-shell action card sync and threshold rendering. Refines `docs/spec/member-shell-v0.md` on action-card sync boundaries and threshold-render semantics; preserves all existing non-claims.
+       - #1889 docs(design): federation operator surface concept. Concept doc for a federation operator shell (operational/control-plane facing surface). Concept-level — no spec, no implementation.
+       - #1890 chore(deps): bump npm_and_yarn group across `examples/mobile-app` (2 updates). Dependabot dev-deps minor.
+       - #1892 chore(repo): add SECURITY.md, issue templates, cross-repo map. Repo hygiene only.
+       - #1893 docs(strategy): Launch + ICN meeting kit for 2026-05-21. Internal strategy reframe of the Launch Cooperative meeting from pitch to learner-first reciprocal.
+       - #1899 docs(spec): define ICN Civic Shell v0 composition surface. Lands `docs/spec/icn-civic-shell-v0.md`. The first draft used the rejected "ICN Headquarters" metaphor; the v0 name is "ICN Civic Shell." Composition contract that ties existing surfaces (public website per ADR-0032/ADR-0033, `docs/spec/member-shell-v0.md`, `docs/spec/steward-cockpit-v0.md`, no-CLI organizer/member workflow, service-hosting model, auth-bridge model, Sovereign Forge, Forgejo deployment plan) into a single top-level public-plus-logged-in institutional operating shell. Composition only; does NOT supersede the Member Shell, Steward Cockpit, public website, service-hosting model, or auth-bridge model. Names a ten-room model, domain-and-route doctrine, status/proof labels anchored to #1796. Explicit non-goals enumerated. No app implementation, no new endpoint, no auth implementation, no Keycloak/Forgejo/Matrix deployment, no n8n workflow build, no DNS/K3s/VLAN/network mutation, no public admin surfaces, no private data in repo. Registry row landed in `docs/registry.toml`, INDEX row landed in `docs/INDEX.md`.
+       - #1900 docs(appliance): record Debian 13 real-smoke verification. Operator-verified end-to-end build + boot of real QCOW2 on Debian 13 trixie host; SHA512 chain recorded. Positive path verified: SSH reachable, firstboot marker present, `icnd.service` active, `/v1/health` returned 200. **Negative / fail-closed firstboot path NOT verified.** Appliance non-claims preserved verbatim (not production, not signed, not immutable, not partner-distributable).
+       - #1901 feat(governance): add production guard for standing checker configuration (closes #1871). Adds `GovernanceContextBuildMode { Bootstrap, Production, Test }` at `icn/apps/governance/src/http/configure.rs:58`; reads `ICN_GOVERNANCE_BUILD_MODE` at line 95 (`production` / `bootstrap` / `test`, case-insensitive, with `Bootstrap` fallback on unrecognized values); Production mode hard-fails at line 455 (`Err(GovernanceContextValidationError)`) when a checker dependency is missing; Bootstrap/Test mode emits `tracing::warn!` at line 459 and continues. Unit tests at line 802+. Does NOT fix #1870 (closed separately by prior work); does NOT add MandateGate; does NOT migrate handlers off broad `governance:write`.
+
+     Closure batch: #1870 and #1871 are both CLOSED. #1868 remains OPEN (decompose `governance:write`) — step 1 landed in #1881; step 2 (handler migration) is pending.
+
+     Cross-cycle disciplines preserved verbatim:
+       - No new ADR, no new RFC, no new contract URN, no new ADR-0026 receipt class.
+       - The meaning firewall is not widened. #1901 adds an enum and an env-var read inside `apps/governance`; #1881 adds capability-string constants inside `icn-rpc` (kernel-side enforcement primitive layer). Neither widens domain-meaning into the kernel.
+       - Settlement / position / obligation / allocation / receipt / provenance — never payment / wallet / currency / balance / token / crypto / blockchain / timebank — for ICN-native compute / settlement / federation surfaces.
+       - "Civic Shell" is the v0 name; "Headquarters" was the rejected first-draft metaphor. The merged spec is `docs/spec/icn-civic-shell-v0.md`.
+       - Privacy is posture, not content. PrivateEvidence body bytes never reach any rendering layer.
+       - When cockpit shows degraded, member shell must show degraded too.
+
+     Open Dependabot PRs at sync write-time (all in `sdk/typescript/`, none merged):
+       - #1894 flatted 3.3.3 → 3.4.2 (CWE-1321 patch).
+       - #1895 dev-dependencies group (4 updates: `@types/node`, `@typescript-eslint/*`, `ts-jest`).
+       - #1896 minimatch 3.1.2 → 10.2.5 (major jump, requires Node ≥20, adds install-time `prepare` script).
+       - #1897 picomatch 2.3.1 → 4.0.4 (major + two CVE fixes: CVE-2026-33671, CVE-2026-33672).
+       - #1898 fast-uri 3.1.0 → 3.1.2 (security patch GHSA-v39h-62p7-jpjc).
+
+     Phase 2 status remains ⏳ (still partner-bound). Nothing in this cycle completes a phase, removes a partner-binding gate, activates NYCN, or implements live federation. The Civic Shell spec, governance production guard, and class-level scope minting all materially strengthen the *design* and *startup-time legibility* of Phase 2 machinery; they do not change the partner gate.
+
+     Truth-class corrections to prior beliefs surfaced by this verification:
+       - `docs/status.toml` line 241 said `total_crates = "34 crates + 4 apps + 3 binaries = 41 workspace members"`. Actual count from `icn/Cargo.toml` `[workspace].members` is 37 crates + 3 bins + 4 apps = **44 workspace members**. Fixed in this PR.
+       - `docs/strategy/ICN-Technical-Whitepaper.md` line 207 says "38 Rust workspace crates." Actual lib-crate count is 37. Defer correction to a strategy-doc refresh PR.
+       - `docs/deployment/DEPLOYMENT_READY.md` lines 26-27 and 130-144 use wallet/balance/payment language. The file is not in `[control].canonical_doc_paths`. Recommend follow-up archive or banner; do not silently delete.
+       - The first draft of #1899 was titled "ICN Headquarters v0." Reviewer-driven rename to "Civic Shell" landed in the merged spec.
+
+     Next pre-RFC architecture move is **not yet selected**; this sync preserves optionality. Named candidates (descriptive only, not selected here):
+       (a) #1868 step 2 — migrate the *charter* handler family from broad `"governance:write"` to `GOVERNANCE_CHARTER_WRITE`, keeping broad scope as an accepted-also fallback per the hybrid design in #1880. One handler family per PR (charter → proposal → steward → federation → meeting → activity → comment).
+       (b) Appliance negative firstboot smoke — exercise the `10-firstboot-gate.conf` drop-in as a fail-closed scenario; complete the proof matrix #1900 left at positive-only.
+       (c) Receipt evidence carries presented scope + mandate grant — conditional on #1880's open question about administrative receipt class.
+       (d) MandateGate trait + types + persistence — defer until handler migration is far enough that the gating need is concrete.
+       (e) Dependabot triage — fast-track #1898/#1894/#1895 after `cd sdk/typescript && npm ci && npm test && npm run build && npm run typecheck`. Hold #1897 for careful CVE-changelog read. Defer #1896 pending Node ≥20 decision.
+       (f) Strategy-doc crate-count refresh and `DEPLOYMENT_READY.md` regulatory-vocabulary handling.
+
+     Hard rule preserved: this sync edit does NOT change any contract field, does NOT mint a new contract URN, does NOT add an ADR, does NOT add an RFC, does NOT widen gateway typed governance imports, does NOT migrate any handler, does NOT add MandateGate, does NOT retire `governance:write`, does NOT touch K3s / DNS / GitHub / Forgejo state, does NOT handle private partner / member / organizer data, does NOT claim Phase 2 completion, does NOT claim formal NYCN pilot, does NOT claim production readiness, does NOT claim live federation, does NOT verify the appliance fail-closed firstboot path. Phase model unchanged. -->
 
 <!-- [sync edit] 2026-05-16 (abuse-case hardening strategy doc):
      Truth-sync recording the landing of `docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md`. **Doc/control-plane only**: no Rust code, no schema fields changed, no new contract URN, no new ADR, no new RFC, no new ADR-0026 receipt class, no kernel/gateway/runtime mutation, no K3s/DNS/Forgejo mutation, no NYCN partner data, no production-readiness claim, no live-federation claim, no formal NYCN pilot claim, no Phase 2 completion claim.
