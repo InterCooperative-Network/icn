@@ -6,6 +6,11 @@
 //! - Invalid formats
 
 use crate::error::{GatewayError, Result};
+use icn_rpc::auth::scopes::{
+    GOVERNANCE_ACTIVITY_WRITE, GOVERNANCE_CHARTER_WRITE, GOVERNANCE_COMMENT_WRITE,
+    GOVERNANCE_FEDERATION_WRITE, GOVERNANCE_MEETING_WRITE, GOVERNANCE_PROPOSAL_WRITE,
+    GOVERNANCE_STEWARD_WRITE,
+};
 
 /// Maximum length for cooperative ID
 pub const MAX_COOP_ID_LEN: usize = 64;
@@ -54,16 +59,20 @@ pub const ALLOWED_SCOPES: &[&str] = &[
     "governance:write",
     // Governance class-level write scopes (subdivisions of `governance:write`).
     // Minted by §10 step 1 of `docs/design/governance/governance-write-decomposition.md`.
-    // No handler in `apps/governance/src/http/handlers.rs` references these
-    // yet; handler migration happens in later steps. The broad
-    // `governance:write` remains in the allowlist during the migration.
-    "governance:charter:write",
-    "governance:proposal:write",
-    "governance:steward:write",
-    "governance:federation:write",
-    "governance:meeting:write",
-    "governance:activity:write",
-    "governance:comment:write",
+    // Wire strings are sourced from `icn_rpc::auth::scopes` so the gateway
+    // allowlist and the RPC scope constants cannot drift; the test
+    // `test_allowed_scopes_contains_governance_class_write` locks that
+    // invariant. No handler in `apps/governance/src/http/handlers.rs`
+    // references these yet; handler migration happens in later steps. The
+    // broad `governance:write` remains in the allowlist during the
+    // migration.
+    GOVERNANCE_CHARTER_WRITE,
+    GOVERNANCE_PROPOSAL_WRITE,
+    GOVERNANCE_STEWARD_WRITE,
+    GOVERNANCE_FEDERATION_WRITE,
+    GOVERNANCE_MEETING_WRITE,
+    GOVERNANCE_ACTIVITY_WRITE,
+    GOVERNANCE_COMMENT_WRITE,
     // Settlement operations
     "settlements:read",
     "settlements:write",
@@ -856,6 +865,44 @@ mod tests {
         assert!(validate_scopes(&["governance:nonexistent:write".to_string()]).is_err());
         assert!(validate_scopes(&["governance:charter".to_string()]).is_err());
         assert!(validate_scopes(&["governance:charter:admin".to_string()]).is_err());
+    }
+
+    /// Cross-crate invariant: every class-level governance write scope
+    /// minted in `icn_rpc::auth::scopes::GOVERNANCE_CLASS_WRITE` must be
+    /// accepted by the gateway scope allowlist. Without this lock, a
+    /// future PR could add a new class scope on the icn-rpc side without
+    /// extending the gateway allowlist, leaving any handler migrated to
+    /// that scope unreachable because the gateway auth endpoint at
+    /// `icn/crates/icn-gateway/src/api/auth.rs:87-94` would refuse to
+    /// issue a capability containing the new string.
+    ///
+    /// This test asserts membership both at the constant-list level
+    /// (`ALLOWED_SCOPES`) and at the public-API level (`validate_scopes`).
+    #[test]
+    fn test_allowed_scopes_contains_governance_class_write() {
+        use icn_rpc::auth::scopes::GOVERNANCE_CLASS_WRITE;
+
+        for scope in GOVERNANCE_CLASS_WRITE {
+            assert!(
+                ALLOWED_SCOPES.contains(scope),
+                "icn-rpc canonical scope {scope:?} must be in the gateway ALLOWED_SCOPES"
+            );
+            assert!(
+                validate_scopes(&[(*scope).to_string()]).is_ok(),
+                "icn-rpc canonical scope {scope:?} must pass validate_scopes"
+            );
+        }
+        // Also assert the full slice is acceptable as a bundled token request,
+        // matching how a migrated client would request a single capability
+        // covering multiple class-level acts.
+        let bundled: Vec<String> = GOVERNANCE_CLASS_WRITE
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        assert!(
+            validate_scopes(&bundled).is_ok(),
+            "all of GOVERNANCE_CLASS_WRITE must be acceptable in a single request"
+        );
     }
 
     #[test]
