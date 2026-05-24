@@ -34,28 +34,49 @@ const DEFAULT_FUEL_COST_DIVISOR: i64 = 1_000;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use icn_compute::types::{ComputeTask, FuelLimit};
 /// use icn_compute::cost::compute_credits_required;
+/// use icn_compute::{ComputeTask, FuelLimit};
+/// # use icn_compute::{
+/// #     DeterminismClass, ExecutorCapability, PrivacyClass, TaskCode, TaskId, TaskPriority,
+/// # };
+/// #
+/// # fn test_task(fuel_limit: u64, payment_rate: Option<u64>) -> ComputeTask {
+/// #     ComputeTask {
+/// #         id: TaskId::from("test_task"),
+/// #         submitter: "did:icn:test".to_string(),
+/// #         coop_id: None,
+/// #         code: TaskCode::Ccl("return 42".into()),
+/// #         inputs: vec![],
+/// #         fuel_limit: FuelLimit(fuel_limit),
+/// #         required_capabilities: vec![ExecutorCapability::Ccl],
+/// #         priority: TaskPriority::default(),
+/// #         created_at: 0,
+/// #         deadline: None,
+/// #         payment_rate,
+/// #         payment_currency: None,
+/// #         resource_profile: None,
+/// #         actor_mode: None,
+/// #         placement_constraints: None,
+/// #         federation_constraints: None,
+/// #         estimated_value: None,
+/// #         verification: None,
+/// #         inputs_hash: None,
+/// #         policy_hash: None,
+/// #         determinism_class: DeterminismClass::default(),
+/// #         privacy_class: PrivacyClass::default(),
+/// #         storage_class: None,
+/// #         data_locality: None,
+/// #         scope: Default::default(),
+/// #     }
+/// # }
 ///
-/// let task = ComputeTask {
-///     fuel_limit: FuelLimit(10_000),
-///     payment_rate: None,
-///     ..Default::default()
-/// };
+/// let task = test_task(10_000, None);
 /// assert_eq!(compute_credits_required(&task), 10);
 ///
-/// let task_with_rate = ComputeTask {
-///     fuel_limit: FuelLimit(10_000),
-///     payment_rate: Some(2),
-///     ..Default::default()
-/// };
+/// let task_with_rate = test_task(10_000, Some(2));
 /// assert_eq!(compute_credits_required(&task_with_rate), 20);
 ///
-/// let tiny_task = ComputeTask {
-///     fuel_limit: FuelLimit(500),
-///     payment_rate: None,
-///     ..Default::default()
-/// };
+/// let tiny_task = test_task(500, None);
 /// assert_eq!(compute_credits_required(&tiny_task), 1);  // floor applied
 /// ```
 pub fn compute_credits_required(task: &ComputeTask) -> i64 {
