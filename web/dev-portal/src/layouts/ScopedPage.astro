@@ -1,0 +1,50 @@
+---
+import BaseLayout from "./BaseLayout.astro";
+import ScopeBadge from "../components/ScopeBadge.astro";
+import AuditShelf from "../components/AuditShelf.astro";
+import { evaluate, type Scope, type Identity } from "../lib/scope-policy";
+import { record } from "../lib/audit";
+
+interface Props {
+  title: string;
+  scope: Scope;
+  description?: string;
+}
+
+const { title, scope, description } = Astro.props;
+const identity: Identity = Astro.locals.identity ?? { kind: "anonymous" };
+const resource = new URL(Astro.request.url).pathname;
+
+// Evaluate scope. Middleware has already enforced staff-or-higher for /inside/*
+// but pages may declare a tighter scope; this is where that's enforced.
+const decision = evaluate({ actor: identity, scope, resource });
+if (scope !== "public") {
+  record({ actor: identity, scope, resource, decision });
+}
+
+if (decision.decision === "deny") {
+  // Return a 403 with a small explanation.
+  Astro.response.status = 403;
+}
+---
+<BaseLayout title={title} description={description}>
+  <div class="row" style="justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+    <h1 style="margin: 0;">{title}</h1>
+    <ScopeBadge scope={scope} />
+  </div>
+
+  {decision.decision === "deny" ? (
+    <div class="card" style="border-color: var(--tone-critical-fg); color: var(--tone-critical-fg); margin-top: 16px;">
+      <strong>Access denied.</strong>
+      <div style="color: var(--text-muted); margin-top: 6px;">{decision.reason}</div>
+      <div style="margin-top: 10px; font-size: 13px;">
+        See <a href="https://github.com/InterCooperative-Network/icn/blob/main/web/dev-portal/content/scope-doctrine.md">scope doctrine</a>
+        to understand how access is decided here.
+      </div>
+    </div>
+  ) : (
+    <slot />
+  )}
+
+  <AuditShelf identity={identity} scope={scope} resource={resource} />
+</BaseLayout>

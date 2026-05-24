@@ -24,20 +24,34 @@ function resolvePptxgen() {
     const nodePathDirs = (process.env.NODE_PATH || "")
       .split(path.delimiter)
       .filter(Boolean);
+
+    // Also consult Node's known global module paths (nvm, brew, etc.).
+    let globalPaths = [];
+    try {
+      globalPaths = require("module").globalPaths || [];
+    } catch (_) {}
+
     const appdataDir =
       process.env.APPDATA && path.join(process.env.APPDATA, "npm", "node_modules");
     const candidates = [
       ...nodePathDirs,
+      ...globalPaths,
       appdataDir,
       "/usr/local/lib/node_modules",
       "/usr/lib/node_modules",
+      "/opt/homebrew/lib/node_modules",
     ].filter(Boolean);
+
     for (const dir of candidates) {
       try {
         return require(path.join(dir, "pptxgenjs"));
       } catch (_) {}
     }
-    throw new Error("pptxgenjs not found. Install with: npm install -g pptxgenjs");
+    throw new Error(
+      "pptxgenjs not found. Install with: npm install -g pptxgenjs " +
+        "(then set NODE_PATH to the global node_modules directory if needed, " +
+        "e.g. `export NODE_PATH=$(npm root -g)`)",
+    );
   }
 }
 const pptxgen = resolvePptxgen();
@@ -461,7 +475,7 @@ const TOTAL = 11;
   addTitle(s, "ICN in one breath");
 
   // Subtitle
-  s.addText("Seven words. Not in this order in real life, but this is the shape.", {
+  s.addText("Eight words. Not in this order in real life, but this is the shape.", {
     x: MARGIN_LEFT,
     y: 1.75,
     w: CONTENT_W,
@@ -477,11 +491,12 @@ const TOTAL = 11;
     "Authority",
     "Decision",
     "Obligation",
+    "Effect",
     "Receipt",
     "Evidence",
     "Review",
   ];
-  // Build two rows so the chips don't get squeezed
+  // Build two rows so the chips don't get squeezed: 4 + 4.
   const row1 = spine.slice(0, 4);
   const row2 = spine.slice(4);
 
@@ -535,11 +550,11 @@ const TOTAL = 11;
 
   s.addNotes(
     [
-      "PURPOSE: compress ICN into seven words she can remember. ≈40 sec to recite.",
+      "PURPOSE: compress ICN into eight words she can remember. ≈40 sec to recite. This is the canonical spine used across the repo (NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY, NYCN_ORGANIZER_MEETING_ONE_PAGE_AID, MCKENZIE_LIVE_NOTES).",
       "",
       "Spoken copy:",
       "",
-      "“If I had to compress ICN into seven words, it'd be these. [Read across the rows, one breath if you can:] Standing. Authority. Decision. Obligation. Receipt. Evidence. Review.”",
+      "“If I had to compress ICN into eight words, it'd be these. [Read across the rows, one breath if you can:] Standing. Authority. Decision. Obligation. Effect. Receipt. Evidence. Review.”",
       "",
       "[Beat. Then the why.]",
       "",
@@ -562,6 +577,10 @@ const TOTAL = 11;
       "OBLIGATION — a commitment created by a decision.",
       "  How it works: obligor, obligee, scope, triggering decision, evidence-of-completion.",
       "  Quick: replaces 'debt' / 'liability' in ICN vocabulary. Advisor agreements, patronage allocations, federation commitments all live here.",
+      "",
+      "EFFECT — the actual change in the world that a decision caused.",
+      "  How it works: the state transition (a member is admitted, an allocation lands, a bylaw is adopted) that follows from authority + decision and produces the receipt.",
+      "  Quick: a decision without an effect is just talk. The effect is what makes the receipt verifiable as a real institutional event.",
       "",
       "RECEIPT — a verifiable record that an event happened.",
       "  How it works: signed, content-addressed, everything attached; verifiable independently of any platform.",

@@ -1,0 +1,20 @@
+---
+import type { RepoEntry } from "../data/repos";
+interface Props {
+  repo: RepoEntry;
+}
+const { repo } = Astro.props;
+const visTone = repo.visibility === "public" ? "info" : "neutral";
+---
+<div class="card repo-card">
+  <div class="top">
+    <span class="repo-name">{repo.name}</span>
+    <span class={`scope-badge ${visTone}`}>{repo.visibility}</span>
+  </div>
+  <div style="font-size: 13px;">{repo.statusEmoji} {repo.status}</div>
+  <div style="font-size: 12px; color: var(--text-muted); margin-top: 4px;">{repo.role}</div>
+  <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">{repo.note}</div>
+  <div style="margin-top: 8px;">
+    <a href={repo.url} target="_blank" rel="noopener noreferrer" style="font-size: 12px;">View on GitHub →</a>
+  </div>
+</div>

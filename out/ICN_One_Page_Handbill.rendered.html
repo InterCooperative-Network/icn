@@ -1,0 +1,364 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Infrastructure the cooperative movement owns</title>
+<style>
+/* ============================================================
+   PRINTING PRESS — base styles
+   Shared structural CSS. Themes override colors/fonts/details.
+   ============================================================ */
+
+/* Reset */
+* { box-sizing: border-box; }
+html { font-size: 11pt; }
+body {
+  margin: 0;
+  padding: 0;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: var(--body-font);
+  font-size: 1rem;
+  line-height: var(--body-leading);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Page setup — US Letter, generous margins */
+@page {
+  size: letter;
+  margin: var(--page-margin);
+}
+@page :first { margin-top: var(--page-margin); }
+
+/* Page-break utilities */
+.page-break  { page-break-before: always; }
+.no-break    { page-break-inside: avoid; }
+h1, h2       { page-break-after: avoid; }
+table, blockquote, pre, figure { page-break-inside: avoid; }
+
+/* Cover page — height tuned to fit US Letter minus any theme's @page margin
+   (worst case: 1.1in margins -> 8.8in printable; we use 8.4in to leave a
+   buffer for font-rendering rounding). */
+.cover {
+  height: 8.4in;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0;
+  page-break-after: always;
+}
+.cover .eyebrow {
+  font-family: var(--header-font);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 1.2rem;
+}
+.cover h1 {
+  font-family: var(--header-font);
+  font-size: var(--cover-title-size);
+  font-weight: var(--cover-title-weight);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 0 0 1.0rem;
+  max-width: 7.5in;
+  border: 0;
+  padding: 0;
+}
+.cover .subtitle {
+  font-family: var(--header-font);
+  font-size: 1.35rem;
+  font-weight: 400;
+  color: var(--ink-soft);
+  margin: 0 0 2.5rem;
+  max-width: 6.5in;
+  line-height: 1.4;
+}
+.cover .meta {
+  font-family: var(--header-font);
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.06em;
+  margin-top: auto;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+/* Body content */
+main { padding: 0; }
+
+h1, h2, h3, h4 {
+  font-family: var(--header-font);
+  color: var(--ink);
+  margin: 1.6em 0 0.5em;
+}
+h1 {
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  border-bottom: 2px solid var(--rule-strong);
+  padding-bottom: 0.4rem;
+  margin-top: 0;
+}
+h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent-dark);
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--rule);
+}
+h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: none;
+  margin: 1.2em 0 0.3em;
+}
+
+p {
+  margin: 0 0 0.8em;
+  orphans: 3;
+  widows: 3;
+}
+
+a { color: var(--accent-dark); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+strong { color: var(--ink); }
+em { color: var(--ink); }
+
+ul, ol {
+  margin: 0.4em 0 1em;
+  padding-left: 1.4em;
+}
+li {
+  margin: 0.25em 0;
+  line-height: var(--body-leading);
+}
+
+blockquote {
+  margin: 1.0em 0;
+  padding: 0.7em 1.1em;
+  border-left: 3px solid var(--accent);
+  background: var(--quote-bg);
+  font-size: 1.0rem;
+  line-height: 1.55;
+  color: var(--ink);
+  border-radius: 0 3px 3px 0;
+}
+blockquote p:last-child { margin-bottom: 0; }
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  padding: 0.05em 0.35em;
+  border-radius: 3px;
+  color: var(--ink);
+}
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+  padding: 0.8em 1.0em;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+pre code { background: transparent; padding: 0; }
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 1.6em 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.8em 0 1.2em;
+  font-size: 0.92rem;
+  background: var(--table-bg);
+}
+th, td {
+  border: 1px solid var(--rule);
+  padding: 0.5em 0.7em;
+  vertical-align: top;
+  text-align: left;
+  line-height: 1.45;
+}
+th {
+  background: var(--table-header-bg);
+  font-family: var(--header-font);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+/* Frontmatter chip (Status: descriptive · Canonical: no etc.) */
+.frontmatter {
+  font-family: var(--header-font);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.4em 0.7em;
+  margin: 0 0 1.6em;
+  background: var(--quote-bg);
+  border-left: 2px solid var(--accent);
+  border-radius: 0 3px 3px 0;
+  display: block;
+}
+
+/* First-paragraph drop cap, opt-in by theme.
+   The siblings (lists, headings, blockquotes) clear the float so they don't
+   wrap awkwardly around a short opening paragraph. */
+.dropcap main > p:first-of-type::first-letter {
+  font-family: var(--header-font);
+  font-size: 3.2em;
+  font-weight: 700;
+  float: left;
+  line-height: 1;
+  margin: 0.04em 0.12em 0 0;
+  color: var(--accent-dark);
+}
+.dropcap main > ul,
+.dropcap main > ol,
+.dropcap main > h2,
+.dropcap main > h3,
+.dropcap main > blockquote { clear: left; }
+
+/* Pull-quote helper */
+.pullquote {
+  font-family: var(--header-font);
+  font-size: 1.25rem;
+  line-height: 1.4;
+  color: var(--accent-dark);
+  font-style: italic;
+  border-top: 1px solid var(--accent);
+  border-bottom: 1px solid var(--accent);
+  padding: 0.8em 0;
+  margin: 1.4em 0;
+  text-align: center;
+}
+
+/* Inline callout box */
+.callout {
+  background: var(--callout-bg);
+  border-left: 3px solid var(--accent);
+  padding: 0.8em 1.1em;
+  margin: 1.2em 0;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.95rem;
+}
+
+/* Print page number — needs running headers from @page; Chrome headless
+   currently supports limited @page CSS. We use --no-pdf-header-footer in
+   the renderer and rely on body-level page numbers via the cover. If
+   page numbers are needed, render via weasyprint or paged.js instead. */
+
+</style>
+<style>
+/* ============================================================
+   THEME: handbill
+   Use for: single-page (or tight) call-to-action / event /
+   one-pager handouts. Larger type, more whitespace, hierarchy
+   tuned for posting on a bulletin board or tabling. Bold red
+   accent. Optimized for printing in black + one ink if you ever
+   send it to a print shop.
+   ============================================================ */
+
+:root {
+  --body-font: Georgia, 'Charter', 'Iowan Old Style', serif;
+  --header-font: 'Impact', 'Helvetica Neue Condensed', 'Arial Black', 'Arial Narrow', sans-serif;
+  --mono-font: 'Consolas', 'Menlo', monospace;
+  --body-leading: 1.55;
+  --page-margin: 0.8in;
+
+  /* Color palette: Cherry Bold — high-impact, agitprop energy */
+  --ink: #1A1A1A;
+  --ink-soft: #444444;
+  --ink-faint: #888888;
+  --paper: #FCF6F5;
+  --accent: #990011;          /* cherry */
+  --accent-dark: #66000B;
+  --rule: #D4C4C5;
+  --rule-strong: #1A1A1A;
+  --quote-bg: #F7E6E8;
+  --callout-bg: #F7E6E8;
+  --code-bg: #EFE5E6;
+  --table-bg: #FFFFFF;
+  --table-header-bg: #F7E6E8;
+
+  --cover-title-size: 6.0rem;
+  --cover-title-weight: 900;
+}
+
+html { font-size: 13pt; }   /* bigger base type for handbills */
+
+/* Handbill details: louder headers, tighter letterspacing */
+h1 {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 2.6rem;
+}
+h2 {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 900;
+  color: var(--accent-dark);
+}
+h3 {
+  font-family: var(--header-font);
+  font-weight: 700;
+}
+
+.cover h1 {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.cover .eyebrow {
+  color: var(--accent-dark);
+  font-weight: 900;
+}
+
+blockquote {
+  border-left-width: 5px;
+  font-size: 1.1rem;
+}
+
+</style>
+</head>
+<body>
+
+<main>
+
+<h1>Infrastructure the cooperative movement owns</h1>
+<blockquote>
+<p>ICN is software cooperatives own — instead of renting it from companies whose values run opposite to theirs.</p>
+</blockquote>
+<h2>The problem</h2>
+<p>Cooperatives have worked for 180 years, but the software they run on hasn&rsquo;t. Member lists, votes, documents, and patronage all live in tools rented from companies that can raise prices, change terms, or shut down — taking the cooperative&rsquo;s institutional memory with them. <strong>A movement built on democratic ownership runs on infrastructure built for extraction.</strong></p>
+<h2>What ICN does</h2>
+<p>ICN — the InterCooperative Network — is open-source software that helps cooperatives:</p>
+<ul>
+<li><strong>Keep durable records</strong> of who is a member and what was decided.</li>
+<li><strong>Verify each other</strong> across organizational boundaries, with no vendor in the middle.</li>
+<li><strong>Survive turnover</strong> — when founders leave, the institutional memory does not.</li>
+<li><strong>Coordinate as a movement</strong>, not a scatter of unconnected organizations.</li>
+</ul>
+<p>Each cooperative runs its own copy on its own server — no central platform, no subscription, no crypto, no company that owns the data. ICN is pre-pilot: the substrate runs today; the member apps are still being built.</p>
+<p><strong>Open source · Not a vendor · Not for sale · github.com/InterCooperative-Network/icn</strong></p>
+</main>
+</body>
+</html>

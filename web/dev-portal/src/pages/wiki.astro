@@ -1,0 +1,15 @@
+---
+import ScopedPage from "../layouts/ScopedPage.astro";
+---
+<ScopedPage title="Wiki" scope="public" description="Concept explainers, design rationale, FAQ, ADR navigator.">
+  <div class="stub">
+    <h2>Wiki — stub</h2>
+    <p>Technical wiki for ICN. Concept explainers (kernel/app separation, meaning firewall, opaque receipt storage, scope policy oracle), design rationale, FAQ, ADR navigator.</p>
+    <p style="margin-top: 12px; font-size: 13px; color: var(--text-muted);">
+      Content lives in <code>content/wiki/</code> as Markdown. Build-time indexing produces this page; individual articles get their own URLs under <code>/wiki/&lt;slug&gt;</code>.
+    </p>
+    <p style="margin-top: 16px;">
+      <a href="/adr/0026" class="btn">Read ADR-0026 →</a>
+    </p>
+  </div>
+</ScopedPage>

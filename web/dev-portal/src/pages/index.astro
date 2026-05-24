@@ -1,0 +1,327 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+import { health, statusColor } from "../data/health";
+import { tools } from "../data/tools";
+import { services, serviceGroups } from "../data/services";
+import { upcoming, tagDot } from "../data/calendar";
+import { notices } from "../data/notices";
+import { standing } from "../data/standing";
+
+const identity = Astro.locals.identity;
+const signedIn = identity?.kind === "github";
+const myLogin = signedIn && identity?.kind === "github" ? identity.login : null;
+const greeting = myLogin ? `Welcome back, @${myLogin}` : "Welcome to icn.zone";
+
+const quickTools = tools.filter((t) => t.quickAccess);
+const nextEvents = upcoming(5);
+
+const groupedServices = (Object.keys(serviceGroups) as Array<keyof typeof serviceGroups>).map((g) => ({
+  group: g,
+  label: serviceGroups[g].label,
+  items: services.filter((s) => s.group === g),
+}));
+
+const members = Object.entries(standing).map(([login, grants]) => ({
+  login,
+  steward: (grants.steward ?? []).length > 0,
+  coopMember: (grants.cooperativeMember ?? []).length > 0,
+}));
+
+function formatDate(iso: string): string {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+---
+<BaseLayout title="Home" description="The operational hub for the InterCooperative Network. Project health, tools, services, calendar, notices.">
+
+  <!-- ============ Greeting strip ============ -->
+  <section class="section" style="margin-bottom: 18px;">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 12px;">
+      <div>
+        <h1 style="margin: 0;">{greeting}</h1>
+        <p style="margin: 4px 0 0; color: var(--text-muted); font-size: 14px;">
+          Short for the software, long for the explanation.
+          For "what is ICN," see <a href="https://intercooperative.network">intercooperative.network</a>.
+        </p>
+      </div>
+      {!signedIn && (
+        <a href="/sign-in" class="btn primary">Come in →</a>
+      )}
+    </div>
+  </section>
+
+  <!-- ============ Project health (central utility) ============ -->
+  <section class="section">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;">
+      <h2 style="margin: 0;">Project health</h2>
+      <a href="/health" style="font-size: 12px;">Full view →</a>
+    </div>
+    <div class="health-grid">
+      {health.map((m) => {
+        const c = statusColor(m.status);
+        return (
+          <a class="health-tile" href={m.href ?? "#"} style={`background: ${c.bg}; color: ${c.fg};`}>
+            <div class="ht-label">{m.label}</div>
+            <div class="ht-primary"><span style="opacity: 0.7;">{c.dot}</span> {m.primary}</div>
+            {m.secondary && <div class="ht-secondary">{m.secondary}</div>}
+          </a>
+        );
+      })}
+    </div>
+  </section>
+
+  <!-- ============ Quick access tiles (tools) ============ -->
+  <section class="section">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;">
+      <h2 style="margin: 0;">Quick access</h2>
+      <a href="/tools" style="font-size: 12px;">All tools →</a>
+    </div>
+    <div class="tool-grid">
+      {quickTools.map((t) => (
+        <a
+          class="tool-tile"
+          href={t.href}
+          target={t.external ? "_blank" : undefined}
+          rel={t.external ? "noopener noreferrer" : undefined}
+        >
+          <span class="tt-icon">{t.icon}</span>
+          <div>
+            <div class="tt-name">{t.name}{t.external && <span class="tt-ext" aria-hidden="true">↗</span>}</div>
+            <div class="tt-blurb">{t.blurb}</div>
+          </div>
+        </a>
+      ))}
+    </div>
+  </section>
+
+  <!-- ============ Services + Calendar + Pinned (three-col) ============ -->
+  <section class="section three-col">
+
+    <!-- Services -->
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;">
+        <h2 style="margin: 0;">How do I…</h2>
+        <a href="/services" style="font-size: 12px;">All →</a>
+      </div>
+      <div class="card services-card">
+        {groupedServices.map((grp) => (
+          <div class="svc-group">
+            <div class="svc-group-label">{grp.label}</div>
+            {grp.items.slice(0, 3).map((s) => (
+              <a
+                class="svc-item"
+                href={s.href}
+                target={s.external ? "_blank" : undefined}
+                rel={s.external ? "noopener noreferrer" : undefined}
+              >
+                <span class="svc-icon">{s.icon}</span>
+                <span class="svc-q">{s.question}</span>
+                <span class="svc-arrow">→</span>
+              </a>
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+
+    <!-- Calendar -->
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;">
+        <h2 style="margin: 0;">What's next</h2>
+        <a href="/calendar" style="font-size: 12px;">All →</a>
+      </div>
+      <div class="card calendar-card">
+        {nextEvents.length === 0 ? (
+          <p style="color: var(--text-faint); font-style: italic; margin: 0; padding: 14px;">Nothing on the calendar.</p>
+        ) : (
+          nextEvents.map((c) => (
+            <div class="cal-row">
+              <span class="cal-dot">{tagDot(c.tag)}</span>
+              <span class="cal-date">{formatDate(c.date)}</span>
+              <span class="cal-label">{c.label}</span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+
+    <!-- Pinned notices -->
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;">
+        <h2 style="margin: 0;">Pinned</h2>
+        <a href="/inside/notices" style="font-size: 12px;">Bulletin →</a>
+      </div>
+      <div class="notice-stack">
+        {notices.slice(0, 3).map((n) => (
+          <div class={`notice notice-${n.tag}`}>
+            <div class="notice-headline">{n.headline}</div>
+            <div class="notice-body">{n.body}</div>
+            {n.link && (
+              <a class="notice-link" href={n.link.href}>{n.link.label}</a>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ Who's around ============ -->
+  <section class="section">
+    <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px;">
+      <h2 style="margin: 0;">Who's around</h2>
+      <a href="/directory" style="font-size: 12px;">Directory →</a>
+    </div>
+    <div class="card" style="display: flex; flex-wrap: wrap; gap: 14px; align-items: center;">
+      {members.map((m) => (
+        <a
+          href={`https://github.com/${m.login}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="member-chip"
+        >
+          <span class="avatar" aria-hidden="true">{m.login.slice(0, 2).toUpperCase()}</span>
+          <span class="mc-name">@{m.login}</span>
+          {m.steward && <span class="scope-badge critical" style="margin-left: 6px;">steward</span>}
+        </a>
+      ))}
+      <span style="color: var(--text-faint); font-size: 13px;">
+        {members.length === 1 ? "Just one of you here for now." : `${members.length} members`} — seats open for collaborators.
+      </span>
+    </div>
+  </section>
+
+</BaseLayout>
+
+<style>
+  .health-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+    gap: 8px;
+  }
+  .health-tile {
+    display: block;
+    padding: 12px 14px;
+    border-radius: 8px;
+    text-decoration: none;
+    border: 1px solid var(--border);
+    transition: transform 0.08s ease-out;
+  }
+  .health-tile:hover { transform: translateY(-1px); text-decoration: none; }
+  .ht-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; opacity: 0.7; }
+  .ht-primary { font-size: 17px; font-weight: 600; margin-top: 4px; }
+  .ht-secondary { font-size: 11px; margin-top: 4px; opacity: 0.75; }
+
+  .tool-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 8px;
+  }
+  .tool-tile {
+    display: flex;
+    gap: 10px;
+    padding: 12px 14px;
+    border-radius: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    text-decoration: none;
+    transition: border-color 0.12s, transform 0.08s ease-out;
+  }
+  .tool-tile:hover { border-color: var(--border-strong); transform: translateY(-1px); text-decoration: none; }
+  .tt-icon { font-size: 20px; line-height: 1; flex-shrink: 0; }
+  .tt-name { font-weight: 600; font-size: 14px; }
+  .tt-ext { font-size: 11px; color: var(--text-faint); margin-left: 4px; }
+  .tt-blurb { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
+
+  .three-col {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 980px) {
+    .three-col { grid-template-columns: 1fr; }
+  }
+
+  .services-card { padding: 0; }
+  .svc-group { border-top: 1px solid var(--border); padding: 8px 0 12px; }
+  .svc-group:first-child { border-top: none; }
+  .svc-group-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    color: var(--text-muted);
+    padding: 8px 14px 4px;
+  }
+  .svc-item {
+    display: grid;
+    grid-template-columns: 24px 1fr 16px;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .svc-item:hover { background: var(--bg); text-decoration: none; }
+  .svc-icon { font-size: 14px; }
+  .svc-arrow { color: var(--text-faint); }
+
+  .calendar-card { padding: 0; }
+  .cal-row {
+    display: grid;
+    grid-template-columns: 22px 90px 1fr;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .cal-row:first-child { border-top: none; }
+  .cal-dot { font-size: 12px; }
+  .cal-date { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+  .cal-label { color: var(--text); }
+
+  .notice-stack { display: flex; flex-direction: column; gap: 10px; }
+  .notice {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--border-strong);
+    border-radius: 6px;
+    padding: 10px 12px;
+  }
+  .notice-focus { border-left-color: #6366f1; }
+  .notice-ask   { border-left-color: #10b981; }
+  .notice-warn  { border-left-color: #d97706; }
+  .notice-info  { border-left-color: #6b7280; }
+  .notice-headline { font-size: 13px; font-weight: 600; }
+  .notice-body { font-size: 12px; color: var(--text-muted); margin-top: 4px; line-height: 1.5; }
+  .notice-link { display: inline-block; margin-top: 6px; font-size: 12px; }
+
+  .member-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px 4px 4px;
+    border-radius: 100px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    text-decoration: none;
+    font-size: 13px;
+  }
+  .member-chip:hover { background: var(--surface); text-decoration: none; }
+  .avatar {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #10b981, #6366f1);
+    color: white;
+    font-size: 11px;
+    font-weight: 700;
+  }
+  .mc-name { font-weight: 500; }
+</style>

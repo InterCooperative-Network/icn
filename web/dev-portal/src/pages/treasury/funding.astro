@@ -1,0 +1,131 @@
+---
+import ScopedPage from "../../layouts/ScopedPage.astro";
+import { fundingTargets, fundingStatusLabel, tierLabel, pipelineSummary, type FundingTier } from "../../data/funding";
+
+const summary = pipelineSummary();
+const tiers: FundingTier[] = [1, 2, 3, 4, 5];
+const byTier = tiers.map((t) => ({
+  tier: t,
+  label: tierLabel[t],
+  items: fundingTargets.filter((x) => x.tier === t),
+}));
+---
+<ScopedPage title="Funding pipeline" scope="public" description="ICN's funding pipeline. Targets, status, deadlines, fit.">
+  <p style="color: var(--text-muted); max-width: 720px;">
+    Live view of where ICN's fundraising stands. Source of truth is <code>docs/strategy/grants/funding-pipeline.md</code>; this page is the dashboard.
+  </p>
+
+  <section class="section">
+    <h2>Pipeline at a glance</h2>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="kpi-num">{summary.total}</div><div class="kpi-label">Targets tracked</div></div>
+      <div class="kpi kpi-go"><div class="kpi-num">{summary.applyNow}</div><div class="kpi-label">Apply now</div></div>
+      <div class="kpi kpi-go"><div class="kpi-num">{summary.inMotion}</div><div class="kpi-label">In motion</div></div>
+      <div class="kpi kpi-prep"><div class="kpi-num">{summary.prep}</div><div class="kpi-label">Prep</div></div>
+      <div class="kpi"><div class="kpi-num">{summary.relationship}</div><div class="kpi-label">Cultivate</div></div>
+    </div>
+  </section>
+
+  {byTier.map((tier) => tier.items.length > 0 && (
+    <section class="section">
+      <h2>{tier.label}</h2>
+      <div class="card funder-card-list">
+        {tier.items.map((f) => {
+          const tone = fundingStatusLabel[f.status].tone;
+          return (
+            <div class="funder-row">
+              <div class="funder-row-top">
+                <a href={f.url} target="_blank" rel="noopener noreferrer" class="funder-name">{f.name}</a>
+                <span class={`scope-badge ${tone}`}>{fundingStatusLabel[f.status].label}</span>
+              </div>
+              <div class="funder-row-meta">
+                <span><strong>Amount:</strong> {f.amount}</span>
+                <span><strong>Deadline:</strong> {f.deadline}</span>
+              </div>
+              <div class="funder-row-fit">{f.fit}</div>
+              {f.application && (
+                <div class="funder-row-link">
+                  <a href={`https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/grants/applications/${f.application}`} target="_blank" rel="noopener noreferrer">
+                    Application draft →
+                  </a>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  ))}
+
+  <section class="section">
+    <h2>Constraints to design around</h2>
+    <div class="card" style="font-size: 13px;">
+      <ol style="margin: 0; padding-left: 20px;">
+        <li><strong>SSDI income limits.</strong> $1,690/mo SGA threshold. Structure payments through fiscal sponsor; get a disability-aware accountant.</li>
+        <li><strong>Sovereign Tech Fund's no-double-public-funding rule.</strong> Carve discrete slices per funder.</li>
+        <li><strong>NLnet's libre license requirement.</strong> ICN code is AGPL ✓. Docs need CC-BY-SA.</li>
+        <li><strong>Capital Impact's worker-coop preference.</strong> ICN incorporation decision pending — joint app with NYCN or solo-coop.</li>
+        <li><strong>NGI Sargasso requires EU partner.</strong> Multi-month cultivation lead time.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Realistic ceiling Q3–Q4 2026</h2>
+    <div class="card">
+      <p style="margin-top: 0;">If we move on the top targets in the next 30 days with focused effort:</p>
+      <ul>
+        <li><strong>NLnet NGI Zero Commons</strong> (Jun 1 deadline): €30K–€50K → ~$33K–$54K</li>
+        <li><strong>Sovereign Tech Fund</strong> (rolling): €100K → ~$108K</li>
+        <li><strong>ACCES-VR</strong>: $15K</li>
+        <li><strong>Mozilla Democracy x AI</strong>: $50K (if cohort accepts)</li>
+      </ul>
+      <p style="margin-bottom: 0;"><strong>Reachable total: $200K–$250K.</strong></p>
+    </div>
+  </section>
+
+  <style>
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 10px;
+    }
+    .kpi {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      text-align: center;
+    }
+    .kpi.kpi-go { border-color: var(--done-border); background: var(--done-bg); }
+    .kpi.kpi-go .kpi-num { color: var(--done-fg); }
+    .kpi.kpi-prep { border-color: var(--active-border); background: var(--active-bg); }
+    .kpi.kpi-prep .kpi-num { color: var(--active-fg); }
+    .kpi-num { font-size: 24px; font-weight: 700; }
+    .kpi-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); font-weight: 600; margin-top: 2px; }
+
+    .funder-card-list { padding: 0; }
+    .funder-row {
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+    }
+    .funder-row:first-child { border-top: none; }
+    .funder-row-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 6px;
+      gap: 12px;
+    }
+    .funder-name { font-weight: 600; font-size: 15px; }
+    .funder-row-meta {
+      display: flex;
+      gap: 24px;
+      font-size: 12px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+    .funder-row-fit { font-size: 13px; color: var(--text); }
+    .funder-row-link { margin-top: 6px; font-size: 12px; }
+  </style>
+</ScopedPage>

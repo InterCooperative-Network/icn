@@ -1,0 +1,76 @@
+---
+import ScopedPage from "../layouts/ScopedPage.astro";
+import { calendar, tagDot } from "../data/calendar";
+
+function fmt(iso: string) {
+  const d = new Date(iso + "T00:00:00");
+  return d.toLocaleDateString(undefined, { weekday: "long", month: "short", day: "numeric", year: "numeric" });
+}
+
+const today = new Date().toISOString().slice(0, 10);
+const upcoming = calendar.filter((c) => c.date >= today);
+const past = calendar.filter((c) => c.date < today).reverse();
+---
+<ScopedPage title="Calendar" scope="public" description="When syncs happen. When standups are due. Upcoming milestones.">
+  <p style="color: var(--text-muted); max-width: 720px; margin-bottom: 24px;">
+    The cooperative's shared rhythm. Edit in <code>src/data/calendar.ts</code> (hand-maintained today). Eventually pulls from an iCal feed.
+  </p>
+
+  <section class="section">
+    <h2>Upcoming</h2>
+    <div class="card cal-card">
+      {upcoming.length === 0 ? (
+        <p style="color: var(--text-faint); font-style: italic; padding: 14px; margin: 0;">Nothing scheduled.</p>
+      ) : (
+        upcoming.map((c) => (
+          <div class="cal-row">
+            <span class="cal-dot">{tagDot(c.tag)}</span>
+            <span class="cal-date">{fmt(c.date)}</span>
+            <span class="cal-label">{c.label}</span>
+            <span class="cal-tag">{c.tag}</span>
+          </div>
+        ))
+      )}
+    </div>
+  </section>
+
+  {past.length > 0 && (
+    <section class="section">
+      <h2>Recently</h2>
+      <div class="card cal-card">
+        {past.map((c) => (
+          <div class="cal-row" style="opacity: 0.6;">
+            <span class="cal-dot">{tagDot(c.tag)}</span>
+            <span class="cal-date">{fmt(c.date)}</span>
+            <span class="cal-label">{c.label}</span>
+            <span class="cal-tag">{c.tag}</span>
+          </div>
+        ))}
+      </div>
+    </section>
+  )}
+
+  <style>
+    .cal-card { padding: 0; }
+    .cal-row {
+      display: grid;
+      grid-template-columns: 28px 200px 1fr 110px;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .cal-row:first-child { border-top: none; }
+    .cal-dot { font-size: 14px; }
+    .cal-date { color: var(--text-muted); white-space: nowrap; }
+    .cal-tag {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em;
+      font-weight: 700; color: var(--text-faint); text-align: right;
+    }
+    @media (max-width: 640px) {
+      .cal-row { grid-template-columns: 24px 1fr; }
+      .cal-date, .cal-tag { display: none; }
+    }
+  </style>
+</ScopedPage>

@@ -128,13 +128,14 @@ Speaker copy (≈60 sec):
 - Authority.
 - Decision.
 - Obligation.
+- Effect.
 - Receipt.
 - Evidence.
 - Review.
 
 Speaker copy (≈40 sec to recite):
 
-> "If I had to compress ICN into seven words, it'd be these. Standing. Authority. Decision. Obligation. Receipt. Evidence. Review."
+> "If I had to compress ICN into eight words, it'd be these. Standing. Authority. Decision. Obligation. Effect. Receipt. Evidence. Review."
 >
 > [Beat.]
 >
@@ -159,6 +160,10 @@ Speaker copy (≈40 sec to recite):
 **Obligation** — *a commitment created by a decision.*
 - **How it works:** obligor, obligee, scope, triggering decision, evidence-of-completion.
 - **Quick:** replaces "debt" / "liability" in ICN vocabulary. Advisor agreements, patronage allocations, federation commitments all live here.
+
+**Effect** — *the actual change in the world that a decision caused.*
+- **How it works:** the state transition (a member is admitted, an allocation lands, a bylaw is adopted) that follows from authority + decision and produces the receipt.
+- **Quick:** a decision without an effect is just talk. The effect is what makes the receipt verifiable as a real institutional event.
 
 **Receipt** — *a verifiable record that an event happened.*
 - **How it works:** signed, content-addressed, everything attached; verifiable independently of any platform.

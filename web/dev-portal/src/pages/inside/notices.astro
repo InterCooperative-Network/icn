@@ -1,0 +1,12 @@
+---
+import ScopedPage from "../../layouts/ScopedPage.astro";
+---
+<ScopedPage title="Notices" scope="staff" description="Pinned team context.">
+  <div class="stub">
+    <h2>Notices — stub</h2>
+    <p>Pinned team-facing notices. Long-form context — "this is where we are this week, here's what to read first, here's what's asked of you." Each notice is a Markdown file in <code>content/notices/</code>. The most recent N appear here, with older ones in an archive.</p>
+    <p style="margin-top: 12px; font-size: 13px; color: var(--text-muted);">
+      Notices are NOT a chat or feed — they are stable, edited, deliberately persistent. The feed at <code>/inside/feed</code> handles ephemeral activity.
+    </p>
+  </div>
+</ScopedPage>

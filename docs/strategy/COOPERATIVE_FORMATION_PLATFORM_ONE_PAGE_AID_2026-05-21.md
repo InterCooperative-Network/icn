@@ -191,7 +191,9 @@ The cooperative movement is ~180 years old. It has a corpus (Rochdale Principles
 
 ## §7 — ICN in one breath *(deck slide 7)*
 
-**On screen, seven words:** Standing. Authority. Decision. Obligation. Receipt. Evidence. Review.
+**On screen, eight words:** Standing. Authority. Decision. Obligation. Effect. Receipt. Evidence. Review.
+
+This is the canonical spine used across the repo (`NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY`, `NYCN_ORGANIZER_MEETING_ONE_PAGE_AID`, `MCKENZIE_LIVE_NOTES`). The deck recites it as one breath.
 
 **Each word, defined briefly with a co-op example:**
 
@@ -201,13 +203,14 @@ The cooperative movement is ~180 years old. It has a corpus (Rochdale Principles
 | **Authority** | Who can authorize what, under what governance. | Whether the board can approve a new committee, or whether it requires a member vote. |
 | **Decision** | A choice the institution made, under authority, with a threshold met. | The vote to admit a new member. The board resolution to engage a lawyer. |
 | **Obligation** | A commitment created by a decision. | An advisor agreement, a patronage allocation, an inter-coop trade. |
-| **Receipt** | A verifiable record that a decision happened, with everything attached. | A signed record linking the proposal, vote, threshold, and effect. |
+| **Effect** | The actual state change in the world that the decision caused. | A member is admitted. An allocation lands. A bylaw is adopted. |
+| **Receipt** | A verifiable record that a decision and its effect happened, with everything attached. | A signed record linking the proposal, vote, threshold, and effect. |
 | **Evidence** | Receipts plus their context, available to verify later. | The chain of records a new treasurer can read in 2030 to understand 2026's allocations. |
 | **Review** | The ability for someone (member, board, federation, regulator) to verify the chain. | A federation auditing a member co-op's patronage history. A new board reviewing what was decided. |
 
 **The why-this-matters sentence (in Matt's voice):** "Not because every human process should become software. Because some records need to survive turnover, without everyone reconstructing the institution from email, PDFs, and somebody's exhausted memory."
 
-**Boundary:** ICN is the substrate. It doesn't know what a *worker* co-op is or what a *Summit* is. Apps that sit on top of ICN add the domain meaning. The seven words are kernel-level primitives that apply to any democratic organization.
+**Boundary:** ICN is the substrate. It doesn't know what a *worker* co-op is or what a *Summit* is. Apps that sit on top of ICN add the domain meaning. The eight words are kernel-level primitives that apply to any democratic organization.
 
 ---
 

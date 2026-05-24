@@ -1,0 +1,33 @@
+---
+import ScopedPage from "../../layouts/ScopedPage.astro";
+import { standing } from "../../data/standing";
+
+const rows = Object.entries(standing);
+---
+<ScopedPage title="Contributors" scope="staff" description="Team directory: who holds what standing.">
+  <p style="color: var(--text-muted); max-width: 720px; margin-bottom: 20px;">
+    Who has standing on icn.zone today. Today this is the hand-maintained allowlist in <code>src/data/standing.ts</code>; eventually a view over the trust graph.
+  </p>
+  <div class="card" style="font-size: 13px;">
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr style="border-bottom: 1px solid var(--border); text-align: left;">
+          <th style="padding: 6px;">GitHub login</th>
+          <th style="padding: 6px;">Contributor</th>
+          <th style="padding: 6px;">Coop member</th>
+          <th style="padding: 6px;">Steward</th>
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map(([login, g]) => (
+          <tr style="border-bottom: 1px solid var(--border);">
+            <td style="padding: 6px;"><a href={`https://github.com/${login}`}>@{login}</a></td>
+            <td style="padding: 6px;">{g.contributor ? "✓" : "—"}</td>
+            <td style="padding: 6px;">{g.cooperativeMember?.join(", ") ?? "—"}</td>
+            <td style="padding: 6px;">{g.steward?.join(", ") ?? "—"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</ScopedPage>

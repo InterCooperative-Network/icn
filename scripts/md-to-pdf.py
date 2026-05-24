@@ -2,7 +2,19 @@
 """Render a markdown file to a print-styled PDF via headless Chrome.
 
 Usage: md-to-pdf.py <input.md> <output.pdf>
-Writes an intermediate <output>.rendered.html alongside the PDF.
+
+Writes an intermediate file next to the output PDF named
+``<output-stem>.rendered.html`` (e.g. ``foo.pdf`` -> ``foo.rendered.html``).
+
+Browser discovery:
+  - The ``CHROME`` or ``CHROME_BIN`` env var, if set, takes precedence.
+  - Otherwise ``shutil.which`` searches PATH for: ``chrome``, ``google-chrome``,
+    ``google-chrome-stable``, ``chromium``, ``chromium-browser``, ``msedge``.
+  - Otherwise common per-OS install paths are tried as a last resort.
+
+Security:
+  - ``--no-sandbox`` is OFF by default. Set ``MD_TO_PDF_NO_SANDBOX=1`` to enable
+    it for constrained CI environments where sandboxing is unavailable.
 """
 import os
 import shutil
@@ -22,10 +34,10 @@ except ImportError:
 def resolve_chrome() -> str:
     """Resolve a Chrome / Chromium executable across Linux, macOS, Windows.
 
-    Order: $CHROME_BIN env var, then PATH lookup for common names, then a
-    handful of well-known install locations as a last resort.
+    Order: $CHROME or $CHROME_BIN env var, then PATH lookup for common names,
+    then a handful of well-known install locations as a last resort.
     """
-    if env := os.environ.get("CHROME_BIN"):
+    if env := os.environ.get("CHROME") or os.environ.get("CHROME_BIN"):
         if Path(env).exists():
             return env
     for name in (
@@ -41,19 +53,23 @@ def resolve_chrome() -> str:
     well_known = [
         r"C:\Program Files\Google\Chrome\Application\chrome.exe",
         r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
+        r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+        r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
         "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
         "/Applications/Chromium.app/Contents/MacOS/Chromium",
+        "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+        "/usr/bin/google-chrome",
+        "/usr/bin/chromium",
+        "/usr/bin/chromium-browser",
+        "/snap/bin/chromium",
     ]
     for candidate in well_known:
         if Path(candidate).exists():
             return candidate
     sys.exit(
         "md-to-pdf.py: no Chrome/Chromium found. "
-        "Set CHROME_BIN or install Chrome and put it on PATH."
+        "Set CHROME or CHROME_BIN, or install Chrome and put it on PATH."
     )
-
-
-CHROME = resolve_chrome()
 
 CSS = """
 :root {
@@ -153,7 +169,7 @@ def render(md_path: Path, pdf_path: Path) -> None:
 
     # Use forward-slash URI; Chrome on Windows accepts file:/// + UNC via file://wsl.localhost/...
     file_url = "file:///" + str(html_path.resolve()).replace("\\", "/")
-    cmd = [CHROME, "--headless", "--disable-gpu"]
+    cmd = [resolve_chrome(), "--headless", "--disable-gpu"]
     if os.environ.get("MD_TO_PDF_NO_SANDBOX") == "1":
         cmd.append("--no-sandbox")
     cmd.extend([

@@ -24,7 +24,7 @@ ICN is a peer-to-peer coordination substrate that lets cooperatives and communit
 
 | Metric | Value |
 |--------|-------|
-| Rust codebase | 451K lines, 34 crates |
+| Rust codebase | 44 workspace members (37 crates, 4 apps, 3 binaries) |
 | Test suite | 5,933 passing tests |
 | API surface | 70+ REST endpoints |
 | Demo flows | 4 (governance, patronage, federation, reporting) |

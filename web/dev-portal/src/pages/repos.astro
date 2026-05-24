@@ -1,0 +1,48 @@
+---
+import ScopedPage from "../layouts/ScopedPage.astro";
+import RepoCard from "../components/RepoCard.astro";
+import { repos, mergeOrder } from "../data/repos";
+---
+<ScopedPage title="Repos" scope="public" description="Cross-repo orientation across the ICN org.">
+  <p style="color: var(--text-muted); max-width: 720px; margin-bottom: 24px;">
+    The InterCooperative Network spans four repositories under the <a href="/org">InterCooperative-Network</a> GitHub org. The canonical substrate lives in <code>icn</code>; the others are downstream applications, learning material, and community utilities.
+  </p>
+
+  <section class="section">
+    <div class="repo-stack" style="max-width: 720px;">
+      {repos.map((r) => <RepoCard repo={r} />)}
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Cross-repo discipline</h2>
+    <div class="card">
+      <strong>Merge order:</strong> <code>{mergeOrder}</code>
+      <p style="margin-top: 8px; font-size: 13px; color: var(--text-muted);">
+        Primitives land in <code>icn</code> first. Institution-specific applications (NYCN and similar) consume those primitives. Teaching material reflects what has shipped. Out-of-order merges create teaching that describes something that does not exist, or application behavior whose primitive moved underneath it.
+      </p>
+      <p style="margin-top: 8px; font-size: 13px;">
+        Full discipline: <a href="https://github.com/InterCooperative-Network/icn/blob/main/ops/coordination/PR_STACK_PROTOCOL.md"><code>ops/coordination/PR_STACK_PROTOCOL.md</code></a>
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Truth and confidentiality per repo</h2>
+    <div class="card" style="font-size: 13px;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <thead>
+          <tr style="border-bottom: 1px solid var(--border); text-align: left;">
+            <th style="padding: 6px;">Repo</th><th style="padding: 6px;">Truth class</th><th style="padding: 6px;">What lives here that's not elsewhere</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px;"><code>icn</code></td><td style="padding: 6px;">Public, canonical</td><td style="padding: 6px;">The substrate itself. Public claims ground here.</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px;"><code>nycn</code></td><td style="padding: 6px;">Private, app-canonical</td><td style="padding: 6px;">Institution-specific decisions, member models, organizing flows.</td></tr>
+          <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px;"><code>icn-learn</code></td><td style="padding: 6px;">Private, derivative</td><td style="padding: 6px;">Curriculum, exercises. Re-derives from <code>icn</code>/<code>nycn</code>.</td></tr>
+          <tr><td style="padding: 6px;"><code>icn-community-bridge</code></td><td style="padding: 6px;">Private, operational</td><td style="padding: 6px;">Bridge config and policy. Operational only.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+</ScopedPage>

@@ -1,0 +1,8 @@
+---
+import { scopeLabel, scopeTone, type Scope } from "../lib/scope-policy";
+interface Props {
+  scope: Scope;
+}
+const { scope } = Astro.props;
+---
+<span class={`scope-badge ${scopeTone(scope)}`}>{scopeLabel(scope)}</span>

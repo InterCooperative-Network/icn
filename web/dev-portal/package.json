@@ -1,0 +1,25 @@
+{
+  "name": "icn-zone",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "icn.zone — shortlink hub, public dev landing, and authenticated coordination space for the InterCooperative Network",
+  "scripts": {
+    "dev": "astro dev",
+    "start": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "astro": "astro",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "@astrojs/check": "^0.9.6",
+    "@astrojs/node": "^9.0.0",
+    "astro": "^5.16.5",
+    "typescript": "^5.8.3"
+  },
+  "devDependencies": {
+    "prettier": "^3.0.0",
+    "prettier-plugin-astro": "^0.12.0"
+  }
+}

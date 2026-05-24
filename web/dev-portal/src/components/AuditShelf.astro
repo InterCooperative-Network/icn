@@ -1,0 +1,50 @@
+---
+import { tail } from "../lib/audit";
+import type { Identity, Scope } from "../lib/scope-policy";
+
+interface Props {
+  identity: Identity;
+  scope: Scope;
+  resource: string;
+}
+const { identity, scope, resource } = Astro.props;
+
+// Don't render the shelf on public pages — public scope doesn't emit per-actor
+// receipts, so there's nothing to render. Public is the nerd-surface default.
+const renderShelf = scope !== "public";
+
+const receipts = renderShelf
+  ? tail({ actor: identity, resource, limit: 5 })
+  : [];
+
+function fmt(iso: string) {
+  return new Date(iso).toLocaleString();
+}
+function actorLabel(a: Identity) {
+  if (a.kind === "github") return `@${a.login}`;
+  return "anonymous";
+}
+---
+{renderShelf && (
+  <aside class="audit-shelf">
+    <header>Audit shelf — your recent access to this page</header>
+    {receipts.length === 0 ? (
+      <p style="margin:0; color: var(--text-faint); font-style: italic;">No prior visits recorded.</p>
+    ) : (
+      receipts.map((r) => (
+        <div class="row" style="display:flex; gap:14px; justify-content: space-between;">
+          <span class="mono">{actorLabel(r.actor)}</span>
+          <span class={`scope-badge ${r.decision === "allow" ? "info" : "critical"}`}>{r.decision}</span>
+          <span>{r.authority?.rule ?? r.reason ?? "—"}</span>
+          <span class="muted">{fmt(r.recorded_at)}</span>
+          <span class="faint mono" title="receipt hash">{r.receipt_hash.slice(0, 10)}</span>
+        </div>
+      ))
+    )}
+    <p style="margin: 10px 0 0; font-size: 11px;">
+      Interim implementation: receipts are written to <code>runtime/access.log</code>.
+      Future: ADR-0026 receipts in the gateway's opaque receipt store.
+      See <a href="https://github.com/InterCooperative-Network/icn/blob/main/web/dev-portal/content/scope-doctrine.md">scope doctrine</a>.
+    </p>
+  </aside>
+)}

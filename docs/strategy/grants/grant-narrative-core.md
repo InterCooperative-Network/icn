@@ -68,7 +68,7 @@ This separation has three consequences:
 
 ICN is not a whitepaper project. It is a working system:
 
-- **451,000 lines of Rust** across 34 crates in a single workspace
+- **44 workspace members** (37 library crates, 4 apps, 3 binaries) in a single Rust workspace
 - **5,933 passing tests** including integration tests and a full vertical slice test
 - **70+ REST API endpoints** for governance, mutual credit, federation, and receipts
 - **4 demo flows** demonstrating governance, patronage distribution, federation agreements, and institutional reporting

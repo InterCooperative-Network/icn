@@ -112,3 +112,4 @@ icn-wt/
 
 # Session scratch artifacts
 .tmp/
+.cw/

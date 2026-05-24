@@ -1,0 +1,33 @@
+---
+import ScopedPage from "../layouts/ScopedPage.astro";
+import PhaseRail from "../components/PhaseRail.astro";
+import { phase2Gates } from "../data/phases";
+---
+<ScopedPage title="Roadmap" scope="public" description="Phase-level roadmap. Strategic trajectory and month-level next phases.">
+  <p style="color: var(--text-muted); max-width: 720px; margin-bottom: 24px;">
+    Strategic phase trajectory. Each strategic phase aggregates many implementation phases. Public view; the inside dashboard has the team-specific overlay.
+  </p>
+
+  <section class="section">
+    <h2>Strategic position</h2>
+    <PhaseRail />
+  </section>
+
+  <section class="section">
+    <h2>Phase 2 closure gates</h2>
+    <div class="card">
+      {phase2Gates.map((g) => (
+        <div style="display: flex; align-items: flex-start; gap: 10px; padding: 4px 0;">
+          <span style="display: inline-block; width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid var(--border-strong); margin-top: 3px; flex-shrink: 0;"></span>
+          <span>{g}</span>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <div class="stub">
+    <h2>More coming</h2>
+    <p>Mermaid Gantt of Phases 0–4 with date overlays; clickable per-phase deep-dives; auto-rendered from <code>docs/PHASE_PROGRESS.md</code> + <code>docs/PHASE_HISTORY.md</code> at build time.</p>
+    <p style="margin-top: 16px;"><a href="/phase" class="btn">Read phase progress →</a></p>
+  </div>
+</ScopedPage>

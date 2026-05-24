@@ -1,0 +1,38 @@
+---
+import ScopedPage from "../layouts/ScopedPage.astro";
+import { health, statusColor } from "../data/health";
+---
+<ScopedPage title="Project health" scope="public" description="Cross-cutting project-health metrics for ICN.">
+  <p style="color: var(--text-muted); max-width: 720px;">
+    The traffic-light view of where the project is right now. Each metric is a live read against the underlying system (when wiring lands); today they're hand-edited in <code>src/data/health.ts</code>.
+  </p>
+
+  <section class="section">
+    <div class="health-grid">
+      {health.map((m) => {
+        const c = statusColor(m.status);
+        return (
+          <a class="health-tile" href={m.href ?? "#"} style={`background: ${c.bg}; color: ${c.fg};`}>
+            <div class="ht-label">{m.label}</div>
+            <div class="ht-primary"><span style="opacity: 0.7;">{c.dot}</span> {m.primary}</div>
+            {m.secondary && <div class="ht-secondary">{m.secondary}</div>}
+          </a>
+        );
+      })}
+    </div>
+  </section>
+
+  <div class="stub">
+    <h2>More coming</h2>
+    <p>Live readouts from: GitHub Actions API (CI), GitHub REST (open PRs / issues), K3s status relay (deploy), Dependabot REST (vuln counts), Project board GraphQL (work in flight). Each metric becomes click-through to the underlying source.</p>
+  </div>
+
+  <style>
+    .health-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 24px; }
+    .health-tile { display: block; padding: 16px; border-radius: 8px; text-decoration: none; border: 1px solid var(--border); }
+    .health-tile:hover { transform: translateY(-1px); text-decoration: none; }
+    .ht-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; font-weight: 700; opacity: 0.7; }
+    .ht-primary { font-size: 19px; font-weight: 600; margin-top: 6px; }
+    .ht-secondary { font-size: 12px; margin-top: 4px; opacity: 0.75; }
+  </style>
+</ScopedPage>

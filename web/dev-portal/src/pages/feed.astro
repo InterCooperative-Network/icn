@@ -1,0 +1,15 @@
+---
+import ScopedPage from "../layouts/ScopedPage.astro";
+---
+<ScopedPage title="Feed" scope="public" description="Public activity stream — merged PRs, commits, discussions.">
+  <div class="stub">
+    <h2>Public Feed — stub</h2>
+    <p>This page renders recent activity from the <code>icn</code> public repo: merged PRs, recent commits to <code>main</code>, public GitHub Discussions threads, and CI runs on <code>main</code>.</p>
+    <p style="margin-top: 12px; font-size: 13px; color: var(--text-muted);">
+      Data source: GitHub REST API (cached briefly server-side). The inside Feed (under <code>/inside/feed</code>) extends this with private-repo activity for signed-in staff.
+    </p>
+    <p style="margin-top: 16px;">
+      <a href="/prs" class="btn">Open PRs on GitHub →</a>
+    </p>
+  </div>
+</ScopedPage>

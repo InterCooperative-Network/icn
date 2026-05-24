@@ -1,0 +1,12 @@
+---
+import ScopedPage from "../../layouts/ScopedPage.astro";
+---
+<ScopedPage title="Standups" scope="staff" description="Async written team updates.">
+  <div class="stub">
+    <h2>Standups — stub</h2>
+    <p>Async written standups. Each contributor posts a short text update — what landed, what's blocking, what's next — keyed by date. Persistent, searchable, no editing pressure.</p>
+    <p style="margin-top: 12px; font-size: 13px; color: var(--text-muted);">
+      Storage: Markdown files in <code>content/standups/&lt;login&gt;/&lt;date&gt;.md</code> committed to the repo via a small POST endpoint. No external database needed at the team's current scale.
+    </p>
+  </div>
+</ScopedPage>

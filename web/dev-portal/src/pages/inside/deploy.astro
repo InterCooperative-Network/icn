@@ -1,0 +1,12 @@
+---
+import ScopedPage from "../../layouts/ScopedPage.astro";
+---
+<ScopedPage title="Deploy" scope="steward" description="K3s cluster status. Steward scope.">
+  <div class="stub">
+    <h2>Deploy — stub (steward scope)</h2>
+    <p>K3s cluster status: deployed image SHA, pod health, recent smoke-test runs, deploy makefile log. Pulls from the cluster's API (or a small status-relay endpoint).</p>
+    <p style="margin-top: 12px; font-size: 13px; color: var(--text-muted);">
+      Steward scope. Access leaves an audit receipt visible to all stewards. The receipt's <code>authority</code> is the steward grant in <code>src/data/standing.ts</code> today; eventually a CCL clause.
+    </p>
+  </div>
+</ScopedPage>

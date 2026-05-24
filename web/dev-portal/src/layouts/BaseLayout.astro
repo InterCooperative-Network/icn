@@ -1,0 +1,40 @@
+---
+import "../styles/global.css";
+import Nav from "../components/Nav.astro";
+import type { Identity } from "../lib/scope-policy";
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description } = Astro.props;
+const identity = Astro.locals.identity ?? ({ kind: "anonymous" } as Identity);
+const pathname = new URL(Astro.request.url).pathname;
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>{title} · icn.zone</title>
+{description && <meta name="description" content={description} />}
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%2310b981'/%3E%3Ctext x='32' y='42' font-family='ui-monospace,Menlo' font-size='32' font-weight='700' text-anchor='middle' fill='white'%3Ez%3C/text%3E%3C/svg%3E" />
+</head>
+<body>
+<Nav identity={identity} current={pathname} />
+<main>
+  <slot />
+</main>
+<footer class="site-footer">
+  <div class="inner">
+    <span>icn.zone — short for the software · <a href="https://intercooperative.network">intercooperative.network</a> for the explanation</span>
+    <span>
+      <a href="https://github.com/InterCooperative-Network/icn/blob/main/web/dev-portal/content/scope-doctrine.md">scope doctrine</a>
+      {" · "}
+      <a href="https://github.com/InterCooperative-Network/icn">source</a>
+    </span>
+  </div>
+</footer>
+</body>
+</html>

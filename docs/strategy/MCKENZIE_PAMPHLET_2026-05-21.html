@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ICN — A Substrate for What Survives After Formation</title>
+<style>
+  @page { size: letter; margin: 0.6in 0.7in; }
+  :root {
+    --ink: #0e1116;
+    --soft: #4a5160;
+    --rule: #c8c9cc;
+    --accent: #2c4a73;
+    --paper: #ffffff;
+    --tint: #f4f1ea;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--paper); color: var(--ink); }
+  body {
+    font-family: "Charter", "Iowan Old Style", "Georgia", "Source Serif Pro", serif;
+    font-size: 11pt;
+    line-height: 1.42;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .page {
+    max-width: 7.1in;
+    margin: 0 auto;
+    padding: 0.25in 0;
+  }
+  .page + .page { page-break-before: always; }
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding-bottom: 8px;
+    margin-bottom: 18px;
+  }
+  .masthead-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+    font-size: 9.5pt; color: var(--soft); letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+  .masthead-title {
+    font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 700; font-size: 22pt; margin-top: 6px; color: var(--ink); letter-spacing: -0.01em;
+  }
+  .masthead-subtitle { color: var(--soft); font-size: 11pt; margin-top: 3px; font-style: italic; }
+  h2 {
+    font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 700; font-size: 12pt; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--accent);
+    margin: 18px 0 6px; padding-bottom: 2px;
+    border-bottom: 1px solid var(--rule);
+  }
+  h3 {
+    font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 600; font-size: 10.5pt; color: var(--ink);
+    margin: 12px 0 3px; letter-spacing: 0.01em;
+  }
+  p { margin: 0 0 9px; }
+  ul { margin: 0 0 9px; padding-left: 1.1em; }
+  li { margin-bottom: 3px; }
+  blockquote {
+    margin: 8px 0 12px;
+    padding: 8px 14px;
+    border-left: 3px solid var(--accent);
+    background: var(--tint);
+    font-style: italic;
+    color: var(--ink);
+    font-size: 10.5pt;
+  }
+  blockquote cite { display: block; font-style: normal; font-size: 9pt; color: var(--soft); margin-top: 4px; }
+  .lede {
+    font-size: 12pt; line-height: 1.5; color: var(--ink);
+  }
+  .lede em { font-style: italic; }
+  .seam {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 0;
+    border: 1px solid var(--rule); margin: 8px 0 12px;
+    font-size: 10pt;
+  }
+  .seam > div { padding: 7px 10px; }
+  .seam .h { background: var(--tint); font-family: "Inter", sans-serif; font-weight: 600; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); }
+  .seam > div + div { border-left: 1px solid var(--rule); }
+  .seam > div.row { border-top: 1px solid var(--rule); }
+  .not-list { columns: 2; column-gap: 22px; font-size: 10pt; }
+  .not-list li { break-inside: avoid; }
+  .footer-rule { border-top: 1px solid var(--rule); margin-top: 16px; padding-top: 8px; font-size: 9.5pt; color: var(--soft); }
+  .kicker { font-family: "Inter", sans-serif; font-weight: 600; font-size: 9pt; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); }
+  .kvtable { width: 100%; border-collapse: collapse; font-size: 10pt; margin-top: 4px; }
+  .kvtable td { padding: 4px 6px; vertical-align: top; border-bottom: 1px solid var(--rule); }
+  .kvtable td:first-child { font-family: "Inter", sans-serif; font-weight: 600; width: 28%; color: var(--accent); }
+  code { font-family: "JetBrains Mono", "Menlo", monospace; font-size: 9.5pt; background: var(--tint); padding: 1px 4px; border-radius: 2px; }
+  @media print {
+    .page { padding: 0; }
+  }
+</style>
+</head>
+<body>
+
+<section class="page">
+  <header class="masthead">
+    <div class="masthead-row">
+      <span>ICN · Intercooperative Network</span>
+      <span>For McKenzie · 2026-05-21</span>
+    </div>
+    <div class="masthead-title">A substrate for what survives after formation.</div>
+    <div class="masthead-subtitle">Standing, authority, decisions, allocations, and the layer of cooperative memory that has to survive every handoff after formation.</div>
+  </header>
+
+  <p class="lede">
+    Launch makes cooperative formation <em>doable</em>. ICN is asking the next layer of question: once those steps become real institutional facts, how does the co-op remember them — across founder rotations, advisor handoffs, fiscal years, and the inevitable platform migration?
+  </p>
+
+  <h2>What ICN is</h2>
+  <p>
+    ICN is a substrate daemon for cooperative coordination. It's not a SaaS app, not a blockchain, not a payment system, and not a replacement for the work Launch is doing. It's a constraint enforcement engine that a cooperative (or federation of cooperatives) runs on its own infrastructure, with records signed in a way an outside party — a future board, a CPA, an auditor, a buyer of a member's interest — can verify later <em>without trusting us</em>.
+  </p>
+  <p>
+    The architecture has a deliberate firewall: cooperative meaning (trust, governance rules, membership criteria, patronage allocation logic) lives in apps that the cooperative governs. The kernel enforces constraints blindly. This keeps the substrate predictable while leaving the meaning under democratic control.
+  </p>
+
+  <h2>The spine — formation to durable governance</h2>
+  <div class="seam">
+    <div class="h">Launch surface (today)</div>
+    <div class="h">ICN substrate question</div>
+    <div class="row">Founding team / co-founders</div>
+    <div class="row">Who has standing?</div>
+    <div class="row">Roles / advisor relationship</div>
+    <div class="row">Who can act, review, certify?</div>
+    <div class="row">Governance doc drafted</div>
+    <div class="row">Under whose authority?</div>
+    <div class="row">Task / milestone completed</div>
+    <div class="row">What receipt of that effect survives?</div>
+    <div class="row">Service provider engaged</div>
+    <div class="row">What obligation crosses the boundary?</div>
+    <div class="row"><strong>Patronage / capital-account record</strong></div>
+    <div class="row"><strong>What is governance evidence vs. accounting?</strong></div>
+    <div class="row">Launch → operating co-op handoff</div>
+    <div class="row">What standing / authority carries forward?</div>
+  </div>
+
+  <h2>Where ICN actually has substrate</h2>
+  <ul>
+    <li><strong>Mutual credit ledger</strong> with double-entry journaling, append-only, signed entries, vector-clock-ordered. The state-change journal a co-op's CPA or board could verify years later.</li>
+    <li><strong>Receipt envelopes</strong> for every state transition (ADR-0026). Every governance decision, every allocation, every standing change leaves a verifiable artifact.</li>
+    <li><strong>Vocabulary discipline</strong> — settlement, obligation, allocation, position, receipt, provenance, evidence. The substrate avoids financial-product semantics by design.</li>
+  </ul>
+
+  <div class="footer-rule">
+    <span class="kicker">Page 1 / 2</span> · Research-stage substrate, not production software. Continues overleaf.
+  </div>
+</section>
+
+<section class="page">
+  <header class="masthead">
+    <div class="masthead-row">
+      <span>Intercooperative Network</span>
+      <span>Page 2 / 2</span>
+    </div>
+  </header>
+
+  <h2>What ICN is <em>not</em></h2>
+  <p>These are commitments, not modesty.</p>
+  <ul class="not-list">
+    <li>Not accounting software.</li>
+    <li>Not a payment app or wallet.</li>
+    <li>Not a money transmitter.</li>
+    <li>Not a bank or financial intermediary.</li>
+    <li>Not a Launch replacement.</li>
+    <li>Not a replacement for lawyers, CPAs, bookkeepers, or co-op developers.</li>
+    <li>Not a blockchain or token system.</li>
+    <li>Not production-ready.</li>
+    <li>Not externally audited.</li>
+    <li>Not a formal pilot.</li>
+  </ul>
+  <p>
+    A receipt is not a legitimacy claim. Receipts prove that an event happened with the signatures attached; legitimacy comes from the cooperative's own process — who had standing, who held authority, what the governance document said. The receipt is just the part that survives.
+  </p>
+
+  <h2>What this conversation is for</h2>
+  <p>
+    A reciprocal conversation. I want to learn more about Launch's workflow and ecosystem, share enough of the ICN shape to make the question intelligible, and find out where the map is wrong. Specific interest, from your May 1 email: patronage and capital-account history as institutional memory that survives founder rotation and advisor handoffs.
+  </p>
+  <p>The most useful outcome would be one of three things:</p>
+  <ul>
+    <li>A <strong>sanitized rehearsal scenario</strong> — a fictional five-member worker co-op, one allocation cycle, one disputed entry — that we walk through together to test whether the seam holds.</li>
+    <li>A <strong>"not yet"</strong> with specifics about what would need to be true for the seam to be worth working.</li>
+    <li>A <strong>handoff to others</strong> — a CPA, co-op lawyer, federation organizer, or co-op developer whose perspective should be in the room before the conversation goes further.</li>
+  </ul>
+
+  <h2>Project state, plainly</h2>
+  <table class="kvtable">
+    <tr><td>Substrate</td><td>~75% of planned kernel + apps implemented (~272K lines of Rust, ~2,300 tests). Daemon runs on a small K3s cluster since December 2025.</td></tr>
+    <tr><td>What works today</td><td>Identity, mutual credit ledger, gossip / sync, governance primitives, receipt envelopes, trust graph, the constraint engine.</td></tr>
+    <tr><td>What does not exist yet</td><td>The human-facing surfaces a member would use. No production member app, no steward dashboard, no live federation. All UX is still rehearsal-stage.</td></tr>
+    <tr><td>Fiscal sponsor</td><td>Alchemical Nursery (active). Comparing to Open Source Collective for the larger-grant horizon.</td></tr>
+    <tr><td>Maintainer</td><td>One — Matt Faherty. Honest bus-factor constraint; broadening is part of why this conversation is happening.</td></tr>
+    <tr><td>License</td><td>Open source. Documentation under CC-BY-SA where grant-required.</td></tr>
+  </table>
+
+  <h2>Where to look if you want to look</h2>
+  <table class="kvtable">
+    <tr><td>icn.zone</td><td>Project landing + operator-facing pages (Treasury, Repos, Calendar, Roadmap).</td></tr>
+    <tr><td>github.com/InterCooperative-Network</td><td>Source, issues, roadmap project board, organization profile.</td></tr>
+    <tr><td>Architecture</td><td><code>docs/architecture/KERNEL_APP_SEPARATION.md</code> — the meaning firewall, in prose.</td></tr>
+    <tr><td>Receipts &amp; legitimacy</td><td><code>docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md</code> — why a receipt is not a legitimacy claim.</td></tr>
+    <tr><td>Reference institution</td><td><code>docs/strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md</code> — the Summit as ICN's reference cooperative ecosystem.</td></tr>
+  </table>
+
+  <h2>One ask</h2>
+  <p>
+    If any of this is real to you: tell me about one cooperative project you've been part of where the patronage or internal-capital-account record broke, or didn't survive a handoff, or couldn't be trusted later. Names and numbers stripped — just the shape of what didn't work. That shape is what would tell us whether there's a rehearsal worth doing together.
+  </p>
+
+  <div class="footer-rule">
+    Matt Faherty · matt.faherty@gmail.com · github.com/InterCooperative-Network · icn.zone
+  </div>
+</section>
+
+</body>
+</html>

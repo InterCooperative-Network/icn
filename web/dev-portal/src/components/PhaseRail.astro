@@ -1,0 +1,13 @@
+---
+import { strategicPhases } from "../data/phases";
+---
+<div class="phase-rail">
+  {strategicPhases.map((p) => (
+    <div class={`phase-cell ${p.status}`}>
+      {p.status === "active" && <span class="you-are-here">You are here</span>}
+      <div class="label">Phase {p.num}</div>
+      <div class="name">{p.name}</div>
+      <div class="caption">{p.caption}</div>
+    </div>
+  ))}
+</div>

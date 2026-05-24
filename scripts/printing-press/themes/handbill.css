@@ -1,0 +1,67 @@
+/* ============================================================
+   THEME: handbill
+   Use for: single-page (or tight) call-to-action / event /
+   one-pager handouts. Larger type, more whitespace, hierarchy
+   tuned for posting on a bulletin board or tabling. Bold red
+   accent. Optimized for printing in black + one ink if you ever
+   send it to a print shop.
+   ============================================================ */
+
+:root {
+  --body-font: Georgia, 'Charter', 'Iowan Old Style', serif;
+  --header-font: 'Impact', 'Helvetica Neue Condensed', 'Arial Black', 'Arial Narrow', sans-serif;
+  --mono-font: 'Consolas', 'Menlo', monospace;
+  --body-leading: 1.55;
+  --page-margin: 0.8in;
+
+  /* Color palette: Cherry Bold — high-impact, agitprop energy */
+  --ink: #1A1A1A;
+  --ink-soft: #444444;
+  --ink-faint: #888888;
+  --paper: #FCF6F5;
+  --accent: #990011;          /* cherry */
+  --accent-dark: #66000B;
+  --rule: #D4C4C5;
+  --rule-strong: #1A1A1A;
+  --quote-bg: #F7E6E8;
+  --callout-bg: #F7E6E8;
+  --code-bg: #EFE5E6;
+  --table-bg: #FFFFFF;
+  --table-header-bg: #F7E6E8;
+
+  --cover-title-size: 6.0rem;
+  --cover-title-weight: 900;
+}
+
+html { font-size: 13pt; }   /* bigger base type for handbills */
+
+/* Handbill details: louder headers, tighter letterspacing */
+h1 {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  font-size: 2.6rem;
+}
+h2 {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 900;
+  color: var(--accent-dark);
+}
+h3 {
+  font-family: var(--header-font);
+  font-weight: 700;
+}
+
+.cover h1 {
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.cover .eyebrow {
+  color: var(--accent-dark);
+  font-weight: 900;
+}
+
+blockquote {
+  border-left-width: 5px;
+  font-size: 1.1rem;
+}

@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ICN — State Packet — May 2026</title>
+<style>
+  @page { size: letter; margin: 0.55in 0.65in; }
+  :root {
+    --ink: #0e1116;
+    --soft: #4a5160;
+    --rule: #c8c9cc;
+    --accent: #2c4a73;
+    --warn: #8a4a1f;
+    --good: #2f6b3f;
+    --tint: #f4f1ea;
+    --tint2: #eef1f5;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: var(--ink); }
+  body {
+    font-family: "Charter", "Iowan Old Style", "Georgia", serif;
+    font-size: 10.5pt;
+    line-height: 1.38;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .page { max-width: 7.2in; margin: 0 auto; padding: 0.2in 0; }
+  .page + .page { page-break-before: always; }
+  .masthead { border-bottom: 2px solid var(--ink); padding-bottom: 6px; margin-bottom: 12px; }
+  .masthead-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+    font-size: 9pt; color: var(--soft); letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .masthead-title {
+    font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+    font-weight: 700; font-size: 19pt; margin-top: 4px; letter-spacing: -0.01em;
+  }
+  .masthead-subtitle { color: var(--soft); font-size: 10.5pt; font-style: italic; margin-top: 2px; }
+  h2 {
+    font-family: "Inter", sans-serif; font-weight: 700; font-size: 11pt;
+    text-transform: uppercase; letter-spacing: 0.07em; color: var(--accent);
+    margin: 14px 0 5px; padding-bottom: 2px; border-bottom: 1px solid var(--rule);
+  }
+  h3 {
+    font-family: "Inter", sans-serif; font-weight: 600; font-size: 10pt;
+    color: var(--ink); margin: 9px 0 3px;
+  }
+  p { margin: 0 0 7px; }
+  ul, ol { margin: 0 0 8px; padding-left: 1.1em; }
+  li { margin-bottom: 2px; }
+  .kicker { font-family: "Inter", sans-serif; font-weight: 600; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); }
+  .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .threecol { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .card { border: 1px solid var(--rule); padding: 9px 11px; }
+  .card h3 { margin-top: 0; }
+  table.kv { width: 100%; border-collapse: collapse; font-size: 10pt; }
+  table.kv td { padding: 4px 6px; vertical-align: top; border-bottom: 1px solid var(--rule); }
+  table.kv td:first-child { font-family: "Inter", sans-serif; font-weight: 600; width: 30%; color: var(--accent); }
+  blockquote { margin: 6px 0 10px; padding: 6px 12px; border-left: 3px solid var(--accent); background: var(--tint); font-style: italic; font-size: 10pt; }
+  blockquote cite { display: block; font-style: normal; font-size: 8.5pt; color: var(--soft); margin-top: 3px; }
+  code { font-family: "JetBrains Mono", "Menlo", monospace; font-size: 9pt; background: var(--tint); padding: 1px 4px; border-radius: 2px; }
+  .pill { display: inline-block; font-family: "Inter", sans-serif; font-size: 8.5pt; padding: 1px 6px; border-radius: 8px; }
+  .pill-good { background: #dfeede; color: var(--good); }
+  .pill-warn { background: #f7e8d6; color: var(--warn); }
+  .pill-neutral { background: var(--tint2); color: var(--accent); }
+  .footer-rule { border-top: 1px solid var(--rule); margin-top: 14px; padding-top: 6px; font-size: 9pt; color: var(--soft); }
+  .seemore { font-size: 9pt; color: var(--soft); font-style: italic; margin-top: 2px; }
+  .seemore code { font-size: 8.5pt; }
+  ul.tight { margin-bottom: 4px; }
+  ul.tight li { margin-bottom: 1px; }
+  hr { border: none; border-top: 1px solid var(--rule); margin: 10px 0; }
+</style>
+</head>
+<body>
+
+<!-- ============== PAGE 1: PROJECT STATE ============== -->
+<section class="page">
+  <header class="masthead">
+    <div class="masthead-row">
+      <span>Intercooperative Network</span>
+      <span>Snapshot · 2026-05-20</span>
+    </div>
+    <div class="masthead-title">ICN · where it stands.</div>
+    <div class="masthead-subtitle">Substrate for cooperative coordination. Research stage, single maintainer, running on a small K3s cluster since December 2025. Not a SaaS app, not a blockchain, not production.</div>
+  </header>
+
+  <h2>One-paragraph project frame</h2>
+  <p>
+    <strong>ICN (Intercooperative Network)</strong> is a substrate daemon for the cooperative internet — a constraint enforcement engine that cooperatives, communities, and federations run on their own infrastructure to coordinate without central servers. The core architectural commitment is the <strong>meaning firewall</strong>: apps (governance, ledger, membership) translate domain meaning into generic constraints, and the kernel enforces those constraints without understanding what they mean. This keeps the substrate predictable while leaving cooperative meaning under democratic control.
+  </p>
+
+  <h2>State at a glance</h2>
+  <table class="kv">
+    <tr><td>Live deployment</td><td>Daemon, gateway, and observability stack running on a small K3s cluster since 2025-12-03. Pilot is internal — synthetic load and correctness, not yet a real cooperative.</td></tr>
+    <tr><td>Architecture invariants</td><td>The meaning firewall is enforced, not aspirational — kernel crates cannot import domain types, and CI catches it when they try.</td></tr>
+    <tr><td>Receipts</td><td>Every state transition produces an ADR-0026 receipt envelope. Opaque storage cascade. Signed.</td></tr>
+    <tr><td>Working primitives</td><td>Identity (DIDs, keystore, rotation, DID-TLS binding). Ledger (double-entry mutual credit). Gossip (vector clocks, anti-entropy). Network (QUIC/TLS, mDNS). Governance (proposals, voting, delegation). Trust graph + policy oracle. Constraint engine end-to-end.</td></tr>
+    <tr><td>Not yet</td><td>No member-facing UX. No steward dashboard. No live federation between independent instances. No external audit. No production secrets posture beyond the keystore.</td></tr>
+    <tr><td>Repo layout</td><td>Monorepo with the Cargo workspace at <code>icn/</code>. Domain apps separate from kernel crates. Binaries: <code>icnd</code> daemon, <code>icnctl</code> CLI, <code>icn-console</code> TUI.</td></tr>
+    <tr><td>Maintainer</td><td>One — Matt Faherty. Honest bus-factor of 1. Broadening is part of the plan, not the current state.</td></tr>
+    <tr><td>Fiscal sponsor</td><td>Alchemical Nursery (active). Open Source Collective under evaluation for the larger-grant horizon.</td></tr>
+    <tr><td>License</td><td>Open source. CC-BY-SA on docs where grant-required (NLnet condition).</td></tr>
+  </table>
+  <div class="seemore">See: <code>docs/STATE.md</code> · <code>docs/dev-journal/ROADMAP.md</code> · <code>docs/PHASE_HISTORY.md</code></div>
+
+  <h2>What's working today vs. what's not</h2>
+  <div class="twocol">
+    <div class="card">
+      <h3>Working</h3>
+      <ul class="tight">
+        <li>Identity — Ed25519 DIDs, age-encrypted keystore, key rotation, DID-TLS binding.</li>
+        <li>Mutual credit ledger — double-entry journal, signed entries, Merkle-DAG state.</li>
+        <li>Gossip — vector-clock-ordered, topic-based, anti-entropy, signed envelopes.</li>
+        <li>Network — QUIC/TLS sessions, mDNS discovery, replay guards.</li>
+        <li>Governance primitives — proposals, voting, thresholds, delegation.</li>
+        <li>Trust graph + TrustPolicyOracle — rate limiting tied to trust class.</li>
+        <li>Receipt envelopes (ADR-0026) for state transitions.</li>
+        <li>Constraint engine — apps → ConstraintSet → kernel enforcement.</li>
+        <li>K3s cluster deployment, CI/CD, observability stack (Prometheus, tracing).</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Not yet</h3>
+      <ul class="tight">
+        <li>Member-facing app (mobile or web) — design only, no production surface.</li>
+        <li>Steward / operator dashboard — wired to data, but rehearsal-stage.</li>
+        <li>Live federation between independent ICN instances — protocol designed, not exercised.</li>
+        <li>Production-grade CCL contract authoring tooling.</li>
+        <li>External security audit.</li>
+        <li>SDK polish (TypeScript SDK exists but type drift is a recurring CI issue).</li>
+        <li>Production secrets / KMS posture beyond keystore.</li>
+        <li>Documented runbooks for the pilot deployment.</li>
+        <li>Real human-facing UX for any of the eight primitive surfaces.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="seemore">See: <code>docs/strategy/ACTIVE_SPRINT.md</code> · <code>docs/strategy/GAP_ANALYSIS.md</code></div>
+
+  <h2>The eight core primitives</h2>
+  <div class="threecol">
+    <div class="card"><h3>Identity</h3><p>DIDs, Ed25519, keystore, capabilities.</p></div>
+    <div class="card"><h3>Trust Graph</h3><p>Web-of-participation; policy oracle.</p></div>
+    <div class="card"><h3>Networking</h3><p>QUIC/TLS, mDNS, kernel-side.</p></div>
+    <div class="card"><h3>Ledger</h3><p>Mutual credit, double-entry; policy oracle.</p></div>
+    <div class="card"><h3>Contracts (CCL)</h3><p>Cooperative Contract Language; policy oracle.</p></div>
+    <div class="card"><h3>Gossip</h3><p>Topics, vector clocks, kernel-side.</p></div>
+    <div class="card"><h3>Governance</h3><p>Proposals, voting, policy oracle.</p></div>
+    <div class="card"><h3>Compute</h3><p>Trust-gated task execution; policy oracle.</p></div>
+  </div>
+  <div class="seemore">See: <code>docs/ARCHITECTURE.md</code> · <code>docs/OVERVIEW.md</code></div>
+
+  <div class="footer-rule"><span class="kicker">Page 1 / 4</span> · ICN · matt.faherty@gmail.com</div>
+</section>
+
+<!-- ============== PAGE 2: ARCHITECTURE ============== -->
+<section class="page">
+  <header class="masthead">
+    <div class="masthead-row">
+      <span>Architecture — kernel / app / meaning firewall</span>
+      <span>Page 2 / 4</span>
+    </div>
+  </header>
+
+  <h2>The meaning firewall</h2>
+  <p>
+    The architectural commitment that makes everything else legible: <strong>kernel code never imports domain types</strong>. Apps translate domain meaning (trust scores, governance rules, membership criteria, patronage rules) into a generic <code>ConstraintSet</code>. The kernel sees only constraints and decisions, never the semantic origin. A trust-policy oracle, for example, computes a trust score and converts it into a rate limit + credit multiplier; the kernel enforces those limits without knowing they came from trust.
+  </p>
+  <p>
+    This means the kernel stays small and predictable, and cooperative governance can adapt the meaning layer without rewriting infrastructure. It also means apps are <em>policy oracles</em> — they answer "is this allowed, and with what shape?" without giving the kernel any reason to care why.
+  </p>
+  <div class="seemore">See: <code>docs/architecture/KERNEL_APP_SEPARATION.md</code></div>
+
+  <h2>The receipt chain</h2>
+  <p>
+    Every state transition produces a receipt envelope (ADR-0026). Receipts are signed, opaque to non-authorized readers (storage cascade), and form an audit trail. <strong>A receipt is not a legitimacy claim</strong> — it proves the event happened with the signatures attached. Legitimacy comes from the cooperative's process: who held standing, who held authority, what the governance document said. This separation is doctrinal and is documented explicitly in the abuse-case hardening strategy.
+  </p>
+  <div class="seemore">See: <code>docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md</code> · ADR-0026</div>
+
+  <h2>Bootstrap phases</h2>
+  <ol>
+    <li><strong>Genesis</strong> — AllowAllOracle active, genesis capabilities can be issued.</li>
+    <li><strong>CoreApps</strong> — First-party apps loading, trust oracle registering, others queued.</li>
+    <li><strong>Running</strong> — Deny-by-default for unknown domains; full enforcement.</li>
+  </ol>
+
+  <h2>Apps (where meaning lives)</h2>
+  <table class="kv">
+    <tr><td>governance</td><td>Proposals, voting, thresholds, delegation. PolicyOracle for governance domain.</td></tr>
+    <tr><td>ledger</td><td>Mutual credit, journal, settlement, PatronageTracker, EarningTracker.</td></tr>
+    <tr><td>membership</td><td>Standing, member roster, entity binding.</td></tr>
+    <tr><td>charter</td><td>Org lifecycle, charter docs, CCL anchoring.</td></tr>
+  </table>
+
+  <h2>Crate organization (selected)</h2>
+  <div class="twocol">
+    <div>
+      <h3>Kernel layer</h3>
+      <ul class="tight">
+        <li><code>icn-kernel-api</code> — primitive traits, no semantics.</li>
+        <li><code>icn-core</code> — runtime, supervisor, actor lifecycle.</li>
+        <li><code>icn-net</code>, <code>icn-gossip</code>, <code>icn-protocol</code> — comms substrate.</li>
+        <li><code>icn-store</code>, <code>icn-encoding</code> — persistence + serialization.</li>
+        <li><code>icn-crypto-pq</code>, <code>icn-crypto</code> — hybrid PQ crypto.</li>
+        <li><code>icn-obs</code> — Prometheus, tracing.</li>
+        <li><code>icn-gateway</code>, <code>icn-rpc</code> — REST / gRPC surface.</li>
+        <li><code>icn-authz</code>, <code>icn-naming</code>, <code>icn-time</code>, <code>icn-snapshot</code>.</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Domain / app layer</h3>
+      <ul class="tight">
+        <li><code>icn-identity</code> — DIDs, keystore.</li>
+        <li><code>icn-trust</code> — trust graph, scoring.</li>
+        <li><code>icn-ledger</code> — accounting primitives.</li>
+        <li><code>icn-ccl</code> — Cooperative Contract Language.</li>
+        <li><code>icn-governance</code>, <code>icn-coop</code>, <code>icn-community</code>, <code>icn-entity</code>.</li>
+        <li><code>icn-federation</code> — inter-coop coordination.</li>
+        <li><code>icn-steward</code>, <code>icn-zkp</code> — SDIS layer.</li>
+        <li><code>icn-privacy</code>, <code>icn-security</code> — privacy + Byzantine detection.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="seemore">See: <code>docs/planning/CRATE_REFERENCE.md</code> · <code>docs/ARCHITECTURE.md</code></div>
+
+  <h2>Vocabulary discipline</h2>
+  <p>
+    Avoided: <em>currency, token, exchange, transfer, wallet, send, payment, crypto</em>. Used instead: <em>settlement, obligation, allocation, position, receipt, provenance, evidence, unit</em>. The choice is to keep ICN-native primitives from claiming financial-product semantics. Whether the resulting posture is sufficient for any specific jurisdiction is an attorney question, not an architecture one.
+  </p>
+
+  <div class="footer-rule"><span class="kicker">Page 2 / 4</span></div>
+</section>
+
+<!-- ============== PAGE 3: DEPLOYMENT, GOVERNANCE, COMMUNITY ============== -->
+<section class="page">
+  <header class="masthead">
+    <div class="masthead-row">
+      <span>Deployment · Governance · Reference institutions</span>
+      <span>Page 3 / 4</span>
+    </div>
+  </header>
+
+  <h2>The lab — what's actually deployed (evidence)</h2>
+  <p>
+    This is the infrastructure ICN runs on. Every line is checkable against
+    <code>docs/operations/deployment/HOMELAB_DEPLOYMENT.md</code> and the
+    cluster itself.
+  </p>
+
+  <h3>Cluster topology</h3>
+  <table class="kv">
+    <tr><td>K3s version</td><td>v1.34.4+k3s1</td></tr>
+    <tr><td>Control plane</td><td><code>k3s-control</code> at 10.8.30.40 · 4 vCPU · 8GB RAM · hosted on Hyperion · tainted NoSchedule</td></tr>
+    <tr><td>Worker 1</td><td><code>k3s-worker-1</code> at 10.8.30.41 · 4 vCPU · 16GB RAM · on node-2</td></tr>
+    <tr><td>Worker 2</td><td><code>k3s-worker-2</code> at 10.8.30.42 · 4 vCPU · 16GB RAM · on node-3</td></tr>
+    <tr><td>Storage</td><td>NFS from Atlas (10.8.10.25) via csi-driver-nfs v4.9.0 · <code>atlas-nfs</code> StorageClass</td></tr>
+    <tr><td>In-cluster registry</td><td>10.8.30.40:30500 · NFS-backed PVC · <code>imagePullPolicy: Always</code></td></tr>
+    <tr><td>Ports</td><td>7777/UDP (QUIC) · 5601/TCP (RPC) · 9100/TCP (Prometheus) · 8080/TCP (Gateway)</td></tr>
+  </table>
+
+  <h3>CI/CD</h3>
+  <table class="kv">
+    <tr><td>Runner</td><td>Self-hosted GitHub Actions runner on dedicated VM (not inside K3s) · 8 vCPU · 6GB RAM · 80GB disk</td></tr>
+    <tr><td>Toolchain</td><td>Rust 1.88.0 with sccache · shared cache on Atlas NFS at <code>/mnt/icn-sccache</code></td></tr>
+    <tr><td>Pipeline</td><td>GitHub Actions · Dependabot · CodeQL · secret scanning · push protection · branch protection (solo-mode adjusted)</td></tr>
+    <tr><td>Deploy paths</td><td><code>make fast-deploy</code> (build + push to registry + rolling restart) · <code>make fast-deploy-all</code> (daemon + UI)</td></tr>
+  </table>
+
+  <h3>Monitoring stack</h3>
+  <table class="kv">
+    <tr><td>Grafana</td><td>http://10.8.30.40:30300 · kube-prometheus-stack Helm chart</td></tr>
+    <tr><td>Prometheus</td><td>http://10.8.30.40:30090 · scrapes ICN metrics via ServiceMonitor</td></tr>
+    <tr><td>AlertManager</td><td>kube-prometheus-stack internal</td></tr>
+    <tr><td>Storage</td><td>Prometheus + Alertmanager PVCs on atlas-nfs StorageClass · durable across pod restarts</td></tr>
+  </table>
+
+  <h3>Pilot network — 5 nodes (verified 2025-12-05)</h3>
+  <table class="kv">
+    <tr><td>Identity</td><td>5 nodes each with unique DIDs · verified via Gateway API</td></tr>
+    <tr><td>Governance</td><td>Domain creation · proposal lifecycle · voting · verified via Gateway</td></tr>
+    <tr><td>Ledger</td><td>Mutual credit transactions submitted + observed via Gateway</td></tr>
+    <tr><td>Compute</td><td>ComputeHandle wired to Gateway · trust-gated task execution path live</td></tr>
+    <tr><td>Contracts</td><td>icnctl runtime path live</td></tr>
+    <tr><td>Trust graph</td><td>Path identified · pending image rebuild (#46)</td></tr>
+  </table>
+
+  <h3>SDIS — Sovereign Digital Identity (deployed 2025-12-13)</h3>
+  <table class="kv">
+    <tr><td>Pilot UI</td><td>http://10.8.30.40:30030</td></tr>
+    <tr><td>Steward Dashboard</td><td>http://10.8.30.40:30030/steward-dashboard.html</td></tr>
+    <tr><td>SDIS Enrollment</td><td>http://10.8.30.40:30030/sdis-enrollment.html</td></tr>
+    <tr><td>API endpoints</td><td>11 endpoints under <code>/v1/sdis/</code> — enrollment, level-1 device proof, level-2 steward vouch, pending list, status, vouch/reject, steward stats + history</td></tr>
+    <tr><td>Verification levels</td><td>0 (started) · 1 (device-signature verified) · 2 (steward vouched)</td></tr>
+  </table>
+
+  <h3>Major rebuilds (the receipts)</h3>
+  <table class="kv">
+    <tr><td>2025-12-03</td><td>Initial deployment. Manual fixes: GLIBC compatibility, STUN port conflict, governance-topic timing, memory limit, health probe port.</td></tr>
+    <tr><td>2025-12-04</td><td>Automated deployment system: Kubernetes manifests in <code>deploy/k8s/</code>, build scripts with <code>.dockerignore</code>, image sync automation.</td></tr>
+    <tr><td>2025-12-05</td><td>Five-node pilot verified end-to-end.</td></tr>
+    <tr><td>2025-12-13</td><td>SDIS + Steward Dashboard deployed.</td></tr>
+    <tr><td>2026-02-21</td><td>Full infrastructure tear-down + rebuild: control plane moved to Hyperion (from undersized node-1), worker RAM doubled to 16GB each, dedicated CI runner VM, registry-first architecture, NFS CSI v4.9.0 replacing broken controller, Prometheus stack via Helm, four coop instances (alpha/beta/gamma/delta).</td></tr>
+  </table>
+
+  <div class="seemore">See: <code>docs/operations/deployment/HOMELAB_DEPLOYMENT.md</code> · <code>deploy/k8s/</code> · <code>deploy/ci-runner/</code> · <code>deploy/k8s/monitoring/</code> · GitHub issue #1597 (sccache) · #46 (trust-graph rebuild)</div>
+
+  <h2>What it would take to scale further</h2>
+  <p>
+    Resource needs, framed against what's already built — not asking from zero.
+  </p>
+  <table class="kv">
+    <tr><td>People</td><td>Single maintainer today. Broadening to two or three would let federation, mobile, and steward-cockpit work proceed in parallel rather than serial. Closest near-term needs: a Rust contributor for the federation-clearing path and a front-end engineer for the steward + member surfaces.</td></tr>
+    <tr><td>Compute</td><td>Three-node K3s handles the pilot. Beyond ~10-coop federation rehearsal, the cluster needs more workers — either additional Proxmox hosts or capacity on dedicated coop infrastructure as partners come online.</td></tr>
+    <tr><td>Storage</td><td>Atlas NFS is the single backing store. Adequate for receipt history at pilot scale; needs an off-host replica plan before any real-coop pilot stores production data.</td></tr>
+    <tr><td>Bandwidth + edge</td><td>OPNsense edge handles current QUIC traffic. Multi-federation rehearsal across geographically distinct nodes is the next stress test.</td></tr>
+    <tr><td>Audit</td><td>External security review — substrate + cryptography + key handling — before any production-coop pilot.</td></tr>
+    <tr><td>Legal counsel</td><td>Cooperative attorney + regulatory attorney engagement before any specific deployment claims about jurisdictional fit.</td></tr>
+    <tr><td>Funded organizer time</td><td>For the institution-package work (Summit, formation, federation) — practitioners who shape the meaning layer should be paid for it, not volunteering on the side of full-time co-op work. This is what Summit organizers themselves identified as the blocker (Lessons Learned, Dec 2025).</td></tr>
+  </table>
+
+  <h2>icn.zone — the dev portal</h2>
+  <p>
+    The single launcher for the project's operator-facing surfaces. Public pages: Home, Health, Tools, Services, Treasury, Directory, Calendar, Roadmap, Repos. Authenticated pages (the "inside" set): Bulletin, Check-ins. Scope policy is a 5-tier model: public, staff, contributor, cooperative-member, steward. Identity uses GitHub OAuth today; PolicyOracle pattern is wired up with mock implementations and migration markers for the eventual ICN-native identity backend.
+  </p>
+  <div class="seemore">See: <code>web/dev-portal/</code> · <code>content/scope-doctrine.md</code></div>
+
+  <h2>Reference institutions</h2>
+  <p>
+    The strategic question is: what real cooperative ecosystems let ICN stress-test whether its generic primitives can support actual democratic institutional life?
+  </p>
+  <ul class="tight">
+    <li><strong>NYCN / NY Cooperative Summit</strong> — the primary reference institution. ICN co-organizers (Matt, Frank Cetera, Joe Marraffino, McKenzie Jones, Anh-Thu Nguyen, Mike Zak, Mike Sandmel, Stephen Filler) have been running this for years. A recurring real cooperative ecosystem with sessions, sponsors, accessibility commitments, fiscal sponsorship, organizer rotation — i.e. real institutional load.</li>
+    <li><strong>Institution packages</strong> — the reusable templates / examples layer between substrate and any one institution. Worker-coop formation, board governance, recurring events, federation membership, mutual aid, fiscal sponsorship. Future library, not one NYCN-shaped system.</li>
+  </ul>
+  <div class="seemore">See: <code>docs/strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md</code> · <code>docs/strategy/ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md</code></div>
+
+  <h2>Governance posture (ICN-internal)</h2>
+  <ul class="tight">
+    <li>Solo-maintainer mode adjusted from default branch protection — required-reviewer rules off, security gates (CodeQL, Dependabot, secret scanning, push protection) on.</li>
+    <li>Labels: 19 labels organized as <code>epic:*</code>, <code>type:*</code>, <code>tier:*</code>. See <code>.github/ISSUE_POLICY.md</code>.</li>
+    <li>Issue templates: documentation, design/accessibility, RFC, governance, security-redirect.</li>
+    <li>Cross-repo orientation: <code>docs/reference/project-index/repository-map.md</code>.</li>
+    <li>Org project board: ICN System Roadmap (11 fields, 10 views).</li>
+  </ul>
+
+  <h2>The five things that can't move</h2>
+  <ul class="tight">
+    <li><strong>Public by default ≠ private info made public.</strong> It means everything affecting members is auditable through the channels those members consented to.</li>
+    <li><strong>Treasury visible to members.</strong> Legitimacy of process is auditable through channels affected parties consent to.</li>
+    <li><strong>Receipts prove events, not legitimacy.</strong> Legitimacy lives in the cooperative's process.</li>
+    <li><strong>Meaning in apps; kernel predictable.</strong> Constraint engine, not policy engine.</li>
+    <li><strong>Regulatory vocabulary discipline.</strong> Settlement, obligation, allocation, position, receipt, provenance, evidence. Never currency, token, transfer, wallet.</li>
+    <li><strong>Anti-software boundaries.</strong> Some things must stay human and process-first. Some records should expire. Some should never be public.</li>
+  </ul>
+
+  <div class="footer-rule"><span class="kicker">Page 3 / 4</span></div>
+</section>
+
+<!-- ============== PAGE 4: FUNDING, CONSTRAINTS, ROADMAP, LINKS ============== -->
+<section class="page">
+  <header class="masthead">
+    <div class="masthead-row">
+      <span>Funding · Personal constraints · Roadmap · Links</span>
+      <span>Page 4 / 4</span>
+    </div>
+  </header>
+
+  <h2>Funding pipeline (current state)</h2>
+  <table class="kv">
+    <tr><td>Tier 1 — Apply now</td><td><strong>NLnet NGI Zero Commons Fund</strong> (Jun 1 deadline). €20–25K. Three slice options drafted. Libre license requirement: CC-BY-SA on docs.</td></tr>
+    <tr><td>Tier 2 — In motion</td><td><strong>Sovereign Tech Fund</strong> — rolling; kernel-hardening slice ~€150K. STF no-double-public-funding rule means discrete slices per funder.</td></tr>
+    <tr><td>Tier 3 — In prep</td><td><strong>Mozilla Democracy x AI</strong> (Reframe A vs B drafted). <strong>NGI Sargasso</strong> — EU partner cultivation plan (requires EU partner).</td></tr>
+    <tr><td>Tier 4 — Relationship</td><td><strong>CFNE</strong> (Joe Marraffino — known via Summit organizing). <strong>ICDE</strong> (Frank Cetera — known). <strong>CDI</strong> — initial consultation for worker co-op bylaws + ICA structure.</td></tr>
+    <tr><td>Tier 5 — Last resort</td><td>ACCES-VR Self-Employment Plan (NY State). Demoted; footnote-only.</td></tr>
+  </table>
+  <div class="seemore">See: <code>docs/strategy/grants/funding-pipeline.md</code> · <code>docs/strategy/grants/budget-skeleton.md</code> · <code>docs/strategy/grants/applications/</code></div>
+
+  <h2>Personal constraints (load-bearing on funding structure)</h2>
+  <ul class="tight">
+    <li><strong>SSDI income limits</strong> — 2026 SGA threshold $1,690/mo. TWP threshold $1,210/mo. Payments structured through fiscal sponsor as W-2 (not 1099) to avoid the "Three Tests" SSA self-employment scrutiny.</li>
+    <li><strong>NY MBI-WPD healthcare shield</strong> — requires formal earned income; 2026 resource limit $33,038. Project funds stay in fiscal sponsor vault.</li>
+    <li><strong>Bus factor</strong> — one maintainer; broadening is part of the roadmap, not a current state.</li>
+    <li><strong>Co-op incorporation</strong> — pending. Affects grant eligibility for funders that require a cooperative entity. Path needs an attorney before any specific filing decision.</li>
+  </ul>
+  <div class="seemore">See: Foundation Launch Kit (Drive, Feb 2026)</div>
+
+  <h2>Phases 19 → 35 (remaining)</h2>
+  <div class="twocol">
+    <div>
+      <h3>Near</h3>
+      <ul class="tight">
+        <li>19 — Release Infrastructure</li>
+        <li>20 — Testing Foundation</li>
+        <li>21 — Network Connectivity</li>
+        <li>22 — Security Hardening</li>
+        <li>23 — Identity</li>
+        <li>24 — SDK</li>
+        <li>25 — Observability</li>
+        <li>26 — Documentation</li>
+      </ul>
+    </div>
+    <div>
+      <h3>Far</h3>
+      <ul class="tight">
+        <li>27 — Ledger / Economics</li>
+        <li>28 — CCL / Governance</li>
+        <li>29 — Code Quality</li>
+        <li>30 — Mobile</li>
+        <li>31 — Infrastructure</li>
+        <li>32 — Federation</li>
+        <li>33 — CLI / UX</li>
+        <li>34 — Release Candidate</li>
+        <li>35 — Pilot Deployment</li>
+      </ul>
+    </div>
+  </div>
+  <div class="seemore">See: <code>docs/dev-journal/ROADMAP.md</code></div>
+
+  <h2>Key links</h2>
+  <table class="kv">
+    <tr><td>icn.zone</td><td>Project landing, operator-facing pages.</td></tr>
+    <tr><td>github.com/InterCooperative-Network</td><td>Source, issues, roadmap project, organization profile.</td></tr>
+    <tr><td>github.com/InterCooperative-Network/icn</td><td>Primary repo.</td></tr>
+    <tr><td>github.com/InterCooperative-Network/nycn</td><td>NYCN reference institution work.</td></tr>
+    <tr><td>github.com/sponsors/InterCooperative-Network</td><td>GitHub Sponsors (live).</td></tr>
+    <tr><td>Docs index</td><td><code>docs/INDEX.md</code> · <code>docs/README.md</code></td></tr>
+    <tr><td>Status / state</td><td><code>docs/STATE.md</code> · <code>docs/status/icn-status-march-2026.md</code></td></tr>
+    <tr><td>Strategy hub</td><td><code>docs/strategy/</code> — gap analysis, sprint, roadmaps, grants, summit work.</td></tr>
+    <tr><td>Mobile UX spec</td><td><code>docs/mobile/icn-mobile-ux-spec-v1.md</code></td></tr>
+    <tr><td>Golden prompt</td><td><code>docs/GOLDEN_PROMPT.md</code> — master agent context.</td></tr>
+    <tr><td>System dashboard</td><td><code>docs/status/icn-system-dashboard.md</code> + HTML companion.</td></tr>
+  </table>
+
+  <div class="footer-rule">
+    <span class="kicker">End</span> · Snapshot 2026-05-20 · research-stage substrate · open source · single maintainer
+  </div>
+</section>
+
+</body>
+</html>

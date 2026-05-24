@@ -1,0 +1,12 @@
+---
+import ScopedPage from "../../layouts/ScopedPage.astro";
+---
+<ScopedPage title="Feed" scope="staff" description="Full activity feed including private repos.">
+  <div class="stub">
+    <h2>Inside Feed — stub</h2>
+    <p>Full activity feed across all org repos including private ones (nycn, icn-learn, icn-community-bridge). PR opens/closes, recent commits, project board moves, CI runs.</p>
+    <p style="margin-top: 12px; font-size: 13px; color: var(--text-muted);">
+      Data source: GitHub REST API with a token that has private-repo read scope. The public feed at <code>/feed</code> shows only the public-repo subset.
+    </p>
+  </div>
+</ScopedPage>

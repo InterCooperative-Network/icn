@@ -1,0 +1,72 @@
+---
+import ScopedPage from "../layouts/ScopedPage.astro";
+import { strategicPhases, nextImplementationPhases } from "../data/phases";
+
+const identity = Astro.locals.identity;
+const login = identity?.kind === "github" ? identity.login : null;
+---
+<ScopedPage title={`Inside · @${login ?? "?"}`} scope="staff" description="Your team-specific view of the work.">
+  <p style="color: var(--text-muted); max-width: 720px;">
+    The inside dashboard. What you're holding open, what the team is on this week, what's blocking what. Live data wiring comes from your contributor profile and the org's project board.
+  </p>
+
+  <section class="section two-col">
+    <div class="card">
+      <h2 style="margin-top: 0;">Your week</h2>
+      <p style="color: var(--text-faint); font-style: italic;">
+        Once GitHub OAuth + Projects v2 API wiring lands, this panel renders your assigned items from
+        <a href="/board">Project #15</a>, your PRs awaiting review, and your reviews requested. Currently a stub.
+      </p>
+      <ul style="margin: 8px 0; color: var(--text-muted); font-size: 13px;">
+        <li>Assigned: <span class="faint">— pending API wiring —</span></li>
+        <li>Reviews requested: <span class="faint">— pending API wiring —</span></li>
+        <li>Recent activity (you): <span class="faint">— pending API wiring —</span></li>
+      </ul>
+    </div>
+    <div class="card">
+      <h2 style="margin-top: 0;">Team focus this week</h2>
+      <p style="color: var(--text-muted); font-size: 13px;">Pinned notice. Edit in <code>content/notices/</code>.</p>
+      <p style="font-size: 13px;">
+        Phase 2 partner-bound. Substrate shipped + spec ladder dense (May 14–15). What's left is human procedure: present the merged ladder to NYCN organizers → formalize → first operator rehearsal.
+      </p>
+      <p style="font-size: 13px;">
+        Active framing tracks running parallel: <strong>idea-0019</strong> (Institutional Process Substrate, partial runtime dogfood), <strong>idea-0020</strong> (Democratic Authority Primitives, read-model dogfood).
+      </p>
+      <p style="margin-top: 12px;"><a href="/inside/notices" style="font-size: 13px;">All notices →</a></p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Next implementation phases</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px;">
+      {nextImplementationPhases.map((p) => (
+        <div class="card">
+          <div style="font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: 0.08em;">PHASE {p.num}</div>
+          <div style="font-size: 15px; font-weight: 600; margin-top: 4px;">{p.name}</div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 6px;">{p.workstream}</div>
+          <div style="font-size: 12px; color: var(--text-muted); margin-top: 8px;">{p.note}</div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Quick shortlinks</h2>
+    <div class="card" style="font-size: 13px;">
+      <p style="margin-top: 0;">Inside (signed-in) shortlinks that resolve while you're logged in:</p>
+      <ul>
+        <li><code>icn.zone/me</code> — this page</li>
+        <li><code>icn.zone/today</code> — today's standup</li>
+        <li><code>icn.zone/notices</code> — pinned context</li>
+        <li><code>icn.zone/deploy</code> — K3s status (steward scope)</li>
+      </ul>
+      <p>Public shortlinks (work for anyone, no sign-in):</p>
+      <ul>
+        <li><code>icn.zone/board</code> · <code>icn.zone/pr/NNNN</code> · <code>icn.zone/issue/NNNN</code></li>
+        <li><code>icn.zone/state</code> · <code>icn.zone/phase</code> · <code>icn.zone/arch</code></li>
+        <li><code>icn.zone/adr/NNNN</code> · <code>icn.zone/idea/NNNN</code></li>
+      </ul>
+      <p>Full table: <a href="https://github.com/InterCooperative-Network/icn/blob/main/web/dev-portal/src/data/shortlinks.ts"><code>src/data/shortlinks.ts</code></a></p>
+    </div>
+  </section>
+</ScopedPage>

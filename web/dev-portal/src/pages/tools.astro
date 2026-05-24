@@ -1,0 +1,46 @@
+---
+import ScopedPage from "../layouts/ScopedPage.astro";
+import { tools, toolCategories } from "../data/tools";
+
+const categories = (Object.keys(toolCategories) as Array<keyof typeof toolCategories>).map((c) => ({
+  key: c,
+  meta: toolCategories[c],
+  items: tools.filter((t) => t.category === c),
+}));
+---
+<ScopedPage title="Tools" scope="public" description="Every tool a member uses. The launcher index.">
+  <p style="color: var(--text-muted); max-width: 720px; margin-bottom: 24px;">
+    The catalog. Every external tool, dashboard, and resource a member of the cooperative might need. Grouped by purpose. Edit in <code>src/data/tools.ts</code>.
+  </p>
+
+  {categories.map((c) => (
+    <section class="section">
+      <h2>{c.meta.icon} {c.meta.label}</h2>
+      <div class="tool-grid">
+        {c.items.map((t) => (
+          <a class="tool-tile" href={t.href} target={t.external ? "_blank" : undefined} rel={t.external ? "noopener noreferrer" : undefined}>
+            <span class="tt-icon">{t.icon}</span>
+            <div>
+              <div class="tt-name">{t.name}{t.external && <span class="tt-ext" aria-hidden="true">↗</span>}</div>
+              <div class="tt-blurb">{t.blurb}</div>
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+  ))}
+
+  <style>
+    .tool-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+    .tool-tile {
+      display: flex; gap: 10px; padding: 12px 14px;
+      border-radius: 8px; background: var(--surface); border: 1px solid var(--border);
+      color: var(--text); text-decoration: none;
+    }
+    .tool-tile:hover { border-color: var(--border-strong); text-decoration: none; }
+    .tt-icon { font-size: 20px; flex-shrink: 0; }
+    .tt-name { font-weight: 600; font-size: 14px; }
+    .tt-ext { font-size: 11px; color: var(--text-faint); margin-left: 4px; }
+    .tt-blurb { font-size: 12px; color: var(--text-muted); margin-top: 2px; line-height: 1.4; }
+  </style>
+</ScopedPage>

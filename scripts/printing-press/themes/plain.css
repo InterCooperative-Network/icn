@@ -1,0 +1,47 @@
+/* ============================================================
+   THEME: plain
+   Use for: public-facing, plain-language documents. Warm,
+   welcoming, approachable. Terracotta accent, slightly softer
+   ink, generous Cambria body, slightly looser leading. Optional
+   drop-cap on first paragraph (add class="dropcap" to <body>).
+   ============================================================ */
+
+:root {
+  --body-font: 'Cambria', 'Charter', Georgia, 'Iowan Old Style', serif;
+  --header-font: 'Calibri', 'Helvetica Neue', 'Arial', system-ui, sans-serif;
+  --mono-font: 'JetBrains Mono', 'Consolas', 'Menlo', monospace;
+  --body-leading: 1.65;
+  --page-margin: 1.05in;
+
+  /* Color palette: Warm Terracotta — softer, less corporate */
+  --ink: #2A2620;
+  --ink-soft: #5A5448;
+  --ink-faint: #8C8678;
+  --paper: #FBF8F2;
+  --accent: #B85042;          /* terracotta */
+  --accent-dark: #8C3D32;
+  --rule: #DDD5C6;
+  --rule-strong: #2A2620;
+  --quote-bg: #F6EDDE;
+  --callout-bg: #F6EDDE;
+  --code-bg: #F1ECE0;
+  --table-bg: #FFFFFF;
+  --table-header-bg: #F6EDDE;
+
+  --cover-title-size: 4.4rem;
+  --cover-title-weight: 700;
+}
+
+/* Plain-theme details */
+h1 { letter-spacing: -0.02em; }
+h2 { font-weight: 600; }
+
+/* Pull-quote slightly different in plain */
+.pullquote {
+  font-style: normal;
+  font-weight: 600;
+  color: var(--accent-dark);
+}
+
+/* Tables: warmer row stripe */
+table tbody tr:nth-child(even) td { background: #FDFBF5; }

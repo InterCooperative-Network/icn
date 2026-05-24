@@ -1,0 +1,583 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Infrastructure for the Cooperative Movement</title>
+<style>
+/* ============================================================
+   PRINTING PRESS — base styles
+   Shared structural CSS. Themes override colors/fonts/details.
+   ============================================================ */
+
+/* Reset */
+* { box-sizing: border-box; }
+html { font-size: 11pt; }
+body {
+  margin: 0;
+  padding: 0;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: var(--body-font);
+  font-size: 1rem;
+  line-height: var(--body-leading);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Page setup — US Letter, generous margins */
+@page {
+  size: letter;
+  margin: var(--page-margin);
+}
+@page :first { margin-top: var(--page-margin); }
+
+/* Page-break utilities */
+.page-break  { page-break-before: always; }
+.no-break    { page-break-inside: avoid; }
+h1, h2       { page-break-after: avoid; }
+table, blockquote, pre, figure { page-break-inside: avoid; }
+
+/* Cover page — height tuned to fit US Letter minus any theme's @page margin
+   (worst case: 1.1in margins -> 8.8in printable; we use 8.4in to leave a
+   buffer for font-rendering rounding). */
+.cover {
+  height: 8.4in;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 0;
+  page-break-after: always;
+}
+.cover .eyebrow {
+  font-family: var(--header-font);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin: 0 0 1.2rem;
+}
+.cover h1 {
+  font-family: var(--header-font);
+  font-size: var(--cover-title-size);
+  font-weight: var(--cover-title-weight);
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+  margin: 0 0 1.0rem;
+  max-width: 7.5in;
+  border: 0;
+  padding: 0;
+}
+.cover .subtitle {
+  font-family: var(--header-font);
+  font-size: 1.35rem;
+  font-weight: 400;
+  color: var(--ink-soft);
+  margin: 0 0 2.5rem;
+  max-width: 6.5in;
+  line-height: 1.4;
+}
+.cover .meta {
+  font-family: var(--header-font);
+  font-size: 0.85rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.06em;
+  margin-top: auto;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--rule);
+}
+
+/* Body content */
+main { padding: 0; }
+
+h1, h2, h3, h4 {
+  font-family: var(--header-font);
+  color: var(--ink);
+  margin: 1.6em 0 0.5em;
+}
+h1 {
+  font-size: 1.7rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  border-bottom: 2px solid var(--rule-strong);
+  padding-bottom: 0.4rem;
+  margin-top: 0;
+}
+h2 {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--accent-dark);
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--rule);
+}
+h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--ink);
+}
+h4 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: none;
+  margin: 1.2em 0 0.3em;
+}
+
+p {
+  margin: 0 0 0.8em;
+  orphans: 3;
+  widows: 3;
+}
+
+a { color: var(--accent-dark); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+strong { color: var(--ink); }
+em { color: var(--ink); }
+
+ul, ol {
+  margin: 0.4em 0 1em;
+  padding-left: 1.4em;
+}
+li {
+  margin: 0.25em 0;
+  line-height: var(--body-leading);
+}
+
+blockquote {
+  margin: 1.0em 0;
+  padding: 0.7em 1.1em;
+  border-left: 3px solid var(--accent);
+  background: var(--quote-bg);
+  font-size: 1.0rem;
+  line-height: 1.55;
+  color: var(--ink);
+  border-radius: 0 3px 3px 0;
+}
+blockquote p:last-child { margin-bottom: 0; }
+
+code {
+  font-family: var(--mono-font);
+  font-size: 0.88em;
+  background: var(--code-bg);
+  padding: 0.05em 0.35em;
+  border-radius: 3px;
+  color: var(--ink);
+}
+pre {
+  background: var(--code-bg);
+  border: 1px solid var(--rule);
+  padding: 0.8em 1.0em;
+  border-radius: 4px;
+  overflow-x: auto;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+pre code { background: transparent; padding: 0; }
+
+hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 1.6em 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.8em 0 1.2em;
+  font-size: 0.92rem;
+  background: var(--table-bg);
+}
+th, td {
+  border: 1px solid var(--rule);
+  padding: 0.5em 0.7em;
+  vertical-align: top;
+  text-align: left;
+  line-height: 1.45;
+}
+th {
+  background: var(--table-header-bg);
+  font-family: var(--header-font);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+/* Frontmatter chip (Status: descriptive · Canonical: no etc.) */
+.frontmatter {
+  font-family: var(--header-font);
+  font-size: 0.72rem;
+  color: var(--ink-faint);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.4em 0.7em;
+  margin: 0 0 1.6em;
+  background: var(--quote-bg);
+  border-left: 2px solid var(--accent);
+  border-radius: 0 3px 3px 0;
+  display: block;
+}
+
+/* First-paragraph drop cap, opt-in by theme.
+   The siblings (lists, headings, blockquotes) clear the float so they don't
+   wrap awkwardly around a short opening paragraph. */
+.dropcap main > p:first-of-type::first-letter {
+  font-family: var(--header-font);
+  font-size: 3.2em;
+  font-weight: 700;
+  float: left;
+  line-height: 1;
+  margin: 0.04em 0.12em 0 0;
+  color: var(--accent-dark);
+}
+.dropcap main > ul,
+.dropcap main > ol,
+.dropcap main > h2,
+.dropcap main > h3,
+.dropcap main > blockquote { clear: left; }
+
+/* Pull-quote helper */
+.pullquote {
+  font-family: var(--header-font);
+  font-size: 1.25rem;
+  line-height: 1.4;
+  color: var(--accent-dark);
+  font-style: italic;
+  border-top: 1px solid var(--accent);
+  border-bottom: 1px solid var(--accent);
+  padding: 0.8em 0;
+  margin: 1.4em 0;
+  text-align: center;
+}
+
+/* Inline callout box */
+.callout {
+  background: var(--callout-bg);
+  border-left: 3px solid var(--accent);
+  padding: 0.8em 1.1em;
+  margin: 1.2em 0;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.95rem;
+}
+
+/* Print page number — needs running headers from @page; Chrome headless
+   currently supports limited @page CSS. We use --no-pdf-header-footer in
+   the renderer and rely on body-level page numbers via the cover. If
+   page numbers are needed, render via weasyprint or paged.js instead. */
+
+</style>
+<style>
+/* ============================================================
+   THEME: civic
+   Use for: serious peer-to-peer documents (movement-facing,
+   institutional briefings, technical literature). Calm, neutral,
+   confident. Navy accent, deep ink, generous Georgia body.
+   ============================================================ */
+
+:root {
+  --body-font: Georgia, 'Source Serif Pro', 'Charter', 'Iowan Old Style', serif;
+  --header-font: 'Inter', 'Helvetica Neue', 'Arial', system-ui, sans-serif;
+  --mono-font: 'JetBrains Mono', 'Consolas', 'Menlo', monospace;
+  --body-leading: 1.55;
+  --page-margin: 0.95in;
+
+  /* Color palette: Midnight Executive-ish, calm and serious */
+  --ink: #1A1D21;
+  --ink-soft: #4A4F55;
+  --ink-faint: #8A8F95;
+  --paper: #FCFCFA;
+  --accent: #2B5876;          /* deep navy/teal */
+  --accent-dark: #1E3F58;
+  --rule: #D9DDE2;
+  --rule-strong: #1A1D21;
+  --quote-bg: #EFF3F7;
+  --callout-bg: #EFF3F7;
+  --code-bg: #F1F3F5;
+  --table-bg: #FFFFFF;
+  --table-header-bg: #EFF3F7;
+
+  --cover-title-size: 4.0rem;
+  --cover-title-weight: 700;
+}
+
+/* Civic theme details */
+h1 { letter-spacing: -0.015em; }
+h2 { font-weight: 700; }
+
+/* Slight italic for blockquote in civic */
+blockquote { font-style: italic; color: var(--ink-soft); }
+
+/* Table left-column emphasis */
+table td:first-child { color: var(--accent-dark); font-weight: 600; }
+
+</style>
+</head>
+<body>
+<section class="cover">
+  <div class="eyebrow">INTERCOOPERATIVE NETWORK</div>
+  <h1>Infrastructure for the Cooperative Movement</h1>
+  <p class="subtitle">A plain-English introduction for cooperative developers, federation organizers, TA providers, and member-owners.</p>
+  <div class="meta">Pre-pilot · Open source · intercooperative.network</div>
+</section>
+<main>
+
+<hr />
+<h2>The one-sentence version</h2>
+<p>ICN is software that lets cooperatives govern, remember, coordinate, and federate <strong>on infrastructure the movement owns</strong>, so the cooperative and solidarity economy can materially exist as a coordinated ecosystem, not just ideologically exist as a shared set of values.</p>
+<hr />
+<h2>The problem this sits in</h2>
+<p>The cooperative movement is roughly 180 years old. It has produced credit unions, worker cooperatives, housing cooperatives, agricultural cooperatives, consumer cooperatives, mutual aid networks, community land trusts, the solidarity economy. It has principles (Rochdale, ICA), institutions (USFWC, NCBA CLUSA, ICA), and a long memory of what works.</p>
+<p>What it does <strong>not</strong> have is digital infrastructure it owns.</p>
+<ul>
+<li>Governance lives in Loomio (a B-Corp, not a coop).</li>
+<li>Documents live in Google Workspace.</li>
+<li>Accounting lives in QuickBooks.</li>
+<li>Fundraising lives in Open Collective.</li>
+<li>Communications live in Slack.</li>
+<li>Membership records live in Mailchimp.</li>
+<li>Inter-coop coordination lives in email.</li>
+<li>Records die when founders rotate, advisors move on, or a vendor changes its terms.</li>
+</ul>
+<p>Every tool in the cooperative tech stack is rented from a company whose values are not cooperative. When the vendor raises prices, coops absorb the cost. When the vendor changes its terms, coops comply or migrate. When the vendor shuts down, coops lose their institutional records.</p>
+<p>For a movement built on democratic ownership, this is a structural contradiction. <strong>The solidarity economy runs on infrastructure designed for extraction.</strong></p>
+<p>ICN is one attempt to change that, starting from the substrate up.</p>
+<hr />
+<h2>What ICN actually is</h2>
+<p>A peer-to-peer software substrate. Each cooperative runs its own node, on its own hardware. Nodes communicate over encrypted peer-to-peer connections. There is no central server. There is no platform operator. There is no vendor.</p>
+<p>The substrate provides eight primitives that any democratic organization needs:</p>
+<p><strong>Standing → Authority → Decision → Obligation → Effect → Receipt → Evidence → Review.</strong></p>
+<p>Apps sit on top of the substrate and add the domain meaning — worker-coop bylaws, housing-coop equity structures, federation treaties, ag-coop patronage calculations. The substrate enforces the rules without understanding them. The meaning lives in the apps, where it can be governed by the people it affects.</p>
+<p>This separation is intentional. It means:
+- The substrate is reusable across cooperative sectors.
+- Domain meaning stays with the people who understand it.
+- No one (including ICN) can change the rules of your cooperative from outside.</p>
+<hr />
+<h2>The eight-word spine, with examples from movement work</h2>
+<table>
+<thead>
+<tr>
+<th>Word</th>
+<th>What it means</th>
+<th>Example from cooperative practice</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Standing</strong></td>
+<td>Who has the right to act in this context.</td>
+<td>A patronage refund vote that only full members can cast. A board action only directors can take.</td>
+</tr>
+<tr>
+<td><strong>Authority</strong></td>
+<td>Who can authorize what, under what governance rule.</td>
+<td>The bylaws say the board can engage a CPA up to $25k without a member vote. ICN holds that rule as a constraint the kernel enforces.</td>
+</tr>
+<tr>
+<td><strong>Decision</strong></td>
+<td>A choice the institution made, under authority, with a threshold met.</td>
+<td>The vote to admit a new member. The board resolution to enter a federation. The general assembly&rsquo;s approval of the annual capital plan.</td>
+</tr>
+<tr>
+<td><strong>Obligation</strong></td>
+<td>A commitment created by a decision.</td>
+<td>The patronage allocation owed to a member. The federation&rsquo;s commitment to a shared purchasing pool. The advisor engagement letter.</td>
+</tr>
+<tr>
+<td><strong>Effect</strong></td>
+<td>The actual change in the world that the decision caused.</td>
+<td>Member admitted. Allocation lands in the capital account. Bylaw adopted. Federation joined.</td>
+</tr>
+<tr>
+<td><strong>Receipt</strong></td>
+<td>A verifiable record that the decision and its effect happened.</td>
+<td>A signed record linking the proposal, the vote, the threshold met, and the allocation that resulted.</td>
+</tr>
+<tr>
+<td><strong>Evidence</strong></td>
+<td>Receipts plus their context, available to verify later.</td>
+<td>The full chain a new treasurer in 2030 can read to understand 2026&rsquo;s patronage cycle.</td>
+</tr>
+<tr>
+<td><strong>Review</strong></td>
+<td>Anyone (member, board, federation, regulator) can verify the chain without trusting a vendor.</td>
+<td>A federation auditing a member coop&rsquo;s patronage history. A new board reviewing what the founders actually decided. A CPA cross-checking the books against governance evidence.</td>
+</tr>
+</tbody>
+</table>
+<p>The spine isn&rsquo;t novel as a concept — every cooperative does this work today, just in spreadsheets, meeting minutes, email threads, and founder memory. ICN is a substrate that lets the work survive what the spreadsheets and email don&rsquo;t survive.</p>
+<hr />
+<h2>The seam ICN is trying to be</h2>
+<p><strong>Formation → governance → coordination → federation.</strong></p>
+<p>Most cooperative-tech work today focuses on either <em>formation</em> (Launch.coop, USFWC&rsquo;s Worker Co-op Academy, state cooperative-development programs) or <em>operations</em> (Loomio for governance, QuickBooks for accounting, Slack for comms). What&rsquo;s missing is the durable layer underneath both — the records that have to survive founder rotation, advisor turnover, fiscal-year close, member exit, dissolution, and eventually federation with other coops.</p>
+<p>ICN is the layer underneath. Not formation. Not operations. The continuity layer.</p>
+<p>The federation case is where it gets interesting. Today, when two coops want to coordinate — joint purchasing, shared services, a federated credit pool, mutual recognition of membership, a regional alliance — they negotiate bilateral contracts and trust each other&rsquo;s word. There&rsquo;s no shared verifiable record of who owes what, under what authority, against what evidence. ICN&rsquo;s federation primitives let coops verify each other without surrendering to a common platform.</p>
+<p>For a movement that has always <em>talked</em> about federation and rarely <em>done</em> it at scale, that&rsquo;s the actual unlock.</p>
+<hr />
+<h2>How ICN compares to tools you already know</h2>
+<p>Honest comparisons, not sales:</p>
+<h3>Loomio</h3>
+<p><strong>What Loomio does well:</strong> structured online deliberation, threaded proposal-and-vote workflows, a familiar interface for cooperative decision-making.
+<strong>Where it leaves a gap:</strong> Loomio records that a vote happened on Loomio. It does not produce records that survive Loomio&rsquo;s pricing changes, terms changes, or shutdown. If your cooperative needs to prove to a future board, a funder, or a regulator that a specific decision happened on a specific date under specific authority, Loomio&rsquo;s records are vendor-dependent.
+<strong>Where ICN sits:</strong> underneath Loomio (or alongside it). ICN&rsquo;s receipts are signed, content-addressed, verifiable without the vendor. Use Loomio for the deliberation, ICN for the durable record.</p>
+<h3>Co-op Cloud (and similar self-hosted stacks)</h3>
+<p><strong>What Co-op Cloud does well:</strong> packaged self-hosting of standard SaaS-style apps (Nextcloud, Wordpress, CryptPad, etc.) on infrastructure owned by the cooperative.
+<strong>Where it leaves a gap:</strong> Co-op Cloud is an excellent answer to &ldquo;how do we run our own infrastructure?&rdquo; It does not answer &ldquo;how do our institutional records survive across years, member rotations, and platform migrations?&rdquo; — that&rsquo;s a layer above hosting.
+<strong>Where ICN sits:</strong> complementary. Co-op Cloud + ICN is the right pairing. Run your tools on Co-op Cloud. Hold the governance evidence in ICN. Different problems, both real.</p>
+<h3>Open Collective</h3>
+<p><strong>What Open Collective does well:</strong> transparent fundraising and budget transparency, fiscal sponsorship, a friendly public-facing surface for member contributions.
+<strong>Where it leaves a gap:</strong> Open Collective is a hosted platform. Your records live on their servers. Their values and your values may align today but you do not control the infrastructure.
+<strong>Where ICN sits:</strong> orthogonal. Open Collective is good for <em>public</em> transparency. ICN is for <em>durable governance evidence</em> that doesn&rsquo;t depend on a hosted platform.</p>
+<h3>QuickBooks</h3>
+<p><strong>What QuickBooks does well:</strong> general-purpose accounting that your CPA already knows how to use.
+<strong>Where it leaves a gap:</strong> QuickBooks is the system of record for the books. It does not represent the governance side of economic events — the decision to allocate, the authority that approved it, the obligation it created.
+<strong>Where ICN sits:</strong> beside it. ICN holds the governance evidence; QuickBooks holds the books; both verify each other. The CPA still does the CPA&rsquo;s work.</p>
+<h3>Blockchain / Web3 / DAOs</h3>
+<p><strong>What they do:</strong> speculation, tokens, financialization of governance, &ldquo;smart contracts&rdquo; that are neither smart nor contracts.
+<strong>Where ICN sits:</strong> nowhere near them. ICN uses cryptographic verification for record integrity (signing decisions so you can verify them later), not for tokens, currency, or speculation. If anyone reads &ldquo;peer-to-peer&rdquo; or &ldquo;cryptographic&rdquo; and thinks Web3, they&rsquo;re reading the wrong project.</p>
+<hr />
+<h2>What ICN is NOT</h2>
+<p>A short list, kept honest:</p>
+<ul>
+<li><strong>Not a vendor.</strong> No SaaS subscription, no per-seat pricing, no platform you&rsquo;re locked into. Each cooperative runs its own node.</li>
+<li><strong>Not a startup.</strong> No investors, no exit strategy, no growth-at-all-costs imperative. Funded by grants and volunteer time.</li>
+<li><strong>Not for sale.</strong> ICN is infrastructure the movement owns. Long-term, the substrate is governed by cooperatives that use it, not by a company.</li>
+<li><strong>Not replacing existing cooperative tech.</strong> Loomio, Co-op Cloud, Open Collective, QuickBooks, CryptPad — all good in their domains. ICN sits underneath the durable-records question, not on top of any of them.</li>
+<li><strong>Not replacing TA providers, lawyers, CPAs, bookkeepers, or co-op developers.</strong> The human work of cooperative formation, governance, conflict resolution, legal opinion, and accounting is irreducibly human. ICN holds the <em>evidence</em> of work humans did.</li>
+<li><strong>Not accounting software.</strong> Not banking. Not a wallet. Not a token. Not a payment rail. Not financial-intermediary software in any form.</li>
+<li><strong>Not production-ready.</strong> Pre-pilot. The substrate runs (daemon, gateway, identity, ledger primitives, governance primitives, federation primitives, deployed on a small cluster since December 2025). The human-facing surfaces — member-facing apps, steward dashboards, production federation flows — are next, not done.</li>
+<li><strong>Not a coup of the existing cooperative-tech world.</strong> A long, slow, careful project to build one missing layer. It will only matter if it&rsquo;s actually useful to the people doing the work.</li>
+</ul>
+<hr />
+<h2>Where it fits in your work</h2>
+<p>Some honest guesses about where ICN might be useful, by role:</p>
+<h3>If you&rsquo;re a co-op founder</h3>
+<p>Mostly: nothing today. Use Launch.coop or your local TA provider for formation. Use Loomio for early governance. When your co-op is a few years old and you start losing records to founder rotation, ICN may be a layer to consider for the records that have to survive.</p>
+<h3>If you&rsquo;re a co-op developer or TA provider</h3>
+<p>Eventually: a layer where your advisor work product (engagement scope, evidence of completion, handoff documentation) becomes verifiable across years and successor advisors. Not today; the human-facing surfaces aren&rsquo;t there yet.</p>
+<h3>If you&rsquo;re on a federation organizing committee</h3>
+<p>The clearest fit. Federation primitives are why ICN exists. If you&rsquo;ve ever tried to set up a regional alliance or a shared purchasing pool and gotten stuck in bilateral-contract land, this is the problem ICN&rsquo;s federation layer is aimed at. Still pre-pilot, but if your work survives a few more years, ICN may be ready when you are.</p>
+<h3>If you&rsquo;re a member of an existing coop</h3>
+<p>Probably nothing visible. The point is for governance to keep working when founders rotate and your board changes, without anyone having to reconstruct the institution from email.</p>
+<h3>If you&rsquo;re a CPA, bookkeeper, or financial professional</h3>
+<p>Adjacent. ICN doesn&rsquo;t replicate your books. It holds the governance side that runs alongside the books — the decision to allocate, the authority that approved it, the obligation it created. Both verify each other.</p>
+<h3>If you&rsquo;re at USFWC, NCBA CLUSA, ICA, DAWI, or similar</h3>
+<p>Long-arc. The movement-infrastructure question is real and ICN is one bet at one layer. There are other bets (Co-op Cloud, MayFirst, RPS, .coop registry, MyCoop). All worth funding. ICN is not in competition with them; it&rsquo;s a different layer.</p>
+<hr />
+<h2>A useful test</h2>
+<p>If anything here feels real, the next step is a sanitized tabletop walkthrough, not a sales conversation.</p>
+<ol>
+<li><strong>Pick one workflow your cooperative actually runs</strong> — a patronage cycle, a board election, a new-member admission, a federation negotiation, a dissolution.</li>
+<li><strong>Walk it beat by beat.</strong> What record is generated? Who needs to verify it later? What should never be a record (interpersonal conflict, care work, private deliberation)?</li>
+<li><strong>Capture what works and what breaks.</strong> If ICN&rsquo;s substrate can carry the work cleanly, that&rsquo;s a real seam. If it can&rsquo;t, that&rsquo;s also useful.</li>
+</ol>
+<p>No live data required. No commitment required. A two-hour tabletop with someone who knows the workflow.</p>
+<p>If that surfaces a seam worth pursuing, the next step is bringing in the right additional expertise (co-op lawyer, CPA, federation organizer) — not building product.</p>
+<hr />
+<h2>FAQ — questions movement people actually ask</h2>
+<h3>&ldquo;Why hasn&rsquo;t this been done before?&rdquo;</h3>
+<p>Pieces of it have been. NCBA&rsquo;s mutual-aid networks, the Working World&rsquo;s loan substrate, ICA Group&rsquo;s co-op-developer infrastructure, Loomio&rsquo;s governance layer, Co-op Cloud&rsquo;s hosting, MayFirst&rsquo;s hosting cooperative, RPS&rsquo;s coordination work. ICN is one attempt at the substrate underneath all of them. None of those efforts is wrong; ICN is a different layer.</p>
+<h3>&ldquo;How is this different from a credit union shared-services platform?&rdquo;</h3>
+<p>Credit unions have shared services (Co-op Solutions, PSCU, Catalyst). Those are necessary infrastructure for the credit union sector. ICN is at a lower layer (records, governance, verification) and a wider scope (any democratic organization, not just credit unions). They&rsquo;re complementary.</p>
+<h3>&ldquo;Why not just push for Loomio / Co-op Cloud / X to be better?&rdquo;</h3>
+<p>We should. ICN sits underneath those tools, not in competition with them. The records-survival problem is real even if every cooperative-tech vendor was movement-aligned tomorrow. Vendors change hands. Funding dries up. Founders leave. The substrate question is downstream of any specific vendor.</p>
+<h3>&ldquo;Who&rsquo;s funding it?&rdquo;</h3>
+<p>Currently: self-funded and volunteer time. Grant applications in flight (Mozilla, NLnet, Sovereign Tech Fund). Long-term: funding should come from movement institutions, not from VC. If you know movement-aligned funding sources, talk to us.</p>
+<h3>&ldquo;What&rsquo;s the governance of ICN itself?&rdquo;</h3>
+<p>Open source today. Long-term intent: the substrate is governed by the cooperatives that use it, through whatever federation structure makes sense for the movement. We don&rsquo;t have the answer yet. We&rsquo;re trying to build the substrate well enough that the governance question is worth answering.</p>
+<h3>&ldquo;I&rsquo;ve been burned by tech projects that promised this and disappeared.&rdquo;</h3>
+<p>Fair. ICN is pre-pilot. We&rsquo;re not promising anything. The substrate runs. The human-facing surfaces don&rsquo;t yet. If we disappear, the open-source substrate is on GitHub and can be forked. We are not trying to be the next Diaspora.</p>
+<h3>&ldquo;Will my cooperative have to learn cryptography?&rdquo;</h3>
+<p>No. The cryptography is invisible plumbing for record integrity. A board member uses ICN the way they use email — they don&rsquo;t think about TLS. The whole point of the substrate is that the cooperative gets durable records without having to become a crypto project.</p>
+<h3>&ldquo;What about privacy?&rdquo;</h3>
+<p>Default privacy posture: nothing is public unless explicitly published. Member-private records stay on member-controlled hardware. Cross-coop verification works with hashes and signed claims, not raw data exposure. The privacy model has explicit primitives and an explicit threat model.</p>
+<h3>&ldquo;What about Mondragon? They&rsquo;ve made this work for 70 years without ICN.&rdquo;</h3>
+<p>Mondragon has made it work with extraordinary institutional discipline, a banking subsidiary, and a culture built over decades. Most cooperatives don&rsquo;t have that institutional infrastructure. ICN is one attempt to provide a thinner version that smaller and younger cooperatives can use without becoming Mondragon.</p>
+<h3>&ldquo;What&rsquo;s the long-term goal?&rdquo;</h3>
+<p>A cooperative and solidarity economy that materially exists as a coordinated ecosystem — with governance, obligations, federation, and evidence — on infrastructure the movement owns and runs, instead of infrastructure rented from companies whose business models contradict ours. The 2025 NY Cooperative Summit called this &ldquo;the infrastructure that lets co-ops scale.&rdquo; ICN is one bet at that infrastructure.</p>
+<hr />
+<h2>Glossary, kept short</h2>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>What it means in cooperative-practice language</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Substrate</strong></td>
+<td>The infrastructure underneath the apps — identity, records, governance primitives, federation primitives. Domain-agnostic.</td>
+</tr>
+<tr>
+<td><strong>App</strong></td>
+<td>A piece of software that knows what <em>kind</em> of cooperative this is (worker, housing, ag, consumer, credit union, federation). Apps add meaning; the substrate enforces rules.</td>
+</tr>
+<tr>
+<td><strong>Receipt</strong></td>
+<td>A signed, durable record that something happened, verifiable independently of any platform.</td>
+</tr>
+<tr>
+<td><strong>Settlement</strong></td>
+<td>The final, durable record of an economic event. Replaces &ldquo;payment&rdquo; in ICN&rsquo;s vocabulary (a regulatory choice).</td>
+</tr>
+<tr>
+<td><strong>Obligation</strong></td>
+<td>A forward-looking commitment created by a decision. Includes patronage allocations, advisor agreements, federation commitments.</td>
+</tr>
+<tr>
+<td><strong>Allocation</strong></td>
+<td>An assignment of credits, patronage refunds, or other resources. Replaces &ldquo;distribution&rdquo; in some contexts.</td>
+</tr>
+<tr>
+<td><strong>Position</strong></td>
+<td>A view of where a member or organization stands relative to credits, obligations, equity. Replaces &ldquo;balance&rdquo; / &ldquo;account.&rdquo;</td>
+</tr>
+<tr>
+<td><strong>Provenance</strong></td>
+<td>The full chain of authority and evidence behind a record.</td>
+</tr>
+<tr>
+<td><strong>Federation</strong></td>
+<td>A coordination layer between cooperatives that lets them verify each other and settle obligations across boundaries, without surrendering to a common platform.</td>
+</tr>
+<tr>
+<td><strong>DID</strong></td>
+<td>Decentralized Identifier. A cryptographic identity primitive. Members and organizations have DIDs.</td>
+</tr>
+<tr>
+<td><strong>CCL</strong></td>
+<td>Cooperative Contract Language. The domain-specific language ICN uses to express governance rules, allocation formulas, and lifecycle constraints. Inspectable and amendable.</td>
+</tr>
+<tr>
+<td><strong>Pre-pilot</strong></td>
+<td>The current status of ICN. Substrate runs. Human-facing surfaces don&rsquo;t yet. No live cooperative is running on ICN as production infrastructure.</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>How to get involved</h2>
+<p>Today:
+- Read this document. Push back. Tell us where it&rsquo;s wrong.
+- If you&rsquo;re at a movement institution and the federation layer is interesting, set up a conversation. We&rsquo;re not trying to sell you anything.
+- If you run a workshop or session at a movement gathering and want to include &ldquo;what would coop-owned infrastructure look like?&rdquo; as a topic, we&rsquo;ll show up.
+- If you have a sanitized tabletop scenario you&rsquo;d be willing to walk through, that&rsquo;s the single most valuable thing.</p>
+<p>Not today (yet):
+- Don&rsquo;t migrate your cooperative onto ICN. Pre-pilot means pre-pilot. The substrate runs; the surfaces a member would use don&rsquo;t.
+- Don&rsquo;t recommend ICN to a coop forming today. Use Launch.coop and your local TA provider. Come back when ICN is past pilot.
+- Don&rsquo;t try to integrate ICN with existing systems in production. The integration surfaces are not ready.</p>
+<p>Where to find more:
+- Source code, threat model, technical docs: <a href="https://github.com/InterCooperative-Network/icn">github.com/InterCooperative-Network/icn</a>
+- Architecture overview: <code>docs/ARCHITECTURE.md</code>
+- Threat model: <code>docs/security/threat-model.md</code>
+- Economic vision: <code>docs/design/economics/ECONOMIC_VISION.md</code>
+- This document: <code>docs/strategy/ICN_FOR_COOPERATIVE_MOVEMENT.md</code></p>
+<hr />
+<h2>Closing</h2>
+<p>The cooperative movement already exists. Has for a long time. What it doesn&rsquo;t have yet is shared infrastructure that survives turnover, vendor changes, and the years between annual gatherings without requiring everyone to reconstruct the institution from email and exhausted memory.</p>
+<p>ICN is one attempt at that infrastructure. Open source. Self-hosted. Movement-owned in long-term intent. Pre-pilot today.</p>
+<p>The point is for a cooperative and solidarity-economy ecosystem to materially exist, not just ideologically exist. We&rsquo;re not promising we&rsquo;ll get there. We&rsquo;re saying it&rsquo;s worth trying.</p>
+</main>
+</body>
+</html>

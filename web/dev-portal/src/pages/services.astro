@@ -1,0 +1,54 @@
+---
+import ScopedPage from "../layouts/ScopedPage.astro";
+import { services, serviceGroups } from "../data/services";
+
+const grouped = (Object.keys(serviceGroups) as Array<keyof typeof serviceGroups>).map((g) => ({
+  group: g,
+  label: serviceGroups[g].label,
+  items: services.filter((s) => s.group === g),
+}));
+---
+<ScopedPage title="Services" scope="public" description="The 'how do I' catalog. The cooperative version of HR + payroll + IT helpdesk.">
+  <p style="color: var(--text-muted); max-width: 720px; margin-bottom: 24px;">
+    The cooperative version of a corporate intranet's HR / payroll / IT-helpdesk index. Each entry is a question a member might have, answered by a process or a link. Edit in <code>src/data/services.ts</code>.
+  </p>
+
+  {grouped.map((g) => (
+    <section class="section">
+      <h2>{g.label}</h2>
+      <div class="card svc-card">
+        {g.items.map((s) => (
+          <a class="svc-row" href={s.href} target={s.external ? "_blank" : undefined} rel={s.external ? "noopener noreferrer" : undefined}>
+            <span class="svc-icon">{s.icon}</span>
+            <div>
+              <div class="svc-q">{s.question}{s.external && <span class="svc-ext"> ↗</span>}</div>
+              <div class="svc-b">{s.blurb}</div>
+            </div>
+            <span class="svc-arrow">→</span>
+          </a>
+        ))}
+      </div>
+    </section>
+  ))}
+
+  <style>
+    .svc-card { padding: 0; }
+    .svc-row {
+      display: grid;
+      grid-template-columns: 32px 1fr 20px;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      border-top: 1px solid var(--border);
+      color: var(--text);
+      text-decoration: none;
+    }
+    .svc-row:first-child { border-top: none; }
+    .svc-row:hover { background: var(--bg); text-decoration: none; }
+    .svc-icon { font-size: 18px; }
+    .svc-q { font-weight: 600; font-size: 14px; }
+    .svc-ext { color: var(--text-faint); font-size: 11px; }
+    .svc-b { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+    .svc-arrow { color: var(--text-faint); font-size: 14px; }
+  </style>
+</ScopedPage>

@@ -1,0 +1,42 @@
+/* ============================================================
+   THEME: civic
+   Use for: serious peer-to-peer documents (movement-facing,
+   institutional briefings, technical literature). Calm, neutral,
+   confident. Navy accent, deep ink, generous Georgia body.
+   ============================================================ */
+
+:root {
+  --body-font: Georgia, 'Source Serif Pro', 'Charter', 'Iowan Old Style', serif;
+  --header-font: 'Inter', 'Helvetica Neue', 'Arial', system-ui, sans-serif;
+  --mono-font: 'JetBrains Mono', 'Consolas', 'Menlo', monospace;
+  --body-leading: 1.55;
+  --page-margin: 0.95in;
+
+  /* Color palette: Midnight Executive-ish, calm and serious */
+  --ink: #1A1D21;
+  --ink-soft: #4A4F55;
+  --ink-faint: #8A8F95;
+  --paper: #FCFCFA;
+  --accent: #2B5876;          /* deep navy/teal */
+  --accent-dark: #1E3F58;
+  --rule: #D9DDE2;
+  --rule-strong: #1A1D21;
+  --quote-bg: #EFF3F7;
+  --callout-bg: #EFF3F7;
+  --code-bg: #F1F3F5;
+  --table-bg: #FFFFFF;
+  --table-header-bg: #EFF3F7;
+
+  --cover-title-size: 4.0rem;
+  --cover-title-weight: 700;
+}
+
+/* Civic theme details */
+h1 { letter-spacing: -0.015em; }
+h2 { font-weight: 700; }
+
+/* Slight italic for blockquote in civic */
+blockquote { font-style: italic; color: var(--ink-soft); }
+
+/* Table left-column emphasis */
+table td:first-child { color: var(--accent-dark); font-weight: 600; }

@@ -1,0 +1,57 @@
+---
+import type { Identity } from "../lib/scope-policy";
+interface Props {
+  identity: Identity;
+  current?: string;
+}
+const { identity, current } = Astro.props;
+
+// Top-level sections — the launcher mental model. Deeper destinations live
+// underneath each, but the nav stays flat for legibility.
+const publicLinks = [
+  { href: "/",          label: "Home" },
+  { href: "/health",    label: "Health" },
+  { href: "/tools",     label: "Tools" },
+  { href: "/services",  label: "Services" },
+  { href: "/treasury",  label: "Treasury" },
+  { href: "/directory", label: "Directory" },
+  { href: "/calendar",  label: "Calendar" },
+  { href: "/roadmap",   label: "Roadmap" },
+  { href: "/repos",     label: "Repos" },
+];
+
+const insideLinks = [
+  { href: "/inside",            label: "Inside" },
+  { href: "/inside/notices",    label: "Bulletin" },
+  { href: "/inside/standups",   label: "Check-ins" },
+];
+
+const signedIn = identity.kind === "github";
+---
+<header class="site-header">
+  <div class="inner">
+    <a href="/" class="brand" aria-label="icn.zone home">
+      <span class="dot"></span><code>icn.zone</code>
+    </a>
+    <nav class="primary" aria-label="primary">
+      {publicLinks.map((l) => (
+        <a href={l.href} class={current === l.href ? "active" : ""}>{l.label}</a>
+      ))}
+      {signedIn && <span class="inside-divider" aria-hidden="true"></span>}
+      {signedIn && insideLinks.map((l) => (
+        <a href={l.href} class={current === l.href ? "active" : ""}>{l.label}</a>
+      ))}
+    </nav>
+    <div class="session-chip">
+      {signedIn ? (
+        <span>
+          <strong>@{identity.kind === "github" ? identity.login : ""}</strong>
+          {" · "}
+          <a href="/api/auth/signout" aria-label="sign out">sign out</a>
+        </span>
+      ) : (
+        <a href="/sign-in" class="btn" style="padding: 4px 10px; font-size: 13px;">Sign in</a>
+      )}
+    </div>
+  </div>
+</header>

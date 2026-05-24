@@ -1,58 +1,65 @@
-# Grant Application Artifacts
+---
+Status: operational
+Canonical: yes
+Last Reviewed: 2026-05-19
+---
 
-**Modular, reusable materials for ICN grant applications. March 2026.**
+# ICN Funding
 
-## How to Use These Files
+Working materials for ICN fundraising. **As of May 2026 this directory was refreshed** — the March 2026 funder-specific assembly notes (Outta Excuses, Verizon Digital Ready) are stale and have been removed from this README; check git history if you need to reference them.
 
-Each file is a self-contained module. Compose them per funder:
+## Start here
 
-| File | What It Is | Word Count |
-|------|-----------|------------|
-| [grant-one-pager.md](grant-one-pager.md) | Executive summary for any funder | ~600 |
-| [grant-narrative-core.md](grant-narrative-core.md) | Problem/solution/evidence narrative | ~1,500 |
-| [budget-skeleton.md](budget-skeleton.md) | Budget template with 3 tier examples | ~400 |
-| [milestones.md](milestones.md) | Timeline from current state through pilot | ~500 |
-| [compliance-architecture.md](compliance-architecture.md) | Regulatory-safe architecture explanation | ~800 |
-| [pilot-readiness.md](pilot-readiness.md) | What works, what's close, pilot requirements | ~800 |
+| File | What it is | Status |
+|------|-----------|--------|
+| [`funding-pipeline.md`](funding-pipeline.md) | **Master target list** — ranked funders, deadlines, fit assessments, status | Operational, edit directly |
+| [`budget-skeleton.md`](budget-skeleton.md) | Budget template by category + grant tier — now includes hardware lines | Operational |
+| [`applications/`](applications/) | Per-funder draft applications + cultivation notes | One file per active target |
 
-## Per-Funder Assembly
+## Per-funder applications
 
-### Outta Excuses Foundation ($500-3,000, due Mar 31)
-- One-pager (full)
-- Narrative core (Problem + Solution sections)
-- Budget skeleton (micro-grant tier)
-- Pilot readiness (ideal partner section)
+Active drafts in [`applications/`](applications/):
 
-### Verizon Digital Ready ($10,000, due Mar 31)
-- One-pager (full)
-- Narrative core (full)
-- Budget skeleton (small grant tier)
-- Milestones (near-term section)
-- Pilot readiness (full)
+| Funder | Status | Amount target | Deadline |
+|---|---|---|---|
+| [NLnet NGI Zero Commons](applications/nlnet-ngi-zero-commons.md) | 🟢 Draft, submit by Jun 1 | €30K–€50K | 2026-06-01 |
+| [Sovereign Tech Fund](applications/sovereign-tech-fund.md) | 🟢 Draft, rolling | €100K–€200K | Rolling |
+| [Mozilla Democracy x AI](applications/mozilla-democracy-ai.md) | 🟡 Draft, verify cohort window | $50K | 2026 cohort |
+| [ACCES-VR Self-Employment](applications/acces-vr-self-employment.md) | 🤝 In motion | Up to $15K | Process-based |
+| [NGI Sargasso (EU partner search)](applications/ngi-sargasso-eu-partner-search.md) | 🤝 Cultivation | TBD | Multi-month |
 
-### Sovereign Tech Fund (€50,000+, target Apr 2026)
-- Narrative core (full)
-- Compliance architecture (full)
-- Budget skeleton (medium grant tier)
-- Milestones (full)
-- Pilot readiness (full)
-- Technical whitepaper: `../ICN-Technical-Whitepaper.md`
+## Existing source documents (not part of this directory but referenced)
 
-## Placeholders
+| File | What it is |
+|---|---|
+| [`../ICN-Pitch.md`](../ICN-Pitch.md) | Full narrative pitch |
+| [`../ICN-Definition.md`](../ICN-Definition.md) | Problem/solution definition |
+| [`../ICN-Gap-Analysis-March-2026.md`](../ICN-Gap-Analysis-March-2026.md) | System-by-system reality check |
+| [`../ICN-Technical-Whitepaper.md`](../ICN-Technical-Whitepaper.md) | Technical architecture |
+| [`../../status/icn-status-march-2026.md`](../../status/icn-status-march-2026.md) | Current project status |
 
-Items marked `[PLACEHOLDER]` require external inputs:
-- Exact compensation rates (SSDI-compliant)
-- Named pilot partners
-- Fiscal sponsor fee structure (Alchemical)
-- ACCES-VR plan status
-- Contract developer rates
+Some of these (the March-2026-dated ones) may also be stale — review before citing in any application.
 
-## Source Documents
+## Preserved (March 2026, may need refresh)
 
-These artifacts draw from:
-- `../ICN-Pitch.md` — Full narrative pitch
-- `../ICN-Definition.md` — Problem/solution definition
-- `../ICN-Gap-Analysis-March-2026.md` — System-by-system reality check
-- `../ICN-Technical-Whitepaper.md` — Technical architecture
-- `../../status/icn-status-march-2026.md` — Current project status
-- `../../status/demo-audit-2026-03-19.md` — Demo flow audit results
+These files predate the May 2026 funding research pass. Review them before reusing:
+
+- [`grant-narrative-core.md`](grant-narrative-core.md) — 1,500-word problem/solution narrative
+- [`grant-one-pager.md`](grant-one-pager.md) — exec summary; metrics from March 2026 may need refresh
+- [`milestones.md`](milestones.md) — timeline; check against current phase status
+- [`compliance-architecture.md`](compliance-architecture.md) — regulatory-safe architecture explanation
+- [`pilot-readiness.md`](pilot-readiness.md) — pilot status; check against current NYCN partnership state
+
+## Constraints to design every application around
+
+See [`funding-pipeline.md`](funding-pipeline.md) § *Constraints to design around* for the full list. Key ones:
+
+1. **SSDI income limits** ($1,690/mo SGA threshold) — structure payments through fiscal sponsor; get an accountant
+2. **Sovereign Tech Fund's no-double-public-funding rule** — carve discrete slices per funder
+3. **NLnet's libre license requirement** — ICN code is AGPL ✓; docs need CC-BY-SA or equivalent
+4. **Capital Impact's worker-coop preference** — ICN incorporation decision pending
+
+## Edit log
+
+- 2026-05-19 — Major refresh. New `funding-pipeline.md` based on first systematic research pass. New `applications/` folder. Refreshed `budget-skeleton.md` to include hardware infrastructure category (was entirely missing). Per-funder assembly notes from March 2026 removed (Outta Excuses, Verizon Digital Ready windows have passed).
+- 2026-03 — Original artifacts created (preserved in git history; see `grant-narrative-core.md`, `grant-one-pager.md`, `milestones.md`, `compliance-architecture.md`, `pilot-readiness.md`).

@@ -1,0 +1,80 @@
+---
+import ScopedPage from "../../layouts/ScopedPage.astro";
+import { pipelineSummary } from "../../data/funding";
+
+const fp = pipelineSummary();
+---
+<ScopedPage title="Treasury" scope="public" description="ICN's treasury: funding pipeline, hardware budget, fiscal sponsorship.">
+  <p style="color: var(--text-muted); max-width: 720px;">
+    Where the money is, where it's coming from, where it's going. ICN's principle is that internal finances are visible to members, not admin-secret. This page is the index.
+  </p>
+
+  <section class="section">
+    <h2>Funding pipeline</h2>
+    <div class="card">
+      <p style="margin-top: 0;">
+        Active fundraising. {fp.applyNow} targets ready to apply to right now; {fp.inMotion} in motion; {fp.prep} in prep; {fp.relationship} relationship plays.
+      </p>
+      <p style="margin-bottom: 0;">
+        <a href="/treasury/funding" class="btn">Open the funding pipeline →</a>
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Hardware budget</h2>
+    <div class="card">
+      <p style="margin-top: 0;">
+        Consolidated view of homelab + federation-ready hardware needs by tier (minimum-viable / pilot-ready / federation-ready). Feeds into grant proposal infrastructure line items.
+      </p>
+      <p style="margin-bottom: 0;">
+        Source: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/strategy/grants/budget-skeleton.md" target="_blank" rel="noopener noreferrer"><code>docs/strategy/grants/budget-skeleton.md</code> §2 Hardware Infrastructure</a>
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Fiscal sponsorship</h2>
+    <div class="card">
+      <p style="margin-top: 0;">
+        Current fiscal sponsor: <strong>Alchemical</strong>. Under evaluation: <a href="https://oscollective.org/" target="_blank" rel="noopener noreferrer">Open Source Collective</a> (501(c)(6) for FOSS projects).
+      </p>
+      <p style="margin-bottom: 0;">
+        Compare structure + fees before any larger grant lands.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Sponsors</h2>
+    <div class="card">
+      <p style="margin-top: 0;">
+        Live: <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener noreferrer">GitHub Sponsors</a>. One conservative tier; no governance-for-pay implications. Sponsor profile language tightening is a pending small task.
+      </p>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Constraints affecting everything</h2>
+    <div class="card" style="font-size: 13px;">
+      <ul style="margin: 0;">
+        <li><strong>SSDI income limits</strong> ($1,690/mo SGA threshold) — payments structured through fiscal sponsor, not personal income</li>
+        <li><strong>STF no-double-funding rule</strong> — discrete slices per funder</li>
+        <li><strong>Libre license requirement</strong> on NLnet funded code + docs (CC-BY-SA for docs)</li>
+        <li><strong>Co-op incorporation decision</strong> pending — affects Capital Impact eligibility</li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Doctrine</h2>
+    <div class="card" style="font-size: 13px; color: var(--text-muted);">
+      <p style="margin-top: 0;">
+        ICN's treasury is visible to members because that's the cooperative principle: legitimacy of process is auditable through channels affected parties consent to. The fact that not every number here is exact yet is honest — placeholders signal "still in motion," and pipelines show direction.
+      </p>
+      <p style="margin-bottom: 0;">
+        See <a href="https://github.com/InterCooperative-Network/icn/blob/main/web/dev-portal/content/scope-doctrine.md" target="_blank" rel="noopener noreferrer">scope doctrine</a> for why this is public-by-default rather than admin-only.
+      </p>
+    </div>
+  </section>
+</ScopedPage>

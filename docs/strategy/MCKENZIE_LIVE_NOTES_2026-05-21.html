@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>McKenzie Call — Live Notes — 2026-05-21</title>
+<style>
+  @page { size: letter; margin: 0.5in 0.6in; }
+  :root {
+    --ink: #0e1116;
+    --soft: #4a5160;
+    --rule: #c8c9cc;
+    --accent: #2c4a73;
+    --tint: #f4f1ea;
+    --tint2: #eef1f5;
+    --note: #bfc3c9;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: #fff; color: var(--ink); }
+  body {
+    font-family: "Charter", "Iowan Old Style", "Georgia", serif;
+    font-size: 10.5pt;
+    line-height: 1.36;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  .page { max-width: 7.2in; margin: 0 auto; padding: 0.2in 0; }
+  .page + .page { page-break-before: always; }
+  .masthead { border-bottom: 2px solid var(--ink); padding-bottom: 6px; margin-bottom: 12px; }
+  .masthead-row {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
+    font-size: 9pt; color: var(--soft); letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .masthead-title {
+    font-family: "Inter", sans-serif;
+    font-weight: 700; font-size: 20pt; margin-top: 4px; letter-spacing: -0.01em;
+  }
+  .masthead-subtitle { color: var(--soft); font-size: 10.5pt; font-style: italic; margin-top: 2px; }
+  h2 {
+    font-family: "Inter", sans-serif; font-weight: 700; font-size: 11pt;
+    text-transform: uppercase; letter-spacing: 0.07em; color: var(--accent);
+    margin: 13px 0 5px; padding-bottom: 2px; border-bottom: 1px solid var(--rule);
+  }
+  h3 {
+    font-family: "Inter", sans-serif; font-weight: 600; font-size: 9.5pt;
+    text-transform: uppercase; letter-spacing: 0.05em; color: var(--soft);
+    margin: 8px 0 2px;
+  }
+  p { margin: 0 0 6px; }
+  ul, ol { margin: 0 0 6px; padding-left: 1.1em; }
+  li { margin-bottom: 2px; }
+  .kicker { font-family: "Inter", sans-serif; font-weight: 600; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); }
+  blockquote { margin: 6px 0 10px; padding: 6px 12px; border-left: 3px solid var(--accent); background: var(--tint); font-style: italic; font-size: 10pt; }
+  blockquote cite { display: block; font-style: normal; font-size: 8.5pt; color: var(--soft); margin-top: 3px; }
+  code { font-family: "JetBrains Mono", "Menlo", monospace; font-size: 9pt; background: var(--tint); padding: 1px 4px; border-radius: 2px; }
+  .twocol { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { border: 1px solid var(--rule); padding: 8px 10px; }
+  .checkbox { display: inline-block; width: 11px; height: 11px; border: 1.2px solid var(--ink); margin-right: 6px; vertical-align: -1px; }
+
+  /* note-taking blank space */
+  .notebox {
+    border: 1px solid var(--rule);
+    padding: 8px 10px;
+    margin: 4px 0 10px;
+    min-height: 0.7in;
+    background:
+      repeating-linear-gradient(
+        to bottom,
+        transparent 0,
+        transparent 18px,
+        var(--note) 18px,
+        var(--note) 18.5px
+      );
+    background-position: 0 14px;
+  }
+  .notebox.short { min-height: 0.5in; }
+  .notebox.tall { min-height: 1.2in; }
+  .notebox.xtall { min-height: 1.6in; }
+  .notebox-label {
+    font-family: "Inter", sans-serif; font-size: 9pt; color: var(--soft);
+    text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 2px;
+  }
+  .ask {
+    font-family: "Inter", sans-serif; font-size: 10pt; font-weight: 600; color: var(--ink);
+    margin: 6px 0 2px;
+  }
+  .listen-for {
+    font-size: 9pt; color: var(--soft); font-style: italic; margin: 0 0 4px;
+  }
+  .footer-rule { border-top: 1px solid var(--rule); margin-top: 12px; padding-top: 6px; font-size: 9pt; color: var(--soft); }
+  .timestrip {
+    display: grid; grid-template-columns: 60px 1fr; gap: 8px;
+    font-size: 10pt; margin: 4px 0 6px;
+  }
+  .timestrip .t { font-family: "Inter", sans-serif; font-weight: 600; color: var(--accent); font-size: 9pt; }
+  .pill { display: inline-block; font-family: "Inter", sans-serif; font-size: 8.5pt; padding: 1px 6px; border-radius: 8px; background: var(--tint2); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<!-- ============== PAGE 1: PRE-CALL ORIENTATION ============== -->
+<section class="page">
+  <header class="masthead">
+    <div class="masthead-row">
+      <span>McKenzie Jones</span>
+      <span>Thu 2026-05-21 · 10:30–11:30 EDT</span>
+    </div>
+    <div class="masthead-title">Worker Place · Launch Cooperative.</div>
+    <div class="masthead-subtitle">Google Meet · <code>meet.google.com/ahi-ptqr-zfb</code> · 2025 NY Cooperative Summit content-committee colleague.</div>
+  </header>
+
+  <h2>Pre-call orientation (read twice, slowly)</h2>
+  <p>
+    McKenzie is a known collaborator from the 2025 Summit content committee. She ran the platform-coops session with Ethan Winn. She has direct co-op development practice through The Worker Place: governance documents, decision-making, membership, conflict resolution, bylaw change. Her vocabulary leads. She opened the patronage-and-capital-account axis herself in her May 1 email.
+  </p>
+  <blockquote>
+    "A decision making and member standing tool would have been so helpful for many of my cooperative projects! And if there is economic info, like internal capital account balances or patronage info, that would be a huge deal."
+    <cite>— McKenzie Jones, May 1 2026</cite>
+  </blockquote>
+
+  <h2>The single goal</h2>
+  <p>
+    Leave the call with <strong>one identified seam</strong> (where Launch's formation workflow could plausibly hand off into ICN-style durable governance), <strong>one rehearsal candidate</strong> (a sanitized scenario she names), <strong>or</strong> a clear "not yet" with reasons. Any of those three is a win. None of those three would also be useful information.
+  </p>
+
+  <h2>First-minute moves</h2>
+  <ul>
+    <li><span class="checkbox"></span> Ask who else is on the call (her May 1 email mentioned "another member who is curious").</li>
+    <li><span class="checkbox"></span> Acknowledge Launch is making formation actually doable. That's real work.</li>
+    <li><span class="checkbox"></span> Name back to her: the patronage and capital-account history piece in her email is where I want to spend the time.</li>
+    <li><span class="checkbox"></span> Frame as reciprocal: I want to learn Launch's workflow, share enough ICN shape to ask better questions, and ask where the map is wrong.</li>
+  </ul>
+
+  <h3>Who's in the room</h3>
+  <div class="notebox short"><span class="notebox-label">Names · roles · context</span></div>
+
+  <h2>Tone discipline (one-line reminders)</h2>
+  <div class="twocol">
+    <div class="card">
+      <h3>Do</h3>
+      <ul>
+        <li>Listen more than talk.</li>
+        <li>"I don't know" is allowed.</li>
+        <li>Leave silence after questions.</li>
+        <li>Ask for one specific story, not feature feedback.</li>
+        <li>Be calm about constraints; "single maintainer" is honest.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Don't</h3>
+      <ul>
+        <li>List features.</li>
+        <li>Claim production-ready.</li>
+        <li>Say "blockchain," "crypto," "currency," "token," "wallet."</li>
+        <li>Promise a pilot.</li>
+        <li>Ask for her data.</li>
+      </ul>
+    </div>
+  </div>
+
+  <h2>Hold-in-mind: the vocab discipline</h2>
+  <p>
+    Settlement, obligation, allocation, position, receipt, provenance, evidence, unit. <strong>Internal capital account records are governance evidence</strong>, not assets. Patronage is an allocation rule, not a transfer.
+  </p>
+
+  <div class="footer-rule"><span class="kicker">Page 1 / 4</span> · before the call</div>
+</section>
+
+<!-- ============== PAGE 2: AGENDA + LISTEN-FORS ============== -->
+<section class="page">
+  <header class="masthead">
+    <div class="masthead-row">
+      <span>Agenda · the ask · listen-fors</span>
+      <span>Page 2 / 4</span>
+    </div>
+  </header>
+
+  <h2>Loose agenda (10:30–11:30 EDT)</h2>
+  <div class="timestrip"><div class="t">10:30</div><div>Hellos. Who else is on the call. What McKenzie wants from the hour.</div></div>
+  <div class="timestrip"><div class="t">10:35</div><div>60-second opener. Launch is making formation doable. ICN is the layer underneath. Not a pitch, not a replacement.</div></div>
+  <div class="timestrip"><div class="t">10:40</div><div><strong>The one ask</strong> — "Tell me about one co-op project where the patronage or capital-account record broke." Then listen.</div></div>
+  <div class="timestrip"><div class="t">10:55</div><div>Reflect back what she said. Map it onto the spine (standing → authority → decision → obligation → effect → receipt → evidence → review).</div></div>
+  <div class="timestrip"><div class="t">11:05</div><div>Test the seam. Walk the formation → durable-governance handoff against her example. Is there a clean break or a fuzzy one?</div></div>
+  <div class="timestrip"><div class="t">11:15</div><div>"What is the smallest sanitized rehearsal worth doing?" Who else should be in that room?</div></div>
+  <div class="timestrip"><div class="t">11:25</div><div>Close. Recap one seam identified. Agree cadence or "not yet." Thank her.</div></div>
+
+  <h2>The one ask — verbatim</h2>
+  <blockquote>
+    "Can you tell me about one cooperative project you've been part of where the patronage or internal-capital-account record broke, or didn't survive a handoff, or couldn't be trusted later? With names and numbers stripped — just the shape of what didn't work."
+  </blockquote>
+
+  <h3>Her answer (capture verbatim where possible)</h3>
+  <div class="notebox tall"><span class="notebox-label">What broke · who lost trust · what survived</span></div>
+
+  <h2>Listen-fors (mark when you hear them)</h2>
+  <ul>
+    <li><span class="checkbox"></span> A specific co-op or specific moment (not a general gripe).</li>
+    <li><span class="checkbox"></span> A handoff that lost state (advisor → operating, founder → board, vendor → DIY).</li>
+    <li><span class="checkbox"></span> A record that needed an outside party to trust it later (CPA, IRS, buyer, board).</li>
+    <li><span class="checkbox"></span> A piece she thinks is genuinely accounting (CPA territory) vs. genuinely governance.</li>
+    <li><span class="checkbox"></span> A feeling of "no good tool exists for this."</li>
+    <li><span class="checkbox"></span> A hint at Launch's roadmap intentions or gap.</li>
+    <li><span class="checkbox"></span> Skepticism — sounds like a previous tech-for-coops vendor burned her.</li>
+  </ul>
+
+  <h2>Secondary questions (only if the first lands)</h2>
+  <p class="listen-for">Ask one at a time. Leave silence after each.</p>
+  <ol>
+    <li>Where does the ICA / patronage record first enter a Launch formation workflow today?</li>
+    <li>Who needs to <em>trust</em> those records later — and why?</li>
+    <li>What is <em>governance evidence</em> vs. <em>accounting record</em> vs. <em>professional execution</em> in your head?</li>
+    <li>Where does it break across founder rotation, advisor turnover, fiscal year close, member exit?</li>
+    <li>What would be dangerous for ICN to claim or automate?</li>
+    <li>What would be useful for ICN to provide as <em>provenance</em>, without being the system of record?</li>
+  </ol>
+
+  <h2>Tertiary terrain (only if she pivots from economics)</h2>
+  <ul>
+    <li>Standing / decision-making (her secondary phrase from May 1 — "a decision making and member standing tool").</li>
+    <li>Summit / NYCN as concrete rehearsal surface (content/session → public program, feedback → next-year obligation).</li>
+    <li>Federation shape — Worker Place + comp.coop + Launch as a multi-org case where standing crosses boundaries.</li>
+  </ul>
+
+  <div class="footer-rule"><span class="kicker">Page 2 / 4</span></div>
+</section>
+
+<!-- ============== PAGE 3: NOTE-TAKING SURFACE ============== -->
+<section class="page">
+  <header class="masthead">
+    <div class="masthead-row">
+      <span>Capture during the call</span>
+      <span>Page 3 / 4</span>
+    </div>
+  </header>
+
+  <h2>What McKenzie actually wants from this hour</h2>
+  <div class="notebox short"></div>
+
+  <h2>Her stories / examples / projects named</h2>
+  <div class="notebox xtall"></div>
+
+  <h2>The spine, against her example</h2>
+  <p class="listen-for">Mark which beats break or fuzz in her story.</p>
+  <ul>
+    <li><span class="checkbox"></span> Standing — who has it</li>
+    <li><span class="checkbox"></span> Authority — who can act, certify</li>
+    <li><span class="checkbox"></span> Decision — what was decided</li>
+    <li><span class="checkbox"></span> Obligation — who owes what to whom</li>
+    <li><span class="checkbox"></span> Effect — what allocation / event happened</li>
+    <li><span class="checkbox"></span> Receipt — what artifact exists</li>
+    <li><span class="checkbox"></span> Evidence — what survives long-term</li>
+    <li><span class="checkbox"></span> Review — who can verify later (CPA, board, member, IRS)</li>
+  </ul>
+
+  <h2>Quotes worth keeping verbatim</h2>
+  <div class="notebox tall"></div>
+
+  <h2>Things I said I'd send / do</h2>
+  <div class="notebox short"></div>
+
+  <h2>Things she said she'd send / do</h2>
+  <div class="notebox short"></div>
+
+  <div class="footer-rule"><span class="kicker">Page 3 / 4</span></div>
+</section>
+
+<!-- ============== PAGE 4: POST-CALL CAPTURE ============== -->
+<section class="page">
+  <header class="masthead">
+    <div class="masthead-row">
+      <span>After the call · sanitized · within 24 hours</span>
+      <span>Page 4 / 4</span>
+    </div>
+  </header>
+
+  <h2>What Launch / McKenzie identified as real or useful</h2>
+  <div class="notebox tall"></div>
+
+  <h2>What they identified as wrong / overbuilt / unclear</h2>
+  <div class="notebox tall"></div>
+
+  <h2>Clean seam identified (formation → governance)</h2>
+  <div class="notebox tall"></div>
+
+  <h2>Seam rejected / not ready</h2>
+  <div class="notebox short"></div>
+
+  <h2>Smallest sanitized rehearsal candidate</h2>
+  <p class="listen-for">A fictional N-member co-op, one cycle, one disputed entry. Concrete.</p>
+  <div class="notebox tall"></div>
+
+  <h2>Who else should be in the next room</h2>
+  <p class="listen-for">CPA · co-op lawyer · TA provider · federation organizer · Frank · Joe · Anh-Thu?</p>
+  <div class="notebox short"></div>
+
+  <h2>Cadence / next contact</h2>
+  <div class="notebox short"></div>
+
+  <h2>Docs / artifacts to revise based on what was learned</h2>
+  <div class="notebox short"></div>
+
+  <h2>Personal calibration</h2>
+  <p class="listen-for">How did this feel? Where did I drift from the discipline? What do I need to practice for the next conversation?</p>
+  <div class="notebox tall"></div>
+
+  <div class="footer-rule">
+    <span class="kicker">After capture</span> · paste sanitized version into §15 of <code>COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md</code> · decide cadence · update sprint plan if a seam landed.
+  </div>
+</section>
+
+</body>
+</html>

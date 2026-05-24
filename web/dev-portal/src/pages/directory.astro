@@ -1,0 +1,58 @@
+---
+import ScopedPage from "../layouts/ScopedPage.astro";
+import { standing } from "../data/standing";
+
+const members = Object.entries(standing).map(([login, grants]) => ({
+  login,
+  contributor: !!grants.contributor,
+  coops: grants.cooperativeMember ?? [],
+  stewardships: grants.steward ?? [],
+}));
+---
+<ScopedPage title="Directory" scope="public" description="Who's here. Who has what standing. How to reach them.">
+  <p style="color: var(--text-muted); max-width: 720px; margin-bottom: 24px;">
+    Public-facing member directory. Standing today is the hand-maintained allowlist in <code>src/data/standing.ts</code>; eventually a view over the trust graph. Sign-in adds a richer view at <a href="/inside/contributors"><code>/inside/contributors</code></a>.
+  </p>
+
+  <section class="section">
+    <div class="member-grid">
+      {members.map((m) => (
+        <div class="member-card card">
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <span class="avatar-lg" aria-hidden="true">{m.login.slice(0, 2).toUpperCase()}</span>
+            <div>
+              <div style="font-weight: 700; font-size: 15px;"><a href={`https://github.com/${m.login}`}>@{m.login}</a></div>
+              <div style="font-size: 12px; color: var(--text-muted); margin-top: 2px;">
+                {m.stewardships.length > 0 && <span class="scope-badge critical" style="margin-right: 4px;">steward</span>}
+                {m.coops.length > 0 && <span class="scope-badge warn" style="margin-right: 4px;">member: {m.coops.join(", ")}</span>}
+                {m.contributor && <span class="scope-badge info">contributor</span>}
+              </div>
+            </div>
+          </div>
+          {m.stewardships.length > 0 && (
+            <div style="font-size: 12px; color: var(--text-muted); margin-top: 10px;">
+              Stewards: <strong>{m.stewardships.join(", ")}</strong>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <div class="stub">
+    <h2>What's missing</h2>
+    <p>Per-member focus area, current contributions in flight, contact (Matrix handle, etc.), pronouns, timezone. Each member will be able to maintain their own page at <code>/people/&lt;login&gt;</code>.</p>
+  </div>
+
+  <style>
+    .member-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+    .member-card { padding: 14px; }
+    .avatar-lg {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 44px; height: 44px; border-radius: 50%;
+      background: linear-gradient(135deg, #10b981, #6366f1);
+      color: white; font-size: 14px; font-weight: 700;
+      flex-shrink: 0;
+    }
+  </style>
+</ScopedPage>

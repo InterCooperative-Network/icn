@@ -1,0 +1,33 @@
+---
+import ScopedPage from "../layouts/ScopedPage.astro";
+---
+<ScopedPage title="Glossary" scope="public" description="ICN vocabulary. Regulatory-safe nouns and what they mean.">
+  <p style="color: var(--text-muted); max-width: 720px; margin-bottom: 24px;">
+    ICN uses a specific vocabulary by design. The terms below are <strong>regulatory-safe</strong> — they describe what's actually happening without using nouns that carry legal or financial-product baggage. Use these; not their not-used counterparts.
+  </p>
+
+  <div class="card" style="font-size: 14px;">
+    <table style="width: 100%; border-collapse: collapse;">
+      <thead>
+        <tr style="border-bottom: 1px solid var(--border); text-align: left;">
+          <th style="padding: 8px;">Use</th><th style="padding: 8px;">Not</th><th style="padding: 8px;">Means</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;"><strong>settlement</strong></td><td style="padding: 8px; color: var(--text-faint);">payment</td><td style="padding: 8px;">Final disposition of an obligation between parties.</td></tr>
+        <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;"><strong>position</strong></td><td style="padding: 8px; color: var(--text-faint);">balance</td><td style="padding: 8px;">An account's current standing as a sum of obligations.</td></tr>
+        <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;"><strong>obligation</strong></td><td style="padding: 8px; color: var(--text-faint);">debt, IOU</td><td style="padding: 8px;">An undischarged promise between identified parties.</td></tr>
+        <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;"><strong>allocation</strong></td><td style="padding: 8px; color: var(--text-faint);">transfer</td><td style="padding: 8px;">Assignment of a resource share to a party or purpose.</td></tr>
+        <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;"><strong>unit</strong></td><td style="padding: 8px; color: var(--text-faint);">currency, token, coin</td><td style="padding: 8px;">A counted measure inside a specific accounting system. Not a financial instrument.</td></tr>
+        <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;"><strong>identity</strong></td><td style="padding: 8px; color: var(--text-faint);">wallet, account</td><td style="padding: 8px;">A DID with attached capabilities and standing.</td></tr>
+        <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;"><strong>standing</strong></td><td style="padding: 8px; color: var(--text-faint);">role, permission</td><td style="padding: 8px;">A party's verified position in an entity (member, steward, contributor).</td></tr>
+        <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 8px;"><strong>receipt</strong></td><td style="padding: 8px; color: var(--text-faint);">log entry</td><td style="padding: 8px;">A content-addressed record of an event, signed and durable.</td></tr>
+        <tr><td style="padding: 8px;"><strong>provenance</strong></td><td style="padding: 8px; color: var(--text-faint);">audit log</td><td style="padding: 8px;">The chain of receipts that explains where state came from.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="font-size: 13px; color: var(--text-muted); margin-top: 16px;">
+    This is regulatory framing, not aesthetic preference. ICN is not a financial product, not a token system, not a platform. The vocabulary is what keeps it that way under scrutiny.
+  </p>
+</ScopedPage>

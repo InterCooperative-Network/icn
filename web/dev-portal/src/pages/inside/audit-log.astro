@@ -1,0 +1,58 @@
+---
+import ScopedPage from "../../layouts/ScopedPage.astro";
+import { tail } from "../../lib/audit";
+
+const identity = Astro.locals.identity;
+const myReceipts = identity?.kind === "github"
+  ? tail({ actor: identity, limit: 25 })
+  : [];
+
+function fmt(iso: string) {
+  return new Date(iso).toLocaleString();
+}
+---
+<ScopedPage title="Audit log" scope="staff" description="Your access trail through icn.zone.">
+  <p style="color: var(--text-muted); max-width: 720px; margin-bottom: 20px;">
+    Every scope-gated page you visit on icn.zone leaves an audit receipt. This page shows your own trail — the receipts written under your identity. Other people's receipts are not shown here (they appear in their own audit log; collective access patterns become available only through the redaction policy below).
+  </p>
+
+  <section class="section">
+    <h2>Your last 25 receipts</h2>
+    <div class="card" style="font-size: 13px;">
+      {myReceipts.length === 0 ? (
+        <p style="color: var(--text-faint); font-style: italic;">No receipts recorded for your identity yet. Visit a scoped page to start the trail.</p>
+      ) : (
+        <table style="width: 100%; border-collapse: collapse;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--border); text-align: left;">
+              <th style="padding: 4px;">When</th><th style="padding: 4px;">Resource</th><th style="padding: 4px;">Scope</th><th style="padding: 4px;">Decision</th><th style="padding: 4px;">Authority</th>
+            </tr>
+          </thead>
+          <tbody>
+            {myReceipts.map((r) => (
+              <tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 4px; white-space: nowrap;">{fmt(r.recorded_at)}</td>
+                <td style="padding: 4px;"><code>{r.resource}</code></td>
+                <td style="padding: 4px;"><span class="scope-badge neutral">{r.scope}</span></td>
+                <td style="padding: 4px;"><span class={`scope-badge ${r.decision === "allow" ? "info" : "critical"}`}>{r.decision}</span></td>
+                <td style="padding: 4px; color: var(--text-muted);">{r.authority?.rule ?? r.reason ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Redaction policy</h2>
+    <div class="card" style="font-size: 13px; color: var(--text-muted);">
+      <p style="margin-top: 0;">
+        Today: receipts are written to <code>runtime/access.log</code> on the host. Only the actor named in a receipt sees that receipt through this page. Stewards with audit scope can read the whole log for incident response.
+      </p>
+      <p>
+        Tomorrow: receipts are ADR-0026 receipts in the gateway's opaque receipt store. Their privacy class (members of which sets) determines who sees what. The redaction policy itself is a governance artifact, not a hardcoded rule.
+      </p>
+    </div>
+  </section>
+</ScopedPage>

@@ -1,0 +1,32 @@
+# ICN Printing Press — public-literature manifest.
+#
+# Renders the ICN public-facing documents with appropriate themes.
+# Run: python scripts/printing-press/press.py --manifest scripts/printing-press/manifests/library.toml
+
+[defaults]
+show_cover = true
+hide_frontmatter = true
+meta = "Pre-pilot · Open source · intercooperative.network"
+
+[[documents]]
+input  = "docs/strategy/ICN_HANDBILL.md"
+output = "out/ICN_One_Page_Handbill.pdf"
+theme  = "handbill"
+show_cover = false
+
+[[documents]]
+input  = "docs/strategy/ICN_FOR_COOPERATIVE_MOVEMENT.md"
+output = "out/ICN for the Cooperative Movement.pdf"
+theme  = "civic"
+eyebrow = "INTERCOOPERATIVE NETWORK"
+title    = "Infrastructure for the Cooperative Movement"
+subtitle = "A plain-English introduction for cooperative developers, federation organizers, TA providers, and member-owners."
+
+[[documents]]
+input  = "docs/strategy/ICN_FOR_EVERYONE.md"
+output = "out/ICN in Plain English.pdf"
+theme  = "plain"
+dropcap = true
+eyebrow = "INTERCOOPERATIVE NETWORK"
+title    = "ICN, in Plain English"
+subtitle = "A friendly introduction for anyone who's heard about ICN and asked, \"wait, what is that?\""
