@@ -187,16 +187,17 @@ export class ICNMobileClient extends ICNClient {
    */
   private startBasicNetworkMonitoring(): void {
     const intervalId = setInterval(async () => {
-      try {
-        const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
+      const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      // Like the heartbeat interval, this abort timer must never keep a host
+      // process alive on its own; `unref` is a safe no-op on the RN numeric id.
+      (timeout as { unref?: () => void }).unref?.();
 
+      try {
         await fetch(`${baseUrl}/v1/health`, {
           signal: controller.signal,
         });
-
-        clearTimeout(timeout);
 
         if (this._networkState !== 'online') {
           this._networkState = 'online';
@@ -208,6 +209,10 @@ export class ICNMobileClient extends ICNClient {
           this._networkState = 'offline';
           this.notifyNetworkListeners();
         }
+      } finally {
+        // Always clear the abort timer, including on fetch errors, so a failed
+        // probe never leaves a 5s timer scheduled on every interval tick.
+        clearTimeout(timeout);
       }
     }, 30000); // Check every 30 seconds
 

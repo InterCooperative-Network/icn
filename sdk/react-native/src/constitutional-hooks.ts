@@ -745,8 +745,10 @@ export interface AmendmentResults {
  * function AmendmentVoting({ amendmentId }: { amendmentId: string }) {
  *   const { vote, loading, myVote, error } = useAmendmentVoting(client, amendmentId);
  *
- *   if (myVote) {
- *     return <Text>You voted: {myVote.vote}</Text>;
+ *   // `myVote` is a union: the on-mount fetch returns a status object
+ *   // (`MyAmendmentVoteResponse`) whose `vote` field is the nested record.
+ *   if (myVote && 'has_voted' in myVote && myVote.has_voted) {
+ *     return <Text>You voted: {myVote.vote?.vote}</Text>;
  *   }
  *
  *   return (
@@ -839,9 +841,9 @@ export function useAmendmentVoting(client: ICNMobileClient, amendmentId: string)
  *       <Text>Status: {results.status}</Text>
  *       <Text>Approve: {results.approve_count}</Text>
  *       <Text>Reject: {results.reject_count}</Text>
- *       <Text>Quorum: {results.has_quorum ? 'Met' : 'Not Met'}</Text>
+ *       <Text>Quorum: {results.quorum_achieved ? 'Met' : 'Not Met'}</Text>
  *       <ProgressBar
- *         progress={results.total_votes / results.eligible_voters}
+ *         progress={results.approval_percentage / 100}
  *       />
  *     </View>
  *   );
