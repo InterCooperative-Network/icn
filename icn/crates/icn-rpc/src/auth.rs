@@ -951,6 +951,41 @@ pub mod scopes {
     pub const RECOVERY_WRITE: &str = "recovery:write";
     pub const DISPUTE_WRITE: &str = "dispute:write";
 
+    // Governance class-level write scopes (subdivisions of `governance:write`).
+    //
+    // These are minted by §10 step 1 of
+    // `docs/design/governance/governance-write-decomposition.md`. Handler
+    // migration happens in later steps; this PR only mints the strings and
+    // adds them to the gateway allowlist
+    // (`icn-gateway/src/validation.rs::ALLOWED_SCOPES`). No handler in
+    // `apps/governance/src/http/handlers.rs` references these constants yet.
+    //
+    // `GOVERNANCE_WRITE` remains in place during the migration and is only
+    // retired by step 13 once no production code references it (see §10
+    // step 13 of the design doc).
+    pub const GOVERNANCE_CHARTER_WRITE: &str = "governance:charter:write";
+    pub const GOVERNANCE_PROPOSAL_WRITE: &str = "governance:proposal:write";
+    pub const GOVERNANCE_STEWARD_WRITE: &str = "governance:steward:write";
+    pub const GOVERNANCE_FEDERATION_WRITE: &str = "governance:federation:write";
+    pub const GOVERNANCE_MEETING_WRITE: &str = "governance:meeting:write";
+    pub const GOVERNANCE_ACTIVITY_WRITE: &str = "governance:activity:write";
+    pub const GOVERNANCE_COMMENT_WRITE: &str = "governance:comment:write";
+
+    /// Class-level governance write scopes minted by §10 step 1 of the
+    /// `governance:write` decomposition design. Listed in declaration order so
+    /// downstream consumers (gateway allowlist, RPC method mappings, future
+    /// handler migrations) can iterate over them without depending on the
+    /// individual constant names.
+    pub const GOVERNANCE_CLASS_WRITE: &[&str] = &[
+        GOVERNANCE_CHARTER_WRITE,
+        GOVERNANCE_PROPOSAL_WRITE,
+        GOVERNANCE_STEWARD_WRITE,
+        GOVERNANCE_FEDERATION_WRITE,
+        GOVERNANCE_MEETING_WRITE,
+        GOVERNANCE_ACTIVITY_WRITE,
+        GOVERNANCE_COMMENT_WRITE,
+    ];
+
     // Admin scopes
     pub const ADMIN: &str = "admin";
 
@@ -1468,5 +1503,45 @@ mod tests {
             read_results.iter().all(|&r| r),
             "All concurrent reads should return revoked"
         );
+    }
+
+    /// The seven governance class-level scope constants minted by §10 step 1
+    /// of the `governance:write` decomposition design must have their declared
+    /// wire-string values, and the `GOVERNANCE_CLASS_WRITE` slice must
+    /// enumerate them in declaration order.
+    ///
+    /// This is the canonical assertion that the new constants exist and bind
+    /// to the strings that subsequent migration PRs and the gateway allowlist
+    /// will reference. Wire stability of these strings is a requirement of
+    /// the design (`docs/design/governance/governance-write-decomposition.md`).
+    #[test]
+    fn test_governance_class_scope_constants() {
+        use super::scopes::*;
+
+        assert_eq!(GOVERNANCE_CHARTER_WRITE, "governance:charter:write");
+        assert_eq!(GOVERNANCE_PROPOSAL_WRITE, "governance:proposal:write");
+        assert_eq!(GOVERNANCE_STEWARD_WRITE, "governance:steward:write");
+        assert_eq!(GOVERNANCE_FEDERATION_WRITE, "governance:federation:write");
+        assert_eq!(GOVERNANCE_MEETING_WRITE, "governance:meeting:write");
+        assert_eq!(GOVERNANCE_ACTIVITY_WRITE, "governance:activity:write");
+        assert_eq!(GOVERNANCE_COMMENT_WRITE, "governance:comment:write");
+
+        assert_eq!(GOVERNANCE_CLASS_WRITE.len(), 7);
+        assert_eq!(
+            GOVERNANCE_CLASS_WRITE,
+            &[
+                GOVERNANCE_CHARTER_WRITE,
+                GOVERNANCE_PROPOSAL_WRITE,
+                GOVERNANCE_STEWARD_WRITE,
+                GOVERNANCE_FEDERATION_WRITE,
+                GOVERNANCE_MEETING_WRITE,
+                GOVERNANCE_ACTIVITY_WRITE,
+                GOVERNANCE_COMMENT_WRITE,
+            ]
+        );
+
+        // The broad `governance:write` remains in place during the migration.
+        // §10 step 13 retires it only after every handler has migrated.
+        assert_eq!(GOVERNANCE_WRITE, "governance:write");
     }
 }

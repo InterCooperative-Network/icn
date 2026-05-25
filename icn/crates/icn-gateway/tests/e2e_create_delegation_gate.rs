@@ -272,6 +272,7 @@ async fn test_suspended_member_cannot_create_delegation() {
         suspension_checker: Some(suspension_checker),
         membership_resolver: None,
         sdis_service: None,
+        build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
@@ -505,6 +506,7 @@ async fn test_suspended_member_cannot_create_blanket_delegation() {
         suspension_checker: Some(suspension_checker),
         membership_resolver: None,
         sdis_service: None,
+        build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 
     let auth_mw = HttpAuthentication::bearer(jwt_auth);

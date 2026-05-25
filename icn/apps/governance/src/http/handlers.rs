@@ -5314,7 +5314,8 @@ mod tests {
     use super::*;
     use crate::events::NoopEventEmitter;
     use crate::http::configure::{
-        GovernanceContext, GovernanceEffect, ProposalAcceptedHook, SuspensionChecker,
+        GovernanceContext, GovernanceContextBuildMode, GovernanceEffect, ProposalAcceptedHook,
+        SuspensionChecker,
     };
     use crate::manager::{GovernanceManager, InMemoryMilestoneEventLog};
 
@@ -5577,6 +5578,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            build_mode: GovernanceContextBuildMode::Test,
         };
 
         let app = test_app!(ctx, member_did);
@@ -5700,6 +5702,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            build_mode: GovernanceContextBuildMode::Test,
         };
 
         let app = test_app!(ctx, member_did);
@@ -5826,6 +5829,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            build_mode: GovernanceContextBuildMode::Test,
         };
 
         let app = test_app!(ctx, steward_did);
@@ -5949,6 +5953,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            build_mode: GovernanceContextBuildMode::Test,
         };
 
         let app = test_app!(ctx, steward_did);
@@ -6069,6 +6074,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            build_mode: GovernanceContextBuildMode::Test,
         };
 
         let app = test_app!(ctx, steward_did);
@@ -6135,6 +6141,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            build_mode: GovernanceContextBuildMode::Test,
         };
 
         let app = test_app!(ctx, member_did);
@@ -6257,6 +6264,7 @@ mod tests {
             suspension_checker: Some(suspension_checker),
             membership_resolver: Some(resolver),
             sdis_service: None,
+            build_mode: GovernanceContextBuildMode::Test,
         };
 
         let app = test_app!(ctx, alice_did);
@@ -6321,6 +6329,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            build_mode: GovernanceContextBuildMode::Test,
         };
 
         let app = me_test_app!(ctx, caller);
@@ -6372,6 +6381,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            build_mode: GovernanceContextBuildMode::Test,
         };
 
         let app = me_test_app!(ctx, caller.clone());
@@ -6404,6 +6414,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            build_mode: GovernanceContextBuildMode::Test,
         };
 
         let app = me_test_app!(ctx, caller);
@@ -6461,6 +6472,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            build_mode: GovernanceContextBuildMode::Test,
         };
 
         let app = me_test_app!(ctx, caller.clone());
@@ -6496,6 +6508,7 @@ mod tests {
                 suspension_checker: None,
                 membership_resolver: None,
                 sdis_service: None,
+                build_mode: GovernanceContextBuildMode::Test,
             };
             me_test_app!(ctx, $caller)
         }};
@@ -7008,6 +7021,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            build_mode: GovernanceContextBuildMode::Test,
         }
     }
 
@@ -8061,6 +8075,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            build_mode: GovernanceContextBuildMode::Test,
         }
     }
 
