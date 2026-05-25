@@ -9,10 +9,10 @@ use icn_federation::SettlementInterval;
 use icn_governance::{
     ActionItemFilter, ActionItemId, ActionItemPriority, ActionItemStatus, ActivityId, ActivityKind,
     ActivityStatus, AttendanceStatus, DataSharingLevel, Delegation, DelegationId, DelegationScope,
-    DisputeResolutionMethod, FederationProposal, FederationTerms, GovernanceDomainId,
-    GovernanceParams, MeetingId, MeetingRole, MeetingStatus, MembershipAction, MembershipConfig,
-    MilestoneId, MilestoneStatus, ProgramId, ProgramKind, ProposalId, ProposalPayload,
-    ProposalScope, StructureId, StructureKind, StructureStatus, VoteChoice,
+    DisputeResolutionMethod, FederationProposal, FederationTerms, GovernanceDomain,
+    GovernanceDomainId, GovernanceParams, MeetingId, MeetingRole, MeetingStatus, MembershipAction,
+    MembershipConfig, MilestoneId, MilestoneStatus, ProgramId, ProgramKind, ProposalId,
+    ProposalPayload, ProposalScope, StructureId, StructureKind, StructureStatus, VoteChoice,
 };
 use icn_http_kit::{
     auth::{require_scope, BasicClaims},
@@ -84,6 +84,57 @@ async fn check_domain_membership(
         )));
     }
     Ok(())
+}
+
+/// Resolve whether `caller` is authorized to mutate the membership of
+/// `domain` via the direct add/remove member handlers.
+///
+/// This closes the #1870 fail-open. For `TrustThreshold` domains membership is
+/// derived from a trust graph that lives outside the governance layer, so the
+/// caller's standing is resolved through the configured [`MembershipResolver`]
+/// instead of being assumed. Outcomes:
+///
+/// * `Ok(true)` — caller holds standing; the handler may proceed.
+/// * `Ok(false)` — caller is provably not a member; the handler returns its
+///   own context-specific `403 Forbidden`.
+/// * `Err(Forbidden)` — standing could not be resolved (the resolver failed,
+///   or no resolver is wired under a posture that refuses to fall open). The
+///   error carries the explicit `unresolved_standing` code and must be
+///   propagated — it must never be downgraded to a permissive allow.
+///
+/// `StaticList` domains are resolved directly from the source, unchanged.
+fn resolve_caller_membership<E>(
+    ctx: &GovernanceContext<E>,
+    domain: &GovernanceDomain,
+    caller_did: &Did,
+) -> Result<bool, ApiError> {
+    match &domain.config.membership.source {
+        icn_governance::MembershipSource::StaticList(members) => Ok(members.contains(caller_did)),
+        icn_governance::MembershipSource::TrustThreshold(_) => match &ctx.membership_resolver {
+            Some(resolver) => resolver.is_member(domain, caller_did).map_err(|e| {
+                err_forbidden(format!(
+                    "Cannot resolve membership standing for caller in TrustThreshold domain \
+                     '{}' (unresolved_standing): {e}",
+                    domain.id.0
+                ))
+            }),
+            None => {
+                if ctx.build_mode.rejects_unresolved_standing() {
+                    Err(err_forbidden(format!(
+                        "Membership resolver is not configured for TrustThreshold domain '{}' \
+                         (unresolved_standing); refusing membership mutation under production \
+                         posture",
+                        domain.id.0
+                    )))
+                } else {
+                    // Bootstrap/Test posture preserves the historical permissive
+                    // behavior so existing dev/devnet flows keep working. Only
+                    // Production fails closed (issue #1870).
+                    Ok(true)
+                }
+            }
+        },
+    }
 }
 
 // ============================================================================
@@ -567,11 +618,7 @@ pub async fn add_domain_member<E: GovernanceEventEmitter + Clone + 'static>(
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found(format!("Domain not found: {domain_id_str}")))?;
 
-    let caller_is_member = match &domain.config.membership.source {
-        icn_governance::MembershipSource::StaticList(members) => members.contains(&caller_did),
-        icn_governance::MembershipSource::TrustThreshold(_) => true,
-    };
-    if !caller_is_member {
+    if !resolve_caller_membership(&ctx, &domain, &caller_did)? {
         return Err(err_forbidden(format!(
             "Only domain members can add members to domain '{domain_id_str}'"
         )));
@@ -612,11 +659,7 @@ pub async fn remove_domain_member<E: GovernanceEventEmitter + Clone + 'static>(
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found(format!("Domain not found: {domain_id_str}")))?;
 
-    let caller_is_member = match &domain.config.membership.source {
-        icn_governance::MembershipSource::StaticList(members) => members.contains(&caller_did),
-        icn_governance::MembershipSource::TrustThreshold(_) => true,
-    };
-    if !caller_is_member {
+    if !resolve_caller_membership(&ctx, &domain, &caller_did)? {
         return Err(err_forbidden(format!(
             "Only domain members can remove members from domain '{domain_id_str}'"
         )));
@@ -5305,8 +5348,9 @@ mod tests {
     use actix_web::dev::Service as _;
     use actix_web::{test, web, App, HttpMessage};
     use icn_governance::{
-        GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipSource, ProposalId,
-        ProposalPayload, ProposalScope, VoteChoice,
+        GovernanceDomain, GovernanceDomainId, GovernanceParams, MembershipConfig,
+        MembershipResolver, MembershipSource, ProposalId, ProposalPayload, ProposalScope,
+        VoteChoice,
     };
     use icn_http_kit::auth::BasicClaims;
     use icn_identity::Did;
@@ -5440,6 +5484,36 @@ mod tests {
                     .route(
                         "/proposals/{proposal_id}/close",
                         web::post().to(close_proposal::<NoopEventEmitter>),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    /// Build a test app wiring the direct membership-mutation routes
+    /// (`add_domain_member` / `remove_domain_member`) with the given caller
+    /// injected as authenticated `governance:write` claims. Mirrors
+    /// [`test_app`] but targets `/domains/{domain_id}/members` so the #1870
+    /// TrustThreshold standing-resolution path is exercised through actix
+    /// exactly as `configure` wires it in production.
+    macro_rules! member_test_app {
+        ($ctx:expr, $caller_did:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            let caller_did_str = $caller_did.to_string();
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: caller_did_str.clone(),
+                            scope: Some("governance:write".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .service(
+                        web::resource("/domains/{domain_id}/members")
+                            .route(web::post().to(add_domain_member::<NoopEventEmitter>))
+                            .route(web::delete().to(remove_domain_member::<NoopEventEmitter>)),
                     ),
             )
             .await
@@ -6284,6 +6358,309 @@ mod tests {
         assert!(
             *resolver_called.lock().unwrap(),
             "membership_resolver.resolve_members() must be invoked for TrustThreshold domains"
+        );
+    }
+
+    // ── #1870: TrustThreshold direct membership-mutation standing resolution ──
+    //
+    // These tests exercise `add_domain_member` / `remove_domain_member` for
+    // `TrustThreshold` domains through actix. They prove the fail-open closed
+    // by #1870: the authorization gate must consult `membership_resolver`
+    // rather than treating every caller as a member.
+    //
+    // Note on the "allowed" path: the in-memory `GovernanceManager` always
+    // rejects direct member-list mutation of a `TrustThreshold` domain (it
+    // returns "Cannot modify members of trust-based membership domain"). That
+    // is a pre-existing, orthogonal safety net (HTTP 500), NOT the #1870
+    // authorization fail-closed path (HTTP 403). So "authorization allowed"
+    // is asserted as "not 403, request reaches the manager", and
+    // "authorization rejected" is asserted as "403 + never reaches the
+    // manager".
+
+    /// Configurable test resolver. `Ok(members)` resolves a concrete eligible
+    /// set; `Err(_)` simulates an unresolved trust graph (resolution failure).
+    struct FakeMembershipResolver {
+        outcome: Result<Vec<Did>, String>,
+    }
+
+    impl MembershipResolver for FakeMembershipResolver {
+        fn resolve_members(&self, _domain: &GovernanceDomain) -> anyhow::Result<Vec<Did>> {
+            self.outcome.clone().map_err(|e| anyhow::anyhow!(e))
+        }
+    }
+
+    /// Create an in-memory manager owning a single `TrustThreshold` domain.
+    async fn trust_threshold_domain(domain_id: &str) -> Arc<GovernanceManager> {
+        let mgr = Arc::new(GovernanceManager::new());
+        mgr.create_domain(
+            GovernanceDomainId(domain_id.to_string()),
+            "TrustThreshold Coop".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(0, 0, 86_400),
+            MembershipConfig {
+                source: MembershipSource::TrustThreshold(0.3),
+            },
+        )
+        .await
+        .unwrap();
+        mgr
+    }
+
+    /// Build a governance context varying only the fields these tests need
+    /// (`membership_resolver`, `build_mode`); everything else is unwired.
+    fn membership_mutation_ctx(
+        mgr: Arc<GovernanceManager>,
+        membership_resolver: Option<Arc<dyn MembershipResolver>>,
+        build_mode: GovernanceContextBuildMode,
+    ) -> GovernanceContext<NoopEventEmitter> {
+        GovernanceContext {
+            manager: mgr,
+            emitter: NoopEventEmitter,
+            on_charter_accepted: None,
+            on_proposal_accepted: None,
+            on_proposal_accepted_with_evidence: None,
+            member_checker: None,
+            steward_checker: None,
+            suspension_checker: None,
+            membership_resolver,
+            sdis_service: None,
+            build_mode,
+        }
+    }
+
+    /// #1870 AC1: a TrustThreshold caller whose standing the configured
+    /// resolver confirms is admitted by the authorization gate (it then hits
+    /// the manager's TrustThreshold safety net, which is orthogonal).
+    #[tokio::test]
+    async fn add_member_trust_threshold_resolved_standing_allows() {
+        use icn_identity::KeyPair;
+        let caller = KeyPair::generate().unwrap().did().clone();
+        let new_member = KeyPair::generate().unwrap().did().clone();
+
+        let mgr = trust_threshold_domain("tt-add-ok").await;
+        let resolver: Arc<dyn MembershipResolver> = Arc::new(FakeMembershipResolver {
+            outcome: Ok(vec![caller.clone()]),
+        });
+        let ctx = membership_mutation_ctx(mgr, Some(resolver), GovernanceContextBuildMode::Test);
+        let app = member_test_app!(ctx, caller);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/domains/tt-add-ok/members")
+                .set_json(serde_json::json!({ "did": new_member.to_string() }))
+                .to_request(),
+        )
+        .await;
+
+        let status = resp.status().as_u16();
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        assert_ne!(
+            status, 403,
+            "resolver-confirmed TrustThreshold caller must not be blocked by the membership gate; \
+             got body: {body_str}"
+        );
+        assert!(
+            !body_str.contains("unresolved_standing"),
+            "confirmed standing must not be reported as unresolved; got: {body_str}"
+        );
+        assert_eq!(
+            status, 500,
+            "request must reach the manager (which rejects TrustThreshold mutation), proving \
+             authorization was granted; got body: {body_str}"
+        );
+    }
+
+    /// #1870 AC2: when the resolver cannot determine the caller's standing
+    /// (unresolved), the mutation is rejected outright with an explicit code
+    /// rather than falling open. Pre-fix this fell through to the manager.
+    #[tokio::test]
+    async fn add_member_trust_threshold_unresolved_standing_rejected() {
+        use icn_identity::KeyPair;
+        let caller = KeyPair::generate().unwrap().did().clone();
+        let new_member = KeyPair::generate().unwrap().did().clone();
+
+        let mgr = trust_threshold_domain("tt-add-unresolved").await;
+        let resolver: Arc<dyn MembershipResolver> = Arc::new(FakeMembershipResolver {
+            outcome: Err("trust graph unavailable".to_string()),
+        });
+        let ctx = membership_mutation_ctx(mgr, Some(resolver), GovernanceContextBuildMode::Test);
+        let app = member_test_app!(ctx, caller);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/domains/tt-add-unresolved/members")
+                .set_json(serde_json::json!({ "did": new_member.to_string() }))
+                .to_request(),
+        )
+        .await;
+
+        let status = resp.status().as_u16();
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        assert_eq!(
+            status, 403,
+            "unresolved TrustThreshold standing must be rejected, not allowed (fail-open #1870); \
+             got body: {body_str}"
+        );
+        assert!(
+            body_str.contains("unresolved_standing"),
+            "rejection must carry the explicit unresolved_standing code; got: {body_str}"
+        );
+    }
+
+    /// A TrustThreshold caller the resolver positively excludes (resolved
+    /// non-member) is rejected with 403.
+    #[tokio::test]
+    async fn add_member_trust_threshold_resolved_non_member_rejected() {
+        use icn_identity::KeyPair;
+        let caller = KeyPair::generate().unwrap().did().clone();
+        let other = KeyPair::generate().unwrap().did().clone();
+        let new_member = KeyPair::generate().unwrap().did().clone();
+
+        let mgr = trust_threshold_domain("tt-add-nonmember").await;
+        let resolver: Arc<dyn MembershipResolver> = Arc::new(FakeMembershipResolver {
+            outcome: Ok(vec![other]), // caller is not in the resolved member set
+        });
+        let ctx = membership_mutation_ctx(mgr, Some(resolver), GovernanceContextBuildMode::Test);
+        let app = member_test_app!(ctx, caller);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/domains/tt-add-nonmember/members")
+                .set_json(serde_json::json!({ "did": new_member.to_string() }))
+                .to_request(),
+        )
+        .await;
+
+        let status = resp.status().as_u16();
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        assert_eq!(
+            status, 403,
+            "resolver-excluded TrustThreshold caller must not be able to add members; \
+             got body: {body_str}"
+        );
+        assert!(
+            body_str.contains("domain members"),
+            "rejection should explain that only domain members may mutate; got: {body_str}"
+        );
+    }
+
+    /// Remove-path parity: unresolved TrustThreshold standing rejects on the
+    /// remove handler too (the fail-open existed identically in both).
+    #[tokio::test]
+    async fn remove_member_trust_threshold_unresolved_standing_rejected() {
+        use icn_identity::KeyPair;
+        let caller = KeyPair::generate().unwrap().did().clone();
+        let target = KeyPair::generate().unwrap().did().clone();
+
+        let mgr = trust_threshold_domain("tt-remove-unresolved").await;
+        let resolver: Arc<dyn MembershipResolver> = Arc::new(FakeMembershipResolver {
+            outcome: Err("trust graph unavailable".to_string()),
+        });
+        let ctx = membership_mutation_ctx(mgr, Some(resolver), GovernanceContextBuildMode::Test);
+        let app = member_test_app!(ctx, caller);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::delete()
+                .uri("/domains/tt-remove-unresolved/members")
+                .set_json(serde_json::json!({ "did": target.to_string() }))
+                .to_request(),
+        )
+        .await;
+
+        let status = resp.status().as_u16();
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        assert_eq!(
+            status, 403,
+            "unresolved TrustThreshold standing must reject member removal (fail-open #1870); \
+             got body: {body_str}"
+        );
+        assert!(
+            body_str.contains("unresolved_standing"),
+            "rejection must carry the explicit unresolved_standing code; got: {body_str}"
+        );
+    }
+
+    /// #1870 AC3: in Production posture an unconfigured resolver must reject
+    /// the mutation outright rather than fall open. Reachable here because
+    /// the test wires routes directly, bypassing the `configure()` startup
+    /// guard that would otherwise panic on this configuration.
+    #[tokio::test]
+    async fn add_member_trust_threshold_production_without_resolver_rejected() {
+        use icn_identity::KeyPair;
+        let caller = KeyPair::generate().unwrap().did().clone();
+        let new_member = KeyPair::generate().unwrap().did().clone();
+
+        let mgr = trust_threshold_domain("tt-add-prod-noresolver").await;
+        let ctx = membership_mutation_ctx(mgr, None, GovernanceContextBuildMode::Production);
+        let app = member_test_app!(ctx, caller);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/domains/tt-add-prod-noresolver/members")
+                .set_json(serde_json::json!({ "did": new_member.to_string() }))
+                .to_request(),
+        )
+        .await;
+
+        let status = resp.status().as_u16();
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        assert_eq!(
+            status, 403,
+            "production posture with no resolver must reject TrustThreshold mutation, not fall \
+             open; got body: {body_str}"
+        );
+        assert!(
+            body_str.contains("unresolved_standing"),
+            "rejection must carry the explicit unresolved_standing code; got: {body_str}"
+        );
+    }
+
+    /// Backward-compatibility guard: Bootstrap/dev posture with no resolver
+    /// preserves the historical permissive behavior (the gate admits the
+    /// caller, who then hits the manager's TrustThreshold safety net). Only
+    /// Production is tightened by #1870, so existing dev/devnet flows are
+    /// unaffected.
+    #[tokio::test]
+    async fn add_member_trust_threshold_bootstrap_without_resolver_still_permissive() {
+        use icn_identity::KeyPair;
+        let caller = KeyPair::generate().unwrap().did().clone();
+        let new_member = KeyPair::generate().unwrap().did().clone();
+
+        let mgr = trust_threshold_domain("tt-add-bootstrap-noresolver").await;
+        let ctx = membership_mutation_ctx(mgr, None, GovernanceContextBuildMode::Bootstrap);
+        let app = member_test_app!(ctx, caller);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/domains/tt-add-bootstrap-noresolver/members")
+                .set_json(serde_json::json!({ "did": new_member.to_string() }))
+                .to_request(),
+        )
+        .await;
+
+        let status = resp.status().as_u16();
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        assert_ne!(
+            status, 403,
+            "Bootstrap posture without a resolver must remain permissive (no behavior change); \
+             got body: {body_str}"
+        );
+        assert_eq!(
+            status, 500,
+            "permissive gate must let the request reach the manager's TrustThreshold safety net; \
+             got body: {body_str}"
         );
     }
 
