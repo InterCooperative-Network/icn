@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import type { MyAmendmentVoteResponse, AmendmentVoteResults } from '@icn/client';
 import { ICNMobileClient } from './client';
 import {
   Amendment,
@@ -766,7 +767,9 @@ export interface AmendmentResults {
  * ```
  */
 export function useAmendmentVoting(client: ICNMobileClient, amendmentId: string) {
-  const [myVote, setMyVote] = useState<AmendmentVote | null>(null);
+  // Holds either the fetched "my vote" status (getMyAmendmentVote) or the
+  // record returned when casting a vote (voteOnAmendment) — two distinct shapes.
+  const [myVote, setMyVote] = useState<MyAmendmentVoteResponse | AmendmentVote | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -846,7 +849,7 @@ export function useAmendmentVoting(client: ICNMobileClient, amendmentId: string)
  * ```
  */
 export function useAmendmentResults(client: ICNMobileClient, amendmentId: string) {
-  const [results, setResults] = useState<AmendmentResults | null>(null);
+  const [results, setResults] = useState<AmendmentVoteResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

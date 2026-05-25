@@ -186,7 +186,7 @@ export class ICNMobileClient extends ICNClient {
    * Basic network monitoring using periodic checks
    */
   private startBasicNetworkMonitoring(): void {
-    setInterval(async () => {
+    const intervalId = setInterval(async () => {
       try {
         const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
         const controller = new AbortController();
@@ -195,7 +195,7 @@ export class ICNMobileClient extends ICNClient {
         await fetch(`${baseUrl}/v1/health`, {
           signal: controller.signal,
         });
-        
+
         clearTimeout(timeout);
 
         if (this._networkState !== 'online') {
@@ -210,6 +210,11 @@ export class ICNMobileClient extends ICNClient {
         }
       }
     }, 30000); // Check every 30 seconds
+
+    // The heartbeat must not keep a host process alive on its own. `unref` exists
+    // on Node timers (so Jest/Node can exit cleanly); on React Native the timer id
+    // is a number and this optional call is a safe no-op.
+    (intervalId as { unref?: () => void }).unref?.();
   }
 
   /**
@@ -221,9 +226,9 @@ export class ICNMobileClient extends ICNClient {
     await this.queueManager.processQueue(async (op) => {
       switch (op.type) {
         case 'payment':
-          // Re-execute payment
+          // Re-execute settlement
           const paymentData = op.data as any;
-          await this.pay(paymentData.coopId, paymentData.request);
+          await this.settle(paymentData.coopId, paymentData.request);
           break;
         case 'vote':
           // Re-execute vote
@@ -1480,7 +1485,7 @@ export class ICNMobileClient extends ICNClient {
    * @param amendmentId - Amendment ID (hex)
    * @returns Vote record or null if not voted
    */
-  async getMyAmendmentVote(amendmentId: string): Promise<import('./constitutional-hooks').AmendmentVote> {
+  async getMyAmendmentVote(amendmentId: string): Promise<import('@icn/client').MyAmendmentVoteResponse> {
     const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
     const response = await fetch(`${baseUrl}/v1/constitutional/amendments/${amendmentId}/my-vote`, {
       method: 'GET',
@@ -1503,7 +1508,7 @@ export class ICNMobileClient extends ICNClient {
    * @param amendmentId - Amendment ID (hex)
    * @returns Voting results with counts and quorum status
    */
-  async getAmendmentResults(amendmentId: string): Promise<import('./constitutional-hooks').AmendmentResults> {
+  async getAmendmentResults(amendmentId: string): Promise<import('@icn/client').AmendmentVoteResults> {
     const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
     const response = await fetch(`${baseUrl}/v1/constitutional/amendments/${amendmentId}/results`, {
       method: 'GET',

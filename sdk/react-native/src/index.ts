@@ -165,7 +165,14 @@ export {
 } from './steward-hooks';
 
 // Membership Types
-export * from './membership-types';
+// Canonical membership types flow through `./types` (re-exported from @icn/client);
+// only re-export the RN-specific additions here to avoid duplicate-export ambiguity.
+export type {
+  BanMemberRequest,
+  MemberResponse,
+  RevokeMembershipRequest,
+  RoleRequest,
+} from './membership-types';
 
 // Membership React Hooks
 export {
@@ -177,7 +184,9 @@ export {
 } from './membership-hooks';
 
 // Charter Types
-export * from './charter-types';
+// Canonical charter types flow through `./types` (re-exported from @icn/client);
+// only re-export the RN-specific additions here to avoid duplicate-export ambiguity.
+export type { UpdateCharterStatusRequest } from './charter-types';
 
 // Charter React Hooks
 export {
@@ -189,7 +198,14 @@ export {
 } from './charter-hooks';
 
 // Constitutional Governance Types (Amendments & Appeals)
-export * from './constitutional-types';
+// Canonical amendment/appeal types flow through `./types` (re-exported from
+// @icn/client); only re-export the RN-specific aliases/additions here.
+export type {
+  AddChangeRequest,
+  RatifyRequest,
+  AmendmentSummary,
+  AmendmentChangeResponse,
+} from './constitutional-types';
 
 // Constitutional Governance React Hooks
 export {
