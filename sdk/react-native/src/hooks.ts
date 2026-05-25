@@ -9,7 +9,7 @@ import { ICNMobileClient } from './client';
 import {
   AuthState,
   WebSocketState,
-  Balance,
+  Position,
   WsMessage,
   Cooperative,
   Member,
@@ -187,7 +187,7 @@ export function useEvent(
  *
  *   return (
  *     <View>
- *       <Text>Balance: {balance?.balance} hours</Text>
+ *       <Text>Balance: {balance?.position} {balance?.unit}</Text>
  *       <Button onPress={refresh} title="Refresh" />
  *     </View>
  *   );
@@ -195,7 +195,7 @@ export function useEvent(
  * ```
  */
 export function useBalance(client: ICNMobileClient, coopId: string, did: string) {
-  const [balance, setBalance] = useState<Balance | null>(null);
+  const [balance, setBalance] = useState<Position | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -203,7 +203,7 @@ export function useBalance(client: ICNMobileClient, coopId: string, did: string)
     setIsLoading(true);
     setError(null);
     try {
-      const result = await client.getBalance(coopId, did);
+      const result = await client.getPosition(coopId, did);
       setBalance(result);
     } catch (err) {
       setError((err as Error).message);
@@ -529,15 +529,15 @@ export function usePayment(client: ICNMobileClient, coopId: string, defaultCurre
         if (!senderDid) {
           throw new Error('Not authenticated - no DID available');
         }
-        // Build full payment request with required fields
+        // Build full settlement request with required fields
         const fullRequest = {
           from: senderDid,
           to: request.to,
           amount: request.amount,
-          currency: request.currency || defaultCurrency,
+          unit: request.currency || defaultCurrency,
           memo: request.memo,
         };
-        const result = await client.pay(coopId, fullRequest);
+        const result = await client.settle(coopId, fullRequest);
         return result;
       } catch (err) {
         setError((err as Error).message);

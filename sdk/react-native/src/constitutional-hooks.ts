@@ -5,6 +5,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import type { MyAmendmentVoteResponse, AmendmentVoteResults } from '@icn/client';
 import { ICNMobileClient } from './client';
 import {
   Amendment,
@@ -744,8 +745,10 @@ export interface AmendmentResults {
  * function AmendmentVoting({ amendmentId }: { amendmentId: string }) {
  *   const { vote, loading, myVote, error } = useAmendmentVoting(client, amendmentId);
  *
- *   if (myVote) {
- *     return <Text>You voted: {myVote.vote}</Text>;
+ *   // `myVote` is a union: the on-mount fetch returns a status object
+ *   // (`MyAmendmentVoteResponse`) whose `vote` field is the nested record.
+ *   if (myVote && 'has_voted' in myVote && myVote.has_voted) {
+ *     return <Text>You voted: {myVote.vote?.vote}</Text>;
  *   }
  *
  *   return (
@@ -766,7 +769,9 @@ export interface AmendmentResults {
  * ```
  */
 export function useAmendmentVoting(client: ICNMobileClient, amendmentId: string) {
-  const [myVote, setMyVote] = useState<AmendmentVote | null>(null);
+  // Holds either the fetched "my vote" status (getMyAmendmentVote) or the
+  // record returned when casting a vote (voteOnAmendment) — two distinct shapes.
+  const [myVote, setMyVote] = useState<MyAmendmentVoteResponse | AmendmentVote | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -836,9 +841,9 @@ export function useAmendmentVoting(client: ICNMobileClient, amendmentId: string)
  *       <Text>Status: {results.status}</Text>
  *       <Text>Approve: {results.approve_count}</Text>
  *       <Text>Reject: {results.reject_count}</Text>
- *       <Text>Quorum: {results.has_quorum ? 'Met' : 'Not Met'}</Text>
+ *       <Text>Quorum: {results.quorum_achieved ? 'Met' : 'Not Met'}</Text>
  *       <ProgressBar
- *         progress={results.total_votes / results.eligible_voters}
+ *         progress={results.approval_percentage / 100}
  *       />
  *     </View>
  *   );
@@ -846,7 +851,7 @@ export function useAmendmentVoting(client: ICNMobileClient, amendmentId: string)
  * ```
  */
 export function useAmendmentResults(client: ICNMobileClient, amendmentId: string) {
-  const [results, setResults] = useState<AmendmentResults | null>(null);
+  const [results, setResults] = useState<AmendmentVoteResults | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
