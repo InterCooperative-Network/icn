@@ -51,9 +51,13 @@ use super::handlers;
 ///
 /// **This type does not make governance production-ready.** It only makes
 /// the bootstrap-vs-production distinction legible at startup. The
-/// `TrustThreshold` direct-membership-mutation fail-open path tracked in
-/// issue #1870 remains open and must be resolved before claiming
-/// production readiness.
+/// `TrustThreshold` direct-membership-mutation fail-open that issue #1870
+/// tracked is now closed in the add/remove member handlers (see
+/// `handlers::resolve_caller_membership`): `TrustThreshold` callers are
+/// resolved through `membership_resolver`, unresolved standing is rejected
+/// rather than treated as standing, and an unconfigured resolver rejects
+/// outright in `Production`. Other production hardening (full checker
+/// wiring, operational posture) still applies before claiming readiness.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum GovernanceContextBuildMode {
     /// Permissive mode for dev, devnet, and bootstrap contexts.
