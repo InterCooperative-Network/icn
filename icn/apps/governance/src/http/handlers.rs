@@ -62,22 +62,27 @@ fn parse_did(s: &str, context: &str) -> Result<Did, ApiError> {
 }
 
 /// Check domain membership for a given user.
-async fn check_domain_membership(
-    mgr: &crate::manager::GovernanceManager,
+///
+/// Delegates to [`resolve_caller_membership`] so that `TrustThreshold` domains
+/// are resolved through the configured `membership_resolver` rather than being
+/// treated as unconditional members (issue #1913 — the same fail-open #1870
+/// closed in the direct add/remove member handlers, here on the ~20 read/write
+/// endpoints this shared gate backs). Unresolved standing fails closed under
+/// `Production` posture (surfacing `unresolved_standing`); `Bootstrap`/`Test`
+/// stay permissive for dev/devnet.
+async fn check_domain_membership<E>(
+    ctx: &GovernanceContext<E>,
     domain_id: &GovernanceDomainId,
     user_did: &Did,
 ) -> Result<(), ApiError> {
-    let domain = mgr
+    let domain = ctx
+        .manager
         .get_domain(domain_id)
         .await
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found(format!("Domain not found: {}", domain_id.0)))?;
 
-    let is_member = match &domain.config.membership.source {
-        icn_governance::MembershipSource::StaticList(members) => members.contains(user_did),
-        icn_governance::MembershipSource::TrustThreshold(_) => true,
-    };
-    if !is_member {
+    if !resolve_caller_membership(ctx, &domain, user_did)? {
         return Err(err_forbidden(format!(
             "Only domain members can perform this action (not a member of domain '{}')",
             domain_id.0
@@ -86,8 +91,11 @@ async fn check_domain_membership(
     Ok(())
 }
 
-/// Resolve whether `caller` is authorized to mutate the membership of
-/// `domain` via the direct add/remove member handlers.
+/// Resolve whether `caller` holds membership standing in `domain`.
+///
+/// This is the single shared resolver-backed standing check used by both the
+/// direct add/remove member handlers (#1870) and [`check_domain_membership`]
+/// (#1913), so the two never drift into divergent authorization policies.
 ///
 /// This closes the #1870 fail-open. For `TrustThreshold` domains membership is
 /// derived from a trust graph that lives outside the governance layer, so the
@@ -2600,7 +2608,7 @@ pub async fn create_action_item<E: GovernanceEventEmitter + Clone + 'static>(
     let creator_did = parse_did(&claims.sub, "Invalid DID in token")?;
     let domain = GovernanceDomainId(domain_id.into_inner());
 
-    check_domain_membership(&ctx.manager, &domain, &creator_did).await?;
+    check_domain_membership(&ctx, &domain, &creator_did).await?;
 
     // Validate inputs
     val::validate_action_item_title(&req.title)?;
@@ -2692,7 +2700,7 @@ pub async fn update_action_item<E: GovernanceEventEmitter + Clone + 'static>(
     let domain = GovernanceDomainId(domain_id);
     let id = parse_action_item_id(&item_id)?;
 
-    check_domain_membership(&ctx.manager, &domain, &user_did).await?;
+    check_domain_membership(&ctx, &domain, &user_did).await?;
 
     let mut item = ctx
         .manager
@@ -2785,7 +2793,7 @@ pub async fn delete_action_item<E: GovernanceEventEmitter + Clone + 'static>(
     let domain = GovernanceDomainId(domain_id);
     let id = parse_action_item_id(&item_id)?;
 
-    check_domain_membership(&ctx.manager, &domain, &user_did).await?;
+    check_domain_membership(&ctx, &domain, &user_did).await?;
 
     let item = ctx
         .manager
@@ -2820,7 +2828,7 @@ pub async fn update_action_item_status<E: GovernanceEventEmitter + Clone + 'stat
     let domain = GovernanceDomainId(domain_id);
     let id = parse_action_item_id(&item_id)?;
 
-    check_domain_membership(&ctx.manager, &domain, &user_did).await?;
+    check_domain_membership(&ctx, &domain, &user_did).await?;
 
     let existing = ctx
         .manager
@@ -2859,7 +2867,7 @@ pub async fn add_action_item_note<E: GovernanceEventEmitter + Clone + 'static>(
     let domain = GovernanceDomainId(domain_id);
     let id = parse_action_item_id(&item_id)?;
 
-    check_domain_membership(&ctx.manager, &domain, &author_did).await?;
+    check_domain_membership(&ctx, &domain, &author_did).await?;
 
     let item = ctx
         .manager
@@ -2913,7 +2921,7 @@ pub async fn get_action_item_completion_receipt<E: GovernanceEventEmitter + Clon
     // receive a spurious 404.
     let canonical_item_id = parse_action_item_id(&item_id)?.to_string();
 
-    check_domain_membership(&ctx.manager, &domain, &caller_did).await?;
+    check_domain_membership(&ctx, &domain, &caller_did).await?;
 
     let receipt = ctx
         .manager
@@ -3728,7 +3736,7 @@ pub async fn create_meeting<E: GovernanceEventEmitter + Clone + 'static>(
     let domain = GovernanceDomainId(domain_id.into_inner());
 
     check_domain_membership(
-        &ctx.manager,
+        &ctx,
         &domain,
         &parse_did(&claims.sub, "Invalid DID in token")?,
     )
@@ -3812,7 +3820,7 @@ pub async fn start_meeting<E: GovernanceEventEmitter + Clone + 'static>(
         .ok_or_else(|| err_not_found("Meeting not found"))?;
 
     check_domain_membership(
-        &ctx.manager,
+        &ctx,
         &GovernanceDomainId(m.domain_id.clone()),
         &parse_did(&claims.sub, "Invalid DID in token")?,
     )
@@ -3862,7 +3870,7 @@ pub async fn end_meeting<E: GovernanceEventEmitter + Clone + 'static>(
         .ok_or_else(|| err_not_found("Meeting not found"))?;
 
     check_domain_membership(
-        &ctx.manager,
+        &ctx,
         &GovernanceDomainId(m.domain_id.clone()),
         &parse_did(&claims.sub, "Invalid DID in token")?,
     )
@@ -3963,12 +3971,7 @@ pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
 
     // Domain-membership check: only members of the meeting's governance domain
     // may mutate its state. `governance:write` alone is insufficient.
-    check_domain_membership(
-        &ctx.manager,
-        &GovernanceDomainId(m.domain_id.clone()),
-        &recorded_by,
-    )
-    .await?;
+    check_domain_membership(&ctx, &GovernanceDomainId(m.domain_id.clone()), &recorded_by).await?;
 
     if matches!(
         m.status,
@@ -4006,7 +4009,7 @@ pub async fn add_agenda_item<E: GovernanceEventEmitter + Clone + 'static>(
         .ok_or_else(|| err_not_found("Meeting not found"))?;
 
     check_domain_membership(
-        &ctx.manager,
+        &ctx,
         &GovernanceDomainId(m.domain_id.clone()),
         &parse_did(&claims.sub, "Invalid DID in token")?,
     )
@@ -4052,7 +4055,7 @@ pub async fn update_agenda_item<E: GovernanceEventEmitter + Clone + 'static>(
         .ok_or_else(|| err_not_found("Meeting not found"))?;
 
     check_domain_membership(
-        &ctx.manager,
+        &ctx,
         &GovernanceDomainId(m.domain_id.clone()),
         &parse_did(&claims.sub, "Invalid DID in token")?,
     )
@@ -4185,7 +4188,7 @@ pub async fn create_program<E: GovernanceEventEmitter + Clone + 'static>(
     let domain = GovernanceDomainId(domain_id.into_inner());
 
     check_domain_membership(
-        &ctx.manager,
+        &ctx,
         &domain,
         &parse_did(&claims.sub, "Invalid DID in token")?,
     )
@@ -4280,7 +4283,7 @@ pub async fn create_milestone<E: GovernanceEventEmitter + Clone + 'static>(
         .ok_or_else(|| err_not_found("Program not found"))?;
 
     check_domain_membership(
-        &ctx.manager,
+        &ctx,
         &prog.domain_id,
         &parse_did(&claims.sub, "Invalid DID in token")?,
     )
@@ -4360,7 +4363,7 @@ pub async fn update_milestone_status<E: GovernanceEventEmitter + Clone + 'static
         .get_program(&milestone.program_id)
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Program not found for milestone"))?;
-    check_domain_membership(&ctx.manager, &prog.domain_id, &actor).await?;
+    check_domain_membership(&ctx, &prog.domain_id, &actor).await?;
 
     let m = ctx
         .manager
@@ -4396,7 +4399,7 @@ pub async fn link_activity_to_program<E: GovernanceEventEmitter + Clone + 'stati
         .get_program(&pid)
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Program not found"))?;
-    check_domain_membership(&ctx.manager, &prog.domain_id, &actor).await?;
+    check_domain_membership(&ctx, &prog.domain_id, &actor).await?;
 
     // Pre-check the activity exists so we return a deterministic 404 rather
     // than relying on string-matching the manager's error message.
@@ -4436,7 +4439,7 @@ pub async fn unlink_activity_from_program<E: GovernanceEventEmitter + Clone + 's
         .get_program(&pid)
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Program not found"))?;
-    check_domain_membership(&ctx.manager, &prog.domain_id, &actor).await?;
+    check_domain_membership(&ctx, &prog.domain_id, &actor).await?;
 
     ctx.manager
         .unlink_activity_from_program(&pid, &aid)
@@ -4981,7 +4984,7 @@ pub async fn update_program_status<E: GovernanceEventEmitter + Clone + 'static>(
         .get_program(&pid)
         .map_err(anyhow_to_api)?
         .ok_or_else(|| err_not_found("Program not found"))?;
-    check_domain_membership(&ctx.manager, &prog.domain_id, &actor).await?;
+    check_domain_membership(&ctx, &prog.domain_id, &actor).await?;
 
     let p = ctx
         .manager
@@ -6660,6 +6663,258 @@ mod tests {
         assert_eq!(
             status, 500,
             "permissive gate must let the request reach the manager's TrustThreshold safety net; \
+             got body: {body_str}"
+        );
+    }
+
+    // ── #1913: TrustThreshold standing resolution in check_domain_membership ──
+    //
+    // `check_domain_membership` is the shared gate behind ~20 read/write
+    // governance endpoints. These tests exercise two representative consumers
+    // (`create_action_item`, `create_meeting`) through actix for a
+    // `TrustThreshold` domain, proving the same fail-open closed by #1870 in
+    // the direct mutation handlers is also closed here: the gate must consult
+    // `membership_resolver` rather than treating every caller as a member.
+    //
+    // Unlike the member-mutation handlers, these endpoints have no manager-side
+    // TrustThreshold safety net, so "authorization allowed" is observable as a
+    // clean `201 Created`, and "authorization rejected" as `403`.
+
+    /// Wire the two representative `check_domain_membership` consumers
+    /// (`POST /domains/{domain_id}/action-items`, `POST /domains/{domain_id}/meetings`)
+    /// with the given caller injected as authenticated `governance:write` claims.
+    macro_rules! domain_membership_test_app {
+        ($ctx:expr, $caller_did:expr) => {{
+            let ctx_data = web::Data::new($ctx);
+            let caller_did_str = $caller_did.to_string();
+            test::init_service(
+                App::new()
+                    .app_data(ctx_data)
+                    .wrap_fn(move |req, srv| {
+                        req.extensions_mut().insert(BasicClaims {
+                            sub: caller_did_str.clone(),
+                            scope: Some("governance:write".to_string()),
+                        });
+                        srv.call(req)
+                    })
+                    .service(
+                        web::resource("/domains/{domain_id}/action-items")
+                            .route(web::post().to(create_action_item::<NoopEventEmitter>)),
+                    )
+                    .service(
+                        web::resource("/domains/{domain_id}/meetings")
+                            .route(web::post().to(create_meeting::<NoopEventEmitter>)),
+                    ),
+            )
+            .await
+        }};
+    }
+
+    /// #1913 AC: unresolved standing must be rejected (not treated as member)
+    /// on a representative read/write endpoint. Pre-fix this fell through to
+    /// the manager and created the item.
+    #[tokio::test]
+    async fn create_action_item_trust_threshold_unresolved_standing_rejected() {
+        use icn_identity::KeyPair;
+        let caller = KeyPair::generate().unwrap().did().clone();
+
+        let mgr = trust_threshold_domain("tt-ai-unresolved").await;
+        let resolver: Arc<dyn MembershipResolver> = Arc::new(FakeMembershipResolver {
+            outcome: Err("trust graph unavailable".to_string()),
+        });
+        let ctx = membership_mutation_ctx(mgr, Some(resolver), GovernanceContextBuildMode::Test);
+        let app = domain_membership_test_app!(ctx, caller);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/domains/tt-ai-unresolved/action-items")
+                .set_json(serde_json::json!({ "title": "Plan the rehearsal" }))
+                .to_request(),
+        )
+        .await;
+
+        let status = resp.status().as_u16();
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        assert_eq!(
+            status, 403,
+            "unresolved TrustThreshold standing must be rejected, not allowed (fail-open #1913); \
+             got body: {body_str}"
+        );
+        assert!(
+            body_str.contains("unresolved_standing"),
+            "rejection must carry the explicit unresolved_standing code; got: {body_str}"
+        );
+    }
+
+    /// A TrustThreshold caller the resolver positively excludes is rejected.
+    #[tokio::test]
+    async fn create_action_item_trust_threshold_resolved_non_member_rejected() {
+        use icn_identity::KeyPair;
+        let caller = KeyPair::generate().unwrap().did().clone();
+        let other = KeyPair::generate().unwrap().did().clone();
+
+        let mgr = trust_threshold_domain("tt-ai-nonmember").await;
+        let resolver: Arc<dyn MembershipResolver> = Arc::new(FakeMembershipResolver {
+            outcome: Ok(vec![other]), // caller is not in the resolved member set
+        });
+        let ctx = membership_mutation_ctx(mgr, Some(resolver), GovernanceContextBuildMode::Test);
+        let app = domain_membership_test_app!(ctx, caller);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/domains/tt-ai-nonmember/action-items")
+                .set_json(serde_json::json!({ "title": "Plan the rehearsal" }))
+                .to_request(),
+        )
+        .await;
+
+        let status = resp.status().as_u16();
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        assert_eq!(
+            status, 403,
+            "resolver-excluded TrustThreshold caller must not pass the membership gate; \
+             got body: {body_str}"
+        );
+    }
+
+    /// A TrustThreshold caller whose standing the resolver confirms is admitted
+    /// and the action item is created (`201`). Guards against the fix
+    /// over-rejecting legitimate members.
+    #[tokio::test]
+    async fn create_action_item_trust_threshold_resolved_member_allows() {
+        use icn_identity::KeyPair;
+        let caller = KeyPair::generate().unwrap().did().clone();
+
+        let mgr = trust_threshold_domain("tt-ai-member").await;
+        let resolver: Arc<dyn MembershipResolver> = Arc::new(FakeMembershipResolver {
+            outcome: Ok(vec![caller.clone()]),
+        });
+        let ctx = membership_mutation_ctx(mgr, Some(resolver), GovernanceContextBuildMode::Test);
+        let app = domain_membership_test_app!(ctx, caller);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/domains/tt-ai-member/action-items")
+                .set_json(serde_json::json!({ "title": "Plan the rehearsal" }))
+                .to_request(),
+        )
+        .await;
+
+        let status = resp.status().as_u16();
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        assert_eq!(
+            status, 201,
+            "resolver-confirmed TrustThreshold member must be allowed to create an action item; \
+             got body: {body_str}"
+        );
+    }
+
+    /// Production posture with no resolver wired must fail closed on the shared
+    /// gate (cannot resolve standing → refuse), matching the #1870/#1911 policy.
+    #[tokio::test]
+    async fn create_action_item_trust_threshold_production_without_resolver_fails_closed() {
+        use icn_identity::KeyPair;
+        let caller = KeyPair::generate().unwrap().did().clone();
+
+        let mgr = trust_threshold_domain("tt-ai-prod-noresolver").await;
+        let ctx = membership_mutation_ctx(mgr, None, GovernanceContextBuildMode::Production);
+        let app = domain_membership_test_app!(ctx, caller);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/domains/tt-ai-prod-noresolver/action-items")
+                .set_json(serde_json::json!({ "title": "Plan the rehearsal" }))
+                .to_request(),
+        )
+        .await;
+
+        let status = resp.status().as_u16();
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        assert_eq!(
+            status, 403,
+            "Production posture without a resolver must fail closed on TrustThreshold standing; \
+             got body: {body_str}"
+        );
+        assert!(
+            body_str.contains("unresolved_standing"),
+            "Production fail-closed rejection must carry unresolved_standing; got: {body_str}"
+        );
+    }
+
+    /// Second representative endpoint: the shared gate also closes the fail-open
+    /// for `create_meeting`. Unresolved standing is rejected.
+    #[tokio::test]
+    async fn create_meeting_trust_threshold_unresolved_standing_rejected() {
+        use icn_identity::KeyPair;
+        let caller = KeyPair::generate().unwrap().did().clone();
+
+        let mgr = trust_threshold_domain("tt-meeting-unresolved").await;
+        let resolver: Arc<dyn MembershipResolver> = Arc::new(FakeMembershipResolver {
+            outcome: Err("trust graph unavailable".to_string()),
+        });
+        let ctx = membership_mutation_ctx(mgr, Some(resolver), GovernanceContextBuildMode::Test);
+        let app = domain_membership_test_app!(ctx, caller);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/domains/tt-meeting-unresolved/meetings")
+                .set_json(serde_json::json!({ "title": "Coop kickoff" }))
+                .to_request(),
+        )
+        .await;
+
+        let status = resp.status().as_u16();
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        assert_eq!(
+            status, 403,
+            "unresolved TrustThreshold standing must be rejected on create_meeting too; \
+             got body: {body_str}"
+        );
+        assert!(
+            body_str.contains("unresolved_standing"),
+            "rejection must carry the explicit unresolved_standing code; got: {body_str}"
+        );
+    }
+
+    /// Second endpoint allow-path guard: a resolver-confirmed member can create
+    /// a meeting (`201`), so the reject test above is not a spurious always-403.
+    #[tokio::test]
+    async fn create_meeting_trust_threshold_resolved_member_allows() {
+        use icn_identity::KeyPair;
+        let caller = KeyPair::generate().unwrap().did().clone();
+
+        let mgr = trust_threshold_domain("tt-meeting-member").await;
+        let resolver: Arc<dyn MembershipResolver> = Arc::new(FakeMembershipResolver {
+            outcome: Ok(vec![caller.clone()]),
+        });
+        let ctx = membership_mutation_ctx(mgr, Some(resolver), GovernanceContextBuildMode::Test);
+        let app = domain_membership_test_app!(ctx, caller);
+
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri("/domains/tt-meeting-member/meetings")
+                .set_json(serde_json::json!({ "title": "Coop kickoff" }))
+                .to_request(),
+        )
+        .await;
+
+        let status = resp.status().as_u16();
+        let body = test::read_body(resp).await;
+        let body_str = String::from_utf8_lossy(&body);
+        assert_eq!(
+            status, 201,
+            "resolver-confirmed TrustThreshold member must be allowed to create a meeting; \
              got body: {body_str}"
         );
     }
