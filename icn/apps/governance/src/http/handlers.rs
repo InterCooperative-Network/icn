@@ -130,7 +130,7 @@ fn resolve_caller_membership<E>(
                 if ctx.build_mode.rejects_unresolved_standing() {
                     Err(err_forbidden(format!(
                         "Membership resolver is not configured for TrustThreshold domain '{}' \
-                         (unresolved_standing); refusing membership mutation under production \
+                         (unresolved_standing); refusing domain-scoped operation under production \
                          posture",
                         domain.id.0
                     )))
