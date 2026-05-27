@@ -1,0 +1,449 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>MandateGate — Act-Time Resolver Design | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>governance</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>mandate gate design</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/governance/mandate-gate-design.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>MandateGate — Act-Time Resolver Design</h1>
+<p><strong>Status</strong>: Design draft (Phase A — design only; no code change in this PR)
+<strong>Last Updated</strong>: 2026-05-27
+<strong>Issue</strong>: #1868 (step 6 of the <code>governance:write</code> decomposition ladder)
+<strong>Doctrine source</strong>: <a href="/docs/architecture/ABUSE_CASE_HARDENING_STRATEGY">`docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md`</a> §4.1, §7; <a href="https://github.com/InterCooperative-Network/icn/blob/main/governance-write-decomposition">`governance-write-decomposition.md`</a> §6.1</p>
+<p>This document specifies the <code>MandateGate</code> — the app-side, act-time resolver that
+answers <em>&quot;does this actor hold a valid mandate to perform this institutional act
+on this target right now?&quot;</em> It is the keystone the <code>governance:write</code>
+decomposition ladder names as step 6. It is design only; no runtime behavior
+changes here, and no trait or type is added to the codebase in this PR.</p>
+<h2>0. Non-claims</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li>This is a design proposal. It does not change runtime behavior, add code, or
+modify any handler.</li>
+<li>It does not retire <code>governance:write</code>, add receipt-body schema fields, or
+touch the <code>proposal:write</code> routes.</li>
+<li>No production-readiness, pilot-readiness, live-federation, or NYCN-activation
+claim. No regulatory-vocabulary change.</li>
+</ul>
+<h2>1. Problem statement</h2>
+<!-- truth: descriptive -->
+
+<p>A capability scope proves <em>technical permission</em> (&quot;the bearer may call this
+class of route&quot;). It does not prove <em>institutional authority</em> (&quot;the institution
+authorized this actor to perform this act on this target&quot;). Doctrine §4.1 states
+the split directly: the kernel-side enforcement primitive is the capability; the
+institutional gate that <em>produces</em> the right to act is the mandate. The seven
+class scopes minted in steps 3-11 narrow the technical surface, but a holder of
+<code>governance:proposal:write</code> can still close any proposal or cast on behalf of
+any decision — the capability does not bind to the specific institutional act.</p>
+<p>The missing layer is an <strong>act-time gate</strong>: a check, called by a handler at the
+moment it performs a high- or medium-blast act, that resolves whether a valid
+mandate authorizes <em>this actor</em> for <em>this act</em> on <em>this target</em> at <em>this time</em> —
+and returns a reference the handler records in the receipt so the artifact trail
+captures both <em>which capability</em> the bearer used and <em>which mandate</em> authorized
+the act.</p>
+<h2>2. Existing substrate (already built — do not rebuild)</h2>
+<!-- truth: descriptive -->
+
+<p>The mandate <em>record</em> and its storage already exist. MandateGate is a resolver
+over this substrate, not a new subsystem.</p>
+<ul>
+<li><strong><code>Mandate</code> record</strong> (<code>icn-governance</code> <code>src/mandate.rs</code>): <code>id</code> (<code>MandateId</code>),
+<code>decision</code> (<code>DecisionProvenance</code> — <code>proposal_id</code> + <code>decision_hash</code>), <code>grants</code>
+(<code>Vec&lt;AuthorityGrantId&gt;</code>), <code>status</code>, plus time bounds. Per ADR-0014.</li>
+<li><strong><code>MandateStatus</code></strong> state machine: <code>Pending → InProgress → Discharged | Expired | Revoked</code>. The states exist; transition <em>enforcement</em> is future work.</li>
+<li><strong>Acceptance-time minting</strong>: <code>grant_minting::mint_and_persist_for_accepted</code>
+mints a <code>Mandate</code> (strict or pending-grants) when a proposal is accepted, and
+the non-atomic boundary plus the sled-backed atomic override are covered by
+tests (#1872, PRs #1920/#1921).</li>
+<li><strong>Mandate store</strong> (<code>GovernanceReceiptBackend</code> in
+<code>apps/governance</code>): <code>put_mandate</code>, <code>get_mandate_by_proposal</code>,
+<code>list_mandates_by_decision</code>, plus the authority-grant queries
+(<code>get_authority_grant</code>, <code>list_active_authority_grants_by_grantee</code>,
+<code>list_authority_grants_by_grantee</code>, <code>revoke_authority_grant</code>).</li>
+<li><strong><code>AuthorityGrant</code></strong> (<code>icn-governance</code>): the bounded authorization composed
+into a mandate — <code>class</code>, <code>grantor</code>, <code>grantee</code>, <code>scope</code>, <code>granted_by</code>
+(provenance), <code>valid_from</code>, <code>valid_until</code>, <code>revoked_at</code>.</li>
+<li><strong>Posture model + fail-closed precedent</strong> (<code>apps/governance</code>
+<code>GovernanceContextBuildMode</code>: <code>Bootstrap</code> / <code>Production</code> / <code>Test</code>). The
+membership path (<code>check_domain_membership</code> / <code>resolve_caller_membership</code>) is
+the template: an unconfigured resolver <strong>rejects outright in <code>Production</code></strong>
+and stays permissive in <code>Bootstrap</code>/<code>Test</code>. Issue #1871 adds the matching
+production startup guard for optional standing checkers.</li>
+</ul>
+<h2>3. The missing piece: an act-time resolver</h2>
+<!-- truth: descriptive -->
+
+<p>What is <em>not</em> built is the resolver that, at act time, takes
+<code>(actor, domain, act, target, at)</code> and answers whether a live mandate authorizes
+it. The acceptance-time seam records &quot;this decision granted this bounded
+authority&quot;; the gate is the <em>consumer</em> that, later, validates &quot;this actor is
+exercising that authority correctly, now.&quot; The two are distinct moments:
+minting is write-once at acceptance; the gate is read-mostly at each act.</p>
+<p>MandateGate is <strong>app-side</strong> (<code>apps/governance</code>), never kernel. The kernel
+continues to enforce only opaque capability strings and constraint sets; the
+mandate semantics stay in the app. This preserves the meaning firewall.</p>
+<h2>4. Proposed trait shape</h2>
+<!-- truth: descriptive -->
+
+<p>A synchronous, app-side trait (the same shape as a <code>PolicyOracle::evaluate</code>
+call — <code>parking_lot</code>, no <code>.await</code>), so a handler can call it inline immediately
+after <code>require_any_scope</code>:</p>
+<pre><code class="language-text">trait MandateGate {
+    fn require(&amp;self, req: &amp;MandateRequest) -&gt; Result&lt;MandateGrant, MandateRejection&gt;;
+}
+</code></pre>
+<ul>
+<li>Synchronous: handlers call it as an admission check beside the capability
+check; it must not hold a lock across <code>.await</code>.</li>
+<li>App-side only. The kernel never sees <code>MandateAct</code>, <code>MandateTarget</code>, or the
+resolution logic.</li>
+<li>Composable: it sits <em>beside</em> <code>require_any_scope</code> (capability) and
+<code>check_domain_membership</code> (standing), not inside or replacing them. See §6.</li>
+</ul>
+<h2>5. Proposed types</h2>
+<!-- truth: descriptive -->
+
+<pre><code class="language-text">struct MandateRequest {
+    actor:  Did,
+    domain: GovernanceDomainId,
+    act:    MandateAct,
+    target: MandateTarget,
+    at:     Timestamp,            // seconds; see §11 (Timestamp over BlockHeight)
+}
+
+enum MandateAct {                  // finite, named institutional acts
+    ActivateCharter,
+    AddDomainMember,
+    RemoveDomainMember,
+    CloseProposal,
+    CastVote,                      // distinct from CloseProposal — see §11
+    AppointSteward,
+    RemoveSteward,
+    JoinFederation,
+    LeaveFederation,
+    // … one variant per high/medium-blast act, added as handlers are wired
+}
+
+enum MandateTarget {
+    Domain(GovernanceDomainId),
+    Proposal(ProposalId),
+    Role { structure_id: StructureId, holder: Did },
+    Federation(FederationId),
+}
+
+struct MandateGrant {              // returned to the handler; its hash → receipt
+    mandate_id:    MandateId,
+    decision_hash: Hash,
+    act:           MandateAct,
+    target:        MandateTarget,
+    granted_at:    Timestamp,
+}
+
+enum MandateRejection {            // structured reason for the surface to render
+    NoMandate,
+    Expired,
+    WrongTarget,
+    WrongActor,
+    Suspended,
+    Revoked,
+}
+</code></pre>
+<p><code>MandateGrant</code> is a <em>reference</em>, not a new durable record: it points at the
+existing <code>Mandate</code> and carries enough to (a) let the handler record a stable
+hash in the receipt and (b) render the authorization in surfaces. Its exact wire
+format is picked at implementation time (§9 of the decomposition doc lists this
+as open).</p>
+<h2>6. Persistence / resolution model</h2>
+<!-- truth: descriptive -->
+
+<p><strong>MandateGate is a thin resolver over the existing mandate store. It introduces
+no new persistence subsystem and duplicates no record.</strong></p>
+<p>Resolution algorithm (default impl, over <code>GovernanceReceiptBackend</code>):</p>
+<ol>
+<li><strong>Locate the authorizing mandate. The lookup path is target-dependent and is
+a required step-6 deliverable, not an optional add-on.</strong><ul>
+<li><code>MandateTarget::Proposal</code>: resolve via the existing
+<code>get_mandate_by_proposal</code> / <code>list_mandates_by_decision</code> indexes.</li>
+<li><code>MandateTarget::Domain</code> / <code>Federation</code> / <code>Role</code>: the existing indexes are
+keyed by <code>proposal_id</code>/<code>decision_hash</code>, which a <code>MandateRequest</code> does not
+carry, and <code>Mandate</code> persists no <code>(domain, act, target)</code> binding — so these
+targets have <strong>no</strong> existing key. Because the first handlers wired in §10
+step 7 are charter/federation (<code>Domain</code>/<code>Federation</code> targets), a concrete
+reverse lookup must ship <strong>with</strong> the gate (step 6), or production
+resolution would fail closed for exactly those handlers. Preferred path:
+<strong>actor-first</strong> — call <code>list_active_authority_grants_by_grantee(actor, at)</code>,
+then select the grant whose <code>scope</code> binds <code>(domain, act, target)</code>; that
+grant&#39;s mandate is the authorizing mandate. This needs <strong>no new index</strong> and
+inherently enforces the grant-grantee actor binding (§6 step 5). Only if an
+act cannot be expressed actor-first does step 6 add a
+<code>(domain, act, target) → mandate_id</code> secondary index written at mint time.</li>
+</ul>
+</li>
+<li>Check <code>MandateStatus</code> is live (<code>Pending</code>/<code>InProgress</code>, not
+<code>Discharged</code>/<code>Expired</code>/<code>Revoked</code>) → <code>Revoked</code>/<code>Expired</code> rejection otherwise.</li>
+<li><strong>Reject if past the mandate&#39;s own deadline</strong> — <code>mandate.is_past_deadline(req.at)</code>
+→ <code>Expired</code>. The mandate-level <code>deadline</code> is authoritative for expiry even
+when status-transition enforcement has not yet mechanically moved a
+<code>Pending</code>/<code>InProgress</code> mandate to <code>Expired</code> (that enforcement is future work,
+§12), and even if an attached grant has a wider or absent <code>valid_until</code>. The
+resolver must <strong>not</strong> rely on <code>MandateStatus</code> alone for expiry.</li>
+<li><strong>Reject unbound (empty-grant) mandates fail-closed, before any actor
+check.</strong> A mandate with <code>has_no_grants()</code> is a <em>pending-grants</em> record: it
+attests that a decision occurred but carries <strong>no bounded authority</strong>. These
+records exist precisely because typed grant minting/storage was unavailable
+(the #1872 fallback path in <code>write_pending_mandate</code>); per <code>Mandate</code>&#39;s own
+contract (<code>icn-governance</code> <code>src/mandate.rs</code>) they are ineligible for
+execution authorization until real grants are attached. The resolver must
+therefore reject them with <code>NoMandate</code> <em>before</em> the actor step — never let an
+authorization-provenance-only record become act-time authority.</li>
+<li>Check the actor is <strong>named by an <code>AuthorityGrant.grantee</code> on this mandate</strong> →
+<code>WrongActor</code>. Authorization is <strong>grant-grantee-only</strong>: <code>DecisionProvenance</code>
+carries only <code>proposal_id</code>/<code>decision_hash</code> (not a grantee or executor;
+<code>icn-governance</code> <code>src/authority.rs</code>), so it binds the mandate to its decision
+for audit but <strong>never</strong> authorizes an actor. Step 4 guarantees at least one
+grant is present, so a grantee match is always required — there is no
+provenance-only fallback that a bare capability holder could satisfy by
+pointing at the decision.</li>
+<li>Check the target matches the mandate&#39;s bound subject → <code>WrongTarget</code>.</li>
+<li>Check grant time validity against each grant&#39;s <code>valid_from</code>/<code>valid_until</code> →
+<code>Expired</code> (in addition to the mandate-level deadline in step 3).</li>
+<li>Consult the existing <code>suspension_checker</code> for the actor as an <strong>adjacent</strong>
+fail-closed condition → <code>Suspended</code>. The gate does <strong>not</strong> re-implement
+suspension; it only reads the existing checker.</li>
+</ol>
+<p>Separation of concerns is deliberate: capability scope (technical permission),
+membership standing (<code>check_domain_membership</code>), mandate validity (this gate),
+and suspension (existing checker) stay <strong>composable checks</strong>, not one god-auth
+function. The gate owns only mandate validity, and surfaces <code>Suspended</code> by
+delegating.</p>
+<h2>7. Receipt linkage and dependency on the receipt-body schema step</h2>
+<!-- truth: descriptive -->
+
+<p>The handler records <code>MandateGrant</code>&#39;s hash in the resulting receipt so the
+artifact trail captures both the capability presented and the mandate that
+authorized the act. This <strong>depends on §10 step 2</strong> of the decomposition doc (the
+receipt-body schema work: <code>capability_scope_presented</code> + <code>mandate_grant: Option&lt;MandateGrantRef&gt;</code> on <code>GovernanceDecisionReceipt</code> /
+<code>ActionItemCompletionReceipt</code> / <code>MeetingAttendanceReceipt</code>, under a new
+<code>icn:gov:…:v2</code> domain-separation tag; old receipts remain replayable).</p>
+<p>Sequencing consequence: <strong>step 6 (build the gate) lands and is unit-tested
+without step 2.</strong> The gate <em>returns</em> a <code>MandateGrant</code>; recording its hash in a
+receipt is the downstream consumer wired in step 7, after step 2 has added the
+field. Low-blast acts record an explicit <code>no_mandate_required</code> discriminator
+rather than a grant.</p>
+<h2>8. Posture / failure behavior</h2>
+<!-- truth: descriptive -->
+
+<p>Mirrors the membership precedent (<code>check_domain_membership</code>, #1871):</p>
+<ul>
+<li><strong><code>Production</code></strong>: a required mandate that cannot be resolved → <code>MandateRejection</code>
+(fail-closed); the act is refused with a stable status (403/409) and a
+structured reason. An <em>unwired</em> gate where one is required → <code>GovernanceContext::validate</code>
+refuses to start (the #1871 production-startup-guard pattern, extended to the
+mandate gate).</li>
+<li><strong><code>Bootstrap</code> / <code>Test</code></strong>: permissive — a missing/unwired gate allows the act,
+logged and explicitly labeled as non-production posture, preserving dev/devnet
+flow. This is an explicitly labeled carve-out, not a silent bypass.</li>
+<li><strong><code>MandateRejection</code></strong> reasons map to stable HTTP codes + a machine-readable
+body so surfaces can render <em>why</em> (no-mandate, expired, wrong-target,
+wrong-actor, suspended, revoked).</li>
+</ul>
+<h2>9. Tests required before handler migration</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li><strong>Unit (step 6, in <code>apps/governance</code>)</strong>: a fixture
+<code>GovernanceReceiptBackend</code> seeded with mandates →<ul>
+<li>valid <code>(actor, domain, act, target, at)</code> → <code>MandateGrant</code>;</li>
+<li>each rejection reason exercised: no-mandate, time-expired, wrong-target,
+wrong-actor, revoked status, suspended (via the suspension checker);</li>
+<li><strong>unbound pending-grants mandate</strong> (status <code>Pending</code>, <code>has_no_grants()</code>) →
+rejected with <code>NoMandate</code> even when actor/target/time would otherwise
+match, and even though its status is live — a required case, since this is
+the authority-laundering path the gate must close;</li>
+<li><strong>past-deadline mandate with a still-live status</strong> (<code>Pending</code>/<code>InProgress</code>
+but <code>is_past_deadline(req.at)</code>, including the case where an attached grant&#39;s
+<code>valid_until</code> is wider/absent) → rejected <code>Expired</code> — proves the deadline is
+authoritative without assuming status-transition enforcement has run;</li>
+<li><strong>provenance-only actor</strong> (the actor is named in the decision provenance
+but is <strong>not</strong> a grantee of any attached grant) → rejected <code>WrongActor</code> —
+proves there is no provenance-only authorization path;</li>
+<li><strong>non-proposal target resolution</strong>: a <code>Domain</code> (and a <code>Federation</code>) target
+resolves actor-first via the grantee&#39;s active grants (§6 step 1), returning
+the bound mandate — not only <code>Proposal</code> targets, since charter/federation
+are wired first;</li>
+<li>posture: <code>Production</code> fail-closed vs <code>Bootstrap</code> permissive;</li>
+<li><code>MandateGrant</code> hash determinism (stable across runs).</li>
+</ul>
+</li>
+<li><strong>Integration (step 7)</strong>: a migrated handler (e.g. <code>close_proposal</code>) calls
+<code>require()</code> after <code>require_any_scope</code>; rejected → 403/409; accepted → proceeds
+and (once step 2 lands) records the grant hash in the receipt.</li>
+<li><strong>Startup guard (with #1871)</strong>: <code>Production</code> + a required-but-unwired gate →
+<code>validate()</code> refuses.</li>
+</ul>
+<h2>10. Migration order after this design</h2>
+<!-- truth: descriptive -->
+
+<ol>
+<li><strong>Step 6 (next impl PR)</strong> — build the <code>MandateGate</code> trait + types + the
+resolver + tests. <strong>No handler changes; independent.</strong> May run in parallel
+with step 2.</li>
+<li><strong>Step 2</strong> — receipt-body schema (mandate-grant reference +
+<code>capability_scope_presented</code>, v2 tag).</li>
+<li><strong>Step 7</strong> — wire <code>require()</code> into the <strong>charter and federation</strong> handlers
+first (highest / cross-cooperative blast radius); record the grant hash
+(needs step 2).</li>
+<li><strong>Step 8</strong> — wire <code>proposal:write</code> acts (close/cast/steward-proposal/
+delegation).</li>
+<li><strong>ADR + step 13</strong> — once the trait and scope set are stable, the ADR (§11 of
+the decomposition doc) freezes the <code>MandateGate</code> interface, the class scope
+set, and the <code>governance:write</code> retirement schedule.</li>
+</ol>
+<h2>11. Open decisions and recommended defaults</h2>
+<!-- truth: descriptive -->
+
+<p>Recorded defaults (chosen for this design; reviewers/impl PRs may revisit):</p>
+<ul>
+<li><strong>Distinct <code>MandateAct</code> variants for <code>CastVote</code> and <code>CloseProposal</code></strong>
+(decomposition §12 Q4). Different target and semantics; do not collapse.</li>
+<li><strong>Comment <code>edit</code>/<code>delete</code> stay direct per-resource ownership checks, not
+routed through MandateGate</strong> (§12 Q5). They are app-level resource ownership,
+not institutional authority.</li>
+<li><strong><code>Timestamp</code> (seconds), not <code>BlockHeight</code></strong> for <code>MandateRequest.at</code>. Mandates
+and grants already carry <code>valid_from</code>/<code>valid_until</code> in seconds; aligning the
+gate with that avoids a unit mismatch.</li>
+<li><strong>Bootstrap / direct-administrative acts use the labeled bootstrap path</strong>
+(already built — #1869&#39;s <code>activation_path: bootstrap</code>), <strong>not</strong> a
+<code>MandateGrant::AdministrativeShortcut</code> variant for now. MandateGate is for
+<em>ratified</em> acts; bootstrap acts do not claim a mandate.</li>
+<li><strong>An unbound (empty-grant) mandate never confers act-time authority.</strong> A
+<code>has_no_grants()</code> pending-grants record attests a decision occurred but
+carries no bounded authority; the resolver rejects it fail-closed (<code>NoMandate</code>)
+before the actor check (§6 step 4). This is a hard invariant, not a default.</li>
+<li><strong>Actor authorization is grant-grantee-only.</strong> <code>DecisionProvenance</code> (only
+<code>proposal_id</code>/<code>decision_hash</code>) never authorizes an actor; the actor must be a
+grantee of an attached <code>AuthorityGrant</code> (§6 step 5). Hard invariant.</li>
+<li><strong>The mandate <code>deadline</code> is authoritative for expiry independent of
+<code>MandateStatus</code>.</strong> The resolver rejects a past-deadline mandate (<code>Expired</code>)
+even if status-transition enforcement (future work) has not moved it off
+<code>Pending</code>/<code>InProgress</code>, and regardless of any grant&#39;s <code>valid_until</code> (§6 step 3).
+Hard invariant.</li>
+<li><strong>Resolver over the existing mandate store</strong> (no separate persistence, no
+duplicate records). Non-proposal targets (<code>Domain</code>/<code>Federation</code>/<code>Role</code>) resolve
+<strong>actor-first</strong> via <code>list_active_authority_grants_by_grantee</code> (§6 step 1) — a
+required step-6 deliverable, since charter/federation are wired first; a new
+<code>(domain, act, target)</code> index is added only if an act cannot be expressed
+actor-first.</li>
+<li><strong>MandateGate is app-side, not kernel-side.</strong> Capability scope = technical
+permission; MandateGate = institutional authority. Membership standing stays
+its own layer.</li>
+</ul>
+<h2>12. Non-goals</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li>No code, trait, or type added to the codebase in this PR (design only).</li>
+<li>No handler changes; no <code>proposal:write</code> migration; no receipt-body schema
+fields added yet; no <code>governance:write</code> retirement.</li>
+<li>No mandate <em>transition</em> enforcement (the <code>MandateStatus</code> state machine
+transitions remain future work; this design covers resolution, not lifecycle
+mutation).</li>
+<li>No kernel changes; the meaning firewall is unchanged.</li>
+<li>No production/pilot/live-federation/NYCN readiness claim.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
