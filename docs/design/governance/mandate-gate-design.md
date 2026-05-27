@@ -182,11 +182,20 @@ Resolution algorithm (default impl, over `GovernanceReceiptBackend`):
    existing keys cannot resolve the tuple cleanly — not by default.
 2. Check `MandateStatus` is live (`Pending`/`InProgress`, not
    `Discharged`/`Expired`/`Revoked`) → `Revoked`/`Expired` rejection otherwise.
-3. Check the actor is authorized by the mandate's grants/provenance (the
+3. **Reject unbound (empty-grant) mandates fail-closed, before any actor
+   check.** A mandate with `has_no_grants()` is a *pending-grants* record: it
+   attests that a decision occurred but carries **no bounded authority**. These
+   records exist precisely because typed grant minting/storage was unavailable
+   (the #1872 fallback path in `write_pending_mandate`); per `Mandate`'s own
+   contract (`icn-governance` `src/mandate.rs`) they are ineligible for
+   execution authorization until real grants are attached. The resolver must
+   therefore reject them with `NoMandate` *before* the actor/provenance step —
+   never let an authorization-provenance-only record become act-time authority.
+4. Check the actor is authorized by the mandate's grants/provenance (the
    `AuthorityGrant.grantee` set, or the decision provenance) → `WrongActor`.
-4. Check the target matches the mandate's bound subject → `WrongTarget`.
-5. Check time validity against `valid_from`/`valid_until` → `Expired`.
-6. Consult the existing `suspension_checker` for the actor as an **adjacent**
+5. Check the target matches the mandate's bound subject → `WrongTarget`.
+6. Check time validity against `valid_from`/`valid_until` → `Expired`.
+7. Consult the existing `suspension_checker` for the actor as an **adjacent**
    fail-closed condition → `Suspended`. The gate does **not** re-implement
    suspension; it only reads the existing checker.
 
@@ -241,6 +250,10 @@ Mirrors the membership precedent (`check_domain_membership`, #1871):
   - valid `(actor, domain, act, target, at)` → `MandateGrant`;
   - each rejection reason exercised: no-mandate, time-expired, wrong-target,
     wrong-actor, revoked status, suspended (via the suspension checker);
+  - **unbound pending-grants mandate** (status `Pending`, `has_no_grants()`) →
+    rejected with `NoMandate` even when actor/target/time would otherwise
+    match, and even though its status is live — a required case, since this is
+    the authority-laundering path the gate must close;
   - posture: `Production` fail-closed vs `Bootstrap` permissive;
   - `MandateGrant` hash determinism (stable across runs).
 - **Integration (step 7)**: a migrated handler (e.g. `close_proposal`) calls
@@ -285,6 +298,10 @@ Recorded defaults (chosen for this design; reviewers/impl PRs may revisit):
   (already built — #1869's `activation_path: bootstrap`), **not** a
   `MandateGrant::AdministrativeShortcut` variant for now. MandateGate is for
   *ratified* acts; bootstrap acts do not claim a mandate.
+- **An unbound (empty-grant) mandate never confers act-time authority.** A
+  `has_no_grants()` pending-grants record attests a decision occurred but
+  carries no bounded authority; the resolver rejects it fail-closed (`NoMandate`)
+  before the actor check (§6 step 3). This is a hard invariant, not a default.
 - **Resolver over the existing mandate store** (no separate persistence, no
   duplicate records; add a secondary index only if proven necessary).
 - **MandateGate is app-side, not kernel-side.** Capability scope = technical
