@@ -6468,10 +6468,11 @@ mod tests {
             !body_str.contains("unresolved_standing"),
             "confirmed standing must not be reported as unresolved; got: {body_str}"
         );
-        assert_eq!(
-            status, 500,
-            "request must reach the manager (which rejects TrustThreshold mutation), proving \
-             authorization was granted; got body: {body_str}"
+        assert!(
+            body_str.contains("trust-based membership domain"),
+            "request must reach the manager's TrustThreshold safety net (proving the membership \
+             gate granted authorization), not be blocked at the gate; got status {status}, \
+             body: {body_str}"
         );
     }
 
@@ -6660,10 +6661,10 @@ mod tests {
             "Bootstrap posture without a resolver must remain permissive (no behavior change); \
              got body: {body_str}"
         );
-        assert_eq!(
-            status, 500,
+        assert!(
+            body_str.contains("trust-based membership domain"),
             "permissive gate must let the request reach the manager's TrustThreshold safety net; \
-             got body: {body_str}"
+             got status {status}, body: {body_str}"
         );
     }
 
