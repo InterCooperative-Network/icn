@@ -2289,7 +2289,10 @@ pub async fn add_comment<E: GovernanceEventEmitter + Clone + 'static>(
     proposal_id: web::Path<String>,
     req: web::Json<AddCommentRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:comment:write", "governance:write"],
+    )?;
     let author = parse_did(&claims.sub, "Invalid DID in token")?;
 
     if req.content.trim().is_empty() {
@@ -2368,7 +2371,10 @@ pub async fn edit_comment<E: GovernanceEventEmitter + Clone + 'static>(
     path: web::Path<(String, String)>,
     req: web::Json<EditCommentRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:comment:write", "governance:write"],
+    )?;
     let editor = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (_proposal_id, comment_id_str) = path.into_inner();
@@ -2399,7 +2405,10 @@ pub async fn delete_comment<E: GovernanceEventEmitter + Clone + 'static>(
     http_req: HttpRequest,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:comment:write", "governance:write"],
+    )?;
     let deleter = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (_proposal_id, comment_id_str) = path.into_inner();
@@ -2420,7 +2429,10 @@ pub async fn add_reaction<E: GovernanceEventEmitter + Clone + 'static>(
     path: web::Path<(String, String)>,
     req: web::Json<AddReactionRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:comment:write", "governance:write"],
+    )?;
     let reactor = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (_proposal_id, comment_id_str) = path.into_inner();
@@ -2445,7 +2457,10 @@ pub async fn remove_reaction<E: GovernanceEventEmitter + Clone + 'static>(
     path: web::Path<(String, String)>,
     req: web::Json<RemoveReactionRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:comment:write", "governance:write"],
+    )?;
     let reactor = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (_proposal_id, comment_id_str) = path.into_inner();
@@ -2634,7 +2649,10 @@ pub async fn create_action_item<E: GovernanceEventEmitter + Clone + 'static>(
     domain_id: web::Path<String>,
     req: web::Json<CreateActionItemRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:meeting:write", "governance:write"],
+    )?;
     let creator_did = parse_did(&claims.sub, "Invalid DID in token")?;
     let domain = GovernanceDomainId(domain_id.into_inner());
 
@@ -2723,7 +2741,10 @@ pub async fn update_action_item<E: GovernanceEventEmitter + Clone + 'static>(
     path: web::Path<(String, String)>,
     req: web::Json<UpdateActionItemRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:meeting:write", "governance:write"],
+    )?;
     let user_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (domain_id, item_id) = path.into_inner();
@@ -2816,7 +2837,10 @@ pub async fn delete_action_item<E: GovernanceEventEmitter + Clone + 'static>(
     http_req: HttpRequest,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:meeting:write", "governance:write"],
+    )?;
     let user_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (domain_id, item_id) = path.into_inner();
@@ -2851,7 +2875,10 @@ pub async fn update_action_item_status<E: GovernanceEventEmitter + Clone + 'stat
     path: web::Path<(String, String)>,
     req: web::Json<StatusUpdateRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:meeting:write", "governance:write"],
+    )?;
     let user_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (domain_id, item_id) = path.into_inner();
@@ -2890,7 +2917,10 @@ pub async fn add_action_item_note<E: GovernanceEventEmitter + Clone + 'static>(
     path: web::Path<(String, String)>,
     req: web::Json<AddActionItemNoteRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:meeting:write", "governance:write"],
+    )?;
     let author_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (domain_id, item_id) = path.into_inner();
@@ -3499,7 +3529,10 @@ pub async fn create_structure<E: GovernanceEventEmitter + Clone + 'static>(
     entity_id: web::Path<String>,
     req: web::Json<CreateStructureRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:activity:write", "governance:write"],
+    )?;
     let entity = entity_id.into_inner();
     let kind = parse_structure_kind(&req.kind)?;
 
@@ -3599,7 +3632,10 @@ pub async fn create_activity<E: GovernanceEventEmitter + Clone + 'static>(
     entity_id: web::Path<String>,
     req: web::Json<CreateActivityRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:activity:write", "governance:write"],
+    )?;
     let entity = entity_id.into_inner();
     let kind = parse_activity_kind(&req.kind)?;
 
@@ -3766,7 +3802,10 @@ pub async fn create_meeting<E: GovernanceEventEmitter + Clone + 'static>(
     domain_id: web::Path<String>,
     req: web::Json<CreateMeetingRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:meeting:write", "governance:write"],
+    )?;
     let domain = GovernanceDomainId(domain_id.into_inner());
 
     check_domain_membership(
@@ -3844,7 +3883,10 @@ pub async fn start_meeting<E: GovernanceEventEmitter + Clone + 'static>(
     http_req: HttpRequest,
     meeting_id: web::Path<String>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:meeting:write", "governance:write"],
+    )?;
     let id = MeetingId(meeting_id.into_inner());
 
     let mut m = ctx
@@ -3894,7 +3936,10 @@ pub async fn end_meeting<E: GovernanceEventEmitter + Clone + 'static>(
     http_req: HttpRequest,
     meeting_id: web::Path<String>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:meeting:write", "governance:write"],
+    )?;
     let id = MeetingId(meeting_id.into_inner());
 
     let mut m = ctx
@@ -3936,7 +3981,10 @@ pub async fn add_attendee<E: GovernanceEventEmitter + Clone + 'static>(
     meeting_id: web::Path<String>,
     req: web::Json<AddAttendeeRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:meeting:write", "governance:write"],
+    )?;
     let id = MeetingId(meeting_id.into_inner());
     let role = parse_meeting_role(&req.meeting_role)?;
 
@@ -3992,7 +4040,10 @@ pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
     meeting_id: web::Path<String>,
     req: web::Json<MarkAttendanceRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:meeting:write", "governance:write"],
+    )?;
     let id = MeetingId(meeting_id.into_inner());
     let status = parse_attendance_status(&req.status)?;
     let recorded_by = parse_did(&claims.sub, "Invalid DID in token")?;
@@ -4033,7 +4084,10 @@ pub async fn add_agenda_item<E: GovernanceEventEmitter + Clone + 'static>(
     meeting_id: web::Path<String>,
     req: web::Json<AddAgendaItemRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:meeting:write", "governance:write"],
+    )?;
     let id = MeetingId(meeting_id.into_inner());
 
     let mut m = ctx
@@ -4074,7 +4128,10 @@ pub async fn update_agenda_item<E: GovernanceEventEmitter + Clone + 'static>(
     path: web::Path<(String, String)>,
     req: web::Json<UpdateAgendaItemRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:meeting:write", "governance:write"],
+    )?;
     let (meeting_id_str, item_id_str) = path.into_inner();
     let meeting_id = MeetingId(meeting_id_str);
     let item_uuid = item_id_str
@@ -4218,7 +4275,10 @@ pub async fn create_program<E: GovernanceEventEmitter + Clone + 'static>(
     domain_id: web::Path<String>,
     req: web::Json<CreateProgramRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:activity:write", "governance:write"],
+    )?;
     let domain = GovernanceDomainId(domain_id.into_inner());
 
     check_domain_membership(
@@ -4300,7 +4360,10 @@ pub async fn create_milestone<E: GovernanceEventEmitter + Clone + 'static>(
     program_id: web::Path<String>,
     req: web::Json<CreateMilestoneRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:activity:write", "governance:write"],
+    )?;
     let pid = ProgramId(program_id.into_inner());
 
     if req.name.trim().is_empty() {
@@ -4381,7 +4444,10 @@ pub async fn update_milestone_status<E: GovernanceEventEmitter + Clone + 'static
     milestone_id: web::Path<String>,
     req: web::Json<UpdateMilestoneStatusRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:activity:write", "governance:write"],
+    )?;
     let id = MilestoneId(milestone_id.into_inner());
     let status = parse_milestone_status(&req.status)?;
     let actor = parse_did(&claims.sub, "Invalid DID in token")?;
@@ -4422,7 +4488,10 @@ pub async fn link_activity_to_program<E: GovernanceEventEmitter + Clone + 'stati
     http_req: HttpRequest,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:activity:write", "governance:write"],
+    )?;
     let (program_id_str, activity_id_str) = path.into_inner();
     let pid = ProgramId(program_id_str);
     let aid = ActivityId(activity_id_str);
@@ -4462,7 +4531,10 @@ pub async fn unlink_activity_from_program<E: GovernanceEventEmitter + Clone + 's
     http_req: HttpRequest,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:activity:write", "governance:write"],
+    )?;
     let (program_id_str, activity_id_str) = path.into_inner();
     let pid = ProgramId(program_id_str);
     let aid = ActivityId(activity_id_str);
@@ -5007,7 +5079,10 @@ pub async fn update_program_status<E: GovernanceEventEmitter + Clone + 'static>(
     program_id: web::Path<String>,
     req: web::Json<UpdateProgramStatusRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:activity:write", "governance:write"],
+    )?;
     let pid = ProgramId(program_id.into_inner());
     let status = parse_program_status(&req.status)?;
     let actor = parse_did(&claims.sub, "Invalid DID in token")?;
