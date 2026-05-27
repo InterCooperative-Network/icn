@@ -15,7 +15,7 @@ use icn_governance::{
     ProposalPayload, ProposalScope, StructureId, StructureKind, StructureStatus, VoteChoice,
 };
 use icn_http_kit::{
-    auth::{require_scope, BasicClaims},
+    auth::{require_any_scope, require_scope, BasicClaims},
     error::ApiError,
     pagination::{ListPagination, ListQuery, ListResponse},
 };
@@ -447,7 +447,12 @@ pub async fn create_domain<E: GovernanceEventEmitter + Clone + 'static>(
     http_req: HttpRequest,
     req: web::Json<CreateDomainRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    // #1868 step 3: charter-class capability with accepted-also fallback to the
+    // legacy broad `governance:write` until that scope is retired.
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:charter:write", "governance:write"],
+    )?;
     let creator_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     val::validate_domain_id(&req.id)?;
@@ -610,7 +615,12 @@ pub async fn add_domain_member<E: GovernanceEventEmitter + Clone + 'static>(
     domain_id: web::Path<String>,
     body: web::Json<AddDomainMemberRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    // #1868 step 3: charter-class capability with accepted-also fallback to the
+    // legacy broad `governance:write` until that scope is retired.
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:charter:write", "governance:write"],
+    )?;
     let caller_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let domain_id_str = domain_id.into_inner();
@@ -651,7 +661,12 @@ pub async fn remove_domain_member<E: GovernanceEventEmitter + Clone + 'static>(
     domain_id: web::Path<String>,
     body: web::Json<RemoveDomainMemberRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    // #1868 step 3: charter-class capability with accepted-also fallback to the
+    // legacy broad `governance:write` until that scope is retired.
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:charter:write", "governance:write"],
+    )?;
     let caller_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let domain_id_str = domain_id.into_inner();
@@ -747,7 +762,9 @@ pub async fn activate_charter<E: GovernanceEventEmitter + Clone + 'static>(
     http_req: HttpRequest,
     req: web::Json<ActivateCharterRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    // #1868 step 3: charter-class capability with accepted-also fallback to the
+    // legacy broad `governance:write` until that scope is retired.
+    require_any_scope::<BasicClaims>(&http_req, &["governance:charter:write", "governance:write"])?;
 
     val::validate_charter_id(&req.charter_id)?;
     val::validate_charter_yaml(&req.charter_yaml)?;

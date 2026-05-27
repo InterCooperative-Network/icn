@@ -60,6 +60,46 @@ pub fn require_scope<C: ClaimsLike>(
     Ok(claims)
 }
 
+/// Require that the request carries valid claims satisfying **at least one** of
+/// `required_scopes`.
+///
+/// This supports capability-decomposition migrations: a handler can require a
+/// narrowed class scope (e.g. `"governance:charter:write"`) while still
+/// accepting a legacy broad scope (e.g. `"governance:write"`) as an
+/// accepted-also fallback until the broad scope is retired. Each candidate is
+/// matched with the same rule as [`require_scope`] (exact or sub-scope).
+///
+/// Returns the claims on the first candidate that matches. If none match, the
+/// rejection mirrors [`require_scope`] applied to the first (preferred) entry —
+/// distinguishing "no scope present" from "not in granted scopes". Called with
+/// an empty `required_scopes` is a programmer error and returns
+/// `ApiError::Internal`.
+pub fn require_any_scope<C: ClaimsLike>(
+    req: &HttpRequest,
+    required_scopes: &[&str],
+) -> Result<C, ApiError> {
+    let Some((&preferred, fallbacks)) = required_scopes.split_first() else {
+        return Err(ApiError::Internal(
+            "require_any_scope called with no candidate scopes".to_string(),
+        ));
+    };
+    let claims = get_claims::<C>(req).ok_or(ApiError::Unauthenticated)?;
+
+    // Accept on the first matching fallback candidate.
+    if fallbacks
+        .iter()
+        .any(|scope| check_scope(&claims, scope).is_ok())
+    {
+        return Ok(claims);
+    }
+    // No fallback matched — defer to the preferred scope's own check so the
+    // rejection mirrors `require_scope` exactly (preserving the "no scope
+    // present" vs "not in granted scopes" distinction) and names the
+    // preferred (narrowed) scope.
+    check_scope(&claims, preferred)?;
+    Ok(claims)
+}
+
 /// Centralized scope checking. Split and normalize once, not in every handler.
 fn check_scope<C: ClaimsLike>(claims: &C, required: &str) -> Result<(), ApiError> {
     let Some(raw) = claims.raw_scope() else {
@@ -79,5 +119,84 @@ fn check_scope<C: ClaimsLike>(claims: &C, required: &str) -> Result<(), ApiError
         Err(ApiError::Forbidden(format!(
             "required scope '{required}' not in granted scopes"
         )))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::*;
+    use actix_web::test::TestRequest;
+
+    const CHARTER: &str = "governance:charter:write";
+    const BROAD: &str = "governance:write";
+
+    fn req_with_scope(scope: Option<&str>) -> HttpRequest {
+        let req = TestRequest::default().to_http_request();
+        req.extensions_mut().insert(BasicClaims {
+            sub: "did:icn:test".to_string(),
+            scope: scope.map(str::to_string),
+        });
+        req
+    }
+
+    #[test]
+    fn require_any_scope_accepts_class_scope() {
+        let req = req_with_scope(Some(CHARTER));
+        assert!(require_any_scope::<BasicClaims>(&req, &[CHARTER, BROAD]).is_ok());
+    }
+
+    #[test]
+    fn require_any_scope_accepts_legacy_broad_scope() {
+        // Accepted-also fallback: tokens minted before the migration still work.
+        let req = req_with_scope(Some(BROAD));
+        assert!(require_any_scope::<BasicClaims>(&req, &[CHARTER, BROAD]).is_ok());
+    }
+
+    #[test]
+    fn require_any_scope_rejects_unrelated_scope() {
+        let req = req_with_scope(Some("ledger:write"));
+        let err = require_any_scope::<BasicClaims>(&req, &[CHARTER, BROAD]).unwrap_err();
+        assert!(matches!(err, ApiError::Forbidden(_)));
+    }
+
+    #[test]
+    fn require_any_scope_rejects_when_no_scope_present() {
+        let req = req_with_scope(None);
+        let err = require_any_scope::<BasicClaims>(&req, &[CHARTER, BROAD]).unwrap_err();
+        // Mirrors `require_scope`: distinguishes "no scope present" from the
+        // ordinary "not in granted scopes" rejection, naming the preferred scope.
+        match err {
+            ApiError::Forbidden(msg) => {
+                assert!(
+                    msg.contains("no scope present") && msg.contains(CHARTER),
+                    "expected a 'no scope present' rejection naming {CHARTER}, got: {msg}"
+                );
+            }
+            other => panic!("expected Forbidden, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn require_any_scope_empty_candidates_is_internal_error() {
+        // Empty candidate list is a programmer error, not an auth rejection.
+        let req = req_with_scope(Some(CHARTER));
+        let err = require_any_scope::<BasicClaims>(&req, &[]).unwrap_err();
+        assert!(matches!(err, ApiError::Internal(_)));
+    }
+
+    #[test]
+    fn require_any_scope_unauthenticated_without_claims() {
+        let req = TestRequest::default().to_http_request();
+        let err = require_any_scope::<BasicClaims>(&req, &[CHARTER, BROAD]).unwrap_err();
+        assert!(matches!(err, ApiError::Unauthenticated));
+    }
+
+    #[test]
+    fn require_any_scope_honors_sub_scope_match() {
+        // `governance:write:admin` satisfies the broad `governance:write` candidate.
+        let req = req_with_scope(Some("governance:write:admin"));
+        assert!(require_any_scope::<BasicClaims>(&req, &[CHARTER, BROAD]).is_ok());
     }
 }
