@@ -175,11 +175,23 @@ no new persistence subsystem and duplicates no record.**
 
 Resolution algorithm (default impl, over `GovernanceReceiptBackend`):
 
-1. Locate the mandate(s) bound to `(domain, target)` using the existing
-   decision/proposal indexes (`get_mandate_by_proposal` /
-   `list_mandates_by_decision`). Add a single secondary index
-   `(domain, act, target) → mandate` **only if** implementation proves the
-   existing keys cannot resolve the tuple cleanly — not by default.
+1. **Locate the authorizing mandate. The lookup path is target-dependent and is
+   a required step-6 deliverable, not an optional add-on.**
+   - `MandateTarget::Proposal`: resolve via the existing
+     `get_mandate_by_proposal` / `list_mandates_by_decision` indexes.
+   - `MandateTarget::Domain` / `Federation` / `Role`: the existing indexes are
+     keyed by `proposal_id`/`decision_hash`, which a `MandateRequest` does not
+     carry, and `Mandate` persists no `(domain, act, target)` binding — so these
+     targets have **no** existing key. Because the first handlers wired in §10
+     step 7 are charter/federation (`Domain`/`Federation` targets), a concrete
+     reverse lookup must ship **with** the gate (step 6), or production
+     resolution would fail closed for exactly those handlers. Preferred path:
+     **actor-first** — call `list_active_authority_grants_by_grantee(actor, at)`,
+     then select the grant whose `scope` binds `(domain, act, target)`; that
+     grant's mandate is the authorizing mandate. This needs **no new index** and
+     inherently enforces the grant-grantee actor binding (§6 step 5). Only if an
+     act cannot be expressed actor-first does step 6 add a
+     `(domain, act, target) → mandate_id` secondary index written at mint time.
 2. Check `MandateStatus` is live (`Pending`/`InProgress`, not
    `Discharged`/`Expired`/`Revoked`) → `Revoked`/`Expired` rejection otherwise.
 3. **Reject if past the mandate's own deadline** — `mandate.is_past_deadline(req.at)`
@@ -274,6 +286,10 @@ Mirrors the membership precedent (`check_domain_membership`, #1871):
   - **provenance-only actor** (the actor is named in the decision provenance
     but is **not** a grantee of any attached grant) → rejected `WrongActor` —
     proves there is no provenance-only authorization path;
+  - **non-proposal target resolution**: a `Domain` (and a `Federation`) target
+    resolves actor-first via the grantee's active grants (§6 step 1), returning
+    the bound mandate — not only `Proposal` targets, since charter/federation
+    are wired first;
   - posture: `Production` fail-closed vs `Bootstrap` permissive;
   - `MandateGrant` hash determinism (stable across runs).
 - **Integration (step 7)**: a migrated handler (e.g. `close_proposal`) calls
@@ -331,7 +347,11 @@ Recorded defaults (chosen for this design; reviewers/impl PRs may revisit):
   `Pending`/`InProgress`, and regardless of any grant's `valid_until` (§6 step 3).
   Hard invariant.
 - **Resolver over the existing mandate store** (no separate persistence, no
-  duplicate records; add a secondary index only if proven necessary).
+  duplicate records). Non-proposal targets (`Domain`/`Federation`/`Role`) resolve
+  **actor-first** via `list_active_authority_grants_by_grantee` (§6 step 1) — a
+  required step-6 deliverable, since charter/federation are wired first; a new
+  `(domain, act, target)` index is added only if an act cannot be expressed
+  actor-first.
 - **MandateGate is app-side, not kernel-side.** Capability scope = technical
   permission; MandateGate = institutional authority. Membership standing stays
   its own layer.
