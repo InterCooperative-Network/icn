@@ -339,7 +339,14 @@ fn extract_federation_common(
     title: &str,
     description: &str,
 ) -> Result<(Did, String, String, String), ApiError> {
-    let claims = require_scope::<BasicClaims>(http_req, "governance:write")?;
+    // #1868 step 5: federation-class capability with accepted-also fallback to
+    // the legacy broad `governance:write` until that scope is retired. This
+    // shared helper gates all seven federation-proposal handlers, so narrowing
+    // it here migrates the whole family in one place.
+    let claims = require_any_scope::<BasicClaims>(
+        http_req,
+        &["governance:federation:write", "governance:write"],
+    )?;
     let proposer_did = parse_did(&claims.sub, "Invalid DID in token")?;
     val::validate_domain_id(domain_id)?;
     val::validate_proposal_title(title)?;
