@@ -68,6 +68,30 @@ pub struct ActivateCharterRequest {
     pub charter_yaml: String,
 }
 
+/// How a charter became active — the authority lineage of the activation.
+///
+/// Bootstrap activation is **not** ratified/mandate activation. The substrate
+/// has to be bootstrappable (the first charter comes from outside the
+/// governance loop, which is administrative by definition), but a charter that
+/// bypasses governance must never be mistaken by clients or surfaces for one
+/// ratified through a proposal. This discriminator marks the direct path
+/// explicitly so it cannot be rendered as ordinary ratified authority.
+///
+/// Single variant for now; the ratified-path counterpart is intentionally not
+/// modeled here (it travels a different response type). A future administrative
+/// receipt may subsume this signal — see the bootstrap-activation receipt-class
+/// question in the abuse-case hardening doctrine (§4.4, §15).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ActivationPath {
+    /// Direct, bootstrap / direct-administrative activation: registered an
+    /// already-decided charter without a proposal or recorded decision. The
+    /// artifact-level marker for this path is the synthetic
+    /// `direct-activation:<charter_id>` provenance string carried on the
+    /// emitted effect, which this discriminator surfaces at the API boundary.
+    Bootstrap,
+}
+
 /// Response returned after a successful charter activation.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ActivateCharterResponse {
@@ -76,6 +100,10 @@ pub struct ActivateCharterResponse {
     pub status: String,
     /// Unix epoch seconds when activation was recorded.
     pub activated_at: u64,
+    /// Authority lineage of this activation. Direct activation is always
+    /// [`ActivationPath::Bootstrap`]: it is a bootstrap / direct-administrative
+    /// path, not a ratified/mandate activation.
+    pub activation_path: ActivationPath,
 }
 
 // ============================================================================

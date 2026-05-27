@@ -20,6 +20,10 @@
 //!    rather than silently succeeding with commons unaware of the domain.
 //! 9. Response payload uses regulatory-safe vocabulary
 //!    (no "payment", "currency", or "balance" terms).
+//! 10. The response marks the direct path as a bootstrap path
+//!     (`activation_path: "bootstrap"`) while the emitted effect preserves the
+//!     artifact-level `direct-activation:` provenance marker, so the path
+//!     cannot be mistaken for a ratified/mandate activation.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -147,6 +151,13 @@ async fn activate_charter_returns_201_and_fires_hook() {
         parsed["activated_at"].as_u64().is_some(),
         "activated_at must be a unix epoch seconds u64"
     );
+    // Direct activation is a bootstrap / direct-administrative path. The
+    // response must mark it as such so it cannot be mistaken for a
+    // ratified/mandate activation.
+    assert_eq!(
+        parsed["activation_path"], "bootstrap",
+        "direct activation response must mark the bootstrap path"
+    );
 
     // Regulatory-safe vocabulary: response must not leak economic-payment terms.
     let raw = String::from_utf8(body_bytes.to_vec()).unwrap();
@@ -180,6 +191,58 @@ async fn activate_charter_returns_201_and_fires_hook() {
             assert!(
                 proposal_id.starts_with("direct-activation:"),
                 "synthetic proposal_id must mark the direct-activation origin, got {proposal_id}"
+            );
+        }
+        other => panic!("expected GovernanceEffect::DeployCharter, got {other:?}"),
+    }
+}
+
+#[actix_web::test]
+async fn activate_charter_marks_bootstrap_path_under_charter_scope() {
+    // Under the charter-class scope, the direct path must still be labeled a
+    // bootstrap path: the response carries the `bootstrap` discriminator and the
+    // emitted effect preserves the artifact-level `direct-activation:` provenance
+    // marker. This is the handler → emitted artifact → response round-trip.
+    let (ctx, captured) = make_ctx_with_capture();
+    let app = charter_test_app!(ctx, Some("governance:charter:write"));
+
+    let body = json!({
+        "charter_id": "nycn-bootstrap",
+        "charter_yaml": VALID_CHARTER_YAML,
+    });
+    let req = test::TestRequest::post()
+        .uri("/charters")
+        .set_json(&body)
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    let status = resp.status();
+    let body_bytes = to_bytes(resp.into_body()).await.unwrap();
+    assert_eq!(
+        status,
+        StatusCode::CREATED,
+        "charter-scope holder must activate, body: {}",
+        String::from_utf8_lossy(&body_bytes)
+    );
+
+    // Response boundary: bootstrap discriminator present.
+    let parsed: Value = serde_json::from_slice(&body_bytes).unwrap();
+    assert_eq!(
+        parsed["activation_path"], "bootstrap",
+        "direct activation under charter scope must mark the bootstrap path"
+    );
+
+    // Artifact boundary: synthetic `direct-activation:` provenance preserved.
+    let effects = captured.effect_calls.lock().unwrap();
+    assert_eq!(effects.len(), 1, "proposal-accepted hook must fire once");
+    match &effects[0] {
+        GovernanceEffect::DeployCharter {
+            charter_id,
+            proposal_id,
+        } => {
+            assert_eq!(charter_id, "nycn-bootstrap");
+            assert!(
+                proposal_id.starts_with("direct-activation:"),
+                "direct-activation provenance marker must be preserved, got {proposal_id}"
             );
         }
         other => panic!("expected GovernanceEffect::DeployCharter, got {other:?}"),

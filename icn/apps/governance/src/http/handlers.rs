@@ -808,6 +808,12 @@ pub async fn activate_charter<E: GovernanceEventEmitter + Clone + 'static>(
         charter_id: req.charter_id.clone(),
         status: "active".to_string(),
         activated_at: current_time_secs(),
+        // Direct activation is a bootstrap / direct-administrative path, not a
+        // ratified/mandate activation. Surface that lineage at the API boundary
+        // so clients cannot mistake it for ordinary ratified authority. The
+        // artifact-level marker (the synthetic direct-activation provenance
+        // string on the emitted effect) is unchanged.
+        activation_path: ActivationPath::Bootstrap,
     }))
 }
 
