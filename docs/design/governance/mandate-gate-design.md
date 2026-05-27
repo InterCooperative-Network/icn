@@ -182,20 +182,33 @@ Resolution algorithm (default impl, over `GovernanceReceiptBackend`):
    existing keys cannot resolve the tuple cleanly — not by default.
 2. Check `MandateStatus` is live (`Pending`/`InProgress`, not
    `Discharged`/`Expired`/`Revoked`) → `Revoked`/`Expired` rejection otherwise.
-3. **Reject unbound (empty-grant) mandates fail-closed, before any actor
+3. **Reject if past the mandate's own deadline** — `mandate.is_past_deadline(req.at)`
+   → `Expired`. The mandate-level `deadline` is authoritative for expiry even
+   when status-transition enforcement has not yet mechanically moved a
+   `Pending`/`InProgress` mandate to `Expired` (that enforcement is future work,
+   §12), and even if an attached grant has a wider or absent `valid_until`. The
+   resolver must **not** rely on `MandateStatus` alone for expiry.
+4. **Reject unbound (empty-grant) mandates fail-closed, before any actor
    check.** A mandate with `has_no_grants()` is a *pending-grants* record: it
    attests that a decision occurred but carries **no bounded authority**. These
    records exist precisely because typed grant minting/storage was unavailable
    (the #1872 fallback path in `write_pending_mandate`); per `Mandate`'s own
    contract (`icn-governance` `src/mandate.rs`) they are ineligible for
    execution authorization until real grants are attached. The resolver must
-   therefore reject them with `NoMandate` *before* the actor/provenance step —
-   never let an authorization-provenance-only record become act-time authority.
-4. Check the actor is authorized by the mandate's grants/provenance (the
-   `AuthorityGrant.grantee` set, or the decision provenance) → `WrongActor`.
-5. Check the target matches the mandate's bound subject → `WrongTarget`.
-6. Check time validity against `valid_from`/`valid_until` → `Expired`.
-7. Consult the existing `suspension_checker` for the actor as an **adjacent**
+   therefore reject them with `NoMandate` *before* the actor step — never let an
+   authorization-provenance-only record become act-time authority.
+5. Check the actor is **named by an `AuthorityGrant.grantee` on this mandate** →
+   `WrongActor`. Authorization is **grant-grantee-only**: `DecisionProvenance`
+   carries only `proposal_id`/`decision_hash` (not a grantee or executor;
+   `icn-governance` `src/authority.rs`), so it binds the mandate to its decision
+   for audit but **never** authorizes an actor. Step 4 guarantees at least one
+   grant is present, so a grantee match is always required — there is no
+   provenance-only fallback that a bare capability holder could satisfy by
+   pointing at the decision.
+6. Check the target matches the mandate's bound subject → `WrongTarget`.
+7. Check grant time validity against each grant's `valid_from`/`valid_until` →
+   `Expired` (in addition to the mandate-level deadline in step 3).
+8. Consult the existing `suspension_checker` for the actor as an **adjacent**
    fail-closed condition → `Suspended`. The gate does **not** re-implement
    suspension; it only reads the existing checker.
 
@@ -254,6 +267,13 @@ Mirrors the membership precedent (`check_domain_membership`, #1871):
     rejected with `NoMandate` even when actor/target/time would otherwise
     match, and even though its status is live — a required case, since this is
     the authority-laundering path the gate must close;
+  - **past-deadline mandate with a still-live status** (`Pending`/`InProgress`
+    but `is_past_deadline(req.at)`, including the case where an attached grant's
+    `valid_until` is wider/absent) → rejected `Expired` — proves the deadline is
+    authoritative without assuming status-transition enforcement has run;
+  - **provenance-only actor** (the actor is named in the decision provenance
+    but is **not** a grantee of any attached grant) → rejected `WrongActor` —
+    proves there is no provenance-only authorization path;
   - posture: `Production` fail-closed vs `Bootstrap` permissive;
   - `MandateGrant` hash determinism (stable across runs).
 - **Integration (step 7)**: a migrated handler (e.g. `close_proposal`) calls
@@ -301,7 +321,15 @@ Recorded defaults (chosen for this design; reviewers/impl PRs may revisit):
 - **An unbound (empty-grant) mandate never confers act-time authority.** A
   `has_no_grants()` pending-grants record attests a decision occurred but
   carries no bounded authority; the resolver rejects it fail-closed (`NoMandate`)
-  before the actor check (§6 step 3). This is a hard invariant, not a default.
+  before the actor check (§6 step 4). This is a hard invariant, not a default.
+- **Actor authorization is grant-grantee-only.** `DecisionProvenance` (only
+  `proposal_id`/`decision_hash`) never authorizes an actor; the actor must be a
+  grantee of an attached `AuthorityGrant` (§6 step 5). Hard invariant.
+- **The mandate `deadline` is authoritative for expiry independent of
+  `MandateStatus`.** The resolver rejects a past-deadline mandate (`Expired`)
+  even if status-transition enforcement (future work) has not moved it off
+  `Pending`/`InProgress`, and regardless of any grant's `valid_until` (§6 step 3).
+  Hard invariant.
 - **Resolver over the existing mandate store** (no separate persistence, no
   duplicate records; add a secondary index only if proven necessary).
 - **MandateGate is app-side, not kernel-side.** Capability scope = technical
