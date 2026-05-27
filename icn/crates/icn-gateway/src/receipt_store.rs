@@ -194,8 +194,25 @@ const OPAQUE_HASH_BIND_PREFIX: &[u8] = b"receipt:opaque:hash_bind:";
 /// Receipt storage service for governance and economic chain artifacts.
 ///
 /// Stores receipts by canonical hash for cross-node deterministic lookup.
+/// Stable, test-only marker carried by the fault-injected abort in
+/// [`ReceiptStore::put_mandate_with_grants_atomic`]. Tests assert on this
+/// marker rather than the generic transaction-error wording, so the assertion
+/// does not couple to the production error message.
+#[cfg(test)]
+const INJECTED_MANDATE_GRANTS_ABORT_MARKER: &str =
+    "injected:put_mandate_with_grants:abort_after_grants";
+
 pub struct ReceiptStore {
     db: Db,
+    /// Test-only fault injection. When armed (see
+    /// [`ReceiptStore::arm_mandate_grants_failure`]),
+    /// [`ReceiptStore::put_mandate_with_grants_atomic`] aborts its
+    /// transaction after staging grants but before the mandate write, so
+    /// tests can prove the single-transaction commit leaves no orphan
+    /// grants on a partial failure. Compiled out of non-test builds — no
+    /// production behavior change.
+    #[cfg(test)]
+    fail_mandate_grants_after_grants: std::sync::atomic::AtomicBool,
 }
 
 impl ReceiptStore {
@@ -212,7 +229,11 @@ impl ReceiptStore {
     /// migrate will be invisible to length-prefixed readers until the
     /// next successful run.
     pub fn new(db: Db) -> Self {
-        let store = Self { db };
+        let store = Self {
+            db,
+            #[cfg(test)]
+            fail_mandate_grants_after_grants: std::sync::atomic::AtomicBool::new(false),
+        };
         if let Err(e) = store.migrate_legacy_proposal_indexes() {
             tracing::error!(
                 error = %e,
@@ -1540,6 +1561,14 @@ impl ReceiptStore {
             })
             .collect::<Result<_, String>>()?;
 
+        // Test-only: snapshot the fault-injection switch before entering the
+        // transaction so the closure (which sled may retry) reads a stable
+        // value. Compiled out of non-test builds.
+        #[cfg(test)]
+        let inject_abort_after_grants = self
+            .fail_mandate_grants_after_grants
+            .load(std::sync::atomic::Ordering::SeqCst);
+
         self.db
             .transaction(|tx| {
                 for pg in &prepared {
@@ -1549,14 +1578,39 @@ impl ReceiptStore {
                     }
                     tx.insert(pg.grantee_idx.as_slice(), pg.id_bytes.as_slice())?;
                 }
+                // Test-only fault injection: abort after the grants are staged
+                // but before the mandate write, exercising the no-orphan
+                // rollback guarantee of the single-transaction commit. The
+                // abort carries a stable marker so the test asserts on it
+                // rather than on the generic error wording.
+                #[cfg(test)]
+                if inject_abort_after_grants {
+                    return Err(ConflictableTransactionError::Abort(
+                        INJECTED_MANDATE_GRANTS_ABORT_MARKER.to_string(),
+                    ));
+                }
                 tx.insert(mandate_primary_key.as_slice(), mandate_value.as_slice())?;
                 tx.insert(mandate_proposal_idx.as_slice(), mandate_id_bytes.as_slice())?;
                 tx.insert(mandate_decision_idx.as_slice(), mandate_id_bytes.as_slice())?;
-                Ok::<(), ConflictableTransactionError<()>>(())
+                // Error type carries `String` (vs `()`) only to let the
+                // test-only abort above attach its marker. Production never
+                // aborts here — only `?`-propagated `Storage` errors occur —
+                // so the error string and behavior are unchanged.
+                Ok::<(), ConflictableTransactionError<String>>(())
             })
-            .map_err(|e: TransactionError<()>| {
+            .map_err(|e: TransactionError<String>| {
                 format!("sled put_mandate_with_grants tx aborted: {e:?}")
             })
+    }
+
+    /// Test-only fault injection: arm a switch so subsequent
+    /// [`Self::put_mandate_with_grants_atomic`] calls abort their transaction
+    /// after staging grants but before the mandate write. Used to prove the
+    /// single-transaction commit leaves no orphan grants on a partial failure.
+    #[cfg(test)]
+    pub fn arm_mandate_grants_failure(&self) {
+        self.fail_mandate_grants_after_grants
+            .store(true, std::sync::atomic::Ordering::SeqCst);
     }
 }
 
@@ -3138,6 +3192,86 @@ mod tests {
             .list_mandates_by_decision(&decision_hash)
             .unwrap()
             .is_empty());
+    }
+
+    #[test]
+    fn put_mandate_with_grants_override_abort_leaves_no_orphan_grants() {
+        // The sled-backed override of
+        // `GovernanceReceiptBackend::put_mandate_with_grants` commits the
+        // mandate and all its grants in a single transaction. Inject an abort
+        // after the grants are staged but before the mandate write, then prove
+        // the whole commit rolled back: no orphan grants, no mandate, no
+        // secondary index entries. This is the genuine partial-failure
+        // injection that the happy-path `commits_all` test cannot exercise.
+        let store = ReceiptStore::new(temp_db());
+        let decision_hash = [0x55u8; 32];
+        let g1 = make_grant(decision_hash, 1_000);
+        let g2 = make_grant(decision_hash, 2_000);
+        let mandate = Mandate::new(
+            DecisionProvenance {
+                proposal_id: "prop-abort".into(),
+                decision_hash,
+            },
+            [1u8; 32],
+            vec![g1.id.clone(), g2.id.clone()],
+            None,
+            None,
+            3_000,
+        )
+        .unwrap();
+
+        store.arm_mandate_grants_failure();
+        // Drive the trait override (which delegates to the atomic path).
+        let err = GovernanceReceiptBackend::put_mandate_with_grants(
+            &store,
+            &mandate,
+            &[g1.clone(), g2.clone()],
+        )
+        .expect_err("injected mid-transaction abort must surface as Err");
+        assert!(
+            err.contains(INJECTED_MANDATE_GRANTS_ABORT_MARKER),
+            "expected the injected-abort marker in the error, got: {err}"
+        );
+
+        // The whole transaction rolled back — no durable orphans.
+        assert!(
+            store.get_authority_grant(&g1.id).unwrap().is_none(),
+            "grant 1 must not be durable after abort"
+        );
+        assert!(
+            store.get_authority_grant(&g2.id).unwrap().is_none(),
+            "grant 2 must not be durable after abort"
+        );
+        assert!(
+            store
+                .list_authority_grants_by_decision(&decision_hash)
+                .unwrap()
+                .is_empty(),
+            "no grants may be indexed by decision after abort"
+        );
+        // The atomic write also stages a by-grantee index entry per grant;
+        // it too must roll back so "no secondary index entries" holds fully.
+        assert!(
+            store
+                .list_authority_grants_by_grantee(&g1.grantee)
+                .unwrap()
+                .is_empty(),
+            "no grants may remain in the by-grantee index after abort"
+        );
+        assert!(
+            store
+                .get_mandate_by_proposal("prop-abort")
+                .unwrap()
+                .is_none(),
+            "no mandate may be recorded after abort"
+        );
+        assert!(
+            store
+                .list_mandates_by_decision(&decision_hash)
+                .unwrap()
+                .is_empty(),
+            "no mandate may be indexed by decision after abort"
+        );
     }
 
     #[test]
