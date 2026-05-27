@@ -163,11 +163,17 @@ async fn create_domain_rejects_unrelated_scope() {
     );
 }
 
-/// Each of the four charter-family handlers must accept the class scope. A
-/// scope rejection is 401/403; any other status means the gate let the request
-/// through to handler logic. `add`/`remove` target a non-existent domain so the
-/// post-gate path is a 404 lookup miss (not the membership 403), and
-/// `activate_charter` hits the unwired hook (500) — both non-auth statuses.
+/// Each of the four charter-family handlers must accept the class scope and
+/// reach handler logic. Asserting the *specific* post-gate status and body
+/// (not merely "not 401/403") is deliberate: a router-level 404 from a
+/// mis-registered route would also be "not 401/403" and would falsely pass.
+/// The expected post-gate outcomes are:
+/// - `create_domain` → 201 (valid body, domain created).
+/// - `add`/`remove` member → 404 with the handler's "Domain not found" body
+///   (targets a non-existent domain, so the handler's own lookup miss — not the
+///   later membership 403, and not a router 404 which carries no such body).
+/// - `activate_charter` → 500 with the handler's "hook is not wired" body
+///   (the unwired `on_charter_accepted` in `make_ctx`).
 #[actix_web::test]
 async fn all_charter_family_handlers_accept_charter_class_scope() {
     let ctx = make_ctx();
@@ -175,50 +181,65 @@ async fn all_charter_family_handlers_accept_charter_class_scope() {
     let member = fresh_did();
     let app = charter_app!(ctx, &caller, CHARTER_CLASS);
 
-    let assert_gate_passed = |status: StatusCode, route: &str| {
-        assert!(
-            status != StatusCode::UNAUTHORIZED && status != StatusCode::FORBIDDEN,
-            "governance:charter:write must pass the gate on {route}, got auth-rejection {status}"
-        );
-    };
-
-    // create_domain
+    // create_domain → 201 Created (gate passed, handler ran to completion).
     let req = test::TestRequest::post()
         .uri("/domains")
         .set_json(create_domain_body(&caller, "csm-all-create"))
         .to_request();
-    assert_gate_passed(
-        test::call_service(&app, req).await.status(),
-        "POST /domains",
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::CREATED,
+        "POST /domains under governance:charter:write must reach the handler and create the domain"
     );
 
-    // add_domain_member (missing domain → 404 after gate)
+    // add_domain_member → 404 with the handler's own "Domain not found" body.
     let req = test::TestRequest::post()
         .uri("/domains/csm-missing/members")
         .set_json(json!({ "did": member.to_string() }))
         .to_request();
-    assert_gate_passed(
-        test::call_service(&app, req).await.status(),
-        "POST /domains/{id}/members",
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::NOT_FOUND, "POST /members status");
+    let body = to_bytes(resp.into_body()).await.unwrap();
+    assert!(
+        String::from_utf8_lossy(&body).contains("Domain not found"),
+        "POST /members must reach the handler's domain-lookup miss (not a router 404), body: {}",
+        String::from_utf8_lossy(&body)
     );
 
-    // remove_domain_member (missing domain → 404 after gate)
+    // remove_domain_member → 404 with the handler's own "Domain not found" body.
     let req = test::TestRequest::delete()
         .uri("/domains/csm-missing/members")
         .set_json(json!({ "did": member.to_string() }))
         .to_request();
-    assert_gate_passed(
-        test::call_service(&app, req).await.status(),
-        "DELETE /domains/{id}/members",
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::NOT_FOUND,
+        "DELETE /members status"
+    );
+    let body = to_bytes(resp.into_body()).await.unwrap();
+    assert!(
+        String::from_utf8_lossy(&body).contains("Domain not found"),
+        "DELETE /members must reach the handler's domain-lookup miss (not a router 404), body: {}",
+        String::from_utf8_lossy(&body)
     );
 
-    // activate_charter (unwired hook → 500 after gate)
+    // activate_charter → 500 with the handler's own "hook is not wired" body.
     let req = test::TestRequest::post()
         .uri("/charters")
         .set_json(json!({ "charter_id": "csm-charter", "charter_yaml": VALID_CHARTER_YAML }))
         .to_request();
-    assert_gate_passed(
-        test::call_service(&app, req).await.status(),
-        "POST /charters",
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::INTERNAL_SERVER_ERROR,
+        "POST /charters status"
+    );
+    let body = to_bytes(resp.into_body()).await.unwrap();
+    assert!(
+        String::from_utf8_lossy(&body).contains("hook is not wired"),
+        "POST /charters must reach the handler's unwired-hook path (not a router 404), body: {}",
+        String::from_utf8_lossy(&body)
     );
 }

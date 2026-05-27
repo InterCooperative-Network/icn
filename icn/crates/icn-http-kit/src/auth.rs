@@ -70,22 +70,34 @@ pub fn require_scope<C: ClaimsLike>(
 /// matched with the same rule as [`require_scope`] (exact or sub-scope).
 ///
 /// Returns the claims on the first candidate that matches. If none match, the
-/// `Forbidden` error names the first (preferred) entry in `required_scopes`.
+/// rejection mirrors [`require_scope`] applied to the first (preferred) entry —
+/// distinguishing "no scope present" from "not in granted scopes". Called with
+/// an empty `required_scopes` is a programmer error and returns
+/// `ApiError::Internal`.
 pub fn require_any_scope<C: ClaimsLike>(
     req: &HttpRequest,
     required_scopes: &[&str],
 ) -> Result<C, ApiError> {
+    let Some((&preferred, fallbacks)) = required_scopes.split_first() else {
+        return Err(ApiError::Internal(
+            "require_any_scope called with no candidate scopes".to_string(),
+        ));
+    };
     let claims = get_claims::<C>(req).ok_or(ApiError::Unauthenticated)?;
-    if required_scopes
+
+    // Accept on the first matching fallback candidate.
+    if fallbacks
         .iter()
         .any(|scope| check_scope(&claims, scope).is_ok())
     {
         return Ok(claims);
     }
-    let preferred = required_scopes.first().copied().unwrap_or("");
-    Err(ApiError::Forbidden(format!(
-        "required scope '{preferred}' not in granted scopes"
-    )))
+    // No fallback matched — defer to the preferred scope's own check so the
+    // rejection mirrors `require_scope` exactly (preserving the "no scope
+    // present" vs "not in granted scopes" distinction) and names the
+    // preferred (narrowed) scope.
+    check_scope(&claims, preferred)?;
+    Ok(claims)
 }
 
 /// Centralized scope checking. Split and normalize once, not in every handler.
@@ -153,7 +165,25 @@ mod tests {
     fn require_any_scope_rejects_when_no_scope_present() {
         let req = req_with_scope(None);
         let err = require_any_scope::<BasicClaims>(&req, &[CHARTER, BROAD]).unwrap_err();
-        assert!(matches!(err, ApiError::Forbidden(_)));
+        // Mirrors `require_scope`: distinguishes "no scope present" from the
+        // ordinary "not in granted scopes" rejection, naming the preferred scope.
+        match err {
+            ApiError::Forbidden(msg) => {
+                assert!(
+                    msg.contains("no scope present") && msg.contains(CHARTER),
+                    "expected a 'no scope present' rejection naming {CHARTER}, got: {msg}"
+                );
+            }
+            other => panic!("expected Forbidden, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn require_any_scope_empty_candidates_is_internal_error() {
+        // Empty candidate list is a programmer error, not an auth rejection.
+        let req = req_with_scope(Some(CHARTER));
+        let err = require_any_scope::<BasicClaims>(&req, &[]).unwrap_err();
+        assert!(matches!(err, ApiError::Internal(_)));
     }
 
     #[test]
