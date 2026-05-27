@@ -3249,6 +3249,15 @@ mod tests {
                 .is_empty(),
             "no grants may be indexed by decision after abort"
         );
+        // The atomic write also stages a by-grantee index entry per grant;
+        // it too must roll back so "no secondary index entries" holds fully.
+        assert!(
+            store
+                .list_authority_grants_by_grantee(&g1.grantee)
+                .unwrap()
+                .is_empty(),
+            "no grants may remain in the by-grantee index after abort"
+        );
         assert!(
             store
                 .get_mandate_by_proposal("prop-abort")
