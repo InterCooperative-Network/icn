@@ -1161,6 +1161,244 @@ mod tests {
     }
 
     #[test]
+    fn default_put_mandate_with_grants_returns_sentinel_when_grant_not_durable() {
+        // The default `put_mandate_with_grants` must surface the
+        // `grant_durability_not_supported` sentinel *directly* when a grant
+        // cannot be round-tripped (read-after-write returns None), so the
+        // acceptance seam can recognize the case. This asserts the trait
+        // method's returned error string — the seam-level fallback to a
+        // pending-grants mandate is covered separately by
+        // `no_op_grant_backend_falls_back_to_pending_grants_mandate`.
+        let backend = MandateOnlyBackend::new();
+        let payload = ProposalPayload::Sdis {
+            proposal: SdisProposal::AppointSteward {
+                candidate: did(9),
+                sponsors: vec![did(1)],
+                region: "nyc".into(),
+                bond_amount: 100,
+                term_length: 3_600,
+            },
+        };
+        let grants = derive_grants_for_accepted_proposal(&payload, &domain(), &decision(), 1_000);
+        assert_eq!(
+            grants.len(),
+            1,
+            "AppointSteward must derive exactly one grant"
+        );
+        let mandate = Mandate::new(
+            decision(),
+            [5u8; 32],
+            grants.iter().map(|g| g.id.clone()).collect(),
+            None,
+            None,
+            1_000,
+        )
+        .expect("mandate referencing the derived grant id");
+
+        let err = backend
+            .put_mandate_with_grants(&mandate, &grants)
+            .expect_err("no-op grant storage must fail the read-after-write check");
+        assert!(
+            err.starts_with("grant_durability_not_supported"),
+            "expected the grant_durability_not_supported sentinel, got: {err}"
+        );
+        // The default bails on the failed read-after-write *before* the
+        // `put_mandate` call — no mandate is recorded.
+        assert!(
+            backend.mandates.lock().unwrap().is_empty(),
+            "mandate must not be written when a grant fails to round-trip"
+        );
+    }
+
+    /// Backend that durably stores authority grants (so `put`/`get` round-trip)
+    /// but fails `put_mandate`. Exercises the documented non-atomic boundary of
+    /// the default [`GovernanceReceiptBackend::put_mandate_with_grants`]: grants
+    /// land, the later mandate write fails, and the earlier grants are durable
+    /// orphans.
+    struct OrphanProneGrantBackend {
+        grants: std::sync::Mutex<Vec<AuthorityGrant>>,
+        mandates: std::sync::Mutex<Vec<Mandate>>,
+    }
+
+    impl OrphanProneGrantBackend {
+        fn new() -> Self {
+            Self {
+                grants: std::sync::Mutex::new(vec![]),
+                mandates: std::sync::Mutex::new(vec![]),
+            }
+        }
+    }
+
+    impl GovernanceReceiptBackend for OrphanProneGrantBackend {
+        fn put_governance(
+            &self,
+            _: &icn_governance::GovernanceDecisionReceipt,
+        ) -> Result<(), String> {
+            Ok(())
+        }
+        fn get_governance_by_proposal(
+            &self,
+            _: &str,
+        ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+            Ok(None)
+        }
+        fn put_allocation(
+            &self,
+            _: &icn_kernel_api::AllocationReceipt,
+        ) -> Result<icn_kernel_api::Hash, String> {
+            Ok([0u8; 32])
+        }
+        fn get_governance_by_decision(
+            &self,
+            _: &icn_kernel_api::Hash,
+        ) -> Result<Option<icn_governance::GovernanceDecisionReceipt>, String> {
+            Ok(None)
+        }
+        fn list_allocations_by_decision(
+            &self,
+            _: &icn_kernel_api::Hash,
+        ) -> Result<Vec<icn_kernel_api::AllocationReceipt>, String> {
+            Ok(vec![])
+        }
+        // Grants persist durably and round-trip, so the default's
+        // read-after-write check passes for each grant.
+        fn put_authority_grant(&self, grant: &AuthorityGrant) -> Result<(), String> {
+            self.grants.lock().unwrap().push(grant.clone());
+            Ok(())
+        }
+        fn get_authority_grant(
+            &self,
+            grant_id: &AuthorityGrantId,
+        ) -> Result<Option<AuthorityGrant>, String> {
+            Ok(self
+                .grants
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|g| &g.id == grant_id)
+                .cloned())
+        }
+        // The mandate write fails *after* the grants are already durable.
+        fn put_mandate(&self, _mandate: &Mandate) -> Result<(), String> {
+            Err("injected: put_mandate failed".to_string())
+        }
+        fn get_mandate_by_proposal(&self, proposal_id: &str) -> Result<Option<Mandate>, String> {
+            Ok(self
+                .mandates
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|m| m.decision.proposal_id == proposal_id)
+                .cloned())
+        }
+    }
+
+    #[test]
+    fn default_put_mandate_with_grants_leaves_orphan_grant_when_mandate_write_fails() {
+        // The documented non-atomic boundary: when grants persist durably but
+        // `put_mandate` fails, the default sequential path has already written
+        // the grant — a durable orphan — and returns the (non-sentinel)
+        // `put_mandate` error. Lock in that behavior so the boundary cannot
+        // silently change, and prove the partial state is observable.
+        let backend = OrphanProneGrantBackend::new();
+        let payload = ProposalPayload::Sdis {
+            proposal: SdisProposal::AppointSteward {
+                candidate: did(9),
+                sponsors: vec![did(1)],
+                region: "nyc".into(),
+                bond_amount: 100,
+                term_length: 3_600,
+            },
+        };
+        let grants = derive_grants_for_accepted_proposal(&payload, &domain(), &decision(), 1_000);
+        assert_eq!(
+            grants.len(),
+            1,
+            "AppointSteward must derive exactly one grant"
+        );
+        let grant_id = grants[0].id.clone();
+        let mandate = Mandate::new(
+            decision(),
+            [5u8; 32],
+            grants.iter().map(|g| g.id.clone()).collect(),
+            None,
+            None,
+            1_000,
+        )
+        .expect("mandate referencing the derived grant id");
+
+        let err = backend
+            .put_mandate_with_grants(&mandate, &grants)
+            .expect_err("put_mandate failure must surface");
+        // The grant *did* round-trip; this is the mandate write failing
+        // afterward, not a durability failure. It must not masquerade as the
+        // sentinel, or the seam would wrongly degrade to a pending-grants
+        // mandate and silently bury the orphan.
+        assert!(
+            !err.starts_with("grant_durability_not_supported"),
+            "mandate-write failure must not masquerade as the durability sentinel, got: {err}"
+        );
+        assert!(
+            err.contains("injected"),
+            "expected the injected put_mandate error, got: {err}"
+        );
+
+        // Partial state is observable: the grant is a durable orphan while no
+        // mandate exists.
+        assert!(
+            backend.get_authority_grant(&grant_id).unwrap().is_some(),
+            "grant must be durable (orphan) after the non-atomic partial failure"
+        );
+        assert!(
+            backend
+                .get_mandate_by_proposal(&decision().proposal_id)
+                .unwrap()
+                .is_none(),
+            "no mandate must be recorded when the mandate write failed"
+        );
+    }
+
+    #[test]
+    fn seam_propagates_hard_put_mandate_failure_without_recording_mandate() {
+        // The seam's *non-sentinel* branch: when `put_mandate_with_grants`
+        // returns a hard (non-durability) error, `mint_and_persist_for_accepted`
+        // propagates it and records no mandate. This is distinct from the
+        // sentinel path, which degrades to a pending-grants mandate (covered by
+        // `no_op_grant_backend_falls_back_to_pending_grants_mandate`).
+        let backend = OrphanProneGrantBackend::new();
+        let payload = ProposalPayload::Sdis {
+            proposal: SdisProposal::AppointSteward {
+                candidate: did(9),
+                sponsors: vec![did(1)],
+                region: "nyc".into(),
+                bond_amount: 100,
+                term_length: 3_600,
+            },
+        };
+
+        let result = mint_and_persist_for_accepted(
+            &backend,
+            "prop-orphan",
+            &domain(),
+            [9u8; 32],
+            &payload,
+            1_000,
+        );
+
+        assert!(
+            result.is_err(),
+            "hard put_mandate failure must propagate as Err; got {result:?}"
+        );
+        assert!(
+            backend
+                .get_mandate_by_proposal("prop-orphan")
+                .unwrap()
+                .is_none(),
+            "seam must not record a mandate when the atomic commit hard-fails"
+        );
+    }
+
+    #[test]
     fn appoint_steward_grant_provenance_matches_decision() {
         let payload = ProposalPayload::Sdis {
             proposal: SdisProposal::AppointSteward {
