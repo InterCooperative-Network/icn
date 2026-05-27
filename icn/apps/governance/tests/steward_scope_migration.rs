@@ -21,11 +21,12 @@
 //!   the point of decomposition is that one class scope does not satisfy
 //!   another.
 //!
-//! With no structure created, a scope-accepted request reaches the handler and
-//! fails downstream with 500 (Structure not found via `anyhow_to_api` →
-//! `Internal`) — a non-auth status, and therefore evidence the gate let it
-//! through. A scope-rejected request is blocked at the gate with 403 before any
-//! manager logic runs.
+//! Each test creates a minimal structure via `manager.create_structure`, so a
+//! scope-accepted request reaches the handler and returns a stable
+//! `201 Created` (the role is assigned), while a scope-rejected request is
+//! blocked at the gate with `403` before any manager logic runs. Asserting on
+//! the handler-level success status avoids coupling to downstream error
+//! mappings.
 //!
 //! The scope-matching logic itself is unit-tested in `icn-http-kit::auth`
 //! (`require_any_scope_*`); this file pins the handler wiring. It does NOT
@@ -37,6 +38,7 @@
 use std::sync::Arc;
 
 use actix_web::{body::to_bytes, dev::Service as _, http::StatusCode, test, App, HttpMessage};
+use icn_governance::StructureKind;
 use icn_governance_actor::{
     http::{self, GovernanceContext},
     manager::GovernanceManager,
@@ -58,9 +60,22 @@ fn fresh_did() -> Did {
         .clone()
 }
 
-fn make_ctx() -> GovernanceContext<NoopEventEmitter> {
-    GovernanceContext {
-        manager: Arc::new(GovernanceManager::new()),
+/// Build a context with one pre-created structure, returning the context and
+/// that structure's id (so the `assign_role` route can target a structure that
+/// actually exists and a scope-accepted request can succeed with `201`).
+fn ctx_with_structure() -> (GovernanceContext<NoopEventEmitter>, String) {
+    let manager = Arc::new(GovernanceManager::new());
+    let structure = manager
+        .create_structure(
+            "coop:test".to_string(),
+            StructureKind::Committee,
+            "Steward Scope Migration Test".to_string(),
+            None,
+        )
+        .expect("create_structure");
+    let structure_id = structure.id.to_string();
+    let ctx = GovernanceContext {
+        manager,
         emitter: NoopEventEmitter,
         on_charter_accepted: None,
         on_proposal_accepted: None,
@@ -71,7 +86,8 @@ fn make_ctx() -> GovernanceContext<NoopEventEmitter> {
         membership_resolver: None,
         sdis_service: None,
         build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
-    }
+    };
+    (ctx, structure_id)
 }
 
 /// Build a test app injecting the given caller + scope on every request.
@@ -94,12 +110,11 @@ macro_rules! roles_app {
     }};
 }
 
-/// POST a role assignment to a (non-existent) structure under `scope`, and
-/// return the resulting HTTP status. The structure does not exist, so a
-/// scope-accepted request reaches the manager and fails with 500; a
-/// scope-rejected request is blocked at the auth gate with 403.
+/// POST a role assignment to an existing structure under `scope`, returning the
+/// resulting HTTP status. A scope-accepted request assigns the role and returns
+/// `201`; a scope-rejected request is blocked at the auth gate with `403`.
 async fn assign_role_status(scope: &'static str) -> StatusCode {
-    let ctx = make_ctx();
+    let (ctx, structure_id) = ctx_with_structure();
     let caller = fresh_did();
     let target = fresh_did();
     let app = roles_app!(ctx, &caller, scope);
@@ -110,12 +125,12 @@ async fn assign_role_status(scope: &'static str) -> StatusCode {
         "authority_scope": [],
     });
     let req = test::TestRequest::post()
-        .uri("/structures/test-structure/roles")
+        .uri(&format!("/structures/{structure_id}/roles"))
         .set_json(&body)
         .to_request();
     let resp = test::call_service(&app, req).await;
     let status = resp.status();
-    // Drain the body so a failed assertion can surface it via the caller.
+    // Drain the body so the response is fully consumed.
     let _ = to_bytes(resp.into_body()).await;
     status
 }
@@ -125,9 +140,8 @@ async fn assign_role_accepts_steward_class_scope() {
     let status = assign_role_status(STEWARD_CLASS).await;
     assert_eq!(
         status,
-        StatusCode::INTERNAL_SERVER_ERROR,
-        "governance:steward:write must be accepted on assign_role (reaches the \
-         handler; 500 = structure-not-found downstream, a non-auth status), got {status}"
+        StatusCode::CREATED,
+        "governance:steward:write must be accepted on assign_role and assign the role, got {status}"
     );
 }
 
@@ -136,7 +150,7 @@ async fn assign_role_accepts_legacy_broad_scope() {
     let status = assign_role_status(LEGACY_BROAD).await;
     assert_eq!(
         status,
-        StatusCode::INTERNAL_SERVER_ERROR,
+        StatusCode::CREATED,
         "legacy governance:write must remain accepted on assign_role, got {status}"
     );
 }
