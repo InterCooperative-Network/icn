@@ -3547,7 +3547,11 @@ pub async fn assign_role<E: GovernanceEventEmitter + Clone + 'static>(
     structure_id: web::Path<String>,
     req: web::Json<AssignRoleRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    // #1868 step 4: steward-class capability with accepted-also fallback to the
+    // legacy broad `governance:write` until that scope is retired. Direct role
+    // assignment grants steward authority, so it carries its own narrow scope;
+    // steward *proposals* stay under the proposal-write family (a later rung).
+    require_any_scope::<BasicClaims>(&http_req, &["governance:steward:write", "governance:write"])?;
     let sid = StructureId(structure_id.into_inner());
     let person_did = parse_did(&req.did, "Invalid DID in request")?;
 
