@@ -1017,8 +1017,15 @@ mod build_mode_tests {
             !msg.contains("member_checker,"),
             "must not falsely name wired dep: {msg}"
         );
+        // `err.missing == ["membership_resolver"]` above is already the strong
+        // assertion that `mandate_gate` is not falsely listed. The string-level
+        // check below is a belt-and-suspenders sanity guard: the snake_case
+        // identifier `mandate_gate` can only enter the rendered message via
+        // `missing.join(", ")`, since the doctrine sentence uses the CamelCase
+        // `MandateGate`. So any `mandate_gate` substring is a falsehood
+        // regardless of its position in the list (mid or trailing).
         assert!(
-            !msg.contains("mandate_gate,") && !msg.ends_with("mandate_gate."),
+            !msg.contains("mandate_gate"),
             "must not falsely name wired dep: {msg}"
         );
     }
