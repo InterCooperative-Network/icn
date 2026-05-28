@@ -1379,19 +1379,335 @@ impl MeetingAttendanceReceipt {
     ) -> Hash {
         let mut hasher = blake3::Hasher::new();
         hasher.update(Self::DOMAIN_TAG);
-        for field in [meeting_id, domain_id, attendee_did, recorded_by] {
-            hasher.update(&(field.len() as u64).to_le_bytes());
-            hasher.update(field.as_bytes());
-        }
-        let transition_byte: u8 = match transition {
-            MeetingAttendanceTransition::Present => 0,
-            MeetingAttendanceTransition::Remote => 1,
-        };
-        hasher.update(&[transition_byte]);
-        hasher.update(&recorded_at.to_le_bytes());
+        absorb_meeting_attendance_base_field_bytes(
+            &mut hasher,
+            meeting_id,
+            domain_id,
+            attendee_did,
+            recorded_by,
+            transition,
+            recorded_at,
+        );
         let mut out = [0u8; 32];
         out.copy_from_slice(hasher.finalize().as_bytes());
         out
+    }
+}
+
+/// Absorb the canonical base-field byte sequence shared by every versioned
+/// [`MeetingAttendanceReceipt`] family member.
+///
+/// Writes only `meeting_id`, `domain_id`, `attendee_did`, `recorded_by`,
+/// `transition`, and `recorded_at` into the hasher — **not** a domain-
+/// separation tag. Each versioned receipt's `compute_record_hash` writes
+/// its **own** `DOMAIN_TAG` first and then calls this helper, so the two
+/// version namespaces (`icn:gov:meeting_attendance:v1`,
+/// `icn:gov:meeting_attendance:v2`, …) remain fully separate even though
+/// they share the same base-field encoding.
+///
+/// The encoding mirrors the original v1
+/// [`MeetingAttendanceReceipt::compute_record_hash`] body byte-for-byte so
+/// v1 hashes remain stable after extraction. u64 length prefixes are used
+/// (matching the convention elsewhere in this module) and the transition
+/// ordinal comes from [`meeting_attendance_transition_ordinal`].
+fn absorb_meeting_attendance_base_field_bytes(
+    hasher: &mut blake3::Hasher,
+    meeting_id: &str,
+    domain_id: &str,
+    attendee_did: &str,
+    recorded_by: &str,
+    transition: MeetingAttendanceTransition,
+    recorded_at: u64,
+) {
+    for field in [meeting_id, domain_id, attendee_did, recorded_by] {
+        hasher.update(&(field.len() as u64).to_le_bytes());
+        hasher.update(field.as_bytes());
+    }
+    hasher.update(&[meeting_attendance_transition_ordinal(transition)]);
+    hasher.update(&recorded_at.to_le_bytes());
+}
+
+/// Map [`MeetingAttendanceTransition`] to a deterministic ordinal for
+/// canonical hashing. Ordinals are fixed at v1 of the receipt's wire
+/// format; adding a variant after `Remote` requires a new domain-
+/// separation tag on every receipt that consumes this helper.
+fn meeting_attendance_transition_ordinal(transition: MeetingAttendanceTransition) -> u8 {
+    match transition {
+        MeetingAttendanceTransition::Present => 0,
+        MeetingAttendanceTransition::Remote => 1,
+    }
+}
+
+// ============================================================================
+// Meeting attendance receipt v2 — mandate-attestation fork (#1868)
+// ============================================================================
+
+/// Errors returned by [`MeetingAttendanceReceiptV2::new`] (and by the
+/// `try_from` shadow that routes `Deserialize` through the same checks).
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum MeetingAttendanceReceiptV2Error {
+    /// The `capability_scope_presented` field was empty or whitespace-
+    /// only. Rejected at the constructor and at the wire boundary so the
+    /// receipt cannot record an unattributed scope. Mirrors the
+    /// [`ActionItemCompletionReceiptV2Error::EmptyCapabilityScope`]
+    /// contract.
+    #[error("capability_scope_presented must be a non-empty, non-whitespace string")]
+    EmptyCapabilityScope,
+}
+
+/// Cross-node deterministic attendance receipt for a governance meeting —
+/// **v2** of the canonical wire form, embedding the mandate-attestation
+/// discriminator and the capability scope a caller presented at record
+/// time.
+///
+/// # Relationship to existing types
+///
+/// - [`MeetingAttendanceReceipt`] (this module, above) is the v1 receipt
+///   and is **byte-stable** — its `DOMAIN_TAG`
+///   (`icn:gov:meeting_attendance:v1`), canonical hash, and call sites are
+///   unchanged. v2 is purely additive; no v1 caller is forced to migrate.
+/// - [`GovernanceDecisionReceiptV2`] and [`ActionItemCompletionReceiptV2`]
+///   are the parallel v2 forks on the proposal-decision and action-item
+///   sides (#1868). The three v2 receipts share the same
+///   [`ReceiptMandateAttestation`] / [`NoMandateReason`] primitives and
+///   the same wire-boundary discipline (checked constructor + serde
+///   `try_from` shadow), differing only in their base-field set and their
+///   domain-separation tag namespace.
+///
+/// # Wire / canonical contract
+///
+/// - `DOMAIN_TAG = b"icn:gov:meeting_attendance:v2"`. Fully separate from
+///   the v1 namespace; the two cannot collide. Also distinct from the
+///   proposal-decision and action-item tags so records can never collide
+///   across receipt families.
+/// - Canonical encoding: v2 tag, then the same base-field byte sequence v1
+///   binds (via the shared
+///   [`absorb_meeting_attendance_base_field_bytes`] helper), then the
+///   v2-only fields. The v2 hash is a fresh `blake3` over that byte
+///   stream — **never** derived from v1's `record_hash`, v1's tag, or any
+///   serialized form of either.
+/// - `Deserialize` is routed through a private
+///   `MeetingAttendanceReceiptV2Raw` shadow + `#[serde(try_from = ...)]`
+///   so empty-scope rejection runs on every deserialized payload (mirrors
+///   the #1928 / #1929 / #1930 boundary pattern).
+/// - Equality is anchored to `record_hash` (matches the v1 convention).
+///
+/// # Out of scope for this PR
+///
+/// - No handler emits a v2 meeting-attendance receipt yet.
+/// - No grant-minting expansion; no `TypedScope` federation/role binding;
+///   no `governance:write` retirement; no kernel meaning-firewall
+///   widening; no production-readiness/live-federation/demo claim.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(try_from = "MeetingAttendanceReceiptV2Raw")]
+pub struct MeetingAttendanceReceiptV2 {
+    /// Meeting id (string form of `MeetingId`). This is the same string
+    /// the holder's `ActionCard.source_id` carries — it is the link
+    /// between the card and the receipt.
+    pub meeting_id: String,
+    /// Governance domain the meeting lives under.
+    pub domain_id: String,
+    /// DID of the attendee whose attendance this receipt records.
+    pub attendee_did: String,
+    /// DID of the authenticated caller who recorded the attendance. May
+    /// differ from `attendee_did` (steward-recorded attendance).
+    pub recorded_by: String,
+    /// Transition this receipt records. Closed enum; see
+    /// [`MeetingAttendanceTransition`].
+    pub transition: MeetingAttendanceTransition,
+    /// Unix-seconds the transition was recorded.
+    pub recorded_at: u64,
+    /// The capability scope string the caller presented at record time
+    /// (e.g. `"governance:meeting:write"`). Bound into the canonical hash
+    /// so the receipt records *which kind of write happened* alongside the
+    /// transition. Rejected empty/whitespace by the constructor and the
+    /// serde boundary.
+    pub capability_scope_presented: String,
+    /// Explicit mandate-attestation discriminator: either a
+    /// [`ReceiptMandateAttestation::Grant`] carrying a wire-form
+    /// [`MandateGrantRef`] or a
+    /// [`ReceiptMandateAttestation::NoMandateRequired`] carrying a
+    /// closed-taxonomy [`NoMandateReason`]. Never `Option` — absence
+    /// must never be interpretable as "no mandate."
+    pub mandate_attestation: ReceiptMandateAttestation,
+    /// blake3 canonical record hash from receipt fields under the v2
+    /// domain-separation tag.
+    pub record_hash: Hash,
+}
+
+impl PartialEq for MeetingAttendanceReceiptV2 {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_hash == other.record_hash
+    }
+}
+
+impl Eq for MeetingAttendanceReceiptV2 {}
+
+impl MeetingAttendanceReceiptV2 {
+    /// Domain separation tag for v2 canonical meeting-attendance record
+    /// hashes. Distinct from [`MeetingAttendanceReceipt::DOMAIN_TAG`] so
+    /// the v1 and v2 namespaces remain fully separate.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:meeting_attendance:v2";
+
+    /// Build a new v2 receipt and compute its canonical `record_hash`.
+    /// Rejects empty/whitespace `capability_scope_presented`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        meeting_id: String,
+        domain_id: String,
+        attendee_did: String,
+        recorded_by: String,
+        transition: MeetingAttendanceTransition,
+        recorded_at: u64,
+        capability_scope_presented: String,
+        mandate_attestation: ReceiptMandateAttestation,
+    ) -> Result<Self, MeetingAttendanceReceiptV2Error> {
+        if capability_scope_presented.trim().is_empty() {
+            return Err(MeetingAttendanceReceiptV2Error::EmptyCapabilityScope);
+        }
+        let record_hash = Self::compute_record_hash(
+            &meeting_id,
+            &domain_id,
+            &attendee_did,
+            &recorded_by,
+            transition,
+            recorded_at,
+            &capability_scope_presented,
+            &mandate_attestation,
+        );
+        Ok(Self {
+            meeting_id,
+            domain_id,
+            attendee_did,
+            recorded_by,
+            transition,
+            recorded_at,
+            capability_scope_presented,
+            mandate_attestation,
+            record_hash,
+        })
+    }
+
+    /// Compute the canonical v2 `record_hash` from receipt fields.
+    ///
+    /// The byte stream is: v2 [`Self::DOMAIN_TAG`], then the v1 base
+    /// fields via [`absorb_meeting_attendance_base_field_bytes`] (length-
+    /// prefixed strings, single-byte transition ordinal, u64 LE
+    /// `recorded_at`, identical order to v1), then the v2-only additions:
+    /// length-prefixed `capability_scope_presented`, a single ordinal byte
+    /// for the [`ReceiptMandateAttestation`] variant (`NoMandateRequired`
+    /// = 0, `Grant` = 1), then the per-variant payload:
+    ///
+    /// - `NoMandateRequired { reason }`: a single
+    ///   [`no_mandate_reason_ordinal`] byte.
+    /// - `Grant { grant_ref }`: the 32-byte
+    ///   [`MandateGrantRef::ref_hash`] (fixed-length; no length prefix).
+    ///   Binding via `ref_hash` propagates the grant ref's per-component
+    ///   canonical encoding (#1928) without re-deriving the field layout
+    ///   here.
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_record_hash(
+        meeting_id: &str,
+        domain_id: &str,
+        attendee_did: &str,
+        recorded_by: &str,
+        transition: MeetingAttendanceTransition,
+        recorded_at: u64,
+        capability_scope_presented: &str,
+        mandate_attestation: &ReceiptMandateAttestation,
+    ) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        absorb_meeting_attendance_base_field_bytes(
+            &mut hasher,
+            meeting_id,
+            domain_id,
+            attendee_did,
+            recorded_by,
+            transition,
+            recorded_at,
+        );
+        hasher.update(&(capability_scope_presented.len() as u64).to_le_bytes());
+        hasher.update(capability_scope_presented.as_bytes());
+        hasher.update(&[attestation_kind_ordinal(mandate_attestation)]);
+        match mandate_attestation {
+            ReceiptMandateAttestation::NoMandateRequired { reason } => {
+                hasher.update(&[no_mandate_reason_ordinal(*reason)]);
+            }
+            ReceiptMandateAttestation::Grant { grant_ref } => {
+                // Bind via the grant ref's canonical hash (#1928). Fixed
+                // length (32 bytes), no length prefix.
+                hasher.update(&grant_ref.ref_hash());
+            }
+        }
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+
+    /// Verify the stored `record_hash` against canonical v2 receipt
+    /// fields.
+    pub fn verify(&self) -> bool {
+        let recomputed = Self::compute_record_hash(
+            &self.meeting_id,
+            &self.domain_id,
+            &self.attendee_did,
+            &self.recorded_by,
+            self.transition,
+            self.recorded_at,
+            &self.capability_scope_presented,
+            &self.mandate_attestation,
+        );
+        self.record_hash == recomputed
+    }
+}
+
+/// Raw deserialization shadow for [`MeetingAttendanceReceiptV2`].
+///
+/// `MeetingAttendanceReceiptV2` is a wire/persisted primitive, so
+/// `Deserialize` is an input boundary that must apply the same checks as
+/// the constructor. Routing deserialization through this shadow +
+/// `try_from` keeps the wire surface symmetric with `new` — a payload with
+/// an empty `capability_scope_presented` fails closed at the
+/// deserialization boundary, not only via `new`. Mirrors the pattern
+/// established by `MandateGrantRefRaw` (#1928),
+/// `GovernanceDecisionReceiptV2Raw` (#1929), and
+/// `ActionItemCompletionReceiptV2Raw` (#1930).
+#[derive(Deserialize)]
+struct MeetingAttendanceReceiptV2Raw {
+    meeting_id: String,
+    domain_id: String,
+    attendee_did: String,
+    recorded_by: String,
+    transition: MeetingAttendanceTransition,
+    recorded_at: u64,
+    capability_scope_presented: String,
+    mandate_attestation: ReceiptMandateAttestation,
+    record_hash: Hash,
+}
+
+impl TryFrom<MeetingAttendanceReceiptV2Raw> for MeetingAttendanceReceiptV2 {
+    type Error = MeetingAttendanceReceiptV2Error;
+
+    fn try_from(raw: MeetingAttendanceReceiptV2Raw) -> Result<Self, Self::Error> {
+        if raw.capability_scope_presented.trim().is_empty() {
+            return Err(MeetingAttendanceReceiptV2Error::EmptyCapabilityScope);
+        }
+        // Matches v1 behavior: `Deserialize` accepts whatever
+        // `record_hash` value the wire carries; callers verify integrity
+        // via `verify()` separately. Keeps the deserialization surface a
+        // pure structural check.
+        Ok(Self {
+            meeting_id: raw.meeting_id,
+            domain_id: raw.domain_id,
+            attendee_did: raw.attendee_did,
+            recorded_by: raw.recorded_by,
+            transition: raw.transition,
+            recorded_at: raw.recorded_at,
+            capability_scope_presented: raw.capability_scope_presented,
+            mandate_attestation: raw.mandate_attestation,
+            record_hash: raw.record_hash,
+        })
     }
 }
 
@@ -3656,6 +3972,357 @@ mod tests {
                 "MandateGrantRef JSON must not contain regulated-finance vocabulary; \
                  found `{forbidden}` in: {json}"
             );
+        }
+    }
+
+    // ============================================================================
+    // MeetingAttendanceReceiptV2 — mandate-attestation fork (#1868)
+    // ============================================================================
+
+    #[test]
+    fn meeting_attendance_v1_record_hash_remains_stable_after_v2_introduction() {
+        // Explicit byte-stream fixture: a v1 receipt over known inputs
+        // must hash to the same bytes the v1 canonical encoding
+        // produces. Mirrors v1's length-prefix layout by hand so any
+        // drift in v1 encoding (including from the shared-helper
+        // refactor in this PR) makes this test fail loudly with a
+        // visible byte diff.
+        let mut expected_bytes = Vec::new();
+        expected_bytes.extend_from_slice(MeetingAttendanceReceipt::DOMAIN_TAG);
+        for field in [
+            b"meeting-1".as_slice(),
+            b"coop:test",
+            b"did:icn:attendee",
+            b"did:icn:steward",
+        ] {
+            expected_bytes.extend_from_slice(&(field.len() as u64).to_le_bytes());
+            expected_bytes.extend_from_slice(field);
+        }
+        expected_bytes.push(0); // transition ordinal: Present = 0
+        expected_bytes.extend_from_slice(&1_700_000_000u64.to_le_bytes());
+        let expected: Hash = *blake3::hash(&expected_bytes).as_bytes();
+
+        let actual = MeetingAttendanceReceipt::new(
+            "meeting-1".to_string(),
+            "coop:test".to_string(),
+            "did:icn:attendee".to_string(),
+            "did:icn:steward".to_string(),
+            MeetingAttendanceTransition::Present,
+            1_700_000_000,
+        )
+        .record_hash;
+
+        assert_eq!(
+            actual, expected,
+            "v1 meeting-attendance canonical encoding must remain byte-stable after v2 introduction"
+        );
+    }
+
+    /// Deterministic v2 meeting-attendance receipt around the given
+    /// attestation. Uses fixed values for every base field so per-test
+    /// mutation is localized to the field under assertion.
+    fn sample_meeting_attendance_v2_receipt(
+        att: ReceiptMandateAttestation,
+    ) -> MeetingAttendanceReceiptV2 {
+        MeetingAttendanceReceiptV2::new(
+            "meeting-1".to_string(),
+            "coop:test".to_string(),
+            "did:icn:attendee".to_string(),
+            "did:icn:steward".to_string(),
+            MeetingAttendanceTransition::Present,
+            1_700_000_000,
+            "governance:meeting:write".to_string(),
+            att,
+        )
+        .expect("sample v2 meeting-attendance receipt must construct cleanly")
+    }
+
+    #[test]
+    fn meeting_attendance_v2_hash_is_deterministic_across_calls() {
+        let r1 = sample_meeting_attendance_v2_receipt(sample_no_mandate_attestation());
+        let r2 = sample_meeting_attendance_v2_receipt(sample_no_mandate_attestation());
+        assert_eq!(r1.record_hash, r2.record_hash);
+        assert!(
+            r1.verify(),
+            "v2 meeting-attendance receipt must verify its own hash"
+        );
+    }
+
+    #[test]
+    fn meeting_attendance_v2_hash_distinct_from_v1_for_same_logical_fields() {
+        // Domain-separation tags must keep v1 and v2 hash namespaces
+        // disjoint. A v1 receipt and a v2 receipt over identical base
+        // fields must hash to different values even when the v2 additions
+        // are trivially fixed.
+        let v1 = MeetingAttendanceReceipt::new(
+            "meeting-1".to_string(),
+            "coop:test".to_string(),
+            "did:icn:attendee".to_string(),
+            "did:icn:steward".to_string(),
+            MeetingAttendanceTransition::Present,
+            1_700_000_000,
+        );
+        let v2 = MeetingAttendanceReceiptV2::new(
+            "meeting-1".to_string(),
+            "coop:test".to_string(),
+            "did:icn:attendee".to_string(),
+            "did:icn:steward".to_string(),
+            MeetingAttendanceTransition::Present,
+            1_700_000_000,
+            "governance:meeting:write".to_string(),
+            sample_no_mandate_attestation(),
+        )
+        .unwrap();
+        assert_ne!(
+            v1.record_hash, v2.record_hash,
+            "v1 and v2 meeting-attendance hashes must be domain-separated"
+        );
+    }
+
+    #[test]
+    fn meeting_attendance_v1_and_v2_hashes_namespace_separate() {
+        // Builds v1 + v2 with identical base fields, asserts hashes
+        // differ; mutates one base field (`recorded_at`) on both and
+        // asserts each hash changes within its own namespace while the two
+        // new hashes still differ.
+        let v1_a = MeetingAttendanceReceipt::new(
+            "meeting-1".to_string(),
+            "coop:test".to_string(),
+            "did:icn:attendee".to_string(),
+            "did:icn:steward".to_string(),
+            MeetingAttendanceTransition::Present,
+            1_700_000_000,
+        );
+        let v2_a = MeetingAttendanceReceiptV2::new(
+            "meeting-1".to_string(),
+            "coop:test".to_string(),
+            "did:icn:attendee".to_string(),
+            "did:icn:steward".to_string(),
+            MeetingAttendanceTransition::Present,
+            1_700_000_000,
+            "governance:meeting:write".to_string(),
+            sample_no_mandate_attestation(),
+        )
+        .unwrap();
+        assert_ne!(
+            v1_a.record_hash, v2_a.record_hash,
+            "v1/v2 hashes must differ for identical base fields (domain separation)"
+        );
+
+        // Mutate recorded_at on both; everything else stays identical.
+        let v1_b = MeetingAttendanceReceipt::new(
+            "meeting-1".to_string(),
+            "coop:test".to_string(),
+            "did:icn:attendee".to_string(),
+            "did:icn:steward".to_string(),
+            MeetingAttendanceTransition::Present,
+            1_700_000_001,
+        );
+        let v2_b = MeetingAttendanceReceiptV2::new(
+            "meeting-1".to_string(),
+            "coop:test".to_string(),
+            "did:icn:attendee".to_string(),
+            "did:icn:steward".to_string(),
+            MeetingAttendanceTransition::Present,
+            1_700_000_001,
+            "governance:meeting:write".to_string(),
+            sample_no_mandate_attestation(),
+        )
+        .unwrap();
+
+        assert_ne!(
+            v1_a.record_hash, v1_b.record_hash,
+            "v1 hash must change when base fields change"
+        );
+        assert_ne!(
+            v2_a.record_hash, v2_b.record_hash,
+            "v2 hash must change when base fields change"
+        );
+        assert_ne!(
+            v1_b.record_hash, v2_b.record_hash,
+            "v1/v2 namespaces must remain disjoint after base mutation"
+        );
+    }
+
+    #[test]
+    fn meeting_attendance_v2_hash_binds_capability_scope_presented() {
+        let r_meeting = MeetingAttendanceReceiptV2::new(
+            "meeting-1".to_string(),
+            "coop:test".to_string(),
+            "did:icn:attendee".to_string(),
+            "did:icn:steward".to_string(),
+            MeetingAttendanceTransition::Present,
+            1_700_000_000,
+            "governance:meeting:write".to_string(),
+            sample_no_mandate_attestation(),
+        )
+        .unwrap();
+        let r_activity = MeetingAttendanceReceiptV2::new(
+            "meeting-1".to_string(),
+            "coop:test".to_string(),
+            "did:icn:attendee".to_string(),
+            "did:icn:steward".to_string(),
+            MeetingAttendanceTransition::Present,
+            1_700_000_000,
+            "governance:activity:write".to_string(),
+            sample_no_mandate_attestation(),
+        )
+        .unwrap();
+        assert_ne!(
+            r_meeting.record_hash, r_activity.record_hash,
+            "different capability scopes must hash differently"
+        );
+    }
+
+    #[test]
+    fn meeting_attendance_v2_hash_binds_attestation_kind() {
+        let no_mandate = sample_meeting_attendance_v2_receipt(sample_no_mandate_attestation());
+        let with_grant = sample_meeting_attendance_v2_receipt(sample_grant_attestation());
+        assert_ne!(
+            no_mandate.record_hash, with_grant.record_hash,
+            "NoMandateRequired vs Grant must produce distinct hashes"
+        );
+    }
+
+    #[test]
+    fn meeting_attendance_v2_hash_binds_no_mandate_reason() {
+        let r_membership =
+            sample_meeting_attendance_v2_receipt(ReceiptMandateAttestation::NoMandateRequired {
+                reason: NoMandateReason::MembershipStandingOnly,
+            });
+        let r_bootstrap =
+            sample_meeting_attendance_v2_receipt(ReceiptMandateAttestation::NoMandateRequired {
+                reason: NoMandateReason::Bootstrap,
+            });
+        assert_ne!(
+            r_membership.record_hash, r_bootstrap.record_hash,
+            "distinct NoMandateReason variants must hash differently"
+        );
+    }
+
+    #[test]
+    fn meeting_attendance_v2_hash_binds_grant_ref() {
+        // Mutating any field of the embedded MandateGrantRef changes the
+        // receipt hash via ref_hash propagation. Exercise the target
+        // identifier as a representative field.
+        let r_coop_a = sample_meeting_attendance_v2_receipt(ReceiptMandateAttestation::Grant {
+            grant_ref: sample_ref(MandateGrantRefTarget::Domain {
+                domain_id: "coop-a".to_string(),
+            }),
+        });
+        let r_coop_b = sample_meeting_attendance_v2_receipt(ReceiptMandateAttestation::Grant {
+            grant_ref: sample_ref(MandateGrantRefTarget::Domain {
+                domain_id: "coop-b".to_string(),
+            }),
+        });
+        assert_ne!(
+            r_coop_a.record_hash, r_coop_b.record_hash,
+            "different grant_ref content must propagate into receipt hash"
+        );
+    }
+
+    #[test]
+    fn meeting_attendance_v2_constructor_rejects_empty_capability_scope() {
+        for bad in ["", "   ", "\t\n"] {
+            let err = MeetingAttendanceReceiptV2::new(
+                "meeting-1".to_string(),
+                "coop:test".to_string(),
+                "did:icn:attendee".to_string(),
+                "did:icn:steward".to_string(),
+                MeetingAttendanceTransition::Present,
+                1_700_000_000,
+                bad.to_string(),
+                sample_no_mandate_attestation(),
+            )
+            .unwrap_err();
+            assert_eq!(
+                err,
+                MeetingAttendanceReceiptV2Error::EmptyCapabilityScope,
+                "input {bad:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn meeting_attendance_v2_deserialize_rejects_empty_capability_scope() {
+        // Wire boundary symmetric with the constructor. A payload with an
+        // empty `capability_scope_presented` must fail at the serde path,
+        // not silently round-trip.
+        let valid = sample_meeting_attendance_v2_receipt(sample_no_mandate_attestation());
+        let mut value: serde_json::Value =
+            serde_json::to_value(&valid).expect("serialize valid v2 meeting-attendance receipt");
+        value["capability_scope_presented"] = serde_json::Value::String(String::new());
+        let err = serde_json::from_value::<MeetingAttendanceReceiptV2>(value).unwrap_err();
+        assert!(
+            err.to_string().contains("capability_scope_presented"),
+            "expected EmptyCapabilityScope surfaced through serde, got: {err}"
+        );
+    }
+
+    #[test]
+    fn meeting_attendance_v2_serde_roundtrip_preserves_hash() {
+        for att in [sample_no_mandate_attestation(), sample_grant_attestation()] {
+            let original = sample_meeting_attendance_v2_receipt(att.clone());
+            let json = serde_json::to_string(&original).expect("serialize");
+            let recovered: MeetingAttendanceReceiptV2 =
+                serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(
+                original.record_hash, recovered.record_hash,
+                "round-trip must preserve record_hash for attestation {att:?}"
+            );
+            assert!(
+                recovered.verify(),
+                "round-tripped v2 meeting-attendance receipt must verify; attestation {att:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn meeting_attendance_v2_attestation_serde_uses_snake_case_tags() {
+        let no_mandate = sample_meeting_attendance_v2_receipt(sample_no_mandate_attestation());
+        let json = serde_json::to_string(&no_mandate).expect("serialize");
+        assert!(
+            json.contains("\"kind\":\"no_mandate_required\""),
+            "expected snake_case attestation tag in JSON: {json}"
+        );
+        assert!(
+            json.contains("\"reason\":\"membership_standing_only\""),
+            "expected snake_case reason in JSON: {json}"
+        );
+        // transition snake_case sanity check (carries over from v1's serde
+        // rename_all = "snake_case" on MeetingAttendanceTransition).
+        assert!(
+            json.contains("\"transition\":\"present\""),
+            "expected snake_case transition in JSON: {json}"
+        );
+
+        let grant = sample_meeting_attendance_v2_receipt(sample_grant_attestation());
+        let json = serde_json::to_string(&grant).expect("serialize");
+        assert!(
+            json.contains("\"kind\":\"grant\""),
+            "expected grant tag in JSON: {json}"
+        );
+    }
+
+    #[test]
+    fn meeting_attendance_v2_no_regulated_finance_vocabulary() {
+        // Mirror the receipt-family vocabulary discipline: the v2
+        // meeting-attendance receipt is an institutional-authority record,
+        // not an economic one. Its serialized form must not echo
+        // regulated-finance terms.
+        for att in [sample_no_mandate_attestation(), sample_grant_attestation()] {
+            let r = sample_meeting_attendance_v2_receipt(att);
+            let json = serde_json::to_string(&r).expect("serialize");
+            let lower = json.to_lowercase();
+            for forbidden in [
+                "wallet", "balance", "currency", "payment", "token", "withdraw", "deposit",
+            ] {
+                assert!(
+                    !lower.contains(forbidden),
+                    "MeetingAttendanceReceiptV2 JSON must not contain \
+                     regulated-finance vocabulary; found `{forbidden}` in: {json}"
+                );
+            }
         }
     }
 }
