@@ -14,7 +14,9 @@
 //! - Vote hash is a merkle root of sorted (voter, choice, weight) tuples
 
 use serde::{Deserialize, Serialize};
+use thiserror::Error;
 
+use crate::mandate::MandateId;
 use crate::tally::VoteTally;
 use crate::vote::{Vote, VoteChoice};
 
@@ -899,6 +901,298 @@ fn gate_result_ordinal(result: ProcessGateResult) -> u8 {
     }
 }
 
+// ============================================================================
+// Mandate grant reference (#1868 step 2 primitive — wire form only)
+// ============================================================================
+
+/// Wire-side discriminated target of a [`MandateGrantRef`].
+///
+/// This is the receipt-recordable form of the app-side
+/// `apps/governance::mandate_gate::MandateTarget`. Per-variant fields stay
+/// structurally separate (never collapsed into a single opaque key
+/// string) so the canonical hash is unambiguous and each component can be
+/// validated independently.
+///
+/// Federation identifiers are raw strings in this crate (matching
+/// `FederationProposal`'s shape); there is no `FederationId` newtype.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum MandateGrantRefTarget {
+    /// A governance domain, keyed by its identifier.
+    Domain {
+        /// The governance domain id.
+        domain_id: String,
+    },
+    /// A specific proposal.
+    Proposal {
+        /// The proposal id.
+        proposal_id: String,
+    },
+    /// A role seat in a structure, held by a specific DID.
+    Role {
+        /// The structure id the role belongs to.
+        structure_id: String,
+        /// The DID holding (or to hold) the role.
+        holder: String,
+    },
+    /// A federation network, keyed by its raw string identifier.
+    Federation {
+        /// The federation id.
+        federation_id: String,
+    },
+}
+
+/// Errors returned by [`MandateGrantRef::new`].
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum MandateGrantRefError {
+    /// The `act` field was empty or whitespace-only.
+    #[error("act must be a non-empty, non-whitespace string")]
+    EmptyAct,
+    /// A target component (`domain_id` / `proposal_id` / `structure_id` /
+    /// `holder` / `federation_id`) was empty or whitespace-only. The
+    /// inner str names the offending field.
+    #[error("target field `{0}` must be a non-empty, non-whitespace string")]
+    EmptyTargetField(&'static str),
+    /// `Role.holder` was not a parseable `did:icn:` identifier. The wire
+    /// boundary keeps parity with the app-side `MandateTarget::Role.holder`,
+    /// which is an `icn_identity::Did`; a non-DID wire value would slip
+    /// past `EmptyTargetField` and silently hash, so the constructor (and
+    /// `Deserialize` via the same path) rejects it. Inner string is the
+    /// underlying parse error for diagnosis.
+    #[error("target field `holder` must be a parseable did:icn: identifier: {0}")]
+    InvalidHolderDid(String),
+}
+
+/// Receipt-recordable reference to the mandate that authorized an act.
+///
+/// **Wire-format primitive only.** This type does **not** yet appear in
+/// the body of any existing receipt
+/// ([`GovernanceDecisionReceipt`], [`ActionItemCompletionReceipt`],
+/// [`MeetingAttendanceReceipt`]). Extending those receipts to embed
+/// `Option<MandateGrantRef>` (plus the `capability_scope_presented`
+/// field) is the next slice in the #1868 ladder; this PR only freezes
+/// the reference's wire shape and canonical hash so the next slice has a
+/// stable type to compose.
+///
+/// See `docs/design/governance/mandate-gate-design.md` §7 and
+/// `docs/design/governance/governance-write-decomposition.md` §10 step 2.
+///
+/// The app-side
+/// `apps/governance::mandate_gate::MandateGrant::into_ref` adapter
+/// produces values of this type from the act-time gate result; the
+/// adapter direction is `apps/governance → icn-governance`, never the
+/// other way (the meaning firewall stays intact — kernel crates still
+/// see nothing of `MandateAct`/`MandateTarget`).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "MandateGrantRefRaw")]
+pub struct MandateGrantRef {
+    /// The authorizing mandate's identifier.
+    pub mandate_id: MandateId,
+    /// The decision the mandate is grounded in (binds the
+    /// `Charter → Decision → Mandate → Action → Receipt` chain).
+    pub decision_hash: Hash,
+    /// Snake_case institutional act discriminator (e.g.
+    /// `"activate_charter"`, `"add_domain_member"`, `"close_proposal"`).
+    /// Stored as a string at the wire boundary so adding a new
+    /// `MandateAct` variant on the app side does not break receipt
+    /// verification.
+    pub act: String,
+    /// The structured target the act was authorized against.
+    pub target: MandateGrantRefTarget,
+    /// Unix-seconds the gate granted the act. Aligned with the mandate's
+    /// own `Timestamp` (seconds) convention.
+    pub granted_at: u64,
+}
+
+/// Raw deserialization shadow for [`MandateGrantRef`].
+///
+/// `MandateGrantRef` is a wire/persisted primitive, so `Deserialize` is
+/// an input boundary that must apply the same checks as the public
+/// constructor. Deriving `Deserialize` directly on `MandateGrantRef`
+/// would bypass [`MandateGrantRef::new`] and let an empty `act` or a
+/// whitespace-only target component round-trip silently. Routing
+/// deserialization through this shadow + `try_from` keeps the wire
+/// surface symmetric with the constructor — invalid wire data fails
+/// closed at the deserialization boundary.
+#[derive(Deserialize)]
+struct MandateGrantRefRaw {
+    mandate_id: MandateId,
+    decision_hash: Hash,
+    act: String,
+    target: MandateGrantRefTarget,
+    granted_at: u64,
+}
+
+impl TryFrom<MandateGrantRefRaw> for MandateGrantRef {
+    type Error = MandateGrantRefError;
+
+    fn try_from(raw: MandateGrantRefRaw) -> Result<Self, Self::Error> {
+        Self::new(
+            raw.mandate_id,
+            raw.decision_hash,
+            raw.act,
+            raw.target,
+            raw.granted_at,
+        )
+    }
+}
+
+impl MandateGrantRef {
+    /// Domain separation tag for canonical mandate-grant-ref hashes.
+    /// Distinct from every existing receipt-type tag so a reference can
+    /// never collide with a receipt body hash.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:mandate_grant_ref:v1";
+
+    /// Construct a reference, rejecting empty/whitespace-only string
+    /// fields. Use this constructor rather than struct-literal
+    /// construction to keep the canonical hash inputs well-formed.
+    pub fn new(
+        mandate_id: MandateId,
+        decision_hash: Hash,
+        act: String,
+        target: MandateGrantRefTarget,
+        granted_at: u64,
+    ) -> Result<Self, MandateGrantRefError> {
+        if act.trim().is_empty() {
+            return Err(MandateGrantRefError::EmptyAct);
+        }
+        Self::validate_target(&target)?;
+        Ok(Self {
+            mandate_id,
+            decision_hash,
+            act,
+            target,
+            granted_at,
+        })
+    }
+
+    fn validate_target(target: &MandateGrantRefTarget) -> Result<(), MandateGrantRefError> {
+        match target {
+            MandateGrantRefTarget::Domain { domain_id } => {
+                if domain_id.trim().is_empty() {
+                    return Err(MandateGrantRefError::EmptyTargetField("domain_id"));
+                }
+            }
+            MandateGrantRefTarget::Proposal { proposal_id } => {
+                if proposal_id.trim().is_empty() {
+                    return Err(MandateGrantRefError::EmptyTargetField("proposal_id"));
+                }
+            }
+            MandateGrantRefTarget::Role {
+                structure_id,
+                holder,
+            } => {
+                if structure_id.trim().is_empty() {
+                    return Err(MandateGrantRefError::EmptyTargetField("structure_id"));
+                }
+                if holder.trim().is_empty() {
+                    return Err(MandateGrantRefError::EmptyTargetField("holder"));
+                }
+                // App-side `MandateTarget::Role.holder` is `icn_identity::Did`,
+                // whose deserializer enforces `did:icn:` + Ed25519 multibase.
+                // The wire form is a `String`, so without this check a payload
+                // like `"holder": "not-a-did"` would pass the empty-string gate
+                // and still receive a canonical `ref_hash()`. Run the same
+                // parser at the wire boundary so malformed holders fail closed
+                // here and via `Deserialize`.
+                if let Err(e) = icn_identity::Did::from_str(holder) {
+                    return Err(MandateGrantRefError::InvalidHolderDid(e.to_string()));
+                }
+            }
+            MandateGrantRefTarget::Federation { federation_id } => {
+                if federation_id.trim().is_empty() {
+                    return Err(MandateGrantRefError::EmptyTargetField("federation_id"));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Compute the canonical reference hash from the input fields.
+    ///
+    /// Inputs are length-prefixed (u64 LE) under [`Self::DOMAIN_TAG`],
+    /// matching the encoding convention used by
+    /// [`ActionItemCompletionReceipt::compute_record_hash`] and the other
+    /// receipt-record hash functions in this module. The mandate id is
+    /// hashed as its raw 16 UUID bytes (fixed length) and the
+    /// `decision_hash` as its raw 32 bytes (fixed length); both omit
+    /// length prefixes because the lengths are fixed by the wire type.
+    /// Target kind is a single-byte ordinal followed by each component
+    /// as its own length-prefixed string.
+    pub fn compute_ref_hash(
+        mandate_id: &MandateId,
+        decision_hash: &Hash,
+        act: &str,
+        target: &MandateGrantRefTarget,
+        granted_at: u64,
+    ) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        // Fixed-length: 16-byte UUID, no length prefix.
+        hasher.update(mandate_id.0.as_bytes());
+        // Fixed-length: 32-byte blake3 hash, no length prefix.
+        hasher.update(decision_hash);
+        // Variable-length: act string.
+        hasher.update(&(act.len() as u64).to_le_bytes());
+        hasher.update(act.as_bytes());
+        // Target kind ordinal, then each component length-prefixed.
+        hasher.update(&[target_kind_ordinal(target)]);
+        match target {
+            MandateGrantRefTarget::Domain { domain_id } => {
+                hasher.update(&(domain_id.len() as u64).to_le_bytes());
+                hasher.update(domain_id.as_bytes());
+            }
+            MandateGrantRefTarget::Proposal { proposal_id } => {
+                hasher.update(&(proposal_id.len() as u64).to_le_bytes());
+                hasher.update(proposal_id.as_bytes());
+            }
+            MandateGrantRefTarget::Role {
+                structure_id,
+                holder,
+            } => {
+                hasher.update(&(structure_id.len() as u64).to_le_bytes());
+                hasher.update(structure_id.as_bytes());
+                hasher.update(&(holder.len() as u64).to_le_bytes());
+                hasher.update(holder.as_bytes());
+            }
+            MandateGrantRefTarget::Federation { federation_id } => {
+                hasher.update(&(federation_id.len() as u64).to_le_bytes());
+                hasher.update(federation_id.as_bytes());
+            }
+        }
+        hasher.update(&granted_at.to_le_bytes());
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+
+    /// Compute this reference's canonical hash. Convenience wrapper
+    /// around [`Self::compute_ref_hash`] over the receiver's fields.
+    pub fn ref_hash(&self) -> Hash {
+        Self::compute_ref_hash(
+            &self.mandate_id,
+            &self.decision_hash,
+            &self.act,
+            &self.target,
+            self.granted_at,
+        )
+    }
+}
+
+/// Map [`MandateGrantRefTarget`] to a deterministic ordinal for hashing.
+///
+/// Ordinals are fixed at v1 of the wire format; adding a variant after
+/// the existing four requires a new domain-separation tag (`:v2`).
+fn target_kind_ordinal(target: &MandateGrantRefTarget) -> u8 {
+    match target {
+        MandateGrantRefTarget::Domain { .. } => 0,
+        MandateGrantRefTarget::Proposal { .. } => 1,
+        MandateGrantRefTarget::Role { .. } => 2,
+        MandateGrantRefTarget::Federation { .. } => 3,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1524,6 +1818,434 @@ mod tests {
             assert!(
                 !lower.contains(forbidden),
                 "ProcessGateResultReceipt JSON must not contain regulated-finance vocabulary; \
+                 found `{forbidden}` in: {json}"
+            );
+        }
+    }
+
+    // ============================================================================
+    // MandateGrantRef (#1868 step 2 primitive)
+    // ============================================================================
+
+    fn fixed_mandate_id(byte: u8) -> MandateId {
+        // Build a deterministic UUID from a 16-byte seed so canonical
+        // hash assertions are stable across runs. `uuid::Uuid::from_bytes`
+        // accepts any 16-byte sequence and does not set RFC-4122
+        // version/variant bits, so the result is not a v4 UUID — that is
+        // fine here because the canonical hash binds the raw bytes, not
+        // the version field.
+        MandateId(uuid::Uuid::from_bytes([byte; 16]))
+    }
+
+    fn sample_ref(target: MandateGrantRefTarget) -> MandateGrantRef {
+        MandateGrantRef::new(
+            fixed_mandate_id(0xAA),
+            [0x11; 32],
+            "activate_charter".to_string(),
+            target,
+            1_700_000_000,
+        )
+        .expect("sample ref must construct cleanly")
+    }
+
+    /// Deterministic, valid `did:icn:` string for use in `Role.holder`
+    /// fixtures. `Did::from_anchor_id` accepts arbitrary 32-byte input but
+    /// the constructor now parses through `Did::from_str`, which requires
+    /// the decoded bytes to be a valid Ed25519 public key — so fixtures
+    /// must derive the DID from a real signing key.
+    fn fixture_holder_did(seed: u8) -> String {
+        let sk = ed25519_dalek::SigningKey::from_bytes(&[seed; 32]);
+        icn_identity::Did::from_public_key(&sk.verifying_key()).to_string()
+    }
+
+    #[test]
+    fn mandate_grant_ref_hash_is_deterministic_across_calls() {
+        let r = sample_ref(MandateGrantRefTarget::Domain {
+            domain_id: "coop-a".to_string(),
+        });
+        let h1 = r.ref_hash();
+        let h2 = r.ref_hash();
+        let h3 = MandateGrantRef::compute_ref_hash(
+            &r.mandate_id,
+            &r.decision_hash,
+            &r.act,
+            &r.target,
+            r.granted_at,
+        );
+        assert_eq!(h1, h2);
+        assert_eq!(h1, h3);
+    }
+
+    #[test]
+    fn mandate_grant_ref_distinct_target_kinds_produce_distinct_hashes() {
+        // Use the same key string in each variant so the only difference
+        // is the kind ordinal. This proves the discriminator participates
+        // in the hash and that two variants cannot collide by reusing
+        // an identifier.
+        let key = "shared-key".to_string();
+        let domain = sample_ref(MandateGrantRefTarget::Domain {
+            domain_id: key.clone(),
+        });
+        let proposal = sample_ref(MandateGrantRefTarget::Proposal {
+            proposal_id: key.clone(),
+        });
+        let federation = sample_ref(MandateGrantRefTarget::Federation {
+            federation_id: key.clone(),
+        });
+        let role = sample_ref(MandateGrantRefTarget::Role {
+            structure_id: key.clone(),
+            holder: fixture_holder_did(1),
+        });
+        let mut seen = std::collections::HashSet::new();
+        for h in [
+            domain.ref_hash(),
+            proposal.ref_hash(),
+            federation.ref_hash(),
+            role.ref_hash(),
+        ] {
+            assert!(seen.insert(h), "target kinds must hash to distinct values");
+        }
+    }
+
+    #[test]
+    fn mandate_grant_ref_role_structure_id_changes_hash() {
+        // Holder constant; structure_id varies. Per-component fields
+        // must each participate in the canonical hash so a flat-string
+        // packing ambiguity cannot recur.
+        let holder = fixture_holder_did(1);
+        let a = sample_ref(MandateGrantRefTarget::Role {
+            structure_id: "office-1".to_string(),
+            holder: holder.clone(),
+        });
+        let b = sample_ref(MandateGrantRefTarget::Role {
+            structure_id: "office-2".to_string(),
+            holder,
+        });
+        assert_ne!(a.ref_hash(), b.ref_hash());
+    }
+
+    #[test]
+    fn mandate_grant_ref_role_holder_changes_hash() {
+        // structure_id constant; holder varies.
+        let a = sample_ref(MandateGrantRefTarget::Role {
+            structure_id: "office-1".to_string(),
+            holder: fixture_holder_did(1),
+        });
+        let b = sample_ref(MandateGrantRefTarget::Role {
+            structure_id: "office-1".to_string(),
+            holder: fixture_holder_did(2),
+        });
+        assert_ne!(a.ref_hash(), b.ref_hash());
+    }
+
+    #[test]
+    fn mandate_grant_ref_domain_id_changes_hash() {
+        let a = sample_ref(MandateGrantRefTarget::Domain {
+            domain_id: "coop-a".to_string(),
+        });
+        let b = sample_ref(MandateGrantRefTarget::Domain {
+            domain_id: "coop-b".to_string(),
+        });
+        assert_ne!(a.ref_hash(), b.ref_hash());
+    }
+
+    #[test]
+    fn mandate_grant_ref_proposal_id_changes_hash() {
+        let a = sample_ref(MandateGrantRefTarget::Proposal {
+            proposal_id: "prop-1".to_string(),
+        });
+        let b = sample_ref(MandateGrantRefTarget::Proposal {
+            proposal_id: "prop-2".to_string(),
+        });
+        assert_ne!(a.ref_hash(), b.ref_hash());
+    }
+
+    #[test]
+    fn mandate_grant_ref_federation_id_changes_hash() {
+        let a = sample_ref(MandateGrantRefTarget::Federation {
+            federation_id: "fed-a".to_string(),
+        });
+        let b = sample_ref(MandateGrantRefTarget::Federation {
+            federation_id: "fed-b".to_string(),
+        });
+        assert_ne!(a.ref_hash(), b.ref_hash());
+    }
+
+    #[test]
+    fn mandate_grant_ref_act_changes_hash() {
+        let r = sample_ref(MandateGrantRefTarget::Domain {
+            domain_id: "coop-a".to_string(),
+        });
+        let other = MandateGrantRef::new(
+            r.mandate_id.clone(),
+            r.decision_hash,
+            "add_domain_member".to_string(),
+            r.target.clone(),
+            r.granted_at,
+        )
+        .expect("ref with non-empty act");
+        assert_ne!(r.ref_hash(), other.ref_hash());
+    }
+
+    #[test]
+    fn mandate_grant_ref_granted_at_changes_hash() {
+        let a = MandateGrantRef::new(
+            fixed_mandate_id(0xAA),
+            [0x11; 32],
+            "activate_charter".to_string(),
+            MandateGrantRefTarget::Domain {
+                domain_id: "coop-a".to_string(),
+            },
+            1_700_000_000,
+        )
+        .unwrap();
+        let b = MandateGrantRef::new(
+            fixed_mandate_id(0xAA),
+            [0x11; 32],
+            "activate_charter".to_string(),
+            MandateGrantRefTarget::Domain {
+                domain_id: "coop-a".to_string(),
+            },
+            1_700_000_001,
+        )
+        .unwrap();
+        assert_ne!(a.ref_hash(), b.ref_hash());
+    }
+
+    #[test]
+    fn mandate_grant_ref_decision_hash_changes_ref_hash() {
+        let a = MandateGrantRef::new(
+            fixed_mandate_id(0xAA),
+            [0x11; 32],
+            "activate_charter".to_string(),
+            MandateGrantRefTarget::Domain {
+                domain_id: "coop-a".to_string(),
+            },
+            1_700_000_000,
+        )
+        .unwrap();
+        let b = MandateGrantRef::new(
+            fixed_mandate_id(0xAA),
+            [0x22; 32],
+            "activate_charter".to_string(),
+            MandateGrantRefTarget::Domain {
+                domain_id: "coop-a".to_string(),
+            },
+            1_700_000_000,
+        )
+        .unwrap();
+        assert_ne!(a.ref_hash(), b.ref_hash());
+    }
+
+    #[test]
+    fn mandate_grant_ref_empty_act_rejected() {
+        for bad in ["", "   ", "\t\n"] {
+            let err = MandateGrantRef::new(
+                fixed_mandate_id(0xAA),
+                [0x11; 32],
+                bad.to_string(),
+                MandateGrantRefTarget::Domain {
+                    domain_id: "coop-a".to_string(),
+                },
+                1_700_000_000,
+            )
+            .unwrap_err();
+            assert_eq!(err, MandateGrantRefError::EmptyAct, "input {bad:?}");
+        }
+    }
+
+    #[test]
+    fn mandate_grant_ref_empty_target_components_rejected() {
+        let cases: Vec<(MandateGrantRefTarget, &'static str)> = vec![
+            (
+                MandateGrantRefTarget::Domain {
+                    domain_id: "  ".to_string(),
+                },
+                "domain_id",
+            ),
+            (
+                MandateGrantRefTarget::Proposal {
+                    proposal_id: "".to_string(),
+                },
+                "proposal_id",
+            ),
+            (
+                MandateGrantRefTarget::Role {
+                    structure_id: "\t".to_string(),
+                    holder: fixture_holder_did(7),
+                },
+                "structure_id",
+            ),
+            (
+                MandateGrantRefTarget::Role {
+                    structure_id: "office-1".to_string(),
+                    holder: "  ".to_string(),
+                },
+                "holder",
+            ),
+            (
+                MandateGrantRefTarget::Federation {
+                    federation_id: "".to_string(),
+                },
+                "federation_id",
+            ),
+        ];
+        for (target, expected_field) in cases {
+            let err = MandateGrantRef::new(
+                fixed_mandate_id(0xAA),
+                [0x11; 32],
+                "activate_charter".to_string(),
+                target.clone(),
+                1_700_000_000,
+            )
+            .unwrap_err();
+            assert_eq!(
+                err,
+                MandateGrantRefError::EmptyTargetField(expected_field),
+                "target {target:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn mandate_grant_ref_deserialize_rejects_empty_act() {
+        // Wire-time validation must be symmetric with the constructor:
+        // deserializing a payload the constructor would reject must
+        // also fail, otherwise peers / persisted receipts could carry
+        // malformed mandate refs and still compute a hash over them.
+        let valid = sample_ref(MandateGrantRefTarget::Domain {
+            domain_id: "coop-a".to_string(),
+        });
+        let mut value: serde_json::Value =
+            serde_json::to_value(&valid).expect("serialize valid ref");
+        value["act"] = serde_json::Value::String(String::new());
+        let err = serde_json::from_value::<MandateGrantRef>(value).unwrap_err();
+        assert!(
+            err.to_string().contains("act must be a non-empty"),
+            "expected EmptyAct surfaced through serde, got: {err}"
+        );
+    }
+
+    #[test]
+    fn mandate_grant_ref_deserialize_rejects_whitespace_target_component() {
+        // Same boundary discipline for the structured target's per-
+        // component fields.
+        let valid = sample_ref(MandateGrantRefTarget::Domain {
+            domain_id: "coop-a".to_string(),
+        });
+        let mut value: serde_json::Value =
+            serde_json::to_value(&valid).expect("serialize valid ref");
+        value["target"]["domain_id"] = serde_json::Value::String("   ".to_string());
+        let err = serde_json::from_value::<MandateGrantRef>(value).unwrap_err();
+        assert!(
+            err.to_string().contains("`domain_id`"),
+            "expected EmptyTargetField(domain_id) surfaced through serde, got: {err}"
+        );
+    }
+
+    #[test]
+    fn mandate_grant_ref_deserialize_rejects_empty_role_holder() {
+        // Covers the multi-component Role variant: every component
+        // must individually pass the empty-string check at the wire
+        // boundary, not only at construction.
+        let valid = sample_ref(MandateGrantRefTarget::Role {
+            structure_id: "office-1".to_string(),
+            holder: fixture_holder_did(3),
+        });
+        let mut value: serde_json::Value =
+            serde_json::to_value(&valid).expect("serialize valid ref");
+        value["target"]["holder"] = serde_json::Value::String(String::new());
+        let err = serde_json::from_value::<MandateGrantRef>(value).unwrap_err();
+        assert!(
+            err.to_string().contains("`holder`"),
+            "expected EmptyTargetField(holder) surfaced through serde, got: {err}"
+        );
+    }
+
+    #[test]
+    fn mandate_grant_ref_invalid_holder_did_rejected_at_construction() {
+        // App-side `MandateTarget::Role.holder` is `icn_identity::Did`, so a
+        // non-DID wire value would silently hash if the constructor only
+        // checked emptiness. Confirm the constructor rejects garbage holders
+        // and surfaces `InvalidHolderDid`.
+        for bad in [
+            "not-a-did",
+            "icn:foo",       // missing `did:` prefix
+            "did:other:foo", // wrong DID method
+            "did:icn:",      // empty identifier body
+            "did:icn:!!!",   // unparseable multibase
+        ] {
+            let err = MandateGrantRef::new(
+                fixed_mandate_id(0xAA),
+                [0x11; 32],
+                "appoint_steward".to_string(),
+                MandateGrantRefTarget::Role {
+                    structure_id: "office-1".to_string(),
+                    holder: bad.to_string(),
+                },
+                1_700_000_000,
+            )
+            .unwrap_err();
+            match err {
+                MandateGrantRefError::InvalidHolderDid(_) => {}
+                other => panic!("expected InvalidHolderDid for {bad:?}, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn mandate_grant_ref_deserialize_rejects_invalid_holder_did() {
+        // Same boundary discipline through the serde path: a wire payload
+        // with a parseable shape but a non-DID holder must fail closed at
+        // deserialization, not silently produce a `ref_hash()`.
+        let valid = sample_ref(MandateGrantRefTarget::Role {
+            structure_id: "office-1".to_string(),
+            holder: fixture_holder_did(5),
+        });
+        let mut value: serde_json::Value =
+            serde_json::to_value(&valid).expect("serialize valid ref");
+        value["target"]["holder"] = serde_json::Value::String("not-a-did".to_string());
+        let err = serde_json::from_value::<MandateGrantRef>(value).unwrap_err();
+        assert!(
+            err.to_string().contains("did:icn:"),
+            "expected InvalidHolderDid surfaced through serde, got: {err}"
+        );
+    }
+
+    #[test]
+    fn mandate_grant_ref_serde_roundtrip_preserves_hash() {
+        let r = sample_ref(MandateGrantRefTarget::Role {
+            structure_id: "office-1".to_string(),
+            holder: fixture_holder_did(9),
+        });
+        let json = serde_json::to_string(&r).expect("serialize");
+        let recovered: MandateGrantRef = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(r, recovered);
+        assert_eq!(r.ref_hash(), recovered.ref_hash());
+        // The serde tag exposes the variant discriminator on the wire.
+        assert!(
+            json.contains("\"kind\":\"role\""),
+            "expected snake_case kind tag in JSON: {json}"
+        );
+    }
+
+    #[test]
+    fn mandate_grant_ref_no_regulated_finance_vocabulary() {
+        // Mirror the receipt family's vocabulary-discipline test:
+        // MandateGrantRef is an institutional-authority record, not an
+        // economic one. Its serialized form must not echo regulated-
+        // finance terms.
+        let r = sample_ref(MandateGrantRefTarget::Domain {
+            domain_id: "coop-a".to_string(),
+        });
+        let json = serde_json::to_string(&r).expect("serialize");
+        let lower = json.to_lowercase();
+        for forbidden in [
+            "wallet", "balance", "currency", "payment", "token", "withdraw", "deposit",
+        ] {
+            assert!(
+                !lower.contains(forbidden),
+                "MandateGrantRef JSON must not contain regulated-finance vocabulary; \
                  found `{forbidden}` in: {json}"
             );
         }

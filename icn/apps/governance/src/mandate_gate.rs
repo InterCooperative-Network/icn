@@ -76,8 +76,9 @@ use std::sync::Arc;
 
 use icn_governance::proof::Hash;
 use icn_governance::{
-    AuthorityClass, AuthorityGrant, GovernanceDomainId, Grantee, Mandate, MandateId, MandateStatus,
-    ProposalId, StructureId, Timestamp, TypedScope,
+    AuthorityClass, AuthorityGrant, GovernanceDomainId, Grantee, Mandate, MandateGrantRef,
+    MandateGrantRefError, MandateGrantRefTarget, MandateId, MandateStatus, ProposalId, StructureId,
+    Timestamp, TypedScope,
 };
 use icn_identity::Did;
 
@@ -154,9 +155,9 @@ pub struct MandateRequest {
 /// handler to (eventually) record a stable reference in a receipt and for a
 /// surface to render the authorization.
 ///
-/// Note: the receipt-body wire shape (`MandateGrantRef`) and any stable hash
-/// over this reference are intentionally **out of step-6 scope** — that work
-/// belongs to the receipt-body schema step.
+/// The wire-recordable form is [`icn_governance::MandateGrantRef`], reached
+/// via [`MandateGrant::into_ref`]. No existing receipt embeds it yet; the
+/// receipt-body schema work is the next slice in the #1868 ladder.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct MandateGrant {
     /// The authorizing mandate.
@@ -169,6 +170,80 @@ pub struct MandateGrant {
     pub target: MandateTarget,
     /// Act time recorded at resolution.
     pub granted_at: Timestamp,
+}
+
+impl MandateAct {
+    /// Snake_case wire-form discriminator for receipt recording.
+    ///
+    /// These strings are the `act` field on [`MandateGrantRef`]. They match
+    /// the institutional act vocabulary (one token per variant) and are
+    /// **distinct** from the `scope.action_kind` binding tokens used by
+    /// [`expected_act_tokens`] (which describe a grant's permitted-act
+    /// surface, not the executed act). Keeping the two vocabularies
+    /// separate avoids tying receipt history to internal scope-binding
+    /// conventions.
+    pub fn as_wire_token(&self) -> &'static str {
+        match self {
+            MandateAct::ActivateCharter => "activate_charter",
+            MandateAct::AddDomainMember => "add_domain_member",
+            MandateAct::RemoveDomainMember => "remove_domain_member",
+            MandateAct::CloseProposal => "close_proposal",
+            MandateAct::CastVote => "cast_vote",
+            MandateAct::AppointSteward => "appoint_steward",
+            MandateAct::RemoveSteward => "remove_steward",
+            MandateAct::JoinFederation => "join_federation",
+            MandateAct::LeaveFederation => "leave_federation",
+        }
+    }
+}
+
+impl MandateTarget {
+    /// Translate the app-side target into its wire-recordable form.
+    ///
+    /// Direction is `apps/governance → icn-governance` only — the kernel
+    /// crates and `icn-governance` itself remain unaware of
+    /// [`MandateAct`]/[`MandateTarget`] semantics.
+    pub fn to_ref_target(&self) -> MandateGrantRefTarget {
+        match self {
+            MandateTarget::Domain(domain) => MandateGrantRefTarget::Domain {
+                domain_id: domain.0.clone(),
+            },
+            MandateTarget::Proposal(proposal) => MandateGrantRefTarget::Proposal {
+                proposal_id: proposal.0.clone(),
+            },
+            MandateTarget::Role {
+                structure_id,
+                holder,
+            } => MandateGrantRefTarget::Role {
+                structure_id: structure_id.0.clone(),
+                holder: holder.to_string(),
+            },
+            MandateTarget::Federation(fed) => MandateGrantRefTarget::Federation {
+                federation_id: fed.clone(),
+            },
+        }
+    }
+}
+
+impl MandateGrant {
+    /// Build the wire-recordable [`MandateGrantRef`] from this grant.
+    ///
+    /// Returns the same [`MandateGrantRefError`] surface the underlying
+    /// checked constructor uses; the only failure paths are empty/
+    /// whitespace target components (e.g. an empty `domain_id`). In
+    /// practice these come from upstream data validation, not from the
+    /// gate itself, so callers should treat an `Err` here as a wire-
+    /// integrity bug rather than an authorization failure.
+    pub fn into_ref(self) -> Result<MandateGrantRef, MandateGrantRefError> {
+        let target = self.target.to_ref_target();
+        MandateGrantRef::new(
+            self.mandate_id,
+            self.decision_hash,
+            self.act.as_wire_token().to_string(),
+            target,
+            self.granted_at,
+        )
+    }
 }
 
 /// Structured reason an act was refused, for the surface to render.
@@ -1145,5 +1220,159 @@ mod tests {
         assert_eq!(MandateRejection::WrongActor.reason_code(), "wrong_actor");
         assert_eq!(MandateRejection::Suspended.reason_code(), "suspended");
         assert_eq!(MandateRejection::Revoked.reason_code(), "revoked");
+    }
+
+    // ------- MandateGrant ↔ MandateGrantRef adapter ----------------------
+
+    #[test]
+    fn act_wire_tokens_are_distinct_and_snake_case() {
+        // The wire tokens are bound into receipt hashes via
+        // MandateGrantRef::compute_ref_hash, so every act variant must
+        // map to a unique snake_case token. Adding a MandateAct variant
+        // without updating as_wire_token() is the failure mode this
+        // guards.
+        let acts = [
+            MandateAct::ActivateCharter,
+            MandateAct::AddDomainMember,
+            MandateAct::RemoveDomainMember,
+            MandateAct::CloseProposal,
+            MandateAct::CastVote,
+            MandateAct::AppointSteward,
+            MandateAct::RemoveSteward,
+            MandateAct::JoinFederation,
+            MandateAct::LeaveFederation,
+        ];
+        let mut seen = std::collections::HashSet::new();
+        for act in acts {
+            let tok = act.as_wire_token();
+            assert!(
+                !tok.is_empty()
+                    && tok
+                        .chars()
+                        .all(|c| c.is_ascii_lowercase() || c == '_' || c.is_ascii_digit()),
+                "wire token {tok:?} for {act:?} must be non-empty snake_case"
+            );
+            assert!(seen.insert(tok), "duplicate wire token {tok:?}");
+        }
+    }
+
+    #[test]
+    fn target_to_ref_target_preserves_each_variant_structurally() {
+        let dom = domain("coop-a");
+        let actor = did(1);
+
+        let domain_t = MandateTarget::Domain(dom.clone());
+        match domain_t.to_ref_target() {
+            MandateGrantRefTarget::Domain { domain_id } => assert_eq!(domain_id, dom.0),
+            other => panic!("expected Domain ref target, got {other:?}"),
+        }
+
+        let proposal_t = MandateTarget::Proposal(ProposalId("prop-1".into()));
+        match proposal_t.to_ref_target() {
+            MandateGrantRefTarget::Proposal { proposal_id } => {
+                assert_eq!(proposal_id, "prop-1")
+            }
+            other => panic!("expected Proposal ref target, got {other:?}"),
+        }
+
+        let role_t = MandateTarget::Role {
+            structure_id: StructureId("office-1".into()),
+            holder: actor.clone(),
+        };
+        match role_t.to_ref_target() {
+            MandateGrantRefTarget::Role {
+                structure_id,
+                holder,
+            } => {
+                assert_eq!(structure_id, "office-1");
+                assert_eq!(holder, actor.to_string());
+            }
+            other => panic!("expected Role ref target, got {other:?}"),
+        }
+
+        let fed_t = MandateTarget::Federation("fed-1".into());
+        match fed_t.to_ref_target() {
+            MandateGrantRefTarget::Federation { federation_id } => {
+                assert_eq!(federation_id, "fed-1")
+            }
+            other => panic!("expected Federation ref target, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn grant_into_ref_round_trips_and_hash_is_stable() {
+        let dom = domain("coop-a");
+        let actor = did(1);
+        let prov = decision("prop-1", 7);
+        let g = bound_grant(
+            actor.clone(),
+            &dom,
+            MandateAct::CloseProposal,
+            &prov,
+            100,
+            Some(1000),
+        );
+        let mandate =
+            Mandate::new(prov.clone(), [9u8; 32], vec![g.id.clone()], None, None, 100).unwrap();
+
+        let gate = FixtureBackend::new(vec![mandate.clone()], vec![g]).gate();
+        let grant = gate
+            .require(&proposal_request(actor, dom, "prop-1", 500))
+            .expect("valid tuple resolves");
+
+        // Two consecutive into_ref calls produce equal refs and equal
+        // hashes — proves the adapter is deterministic.
+        let r1 = grant.clone().into_ref().expect("into_ref ok");
+        let r2 = grant.clone().into_ref().expect("into_ref ok");
+        assert_eq!(r1, r2);
+        assert_eq!(r1.ref_hash(), r2.ref_hash());
+
+        // Field-level: the adapter preserves identity from the gate's
+        // result through to the wire form.
+        assert_eq!(r1.mandate_id, mandate.id);
+        assert_eq!(r1.decision_hash, mandate.decision.decision_hash);
+        assert_eq!(r1.act, MandateAct::CloseProposal.as_wire_token());
+        assert_eq!(r1.granted_at, 500);
+        match r1.target {
+            MandateGrantRefTarget::Proposal { proposal_id } => {
+                assert_eq!(proposal_id, "prop-1")
+            }
+            other => panic!("expected Proposal ref target, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn grant_into_ref_for_domain_target_resolves_through_actor_first_path() {
+        // Exercise the resolve_domain path so the adapter is tested end-
+        // to-end for a Domain target as well, not only Proposal.
+        let dom = domain("coop-a");
+        let actor = did(1);
+        let prov = decision("prop-1", 7);
+        let g = bound_grant(
+            actor.clone(),
+            &dom,
+            MandateAct::AddDomainMember,
+            &prov,
+            0,
+            Some(1000),
+        );
+        let mandate = Mandate::new(prov, [9u8; 32], vec![g.id.clone()], None, None, 100).unwrap();
+
+        let gate = FixtureBackend::new(vec![mandate], vec![g]).gate();
+        let req = MandateRequest {
+            actor,
+            domain: dom.clone(),
+            act: MandateAct::AddDomainMember,
+            target: MandateTarget::Domain(dom.clone()),
+            at: 500,
+        };
+        let grant = gate.require(&req).expect("domain actor-first resolves");
+
+        let r = grant.into_ref().expect("into_ref ok");
+        assert_eq!(r.act, "add_domain_member");
+        match r.target {
+            MandateGrantRefTarget::Domain { domain_id } => assert_eq!(domain_id, dom.0),
+            other => panic!("expected Domain ref target, got {other:?}"),
+        }
     }
 }
