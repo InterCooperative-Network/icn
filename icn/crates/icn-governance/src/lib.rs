@@ -137,10 +137,11 @@ pub use message::{GovernanceMessage, ProposalOutcome, TallySnapshot};
 pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, GovernanceRule};
 pub use proof::{
     ActionItemCompletionReceipt, ActionItemTransition, GovernanceDecisionAttestation,
-    GovernanceDecisionReceipt, GovernanceProof, GovernanceProofV2, MandateGrantRef,
-    MandateGrantRefError, MandateGrantRefTarget, MeetingAttendanceReceipt,
-    MeetingAttendanceTransition, ProcessGateKind, ProcessGateResult, ProcessGateResultReceipt,
-    ProofOutcome,
+    GovernanceDecisionReceipt, GovernanceDecisionReceiptV2, GovernanceDecisionReceiptV2Error,
+    GovernanceProof, GovernanceProofV2, MandateGrantRef, MandateGrantRefError,
+    MandateGrantRefTarget, MeetingAttendanceReceipt, MeetingAttendanceTransition, NoMandateReason,
+    ProcessGateKind, ProcessGateResult, ProcessGateResultReceipt, ProofOutcome,
+    ReceiptMandateAttestation,
 };
 pub use proposal::{
     AllocationOption, DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome,

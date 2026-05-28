@@ -316,15 +316,14 @@ impl GovernanceDecisionReceipt {
     ) -> Vec<u8> {
         let mut bytes = Vec::new();
         bytes.extend_from_slice(Self::DOMAIN_TAG);
-        bytes.extend_from_slice(&(proposal_id.len() as u64).to_le_bytes());
-        bytes.extend_from_slice(proposal_id.as_bytes());
-        bytes.extend_from_slice(&(domain_id.len() as u64).to_le_bytes());
-        bytes.extend_from_slice(domain_id.as_bytes());
-        bytes.push(outcome_ordinal(outcome));
-        bytes.extend_from_slice(&(vote_tally.for_votes as u64).to_le_bytes());
-        bytes.extend_from_slice(&(vote_tally.against_votes as u64).to_le_bytes());
-        bytes.extend_from_slice(&(vote_tally.abstain_votes as u64).to_le_bytes());
-        bytes.extend_from_slice(vote_hash);
+        append_decision_base_field_bytes(
+            &mut bytes,
+            proposal_id,
+            domain_id,
+            outcome,
+            vote_tally,
+            vote_hash,
+        );
         bytes
     }
 
@@ -356,6 +355,385 @@ impl GovernanceDecisionReceipt {
             &self.vote_hash,
         );
         self.decision_hash == recomputed
+    }
+}
+
+/// Append the canonical base-field byte sequence shared by every
+/// versioned governance decision receipt.
+///
+/// Absorbs only `proposal_id`, `domain_id`, `outcome`, `vote_tally`,
+/// and `vote_hash` — **not** a domain-separation tag. Each versioned
+/// receipt's `compute_decision_hash` writes its **own** `DOMAIN_TAG`
+/// first and then calls this helper, so the two version namespaces
+/// (`icn:gov:decision:v1`, `icn:gov:decision:v2`, …) remain fully
+/// separate even though they share the same base-field encoding.
+///
+/// The encoding mirrors the original
+/// [`GovernanceDecisionReceipt::compute_decision_hash_bytes_fields`]
+/// body byte-for-byte so v1 hashes remain stable after extraction.
+fn append_decision_base_field_bytes(
+    out: &mut Vec<u8>,
+    proposal_id: &str,
+    domain_id: &str,
+    outcome: ProofOutcome,
+    vote_tally: &VoteTally,
+    vote_hash: &Hash,
+) {
+    out.extend_from_slice(&(proposal_id.len() as u64).to_le_bytes());
+    out.extend_from_slice(proposal_id.as_bytes());
+    out.extend_from_slice(&(domain_id.len() as u64).to_le_bytes());
+    out.extend_from_slice(domain_id.as_bytes());
+    out.push(outcome_ordinal(outcome));
+    out.extend_from_slice(&(vote_tally.for_votes as u64).to_le_bytes());
+    out.extend_from_slice(&(vote_tally.against_votes as u64).to_le_bytes());
+    out.extend_from_slice(&(vote_tally.abstain_votes as u64).to_le_bytes());
+    out.extend_from_slice(vote_hash);
+}
+
+// ============================================================================
+// Governance decision receipt v2 — mandate-attestation fork (#1868 step 2)
+// ============================================================================
+
+/// Closed taxonomy of why a governance act explicitly records "no mandate
+/// required" on a v2 decision receipt.
+///
+/// The decomposition design (`governance-write-decomposition.md` §6) flags
+/// two distinct no-mandate conditions that the receipt must keep
+/// distinguishable: routine record-keeping whose institutional floor is
+/// just membership-in-good-standing, and labeled bootstrap/direct-
+/// administrative shortcuts that bypass the ratified path entirely. A
+/// closed enum mirrors every other taxonomy in this module
+/// (`ProofOutcome`, `ActionItemTransition`, `MeetingAttendanceTransition`,
+/// `ProcessGateKind`, `ProcessGateResult`) and keeps the audit answer
+/// unambiguous. `#[non_exhaustive]` lets future cases land non-breakingly
+/// — adding a variant after the existing two requires a new domain-
+/// separation tag on the receipt that consumes it (`:v3`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum NoMandateReason {
+    /// Membership-in-good-standing is the institutional floor for this
+    /// act. No act-time mandate is required beyond standing — covers the
+    /// routine meeting/activity/comment record-keeping rows in the
+    /// decomposition table at `governance-write-decomposition.md` §6.
+    MembershipStandingOnly,
+    /// Direct-administrative bootstrap shortcut. Pairs with #1869's
+    /// `activation_path: bootstrap` label so the receipt and the
+    /// artifact-level marker tell the same story.
+    Bootstrap,
+}
+
+/// Explicit, structurally-typed mandate-attestation discriminator embedded
+/// in a v2 [`GovernanceDecisionReceiptV2`].
+///
+/// The decomp doc §10 step 2 requires the "no mandate required" answer to
+/// be *explicit* rather than implicit absence. Modeled as a tagged enum
+/// — never `Option<MandateGrantRef>` — so the receipt's mandate stance
+/// can never be derived from field omission, a missing serde default, or
+/// a stringy value.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+#[non_exhaustive]
+pub enum ReceiptMandateAttestation {
+    /// The act was performed under a deliberate "no mandate required"
+    /// classification. `reason` says which closed-taxonomy condition
+    /// applies; see [`NoMandateReason`].
+    NoMandateRequired {
+        /// Why the act needed no mandate. Closed enum, never free-form.
+        reason: NoMandateReason,
+    },
+    /// The act was authorized by a ratified mandate; `grant_ref` is the
+    /// wire-form reference produced by the act-time gate (the
+    /// `apps/governance::mandate_gate` `MandateGate::require` →
+    /// `MandateGrant::into_ref()` adapter). The grant ref carries its
+    /// own per-component canonical encoding (#1928), so the receipt's
+    /// canonical hash binds the entire grant via the grant ref's
+    /// 32-byte `ref_hash()`.
+    Grant {
+        /// The receipt-recordable mandate grant reference; see
+        /// [`MandateGrantRef`].
+        grant_ref: MandateGrantRef,
+    },
+}
+
+/// Errors returned by [`GovernanceDecisionReceiptV2::new`] (and by the
+/// `try_from` shadow that routes `Deserialize` through the same checks).
+#[derive(Debug, Clone, PartialEq, Eq, Error)]
+pub enum GovernanceDecisionReceiptV2Error {
+    /// The `capability_scope_presented` field was empty or whitespace-
+    /// only. The constructor (and the wire boundary) rejects this so the
+    /// receipt cannot record an unattributed scope. This intentionally
+    /// does **not** enforce membership in the gateway's
+    /// `ALLOWED_SCOPES` allowlist — the scope set evolves and an
+    /// allowlist check here would force a v3 fork every time a new class
+    /// scope lands. The audit layer is the right home for the allowlist
+    /// check.
+    #[error("capability_scope_presented must be a non-empty, non-whitespace string")]
+    EmptyCapabilityScope,
+}
+
+/// Cross-node deterministic governance decision receipt — **v2** of the
+/// canonical wire form, embedding the mandate-attestation discriminator
+/// and the capability scope a caller presented at act time.
+///
+/// # Relationship to existing types
+///
+/// - [`GovernanceDecisionReceipt`] (this module, above) is the v1 receipt
+///   and is **byte-stable** — its `DOMAIN_TAG` (`icn:gov:decision:v1`),
+///   canonical hash, and 22+ external call sites are unchanged. v2 is
+///   purely additive; no v1 caller is forced to migrate.
+/// - [`GovernanceProofV2`] (this module, below) is the existing **proof
+///   container** — receipt + node attestations. Its "V2" refers to the
+///   container shape, not the receipt version. The two "V2"s are
+///   orthogonal: `GovernanceProofV2` still wraps a v1
+///   [`GovernanceDecisionReceipt`]. A future slice will decide whether
+///   to extend `GovernanceProofV2` to accept either receipt version, add
+///   a parallel container, or migrate the container shape. The naming
+///   overlap is preserved per existing module convention and called out
+///   explicitly here so readers can tell the two apart.
+///
+/// # Wire / canonical contract
+///
+/// - `DOMAIN_TAG = b"icn:gov:decision:v2"`. Fully separate from the v1
+///   namespace; the two cannot collide.
+/// - Canonical encoding: v2 tag, then the same base-field byte sequence
+///   v1 binds (via the shared [`append_decision_base_field_bytes`]
+///   helper), then the v2-only fields. The v2 hash is a fresh `blake3`
+///   over that byte stream — **never** derived from v1's
+///   `decision_hash`, v1's tag, or any serialized form of either.
+/// - `Deserialize` is routed through a private
+///   `GovernanceDecisionReceiptV2Raw` shadow + `#[serde(try_from = ...)]`
+///   so empty-scope rejection runs on every deserialized payload, not
+///   just on the constructor path (mirrors the #1928 boundary pattern).
+/// - Equality is anchored to `decision_hash` (matches the v1 convention).
+///
+/// # Out of scope for this PR
+///
+/// - No handler emits a v2 receipt yet. All 22 external callers of
+///   [`GovernanceDecisionReceipt::new`] remain on v1.
+/// - No `ActionItemCompletionReceipt` or `MeetingAttendanceReceipt` fork.
+/// - No `GovernanceProofV2` extension to accept the v2 receipt.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(try_from = "GovernanceDecisionReceiptV2Raw")]
+pub struct GovernanceDecisionReceiptV2 {
+    /// ID of the proposal this receipt covers.
+    pub proposal_id: String,
+    /// ID of the governance domain.
+    pub domain_id: String,
+    /// Final outcome of the vote.
+    pub outcome: ProofOutcome,
+    /// Aggregated vote tally.
+    pub vote_tally: VoteTally,
+    /// Merkle root of sorted vote records (deterministic).
+    pub vote_hash: Hash,
+    /// The capability scope string the caller presented at act time
+    /// (e.g. `"governance:charter:write"`, `"governance:write"`). Bound
+    /// into the canonical hash so the receipt records *which kind of
+    /// write happened* alongside the decision itself. Rejected
+    /// empty/whitespace by the constructor and the serde boundary.
+    pub capability_scope_presented: String,
+    /// Explicit mandate-attestation discriminator: either a
+    /// [`ReceiptMandateAttestation::Grant`] carrying a wire-form
+    /// [`MandateGrantRef`] or a
+    /// [`ReceiptMandateAttestation::NoMandateRequired`] carrying a
+    /// closed-taxonomy [`NoMandateReason`]. Never `Option` — absence
+    /// must never be interpretable as "no mandate."
+    pub mandate_attestation: ReceiptMandateAttestation,
+    /// blake3 canonical decision hash from receipt fields under the
+    /// v2 domain-separation tag.
+    pub decision_hash: Hash,
+}
+
+impl PartialEq for GovernanceDecisionReceiptV2 {
+    fn eq(&self, other: &Self) -> bool {
+        self.decision_hash == other.decision_hash
+    }
+}
+
+impl Eq for GovernanceDecisionReceiptV2 {}
+
+impl GovernanceDecisionReceiptV2 {
+    /// Domain separation tag for v2 canonical decision hashes. Distinct
+    /// from [`GovernanceDecisionReceipt::DOMAIN_TAG`] so the v1 and v2
+    /// namespaces remain fully separate.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:decision:v2";
+
+    /// Create a canonical v2 receipt from proposal decision inputs plus
+    /// the capability scope presented and the mandate attestation.
+    /// Rejects empty/whitespace `capability_scope_presented`.
+    pub fn new(
+        proposal_id: String,
+        domain_id: String,
+        outcome: ProofOutcome,
+        vote_tally: VoteTally,
+        votes: &[Vote],
+        capability_scope_presented: String,
+        mandate_attestation: ReceiptMandateAttestation,
+    ) -> Result<Self, GovernanceDecisionReceiptV2Error> {
+        if capability_scope_presented.trim().is_empty() {
+            return Err(GovernanceDecisionReceiptV2Error::EmptyCapabilityScope);
+        }
+        let vote_hash = GovernanceProof::compute_vote_hash(votes);
+        let decision_hash = Self::compute_decision_hash(
+            &proposal_id,
+            &domain_id,
+            outcome,
+            &vote_tally,
+            &vote_hash,
+            &capability_scope_presented,
+            &mandate_attestation,
+        );
+        Ok(Self {
+            proposal_id,
+            domain_id,
+            outcome,
+            vote_tally,
+            vote_hash,
+            capability_scope_presented,
+            mandate_attestation,
+            decision_hash,
+        })
+    }
+
+    /// Compute the canonical v2 `decision_hash` from receipt fields.
+    ///
+    /// The byte stream is: v2 [`Self::DOMAIN_TAG`], then the v1 base
+    /// fields via [`append_decision_base_field_bytes`] (length-prefixed
+    /// strings, single-byte outcome ordinal, u64 LE tally counts, raw
+    /// 32-byte vote hash, identical order to v1), then the v2-only
+    /// additions: length-prefixed `capability_scope_presented`, a single
+    /// ordinal byte for the [`ReceiptMandateAttestation`] variant
+    /// (`NoMandateRequired` = 0, `Grant` = 1), then the per-variant
+    /// payload:
+    ///
+    /// - `NoMandateRequired { reason }`: a single
+    ///   [`no_mandate_reason_ordinal`] byte.
+    /// - `Grant { grant_ref }`: the 32-byte
+    ///   [`MandateGrantRef::ref_hash`] (fixed-length; no length prefix).
+    ///   Binding via `ref_hash` propagates the grant ref's per-component
+    ///   canonical encoding (#1928) without re-deriving the field layout
+    ///   here — that encoding is the single source of truth for the
+    ///   grant-ref surface.
+    pub fn compute_decision_hash(
+        proposal_id: &str,
+        domain_id: &str,
+        outcome: ProofOutcome,
+        vote_tally: &VoteTally,
+        vote_hash: &Hash,
+        capability_scope_presented: &str,
+        mandate_attestation: &ReceiptMandateAttestation,
+    ) -> Hash {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(Self::DOMAIN_TAG);
+        append_decision_base_field_bytes(
+            &mut bytes,
+            proposal_id,
+            domain_id,
+            outcome,
+            vote_tally,
+            vote_hash,
+        );
+        bytes.extend_from_slice(&(capability_scope_presented.len() as u64).to_le_bytes());
+        bytes.extend_from_slice(capability_scope_presented.as_bytes());
+        bytes.push(attestation_kind_ordinal(mandate_attestation));
+        match mandate_attestation {
+            ReceiptMandateAttestation::NoMandateRequired { reason } => {
+                bytes.push(no_mandate_reason_ordinal(*reason));
+            }
+            ReceiptMandateAttestation::Grant { grant_ref } => {
+                // Bind via the grant ref's canonical hash. Fixed length
+                // (32 bytes), no length prefix — see #1928's
+                // `MandateGrantRef::compute_ref_hash` for the field-level
+                // encoding inside this digest.
+                bytes.extend_from_slice(&grant_ref.ref_hash());
+            }
+        }
+        *blake3::hash(&bytes).as_bytes()
+    }
+
+    /// Verify the stored `decision_hash` against canonical v2 receipt
+    /// fields.
+    pub fn verify(&self) -> bool {
+        let recomputed = Self::compute_decision_hash(
+            &self.proposal_id,
+            &self.domain_id,
+            self.outcome,
+            &self.vote_tally,
+            &self.vote_hash,
+            &self.capability_scope_presented,
+            &self.mandate_attestation,
+        );
+        self.decision_hash == recomputed
+    }
+}
+
+/// Raw deserialization shadow for [`GovernanceDecisionReceiptV2`].
+///
+/// `GovernanceDecisionReceiptV2` is a wire/persisted primitive, so
+/// `Deserialize` is an input boundary that must apply the same checks
+/// as `GovernanceDecisionReceiptV2::new`. Routing deserialization
+/// through this shadow + `try_from` keeps the wire surface symmetric
+/// with the constructor — a payload with an empty
+/// `capability_scope_presented` fails closed at the deserialization
+/// boundary, not only via `new`. Mirrors the same pattern as
+/// `MandateGrantRefRaw`.
+#[derive(Deserialize)]
+struct GovernanceDecisionReceiptV2Raw {
+    proposal_id: String,
+    domain_id: String,
+    outcome: ProofOutcome,
+    vote_tally: VoteTally,
+    vote_hash: Hash,
+    capability_scope_presented: String,
+    mandate_attestation: ReceiptMandateAttestation,
+    decision_hash: Hash,
+}
+
+impl TryFrom<GovernanceDecisionReceiptV2Raw> for GovernanceDecisionReceiptV2 {
+    type Error = GovernanceDecisionReceiptV2Error;
+
+    fn try_from(raw: GovernanceDecisionReceiptV2Raw) -> Result<Self, Self::Error> {
+        if raw.capability_scope_presented.trim().is_empty() {
+            return Err(GovernanceDecisionReceiptV2Error::EmptyCapabilityScope);
+        }
+        // Note: we deliberately do not recompute / verify the
+        // `decision_hash` here. `Deserialize` accepts whatever hash
+        // value the wire carries; callers verify integrity via
+        // `verify()` (matches v1 behavior — `GovernanceDecisionReceipt`
+        // also accepts whatever `decision_hash` value is on the wire
+        // and exposes `verify()` separately). This keeps the
+        // deserialization surface a pure structural check.
+        Ok(Self {
+            proposal_id: raw.proposal_id,
+            domain_id: raw.domain_id,
+            outcome: raw.outcome,
+            vote_tally: raw.vote_tally,
+            vote_hash: raw.vote_hash,
+            capability_scope_presented: raw.capability_scope_presented,
+            mandate_attestation: raw.mandate_attestation,
+            decision_hash: raw.decision_hash,
+        })
+    }
+}
+
+/// Map [`ReceiptMandateAttestation`] to a deterministic ordinal for
+/// canonical hashing. Ordinals are fixed at v1 of the wire format;
+/// adding a variant after the existing two requires a new domain-
+/// separation tag (`:v3`).
+fn attestation_kind_ordinal(att: &ReceiptMandateAttestation) -> u8 {
+    match att {
+        ReceiptMandateAttestation::NoMandateRequired { .. } => 0,
+        ReceiptMandateAttestation::Grant { .. } => 1,
+    }
+}
+
+/// Map [`NoMandateReason`] to a deterministic ordinal for canonical
+/// hashing. Same versioning contract as
+/// [`attestation_kind_ordinal`].
+fn no_mandate_reason_ordinal(reason: NoMandateReason) -> u8 {
+    match reason {
+        NoMandateReason::MembershipStandingOnly => 0,
+        NoMandateReason::Bootstrap => 1,
     }
 }
 
@@ -2227,6 +2605,402 @@ mod tests {
             json.contains("\"kind\":\"role\""),
             "expected snake_case kind tag in JSON: {json}"
         );
+    }
+
+    // ============================================================================
+    // GovernanceDecisionReceiptV2 — mandate-attestation fork (#1868 step 2)
+    // ============================================================================
+
+    /// Build a deterministic v2 receipt around the given attestation.
+    /// Uses the existing `make_votes`/`make_tally` helpers so the v1 base
+    /// fields are identical to those used by the v1 test suite.
+    fn sample_v2_receipt(att: ReceiptMandateAttestation) -> GovernanceDecisionReceiptV2 {
+        let votes = make_votes();
+        let tally = make_tally(&votes);
+        GovernanceDecisionReceiptV2::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            tally,
+            &votes,
+            "governance:charter:write".to_string(),
+            att,
+        )
+        .expect("sample v2 receipt must construct cleanly")
+    }
+
+    fn sample_no_mandate_attestation() -> ReceiptMandateAttestation {
+        ReceiptMandateAttestation::NoMandateRequired {
+            reason: NoMandateReason::MembershipStandingOnly,
+        }
+    }
+
+    fn sample_grant_attestation() -> ReceiptMandateAttestation {
+        ReceiptMandateAttestation::Grant {
+            grant_ref: sample_ref(MandateGrantRefTarget::Domain {
+                domain_id: "coop:test".to_string(),
+            }),
+        }
+    }
+
+    #[test]
+    fn decision_v2_hash_is_deterministic_across_calls() {
+        let r1 = sample_v2_receipt(sample_no_mandate_attestation());
+        let r2 = sample_v2_receipt(sample_no_mandate_attestation());
+        assert_eq!(r1.decision_hash, r2.decision_hash);
+        assert!(r1.verify(), "v2 receipt must verify against its own hash");
+    }
+
+    #[test]
+    fn decision_v2_hash_distinct_from_v1_for_same_logical_fields() {
+        // Domain-separation tags must keep v1 and v2 hash namespaces
+        // disjoint. A v1 receipt and a v2 receipt over identical base
+        // fields must hash to different values even when the v2
+        // additions are trivially fixed.
+        let votes = make_votes();
+        let tally = make_tally(&votes);
+        let v1 = GovernanceDecisionReceipt::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            tally.clone(),
+            &votes,
+        );
+        let v2 = GovernanceDecisionReceiptV2::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            tally,
+            &votes,
+            "governance:charter:write".to_string(),
+            sample_no_mandate_attestation(),
+        )
+        .unwrap();
+        assert_ne!(
+            v1.decision_hash, v2.decision_hash,
+            "v1 and v2 hashes must be domain-separated"
+        );
+    }
+
+    #[test]
+    fn decision_v1_and_v2_hashes_namespace_separate() {
+        // Required cross-namespace test: builds v1 + v2 with identical
+        // base fields, asserts the two hashes differ; then mutates one
+        // base field (vote_hash via a different vote set) on both and
+        // asserts each hash changes within its own namespace and the
+        // two new hashes still differ. Proves the shared base encoding
+        // is wired identically on both sides without collapsing the
+        // namespaces.
+        let votes_a = make_votes();
+        let tally_a = make_tally(&votes_a);
+        let v1_a = GovernanceDecisionReceipt::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            tally_a.clone(),
+            &votes_a,
+        );
+        let v2_a = GovernanceDecisionReceiptV2::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            tally_a,
+            &votes_a,
+            "governance:charter:write".to_string(),
+            sample_no_mandate_attestation(),
+        )
+        .unwrap();
+        assert_ne!(
+            v1_a.decision_hash, v2_a.decision_hash,
+            "v1/v2 hashes must differ for identical base fields (domain separation)"
+        );
+
+        // Mutate vote_hash on both by changing the vote set; reuse the
+        // same proposal/domain/outcome/scope/attestation so only the
+        // base-field input shifts.
+        let votes_b: Vec<Vote> = {
+            let (alice, bob, _carol) = make_deterministic_dids();
+            vec![
+                Vote {
+                    proposal_id: crate::ProposalId::new("prop-1"),
+                    voter: alice,
+                    choice: VoteChoice::Against,
+                    weight: 1,
+                    timestamp: 1700000000,
+                    comment: None,
+                },
+                Vote {
+                    proposal_id: crate::ProposalId::new("prop-1"),
+                    voter: bob,
+                    choice: VoteChoice::For,
+                    weight: 1,
+                    timestamp: 1700000001,
+                    comment: None,
+                },
+            ]
+        };
+        let tally_b = make_tally(&votes_b);
+        let v1_b = GovernanceDecisionReceipt::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            tally_b.clone(),
+            &votes_b,
+        );
+        let v2_b = GovernanceDecisionReceiptV2::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            tally_b,
+            &votes_b,
+            "governance:charter:write".to_string(),
+            sample_no_mandate_attestation(),
+        )
+        .unwrap();
+
+        // Each receipt's hash must change in its own namespace ...
+        assert_ne!(
+            v1_a.decision_hash, v1_b.decision_hash,
+            "v1 hash must change when base fields change"
+        );
+        assert_ne!(
+            v2_a.decision_hash, v2_b.decision_hash,
+            "v2 hash must change when base fields change"
+        );
+        // ... and the namespaces must still be disjoint after the
+        // mutation (no accidental collapse).
+        assert_ne!(
+            v1_b.decision_hash, v2_b.decision_hash,
+            "v1/v2 namespaces must remain disjoint after base mutation"
+        );
+    }
+
+    #[test]
+    fn decision_v1_hash_remains_stable_after_v2_introduction() {
+        // Explicit fixture: a v1 receipt over known inputs must hash to
+        // the same bytes that v1's canonical encoding produces. Mirrors
+        // the v1 hash by hand using the documented length-prefix layout
+        // — any drift in the v1 encoding (including accidental drift
+        // from the shared-helper refactor in this PR) makes this test
+        // fail loudly with a visible byte diff.
+        let votes = make_votes();
+        let tally = make_tally(&votes);
+        let vote_hash = GovernanceProof::compute_vote_hash(&votes);
+
+        let mut expected_bytes = Vec::new();
+        expected_bytes.extend_from_slice(GovernanceDecisionReceipt::DOMAIN_TAG);
+        let proposal_id = b"prop-1";
+        let domain_id = b"coop:test";
+        expected_bytes.extend_from_slice(&(proposal_id.len() as u64).to_le_bytes());
+        expected_bytes.extend_from_slice(proposal_id);
+        expected_bytes.extend_from_slice(&(domain_id.len() as u64).to_le_bytes());
+        expected_bytes.extend_from_slice(domain_id);
+        expected_bytes.push(0); // outcome ordinal: Accepted = 0
+        expected_bytes.extend_from_slice(&(tally.for_votes as u64).to_le_bytes());
+        expected_bytes.extend_from_slice(&(tally.against_votes as u64).to_le_bytes());
+        expected_bytes.extend_from_slice(&(tally.abstain_votes as u64).to_le_bytes());
+        expected_bytes.extend_from_slice(&vote_hash);
+        let expected: Hash = *blake3::hash(&expected_bytes).as_bytes();
+
+        let actual = GovernanceDecisionReceipt::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            tally,
+            &votes,
+        )
+        .decision_hash;
+
+        assert_eq!(
+            actual, expected,
+            "v1 canonical encoding must remain byte-stable after v2 introduction"
+        );
+    }
+
+    #[test]
+    fn decision_v2_hash_binds_capability_scope_presented() {
+        let votes = make_votes();
+        let tally = make_tally(&votes);
+        let r_charter = GovernanceDecisionReceiptV2::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            tally.clone(),
+            &votes,
+            "governance:charter:write".to_string(),
+            sample_no_mandate_attestation(),
+        )
+        .unwrap();
+        let r_proposal = GovernanceDecisionReceiptV2::new(
+            "prop-1".to_string(),
+            "coop:test".to_string(),
+            ProofOutcome::Accepted,
+            tally,
+            &votes,
+            "governance:proposal:write".to_string(),
+            sample_no_mandate_attestation(),
+        )
+        .unwrap();
+        assert_ne!(
+            r_charter.decision_hash, r_proposal.decision_hash,
+            "different capability scopes must hash differently"
+        );
+    }
+
+    #[test]
+    fn decision_v2_hash_binds_attestation_kind() {
+        // Same base + scope, different attestation variant → different
+        // hashes. Proves the variant ordinal participates.
+        let no_mandate = sample_v2_receipt(sample_no_mandate_attestation());
+        let with_grant = sample_v2_receipt(sample_grant_attestation());
+        assert_ne!(
+            no_mandate.decision_hash, with_grant.decision_hash,
+            "NoMandateRequired vs Grant must produce distinct hashes"
+        );
+    }
+
+    #[test]
+    fn decision_v2_hash_binds_no_mandate_reason() {
+        let r_membership = sample_v2_receipt(ReceiptMandateAttestation::NoMandateRequired {
+            reason: NoMandateReason::MembershipStandingOnly,
+        });
+        let r_bootstrap = sample_v2_receipt(ReceiptMandateAttestation::NoMandateRequired {
+            reason: NoMandateReason::Bootstrap,
+        });
+        assert_ne!(
+            r_membership.decision_hash, r_bootstrap.decision_hash,
+            "distinct NoMandateReason variants must hash differently"
+        );
+    }
+
+    #[test]
+    fn decision_v2_hash_binds_grant_ref() {
+        // Mutating any field of the embedded MandateGrantRef changes
+        // the receipt hash via ref_hash propagation. Exercise the
+        // target identifier as a representative field.
+        let r_coop_a = sample_v2_receipt(ReceiptMandateAttestation::Grant {
+            grant_ref: sample_ref(MandateGrantRefTarget::Domain {
+                domain_id: "coop-a".to_string(),
+            }),
+        });
+        let r_coop_b = sample_v2_receipt(ReceiptMandateAttestation::Grant {
+            grant_ref: sample_ref(MandateGrantRefTarget::Domain {
+                domain_id: "coop-b".to_string(),
+            }),
+        });
+        assert_ne!(
+            r_coop_a.decision_hash, r_coop_b.decision_hash,
+            "different grant_ref content must propagate into receipt hash"
+        );
+    }
+
+    #[test]
+    fn decision_v2_constructor_rejects_empty_capability_scope() {
+        let votes = make_votes();
+        let tally = make_tally(&votes);
+        for bad in ["", "   ", "\t\n"] {
+            let err = GovernanceDecisionReceiptV2::new(
+                "prop-1".to_string(),
+                "coop:test".to_string(),
+                ProofOutcome::Accepted,
+                tally.clone(),
+                &votes,
+                bad.to_string(),
+                sample_no_mandate_attestation(),
+            )
+            .unwrap_err();
+            assert_eq!(
+                err,
+                GovernanceDecisionReceiptV2Error::EmptyCapabilityScope,
+                "input {bad:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn decision_v2_deserialize_rejects_empty_capability_scope() {
+        // Wire boundary symmetric with the constructor. A payload with
+        // an empty `capability_scope_presented` must fail at the serde
+        // path, not silently round-trip.
+        let valid = sample_v2_receipt(sample_no_mandate_attestation());
+        let mut value: serde_json::Value =
+            serde_json::to_value(&valid).expect("serialize valid v2 receipt");
+        value["capability_scope_presented"] = serde_json::Value::String(String::new());
+        let err = serde_json::from_value::<GovernanceDecisionReceiptV2>(value).unwrap_err();
+        assert!(
+            err.to_string().contains("capability_scope_presented"),
+            "expected EmptyCapabilityScope surfaced through serde, got: {err}"
+        );
+    }
+
+    #[test]
+    fn decision_v2_serde_roundtrip_preserves_hash() {
+        for att in [sample_no_mandate_attestation(), sample_grant_attestation()] {
+            let original = sample_v2_receipt(att.clone());
+            let json = serde_json::to_string(&original).expect("serialize");
+            let recovered: GovernanceDecisionReceiptV2 =
+                serde_json::from_str(&json).expect("deserialize");
+            assert_eq!(
+                original.decision_hash, recovered.decision_hash,
+                "round-trip must preserve decision_hash for attestation {att:?}"
+            );
+            assert!(
+                recovered.verify(),
+                "round-tripped v2 receipt must verify; attestation {att:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn decision_v2_attestation_serde_uses_snake_case_tags() {
+        let no_mandate = sample_v2_receipt(sample_no_mandate_attestation());
+        let json = serde_json::to_string(&no_mandate).expect("serialize");
+        assert!(
+            json.contains("\"kind\":\"no_mandate_required\""),
+            "expected snake_case attestation tag in JSON: {json}"
+        );
+        assert!(
+            json.contains("\"reason\":\"membership_standing_only\""),
+            "expected snake_case reason in JSON: {json}"
+        );
+
+        let bootstrap = sample_v2_receipt(ReceiptMandateAttestation::NoMandateRequired {
+            reason: NoMandateReason::Bootstrap,
+        });
+        let json = serde_json::to_string(&bootstrap).expect("serialize");
+        assert!(
+            json.contains("\"reason\":\"bootstrap\""),
+            "expected bootstrap reason in JSON: {json}"
+        );
+
+        let grant = sample_v2_receipt(sample_grant_attestation());
+        let json = serde_json::to_string(&grant).expect("serialize");
+        assert!(
+            json.contains("\"kind\":\"grant\""),
+            "expected grant tag in JSON: {json}"
+        );
+    }
+
+    #[test]
+    fn decision_v2_no_regulated_finance_vocabulary() {
+        // Mirror the receipt-family vocabulary discipline: the v2
+        // decision receipt is an institutional-authority record, not
+        // an economic one. Its serialized form must not echo
+        // regulated-finance terms.
+        for att in [sample_no_mandate_attestation(), sample_grant_attestation()] {
+            let r = sample_v2_receipt(att);
+            let json = serde_json::to_string(&r).expect("serialize");
+            let lower = json.to_lowercase();
+            for forbidden in [
+                "wallet", "balance", "currency", "payment", "token", "withdraw", "deposit",
+            ] {
+                assert!(
+                    !lower.contains(forbidden),
+                    "GovernanceDecisionReceiptV2 JSON must not contain \
+                     regulated-finance vocabulary; found `{forbidden}` in: {json}"
+                );
+            }
+        }
     }
 
     #[test]
