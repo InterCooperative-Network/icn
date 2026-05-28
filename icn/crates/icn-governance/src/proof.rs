@@ -1776,11 +1776,12 @@ mod tests {
     // ============================================================================
 
     fn fixed_mandate_id(byte: u8) -> MandateId {
-        // Build a deterministic UUID v4 from a 16-byte seed so canonical
+        // Build a deterministic UUID from a 16-byte seed so canonical
         // hash assertions are stable across runs. `uuid::Uuid::from_bytes`
-        // accepts any 16-byte sequence; the result is not RFC-4122
-        // versioned, which is fine — the canonical hash binds the raw
-        // bytes, not the version field.
+        // accepts any 16-byte sequence and does not set RFC-4122
+        // version/variant bits, so the result is not a v4 UUID — that is
+        // fine here because the canonical hash binds the raw bytes, not
+        // the version field.
         MandateId(uuid::Uuid::from_bytes([byte; 16]))
     }
 
