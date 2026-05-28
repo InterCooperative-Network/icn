@@ -35,6 +35,7 @@ pub mod http;
 pub mod init;
 pub mod institutional_effect;
 pub mod manager;
+pub mod mandate_gate;
 pub mod receipt_backend;
 pub mod registry;
 pub mod state_store;
