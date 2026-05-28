@@ -41,13 +41,43 @@
 //! the gate; the handler keeps its existing composed suspension check. The
 //! [`MandateRejection::Suspended`] variant exists so the eventual HTTP
 //! surface can render that reason when the handler's own check fires.
+//!
+//! This is a **deliberate divergence** from
+//! `docs/design/governance/mandate-gate-design.md` §6 step 8, which
+//! contemplates the gate "consulting the existing suspension_checker as an
+//! adjacent fail-closed condition." Because that checker is async and the
+//! gate is synchronous (per §4 of the same design and the repo's
+//! `PolicyOracle::evaluate` convention), suspension stays handler-composed
+//! beside the gate, not folded into it. The design's intent (separate,
+//! composable checks — never a god-auth function) is preserved.
+//!
+//! # Act-binding model (deliberately strict and coarse)
+//!
+//! `TypedScope` has no per-act target field; `Mandate` carries no
+//! `(domain, act, target)` binding. To avoid silently letting one grant
+//! authorize an unrelated act, the gate enforces a small static convention
+//! (see [`expected_act_tokens`] / [`expected_class`]):
+//!
+//! - Class must match the act's natural [`AuthorityClass`] (ADR-0014
+//!   non-conflation): `CastVote` is `Representation`; every other current
+//!   variant is `Execution`.
+//! - The grant must explicitly bind the domain (`scope.domain == Some(req.domain)`;
+//!   `None` is not treated as wildcard authorization).
+//! - The grant must carry an act token in `scope.action_kind` **or** the
+//!   broader class token in `scope.proposal_class`. A grant with neither
+//!   populated cannot prove an act binding and is rejected
+//!   ([`MandateRejection::WrongTarget`]).
+//!
+//! This is intentionally strict for step 6: until grant minting expands
+//! and/or `TypedScope` grows a precise binding surface, the gate fails
+//! closed rather than encode a permissive default.
 
 use std::sync::Arc;
 
 use icn_governance::proof::Hash;
 use icn_governance::{
-    AuthorityGrant, GovernanceDomainId, Grantee, Mandate, MandateId, MandateStatus, ProposalId,
-    StructureId, Timestamp,
+    AuthorityClass, AuthorityGrant, GovernanceDomainId, Grantee, Mandate, MandateId, MandateStatus,
+    ProposalId, StructureId, Timestamp, TypedScope,
 };
 use icn_identity::Did;
 
@@ -224,6 +254,80 @@ fn status_rejection(status: MandateStatus) -> Option<MandateRejection> {
     }
 }
 
+/// Natural [`AuthorityClass`] for a [`MandateAct`] (ADR-0014 non-conflation).
+///
+/// `CastVote` is `Representation`; every other current variant is `Execution`.
+/// `Attestation` is reserved for downstream signed-statement issuance and
+/// never authorizes acts gated here.
+fn expected_class(act: &MandateAct) -> AuthorityClass {
+    match act {
+        MandateAct::CastVote => AuthorityClass::Representation,
+        MandateAct::ActivateCharter
+        | MandateAct::AddDomainMember
+        | MandateAct::RemoveDomainMember
+        | MandateAct::CloseProposal
+        | MandateAct::AppointSteward
+        | MandateAct::RemoveSteward
+        | MandateAct::JoinFederation
+        | MandateAct::LeaveFederation => AuthorityClass::Execution,
+    }
+}
+
+/// Static convention mapping a [`MandateAct`] to the scope tokens a grant must
+/// carry to prove it authorizes the act.
+///
+/// Returns `(action_kind_token, proposal_class_token)`. A grant authorizes the
+/// act if `scope.action_kind` contains the precise action token **or**
+/// `scope.proposal_class` contains the coarser class token. Lifecycle acts
+/// (`CloseProposal`, `CastVote`) have no proposal-class token — they bind only
+/// via the precise `action_kind` entry.
+///
+/// These tokens are private to the gate's act-binding layer; they encode the
+/// step-6 minimum-binding convention and are not part of any persisted
+/// schema.
+fn expected_act_tokens(act: &MandateAct) -> (Option<&'static str>, Option<&'static str>) {
+    match act {
+        MandateAct::ActivateCharter => (Some("charter:activate"), Some("Charter")),
+        MandateAct::AddDomainMember => (Some("membership:add"), Some("Membership")),
+        MandateAct::RemoveDomainMember => (Some("membership:remove"), Some("Membership")),
+        MandateAct::CloseProposal => (Some("proposal:close"), None),
+        MandateAct::CastVote => (Some("proposal:vote"), None),
+        MandateAct::AppointSteward => (Some("sdis:appoint_steward"), Some("Sdis")),
+        MandateAct::RemoveSteward => (Some("sdis:remove_steward"), Some("Sdis")),
+        MandateAct::JoinFederation => (Some("federation:join"), Some("Federation")),
+        MandateAct::LeaveFederation => (Some("federation:leave"), Some("Federation")),
+    }
+}
+
+/// True if `scope` carries an act-binding token for `act` via either the
+/// precise `action_kind` entry or the broader `proposal_class` entry. A scope
+/// with neither populated cannot prove an act binding.
+fn scope_binds_act(scope: &TypedScope, act: &MandateAct) -> bool {
+    let (action_token, class_token) = expected_act_tokens(act);
+    let action_match = action_token
+        .map(|tok| scope.action_kind.iter().any(|s| s == tok))
+        .unwrap_or(false);
+    let class_match = class_token
+        .map(|tok| scope.proposal_class.iter().any(|s| s == tok))
+        .unwrap_or(false);
+    action_match || class_match
+}
+
+/// True if `grant` explicitly authorizes `req`: correct class
+/// (ADR-0014 non-conflation), domain explicitly bound, and at least one act
+/// binding token present. A `None` domain is **not** treated as wildcard —
+/// the gate fails closed unless the grant proves the binding.
+fn grant_authorizes_request(grant: &AuthorityGrant, req: &MandateRequest) -> bool {
+    if grant.class != expected_class(&req.act) {
+        return false;
+    }
+    let domain_matches = matches!(&grant.scope.domain, Some(d) if d == &req.domain);
+    if !domain_matches {
+        return false;
+    }
+    scope_binds_act(&grant.scope, &req.act)
+}
+
 /// The app-side, act-time authority gate.
 ///
 /// Synchronous by design: the backend is synchronous, and this mirrors the
@@ -285,29 +389,42 @@ impl DefaultMandateGate {
         Ok(())
     }
 
-    /// Load the [`AuthorityGrant`]s a mandate references. Grants that cannot be
-    /// retrieved are skipped; a backend read error propagates.
+    /// Load the [`AuthorityGrant`]s a mandate references.
+    ///
+    /// A mandate referencing a grant id the backend cannot retrieve is
+    /// **index/integrity skew**, not "grant absent": silently dropping such a
+    /// reference would let the resolver fall through to a misleading verdict
+    /// (e.g. `WrongActor` because the actor's grant is "missing") and hide an
+    /// infrastructure integrity failure. Fail closed via
+    /// [`MandateGateError::Backend`] so the operator sees the skew.
     fn load_grants(&self, mandate: &Mandate) -> Result<Vec<AuthorityGrant>, MandateGateError> {
         let mut out = Vec::with_capacity(mandate.grants.len());
         for grant_id in &mandate.grants {
-            if let Some(grant) = self
+            match self
                 .backend
                 .get_authority_grant(grant_id)
                 .map_err(MandateGateError::Backend)?
             {
-                out.push(grant);
+                Some(grant) => out.push(grant),
+                None => {
+                    return Err(MandateGateError::Backend(format!(
+                        "mandate_grant_index_skew: mandate {} references grant {} \
+                         not retrievable from backend",
+                        mandate.id, grant_id
+                    )));
+                }
             }
         }
         Ok(out)
     }
 
     /// Proposal target: locate via the existing by-proposal index, then run the
-    /// full spine (lifecycle → actor-is-grantee → matched-grant validity).
+    /// full spine (lifecycle → actor-is-grantee → binding/class match →
+    /// time validity).
     fn resolve_proposal(
         &self,
         proposal: &ProposalId,
-        actor: &Did,
-        at: Timestamp,
+        req: &MandateRequest,
     ) -> Result<Mandate, MandateGateError> {
         let mandate = self
             .backend
@@ -315,7 +432,7 @@ impl DefaultMandateGate {
             .map_err(MandateGateError::Backend)?
             .ok_or_else(|| rejected(MandateRejection::NoMandate))?;
 
-        self.validate_mandate_lifecycle(&mandate, at)?;
+        self.validate_mandate_lifecycle(&mandate, req.at)?;
 
         // Authorization is grant-grantee-only: DecisionProvenance never
         // authorizes an actor, so a grantee match on an attached grant is
@@ -323,12 +440,26 @@ impl DefaultMandateGate {
         let grants = self.load_grants(&mandate)?;
         let actor_grants: Vec<&AuthorityGrant> = grants
             .iter()
-            .filter(|g| matches!(&g.grantee, Grantee::Person(p) if p == actor))
+            .filter(|g| matches!(&g.grantee, Grantee::Person(p) if p == &req.actor))
             .collect();
         if actor_grants.is_empty() {
             return Err(rejected(MandateRejection::WrongActor));
         }
-        if !actor_grants.iter().any(|g| g.is_active_at(at)) {
+
+        // Binding/class match (ADR-0014 non-conflation): an actor grant must
+        // actually authorize this specific act on this domain, not merely be
+        // attached to the mandate. A grant for a different act, wrong class,
+        // or unbound domain fails closed.
+        let authorizing: Vec<&AuthorityGrant> = actor_grants
+            .iter()
+            .copied()
+            .filter(|g| grant_authorizes_request(g, req))
+            .collect();
+        if authorizing.is_empty() {
+            return Err(rejected(MandateRejection::WrongTarget));
+        }
+
+        if !authorizing.iter().any(|g| g.is_active_at(req.at)) {
             return Err(rejected(MandateRejection::Expired));
         }
         Ok(mandate)
@@ -340,31 +471,27 @@ impl DefaultMandateGate {
     /// instead, then recover the authorizing mandate from the matched grant's
     /// provenance. This needs no new index and inherently enforces the
     /// grant-grantee actor binding.
-    fn resolve_domain(
-        &self,
-        domain: &GovernanceDomainId,
-        actor: &Did,
-        at: Timestamp,
-    ) -> Result<Mandate, MandateGateError> {
+    ///
+    /// Selection requires the grant to **prove** it authorizes the requested
+    /// act (correct class, explicit domain, act token in scope) via
+    /// [`grant_authorizes_request`] — a `None`-domain grant or a wrong-act/
+    /// wrong-class grant is not accepted as wildcard authority.
+    fn resolve_domain(&self, req: &MandateRequest) -> Result<Mandate, MandateGateError> {
         let active = self
             .backend
-            .list_active_authority_grants_by_grantee(&Grantee::Person(actor.clone()), at)
+            .list_active_authority_grants_by_grantee(&Grantee::Person(req.actor.clone()), req.at)
             .map_err(MandateGateError::Backend)?;
         if active.is_empty() {
             return Err(rejected(MandateRejection::NoMandate));
         }
 
-        // A grant binds a domain via `scope.domain`; `None` means unbounded on
-        // the domain axis. The actor holds authority, but if none of it covers
-        // this domain the target does not match.
-        let in_domain: Vec<&AuthorityGrant> = active
+        // Strict binding: domain + act + class must be explicitly proven by
+        // the grant. ADR-0014 non-conflation lives here.
+        let authorizing: Vec<&AuthorityGrant> = active
             .iter()
-            .filter(|g| match &g.scope.domain {
-                Some(d) => d == domain,
-                None => true,
-            })
+            .filter(|g| grant_authorizes_request(g, req))
             .collect();
-        if in_domain.is_empty() {
+        if authorizing.is_empty() {
             return Err(rejected(MandateRejection::WrongTarget));
         }
 
@@ -372,7 +499,7 @@ impl DefaultMandateGate {
         // A charter-direct grant (`granted_by: None`) has no mandate to
         // validate; skip it. If no matching grant yields a mandate, there is no
         // mandate to authorize this act.
-        for grant in in_domain {
+        for grant in authorizing {
             let Some(provenance) = &grant.granted_by else {
                 continue;
             };
@@ -382,9 +509,10 @@ impl DefaultMandateGate {
                 .map_err(MandateGateError::Backend)?;
             if let Some(mandate) = mandates.into_iter().find(|m| m.grants.contains(&grant.id)) {
                 // The grant came from `list_active_*` for this grantee, so
-                // actor-is-grantee and grant-time-validity already hold; only
-                // the mandate lifecycle remains.
-                self.validate_mandate_lifecycle(&mandate, at)?;
+                // actor-is-grantee and grant-time-validity already hold; the
+                // binding/class match was just enforced; only the mandate
+                // lifecycle remains.
+                self.validate_mandate_lifecycle(&mandate, req.at)?;
                 return Ok(mandate);
             }
         }
@@ -395,15 +523,13 @@ impl DefaultMandateGate {
 impl MandateGate for DefaultMandateGate {
     fn require(&self, req: &MandateRequest) -> Result<MandateGrant, MandateGateError> {
         let mandate = match &req.target {
-            MandateTarget::Proposal(proposal) => {
-                self.resolve_proposal(proposal, &req.actor, req.at)?
-            }
+            MandateTarget::Proposal(proposal) => self.resolve_proposal(proposal, req)?,
             MandateTarget::Domain(domain) => {
                 // The target domain must be the request domain.
                 if domain != &req.domain {
                     return Err(rejected(MandateRejection::WrongTarget));
                 }
-                self.resolve_domain(domain, &req.actor, req.at)?
+                self.resolve_domain(req)?
             }
             // `TypedScope` carries no federation or role/structure binding, so
             // these targets cannot be matched to a grant yet. Fail closed
@@ -552,7 +678,9 @@ mod tests {
         }
     }
 
-    /// Build a domain-scoped grant for `grantee`, bound to `decision`.
+    /// Build a domain-only grant for `grantee`, bound to `decision`. Has
+    /// **no** act/class binding tokens populated — used by fail-closed tests
+    /// that prove the gate rejects unbound or misclassified grants.
     fn grant(
         grantee: Did,
         dom: &GovernanceDomainId,
@@ -567,6 +695,36 @@ mod tests {
             grantee: Grantee::Person(grantee),
             scope: TypedScope {
                 domain: Some(dom.clone()),
+                ..TypedScope::default()
+            },
+            granted_by: Some(decision.clone()),
+            valid_from,
+            valid_until,
+            revoked_at: None,
+        }
+    }
+
+    /// Build a grant that **explicitly** authorizes `act` for `grantee` in
+    /// `dom`: correct `AuthorityClass` and the precise `action_kind` token.
+    /// Used by success tests so the act-binding spine has something to match.
+    fn bound_grant(
+        grantee: Did,
+        dom: &GovernanceDomainId,
+        act: MandateAct,
+        decision: &DecisionProvenance,
+        valid_from: Timestamp,
+        valid_until: Option<Timestamp>,
+    ) -> AuthorityGrant {
+        let (action_token, _class_token) = expected_act_tokens(&act);
+        let action_kind: Vec<String> = action_token.into_iter().map(str::to_string).collect();
+        AuthorityGrant {
+            id: AuthorityGrantId::new(),
+            class: expected_class(&act),
+            grantor: GrantorEntityId(dom.0.clone()),
+            grantee: Grantee::Person(grantee),
+            scope: TypedScope {
+                domain: Some(dom.clone()),
+                action_kind,
                 ..TypedScope::default()
             },
             granted_by: Some(decision.clone()),
@@ -598,7 +756,16 @@ mod tests {
         let dom = domain("coop-a");
         let actor = did(1);
         let prov = decision("prop-1", 7);
-        let g = grant(actor.clone(), &dom, &prov, 100, Some(1000));
+        // Grant must explicitly bind the act (CloseProposal) for the spine to
+        // accept it — an unbound or wrong-act grant fails closed.
+        let g = bound_grant(
+            actor.clone(),
+            &dom,
+            MandateAct::CloseProposal,
+            &prov,
+            100,
+            Some(1000),
+        );
         let mandate =
             Mandate::new(prov.clone(), [9u8; 32], vec![g.id.clone()], None, None, 100).unwrap();
 
@@ -714,12 +881,19 @@ mod tests {
 
     #[test]
     fn grant_outside_validity_window_rejects_expired() {
-        // Mandate is live with no deadline, but the actor's grant window
-        // excludes the act time.
+        // Mandate is live with no deadline; the actor's grant is properly
+        // bound for the act but its time window excludes the request time.
         let dom = domain("coop-a");
         let actor = did(1);
         let prov = decision("prop-1", 7);
-        let g = grant(actor.clone(), &dom, &prov, 100, Some(200));
+        let g = bound_grant(
+            actor.clone(),
+            &dom,
+            MandateAct::CloseProposal,
+            &prov,
+            100,
+            Some(200),
+        );
         let mandate = Mandate::new(prov, [9u8; 32], vec![g.id.clone()], None, None, 100).unwrap();
 
         let gate = FixtureBackend::new(vec![mandate], vec![g]).gate();
@@ -732,11 +906,19 @@ mod tests {
     #[test]
     fn actor_first_domain_lookup_returns_grant() {
         // A Domain target resolves via the grantee's active grants (not only
-        // Proposal targets), recovering the bound mandate.
+        // Proposal targets), recovering the bound mandate. The grant must
+        // explicitly bind both domain and the act (AddDomainMember).
         let dom = domain("coop-a");
         let actor = did(1);
         let prov = decision("prop-1", 7);
-        let g = grant(actor.clone(), &dom, &prov, 0, Some(1000));
+        let g = bound_grant(
+            actor.clone(),
+            &dom,
+            MandateAct::AddDomainMember,
+            &prov,
+            0,
+            Some(1000),
+        );
         let mandate =
             Mandate::new(prov.clone(), [9u8; 32], vec![g.id.clone()], None, None, 100).unwrap();
 
@@ -850,6 +1032,109 @@ mod tests {
         };
         let err = backend.gate().require(&req).unwrap_err();
         assert!(matches!(err, MandateGateError::Backend(_)), "got {err:?}");
+    }
+
+    #[test]
+    fn grant_bound_for_one_act_does_not_authorize_a_different_act() {
+        // ADR-0014 non-conflation: a grant bound for AppointSteward must not
+        // silently authorize CloseProposal even when actor/domain/class align.
+        // Both acts are Execution-class; the discriminator is the act token
+        // in `scope.action_kind`.
+        let dom = domain("coop-a");
+        let actor = did(1);
+        let prov = decision("prop-1", 7);
+        let g = bound_grant(
+            actor.clone(),
+            &dom,
+            MandateAct::AppointSteward,
+            &prov,
+            0,
+            Some(1000),
+        );
+        let mandate = Mandate::new(prov, [9u8; 32], vec![g.id.clone()], None, None, 100).unwrap();
+
+        let gate = FixtureBackend::new(vec![mandate], vec![g]).gate();
+        let err = gate
+            .require(&proposal_request(actor, dom, "prop-1", 500))
+            .unwrap_err();
+        assert_eq!(err, rejected(MandateRejection::WrongTarget));
+    }
+
+    #[test]
+    fn unbound_grant_on_proposal_target_rejects_wrong_target() {
+        // A domain-only grant with empty `action_kind` and `proposal_class`
+        // cannot prove an act binding and must fail closed — never silently
+        // authorize on actor+domain alone.
+        let dom = domain("coop-a");
+        let actor = did(1);
+        let prov = decision("prop-1", 7);
+        let g = grant(actor.clone(), &dom, &prov, 0, Some(1000));
+        let mandate = Mandate::new(prov, [9u8; 32], vec![g.id.clone()], None, None, 100).unwrap();
+
+        let gate = FixtureBackend::new(vec![mandate], vec![g]).gate();
+        let err = gate
+            .require(&proposal_request(actor, dom, "prop-1", 500))
+            .unwrap_err();
+        assert_eq!(err, rejected(MandateRejection::WrongTarget));
+    }
+
+    #[test]
+    fn wrong_class_grant_rejects_wrong_target() {
+        // ADR-0014: classes are non-conflatable. An Attestation grant with the
+        // correct domain + action token must NOT authorize an Execution act.
+        let dom = domain("coop-a");
+        let actor = did(1);
+        let prov = decision("prop-1", 7);
+        let g = AuthorityGrant {
+            id: AuthorityGrantId::new(),
+            class: AuthorityClass::Attestation, // CloseProposal demands Execution
+            grantor: GrantorEntityId(dom.0.clone()),
+            grantee: Grantee::Person(actor.clone()),
+            scope: TypedScope {
+                domain: Some(dom.clone()),
+                action_kind: vec!["proposal:close".to_string()],
+                ..TypedScope::default()
+            },
+            granted_by: Some(prov.clone()),
+            valid_from: 0,
+            valid_until: Some(1000),
+            revoked_at: None,
+        };
+        let mandate = Mandate::new(prov, [9u8; 32], vec![g.id.clone()], None, None, 100).unwrap();
+
+        let gate = FixtureBackend::new(vec![mandate], vec![g]).gate();
+        let err = gate
+            .require(&proposal_request(actor, dom, "prop-1", 500))
+            .unwrap_err();
+        assert_eq!(err, rejected(MandateRejection::WrongTarget));
+    }
+
+    #[test]
+    fn missing_referenced_grant_surfaces_backend_integrity() {
+        // A mandate referencing a grant id the backend cannot retrieve is
+        // index/integrity skew, not "grant absent." Silently dropping the
+        // reference would fall through to a misleading WrongActor; instead
+        // fail closed as Backend so the operator sees the skew.
+        let dom = domain("coop-a");
+        let actor = did(1);
+        let prov = decision("prop-1", 7);
+        let orphan_id = AuthorityGrantId::new();
+        let mandate = Mandate::new(prov, [9u8; 32], vec![orphan_id], None, None, 100).unwrap();
+
+        // Backend has NO grants — the mandate references an id that won't load.
+        let gate = FixtureBackend::new(vec![mandate], vec![]).gate();
+        let err = gate
+            .require(&proposal_request(actor, dom, "prop-1", 500))
+            .unwrap_err();
+        match err {
+            MandateGateError::Backend(msg) => {
+                assert!(
+                    msg.contains("mandate_grant_index_skew"),
+                    "expected integrity-skew Backend error, got: {msg}"
+                );
+            }
+            other => panic!("expected Backend integrity error, got {other:?}"),
+        }
     }
 
     #[test]
