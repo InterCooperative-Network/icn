@@ -1416,6 +1416,7 @@ impl GatewayServer {
             // Daemon mode: SDIS execution goes through the actor event system
             // (KernelGovernanceExecutor → SdisServiceImpl). HTTP path leaves this None.
             sdis_service: None,
+            mandate_gate: None,
             // Deployment posture for the governance HTTP context.
             //
             // Resolved from the `ICN_GOVERNANCE_BUILD_MODE` environment variable

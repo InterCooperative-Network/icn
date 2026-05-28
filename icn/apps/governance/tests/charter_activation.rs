@@ -88,6 +88,7 @@ fn make_ctx_with_capture() -> (GovernanceContext<NoopEventEmitter>, CapturedHook
         suspension_checker: None,
         membership_resolver: None,
         sdis_service: None,
+        mandate_gate: None,
         build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 
@@ -456,6 +457,7 @@ async fn activate_charter_returns_500_when_charter_hook_not_wired() {
         suspension_checker: None,
         membership_resolver: None,
         sdis_service: None,
+        mandate_gate: None,
         build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
     let app = charter_test_app!(ctx, Some("governance:write"));
@@ -499,6 +501,7 @@ async fn activate_charter_returns_500_when_proposal_hook_not_wired() {
         suspension_checker: None,
         membership_resolver: None,
         sdis_service: None,
+        mandate_gate: None,
         build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
     let app = charter_test_app!(ctx, Some("governance:write"));

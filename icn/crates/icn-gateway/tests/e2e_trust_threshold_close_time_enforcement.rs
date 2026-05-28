@@ -180,6 +180,7 @@ async fn build_app_with_trust_resolver(
         // Live production resolver — NOT a TrackingResolver mock
         membership_resolver: Some(resolver),
         sdis_service: None,
+        mandate_gate: None,
         build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 
