@@ -137,7 +137,8 @@ pub use message::{GovernanceMessage, ProposalOutcome, TallySnapshot};
 pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, GovernanceRule};
 pub use proof::{
     ActionItemCompletionReceipt, ActionItemTransition, GovernanceDecisionAttestation,
-    GovernanceDecisionReceipt, GovernanceProof, GovernanceProofV2, MeetingAttendanceReceipt,
+    GovernanceDecisionReceipt, GovernanceProof, GovernanceProofV2, MandateGrantRef,
+    MandateGrantRefError, MandateGrantRefTarget, MeetingAttendanceReceipt,
     MeetingAttendanceTransition, ProcessGateKind, ProcessGateResult, ProcessGateResultReceipt,
     ProofOutcome,
 };
