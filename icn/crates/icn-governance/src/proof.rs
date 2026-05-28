@@ -977,6 +977,7 @@ pub enum MandateGrantRefError {
 /// other way (the meaning firewall stays intact — kernel crates still
 /// see nothing of `MandateAct`/`MandateTarget`).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(try_from = "MandateGrantRefRaw")]
 pub struct MandateGrantRef {
     /// The authorizing mandate's identifier.
     pub mandate_id: MandateId,
@@ -994,6 +995,39 @@ pub struct MandateGrantRef {
     /// Unix-seconds the gate granted the act. Aligned with the mandate's
     /// own `Timestamp` (seconds) convention.
     pub granted_at: u64,
+}
+
+/// Raw deserialization shadow for [`MandateGrantRef`].
+///
+/// `MandateGrantRef` is a wire/persisted primitive, so `Deserialize` is
+/// an input boundary that must apply the same checks as the public
+/// constructor. Deriving `Deserialize` directly on `MandateGrantRef`
+/// would bypass [`MandateGrantRef::new`] and let an empty `act` or a
+/// whitespace-only target component round-trip silently. Routing
+/// deserialization through this shadow + `try_from` keeps the wire
+/// surface symmetric with the constructor — invalid wire data fails
+/// closed at the deserialization boundary.
+#[derive(Deserialize)]
+struct MandateGrantRefRaw {
+    mandate_id: MandateId,
+    decision_hash: Hash,
+    act: String,
+    target: MandateGrantRefTarget,
+    granted_at: u64,
+}
+
+impl TryFrom<MandateGrantRefRaw> for MandateGrantRef {
+    type Error = MandateGrantRefError;
+
+    fn try_from(raw: MandateGrantRefRaw) -> Result<Self, Self::Error> {
+        Self::new(
+            raw.mandate_id,
+            raw.decision_hash,
+            raw.act,
+            raw.target,
+            raw.granted_at,
+        )
+    }
 }
 
 impl MandateGrantRef {
@@ -2042,6 +2076,61 @@ mod tests {
                 "target {target:?}"
             );
         }
+    }
+
+    #[test]
+    fn mandate_grant_ref_deserialize_rejects_empty_act() {
+        // Wire-time validation must be symmetric with the constructor:
+        // deserializing a payload the constructor would reject must
+        // also fail, otherwise peers / persisted receipts could carry
+        // malformed mandate refs and still compute a hash over them.
+        let valid = sample_ref(MandateGrantRefTarget::Domain {
+            domain_id: "coop-a".to_string(),
+        });
+        let mut value: serde_json::Value =
+            serde_json::to_value(&valid).expect("serialize valid ref");
+        value["act"] = serde_json::Value::String(String::new());
+        let err = serde_json::from_value::<MandateGrantRef>(value).unwrap_err();
+        assert!(
+            err.to_string().contains("act must be a non-empty"),
+            "expected EmptyAct surfaced through serde, got: {err}"
+        );
+    }
+
+    #[test]
+    fn mandate_grant_ref_deserialize_rejects_whitespace_target_component() {
+        // Same boundary discipline for the structured target's per-
+        // component fields.
+        let valid = sample_ref(MandateGrantRefTarget::Domain {
+            domain_id: "coop-a".to_string(),
+        });
+        let mut value: serde_json::Value =
+            serde_json::to_value(&valid).expect("serialize valid ref");
+        value["target"]["domain_id"] = serde_json::Value::String("   ".to_string());
+        let err = serde_json::from_value::<MandateGrantRef>(value).unwrap_err();
+        assert!(
+            err.to_string().contains("`domain_id`"),
+            "expected EmptyTargetField(domain_id) surfaced through serde, got: {err}"
+        );
+    }
+
+    #[test]
+    fn mandate_grant_ref_deserialize_rejects_empty_role_holder() {
+        // Covers the multi-component Role variant: every component
+        // must individually pass the empty-string check at the wire
+        // boundary, not only at construction.
+        let valid = sample_ref(MandateGrantRefTarget::Role {
+            structure_id: "office-1".to_string(),
+            holder: "did:icn:holder".to_string(),
+        });
+        let mut value: serde_json::Value =
+            serde_json::to_value(&valid).expect("serialize valid ref");
+        value["target"]["holder"] = serde_json::Value::String(String::new());
+        let err = serde_json::from_value::<MandateGrantRef>(value).unwrap_err();
+        assert!(
+            err.to_string().contains("`holder`"),
+            "expected EmptyTargetField(holder) surfaced through serde, got: {err}"
+        );
     }
 
     #[test]
