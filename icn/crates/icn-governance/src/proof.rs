@@ -954,6 +954,14 @@ pub enum MandateGrantRefError {
     /// inner str names the offending field.
     #[error("target field `{0}` must be a non-empty, non-whitespace string")]
     EmptyTargetField(&'static str),
+    /// `Role.holder` was not a parseable `did:icn:` identifier. The wire
+    /// boundary keeps parity with the app-side `MandateTarget::Role.holder`,
+    /// which is an `icn_identity::Did`; a non-DID wire value would slip
+    /// past `EmptyTargetField` and silently hash, so the constructor (and
+    /// `Deserialize` via the same path) rejects it. Inner string is the
+    /// underlying parse error for diagnosis.
+    #[error("target field `holder` must be a parseable did:icn: identifier: {0}")]
+    InvalidHolderDid(String),
 }
 
 /// Receipt-recordable reference to the mandate that authorized an act.
@@ -1080,6 +1088,16 @@ impl MandateGrantRef {
                 }
                 if holder.trim().is_empty() {
                     return Err(MandateGrantRefError::EmptyTargetField("holder"));
+                }
+                // App-side `MandateTarget::Role.holder` is `icn_identity::Did`,
+                // whose deserializer enforces `did:icn:` + Ed25519 multibase.
+                // The wire form is a `String`, so without this check a payload
+                // like `"holder": "not-a-did"` would pass the empty-string gate
+                // and still receive a canonical `ref_hash()`. Run the same
+                // parser at the wire boundary so malformed holders fail closed
+                // here and via `Deserialize`.
+                if let Err(e) = icn_identity::Did::from_str(holder) {
+                    return Err(MandateGrantRefError::InvalidHolderDid(e.to_string()));
                 }
             }
             MandateGrantRefTarget::Federation { federation_id } => {
@@ -1830,6 +1848,16 @@ mod tests {
         .expect("sample ref must construct cleanly")
     }
 
+    /// Deterministic, valid `did:icn:` string for use in `Role.holder`
+    /// fixtures. `Did::from_anchor_id` accepts arbitrary 32-byte input but
+    /// the constructor now parses through `Did::from_str`, which requires
+    /// the decoded bytes to be a valid Ed25519 public key — so fixtures
+    /// must derive the DID from a real signing key.
+    fn fixture_holder_did(seed: u8) -> String {
+        let sk = ed25519_dalek::SigningKey::from_bytes(&[seed; 32]);
+        icn_identity::Did::from_public_key(&sk.verifying_key()).to_string()
+    }
+
     #[test]
     fn mandate_grant_ref_hash_is_deterministic_across_calls() {
         let r = sample_ref(MandateGrantRefTarget::Domain {
@@ -1866,7 +1894,7 @@ mod tests {
         });
         let role = sample_ref(MandateGrantRefTarget::Role {
             structure_id: key.clone(),
-            holder: "holder-1".to_string(),
+            holder: fixture_holder_did(1),
         });
         let mut seen = std::collections::HashSet::new();
         for h in [
@@ -1884,13 +1912,14 @@ mod tests {
         // Holder constant; structure_id varies. Per-component fields
         // must each participate in the canonical hash so a flat-string
         // packing ambiguity cannot recur.
+        let holder = fixture_holder_did(1);
         let a = sample_ref(MandateGrantRefTarget::Role {
             structure_id: "office-1".to_string(),
-            holder: "did:icn:holder".to_string(),
+            holder: holder.clone(),
         });
         let b = sample_ref(MandateGrantRefTarget::Role {
             structure_id: "office-2".to_string(),
-            holder: "did:icn:holder".to_string(),
+            holder,
         });
         assert_ne!(a.ref_hash(), b.ref_hash());
     }
@@ -1900,11 +1929,11 @@ mod tests {
         // structure_id constant; holder varies.
         let a = sample_ref(MandateGrantRefTarget::Role {
             structure_id: "office-1".to_string(),
-            holder: "did:icn:holder-a".to_string(),
+            holder: fixture_holder_did(1),
         });
         let b = sample_ref(MandateGrantRefTarget::Role {
             structure_id: "office-1".to_string(),
-            holder: "did:icn:holder-b".to_string(),
+            holder: fixture_holder_did(2),
         });
         assert_ne!(a.ref_hash(), b.ref_hash());
     }
@@ -2043,7 +2072,7 @@ mod tests {
             (
                 MandateGrantRefTarget::Role {
                     structure_id: "\t".to_string(),
-                    holder: "did:icn:holder".to_string(),
+                    holder: fixture_holder_did(7),
                 },
                 "structure_id",
             ),
@@ -2121,7 +2150,7 @@ mod tests {
         // boundary, not only at construction.
         let valid = sample_ref(MandateGrantRefTarget::Role {
             structure_id: "office-1".to_string(),
-            holder: "did:icn:holder".to_string(),
+            holder: fixture_holder_did(3),
         });
         let mut value: serde_json::Value =
             serde_json::to_value(&valid).expect("serialize valid ref");
@@ -2134,10 +2163,60 @@ mod tests {
     }
 
     #[test]
+    fn mandate_grant_ref_invalid_holder_did_rejected_at_construction() {
+        // App-side `MandateTarget::Role.holder` is `icn_identity::Did`, so a
+        // non-DID wire value would silently hash if the constructor only
+        // checked emptiness. Confirm the constructor rejects garbage holders
+        // and surfaces `InvalidHolderDid`.
+        for bad in [
+            "not-a-did",
+            "icn:foo",       // missing `did:` prefix
+            "did:other:foo", // wrong DID method
+            "did:icn:",      // empty identifier body
+            "did:icn:!!!",   // unparseable multibase
+        ] {
+            let err = MandateGrantRef::new(
+                fixed_mandate_id(0xAA),
+                [0x11; 32],
+                "appoint_steward".to_string(),
+                MandateGrantRefTarget::Role {
+                    structure_id: "office-1".to_string(),
+                    holder: bad.to_string(),
+                },
+                1_700_000_000,
+            )
+            .unwrap_err();
+            match err {
+                MandateGrantRefError::InvalidHolderDid(_) => {}
+                other => panic!("expected InvalidHolderDid for {bad:?}, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn mandate_grant_ref_deserialize_rejects_invalid_holder_did() {
+        // Same boundary discipline through the serde path: a wire payload
+        // with a parseable shape but a non-DID holder must fail closed at
+        // deserialization, not silently produce a `ref_hash()`.
+        let valid = sample_ref(MandateGrantRefTarget::Role {
+            structure_id: "office-1".to_string(),
+            holder: fixture_holder_did(5),
+        });
+        let mut value: serde_json::Value =
+            serde_json::to_value(&valid).expect("serialize valid ref");
+        value["target"]["holder"] = serde_json::Value::String("not-a-did".to_string());
+        let err = serde_json::from_value::<MandateGrantRef>(value).unwrap_err();
+        assert!(
+            err.to_string().contains("did:icn:"),
+            "expected InvalidHolderDid surfaced through serde, got: {err}"
+        );
+    }
+
+    #[test]
     fn mandate_grant_ref_serde_roundtrip_preserves_hash() {
         let r = sample_ref(MandateGrantRefTarget::Role {
             structure_id: "office-1".to_string(),
-            holder: "did:icn:holder".to_string(),
+            holder: fixture_holder_did(9),
         });
         let json = serde_json::to_string(&r).expect("serialize");
         let recovered: MandateGrantRef = serde_json::from_str(&json).expect("deserialize");
