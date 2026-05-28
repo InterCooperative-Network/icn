@@ -226,6 +226,7 @@ async fn build_app_with_proposal(
         suspension_checker: None,
         membership_resolver: None,
         sdis_service: None,
+        mandate_gate: None,
         build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 

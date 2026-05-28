@@ -20,6 +20,7 @@ use tracing::warn;
 
 use crate::events::GovernanceEventEmitter;
 use crate::manager::GovernanceManager;
+use crate::mandate_gate::MandateGate;
 
 use super::handlers;
 
@@ -144,10 +145,11 @@ impl std::fmt::Display for GovernanceContextValidationError {
         write!(
             f,
             "governance context built in {:?} mode is missing required \
-             standing/resolver dependencies: {}. \
+             standing/resolver/authority dependencies: {}. \
              Production deployments must wire MemberStandingChecker, \
-             SuspensionChecker, and a MembershipResolver — unresolved \
-             standing must not be treated as standing in production.",
+             SuspensionChecker, a MembershipResolver, and a MandateGate — \
+             unresolved standing must not be treated as standing, and \
+             capability scope is not a mandate.",
             self.mode,
             self.missing.join(", ")
         )
@@ -402,6 +404,25 @@ pub struct GovernanceContext<E> {
     /// system (`SystemEvent::ProposalAccepted` → `KernelGovernanceExecutor` → `SdisService`).
     /// Setting this in tests provides a synchronous wiring path without an actor runtime.
     pub sdis_service: Option<Arc<dyn icn_kernel_api::SdisService>>,
+    /// Optional app-side, act-time authority resolver.
+    ///
+    /// When wired, governance handlers that perform high/medium-blast
+    /// institutional acts (charter activation, federation lifecycle, steward
+    /// appointment, etc.) will resolve a `MandateGrant` via this gate before
+    /// proceeding. The gate sits beside capability scope checks and member
+    /// standing — never replacing them — preserving the design's
+    /// separate/composable-checks intent (see
+    /// `docs/design/governance/mandate-gate-design.md`).
+    ///
+    /// `None` means no act-time mandate gating. Production deployments must
+    /// wire this; [`Self::validate`] rejects a `Production` context with
+    /// `mandate_gate: None`. Bootstrap/Test contexts may leave it unset and
+    /// receive a startup warning. The field is **not** consumed by any
+    /// handler in this PR — wiring `require()` into handlers is a separate,
+    /// follow-up slice (#1868 step 7) so the act-time semantics can be
+    /// reviewed independently of the startup-guard infrastructure landed
+    /// here.
+    pub mandate_gate: Option<Arc<dyn MandateGate + Send + Sync>>,
     /// Deployment posture for this governance HTTP context.
     ///
     /// Controls how missing optional standing checkers and the membership
@@ -434,6 +455,9 @@ impl<E> GovernanceContext<E> {
         }
         if self.membership_resolver.is_none() {
             missing.push("membership_resolver");
+        }
+        if self.mandate_gate.is_none() {
+            missing.push("mandate_gate");
         }
         missing
     }
@@ -500,6 +524,13 @@ impl<E> GovernanceContext<E> {
                     "governance: membership_resolver is not wired; \
                      TrustThreshold domains will close with excluded_delegators=None \
                      (fail-open — delegations from suspended members may flow)"
+                ),
+                "mandate_gate" => warn!(
+                    "governance: MandateGate is not wired; act-time institutional \
+                     authority will not be checked when handlers begin requiring it. \
+                     Production mode would reject this configuration. \
+                     Capability scope is not a mandate — unresolved mandate \
+                     authority must not be treated as authority in production."
                 ),
                 _ => {}
             }
@@ -829,6 +860,7 @@ mod build_mode_tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            mandate_gate: None,
             build_mode: mode,
         }
     }
@@ -843,6 +875,27 @@ mod build_mode_tests {
 
     fn dummy_resolver() -> Arc<dyn MembershipResolver> {
         Arc::new(icn_governance::StaticMembershipResolver::new())
+    }
+
+    /// A test-only `MandateGate` stub that always rejects every request.
+    /// Used by validate()-passes tests where only `Option::is_some()` matters;
+    /// no test in this module exercises `require()` against this stub.
+    struct DummyMandateGate;
+
+    impl crate::mandate_gate::MandateGate for DummyMandateGate {
+        fn require(
+            &self,
+            _req: &crate::mandate_gate::MandateRequest,
+        ) -> Result<crate::mandate_gate::MandateGrant, crate::mandate_gate::MandateGateError>
+        {
+            Err(crate::mandate_gate::MandateGateError::Rejected(
+                crate::mandate_gate::MandateRejection::NoMandate,
+            ))
+        }
+    }
+
+    fn dummy_mandate_gate() -> Arc<dyn crate::mandate_gate::MandateGate + Send + Sync> {
+        Arc::new(DummyMandateGate)
     }
 
     #[test]
@@ -864,14 +917,18 @@ mod build_mode_tests {
 
     #[test]
     fn missing_production_dependencies_lists_unset_optional_fields() {
-        // Empty context → all three deps missing, in stable order.
+        // Empty context → every required dep missing, in stable order. The
+        // order matches the field-declaration order on `GovernanceContext`
+        // and is part of this method's stable contract — operators reading
+        // a startup error and tooling parsing the message both rely on it.
         let ctx = ctx_with_mode(GovernanceContextBuildMode::Bootstrap);
         assert_eq!(
             ctx.missing_production_dependencies(),
             vec![
                 "member_checker",
                 "suspension_checker",
-                "membership_resolver"
+                "membership_resolver",
+                "mandate_gate",
             ]
         );
     }
@@ -882,7 +939,7 @@ mod build_mode_tests {
         ctx.member_checker = Some(dummy_member_checker());
         assert_eq!(
             ctx.missing_production_dependencies(),
-            vec!["suspension_checker", "membership_resolver"]
+            vec!["suspension_checker", "membership_resolver", "mandate_gate",]
         );
     }
 
@@ -892,6 +949,7 @@ mod build_mode_tests {
         ctx.member_checker = Some(dummy_member_checker());
         ctx.suspension_checker = Some(dummy_suspension_checker());
         ctx.membership_resolver = Some(dummy_resolver());
+        ctx.mandate_gate = Some(dummy_mandate_gate());
         assert!(ctx.missing_production_dependencies().is_empty());
     }
 
@@ -909,7 +967,8 @@ mod build_mode_tests {
             vec![
                 "member_checker",
                 "suspension_checker",
-                "membership_resolver"
+                "membership_resolver",
+                "mandate_gate",
             ]
         );
 
@@ -930,6 +989,10 @@ mod build_mode_tests {
             msg.contains("membership_resolver"),
             "error must name membership_resolver: {msg}"
         );
+        assert!(
+            msg.contains("mandate_gate"),
+            "error must name mandate_gate: {msg}"
+        );
     }
 
     #[test]
@@ -937,6 +1000,7 @@ mod build_mode_tests {
         let mut ctx = ctx_with_mode(GovernanceContextBuildMode::Production);
         ctx.member_checker = Some(dummy_member_checker());
         ctx.suspension_checker = Some(dummy_suspension_checker());
+        ctx.mandate_gate = Some(dummy_mandate_gate());
         // membership_resolver still missing
         let result = ctx.validate();
         let Err(err) = result else {
@@ -953,6 +1017,17 @@ mod build_mode_tests {
             !msg.contains("member_checker,"),
             "must not falsely name wired dep: {msg}"
         );
+        // `err.missing == ["membership_resolver"]` above is already the strong
+        // assertion that `mandate_gate` is not falsely listed. The string-level
+        // check below is a belt-and-suspenders sanity guard: the snake_case
+        // identifier `mandate_gate` can only enter the rendered message via
+        // `missing.join(", ")`, since the doctrine sentence uses the CamelCase
+        // `MandateGate`. So any `mandate_gate` substring is a falsehood
+        // regardless of its position in the list (mid or trailing).
+        assert!(
+            !msg.contains("mandate_gate"),
+            "must not falsely name wired dep: {msg}"
+        );
     }
 
     #[test]
@@ -961,7 +1036,70 @@ mod build_mode_tests {
         ctx.member_checker = Some(dummy_member_checker());
         ctx.suspension_checker = Some(dummy_suspension_checker());
         ctx.membership_resolver = Some(dummy_resolver());
+        ctx.mandate_gate = Some(dummy_mandate_gate());
         assert!(ctx.validate().is_ok());
+    }
+
+    #[test]
+    fn production_without_mandate_gate_rejects() {
+        // All three standing/resolver deps wired; only `mandate_gate` is
+        // missing. Production must fail closed and the missing-list must
+        // name `mandate_gate` alone — proving the new dep is fully
+        // integrated into the production guard (not merely listed).
+        let mut ctx = ctx_with_mode(GovernanceContextBuildMode::Production);
+        ctx.member_checker = Some(dummy_member_checker());
+        ctx.suspension_checker = Some(dummy_suspension_checker());
+        ctx.membership_resolver = Some(dummy_resolver());
+        // mandate_gate intentionally left None
+
+        let Err(err) = ctx.validate() else {
+            panic!("Production without mandate_gate must reject; got Ok");
+        };
+        assert_eq!(err.missing, vec!["mandate_gate"]);
+
+        let msg = err.to_string();
+        assert!(
+            msg.contains("mandate_gate"),
+            "error must name mandate_gate: {msg}"
+        );
+        assert!(
+            msg.contains("MandateGate"),
+            "error message must reference MandateGate by name: {msg}"
+        );
+        assert!(
+            msg.contains("capability scope is not a mandate"),
+            "error message must explain the doctrine — capability is not a mandate: {msg}"
+        );
+    }
+
+    #[test]
+    fn bootstrap_without_mandate_gate_does_not_reject() {
+        // Bootstrap is the legacy/dev posture. Missing mandate_gate emits
+        // a warning but does not fail validation, preserving dev/devnet
+        // behavior.
+        let mut ctx = ctx_with_mode(GovernanceContextBuildMode::Bootstrap);
+        ctx.member_checker = Some(dummy_member_checker());
+        ctx.suspension_checker = Some(dummy_suspension_checker());
+        ctx.membership_resolver = Some(dummy_resolver());
+        // mandate_gate intentionally left None
+        assert!(
+            ctx.validate().is_ok(),
+            "Bootstrap mode must not reject startup on missing mandate_gate"
+        );
+    }
+
+    #[test]
+    fn test_mode_without_mandate_gate_does_not_reject() {
+        // Test mode is permissive, identical to Bootstrap for missing deps.
+        let mut ctx = ctx_with_mode(GovernanceContextBuildMode::Test);
+        ctx.member_checker = Some(dummy_member_checker());
+        ctx.suspension_checker = Some(dummy_suspension_checker());
+        ctx.membership_resolver = Some(dummy_resolver());
+        // mandate_gate intentionally left None
+        assert!(
+            ctx.validate().is_ok(),
+            "Test mode must not reject startup on missing mandate_gate"
+        );
     }
 
     #[test]

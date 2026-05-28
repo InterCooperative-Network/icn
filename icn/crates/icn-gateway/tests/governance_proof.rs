@@ -78,6 +78,7 @@ async fn test_governance_proposal_full_lifecycle_with_real_auth() {
         suspension_checker: None,
         membership_resolver: None,
         sdis_service: None,
+        mandate_gate: None,
         build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 
@@ -397,6 +398,7 @@ async fn test_governance_endpoints_require_auth() {
         suspension_checker: None,
         membership_resolver: None,
         sdis_service: None,
+        mandate_gate: None,
         build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
     };
 

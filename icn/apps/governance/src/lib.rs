@@ -57,6 +57,10 @@ pub use manager::{
     SledMilestoneEventLog, SledMilestoneStore, SledProgramEventLog, SledProgramStore,
     SledStructureStore, UpcomingMeetingDigest,
 };
+pub use mandate_gate::{
+    DefaultMandateGate, MandateAct, MandateGate, MandateGateError, MandateGrant, MandateRejection,
+    MandateRequest, MandateTarget,
+};
 pub use receipt_backend::GovernanceReceiptBackend;
 pub use state_store::{GovernanceStateStore, SledGovernanceStateStore};
 

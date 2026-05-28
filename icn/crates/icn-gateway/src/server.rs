@@ -1416,6 +1416,18 @@ impl GatewayServer {
             // Daemon mode: SDIS execution goes through the actor event system
             // (KernelGovernanceExecutor → SdisServiceImpl). HTTP path leaves this None.
             sdis_service: None,
+            // Wire the app-side, act-time authority resolver over the gateway's
+            // existing `receipt_store`, which already implements
+            // `GovernanceReceiptBackend`. `DefaultMandateGate` introduces no new
+            // persistence — it reuses the gateway's mandate/grant indexes.
+            //
+            // No handler calls `require()` yet (handler wiring is #1868 step 7);
+            // populating this field now is necessary so the Production startup
+            // guard does not fail closed on the gateway path. Bootstrap/Test
+            // contexts may still leave this `None` and receive a warning.
+            mandate_gate: Some(Arc::new(icn_governance_actor::DefaultMandateGate::new(
+                receipt_store.clone(),
+            ))),
             // Deployment posture for the governance HTTP context.
             //
             // Resolved from the `ICN_GOVERNANCE_BUILD_MODE` environment variable

@@ -5764,6 +5764,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            mandate_gate: None,
             build_mode: GovernanceContextBuildMode::Test,
         };
 
@@ -5888,6 +5889,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            mandate_gate: None,
             build_mode: GovernanceContextBuildMode::Test,
         };
 
@@ -6015,6 +6017,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            mandate_gate: None,
             build_mode: GovernanceContextBuildMode::Test,
         };
 
@@ -6139,6 +6142,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            mandate_gate: None,
             build_mode: GovernanceContextBuildMode::Test,
         };
 
@@ -6260,6 +6264,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            mandate_gate: None,
             build_mode: GovernanceContextBuildMode::Test,
         };
 
@@ -6327,6 +6332,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            mandate_gate: None,
             build_mode: GovernanceContextBuildMode::Test,
         };
 
@@ -6450,6 +6456,7 @@ mod tests {
             suspension_checker: Some(suspension_checker),
             membership_resolver: Some(resolver),
             sdis_service: None,
+            mandate_gate: None,
             build_mode: GovernanceContextBuildMode::Test,
         };
 
@@ -6536,6 +6543,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver,
             sdis_service: None,
+            mandate_gate: None,
             build_mode,
         }
     }
@@ -7071,6 +7079,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            mandate_gate: None,
             build_mode: GovernanceContextBuildMode::Test,
         };
 
@@ -7123,6 +7132,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            mandate_gate: None,
             build_mode: GovernanceContextBuildMode::Test,
         };
 
@@ -7156,6 +7166,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            mandate_gate: None,
             build_mode: GovernanceContextBuildMode::Test,
         };
 
@@ -7214,6 +7225,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            mandate_gate: None,
             build_mode: GovernanceContextBuildMode::Test,
         };
 
@@ -7250,6 +7262,7 @@ mod tests {
                 suspension_checker: None,
                 membership_resolver: None,
                 sdis_service: None,
+                mandate_gate: None,
                 build_mode: GovernanceContextBuildMode::Test,
             };
             me_test_app!(ctx, $caller)
@@ -7763,6 +7776,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            mandate_gate: None,
             build_mode: GovernanceContextBuildMode::Test,
         }
     }
@@ -8817,6 +8831,7 @@ mod tests {
             suspension_checker: None,
             membership_resolver: None,
             sdis_service: None,
+            mandate_gate: None,
             build_mode: GovernanceContextBuildMode::Test,
         }
     }
