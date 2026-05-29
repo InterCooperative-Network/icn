@@ -3614,12 +3614,18 @@ impl GovernanceManager {
                             error = %e,
                             "Failed to store v3 decision receipt — process-authority evidence not persisted"
                         );
-                        if requires_execution_closure {
-                            anyhow::bail!(
-                                "Proposal '{}' requires execution closure but v3 decision receipt persistence failed: {e}",
-                                proposal_id.0
-                            );
-                        }
+                        // Fail closed, unconditionally. A scoped close emits the
+                        // v3 receipt as required decision evidence; this runs
+                        // before the terminal `proposal.close(...)` below, so
+                        // bailing leaves the proposal Open rather than committing
+                        // a close without its evidence. Matches the actor path and
+                        // the fail-closed opaque-storage contract — not guarded by
+                        // `requires_execution_closure` (which only gates the v1
+                        // provenance-chain bail above).
+                        anyhow::bail!(
+                            "Proposal '{}' close aborted: v3 decision receipt persistence failed: {e}",
+                            proposal_id.0
+                        );
                     }
                 }
 

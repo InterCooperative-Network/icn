@@ -260,6 +260,29 @@ async fn in_memory_unscoped_close_emits_v1_only_no_v3() {
     );
 }
 
+#[tokio::test(flavor = "current_thread")]
+async fn in_memory_scoped_close_v3_persistence_failure_is_fail_closed() {
+    // In-memory path parity with the actor: a scoped close on a backend without
+    // opaque storage must fail closed, not log-and-commit. The proposal must
+    // remain un-closed (Open) so the decision is never committed without its v3.
+    let backend = Arc::new(NoOpaqueBackend);
+    let (mgr, _domain, proposal_id, _did) =
+        seeded_in_memory_manager(backend as Arc<dyn GovernanceReceiptBackend>).await;
+
+    let result = mgr
+        .close_proposal_with_suspension(
+            proposal_id.clone(),
+            None,
+            None,
+            Some("governance:write".to_string()),
+        )
+        .await;
+    assert!(
+        result.is_err(),
+        "standalone v3 persistence failure must fail the close closed, not drop evidence"
+    );
+}
+
 // ============================================================================
 // Actor path (production): manager → dyn GovernanceOps → CloseProposal.
 // ============================================================================

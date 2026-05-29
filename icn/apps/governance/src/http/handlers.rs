@@ -1260,7 +1260,13 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
     http_req: HttpRequest,
     proposal_id: web::Path<String>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    // #1868: capture the scope class that actually authorized this close so the
+    // process-authorized v3 receipt records evidence derived from the auth
+    // decision rather than a hardcoded constant. With a single candidate this is
+    // `governance:write` today; listing decomposed close scope(s) first here
+    // when they land will make the receipt record the narrowest matched class.
+    let (claims, presented_scope) =
+        require_any_scope_matched::<BasicClaims>(&http_req, &["governance:write"])?;
     let requester_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let proposal_id = ProposalId(proposal_id.into_inner());
@@ -1379,11 +1385,11 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
             proposal_id.clone(),
             eligible_voters,
             excluded_delegators,
-            // #1868: this authenticated close presented `governance:write`
-            // (the scope `require_scope` accepted above). Recorded verbatim as
-            // the v3 receipt's `capability_scope_presented` — it is evidence of
-            // what was actually presented, not a canonical preference.
-            Some("governance:write".to_string()),
+            // #1868: record the scope class that actually authorized this close
+            // (from `require_any_scope_matched` above) as the v3 receipt's
+            // `capability_scope_presented` — evidence derived from the auth
+            // decision, not a hardcoded constant.
+            Some(presented_scope),
         )
         .await
         .map_err(anyhow_to_api)?;
