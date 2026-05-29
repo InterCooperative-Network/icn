@@ -677,9 +677,12 @@ impl GovernanceDecisionReceiptV2 {
                 bytes.extend_from_slice(&grant_ref.ref_hash());
             }
             ReceiptMandateAttestation::ProcessAuthorized => {
-                // v3-only mode; v2 rejects it at `new()`/`try_from`, so this
-                // arm is unreachable through the public API. No per-variant
-                // payload — kept here only for exhaustiveness.
+                // v3-only attestation mode; a v2 decision receipt never holds
+                // it — `new()`/`try_from` reject it — so a validly-constructed
+                // v2 receipt never reaches this arm. `compute_decision_hash`
+                // is public, so a direct caller could still pass it; `verify()`
+                // fail-closes on it. No per-variant payload — kept here only
+                // for exhaustiveness.
             }
         }
         *blake3::hash(&bytes).as_bytes()
@@ -1306,11 +1309,15 @@ pub enum ActionItemCompletionReceiptV2Error {
     /// contract.
     #[error("capability_scope_presented must be a non-empty, non-whitespace string")]
     EmptyCapabilityScope,
-    /// `ProcessAuthorized` is a v3-only attestation mode; this v2 receipt's
-    /// attestation taxonomy is frozen at `NoMandateRequired`/`Grant`. Rejected
-    /// at the constructor and the serde boundary so a v2 receipt can never
-    /// carry it — preserving the v2 domain-tag's frozen hash semantics.
-    #[error("ProcessAuthorized attestation requires a v3 decision receipt; v2 cannot carry it")]
+    /// `ProcessAuthorized` is a governance-decision authority mode; an
+    /// action-item completion receipt has no v3 form and never carries it
+    /// (its attestation taxonomy is frozen at `NoMandateRequired`/`Grant`).
+    /// Rejected at the constructor and the serde boundary so a v2 receipt
+    /// can never carry it — preserving the v2 domain-tag's frozen hash
+    /// semantics.
+    #[error(
+        "ProcessAuthorized is a governance-decision authority mode and is not valid for an action-item completion receipt"
+    )]
     UnsupportedAttestation,
 }
 
@@ -1496,9 +1503,12 @@ impl ActionItemCompletionReceiptV2 {
                 hasher.update(&grant_ref.ref_hash());
             }
             ReceiptMandateAttestation::ProcessAuthorized => {
-                // v3-only mode; this v2 receipt rejects it at
-                // `new()`/`try_from`, so this arm is unreachable through the
-                // public API. No per-variant payload — exhaustiveness only.
+                // `ProcessAuthorized` is a governance-decision authority mode;
+                // this receipt never holds it — `new()`/`try_from` reject it —
+                // so a validly-constructed receipt never reaches this arm.
+                // `compute_record_hash` is public, so a direct caller could
+                // still pass it; `verify()` fail-closes on it. No per-variant
+                // payload — exhaustiveness only.
             }
         }
         let mut out = [0u8; 32];
@@ -1766,11 +1776,15 @@ pub enum MeetingAttendanceReceiptV2Error {
     /// contract.
     #[error("capability_scope_presented must be a non-empty, non-whitespace string")]
     EmptyCapabilityScope,
-    /// `ProcessAuthorized` is a v3-only attestation mode; this v2 receipt's
-    /// attestation taxonomy is frozen at `NoMandateRequired`/`Grant`. Rejected
-    /// at the constructor and the serde boundary so a v2 receipt can never
-    /// carry it — preserving the v2 domain-tag's frozen hash semantics.
-    #[error("ProcessAuthorized attestation requires a v3 decision receipt; v2 cannot carry it")]
+    /// `ProcessAuthorized` is a governance-decision authority mode; a
+    /// meeting-attendance receipt has no v3 form and never carries it
+    /// (its attestation taxonomy is frozen at `NoMandateRequired`/`Grant`).
+    /// Rejected at the constructor and the serde boundary so a v2 receipt
+    /// can never carry it — preserving the v2 domain-tag's frozen hash
+    /// semantics.
+    #[error(
+        "ProcessAuthorized is a governance-decision authority mode and is not valid for a meeting-attendance receipt"
+    )]
     UnsupportedAttestation,
 }
 
@@ -1965,9 +1979,12 @@ impl MeetingAttendanceReceiptV2 {
                 hasher.update(&grant_ref.ref_hash());
             }
             ReceiptMandateAttestation::ProcessAuthorized => {
-                // v3-only mode; this v2 receipt rejects it at
-                // `new()`/`try_from`, so this arm is unreachable through the
-                // public API. No per-variant payload — exhaustiveness only.
+                // `ProcessAuthorized` is a governance-decision authority mode;
+                // this receipt never holds it — `new()`/`try_from` reject it —
+                // so a validly-constructed receipt never reaches this arm.
+                // `compute_record_hash` is public, so a direct caller could
+                // still pass it; `verify()` fail-closes on it. No per-variant
+                // payload — exhaustiveness only.
             }
         }
         let mut out = [0u8; 32];
