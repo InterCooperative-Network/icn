@@ -75,6 +75,32 @@ jobs:
             exit 1
           }
 
+      - name: Ensure disk headroom
+        run: |
+          # The self-hosted ci-runner accumulates Docker images (one icn:<sha>
+          # per merge) and build cache on its small root disk. A full-workspace
+          # `docker build` needs ~10-15G of headroom; without a guard the build
+          # starts blind on a near-full disk and crashes mid-layer-write with
+          # "No space left on device". Reclaim proactively when free space is
+          # low, and fail with an actionable message if reclaim is not enough.
+          THRESHOLD_GB=20
+          free_gb() { df -BG --output=avail / | tail -1 | tr -dc '0-9'; }
+          avail=$(free_gb)
+          echo "Free space on /: ${avail:-0}G (threshold ${THRESHOLD_GB}G)"
+          if [ "${avail:-0}" -lt "$THRESHOLD_GB" ]; then
+            echo "::warning::ci-runner low on disk (${avail:-0}G < ${THRESHOLD_GB}G) — reclaiming Docker space before build"
+            docker system prune -af || true
+            docker builder prune -af || true
+            avail=$(free_gb)
+            echo "Free space after reclaim: ${avail:-0}G"
+            if [ "${avail:-0}" -lt "$THRESHOLD_GB" ]; then
+              echo "::error::Disk still below ${THRESHOLD_GB}G after reclaim (${avail:-0}G free)."
+              echo "Manual cleanup or a larger ci-runner root disk is required."
+              df -h /
+              exit 1
+            fi
+          fi
+
       - name: Build Docker image
         run: |
           echo "Building image ${{ env.IMAGE_NAME }}:${{ env.IMAGE_TAG }}"
@@ -184,6 +210,37 @@ jobs:
           ssh -o BatchMode=yes ubuntu@${K3S_CONTROL} "sudo kubectl get pods -A | grep icn" >> $GITHUB_STEP_SUMMARY || echo "No pods found" >> $GITHUB_STEP_SUMMARY
           echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
 
+      - name: Bound Docker disk usage
+        if: always()
+        run: |
+          # Runs even on failure. Bound the build cache (the silent accumulator
+          # the weekly image-only cleanup never touched) while keeping recent
+          # layers for fast incremental rebuilds. Then prune dangling images
+          # and reap old icn:<sha> images (one piles up per merge), keeping the
+          # 3 most recently created. The runner's Docker images are never used
+          # by K3s (K3s uses its own containerd), so removing them here is safe.
+          # Cleanup must not fail the (already-succeeded) deploy, but a failed
+          # prune is surfaced as a warning so cache-bounding regressions to disk
+          # exhaustion don't go silent.
+          docker builder prune -f --keep-storage 20GB \
+            || echo "::warning::docker builder prune failed on ci-runner — build cache not bounded this run; check Docker/BuildKit"
+          docker image prune -f \
+            || echo "::warning::docker image prune (dangling) failed on ci-runner"
+          # Sort icn images newest-first by creation time before keeping the 3
+          # newest — `docker images` default ordering is not a stable contract,
+          # so sorting explicitly avoids reaping newer images by accident.
+          old_icn=$(docker images icn --format '{{.CreatedAt}}|{{.ID}}' \
+            | sort -r \
+            | awk -F'|' '!seen[$2]++ {print $2}' \
+            | awk 'NR>3')
+          if [ -n "$old_icn" ]; then
+            echo "Reaping old icn images (keeping 3 most recently created):"
+            echo "$old_icn"
+            echo "$old_icn" | xargs -r docker rmi -f 2>/dev/null || true
+          fi
+          echo "=== ci-runner disk after build ==="
+          df -h /
+
   # Cleanup old images (runs weekly)
   cleanup:
     name: Cleanup Old Images
@@ -202,6 +259,13 @@ jobs:
             ssh -o BatchMode=yes ubuntu@$NODE "sudo k3s ctr images ls | grep 'docker.io/library/icn:' | sort -r | tail -n +6 | awk '{print \$1}' | xargs -r sudo k3s ctr images rm" 2>/dev/null || true
           done
 
-          # Cleanup local docker on ci-runner
-          docker image prune -f
+          # Cleanup local docker on ci-runner: dangling layers, unused images
+          # older than a week, and the full build cache (regenerated on the
+          # next build). This is the deep weekly reclaim; the per-build
+          # "Bound Docker disk usage" step keeps growth bounded between runs.
+          docker image prune -f || true
+          docker image prune -af --filter "until=168h" || true
+          docker builder prune -af || true
+          echo "=== ci-runner disk after weekly cleanup ==="
+          df -h /
           echo "✓ Cleanup complete"
