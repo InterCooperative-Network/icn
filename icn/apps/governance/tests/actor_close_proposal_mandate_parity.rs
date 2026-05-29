@@ -280,6 +280,7 @@ async fn actor_close_proposal_accept_mints_mandate_and_grant() {
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await
         .expect("CloseProposal submit");
@@ -398,6 +399,7 @@ async fn actor_close_proposal_accept_text_mints_mandate_without_grants() {
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await
         .expect("CloseProposal submit");
@@ -499,6 +501,7 @@ async fn actor_close_proposal_mandate_mint_is_idempotent() {
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await
         .expect("first CloseProposal submit");

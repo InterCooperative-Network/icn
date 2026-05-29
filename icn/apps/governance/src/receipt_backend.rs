@@ -3,8 +3,9 @@
 
 use icn_governance::{
     ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, AuthorityGrant, AuthorityGrantId,
-    GovernanceDecisionReceipt, Grantee, Mandate, MeetingAttendanceReceipt,
-    MeetingAttendanceReceiptV2, ProcessGateKind, ProcessGateResultReceipt, Timestamp,
+    GovernanceDecisionReceipt, GovernanceDecisionReceiptV3, Grantee, Mandate,
+    MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, ProcessGateKind,
+    ProcessGateResultReceipt, Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -24,6 +25,12 @@ const MEETING_ATTENDANCE_V2_CLASS: &str = "meeting_attendance_v2";
 /// Chosen in the apps layer so the gateway persists v2 completion evidence
 /// without importing the typed name (preserves the meaning firewall).
 const ACTION_ITEM_COMPLETION_V2_CLASS: &str = "action_item_completion_v2";
+
+/// Class string for `GovernanceDecisionReceiptV3` opaque storage (#1868).
+/// Chosen in the apps layer so the gateway persists v3 process-authorized
+/// decision evidence without importing the typed name (preserves the meaning
+/// firewall).
+const GOVERNANCE_DECISION_V3_CLASS: &str = "governance_decision_v3";
 
 /// Stable string mapping for `ProcessGateKind` used as the
 /// opaque-storage `key2`. Distinct from serde wire form so the
@@ -74,6 +81,47 @@ pub trait GovernanceReceiptBackend: Send + Sync {
         &self,
         decision_hash: &Hash,
     ) -> Result<Vec<AllocationReceipt>, String>;
+
+    /// Persist a [`GovernanceDecisionReceiptV3`] — the #1868 process-authorized
+    /// decision receipt carrying `capability_scope_presented` and an explicit
+    /// [`ReceiptMandateAttestation`](icn_governance::ReceiptMandateAttestation).
+    /// Emitted **alongside** the existing v1 receipt / `GovernanceProofV2` by
+    /// the migrated normal-close path (v1 emission and its consumers are
+    /// unchanged this slice).
+    ///
+    /// Unlike the meeting/action-item v2 receipts, a decision receipt carries
+    /// no timestamp field, so `recorded_at` (the proposal close time) is
+    /// passed explicitly — it only orders the opaque entry, it is not part of
+    /// the canonical `decision_hash`.
+    ///
+    /// **Default routes through opaque storage** (same pattern as
+    /// [`Self::put_meeting_attendance_v2`] / [`Self::put_action_item_completion_v2`]):
+    /// the typed receipt is serialised to JSON and delegated to
+    /// [`Self::put_opaque`] under class `"governance_decision_v3"` with
+    /// `key1 = receipt.proposal_id`, `key2 = None` (mirrors the v1 by-proposal
+    /// index). The production gateway-backed `ReceiptStore` overrides
+    /// `put_opaque`, so it gets durable persistence here **without** importing
+    /// `GovernanceDecisionReceiptV3` — the meaning firewall stays put. A backend
+    /// that does not implement opaque storage hits the `put_opaque` fail-closed
+    /// default (`opaque_storage_not_implemented`) rather than silently dropping
+    /// the v3 evidence. Backends wanting custom typed persistence (e.g. an
+    /// in-memory test store) may still override this method directly.
+    fn put_governance_decision_v3(
+        &self,
+        receipt: &GovernanceDecisionReceiptV3,
+        recorded_at: u64,
+    ) -> Result<(), String> {
+        let payload = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize GovernanceDecisionReceiptV3: {e}"))?;
+        self.put_opaque(
+            GOVERNANCE_DECISION_V3_CLASS,
+            &receipt.proposal_id,
+            None,
+            recorded_at,
+            receipt.decision_hash,
+            &payload,
+        )
+    }
 
     /// Persist an institutional effect record emitted at proposal acceptance.
     ///

@@ -151,17 +151,28 @@ pub trait GovernanceOps: Send + Sync {
     /// governance influence through pre-existing delegations after a FreezeMember
     /// proposal is accepted.
     ///
-    /// The default implementation ignores `excluded_delegators` and delegates to
-    /// `close_proposal_filtered` (or `close_proposal` if no eligible filter).
-    /// Backends that support delegation expansion (e.g., `GovernanceActor`) should
-    /// override this method.
+    /// The default implementation ignores `excluded_delegators` and
+    /// `capability_scope`, delegating to `close_proposal_filtered` (or
+    /// `close_proposal` if no eligible filter). Backends that support delegation
+    /// expansion (e.g., `GovernanceActor`) should override this method.
+    ///
+    /// `capability_scope` (#1868) is the capability scope the caller actually
+    /// presented at close time, when the close was driven by an authenticated
+    /// request — `Some` only for the scoped HTTP close path (which presents
+    /// `governance:write`); `None` for scheduler/timer auto-close. It is
+    /// **evidence**: it records what was actually presented, never a constant.
+    /// The `GovernanceActor` override carries it into the close so a normal
+    /// democratic close can emit a process-authorized
+    /// `GovernanceDecisionReceiptV3`; the default drops it, so non-actor
+    /// backends emit no v3.
     async fn close_proposal_with_suspension(
         &self,
         proposal_id: ProposalId,
         eligible_voters: Option<std::collections::HashSet<Did>>,
         excluded_delegators: Option<std::collections::HashSet<Did>>,
+        capability_scope: Option<String>,
     ) -> Result<()> {
-        let _ = excluded_delegators;
+        let _ = (excluded_delegators, capability_scope);
         match eligible_voters.as_ref() {
             Some(eligible) => self.close_proposal_filtered(proposal_id, eligible).await,
             None => self.close_proposal(proposal_id).await,

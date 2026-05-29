@@ -194,6 +194,16 @@ pub enum GovernanceCommand {
         /// preventing indirect governance influence after a FreezeMember proposal.
         /// When `None`, all non-voter members may have delegation applied (default).
         excluded_delegators: Option<std::collections::HashSet<Did>>,
+        /// Capability scope the caller actually presented at close time, when
+        /// the close was driven by an authenticated request (#1868). `Some`
+        /// only for the HTTP close path, which presents `governance:write`;
+        /// `None` for scheduler/timer auto-close (no capability presented).
+        ///
+        /// This is **evidence**: it records what was actually presented, never
+        /// a canonical constant. The actor emits a process-authorized
+        /// `GovernanceDecisionReceiptV3` only when this is `Some`; the timer
+        /// path emits no v3 because no scope was presented.
+        capability_scope: Option<String>,
     },
     /// Emergency veto - marks a proposal as vetoed
     VetoProposal {
@@ -353,25 +363,6 @@ impl GovernanceHandle {
         self.submit(GovernanceCommand::RevokeDelegation {
             id: id.clone(),
             revoked_at,
-        })
-        .await
-    }
-
-    /// Close a proposal with standing revalidation and suspension-based delegation exclusion.
-    ///
-    /// Members in `excluded_delegators` are excluded from the close-time delegation
-    /// expansion: their vote weight will not flow via any active delegation.
-    /// Pass `eligible_voters: None` and `excluded_delegators: None` for standard close behavior.
-    pub async fn close_proposal_with_suspension(
-        &self,
-        proposal_id: ProposalId,
-        eligible_voters: Option<std::collections::HashSet<Did>>,
-        excluded_delegators: Option<std::collections::HashSet<Did>>,
-    ) -> Result<()> {
-        self.submit(GovernanceCommand::CloseProposal {
-            proposal_id,
-            eligible_voters,
-            excluded_delegators,
         })
         .await
     }
@@ -1080,6 +1071,9 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
             proposal_id,
             eligible_voters: None,
             excluded_delegators: None,
+            // GovernanceOps trait close: no authenticated request scope flows
+            // through this entry point — emit no v3 (see CloseProposal docs).
+            capability_scope: None,
         })
         .await
     }
@@ -1093,6 +1087,38 @@ impl icn_governance::GovernanceOps for GovernanceHandle {
             proposal_id,
             eligible_voters: Some(eligible_voters.clone()),
             excluded_delegators: None,
+            // GovernanceOps trait close: no authenticated request scope flows
+            // through this entry point — emit no v3 (see CloseProposal docs).
+            capability_scope: None,
+        })
+        .await
+    }
+
+    /// Override the trait default so a scoped HTTP close can carry the
+    /// presented capability scope into the actor, enabling a process-authorized
+    /// `GovernanceDecisionReceiptV3` (#1868).
+    ///
+    /// Behavior note: like the trait default, this does **not** wire
+    /// `excluded_delegators` into the command (the actor's delegation-exclusion
+    /// path is unchanged by this slice — it is submitted as `None`, exactly as
+    /// the default's delegation to `close_proposal_filtered`/`close_proposal`
+    /// produced). The only added behavior is threading `capability_scope`.
+    async fn close_proposal_with_suspension(
+        &self,
+        proposal_id: ProposalId,
+        eligible_voters: Option<std::collections::HashSet<Did>>,
+        excluded_delegators: Option<std::collections::HashSet<Did>>,
+        capability_scope: Option<String>,
+    ) -> Result<()> {
+        // Unchanged from the trait default: excluded_delegators is not wired
+        // into the actor command in this slice. Carrying the presented scope is
+        // the only added behavior.
+        let _ = excluded_delegators;
+        self.submit(GovernanceCommand::CloseProposal {
+            proposal_id,
+            eligible_voters,
+            excluded_delegators: None,
+            capability_scope,
         })
         .await
     }
@@ -1336,6 +1362,9 @@ impl GovernanceActor {
                                         proposal_id: proposal_id.clone(),
                                         eligible_voters: None,
                                         excluded_delegators: None,
+                                        // Scheduler/timer auto-close: no capability scope
+                                        // was presented, so emit no process-authorized v3.
+                                        capability_scope: None,
                                     }).await {
                                         // May fail if proposal was manually closed (race condition - expected)
                                         warn!("Scheduled close for proposal {} skipped: {}", proposal_id.0, e);
@@ -1772,6 +1801,7 @@ impl GovernanceActor {
                 proposal_id,
                 eligible_voters,
                 excluded_delegators,
+                capability_scope,
             } => {
                 info!("Closing proposal: {}", proposal_id.0);
 
@@ -2055,6 +2085,59 @@ impl GovernanceActor {
                     );
                     None
                 };
+
+                // #1868: emit a process-authorized GovernanceDecisionReceiptV3
+                // alongside the v1 receipt / GovernanceProofV2, but ONLY when the
+                // close was driven by an authenticated request that actually
+                // presented a capability scope. A normal democratic close is
+                // authorized by the governance process itself (eligible voters,
+                // period, quorum/threshold, tally) — not membership standing, not
+                // a personal grant — so the attestation is `ProcessAuthorized`.
+                //
+                // `capability_scope` is `None` for scheduler/timer auto-close
+                // (nothing was presented), so no v3 is emitted there: the field is
+                // evidence and must record what was actually presented, never a
+                // constant. Forced-accept (Bootstrap) is a separate path and is
+                // intentionally not emitted in this slice.
+                //
+                // Persisted before the terminal `proposal.close`/`save_proposal`
+                // so a persistence failure fails closed (the proposal stays open)
+                // rather than committing a close without its decision evidence.
+                // Routes through the fail-closed `put_governance_decision_v3` →
+                // `put_opaque` seam; the gateway never imports the v3 type.
+                if let Some(scope) = capability_scope.as_deref() {
+                    if let Some(ref store) = self.receipt_store {
+                        use icn_governance::proof::ProofOutcome;
+                        let v3_outcome = match outcome_result {
+                            DecisionOutcome::Accepted => ProofOutcome::Accepted,
+                            DecisionOutcome::Rejected => ProofOutcome::Rejected,
+                            DecisionOutcome::NoQuorum => ProofOutcome::NoQuorum,
+                        };
+                        let receipt_v3 = icn_governance::GovernanceDecisionReceiptV3::new(
+                            proposal_id.0.clone(),
+                            proposal.domain_id.0.clone(),
+                            v3_outcome,
+                            tally.clone(),
+                            &votes,
+                            scope.to_string(),
+                            icn_governance::ReceiptMandateAttestation::ProcessAuthorized,
+                        )
+                        .map_err(|e| {
+                            anyhow::anyhow!(
+                                "Invalid v3 decision receipt for proposal {}: {e}",
+                                proposal_id.0
+                            )
+                        })?;
+                        store
+                            .put_governance_decision_v3(&receipt_v3, now)
+                            .map_err(|e| {
+                                anyhow::anyhow!(
+                                    "Failed to persist v3 decision receipt for proposal {}: {e}",
+                                    proposal_id.0
+                                )
+                            })?;
+                    }
+                }
 
                 // Update proposal
                 proposal.close(new_state)?;

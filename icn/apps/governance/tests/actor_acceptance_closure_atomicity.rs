@@ -282,6 +282,7 @@ async fn normal_close_execution_required_emits_exactly_once() {
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await
         .expect("CloseProposal submit");
@@ -471,6 +472,7 @@ async fn normal_close_preflight_failure_leaves_proposal_open() {
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await;
     assert!(result.is_err(), "preflight failure must surface as Err");

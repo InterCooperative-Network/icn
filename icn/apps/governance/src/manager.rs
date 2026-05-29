@@ -3383,7 +3383,9 @@ impl GovernanceManager {
         if let Some(ref handle) = self.governance_handle {
             return handle.close_proposal(proposal_id).await;
         }
-        self.close_proposal_inner(proposal_id, None)
+        // No authenticated request scope flows through this entry point —
+        // emit no process-authorized v3 (#1868).
+        self.close_proposal_inner(proposal_id, None, None)
     }
 
     /// Close a proposal counting only votes from currently-eligible members.
@@ -3409,7 +3411,9 @@ impl GovernanceManager {
                 .close_proposal_filtered(proposal_id, eligible_voters)
                 .await;
         }
-        self.close_proposal_inner(proposal_id, Some(eligible_voters))
+        // No authenticated request scope flows through this entry point —
+        // emit no process-authorized v3 (#1868).
+        self.close_proposal_inner(proposal_id, Some(eligible_voters), None)
     }
 
     /// Close a proposal with both standing revalidation and suspension-based
@@ -3421,17 +3425,26 @@ impl GovernanceManager {
         proposal_id: ProposalId,
         eligible_voters: Option<HashSet<Did>>,
         excluded_delegators: Option<HashSet<Did>>,
+        capability_scope: Option<String>,
     ) -> Result<()> {
         if let Some(ref handle) = self.governance_handle {
             return handle
-                .close_proposal_with_suspension(proposal_id, eligible_voters, excluded_delegators)
+                .close_proposal_with_suspension(
+                    proposal_id,
+                    eligible_voters,
+                    excluded_delegators,
+                    capability_scope,
+                )
                 .await;
         }
         // In-memory path: no delegation expansion, so suspension exclusion is a no-op.
-        // Just apply the eligible_voters filter if present.
+        // Just apply the eligible_voters filter if present. The presented scope
+        // (if any) flows through so the in-memory path emits the same
+        // process-authorized v3 as the actor path (#1868).
+        let scope = capability_scope.as_deref();
         match eligible_voters.as_ref() {
-            Some(eligible) => self.close_proposal_inner(proposal_id, Some(eligible)),
-            None => self.close_proposal_inner(proposal_id, None),
+            Some(eligible) => self.close_proposal_inner(proposal_id, Some(eligible), scope),
+            None => self.close_proposal_inner(proposal_id, None, scope),
         }
     }
 
@@ -3439,6 +3452,11 @@ impl GovernanceManager {
         &self,
         proposal_id: ProposalId,
         eligible_voters: Option<&HashSet<Did>>,
+        // Capability scope the caller presented at close time, when the close
+        // was driven by an authenticated request (#1868). `Some` only for the
+        // scoped HTTP close path; `None` for unscoped entry points. Drives the
+        // process-authorized v3 emission (evidence — never a constant).
+        capability_scope: Option<&str>,
     ) -> Result<()> {
         let mut proposals = self.proposals.write().map_err(|e| {
             anyhow::anyhow!("Proposals storage lock poisoned (concurrent panic?): {e}")
@@ -3547,7 +3565,7 @@ impl GovernanceManager {
                     proposal_id.0.clone(),
                     proposal.domain_id.0.clone(),
                     outcome,
-                    tally,
+                    tally.clone(),
                     &proposal_votes,
                 );
                 if let Err(e) = store.put_governance(&receipt) {
@@ -3563,6 +3581,45 @@ impl GovernanceManager {
                             "Proposal '{}' requires execution closure but governance receipt persistence failed: {e}",
                             proposal_id.0
                         );
+                    }
+                }
+
+                // #1868: emit a process-authorized GovernanceDecisionReceiptV3
+                // alongside v1 — ONLY when a capability scope was actually
+                // presented (the scoped HTTP close path). `capability_scope` is
+                // `None` for unscoped/timer entry points, which emit no v3
+                // because nothing was presented (the field is evidence, never a
+                // constant). Mirrors the actor close path so the in-memory and
+                // actor backends produce the same v3 evidence. Routes through the
+                // fail-closed `put_governance_decision_v3` → `put_opaque` seam.
+                if let Some(scope) = capability_scope {
+                    let receipt_v3 = icn_governance::GovernanceDecisionReceiptV3::new(
+                        proposal_id.0.clone(),
+                        proposal.domain_id.0.clone(),
+                        outcome,
+                        tally,
+                        &proposal_votes,
+                        scope.to_string(),
+                        icn_governance::ReceiptMandateAttestation::ProcessAuthorized,
+                    )
+                    .map_err(|e| {
+                        anyhow::anyhow!(
+                            "Invalid v3 decision receipt for proposal {}: {e}",
+                            proposal_id.0
+                        )
+                    })?;
+                    if let Err(e) = store.put_governance_decision_v3(&receipt_v3, now) {
+                        tracing::error!(
+                            proposal_id = %proposal_id.0,
+                            error = %e,
+                            "Failed to store v3 decision receipt — process-authority evidence not persisted"
+                        );
+                        if requires_execution_closure {
+                            anyhow::bail!(
+                                "Proposal '{}' requires execution closure but v3 decision receipt persistence failed: {e}",
+                                proposal_id.0
+                            );
+                        }
                     }
                 }
 

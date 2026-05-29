@@ -453,6 +453,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
             proposal_id: membership_proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await?;
 
@@ -547,6 +548,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
             proposal_id: budget_proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await?;
 

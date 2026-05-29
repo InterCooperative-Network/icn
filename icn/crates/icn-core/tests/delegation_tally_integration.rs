@@ -143,6 +143,7 @@ async fn lifecycle_proposal(
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await?;
 
@@ -352,6 +353,7 @@ async fn test_lost_standing_member_delegation_blocked() -> Result<()> {
             proposal_id: proposal_id.clone(),
             eligible_voters: Some(eligible),
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await?;
 
@@ -451,6 +453,7 @@ async fn test_suspended_delegator_weight_excluded_at_close_time() -> Result<()> 
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: Some(excluded),
+            capability_scope: None,
         })
         .await?;
 
@@ -525,6 +528,7 @@ async fn test_suspended_delegator_weight_excluded_at_close_time() -> Result<()> 
             proposal_id: proposal_id2.clone(),
             eligible_voters: None,
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await?;
 

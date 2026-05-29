@@ -1375,7 +1375,16 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
         };
 
     ctx.manager
-        .close_proposal_with_suspension(proposal_id.clone(), eligible_voters, excluded_delegators)
+        .close_proposal_with_suspension(
+            proposal_id.clone(),
+            eligible_voters,
+            excluded_delegators,
+            // #1868: this authenticated close presented `governance:write`
+            // (the scope `require_scope` accepted above). Recorded verbatim as
+            // the v3 receipt's `capability_scope_presented` — it is evidence of
+            // what was actually presented, not a canonical preference.
+            Some("governance:write".to_string()),
+        )
         .await
         .map_err(anyhow_to_api)?;
 
@@ -5539,6 +5548,22 @@ mod tests {
             _decision_hash: &icn_kernel_api::Hash,
         ) -> Result<Vec<icn_kernel_api::AllocationReceipt>, String> {
             Ok(vec![])
+        }
+        // Support the opaque seam so a scoped normal close can persist its
+        // process-authorized v3 decision receipt (#1868). The production
+        // gateway `ReceiptStore` overrides this; these handler tests don't
+        // assert on v3 content, so accepting the write is sufficient to keep
+        // the close from fail-closing on the v3 emission.
+        fn put_opaque(
+            &self,
+            _class: &str,
+            _key1: &str,
+            _key2: Option<&str>,
+            _recorded_at: u64,
+            _record_hash: [u8; 32],
+            _payload: &[u8],
+        ) -> Result<(), String> {
+            Ok(())
         }
         fn put_institutional_effect(
             &self,
