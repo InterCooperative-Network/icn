@@ -687,7 +687,19 @@ impl GovernanceDecisionReceiptV2 {
 
     /// Verify the stored `decision_hash` against canonical v2 receipt
     /// fields.
+    ///
+    /// Fail-closed on the v3-only `ProcessAuthorized` mode: `new()`/`try_from`
+    /// already reject it, but the struct fields are `pub`, so a direct struct
+    /// literal could otherwise carry it and verify through the defensive hash
+    /// arm. Rejecting here keeps the frozen-taxonomy discipline intact at the
+    /// verification boundary too.
     pub fn verify(&self) -> bool {
+        if matches!(
+            self.mandate_attestation,
+            ReceiptMandateAttestation::ProcessAuthorized
+        ) {
+            return false;
+        }
         let recomputed = Self::compute_decision_hash(
             &self.proposal_id,
             &self.domain_id,
@@ -1497,6 +1509,15 @@ impl ActionItemCompletionReceiptV2 {
     /// Verify the stored `record_hash` against canonical v2 receipt
     /// fields.
     pub fn verify(&self) -> bool {
+        // Fail-closed on the v3-only `ProcessAuthorized` mode (see the v2
+        // decision receipt's `verify` for the rationale: `pub` fields allow a
+        // direct struct literal to bypass the `new()`/`try_from` rejection).
+        if matches!(
+            self.mandate_attestation,
+            ReceiptMandateAttestation::ProcessAuthorized
+        ) {
+            return false;
+        }
         let recomputed = Self::compute_record_hash(
             &self.item_id,
             &self.domain_id,
@@ -1957,6 +1978,15 @@ impl MeetingAttendanceReceiptV2 {
     /// Verify the stored `record_hash` against canonical v2 receipt
     /// fields.
     pub fn verify(&self) -> bool {
+        // Fail-closed on the v3-only `ProcessAuthorized` mode (see the v2
+        // decision receipt's `verify` for the rationale: `pub` fields allow a
+        // direct struct literal to bypass the `new()`/`try_from` rejection).
+        if matches!(
+            self.mandate_attestation,
+            ReceiptMandateAttestation::ProcessAuthorized
+        ) {
+            return false;
+        }
         let recomputed = Self::compute_record_hash(
             &self.meeting_id,
             &self.domain_id,
@@ -5003,6 +5033,101 @@ mod tests {
             err.to_string().to_lowercase().contains("processauthorized")
                 || err.to_string().contains("v3"),
             "meeting-attendance v2 deserialize must reject ProcessAuthorized, got: {err}"
+        );
+    }
+
+    // ---- v2 `verify()` must also fail-closed on ProcessAuthorized, since the
+    //      `pub` struct fields allow a direct struct literal to bypass
+    //      `new()`/`try_from` (addresses the verify-path gap). ----
+
+    #[test]
+    fn decision_v2_verify_rejects_struct_literal_process_authorized() {
+        let votes = make_votes();
+        let tally = make_tally(&votes);
+        let vote_hash = GovernanceProof::compute_vote_hash(&votes);
+        let att = ReceiptMandateAttestation::ProcessAuthorized;
+        // Build the "correct" defensive hash, then plant it in a struct literal.
+        let decision_hash = GovernanceDecisionReceiptV2::compute_decision_hash(
+            "prop-1",
+            "coop:test",
+            ProofOutcome::Accepted,
+            &tally,
+            &vote_hash,
+            "governance:charter:write",
+            &att,
+        );
+        let r = GovernanceDecisionReceiptV2 {
+            proposal_id: "prop-1".to_string(),
+            domain_id: "coop:test".to_string(),
+            outcome: ProofOutcome::Accepted,
+            vote_tally: tally,
+            vote_hash,
+            capability_scope_presented: "governance:charter:write".to_string(),
+            mandate_attestation: att,
+            decision_hash,
+        };
+        assert!(
+            !r.verify(),
+            "v2 decision receipt must not verify a ProcessAuthorized attestation, even when \
+             struct-constructed with a matching hash"
+        );
+    }
+
+    #[test]
+    fn action_item_v2_verify_rejects_struct_literal_process_authorized() {
+        let att = ReceiptMandateAttestation::ProcessAuthorized;
+        let record_hash = ActionItemCompletionReceiptV2::compute_record_hash(
+            "item-1",
+            "coop:test",
+            "did:icn:actor",
+            ActionItemTransition::Completed,
+            1_700_000_000,
+            "governance:meeting:write",
+            &att,
+        );
+        let r = ActionItemCompletionReceiptV2 {
+            item_id: "item-1".to_string(),
+            domain_id: "coop:test".to_string(),
+            actor_did: "did:icn:actor".to_string(),
+            transition: ActionItemTransition::Completed,
+            completed_at: 1_700_000_000,
+            capability_scope_presented: "governance:meeting:write".to_string(),
+            mandate_attestation: att,
+            record_hash,
+        };
+        assert!(
+            !r.verify(),
+            "action-item v2 receipt must not verify a ProcessAuthorized attestation"
+        );
+    }
+
+    #[test]
+    fn meeting_attendance_v2_verify_rejects_struct_literal_process_authorized() {
+        let att = ReceiptMandateAttestation::ProcessAuthorized;
+        let record_hash = MeetingAttendanceReceiptV2::compute_record_hash(
+            "meeting-1",
+            "coop:test",
+            "did:icn:attendee",
+            "did:icn:steward",
+            MeetingAttendanceTransition::Present,
+            1_700_000_000,
+            "governance:meeting:write",
+            &att,
+        );
+        let r = MeetingAttendanceReceiptV2 {
+            meeting_id: "meeting-1".to_string(),
+            domain_id: "coop:test".to_string(),
+            attendee_did: "did:icn:attendee".to_string(),
+            recorded_by: "did:icn:steward".to_string(),
+            transition: MeetingAttendanceTransition::Present,
+            recorded_at: 1_700_000_000,
+            capability_scope_presented: "governance:meeting:write".to_string(),
+            mandate_attestation: att,
+            record_hash,
+        };
+        assert!(
+            !r.verify(),
+            "meeting-attendance v2 receipt must not verify a ProcessAuthorized attestation"
         );
     }
 }
