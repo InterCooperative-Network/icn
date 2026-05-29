@@ -3,8 +3,8 @@
 
 use icn_governance::{
     ActionItemCompletionReceipt, AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt,
-    Grantee, Mandate, MeetingAttendanceReceipt, ProcessGateKind, ProcessGateResultReceipt,
-    Timestamp,
+    Grantee, Mandate, MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, ProcessGateKind,
+    ProcessGateResultReceipt, Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -410,6 +410,25 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     /// [`ReceiptStore`](icn_gateway::receipt_store::ReceiptStore)
     /// override.
     fn put_meeting_attendance(&self, _receipt: &MeetingAttendanceReceipt) -> Result<(), String> {
+        Ok(())
+    }
+
+    /// Persist a [`MeetingAttendanceReceiptV2`] — the #1868 v2 form carrying
+    /// `capability_scope_presented` and an explicit
+    /// [`ReceiptMandateAttestation`](icn_governance::ReceiptMandateAttestation).
+    /// Emitted **alongside** the v1 receipt by migrated handlers (the v1
+    /// emission and its consumers are unchanged this slice).
+    ///
+    /// Append-only and idempotent on `record_hash`, same discipline as
+    /// [`Self::put_meeting_attendance`].
+    ///
+    /// Default impl is a no-op so backends that do not yet durably persist v2
+    /// receipts inherit a truthful "v2 attendance receipt not persisted"
+    /// behavior; storage-backed implementations override.
+    fn put_meeting_attendance_v2(
+        &self,
+        _receipt: &MeetingAttendanceReceiptV2,
+    ) -> Result<(), String> {
         Ok(())
     }
 

@@ -5484,12 +5484,20 @@ impl GovernanceManager {
     /// `recorded_by` is the authenticated caller. It can differ from
     /// `attendee_did` (steward-recorded attendance) and is bound into the
     /// receipt's canonical hash.
+    ///
+    /// `capability_scope` is the capability scope that actually authorized the
+    /// request (e.g. `"governance:meeting:write"`, or the legacy
+    /// `"governance:write"` during the compatibility period). It is recorded
+    /// verbatim into the emitted [`MeetingAttendanceReceiptV2`]'s
+    /// `capability_scope_presented` field — it is evidence, so callers must
+    /// pass the accepted scope, not a canonical preferred one.
     pub fn update_meeting_attendance(
         &self,
         meeting_id: &MeetingId,
         attendee_did: &str,
         status: AttendanceStatus,
         recorded_by: &Did,
+        capability_scope: &str,
     ) -> Result<Meeting> {
         let mut m = self
             .meeting_store
@@ -5539,6 +5547,39 @@ impl GovernanceManager {
                 store.put_meeting_attendance(&receipt).map_err(|e| {
                     anyhow::anyhow!(
                         "Failed to persist meeting attendance receipt for ({}, {}): {e}",
+                        m.id.0,
+                        attendee_did
+                    )
+                })?;
+
+                // #1868: emit the v2 receipt alongside v1. Meeting attendance
+                // is a membership-standing-only act (decomposition §6 / §10
+                // step 9), so the attestation is the explicit
+                // `NoMandateRequired { MembershipStandingOnly }` discriminator —
+                // no MandateGate call, no grant. `capability_scope` is recorded
+                // verbatim as the scope that authorized this request.
+                let receipt_v2 = icn_governance::MeetingAttendanceReceiptV2::new(
+                    m.id.0.clone(),
+                    m.domain_id.clone(),
+                    attendee_did.to_string(),
+                    recorded_by.to_string(),
+                    transition,
+                    now,
+                    capability_scope.to_string(),
+                    icn_governance::ReceiptMandateAttestation::NoMandateRequired {
+                        reason: icn_governance::NoMandateReason::MembershipStandingOnly,
+                    },
+                )
+                .map_err(|e| {
+                    anyhow::anyhow!(
+                        "Invalid v2 meeting attendance receipt for ({}, {}): {e}",
+                        m.id.0,
+                        attendee_did
+                    )
+                })?;
+                store.put_meeting_attendance_v2(&receipt_v2).map_err(|e| {
+                    anyhow::anyhow!(
+                        "Failed to persist v2 meeting attendance receipt for ({}, {}): {e}",
                         m.id.0,
                         attendee_did
                     )

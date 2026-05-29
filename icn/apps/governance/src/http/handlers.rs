@@ -15,7 +15,7 @@ use icn_governance::{
     ProposalPayload, ProposalScope, StructureId, StructureKind, StructureStatus, VoteChoice,
 };
 use icn_http_kit::{
-    auth::{require_any_scope, require_scope, BasicClaims},
+    auth::{require_any_scope, require_any_scope_matched, require_scope, BasicClaims},
     error::ApiError,
     pagination::{ListPagination, ListQuery, ListResponse},
 };
@@ -4040,7 +4040,10 @@ pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
     meeting_id: web::Path<String>,
     req: web::Json<MarkAttendanceRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_any_scope::<BasicClaims>(
+    // Record the scope that actually authorized the request (evidence): the
+    // narrowed class scope when present, else the legacy broad scope during the
+    // compatibility period. Listed narrowest-first so it is preferred.
+    let (claims, presented_scope) = require_any_scope_matched::<BasicClaims>(
         &http_req,
         &["governance:meeting:write", "governance:write"],
     )?;
@@ -4072,7 +4075,7 @@ pub async fn mark_attendance<E: GovernanceEventEmitter + Clone + 'static>(
 
     let updated = ctx
         .manager
-        .update_meeting_attendance(&id, &req.did, status, &recorded_by)
+        .update_meeting_attendance(&id, &req.did, status, &recorded_by, &presented_scope)
         .map_err(anyhow_to_api)?;
     Ok(HttpResponse::Ok().json(meeting_to_response(&updated)))
 }
