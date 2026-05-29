@@ -158,6 +158,7 @@ Feature designs, proposals, and evolution plans:
 - [governance.md](design/governance/governance.md) - Governance system design
 - [governance-primitives.md](design/governance/governance-primitives.md) - Governance building blocks
 - [witness-trust-validation.md](design/governance/witness-trust-validation.md) - Witness validation
+- [decision-receipt-authority-and-grant-minting.md](design/governance/decision-receipt-authority-and-grant-minting.md) - Decision-receipt authority modes + grant-minting design (#1868)
 
 **SDIS (`design/sdis/`):**
 - [README.md](design/sdis/README.md) - SDIS design documentation index

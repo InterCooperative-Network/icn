@@ -17,6 +17,8 @@
 
 ## 1. Problem
 
+<!-- truth: descriptive -->
+
 Low-blast membership-standing receipt emission is live — `MeetingAttendanceReceiptV2`
 (#1934) and `ActionItemCompletionReceiptV2` (#1935), both
 `NoMandateRequired { MembershipStandingOnly }`, persisted via the fail-closed
@@ -52,7 +54,7 @@ decides the authority model so the follow-up code lands honestly — no fake
 
 ## 3. The three authority modes
 
-<!-- truth: doctrine -->
+<!-- truth: normative -->
 
 A receipt's `ReceiptMandateAttestation` must name the *actual* authority mode. There are at
 least three; they must not be collapsed.
@@ -82,7 +84,7 @@ while a downstream execution receipt/act carries `Grant { grant_ref }`.
 
 ## 4. Recommendation: a process-authorized attestation, on a v3 decision receipt
 
-<!-- truth: prescriptive -->
+<!-- truth: normative -->
 
 **Add a positive "process-authorized" attestation mode and emit it on a new
 `GovernanceDecisionReceiptV3`.**
@@ -104,7 +106,7 @@ while a downstream execution receipt/act carries `Grant { grant_ref }`.
 
 ## 5. Per-path answers
 
-<!-- truth: prescriptive -->
+<!-- truth: normative -->
 
 | Decision path | Authority mode | Honest attestation | Emit when |
 |---|---|---|---|
@@ -126,7 +128,7 @@ Explicit answers to §12 Q4 and the review questions:
 
 ## 6. Grant-minting + target-binding gaps (for the execution path)
 
-<!-- truth: descriptive/prescriptive -->
+<!-- truth: normative -->
 
 Before any `Grant`-backed decision/execution attestation or `MandateGate` handler wiring is
 honest:
@@ -144,6 +146,8 @@ deferred.
 
 ## 7. Next-code sequencing (after this design RFCs)
 
+<!-- truth: normative -->
+
 1. **Extend the attestation taxonomy** per §4 (new `ProcessAuthorized` mode) — the smallest
    typed change in `icn-governance/src/proof.rs`, plus `GovernanceDecisionReceiptV3` if the
    `:v3` rule is confirmed.
@@ -155,6 +159,8 @@ deferred.
    target binding (§6), and finally `MandateGate::require()` handler wiring.
 
 ## 8. Open questions for the ADR
+
+<!-- truth: descriptive -->
 
 - `ProcessAuthorized` as a distinct attestation variant (recommended) vs a new
   `NoMandateReason` — freeze the shape.
