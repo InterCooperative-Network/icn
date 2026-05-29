@@ -2741,7 +2741,10 @@ pub async fn update_action_item<E: GovernanceEventEmitter + Clone + 'static>(
     path: web::Path<(String, String)>,
     req: web::Json<UpdateActionItemRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_any_scope::<BasicClaims>(
+    // Record the scope that actually authorized the request (evidence) — used
+    // when this update transitions the item into Completed. Narrowest-first so
+    // the narrow class scope is preferred when both are present.
+    let (claims, presented_scope) = require_any_scope_matched::<BasicClaims>(
         &http_req,
         &["governance:meeting:write", "governance:write"],
     )?;
@@ -2819,7 +2822,7 @@ pub async fn update_action_item<E: GovernanceEventEmitter + Clone + 'static>(
     let final_item = if let Some(new_status) = requested_status {
         if new_status != prior_status {
             ctx.manager
-                .update_action_item_status(&domain, &id, new_status, &user_did)
+                .update_action_item_status(&domain, &id, new_status, &user_did, &presented_scope)
                 .map_err(anyhow_to_api)?
         } else {
             item
@@ -2875,7 +2878,10 @@ pub async fn update_action_item_status<E: GovernanceEventEmitter + Clone + 'stat
     path: web::Path<(String, String)>,
     req: web::Json<StatusUpdateRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_any_scope::<BasicClaims>(
+    // Record the scope that actually authorized the request (evidence): the
+    // narrowed class scope when present, else the legacy broad scope during
+    // the compatibility period. Listed narrowest-first so it is preferred.
+    let (claims, presented_scope) = require_any_scope_matched::<BasicClaims>(
         &http_req,
         &["governance:meeting:write", "governance:write"],
     )?;
@@ -2904,7 +2910,7 @@ pub async fn update_action_item_status<E: GovernanceEventEmitter + Clone + 'stat
     let new_status = parse_status(&req.status)?;
     let item = ctx
         .manager
-        .update_action_item_status(&domain, &id, new_status, &user_did)
+        .update_action_item_status(&domain, &id, new_status, &user_did, &presented_scope)
         .map_err(anyhow_to_api)?;
 
     Ok(HttpResponse::Ok().json(action_item_to_response(&item)))

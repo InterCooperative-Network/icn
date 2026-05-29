@@ -47,9 +47,10 @@ use std::sync::{Arc, Mutex};
 
 use actix_web::{body::to_bytes, dev::Service as _, http::StatusCode, test, App, HttpMessage};
 use icn_governance::{
-    ActionItemCompletionReceipt, ActionItemPriority, ActionItemStatus, ActionItemTransition,
-    AuthorityGrant, GovernanceDecisionReceipt, GovernanceDomainId, GovernanceParams,
-    MembershipConfig, MembershipSource,
+    ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, ActionItemPriority,
+    ActionItemStatus, ActionItemTransition, AuthorityGrant, GovernanceDecisionReceipt,
+    GovernanceDomainId, GovernanceParams, MembershipConfig, MembershipSource, NoMandateReason,
+    ReceiptMandateAttestation,
 };
 use icn_governance_actor::{
     dispatch_evidence::EffectDispatchEvidence,
@@ -72,6 +73,7 @@ use serde_json::Value;
 struct TestReceiptStore {
     governance: Mutex<Vec<GovernanceDecisionReceipt>>,
     action_item_completions: Mutex<Vec<ActionItemCompletionReceipt>>,
+    action_item_completions_v2: Mutex<Vec<ActionItemCompletionReceiptV2>>,
 }
 
 impl GovernanceReceiptBackend for TestReceiptStore {
@@ -149,6 +151,17 @@ impl GovernanceReceiptBackend for TestReceiptStore {
         Ok(())
     }
 
+    fn put_action_item_completion_v2(
+        &self,
+        receipt: &ActionItemCompletionReceiptV2,
+    ) -> Result<(), String> {
+        self.action_item_completions_v2
+            .lock()
+            .unwrap()
+            .push(receipt.clone());
+        Ok(())
+    }
+
     fn get_action_item_completion_by_item(
         &self,
         item_id: &str,
@@ -186,6 +199,17 @@ impl TestReceiptStore {
             .filter(|r| r.item_id == item_id)
             .count()
     }
+
+    /// All v2 completion receipts captured for an item id.
+    fn v2_for_item(&self, item_id: &str) -> Vec<ActionItemCompletionReceiptV2> {
+        self.action_item_completions_v2
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|r| r.item_id == item_id)
+            .cloned()
+            .collect()
+    }
 }
 
 /// A backend whose `put_action_item_completion` always rejects, used to
@@ -220,6 +244,63 @@ impl GovernanceReceiptBackend for FailingCompletionStore {
         _receipt: &ActionItemCompletionReceipt,
     ) -> Result<(), String> {
         Err("simulated receipt backend failure".to_string())
+    }
+}
+
+/// One captured opaque-storage write: `(class, key1, key2, payload)`.
+type CapturedOpaque = (String, String, Option<String>, Vec<u8>);
+
+/// A backend that overrides **only** the opaque storage primitive (like the
+/// production gateway-backed `ReceiptStore`, which overrides `put_opaque` but
+/// has no typed `put_action_item_completion_v2`). Proves the v2 typed default
+/// routes through `put_opaque` so production persists the evidence rather than
+/// silently dropping it.
+#[derive(Default)]
+struct OpaqueCapturingStore {
+    opaque: Mutex<Vec<CapturedOpaque>>,
+}
+
+impl GovernanceReceiptBackend for OpaqueCapturingStore {
+    fn put_governance(&self, _r: &GovernanceDecisionReceipt) -> Result<(), String> {
+        Ok(())
+    }
+    fn get_governance_by_proposal(
+        &self,
+        _p: &str,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        Ok(None)
+    }
+    fn put_allocation(&self, _r: &AllocationReceipt) -> Result<Hash, String> {
+        Ok([0u8; 32])
+    }
+    fn get_governance_by_decision(
+        &self,
+        _h: &Hash,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        Ok(None)
+    }
+    fn list_allocations_by_decision(&self, _h: &Hash) -> Result<Vec<AllocationReceipt>, String> {
+        Ok(vec![])
+    }
+    // Note: no `put_action_item_completion_v2` override — exercises the typed
+    // default's opaque-routing path. v1 `put_action_item_completion` inherits
+    // the trait no-op default (v1 persistence is not under test here).
+    fn put_opaque(
+        &self,
+        class: &str,
+        key1: &str,
+        key2: Option<&str>,
+        _recorded_at: u64,
+        _record_hash: [u8; 32],
+        payload: &[u8],
+    ) -> Result<(), String> {
+        self.opaque.lock().unwrap().push((
+            class.to_string(),
+            key1.to_string(),
+            key2.map(str::to_string),
+            payload.to_vec(),
+        ));
+        Ok(())
     }
 }
 
@@ -363,7 +444,13 @@ async fn action_item_completion_receipt_chain_end_to_end() {
     let updated = h
         .ctx
         .manager
-        .update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller)
+        .update_action_item_status(
+            &domain,
+            &item.id,
+            ActionItemStatus::Completed,
+            &caller,
+            "governance:meeting:write",
+        )
         .expect("update_action_item_status -> Completed");
     assert_eq!(updated.status, ActionItemStatus::Completed);
 
@@ -403,7 +490,13 @@ async fn action_item_completion_receipt_chain_end_to_end() {
     let _ = h
         .ctx
         .manager
-        .update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller)
+        .update_action_item_status(
+            &domain,
+            &item.id,
+            ActionItemStatus::Completed,
+            &caller,
+            "governance:meeting:write",
+        )
         .expect("idempotent re-complete");
     assert_eq!(
         h.receipts.completion_count_for(&item_id_str),
@@ -440,7 +533,13 @@ async fn another_did_does_not_see_first_did_completion_via_action_cards() {
 
     h.ctx
         .manager
-        .update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &alice)
+        .update_action_item_status(
+            &domain,
+            &item.id,
+            ActionItemStatus::Completed,
+            &alice,
+            "governance:meeting:write",
+        )
         .expect("alice complete");
 
     // Bob: not a member, never assigned. Must not see a card pointing at
@@ -486,7 +585,13 @@ async fn completion_receipt_uses_regulatory_safe_vocabulary() {
 
     h.ctx
         .manager
-        .update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller)
+        .update_action_item_status(
+            &domain,
+            &item.id,
+            ActionItemStatus::Completed,
+            &caller,
+            "governance:meeting:write",
+        )
         .expect("complete");
 
     let receipt = h
@@ -631,8 +736,13 @@ async fn receipt_backend_failure_prevents_completed_status_commit() {
         .expect("create_action_item");
     let prior_status = item.status;
 
-    let result =
-        manager.update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller);
+    let result = manager.update_action_item_status(
+        &domain,
+        &item.id,
+        ActionItemStatus::Completed,
+        &caller,
+        "governance:meeting:write",
+    );
     assert!(
         result.is_err(),
         "completion must fail when the receipt backend rejects the receipt"
@@ -680,7 +790,13 @@ async fn reopen_and_recomplete_preserves_completion_history() {
     // First completion.
     h.ctx
         .manager
-        .update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller)
+        .update_action_item_status(
+            &domain,
+            &item.id,
+            ActionItemStatus::Completed,
+            &caller,
+            "governance:meeting:write",
+        )
         .expect("first complete");
     let first_receipt = h
         .receipts
@@ -699,13 +815,25 @@ async fn reopen_and_recomplete_preserves_completion_history() {
     // Reopen.
     h.ctx
         .manager
-        .update_action_item_status(&domain, &item.id, ActionItemStatus::InProgress, &caller)
+        .update_action_item_status(
+            &domain,
+            &item.id,
+            ActionItemStatus::InProgress,
+            &caller,
+            "governance:meeting:write",
+        )
         .expect("reopen via InProgress");
 
     // Second completion.
     h.ctx
         .manager
-        .update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller)
+        .update_action_item_status(
+            &domain,
+            &item.id,
+            ActionItemStatus::Completed,
+            &caller,
+            "governance:meeting:write",
+        )
         .expect("second complete");
 
     let chain = h
@@ -795,7 +923,13 @@ async fn completion_receipt_endpoint_returns_persisted_receipt() {
     let updated = h
         .ctx
         .manager
-        .update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller)
+        .update_action_item_status(
+            &domain,
+            &item.id,
+            ActionItemStatus::Completed,
+            &caller,
+            "governance:meeting:write",
+        )
         .expect("update_action_item_status -> Completed");
 
     // GET the new endpoint as the same caller (governance:read). The
@@ -894,7 +1028,13 @@ async fn completion_receipt_endpoint_does_not_leak_across_domains() {
         .expect("create_action_item");
     h.ctx
         .manager
-        .update_action_item_status(&dom_a, &item.id, ActionItemStatus::Completed, &caller)
+        .update_action_item_status(
+            &dom_a,
+            &item.id,
+            ActionItemStatus::Completed,
+            &caller,
+            "governance:meeting:write",
+        )
         .expect("complete in dom_a");
     let item_id = item.id.to_string();
 
@@ -948,7 +1088,13 @@ async fn completion_receipt_endpoint_response_uses_regulatory_safe_vocabulary() 
         .expect("create_action_item");
     h.ctx
         .manager
-        .update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller)
+        .update_action_item_status(
+            &domain,
+            &item.id,
+            ActionItemStatus::Completed,
+            &caller,
+            "governance:meeting:write",
+        )
         .expect("complete");
 
     let app = gov_app_with_scope!(h.ctx.clone(), &caller, "governance:read");
@@ -1004,7 +1150,13 @@ async fn completion_receipt_endpoint_canonicalizes_non_canonical_uuids() {
         .expect("create_action_item");
     h.ctx
         .manager
-        .update_action_item_status(&domain, &item.id, ActionItemStatus::Completed, &caller)
+        .update_action_item_status(
+            &domain,
+            &item.id,
+            ActionItemStatus::Completed,
+            &caller,
+            "governance:meeting:write",
+        )
         .expect("complete");
 
     let item_id_lower = item.id.to_string();
@@ -1038,4 +1190,186 @@ async fn completion_receipt_endpoint_canonicalizes_non_canonical_uuids() {
             "response item_id must be the canonical lowercase form regardless of input casing"
         );
     }
+}
+
+// ============================================================================
+// #1868: v2 action-item completion receipt emission
+// ============================================================================
+
+/// A completion transition emits an `ActionItemCompletionReceiptV2` alongside
+/// the v1 receipt, recording the capability scope that **actually** authorized
+/// the request and the explicit `NoMandateRequired { MembershipStandingOnly }`
+/// attestation (action-item completion is membership-standing-only — no
+/// MandateGate, no grant).
+#[actix_web::test]
+async fn action_item_completion_emits_v2_recording_accepted_scope() {
+    let receipts = Arc::new(TestReceiptStore::default());
+    let mgr = GovernanceManager::new()
+        .with_receipt_store(receipts.clone() as Arc<dyn GovernanceReceiptBackend>);
+
+    let caller = fresh_did();
+    let domain = seed_domain_with_member(&mgr, &caller, "test-coop").await;
+
+    let mk_item = |title: &str| {
+        mgr.create_action_item(
+            domain.clone(),
+            title.to_string(),
+            None,
+            caller.clone(),
+            Some(caller.clone()),
+            None,
+            ActionItemPriority::Medium,
+            None,
+            None,
+            vec!["fictional".to_string()],
+        )
+        .expect("create_action_item")
+    };
+
+    // Accepted via the narrowed class scope.
+    let item_narrow = mk_item("Narrow-scope completion (fictional)");
+    mgr.update_action_item_status(
+        &domain,
+        &item_narrow.id,
+        ActionItemStatus::Completed,
+        &caller,
+        "governance:meeting:write",
+    )
+    .expect("complete (meeting:write)");
+
+    // Accepted only via the legacy broad scope during the compatibility period.
+    let item_legacy = mk_item("Legacy-scope completion (fictional)");
+    mgr.update_action_item_status(
+        &domain,
+        &item_legacy.id,
+        ActionItemStatus::Completed,
+        &caller,
+        "governance:write",
+    )
+    .expect("complete (legacy write)");
+
+    // ── v2 emitted, recording the accepted scope verbatim + the explicit
+    //    no-mandate attestation.
+    let narrow_v2 = receipts.v2_for_item(&item_narrow.id.to_string());
+    assert_eq!(
+        narrow_v2.len(),
+        1,
+        "exactly one v2 receipt for the narrow item"
+    );
+    let narrow = &narrow_v2[0];
+    assert_eq!(
+        narrow.capability_scope_presented,
+        "governance:meeting:write"
+    );
+    assert_eq!(
+        narrow.mandate_attestation,
+        ReceiptMandateAttestation::NoMandateRequired {
+            reason: NoMandateReason::MembershipStandingOnly,
+        },
+        "action-item completion is membership-standing-only — no mandate grant"
+    );
+    assert!(
+        narrow.verify(),
+        "emitted v2 receipt must verify its own hash"
+    );
+    assert_eq!(narrow.actor_did, caller.to_string());
+    assert_eq!(narrow.transition, ActionItemTransition::Completed);
+
+    // ── Legacy-scope acceptance must record "governance:write", NOT the
+    //    preferred class scope: the field is evidence of what authorized
+    //    the request.
+    let legacy_v2 = receipts.v2_for_item(&item_legacy.id.to_string());
+    assert_eq!(legacy_v2.len(), 1);
+    assert_eq!(
+        legacy_v2[0].capability_scope_presented, "governance:write",
+        "a request accepted via the legacy broad scope must not claim the narrowed class scope"
+    );
+    assert!(legacy_v2[0].verify());
+
+    // ── v1 still emitted alongside (no consumer regression).
+    assert_eq!(
+        receipts.completion_count_for(&item_narrow.id.to_string()),
+        1,
+        "v1 receipt must still be emitted alongside v2"
+    );
+}
+
+/// A backend that overrides only `put_opaque` (like the production
+/// gateway-backed `ReceiptStore`, which has no typed
+/// `put_action_item_completion_v2`) must still durably receive the v2 receipt
+/// via the typed default's opaque-routing path — proving the evidence is
+/// persisted in production, not silently dropped.
+#[actix_web::test]
+async fn action_item_completion_v2_default_routes_through_opaque_storage() {
+    let receipts = Arc::new(OpaqueCapturingStore::default());
+    let mgr = GovernanceManager::new()
+        .with_receipt_store(receipts.clone() as Arc<dyn GovernanceReceiptBackend>);
+
+    let caller = fresh_did();
+    let domain = seed_domain_with_member(&mgr, &caller, "test-coop").await;
+
+    let item = mgr
+        .create_action_item(
+            domain.clone(),
+            "Opaque-routing completion (fictional)".to_string(),
+            None,
+            caller.clone(),
+            Some(caller.clone()),
+            None,
+            ActionItemPriority::Medium,
+            None,
+            None,
+            vec!["fictional".to_string()],
+        )
+        .expect("create_action_item");
+
+    mgr.update_action_item_status(
+        &domain,
+        &item.id,
+        ActionItemStatus::Completed,
+        &caller,
+        "governance:meeting:write",
+    )
+    .expect("complete");
+
+    // The typed default serialised the v2 receipt and routed it through
+    // `put_opaque` under the action-item-completion-v2 class — exactly what the
+    // production gateway persists.
+    let captured = receipts.opaque.lock().unwrap().clone();
+    let v2: Vec<_> = captured
+        .iter()
+        .filter(|(class, _, _, _)| class == "action_item_completion_v2")
+        .collect();
+    assert_eq!(
+        v2.len(),
+        1,
+        "exactly one v2 receipt must route through opaque storage (not be dropped)"
+    );
+    let (_class, key1, key2, payload) = v2[0];
+    assert_eq!(
+        key1,
+        &item.id.to_string(),
+        "opaque key1 must be the item id"
+    );
+    assert_eq!(
+        key2.as_deref(),
+        None,
+        "opaque key2 mirrors the v1 by-item index (none)"
+    );
+    let receipt: ActionItemCompletionReceiptV2 =
+        serde_json::from_slice(payload).expect("opaque payload deserializes to v2 receipt");
+    assert!(
+        receipt.verify(),
+        "routed v2 receipt must verify its own hash"
+    );
+    assert_eq!(
+        receipt.capability_scope_presented,
+        "governance:meeting:write"
+    );
+    assert_eq!(
+        receipt.mandate_attestation,
+        ReceiptMandateAttestation::NoMandateRequired {
+            reason: NoMandateReason::MembershipStandingOnly,
+        }
+    );
 }

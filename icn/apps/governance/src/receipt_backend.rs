@@ -2,9 +2,9 @@
 //! in this crate without a circular dependency on icn-gateway.
 
 use icn_governance::{
-    ActionItemCompletionReceipt, AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt,
-    Grantee, Mandate, MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, ProcessGateKind,
-    ProcessGateResultReceipt, Timestamp,
+    ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, AuthorityGrant, AuthorityGrantId,
+    GovernanceDecisionReceipt, Grantee, Mandate, MeetingAttendanceReceipt,
+    MeetingAttendanceReceiptV2, ProcessGateKind, ProcessGateResultReceipt, Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -19,6 +19,11 @@ const PROCESS_GATE_RESULT_CLASS: &str = "process_gate_result";
 /// Chosen in the apps layer so the gateway persists v2 attendance evidence
 /// without importing the typed name (preserves the meaning firewall).
 const MEETING_ATTENDANCE_V2_CLASS: &str = "meeting_attendance_v2";
+
+/// Class string for `ActionItemCompletionReceiptV2` opaque storage (#1868).
+/// Chosen in the apps layer so the gateway persists v2 completion evidence
+/// without importing the typed name (preserves the meaning firewall).
+const ACTION_ITEM_COMPLETION_V2_CLASS: &str = "action_item_completion_v2";
 
 /// Stable string mapping for `ProcessGateKind` used as the
 /// opaque-storage `key2`. Distinct from serde wire form so the
@@ -360,6 +365,44 @@ pub trait GovernanceReceiptBackend: Send + Sync {
         _receipt: &ActionItemCompletionReceipt,
     ) -> Result<(), String> {
         Ok(())
+    }
+
+    /// Persist an [`ActionItemCompletionReceiptV2`] — the #1868 v2 form
+    /// carrying `capability_scope_presented` and an explicit
+    /// [`ReceiptMandateAttestation`](icn_governance::ReceiptMandateAttestation).
+    /// Emitted **alongside** the v1 receipt by the migrated
+    /// `update_action_item_status` path (v1 emission + consumers unchanged).
+    ///
+    /// Append-only and idempotent on `record_hash`, same discipline as
+    /// [`Self::put_action_item_completion`].
+    ///
+    /// **Default routes through opaque storage** (same pattern as
+    /// [`Self::put_meeting_attendance_v2`] / [`Self::put_process_gate_result`]):
+    /// the typed receipt is serialised to JSON and delegated to
+    /// [`Self::put_opaque`] under class `"action_item_completion_v2"` with
+    /// `key1 = receipt.item_id`, `key2 = None` (mirrors the v1 by-item index).
+    /// The production gateway-backed `ReceiptStore` overrides `put_opaque`
+    /// (Stage 1b), so it gets durable persistence here **without** importing
+    /// `ActionItemCompletionReceiptV2` — the meaning firewall stays put. A
+    /// backend that does not implement opaque storage hits the `put_opaque`
+    /// fail-closed default (`opaque_storage_not_implemented`) rather than
+    /// silently dropping the v2 evidence. Backends wanting custom typed
+    /// persistence (e.g. an in-memory test store) may still override this
+    /// method directly.
+    fn put_action_item_completion_v2(
+        &self,
+        receipt: &ActionItemCompletionReceiptV2,
+    ) -> Result<(), String> {
+        let payload = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize ActionItemCompletionReceiptV2: {e}"))?;
+        self.put_opaque(
+            ACTION_ITEM_COMPLETION_V2_CLASS,
+            &receipt.item_id,
+            None,
+            receipt.completed_at,
+            receipt.record_hash,
+            &payload,
+        )
     }
 
     /// Retrieve the latest [`ActionItemCompletionReceipt`] for an action
