@@ -4894,13 +4894,21 @@ impl GovernanceManager {
         Ok(item)
     }
 
-    /// Update the status of an action item
+    /// Update the status of an action item.
+    ///
+    /// `capability_scope` is the capability scope that actually authorized the
+    /// request (e.g. `"governance:meeting:write"`, or the legacy
+    /// `"governance:write"` during the compatibility period). It is recorded
+    /// verbatim into the emitted [`ActionItemCompletionReceiptV2`]'s
+    /// `capability_scope_presented` field — it is evidence, so callers must
+    /// pass the accepted scope, not a canonical preferred one.
     pub fn update_action_item_status(
         &self,
         domain_id: &GovernanceDomainId,
         id: &ActionItemId,
         status: ActionItemStatus,
         actor: &icn_identity::Did,
+        capability_scope: &str,
     ) -> Result<ActionItem> {
         let mut item = self
             .action_items
@@ -4934,6 +4942,36 @@ impl GovernanceManager {
                         "Failed to persist action item completion receipt for {id}: {e}"
                     )
                 })?;
+
+                // #1868: emit the v2 receipt alongside v1. Action-item
+                // completion is a membership-standing-only act (decomposition
+                // §6 — governance:meeting:write, "no mandate beyond
+                // membership-in-good-standing"), so the attestation is the
+                // explicit `NoMandateRequired { MembershipStandingOnly }`
+                // discriminator — no MandateGate call, no grant.
+                // `capability_scope` is recorded verbatim as the scope that
+                // authorized this request.
+                let receipt_v2 = icn_governance::ActionItemCompletionReceiptV2::new(
+                    item.id.to_string(),
+                    item.domain_id.0.clone(),
+                    actor.to_string(),
+                    icn_governance::ActionItemTransition::Completed,
+                    now,
+                    capability_scope.to_string(),
+                    icn_governance::ReceiptMandateAttestation::NoMandateRequired {
+                        reason: icn_governance::NoMandateReason::MembershipStandingOnly,
+                    },
+                )
+                .map_err(|e| {
+                    anyhow::anyhow!("Invalid v2 action item completion receipt for {id}: {e}")
+                })?;
+                store
+                    .put_action_item_completion_v2(&receipt_v2)
+                    .map_err(|e| {
+                        anyhow::anyhow!(
+                            "Failed to persist v2 action item completion receipt for {id}: {e}"
+                        )
+                    })?;
             }
         }
 
