@@ -215,15 +215,26 @@ jobs:
         run: |
           # Runs even on failure. Bound the build cache (the silent accumulator
           # the weekly image-only cleanup never touched) while keeping recent
-          # layers for fast incremental rebuilds. Then drop dangling layers and
-          # reap old icn:<sha> images (one piles up per merge), keeping the 3
-          # most recent. The runner's Docker images are never used by K3s
-          # (K3s uses its own containerd), so removing them here is safe.
-          docker builder prune -f --keep-storage 20GB || true
-          docker image prune -f || true
-          old_icn=$(docker images icn --format '{{.ID}}' | awk '!seen[$0]++' | awk 'NR>3')
+          # layers for fast incremental rebuilds. Then prune dangling images
+          # and reap old icn:<sha> images (one piles up per merge), keeping the
+          # 3 most recently created. The runner's Docker images are never used
+          # by K3s (K3s uses its own containerd), so removing them here is safe.
+          # Cleanup must not fail the (already-succeeded) deploy, but a failed
+          # prune is surfaced as a warning so cache-bounding regressions to disk
+          # exhaustion don't go silent.
+          docker builder prune -f --keep-storage 20GB \
+            || echo "::warning::docker builder prune failed on ci-runner — build cache not bounded this run; check Docker/BuildKit"
+          docker image prune -f \
+            || echo "::warning::docker image prune (dangling) failed on ci-runner"
+          # Sort icn images newest-first by creation time before keeping the 3
+          # newest — `docker images` default ordering is not a stable contract,
+          # so sorting explicitly avoids reaping newer images by accident.
+          old_icn=$(docker images icn --format '{{.CreatedAt}}|{{.ID}}' \
+            | sort -r \
+            | awk -F'|' '!seen[$2]++ {print $2}' \
+            | awk 'NR>3')
           if [ -n "$old_icn" ]; then
-            echo "Reaping old icn images (keeping 3 most recent):"
+            echo "Reaping old icn images (keeping 3 most recently created):"
             echo "$old_icn"
             echo "$old_icn" | xargs -r docker rmi -f 2>/dev/null || true
           fi
