@@ -3561,43 +3561,27 @@ impl GovernanceManager {
             }
 
             if let Some(ref store) = self.receipt_store {
-                let receipt = GovernanceDecisionReceipt::new(
-                    proposal_id.0.clone(),
-                    proposal.domain_id.0.clone(),
-                    outcome,
-                    tally.clone(),
-                    &proposal_votes,
-                );
-                if let Err(e) = store.put_governance(&receipt) {
-                    tracing::error!(
-                        proposal_id = %proposal_id.0,
-                        error = %e,
-                        "Failed to store governance decision receipt — provenance chain broken"
-                    );
-                    // Escalated from warn to error: receipt store failure means
-                    // the governance→economics provenance chain is broken (PS-3).
-                    if requires_execution_closure {
-                        anyhow::bail!(
-                            "Proposal '{}' requires execution closure but governance receipt persistence failed: {e}",
-                            proposal_id.0
-                        );
-                    }
-                }
-
-                // #1868: emit a process-authorized GovernanceDecisionReceiptV3
-                // alongside v1 — ONLY when a capability scope was actually
-                // presented (the scoped HTTP close path). `capability_scope` is
-                // `None` for unscoped/timer entry points, which emit no v3
+                // #1868: persist a process-authorized GovernanceDecisionReceiptV3
+                // as a PREFLIGHT — before the v1 receipt below and before the
+                // terminal `proposal.close(...)` — ONLY when a capability scope was
+                // actually presented (the scoped HTTP close path). `capability_scope`
+                // is `None` for unscoped/timer entry points, which emit no v3
                 // because nothing was presented (the field is evidence, never a
                 // constant). Mirrors the actor close path so the in-memory and
-                // actor backends produce the same v3 evidence. Routes through the
-                // fail-closed `put_governance_decision_v3` → `put_opaque` seam.
+                // actor backends produce the same v3 evidence.
+                //
+                // Ordering matters: persisting v3 first means a v3 persistence
+                // failure fails closed (bail below) before any durable v1 decision
+                // receipt is written, so a still-Open proposal never has a
+                // contradictory committed receipt exposed via `get_chain`. Routes
+                // through the fail-closed `put_governance_decision_v3` →
+                // `put_opaque` seam.
                 if let Some(scope) = capability_scope {
                     let receipt_v3 = icn_governance::GovernanceDecisionReceiptV3::new(
                         proposal_id.0.clone(),
                         proposal.domain_id.0.clone(),
                         outcome,
-                        tally,
+                        tally.clone(),
                         &proposal_votes,
                         scope.to_string(),
                         icn_governance::ReceiptMandateAttestation::ProcessAuthorized,
@@ -3616,14 +3600,42 @@ impl GovernanceManager {
                         );
                         // Fail closed, unconditionally. A scoped close emits the
                         // v3 receipt as required decision evidence; this runs
-                        // before the terminal `proposal.close(...)` below, so
-                        // bailing leaves the proposal Open rather than committing
-                        // a close without its evidence. Matches the actor path and
-                        // the fail-closed opaque-storage contract — not guarded by
-                        // `requires_execution_closure` (which only gates the v1
-                        // provenance-chain bail above).
+                        // before the v1 receipt write and the terminal
+                        // `proposal.close(...)` below, so bailing leaves the
+                        // proposal Open with NO durable decision artifact rather
+                        // than half-persisting a close (a durable v1 receipt for an
+                        // Open proposal). Not guarded by `requires_execution_closure`
+                        // (which only gates the v1 provenance-chain bail below).
                         anyhow::bail!(
                             "Proposal '{}' close aborted: v3 decision receipt persistence failed: {e}",
+                            proposal_id.0
+                        );
+                    }
+                }
+
+                // v1 GovernanceDecisionReceipt, emitted after the v3 preflight
+                // above. For a scoped close the v3 evidence is already durable by
+                // this point; an unscoped close has no v3 and this v1 receipt is
+                // the decision record. A put_governance failure here is fatal only
+                // when execution closure is required (PS-3 provenance chain).
+                let receipt = GovernanceDecisionReceipt::new(
+                    proposal_id.0.clone(),
+                    proposal.domain_id.0.clone(),
+                    outcome,
+                    tally.clone(),
+                    &proposal_votes,
+                );
+                if let Err(e) = store.put_governance(&receipt) {
+                    tracing::error!(
+                        proposal_id = %proposal_id.0,
+                        error = %e,
+                        "Failed to store governance decision receipt — provenance chain broken"
+                    );
+                    // Escalated from warn to error: receipt store failure means
+                    // the governance→economics provenance chain is broken (PS-3).
+                    if requires_execution_closure {
+                        anyhow::bail!(
+                            "Proposal '{}' requires execution closure but governance receipt persistence failed: {e}",
                             proposal_id.0
                         );
                     }

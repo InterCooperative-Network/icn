@@ -28,7 +28,7 @@ use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_governance::{
     ForcedOutcome, GovernanceDecisionReceipt, GovernanceDecisionReceiptV3, GovernanceDomainId,
     GovernanceOps, GovernanceParams, MembershipConfig, ProofOutcome, ProposalId, ProposalPayload,
-    ProposalScope, ReceiptMandateAttestation, StaticMembershipResolver, VoteChoice,
+    ProposalScope, ProposalState, ReceiptMandateAttestation, StaticMembershipResolver, VoteChoice,
 };
 use icn_governance_actor::{
     actor::GovernanceActor, manager::GovernanceManager, receipt_backend::GovernanceReceiptBackend,
@@ -124,10 +124,22 @@ impl GovernanceReceiptBackend for CapturingBackend {
 // fail-closed `put_opaque` default (`opaque_storage_not_implemented`), so a v3
 // emission through it must error rather than drop silently.
 #[derive(Default)]
-struct NoOpaqueBackend;
+struct NoOpaqueBackend {
+    // Records every v1 receipt write so a test can prove the v3 preflight bails
+    // BEFORE any durable v1 decision receipt is written when opaque storage is
+    // unavailable.
+    v1: Mutex<Vec<GovernanceDecisionReceipt>>,
+}
+
+impl NoOpaqueBackend {
+    fn v1_count(&self) -> usize {
+        self.v1.lock().unwrap().len()
+    }
+}
 
 impl GovernanceReceiptBackend for NoOpaqueBackend {
-    fn put_governance(&self, _: &GovernanceDecisionReceipt) -> Result<(), String> {
+    fn put_governance(&self, receipt: &GovernanceDecisionReceipt) -> Result<(), String> {
+        self.v1.lock().unwrap().push(receipt.clone());
         Ok(())
     }
     fn get_governance_by_proposal(
@@ -265,9 +277,9 @@ async fn in_memory_scoped_close_v3_persistence_failure_is_fail_closed() {
     // In-memory path parity with the actor: a scoped close on a backend without
     // opaque storage must fail closed, not log-and-commit. The proposal must
     // remain un-closed (Open) so the decision is never committed without its v3.
-    let backend = Arc::new(NoOpaqueBackend);
+    let backend = Arc::new(NoOpaqueBackend::default());
     let (mgr, _domain, proposal_id, _did) =
-        seeded_in_memory_manager(backend as Arc<dyn GovernanceReceiptBackend>).await;
+        seeded_in_memory_manager(backend.clone() as Arc<dyn GovernanceReceiptBackend>).await;
 
     let result = mgr
         .close_proposal_with_suspension(
@@ -280,6 +292,28 @@ async fn in_memory_scoped_close_v3_persistence_failure_is_fail_closed() {
     assert!(
         result.is_err(),
         "standalone v3 persistence failure must fail the close closed, not drop evidence"
+    );
+
+    // Preflight guarantee: the v3 write runs BEFORE the v1 put_governance, so a
+    // v3 failure must leave NO durable v1 decision receipt behind — otherwise
+    // `get_chain` could expose a committed receipt for a proposal that never
+    // closed.
+    assert_eq!(
+        backend.v1_count(),
+        0,
+        "v3 preflight must bail before any durable v1 receipt is written"
+    );
+
+    // And the proposal itself must remain Open (the close never committed).
+    let proposal = mgr
+        .get_proposal(&proposal_id)
+        .await
+        .expect("get_proposal")
+        .expect("proposal exists");
+    assert!(
+        matches!(proposal.state, ProposalState::Open { .. }),
+        "proposal must remain Open after a fail-closed v3 persistence, got {:?}",
+        proposal.state
     );
 }
 
@@ -313,10 +347,23 @@ async fn seeded_actor(
     let gossip = gossip_with_governance_topic(did.clone()).await;
     let resolver = Arc::new(StaticMembershipResolver::new());
 
-    let actor_handle =
-        GovernanceActor::spawn(did.clone(), store.clone(), gossip, resolver, None, None)
-            .await
-            .expect("spawn actor");
+    // Install a signing key so the close path also generates + persists a
+    // GovernanceProofV2. This makes the v3-preflight ordering observable: the
+    // fail-closed test asserts a v3 persistence failure leaves no proof behind.
+    let signing_key = Arc::new(ed25519_dalek::SigningKey::from_bytes(
+        &bundle.keypair().expect("keypair").to_signing_key_bytes(),
+    ));
+
+    let actor_handle = GovernanceActor::spawn(
+        did.clone(),
+        store.clone(),
+        gossip,
+        resolver,
+        None,
+        Some(signing_key),
+    )
+    .await
+    .expect("spawn actor");
     let manager = GovernanceManager::with_handle(
         Arc::new(actor_handle.clone()) as Arc<dyn GovernanceOps + Send + Sync>
     );
@@ -365,7 +412,7 @@ async fn seeded_actor(
 #[tokio::test(flavor = "current_thread")]
 async fn actor_scoped_close_emits_process_authorized_v3() {
     let backend = Arc::new(CapturingBackend::default());
-    let (manager, _handle, proposal_id) =
+    let (manager, handle, proposal_id) =
         seeded_actor(backend.clone() as Arc<dyn GovernanceReceiptBackend>).await;
 
     manager
@@ -389,6 +436,18 @@ async fn actor_scoped_close_emits_process_authorized_v3() {
         ReceiptMandateAttestation::ProcessAuthorized
     ));
     assert!(v3.verify(), "emitted v3 receipt must verify");
+
+    // Existing proof behavior preserved after the v3 preflight: a signing key is
+    // configured in `seeded_actor`, so a successful scoped close still persists a
+    // GovernanceProofV2 alongside the v3 decision receipt.
+    assert!(
+        handle
+            .get_proof(&proposal_id)
+            .await
+            .expect("get_proof query")
+            .is_some(),
+        "successful scoped close must still persist a GovernanceProofV2 alongside v3"
+    );
 }
 
 #[tokio::test(flavor = "current_thread")]
@@ -443,15 +502,16 @@ async fn actor_force_accept_emits_no_decision_v2_or_v3() {
 #[tokio::test(flavor = "current_thread")]
 async fn actor_scoped_close_v3_persistence_failure_is_fail_closed() {
     // Backend without opaque storage → the v3 emission hits the fail-closed
-    // `put_opaque` default. The actor persists v3 before the terminal close, so
-    // the whole close must fail rather than commit without its decision evidence.
-    let backend = Arc::new(NoOpaqueBackend);
-    let (manager, _handle, proposal_id) =
+    // `put_opaque` default. The actor persists v3 as a PREFLIGHT (before the
+    // GovernanceProofV2 and the terminal close), so the whole close must fail
+    // AND leave no durable closed-outcome proof behind.
+    let backend = Arc::new(NoOpaqueBackend::default());
+    let (manager, handle, proposal_id) =
         seeded_actor(backend as Arc<dyn GovernanceReceiptBackend>).await;
 
     let result = manager
         .close_proposal_with_suspension(
-            proposal_id,
+            proposal_id.clone(),
             None,
             None,
             Some("governance:write".to_string()),
@@ -461,5 +521,30 @@ async fn actor_scoped_close_v3_persistence_failure_is_fail_closed() {
     assert!(
         result.is_err(),
         "a v3 persistence failure must fail the close closed, not drop the evidence silently"
+    );
+
+    // Preflight guarantee: v3 runs before proof persistence, so no
+    // closed-outcome GovernanceProofV2 may be served for a proposal whose close
+    // was aborted. The signing key IS configured in `seeded_actor`, so a proof
+    // WOULD have been written had the v3 preflight not bailed first.
+    assert!(
+        handle
+            .get_proof(&proposal_id)
+            .await
+            .expect("get_proof query")
+            .is_none(),
+        "v3 preflight failure must leave no durable closed-outcome proof"
+    );
+
+    // And the proposal must remain Open — the close never committed.
+    let proposal = handle
+        .get_proposal(&proposal_id)
+        .await
+        .expect("get_proposal")
+        .expect("proposal exists");
+    assert!(
+        matches!(proposal.state, ProposalState::Open { .. }),
+        "proposal must remain Open after a fail-closed v3 persistence, got {:?}",
+        proposal.state
     );
 }

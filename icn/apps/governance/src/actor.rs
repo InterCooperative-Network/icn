@@ -2033,12 +2033,67 @@ impl GovernanceActor {
                     None
                 };
 
-                // Generate + persist GovernanceProofV2 BEFORE terminal proposal
-                // save. If proof persistence fails, the proposal must not be
-                // persisted as closed — otherwise the API returns Err while the
-                // store disagrees. Non-Accepted outcomes still emit a proof
-                // (useful for audit of rejection / no-quorum signals) but they
-                // bypass the Invariant 7 gate above.
+                // #1868: persist a process-authorized GovernanceDecisionReceiptV3
+                // as a PREFLIGHT — before the GovernanceProofV2 below and before
+                // the terminal `proposal.close`/`save_proposal` — but ONLY when the
+                // close was driven by an authenticated request that actually
+                // presented a capability scope. A normal democratic close is
+                // authorized by the governance process itself (eligible voters,
+                // period, quorum/threshold, tally) — not membership standing, not
+                // a personal grant — so the attestation is `ProcessAuthorized`.
+                //
+                // `capability_scope` is `None` for scheduler/timer auto-close
+                // (nothing was presented), so no v3 is emitted there: the field is
+                // evidence and must record what was actually presented, never a
+                // constant. Forced-accept (Bootstrap) is a separate path and is
+                // intentionally not emitted in this slice.
+                //
+                // Ordering matters: this runs BEFORE proof persistence (and the
+                // terminal close) so a v3 persistence failure fails closed without
+                // leaving a durable closed-outcome proof — or any other decision
+                // artifact — behind for a still-Open proposal. Routes through the
+                // fail-closed `put_governance_decision_v3` → `put_opaque` seam; the
+                // gateway never imports the v3 type.
+                if let Some(scope) = capability_scope.as_deref() {
+                    if let Some(ref store) = self.receipt_store {
+                        use icn_governance::proof::ProofOutcome;
+                        let v3_outcome = match outcome_result {
+                            DecisionOutcome::Accepted => ProofOutcome::Accepted,
+                            DecisionOutcome::Rejected => ProofOutcome::Rejected,
+                            DecisionOutcome::NoQuorum => ProofOutcome::NoQuorum,
+                        };
+                        let receipt_v3 = icn_governance::GovernanceDecisionReceiptV3::new(
+                            proposal_id.0.clone(),
+                            proposal.domain_id.0.clone(),
+                            v3_outcome,
+                            tally.clone(),
+                            &votes,
+                            scope.to_string(),
+                            icn_governance::ReceiptMandateAttestation::ProcessAuthorized,
+                        )
+                        .map_err(|e| {
+                            anyhow::anyhow!(
+                                "Invalid v3 decision receipt for proposal {}: {e}",
+                                proposal_id.0
+                            )
+                        })?;
+                        store
+                            .put_governance_decision_v3(&receipt_v3, now)
+                            .map_err(|e| {
+                                anyhow::anyhow!(
+                                    "Failed to persist v3 decision receipt for proposal {}: {e}",
+                                    proposal_id.0
+                                )
+                            })?;
+                    }
+                }
+
+                // Generate + persist GovernanceProofV2 after the v3 preflight and
+                // BEFORE terminal proposal save. If proof persistence fails, the
+                // proposal must not be persisted as closed — otherwise the API
+                // returns Err while the store disagrees. Non-Accepted outcomes
+                // still emit a proof (useful for audit of rejection / no-quorum
+                // signals) but they bypass the Invariant 7 gate above.
                 let proof_bytes = if let Some(ref signing_key) = self.signing_key {
                     use icn_governance::ProofOutcome;
 
@@ -2085,59 +2140,6 @@ impl GovernanceActor {
                     );
                     None
                 };
-
-                // #1868: emit a process-authorized GovernanceDecisionReceiptV3
-                // alongside the v1 receipt / GovernanceProofV2, but ONLY when the
-                // close was driven by an authenticated request that actually
-                // presented a capability scope. A normal democratic close is
-                // authorized by the governance process itself (eligible voters,
-                // period, quorum/threshold, tally) — not membership standing, not
-                // a personal grant — so the attestation is `ProcessAuthorized`.
-                //
-                // `capability_scope` is `None` for scheduler/timer auto-close
-                // (nothing was presented), so no v3 is emitted there: the field is
-                // evidence and must record what was actually presented, never a
-                // constant. Forced-accept (Bootstrap) is a separate path and is
-                // intentionally not emitted in this slice.
-                //
-                // Persisted before the terminal `proposal.close`/`save_proposal`
-                // so a persistence failure fails closed (the proposal stays open)
-                // rather than committing a close without its decision evidence.
-                // Routes through the fail-closed `put_governance_decision_v3` →
-                // `put_opaque` seam; the gateway never imports the v3 type.
-                if let Some(scope) = capability_scope.as_deref() {
-                    if let Some(ref store) = self.receipt_store {
-                        use icn_governance::proof::ProofOutcome;
-                        let v3_outcome = match outcome_result {
-                            DecisionOutcome::Accepted => ProofOutcome::Accepted,
-                            DecisionOutcome::Rejected => ProofOutcome::Rejected,
-                            DecisionOutcome::NoQuorum => ProofOutcome::NoQuorum,
-                        };
-                        let receipt_v3 = icn_governance::GovernanceDecisionReceiptV3::new(
-                            proposal_id.0.clone(),
-                            proposal.domain_id.0.clone(),
-                            v3_outcome,
-                            tally.clone(),
-                            &votes,
-                            scope.to_string(),
-                            icn_governance::ReceiptMandateAttestation::ProcessAuthorized,
-                        )
-                        .map_err(|e| {
-                            anyhow::anyhow!(
-                                "Invalid v3 decision receipt for proposal {}: {e}",
-                                proposal_id.0
-                            )
-                        })?;
-                        store
-                            .put_governance_decision_v3(&receipt_v3, now)
-                            .map_err(|e| {
-                                anyhow::anyhow!(
-                                    "Failed to persist v3 decision receipt for proposal {}: {e}",
-                                    proposal_id.0
-                                )
-                            })?;
-                    }
-                }
 
                 // Update proposal
                 proposal.close(new_state)?;
