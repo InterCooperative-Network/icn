@@ -1260,13 +1260,18 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
     http_req: HttpRequest,
     proposal_id: web::Path<String>,
 ) -> Result<HttpResponse, ApiError> {
-    // #1868: capture the scope class that actually authorized this close so the
-    // process-authorized v3 receipt records evidence derived from the auth
-    // decision rather than a hardcoded constant. With a single candidate this is
-    // `governance:write` today; listing decomposed close scope(s) first here
-    // when they land will make the receipt record the narrowest matched class.
-    let (claims, presented_scope) =
-        require_any_scope_matched::<BasicClaims>(&http_req, &["governance:write"])?;
+    // #1868 (A0): capture the scope class that actually authorized this close so
+    // the process-authorized v3 receipt records evidence derived from the auth
+    // decision rather than a hardcoded constant. The narrowed
+    // `governance:proposal:write` is listed first so it is preferred when both
+    // are present; the broad `governance:write` remains an accepted-also fallback
+    // until that scope is retired. `require_any_scope_matched` returns whichever
+    // candidate was actually matched, so the receipt records the truth (the
+    // narrow class when held, the broad scope only when the fallback was used).
+    let (claims, presented_scope) = require_any_scope_matched::<BasicClaims>(
+        &http_req,
+        &["governance:proposal:write", "governance:write"],
+    )?;
     let requester_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let proposal_id = ProposalId(proposal_id.into_inner());
