@@ -140,8 +140,9 @@ pub use proof::{
     ActionItemTransition, GovernanceDecisionAttestation, GovernanceDecisionReceipt,
     GovernanceDecisionReceiptV2, GovernanceDecisionReceiptV2Error, GovernanceProof,
     GovernanceProofV2, MandateGrantRef, MandateGrantRefError, MandateGrantRefTarget,
-    MeetingAttendanceReceipt, MeetingAttendanceTransition, NoMandateReason, ProcessGateKind,
-    ProcessGateResult, ProcessGateResultReceipt, ProofOutcome, ReceiptMandateAttestation,
+    MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, MeetingAttendanceReceiptV2Error,
+    MeetingAttendanceTransition, NoMandateReason, ProcessGateKind, ProcessGateResult,
+    ProcessGateResultReceipt, ProofOutcome, ReceiptMandateAttestation,
 };
 pub use proposal::{
     AllocationOption, DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome,
