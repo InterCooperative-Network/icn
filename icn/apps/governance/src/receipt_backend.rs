@@ -3,8 +3,8 @@
 
 use icn_governance::{
     ActionItemCompletionReceipt, AuthorityGrant, AuthorityGrantId, GovernanceDecisionReceipt,
-    Grantee, Mandate, MeetingAttendanceReceipt, ProcessGateKind, ProcessGateResultReceipt,
-    Timestamp,
+    Grantee, Mandate, MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, ProcessGateKind,
+    ProcessGateResultReceipt, Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -14,6 +14,11 @@ use crate::institutional_effect::InstitutionalEffectRecord;
 /// Class string for `ProcessGateResultReceipt` opaque storage. Chosen
 /// in the apps layer so the gateway never sees the typed name.
 const PROCESS_GATE_RESULT_CLASS: &str = "process_gate_result";
+
+/// Class string for `MeetingAttendanceReceiptV2` opaque storage (#1868).
+/// Chosen in the apps layer so the gateway persists v2 attendance evidence
+/// without importing the typed name (preserves the meaning firewall).
+const MEETING_ATTENDANCE_V2_CLASS: &str = "meeting_attendance_v2";
 
 /// Stable string mapping for `ProcessGateKind` used as the
 /// opaque-storage `key2`. Distinct from serde wire form so the
@@ -411,6 +416,44 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     /// override.
     fn put_meeting_attendance(&self, _receipt: &MeetingAttendanceReceipt) -> Result<(), String> {
         Ok(())
+    }
+
+    /// Persist a [`MeetingAttendanceReceiptV2`] — the #1868 v2 form carrying
+    /// `capability_scope_presented` and an explicit
+    /// [`ReceiptMandateAttestation`](icn_governance::ReceiptMandateAttestation).
+    /// Emitted **alongside** the v1 receipt by migrated handlers (the v1
+    /// emission and its consumers are unchanged this slice).
+    ///
+    /// Append-only and idempotent on `record_hash`, same discipline as
+    /// [`Self::put_meeting_attendance`].
+    ///
+    /// **Default routes through opaque storage** (same pattern as
+    /// [`Self::put_process_gate_result`]): the typed receipt is serialised to
+    /// JSON and delegated to [`Self::put_opaque`] under class
+    /// `"meeting_attendance_v2"` with `key1 = receipt.meeting_id`,
+    /// `key2 = Some(receipt.attendee_did)`. The production gateway-backed
+    /// `ReceiptStore` overrides `put_opaque` (Stage 1b), so it gets durable
+    /// persistence here **without** the gateway importing
+    /// `MeetingAttendanceReceiptV2` — the meaning firewall stays put. A
+    /// backend that does not implement opaque storage hits the
+    /// `put_opaque` fail-closed default (`opaque_storage_not_implemented`)
+    /// rather than silently dropping the v2 evidence. Backends wanting custom
+    /// typed persistence (e.g. an in-memory test store) may still override
+    /// this method directly.
+    fn put_meeting_attendance_v2(
+        &self,
+        receipt: &MeetingAttendanceReceiptV2,
+    ) -> Result<(), String> {
+        let payload = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize MeetingAttendanceReceiptV2: {e}"))?;
+        self.put_opaque(
+            MEETING_ATTENDANCE_V2_CLASS,
+            &receipt.meeting_id,
+            Some(receipt.attendee_did.as_str()),
+            receipt.recorded_at,
+            receipt.record_hash,
+            &payload,
+        )
     }
 
     /// Retrieve the latest [`MeetingAttendanceReceipt`] for a

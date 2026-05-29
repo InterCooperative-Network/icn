@@ -44,8 +44,9 @@ use std::sync::{Arc, Mutex};
 
 use icn_governance::{
     AttendanceStatus, AuthorityGrant, GovernanceDecisionReceipt, GovernanceDomainId,
-    GovernanceParams, MeetingAttendanceReceipt, MeetingAttendanceTransition, MeetingAttendee,
-    MeetingRole, MembershipConfig, MembershipSource,
+    GovernanceParams, MeetingAttendanceReceipt, MeetingAttendanceReceiptV2,
+    MeetingAttendanceTransition, MeetingAttendee, MeetingRole, MembershipConfig, MembershipSource,
+    NoMandateReason, ReceiptMandateAttestation,
 };
 use icn_governance_actor::{
     dispatch_evidence::EffectDispatchEvidence, institutional_effect::InstitutionalEffectRecord,
@@ -61,6 +62,7 @@ use icn_kernel_api::{AllocationReceipt, Hash};
 #[derive(Default)]
 struct TestReceiptStore {
     attendance: Mutex<Vec<MeetingAttendanceReceipt>>,
+    attendance_v2: Mutex<Vec<MeetingAttendanceReceiptV2>>,
 }
 
 impl GovernanceReceiptBackend for TestReceiptStore {
@@ -115,6 +117,14 @@ impl GovernanceReceiptBackend for TestReceiptStore {
         Ok(())
     }
 
+    fn put_meeting_attendance_v2(
+        &self,
+        receipt: &MeetingAttendanceReceiptV2,
+    ) -> Result<(), String> {
+        self.attendance_v2.lock().unwrap().push(receipt.clone());
+        Ok(())
+    }
+
     fn get_meeting_attendance(
         &self,
         meeting_id: &str,
@@ -155,6 +165,17 @@ impl TestReceiptStore {
             .filter(|r| r.meeting_id == meeting_id && r.attendee_did == attendee_did)
             .count()
     }
+
+    /// All v2 receipts captured for a `(meeting_id, attendee_did)` pair.
+    fn v2_for_pair(&self, meeting_id: &str, attendee_did: &str) -> Vec<MeetingAttendanceReceiptV2> {
+        self.attendance_v2
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|r| r.meeting_id == meeting_id && r.attendee_did == attendee_did)
+            .cloned()
+            .collect()
+    }
 }
 
 /// A backend whose `put_meeting_attendance` always rejects, used to
@@ -186,6 +207,63 @@ impl GovernanceReceiptBackend for FailingAttendanceStore {
     }
     fn put_meeting_attendance(&self, _receipt: &MeetingAttendanceReceipt) -> Result<(), String> {
         Err("simulated receipt backend failure".to_string())
+    }
+}
+
+/// One captured opaque-storage write: `(class, key1, key2, payload)`.
+type CapturedOpaque = (String, String, Option<String>, Vec<u8>);
+
+/// A backend that overrides **only** the opaque storage primitive (like the
+/// production gateway-backed `ReceiptStore`, which overrides `put_opaque` but
+/// has no typed `put_meeting_attendance_v2`). Proves the v2 typed default
+/// routes through `put_opaque` so production persists the evidence rather than
+/// silently dropping it.
+#[derive(Default)]
+struct OpaqueCapturingStore {
+    opaque: Mutex<Vec<CapturedOpaque>>,
+}
+
+impl GovernanceReceiptBackend for OpaqueCapturingStore {
+    fn put_governance(&self, _r: &GovernanceDecisionReceipt) -> Result<(), String> {
+        Ok(())
+    }
+    fn get_governance_by_proposal(
+        &self,
+        _p: &str,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        Ok(None)
+    }
+    fn put_allocation(&self, _r: &AllocationReceipt) -> Result<Hash, String> {
+        Ok([0u8; 32])
+    }
+    fn get_governance_by_decision(
+        &self,
+        _h: &Hash,
+    ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+        Ok(None)
+    }
+    fn list_allocations_by_decision(&self, _h: &Hash) -> Result<Vec<AllocationReceipt>, String> {
+        Ok(vec![])
+    }
+    // Note: no `put_meeting_attendance_v2` override — exercises the typed
+    // default's opaque-routing path. v1 `put_meeting_attendance` inherits the
+    // trait no-op default (v1 persistence is not under test here).
+    fn put_opaque(
+        &self,
+        class: &str,
+        key1: &str,
+        key2: Option<&str>,
+        _recorded_at: u64,
+        _record_hash: [u8; 32],
+        payload: &[u8],
+    ) -> Result<(), String> {
+        self.opaque.lock().unwrap().push((
+            class.to_string(),
+            key1.to_string(),
+            key2.map(str::to_string),
+            payload.to_vec(),
+        ));
+        Ok(())
     }
 }
 
@@ -272,6 +350,7 @@ async fn meeting_attendance_receipt_chain_end_to_end() {
             attendee.as_str(),
             AttendanceStatus::Present,
             &recorder,
+            "governance:meeting:write",
         )
         .expect("update_meeting_attendance -> Present");
     let updated_attendee = updated
@@ -347,6 +426,7 @@ async fn another_did_does_not_see_first_did_attendance_receipt() {
         alice.as_str(),
         AttendanceStatus::Present,
         &recorder,
+        "governance:meeting:write",
     )
     .expect("alice -> Present");
 
@@ -397,6 +477,7 @@ async fn re_marking_present_is_idempotent_no_duplicate_receipt() {
         attendee.as_str(),
         AttendanceStatus::Present,
         &recorder,
+        "governance:meeting:write",
     )
     .expect("first Present");
 
@@ -406,6 +487,7 @@ async fn re_marking_present_is_idempotent_no_duplicate_receipt() {
         attendee.as_str(),
         AttendanceStatus::Present,
         &recorder,
+        "governance:meeting:write",
     )
     .expect("re-Present");
 
@@ -443,6 +525,7 @@ async fn present_to_remote_appends_new_transition_receipt() {
         attendee.as_str(),
         AttendanceStatus::Present,
         &recorder,
+        "governance:meeting:write",
     )
     .expect("Present");
     let first = receipts
@@ -460,6 +543,7 @@ async fn present_to_remote_appends_new_transition_receipt() {
         attendee.as_str(),
         AttendanceStatus::Remote,
         &recorder,
+        "governance:meeting:write",
     )
     .expect("Remote");
     let chain = receipts
@@ -514,6 +598,7 @@ async fn absent_does_not_emit_attendance_receipt() {
             attendee.as_str(),
             AttendanceStatus::Absent,
             &recorder,
+            "governance:meeting:write",
         )
         .expect("Absent write must succeed");
     let row = updated
@@ -560,6 +645,7 @@ async fn receipt_backend_failure_prevents_attendance_status_commit() {
             attendee.as_str(),
             AttendanceStatus::Present,
             &recorder,
+            "governance:meeting:write",
         )
         .expect_err("receipt backend failure must propagate");
     let msg = err.to_string();
@@ -609,6 +695,7 @@ async fn attendance_receipt_uses_regulatory_safe_vocabulary() {
         attendee.as_str(),
         AttendanceStatus::Present,
         &recorder,
+        "governance:meeting:write",
     )
     .expect("Present");
 
@@ -628,4 +715,182 @@ async fn attendance_receipt_uses_regulatory_safe_vocabulary() {
              found `{forbidden}` in: {json}"
         );
     }
+}
+
+/// #1868: a meeting-attendance transition emits a `MeetingAttendanceReceiptV2`
+/// alongside the v1 receipt, recording the capability scope that **actually**
+/// authorized the request and the explicit
+/// `NoMandateRequired { MembershipStandingOnly }` attestation (meeting
+/// attendance is a membership-standing-only act — no MandateGate, no grant).
+#[tokio::test]
+async fn meeting_attendance_emits_v2_recording_the_accepted_scope() {
+    let receipts = Arc::new(TestReceiptStore::default());
+    let mgr = GovernanceManager::new()
+        .with_receipt_store(receipts.clone() as Arc<dyn GovernanceReceiptBackend>);
+
+    let narrow_attendee = fresh_did();
+    let legacy_attendee = fresh_did();
+    let recorder = fresh_did();
+    let domain = seed_domain_with_member(&mgr, &recorder, "test-coop").await;
+
+    let now_secs = icn_time::current_timestamp_secs();
+    let meeting = mgr
+        .create_meeting(
+            domain.0.clone(),
+            "V2 emission meeting (fictional)".to_string(),
+            None,
+            Some(now_secs + 3_600),
+            recorder.as_str().to_string(),
+        )
+        .expect("create_meeting");
+    invite_to_meeting(&mgr, &meeting.id, &narrow_attendee);
+    invite_to_meeting(&mgr, &meeting.id, &legacy_attendee);
+
+    // Accepted via the narrowed class scope.
+    mgr.update_meeting_attendance(
+        &meeting.id,
+        narrow_attendee.as_str(),
+        AttendanceStatus::Present,
+        &recorder,
+        "governance:meeting:write",
+    )
+    .expect("Present (meeting:write)");
+
+    // Accepted via the legacy broad scope during the compatibility period.
+    mgr.update_meeting_attendance(
+        &meeting.id,
+        legacy_attendee.as_str(),
+        AttendanceStatus::Present,
+        &recorder,
+        "governance:write",
+    )
+    .expect("Present (legacy write)");
+
+    // ── v2 emitted, recording the accepted scope verbatim + the explicit
+    //    no-mandate attestation.
+    let narrow_v2 = receipts.v2_for_pair(meeting.id.0.as_str(), narrow_attendee.as_str());
+    assert_eq!(
+        narrow_v2.len(),
+        1,
+        "exactly one v2 receipt for the narrow-scope attendee"
+    );
+    let narrow = &narrow_v2[0];
+    assert_eq!(
+        narrow.capability_scope_presented,
+        "governance:meeting:write"
+    );
+    assert_eq!(
+        narrow.mandate_attestation,
+        ReceiptMandateAttestation::NoMandateRequired {
+            reason: NoMandateReason::MembershipStandingOnly,
+        },
+        "meeting attendance is membership-standing-only — no mandate grant"
+    );
+    assert!(
+        narrow.verify(),
+        "emitted v2 receipt must verify its own canonical hash"
+    );
+    assert_eq!(narrow.meeting_id, meeting.id.0);
+    assert_eq!(narrow.attendee_did, narrow_attendee.to_string());
+    assert_eq!(narrow.recorded_by, recorder.to_string());
+    assert_eq!(narrow.transition, MeetingAttendanceTransition::Present);
+
+    // ── Legacy-scope acceptance must record "governance:write", NOT the
+    //    preferred class scope: the field is evidence of what authorized
+    //    the request.
+    let legacy_v2 = receipts.v2_for_pair(meeting.id.0.as_str(), legacy_attendee.as_str());
+    assert_eq!(legacy_v2.len(), 1);
+    assert_eq!(
+        legacy_v2[0].capability_scope_presented, "governance:write",
+        "a request accepted via the legacy broad scope must not claim the narrowed class scope"
+    );
+    assert!(legacy_v2[0].verify());
+
+    // ── v1 still emitted alongside (no consumer regression).
+    assert_eq!(
+        receipts.count_for_pair(meeting.id.0.as_str(), narrow_attendee.as_str()),
+        1,
+        "v1 receipt must still be emitted alongside v2"
+    );
+    assert!(
+        receipts
+            .get_meeting_attendance(meeting.id.0.as_str(), legacy_attendee.as_str())
+            .unwrap()
+            .is_some(),
+        "v1 receipt still present for the legacy-scope attendee"
+    );
+}
+
+/// #1868: a backend that overrides only `put_opaque` (like the production
+/// gateway-backed `ReceiptStore`, which has no typed `put_meeting_attendance_v2`)
+/// must still durably receive the v2 receipt via the typed default's
+/// opaque-routing path — proving the evidence is persisted in production, not
+/// silently dropped.
+#[tokio::test]
+async fn meeting_attendance_v2_default_routes_through_opaque_storage() {
+    let receipts = Arc::new(OpaqueCapturingStore::default());
+    let mgr = GovernanceManager::new()
+        .with_receipt_store(receipts.clone() as Arc<dyn GovernanceReceiptBackend>);
+
+    let attendee = fresh_did();
+    let recorder = fresh_did();
+    let domain = seed_domain_with_member(&mgr, &recorder, "test-coop").await;
+
+    let now_secs = icn_time::current_timestamp_secs();
+    let meeting = mgr
+        .create_meeting(
+            domain.0.clone(),
+            "V2 opaque-routing meeting (fictional)".to_string(),
+            None,
+            Some(now_secs + 3_600),
+            recorder.as_str().to_string(),
+        )
+        .expect("create_meeting");
+    invite_to_meeting(&mgr, &meeting.id, &attendee);
+
+    mgr.update_meeting_attendance(
+        &meeting.id,
+        attendee.as_str(),
+        AttendanceStatus::Present,
+        &recorder,
+        "governance:meeting:write",
+    )
+    .expect("Present");
+
+    // The typed default serialised the v2 receipt and routed it through
+    // `put_opaque` under the meeting-attendance-v2 class — exactly what the
+    // production gateway persists.
+    let captured = receipts.opaque.lock().unwrap().clone();
+    let v2: Vec<_> = captured
+        .iter()
+        .filter(|(class, _, _, _)| class == "meeting_attendance_v2")
+        .collect();
+    assert_eq!(
+        v2.len(),
+        1,
+        "exactly one v2 receipt must route through opaque storage (not be dropped)"
+    );
+    let (_class, key1, key2, payload) = v2[0];
+    assert_eq!(key1, &meeting.id.0, "opaque key1 must be the meeting id");
+    assert_eq!(
+        key2.as_deref(),
+        Some(attendee.to_string().as_str()),
+        "opaque key2 must be the attendee did"
+    );
+    let receipt: MeetingAttendanceReceiptV2 =
+        serde_json::from_slice(payload).expect("opaque payload deserializes to v2 receipt");
+    assert!(
+        receipt.verify(),
+        "routed v2 receipt must verify its own hash"
+    );
+    assert_eq!(
+        receipt.capability_scope_presented,
+        "governance:meeting:write"
+    );
+    assert_eq!(
+        receipt.mandate_attestation,
+        ReceiptMandateAttestation::NoMandateRequired {
+            reason: NoMandateReason::MembershipStandingOnly,
+        }
+    );
 }

@@ -100,6 +100,47 @@ pub fn require_any_scope<C: ClaimsLike>(
     Ok(claims)
 }
 
+/// Like [`require_any_scope`], but also returns **which** candidate scope
+/// authorized the request.
+///
+/// The returned scope is the first entry of `required_scopes` (in listed
+/// preference order) that the claims actually grant. Callers that record the
+/// accepted scope as evidence — e.g. a receipt's `capability_scope_presented`
+/// — must use this rather than assuming the preferred class scope: during a
+/// capability-decomposition migration a request may be accepted via a legacy
+/// broad scope, and the evidence must say so truthfully. List the narrowed
+/// class scope first so it is preferred when both are present.
+///
+/// Rejection behavior mirrors [`require_any_scope`] / [`require_scope`]: an
+/// empty `required_scopes` is a programmer error (`ApiError::Internal`), and a
+/// caller with none of the scopes gets the canonical rejection keyed on the
+/// preferred (first) scope.
+pub fn require_any_scope_matched<C: ClaimsLike>(
+    req: &HttpRequest,
+    required_scopes: &[&str],
+) -> Result<(C, String), ApiError> {
+    let Some((&preferred, _)) = required_scopes.split_first() else {
+        return Err(ApiError::Internal(
+            "require_any_scope_matched called with no candidate scopes".to_string(),
+        ));
+    };
+    let claims = get_claims::<C>(req).ok_or(ApiError::Unauthenticated)?;
+    for &scope in required_scopes {
+        if check_scope(&claims, scope).is_ok() {
+            return Ok((claims, scope.to_string()));
+        }
+    }
+    // No candidate matched. Defer to the preferred scope's own check, which
+    // returns the canonical Forbidden/Unauthenticated error. `preferred` is
+    // among the candidates just tried, so this always returns Err and `?`
+    // propagates; the trailing Err is unreachable but keeps the function
+    // total without an unwrap/expect/panic.
+    check_scope(&claims, preferred)?;
+    Err(ApiError::Internal(
+        "require_any_scope_matched: candidate rejected but no error produced".to_string(),
+    ))
+}
+
 /// Centralized scope checking. Split and normalize once, not in every handler.
 fn check_scope<C: ClaimsLike>(claims: &C, required: &str) -> Result<(), ApiError> {
     let Some(raw) = claims.raw_scope() else {
@@ -198,5 +239,46 @@ mod tests {
         // `governance:write:admin` satisfies the broad `governance:write` candidate.
         let req = req_with_scope(Some("governance:write:admin"));
         assert!(require_any_scope::<BasicClaims>(&req, &[CHARTER, BROAD]).is_ok());
+    }
+
+    #[test]
+    fn require_any_scope_matched_returns_narrow_class_scope() {
+        let req = req_with_scope(Some(CHARTER));
+        let (_claims, matched) =
+            require_any_scope_matched::<BasicClaims>(&req, &[CHARTER, BROAD]).unwrap();
+        assert_eq!(matched, CHARTER);
+    }
+
+    #[test]
+    fn require_any_scope_matched_returns_legacy_broad_scope_when_only_that_is_present() {
+        // Evidence integrity: a request accepted via the legacy broad scope must
+        // report `governance:write`, not the preferred narrowed class scope.
+        let req = req_with_scope(Some(BROAD));
+        let (_claims, matched) =
+            require_any_scope_matched::<BasicClaims>(&req, &[CHARTER, BROAD]).unwrap();
+        assert_eq!(matched, BROAD);
+    }
+
+    #[test]
+    fn require_any_scope_matched_prefers_first_listed_when_both_present() {
+        // Both scopes granted → the first-listed (narrowed) candidate wins.
+        let req = req_with_scope(Some(&format!("{CHARTER} {BROAD}")));
+        let (_claims, matched) =
+            require_any_scope_matched::<BasicClaims>(&req, &[CHARTER, BROAD]).unwrap();
+        assert_eq!(matched, CHARTER);
+    }
+
+    #[test]
+    fn require_any_scope_matched_rejects_unrelated_scope() {
+        let req = req_with_scope(Some("ledger:write"));
+        let err = require_any_scope_matched::<BasicClaims>(&req, &[CHARTER, BROAD]).unwrap_err();
+        assert!(matches!(err, ApiError::Forbidden(_)));
+    }
+
+    #[test]
+    fn require_any_scope_matched_empty_candidates_is_internal_error() {
+        let req = req_with_scope(Some(CHARTER));
+        let err = require_any_scope_matched::<BasicClaims>(&req, &[]).unwrap_err();
+        assert!(matches!(err, ApiError::Internal(_)));
     }
 }
