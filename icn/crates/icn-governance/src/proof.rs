@@ -943,7 +943,18 @@ impl GovernanceDecisionReceiptV3 {
     }
 
     /// Verify the stored `decision_hash` against canonical v3 receipt fields.
+    ///
+    /// `verify()` is an acceptance boundary, so it re-applies the
+    /// constructor's non-empty `capability_scope_presented` invariant. The
+    /// struct fields and `compute_decision_hash` are public, so a Rust struct
+    /// literal (or post-construction mutation) could otherwise present an
+    /// empty/whitespace scope with a matching recomputed hash and verify true,
+    /// despite `new()`/`try_from` rejecting it. Fail closed here too so the
+    /// scope-attribution invariant holds however the receipt was constructed.
     pub fn verify(&self) -> bool {
+        if self.capability_scope_presented.trim().is_empty() {
+            return false;
+        }
         let recomputed = Self::compute_decision_hash(
             &self.proposal_id,
             &self.domain_id,
@@ -4931,6 +4942,44 @@ mod tests {
             err.to_string().contains("capability_scope_presented"),
             "expected EmptyCapabilityScope through serde, got: {err}"
         );
+    }
+
+    #[test]
+    fn decision_v3_verify_rejects_struct_literal_empty_scope() {
+        // `verify()` is an acceptance boundary. The `pub` struct fields let a
+        // Rust struct literal carry an empty/whitespace `capability_scope_
+        // presented` with a matching recomputed hash, bypassing the
+        // `new()`/`try_from` non-empty invariant. verify() must fail closed.
+        let votes = make_votes();
+        let tally = make_tally(&votes);
+        let vote_hash = GovernanceProof::compute_vote_hash(&votes);
+        for bad in ["", "   ", "\t\n"] {
+            let att = ReceiptMandateAttestation::ProcessAuthorized;
+            let decision_hash = GovernanceDecisionReceiptV3::compute_decision_hash(
+                "prop-1",
+                "coop:test",
+                ProofOutcome::Accepted,
+                &tally,
+                &vote_hash,
+                bad,
+                &att,
+            );
+            let r = GovernanceDecisionReceiptV3 {
+                proposal_id: "prop-1".to_string(),
+                domain_id: "coop:test".to_string(),
+                outcome: ProofOutcome::Accepted,
+                vote_tally: tally.clone(),
+                vote_hash,
+                capability_scope_presented: bad.to_string(),
+                mandate_attestation: att,
+                decision_hash,
+            };
+            assert!(
+                !r.verify(),
+                "v3 receipt must not verify an empty capability scope ({bad:?}), even when \
+                 struct-constructed with a matching hash"
+            );
+        }
     }
 
     #[test]
