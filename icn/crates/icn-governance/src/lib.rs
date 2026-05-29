@@ -138,11 +138,12 @@ pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, Gover
 pub use proof::{
     ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, ActionItemCompletionReceiptV2Error,
     ActionItemTransition, GovernanceDecisionAttestation, GovernanceDecisionReceipt,
-    GovernanceDecisionReceiptV2, GovernanceDecisionReceiptV2Error, GovernanceProof,
-    GovernanceProofV2, MandateGrantRef, MandateGrantRefError, MandateGrantRefTarget,
-    MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, MeetingAttendanceReceiptV2Error,
-    MeetingAttendanceTransition, NoMandateReason, ProcessGateKind, ProcessGateResult,
-    ProcessGateResultReceipt, ProofOutcome, ReceiptMandateAttestation,
+    GovernanceDecisionReceiptV2, GovernanceDecisionReceiptV2Error, GovernanceDecisionReceiptV3,
+    GovernanceDecisionReceiptV3Error, GovernanceProof, GovernanceProofV2, MandateGrantRef,
+    MandateGrantRefError, MandateGrantRefTarget, MeetingAttendanceReceipt,
+    MeetingAttendanceReceiptV2, MeetingAttendanceReceiptV2Error, MeetingAttendanceTransition,
+    NoMandateReason, ProcessGateKind, ProcessGateResult, ProcessGateResultReceipt, ProofOutcome,
+    ReceiptMandateAttestation,
 };
 pub use proposal::{
     AllocationOption, DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome,
