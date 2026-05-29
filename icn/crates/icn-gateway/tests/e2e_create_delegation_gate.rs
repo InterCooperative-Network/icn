@@ -122,6 +122,23 @@ impl GovernanceReceiptBackend for TestReceiptBackend {
             .cloned()
             .unwrap_or_default())
     }
+
+    // Support the opaque seam so a scoped normal close can persist its
+    // process-authorized v3 decision receipt (#1868). The production gateway
+    // `ReceiptStore` overrides this; these e2e tests don't assert on v3
+    // content, so accepting the write keeps the scoped close from
+    // fail-closing on the v3 emission.
+    fn put_opaque(
+        &self,
+        _class: &str,
+        _key1: &str,
+        _key2: Option<&str>,
+        _recorded_at: u64,
+        _record_hash: [u8; 32],
+        _payload: &[u8],
+    ) -> Result<(), String> {
+        Ok(())
+    }
 }
 
 /// Auth helper: challenge → sign → JWT.

@@ -61,6 +61,20 @@ struct TestReceiptBackend {
 }
 
 impl GovernanceReceiptBackend for TestReceiptBackend {
+    // #1868: accept the opaque v3 decision-receipt write so a scoped normal
+    // close does not fail closed in this test (the production gateway
+    // `ReceiptStore` overrides `put_opaque`; this stand-in doesn't assert on v3).
+    fn put_opaque(
+        &self,
+        _class: &str,
+        _key1: &str,
+        _key2: Option<&str>,
+        _recorded_at: u64,
+        _record_hash: [u8; 32],
+        _payload: &[u8],
+    ) -> Result<(), String> {
+        Ok(())
+    }
     fn put_governance(&self, receipt: &GovernanceDecisionReceipt) -> Result<(), String> {
         self.governance_by_proposal
             .lock()

@@ -234,6 +234,7 @@ async fn actor_close_proposal_accept_emits_appoint_steward_effect() {
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await
         .expect("CloseProposal submit");
@@ -330,6 +331,7 @@ async fn actor_close_proposal_accept_without_receipt_store_is_rejected() {
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await;
     assert!(

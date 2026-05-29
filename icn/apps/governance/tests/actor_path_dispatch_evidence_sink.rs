@@ -295,6 +295,7 @@ async fn sink_records_dispatch_evidence_after_actor_accept() {
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await
         .expect("CloseProposal submit");

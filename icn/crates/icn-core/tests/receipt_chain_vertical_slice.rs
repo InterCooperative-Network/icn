@@ -233,6 +233,7 @@ async fn test_allocation_receipt_chain_end_to_end() -> Result<()> {
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await?;
 

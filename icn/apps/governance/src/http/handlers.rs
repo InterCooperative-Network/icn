@@ -1260,7 +1260,13 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
     http_req: HttpRequest,
     proposal_id: web::Path<String>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    // #1868: capture the scope class that actually authorized this close so the
+    // process-authorized v3 receipt records evidence derived from the auth
+    // decision rather than a hardcoded constant. With a single candidate this is
+    // `governance:write` today; listing decomposed close scope(s) first here
+    // when they land will make the receipt record the narrowest matched class.
+    let (claims, presented_scope) =
+        require_any_scope_matched::<BasicClaims>(&http_req, &["governance:write"])?;
     let requester_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let proposal_id = ProposalId(proposal_id.into_inner());
@@ -1375,7 +1381,16 @@ pub async fn close_proposal<E: GovernanceEventEmitter + Clone + 'static>(
         };
 
     ctx.manager
-        .close_proposal_with_suspension(proposal_id.clone(), eligible_voters, excluded_delegators)
+        .close_proposal_with_suspension(
+            proposal_id.clone(),
+            eligible_voters,
+            excluded_delegators,
+            // #1868: record the scope class that actually authorized this close
+            // (from `require_any_scope_matched` above) as the v3 receipt's
+            // `capability_scope_presented` — evidence derived from the auth
+            // decision, not a hardcoded constant.
+            Some(presented_scope),
+        )
         .await
         .map_err(anyhow_to_api)?;
 
@@ -5539,6 +5554,22 @@ mod tests {
             _decision_hash: &icn_kernel_api::Hash,
         ) -> Result<Vec<icn_kernel_api::AllocationReceipt>, String> {
             Ok(vec![])
+        }
+        // Support the opaque seam so a scoped normal close can persist its
+        // process-authorized v3 decision receipt (#1868). The production
+        // gateway `ReceiptStore` overrides this; these handler tests don't
+        // assert on v3 content, so accepting the write is sufficient to keep
+        // the close from fail-closing on the v3 emission.
+        fn put_opaque(
+            &self,
+            _class: &str,
+            _key1: &str,
+            _key2: Option<&str>,
+            _recorded_at: u64,
+            _record_hash: [u8; 32],
+            _payload: &[u8],
+        ) -> Result<(), String> {
+            Ok(())
         }
         fn put_institutional_effect(
             &self,

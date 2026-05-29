@@ -139,6 +139,7 @@ async fn run_proposal(
             proposal_id: proposal_id.clone(),
             eligible_voters: None,
             excluded_delegators: None,
+            capability_scope: None,
         })
         .await?;
 
