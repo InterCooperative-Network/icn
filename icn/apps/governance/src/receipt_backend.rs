@@ -15,6 +15,11 @@ use crate::institutional_effect::InstitutionalEffectRecord;
 /// in the apps layer so the gateway never sees the typed name.
 const PROCESS_GATE_RESULT_CLASS: &str = "process_gate_result";
 
+/// Class string for `MeetingAttendanceReceiptV2` opaque storage (#1868).
+/// Chosen in the apps layer so the gateway persists v2 attendance evidence
+/// without importing the typed name (preserves the meaning firewall).
+const MEETING_ATTENDANCE_V2_CLASS: &str = "meeting_attendance_v2";
+
 /// Stable string mapping for `ProcessGateKind` used as the
 /// opaque-storage `key2`. Distinct from serde wire form so the
 /// storage key is unambiguous and free of any future enum-rename
@@ -422,14 +427,33 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     /// Append-only and idempotent on `record_hash`, same discipline as
     /// [`Self::put_meeting_attendance`].
     ///
-    /// Default impl is a no-op so backends that do not yet durably persist v2
-    /// receipts inherit a truthful "v2 attendance receipt not persisted"
-    /// behavior; storage-backed implementations override.
+    /// **Default routes through opaque storage** (same pattern as
+    /// [`Self::put_process_gate_result`]): the typed receipt is serialised to
+    /// JSON and delegated to [`Self::put_opaque`] under class
+    /// `"meeting_attendance_v2"` with `key1 = receipt.meeting_id`,
+    /// `key2 = Some(receipt.attendee_did)`. The production gateway-backed
+    /// `ReceiptStore` overrides `put_opaque` (Stage 1b), so it gets durable
+    /// persistence here **without** the gateway importing
+    /// `MeetingAttendanceReceiptV2` — the meaning firewall stays put. A
+    /// backend that does not implement opaque storage hits the
+    /// `put_opaque` fail-closed default (`opaque_storage_not_implemented`)
+    /// rather than silently dropping the v2 evidence. Backends wanting custom
+    /// typed persistence (e.g. an in-memory test store) may still override
+    /// this method directly.
     fn put_meeting_attendance_v2(
         &self,
-        _receipt: &MeetingAttendanceReceiptV2,
+        receipt: &MeetingAttendanceReceiptV2,
     ) -> Result<(), String> {
-        Ok(())
+        let payload = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize MeetingAttendanceReceiptV2: {e}"))?;
+        self.put_opaque(
+            MEETING_ATTENDANCE_V2_CLASS,
+            &receipt.meeting_id,
+            Some(receipt.attendee_did.as_str()),
+            receipt.recorded_at,
+            receipt.record_hash,
+            &payload,
+        )
     }
 
     /// Retrieve the latest [`MeetingAttendanceReceipt`] for a
