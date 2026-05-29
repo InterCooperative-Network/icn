@@ -1,0 +1,289 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>GovernanceDecisionReceipt Authority + Grant-Minting — Design | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>governance</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>decision receipt authority and grant minting</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/governance/decision-receipt-authority-and-grant-minting.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>GovernanceDecisionReceipt Authority + Grant-Minting — Design</h1>
+<blockquote>
+<p><strong>Status:</strong> draft for review (design-only). No code in this PR.
+<strong>Issue:</strong> #1868 (governance:write decomposition / mandate layer).
+<strong>Companion docs:</strong> <a href="https://github.com/InterCooperative-Network/icn/blob/main/governance-write-decomposition">`governance-write-decomposition.md`</a> (§6, §10, §12 Q4), <a href="https://github.com/InterCooperative-Network/icn/blob/main/mandate-gate-design">`mandate-gate-design.md`</a>; ADR-0014 (AuthorityGrant non-conflation).</p>
+</blockquote>
+<h2>0. Non-claims</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li>This is a design draft, not an implementation. No receipt is emitted, no grant is
+minted, no handler is wired by this PR.</li>
+<li>No <code>GovernanceDecisionReceiptV2</code> production emission. No <code>MandateGate::require()</code> handler
+wiring. No grant-minting code. No <code>TypedScope</code> Federation/Role binding code. No
+<code>governance:write</code> retirement.</li>
+<li>No production-readiness, live-federation, or demo-ready claim.</li>
+</ul>
+<h2>1. Problem</h2>
+<!-- truth: descriptive -->
+
+<p>Low-blast membership-standing receipt emission is live — <code>MeetingAttendanceReceiptV2</code>
+(#1934) and <code>ActionItemCompletionReceiptV2</code> (#1935), both
+<code>NoMandateRequired { MembershipStandingOnly }</code>, persisted via the fail-closed
+<code>put_opaque</code> route. The next dormant receipt is <code>GovernanceDecisionReceiptV2</code> (schema from
+#1929), but <strong>its honest production emission is blocked on undecided authority semantics</strong>,
+and <code>MandateGate</code> handler wiring is blocked on a missing grant/target substrate. This doc
+decides the authority model so the follow-up code lands honestly — no fake
+<code>NoMandateRequired</code>, no always-reject theater.</p>
+<h2>2. Current facts (verified against <code>ae7fc00a</code>)</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li><strong>Decision-producing paths</strong> are the proposal close/accept path: standalone manager
+close (<code>icn/apps/governance/src/manager.rs</code>), actor-backed close
+(<code>icn/apps/governance/src/actor.rs</code>), and the <strong>forced-accept</strong> path (same <code>actor.rs</code>,
+with forced provenance in <code>icn/apps/governance/src/lib.rs</code>).</li>
+<li><strong>Forced-accept is an explicit administrative override</strong> of vote thresholds
+(<code>VoteTally::empty()</code>, no votes); the receipt still verifies because its hash is derived
+from those exact inputs.</li>
+<li><strong>Production grants</strong> are minted only for <code>AppointSteward</code> / <code>ReinstateSteward</code> /
+<code>ReconfirmSteward</code> (<code>grant_minting.rs</code>), <strong>all <code>AuthorityClass::Attestation</code></strong>.
+<code>mandate_gate.rs::expected_class</code> maps every wired <code>MandateAct</code> to <code>Execution</code> (or
+<code>CastVote</code> → <code>Representation</code>); <code>Attestation</code> &quot;never authorizes acts gated here&quot;. <strong>No
+minted grant authorizes any gated act today.</strong></li>
+<li><strong><code>MandateGate</code> targets</strong>: <code>Domain</code> (actor-first) and <code>Proposal</code> validate; <strong><code>Federation</code>
+(raw <code>String</code>; no <code>FederationId</code> type) and <code>Role</code> (<code>StructureId</code> + holder) always return
+<code>WrongTarget</code></strong> — <code>TypedScope</code> cannot bind them.</li>
+<li><strong>Taxonomy versioning</strong>: <code>NoMandateReason</code> and <code>ReceiptMandateAttestation</code> are
+<code>#[non_exhaustive]</code>; <code>NoMandateReason</code>&#39;s own note says adding a variant &quot;requires a new
+domain-separation tag on the receipt that consumes it (<code>:v3</code>)&quot;. The existing v2 taxonomy
+is exactly <code>{ NoMandateRequired { MembershipStandingOnly | Bootstrap }, Grant }</code>.</li>
+</ul>
+<h2>3. The three authority modes</h2>
+<!-- truth: normative -->
+
+<p>A receipt&#39;s <code>ReceiptMandateAttestation</code> must name the <em>actual</em> authority mode. There are at
+least three; they must not be collapsed.</p>
+<ol>
+<li><strong>Bootstrap override</strong> — forced-accept / administrative override that bypasses vote
+thresholds. Attestation: <code>NoMandateRequired { Bootstrap }</code>. <strong>Fits the current v2
+taxonomy.</strong></li>
+<li><strong>Process / tally authority</strong> — a normal proposal close where the <strong>governance process
+itself</strong> authorizes the outcome: eligible voters, voting period, quorum/threshold,
+tally, proposal scope, and outcome rules. This is <strong>not</strong> membership standing —
+membership standing authorizes <em>participation and low-blast record-keeping</em> (attendance,
+action-item completion), it does not by itself authorize an institutional decision. It
+is also <strong>not</strong> a personal grant. The current taxonomy has <strong>no honest variant</strong> for
+this mode (§4).</li>
+<li><strong>Grant-backed execution</strong> — a discrete actor authorized to <em>perform</em> a high/medium-blast
+act (charter/federation/steward execution). Attestation: <code>Grant { grant_ref }</code>. Blocked
+until Execution-class grants exist and the Federation/Role target-binding gap is solved.</li>
+</ol>
+<h3>3.1 Decision closure is not payload execution</h3>
+<p>A <code>GovernanceDecisionReceipt</code> records a <strong>decision outcome</strong> (closure / tally
+certification). That outcome can be <strong>process-authorized with no personal grant</strong>.
+<strong>Executing</strong> the accepted payload (e.g. activating a charter, joining a federation,
+seating a steward) is a <em>separate</em> authority path that may require a grant-backed mandate.
+Do not conflate the two: a decision receipt may carry a process-authorized attestation
+while a downstream execution receipt/act carries <code>Grant { grant_ref }</code>.</p>
+<h2>4. Recommendation: a process-authorized attestation, on a v3 decision receipt</h2>
+<!-- truth: normative -->
+
+<p><strong>Add a positive &quot;process-authorized&quot; attestation mode and emit it on a new
+<code>GovernanceDecisionReceiptV3</code>.</strong></p>
+<ul>
+<li><strong>Shape (recommended):</strong> a distinct <code>ReceiptMandateAttestation</code> variant — e.g.
+<code>ProcessAuthorized</code> — rather than a new <code>NoMandateReason</code>. Rationale: a democratic
+decision is <em>positively authorized by process</em>, so labelling it <code>NoMandateRequired</code>
+(&quot;no authority needed&quot;) mislabels it — exactly the conflation this doc forbids. The
+decision receipt already binds the vote tally and votes in its base hash, so the
+attestation only needs to <em>name</em> the mode (it need not re-encode the tally).<ul>
+<li><em>Alternative (lower-churn):</em> <code>NoMandateReason::ProcessAuthorized</code> under the existing
+<code>NoMandateRequired</code> arm. Rejected as primary because it reuses the &quot;no mandate&quot; framing
+for a positively-authorized act. Either way the choice is an ADR-level commitment.</li>
+</ul>
+</li>
+<li><strong>Versioning:</strong> extending either taxonomy for a decision triggers the <code>:v3</code> rule — the
+decision receipt that <em>uses</em> the new mode must be <code>GovernanceDecisionReceiptV3</code>
+(<code>icn:gov:decision:v3</code>), fresh-hashed over its base fields + the new attestation, never
+derived from v2. Existing v2 receipts (meeting/action-item, and decision-v2 if/when used
+for <code>Bootstrap</code>) are unaffected because they never emit the new ordinal.</li>
+</ul>
+<h2>5. Per-path answers</h2>
+<!-- truth: normative -->
+
+<table>
+<thead>
+<tr>
+<th>Decision path</th>
+<th>Authority mode</th>
+<th>Honest attestation</th>
+<th>Emit when</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Forced-accept (admin override)</td>
+<td>Bootstrap</td>
+<td><code>NoMandateRequired { Bootstrap }</code></td>
+<td><strong>Now</strong> — fits v2 taxonomy</td>
+</tr>
+<tr>
+<td>Normal democratic close (vote authorizes outcome)</td>
+<td>Process/tally</td>
+<td><code>ProcessAuthorized</code> (new)</td>
+<td>After §4 lands → <strong>v3</strong></td>
+</tr>
+<tr>
+<td>Close whose <em>outcome triggers/represents execution authority</em> (charter/federation/steward)</td>
+<td>Grant-backed execution</td>
+<td><code>Grant { grant_ref }</code> on the <strong>execution</strong> receipt/act</td>
+<td>Blocked on Execution grants + target binding</td>
+</tr>
+</tbody></table>
+<p>Explicit answers to §12 Q4 and the review questions:</p>
+<ul>
+<li><strong>Which v2 paths emit immediately:</strong> only <strong>forced-accept → <code>Bootstrap</code></strong>.</li>
+<li><strong>Which need a new process-authorized mode first:</strong> <strong>all normal democratic closes</strong> —
+they must not be emitted as <code>MembershipStandingOnly</code>, and the current taxonomy has no
+honest variant, so they wait for §4 (→ v3).</li>
+<li><strong>Which wait for <code>Grant</code>:</strong> the <strong>execution</strong> of accepted high/medium-blast payloads
+(charter/federation/steward) — a separate receipt/act, not the decision closure itself.</li>
+<li><strong>Must <code>NoMandateReason</code>/attestation be extended before normal-close v2 emission?</strong> Yes —
+and extending it for a decision means a <strong>v3</strong> decision receipt, not v2.</li>
+<li><strong>Mixed attestation across the chain?</strong> Yes: the decision receipt may carry
+<code>ProcessAuthorized</code> while the downstream execution receipt carries <code>Grant</code>.</li>
+</ul>
+<h2>6. Grant-minting + target-binding gaps (for the execution path)</h2>
+<!-- truth: normative -->
+
+<p>Before any <code>Grant</code>-backed decision/execution attestation or <code>MandateGate</code> handler wiring is
+honest:</p>
+<ul>
+<li><strong>Execution-class grant minting</strong> (decomposition Q7–Q10): decide which proposal classes
+mint <code>AuthorityClass::Execution</code> grants, the <strong>grantee</strong> (named person/role), a truthful
+<strong>term/expiry</strong> (fail-closed on overflow, per the <code>AppointSteward</code> precedent in
+<code>grant_minting.rs</code>), and the <strong>target</strong>. <code>derive_grants_for_accepted_proposal</code> is the
+extension point. None exist today.</li>
+<li><strong>Federation/Role target binding</strong> (Q11–Q12): a <code>TypedScope</code> binding surface (or a
+<code>(domain, act, target) → mandate_id</code> index) so <code>Federation</code>/<code>Role</code> stop returning
+<code>WrongTarget</code>. Federation also lacks a <code>FederationId</code> type (raw <code>String</code>).</li>
+</ul>
+<p>Until both land, <code>MandateGate::require()</code> handler wiring is <strong>always-reject theater</strong> and is
+deferred.</p>
+<h2>7. Next-code sequencing (after this design RFCs)</h2>
+<!-- truth: normative -->
+
+<ol>
+<li><strong>Extend the attestation taxonomy</strong> per §4 (new <code>ProcessAuthorized</code> mode) — the smallest
+typed change in <code>icn-governance/src/proof.rs</code>, plus <code>GovernanceDecisionReceiptV3</code> if the
+<code>:v3</code> rule is confirmed.</li>
+<li><strong>Emit <code>GovernanceDecisionReceiptV3</code> (and v2-Bootstrap) for the honestly-attestable
+paths</strong>: forced-accept → <code>Bootstrap</code>; normal democratic close → <code>ProcessAuthorized</code>.
+Reuse the fail-closed <code>put_opaque</code> routing pattern (#1934/#1935); no typed gateway
+import.</li>
+<li><strong>Only then</strong> the execution-authority track: Execution-grant minting (§6), Federation/Role
+target binding (§6), and finally <code>MandateGate::require()</code> handler wiring.</li>
+</ol>
+<h2>8. Open questions for the ADR</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li><code>ProcessAuthorized</code> as a distinct attestation variant (recommended) vs a new
+<code>NoMandateReason</code> — freeze the shape.</li>
+<li>Confirm the <code>:v3</code> rule applies (decision receipt must bump) vs a documented exception.</li>
+<li>Whether <code>ProcessAuthorized</code> should carry any process reference (it need not — the tally is
+already in the base hash) or stay a bare discriminator like <code>Bootstrap</code>.</li>
+<li>The Execution-grant grantee/term/target shape (§6) — likely its own design slice.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
