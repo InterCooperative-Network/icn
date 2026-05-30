@@ -347,7 +347,7 @@ ICN_PASSPHRASE=dev ICN_GATEWAY_JWT_SECRET=dev-secret-must-be-at-least-32-bytes \
 
 ### Obtaining a JWT token
 
-The default scopes in `icnctl auth token` use `gov:read`/`gov:write`, which the gateway rejects. Use full scope names:
+`icnctl auth token` defaults to `governance:read`/`governance:write` (full scope names the gateway accepts). For broader access request the full set:
 
 ```bash
 ICN_PASSPHRASE=dev ./target/debug/icnctl --data-dir /tmp/icn auth token \
