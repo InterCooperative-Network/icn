@@ -465,6 +465,12 @@ async fn handle_request(
                     "No candidate scopes configured for method {}",
                     rpc_request.method
                 );
+                counter!(
+                    "icn_rpc_errors_total",
+                    "method" => rpc_request.method.clone(),
+                    "error_code" => "-32603"
+                )
+                .increment(1);
                 gauge!("icn_rpc_active_requests").decrement(1.0);
                 let response = RpcResponse::error(
                     rpc_request.id,
@@ -489,7 +495,10 @@ async fn handle_request(
                             let response = RpcResponse::error(
                                 rpc_request.id,
                                 -32403,
-                                format!("Insufficient scope: requires one of {required_scopes:?}"),
+                                format!(
+                                    "Insufficient scope: requires one of: {}",
+                                    required_scopes.join(", ")
+                                ),
                             );
                             return Ok(json_response(StatusCode::OK, &response));
                         }
