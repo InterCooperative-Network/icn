@@ -95,6 +95,16 @@ pub fn require_scope(req: &HttpRequest, required_scope: &str) -> Result<(), Gate
 /// authorization-failure metric (keyed on the preferred/first scope) is emitted
 /// only when none of the candidates match.
 pub fn require_any_scope(req: &HttpRequest, required_scopes: &[&str]) -> Result<(), GatewayError> {
+    // An empty candidate list is a server-side wiring error, not a client auth
+    // failure: returning 403 would hide a miswired route and pollute the
+    // `required_scope` metric with an empty label. Reject it explicitly before
+    // touching request claims (mirrors `icn_http_kit::auth::require_any_scope_matched`).
+    let Some((&preferred, _)) = required_scopes.split_first() else {
+        return Err(GatewayError::InternalError(
+            "require_any_scope called with no candidate scopes".to_string(),
+        ));
+    };
+
     let claims = get_claims(req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
 
@@ -107,7 +117,6 @@ pub fn require_any_scope(req: &HttpRequest, required_scopes: &[&str]) -> Result<
 
     // None matched — track the failure keyed on the preferred (first) scope,
     // mirroring `require_scope`, then reject.
-    let preferred = required_scopes.first().copied().unwrap_or("");
     gateway::authorization_failures_inc(preferred);
     Err(GatewayError::AuthorizationFailed(format!(
         "Missing required scope (need one of): {required_scopes:?}"
@@ -263,6 +272,17 @@ mod tests {
         assert!(
             require_any_scope(&req, &["governance:proposal:write", "governance:write"]).is_ok()
         );
+    }
+
+    #[actix_web::test]
+    async fn require_any_scope_rejects_empty_candidate_list() {
+        // An empty candidate list is a server-side wiring error: surface it as an
+        // internal error (before reading claims), never a 403 with an empty label.
+        let req = req_with_scopes(&["governance:write"]);
+        assert!(matches!(
+            require_any_scope(&req, &[]),
+            Err(GatewayError::InternalError(_))
+        ));
     }
 
     #[actix_web::test]
