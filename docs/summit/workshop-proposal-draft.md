@@ -77,7 +77,7 @@ Live, step by step, in plain language:
 4. **A piece of organizing work becomes a legible obligation** — e.g. *"Confirm the Summit venue booking."*
 5. **The organizer sees it as a plain-language action card** — what they owe, with a note that a receipt is expected.
 6. **They do the work and mark it done.**
-7. **The node issues a verifiable completion receipt** — who did it, what changed, when, and a `record_hash`: a tamper-evident fingerprint of that exact completion.
+7. **The node issues a verifiable completion receipt** — it binds *which* obligation (item + domain), *who* completed it, the *transition* (`pending → completed`), and *when*, into a `record_hash`: a tamper-evident fingerprint of that completion event. It proves *this member discharged this obligation at this time* — the editable title/description text is not part of the hash — checkable by anyone, no vendor required.
 8. **The obligation is discharged** — the card clears, and the proof remains for anyone to check.
 
 No platform vendor sits in the middle. The receipt is the proof.
