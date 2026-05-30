@@ -611,14 +611,19 @@ pub async fn handle_governance_proposal_open(
 
 /// Handle governance.vote.cast RPC call - cast a vote on a proposal
 ///
-/// Requires scope: `governance:vote` or `governance:*`
+/// Scope authorization is enforced centrally by the JSON-RPC dispatcher
+/// (`required_scopes_for_method` → `[governance:proposal:write,
+/// governance:write]`), the same accepted-also gate the other proposal-family
+/// methods use (#1868). This handler only requires an authenticated context so
+/// the caller DID can be recorded as the voter; it does not re-check scopes.
 pub async fn handle_governance_vote_cast(
     id: u64,
     params: &serde_json::Value,
     state: &Arc<RpcServer>,
     ctx: Option<&RpcContext>,
 ) -> RpcResponse {
-    // Require authentication with governance:vote scope
+    // The caller DID is the voter identity, so an authenticated context is
+    // required. Scope authorization already happened at central dispatch.
     let ctx = match ctx {
         Some(c) => c,
         None => {
@@ -629,19 +634,6 @@ pub async fn handle_governance_vote_cast(
             );
         }
     };
-
-    // Verify caller has required scope
-    if !ctx.has_scope("governance:vote") {
-        tracing::warn!(
-            caller = %ctx.caller_did,
-            "Vote attempt denied: missing governance:vote scope"
-        );
-        return RpcResponse::error(
-            id,
-            crate::error_codes::SCOPE_INSUFFICIENT,
-            "Insufficient scope: governance:vote required".to_string(),
-        );
-    }
 
     tracing::debug!(
         caller = %ctx.caller_did,

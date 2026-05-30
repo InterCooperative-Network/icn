@@ -1891,3 +1891,84 @@ async fn test_internal_error_sanitization() {
 
     handle.abort();
 }
+
+// ============================================================================
+// #1868 A3b — RPC `governance.vote.cast` authorization.
+//
+// Authorization for `governance.vote.cast` is enforced solely by central JSON-RPC
+// dispatch (`required_scopes_for_method` → `[governance:proposal:write,
+// governance:write]`, accepted-also), matching the sibling governance methods and
+// the already-migrated HTTP `cast_vote` surface. The downstream handler no longer
+// re-checks a separate legacy `governance:vote` scope.
+// ============================================================================
+
+/// End-to-end: which scopes authorize `governance.vote.cast` over the RPC path.
+///
+/// The test server wires no governance handle, so a request that PASSES the scope
+/// gate reaches the handler and surfaces `RESOURCE_NOT_AVAILABLE` (-32000) —
+/// "accepted" means "not rejected at the scope gate", mirroring the HTTP A1c
+/// convention. A request REJECTED at central dispatch surfaces -32403 (insufficient
+/// scope) and never reaches the handler. Both codes are stable wire values embedded
+/// by the client as `RPC error {code}: ...`.
+#[tokio::test]
+async fn governance_vote_cast_central_scope_authorization() {
+    let (addr, handle) = start_test_server(true).await.unwrap();
+
+    // (scope presented, should the scope gate accept it?)
+    let cases: &[(&str, bool)] = &[
+        // Canonical proposal-family class scope — the #1868 target. Must work
+        // end-to-end now that the stale handler gate is gone.
+        ("governance:proposal:write", true),
+        // Legacy broad scope — accepted-also fallback, still authorizes.
+        ("governance:write", true),
+        // Unrelated read scope — rejected.
+        ("governance:read", false),
+        // Sibling write class — rejected (not in the candidate list).
+        ("governance:charter:write", false),
+        // Stale legacy vote scope — NOT in the central candidate list, so it is
+        // intentionally rejected. It is not silently preserved as a gate.
+        ("governance:vote", false),
+    ];
+
+    for &(scope, accepted) in cases {
+        let keypair = Arc::new(KeyPair::generate().unwrap());
+        let mut client = RpcClient::with_credentials(addr, keypair);
+        client
+            .authenticate(vec![scope.to_string()])
+            .await
+            .unwrap_or_else(|e| panic!("authenticate({scope}) failed: {e:?}"));
+
+        let params = serde_json::json!({
+            "proposal_id": "prop-a3b",
+            "choice": "for",
+        });
+        let result = client.call("governance.vote.cast", params).await;
+
+        // No governance handle is wired, so an authorized call cannot succeed.
+        let err =
+            result.expect_err("governance.vote.cast must not succeed without a governance handle");
+        let msg = err.to_string();
+
+        if accepted {
+            // Passed the scope gate; failed downstream for lack of a handle.
+            assert!(
+                msg.contains("-32000"),
+                "scope {scope} must be authorized end-to-end (expected -32000 \
+                 RESOURCE_NOT_AVAILABLE downstream), got: {msg}"
+            );
+            assert!(
+                !msg.contains("-32403"),
+                "scope {scope} must not be rejected at the central scope gate, got: {msg}"
+            );
+        } else {
+            // Rejected at central dispatch before reaching the handler.
+            assert!(
+                msg.contains("-32403"),
+                "scope {scope} must be rejected at the central scope gate \
+                 (expected -32403 insufficient scope), got: {msg}"
+            );
+        }
+    }
+
+    handle.abort();
+}
