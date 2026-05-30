@@ -54,7 +54,7 @@ use icn_ledger::{DisputeManager, Ledger};
 use icn_net::{NetworkHandle, RateLimiter};
 use icn_store::Store;
 
-use crate::auth::{required_scope_for_method, RpcAuthManager, RpcTokenClaims};
+use crate::auth::{required_scopes_for_method, RpcAuthManager, RpcTokenClaims};
 use crate::context::RpcContext;
 use crate::handler;
 use crate::receipt::ReceiptStore;
@@ -455,23 +455,50 @@ async fn handle_request(
     // Check authentication if enabled
     let claims: Option<RpcTokenClaims> = if let Some(auth_manager) = &state.auth_manager {
         // Check if this method requires authentication
-        if let Some(required_scope) = required_scope_for_method(&rpc_request.method) {
+        if let Some(required_scopes) = required_scopes_for_method(&rpc_request.method) {
+            // An empty candidate list is a server-side configuration error, not a
+            // client auth failure: fail closed as an internal error rather than a
+            // 403 (mirrors the gateway `require_any_scope` guard). The mapping
+            // always returns >=1 candidate, so this is defensive.
+            if required_scopes.is_empty() {
+                error!(
+                    "No candidate scopes configured for method {}",
+                    rpc_request.method
+                );
+                counter!(
+                    "icn_rpc_errors_total",
+                    "method" => rpc_request.method.clone(),
+                    "error_code" => "-32603"
+                )
+                .increment(1);
+                gauge!("icn_rpc_active_requests").decrement(1.0);
+                let response = RpcResponse::error(
+                    rpc_request.id,
+                    -32603,
+                    "Internal error: method scope misconfigured".to_string(),
+                );
+                return Ok(json_response(StatusCode::OK, &response));
+            }
             // Method requires auth - verify token
             match bearer_token {
                 Some(token) => match auth_manager.verify_token(&token) {
                     Ok(claims) => {
-                        // Check scope
-                        if !claims.has_scope(required_scope) {
+                        // Check scope: authorized if ANY candidate scope is granted
+                        // (accepted-also). `has_scope` semantics are unchanged.
+                        if !required_scopes.iter().any(|s| claims.has_scope(s)) {
                             warn!(
-                                "Insufficient scope for method {}: required {}, has {:?}",
-                                rpc_request.method, required_scope, claims.scopes
+                                "Insufficient scope for method {}: requires one of {:?}, has {:?}",
+                                rpc_request.method, required_scopes, claims.scopes
                             );
                             counter!("icn_rpc_auth_failures_total", "reason" => "insufficient_scope").increment(1);
                             gauge!("icn_rpc_active_requests").decrement(1.0);
                             let response = RpcResponse::error(
                                 rpc_request.id,
                                 -32403,
-                                format!("Insufficient scope: requires {required_scope}"),
+                                format!(
+                                    "Insufficient scope: requires one of: {}",
+                                    required_scopes.join(", ")
+                                ),
                             );
                             return Ok(json_response(StatusCode::OK, &response));
                         }

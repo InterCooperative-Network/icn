@@ -1016,65 +1016,89 @@ pub mod scopes {
     ];
 }
 
-/// Method to scope mapping
-pub fn required_scope_for_method(method: &str) -> Option<&'static str> {
+/// Method to required-scope-candidates mapping.
+///
+/// Returns the ordered list of capability scopes that authorize a method; a
+/// caller is authorized if it holds **any one** of them (accepted-also). For
+/// most methods this is a single scope. During the #1868 `governance:write`
+/// decomposition, the governance write methods list the narrowed class scope
+/// first and keep broad [`scopes::GOVERNANCE_WRITE`] as a backward-compatible
+/// fallback. The returned slice is never empty.
+pub fn required_scopes_for_method(method: &str) -> Option<&'static [&'static str]> {
     match method {
         // Auth methods don't require scope (auth.revoke checks ownership in handler)
         "auth.challenge" | "auth.verify" | "auth.revoke" => None,
 
         // Network methods
         "network.peers" | "network.stats" | "network.status" | "network.nat_status" => {
-            Some(scopes::NETWORK_READ)
+            Some(&[scopes::NETWORK_READ])
         }
-        "network.dial" => Some(scopes::NETWORK_WRITE),
+        "network.dial" => Some(&[scopes::NETWORK_WRITE]),
 
         // Ledger methods
-        "ledger.head" | "ledger.balance" | "ledger.history" => Some(scopes::LEDGER_READ),
-        "ledger.quarantine.list" | "ledger.quarantine.get" => Some(scopes::LEDGER_READ),
+        "ledger.head" | "ledger.balance" | "ledger.history" => Some(&[scopes::LEDGER_READ]),
+        "ledger.quarantine.list" | "ledger.quarantine.get" => Some(&[scopes::LEDGER_READ]),
         "ledger.quarantine.release" | "ledger.quarantine.drop" | "ledger.quarantine.purge" => {
-            Some(scopes::LEDGER_WRITE)
+            Some(&[scopes::LEDGER_WRITE])
         }
 
         // Contract methods
-        "contract.list" | "receipt.get" => Some(scopes::CONTRACT_READ),
-        "contract.deploy" | "contract.call" => Some(scopes::CONTRACT_WRITE),
+        "contract.list" | "receipt.get" => Some(&[scopes::CONTRACT_READ]),
+        "contract.deploy" | "contract.call" => Some(&[scopes::CONTRACT_WRITE]),
 
         // Governance methods
-        "governance.domain.list" | "governance.domain.get" => Some(scopes::GOVERNANCE_READ),
-        "governance.proposal.list" | "governance.proposal.get" => Some(scopes::GOVERNANCE_READ),
-        "governance.domain.create" => Some(scopes::GOVERNANCE_WRITE),
+        "governance.domain.list" | "governance.domain.get" => Some(&[scopes::GOVERNANCE_READ]),
+        "governance.proposal.list" | "governance.proposal.get" => Some(&[scopes::GOVERNANCE_READ]),
+        // #1868 A2b: accepted-also — narrowed class scope first, broad
+        // `governance:write` second as a backward-compatible fallback.
+        "governance.domain.create" => {
+            Some(&[scopes::GOVERNANCE_CHARTER_WRITE, scopes::GOVERNANCE_WRITE])
+        }
         "governance.proposal.create"
         | "governance.proposal.open"
         | "governance.proposal.close"
-        | "governance.vote.cast" => Some(scopes::GOVERNANCE_WRITE),
+        | "governance.vote.cast" => {
+            Some(&[scopes::GOVERNANCE_PROPOSAL_WRITE, scopes::GOVERNANCE_WRITE])
+        }
 
         // Compute methods
-        "compute.status" => Some(scopes::COMPUTE_READ),
-        "compute.submit" | "compute.cancel" => Some(scopes::COMPUTE_WRITE),
+        "compute.status" => Some(&[scopes::COMPUTE_READ]),
+        "compute.submit" | "compute.cancel" => Some(&[scopes::COMPUTE_WRITE]),
 
         // Policy methods
-        "policy.get" | "policy.list" | "quota.usage" | "quota.list" => Some(scopes::POLICY_READ),
-        "policy.set" | "policy.remove" => Some(scopes::POLICY_WRITE),
+        "policy.get" | "policy.list" | "quota.usage" | "quota.list" => Some(&[scopes::POLICY_READ]),
+        "policy.set" | "policy.remove" => Some(&[scopes::POLICY_WRITE]),
 
         // Trust methods
-        "trust.list" | "trust.compute" => Some(scopes::TRUST_READ),
-        "trust.add" | "trust.remove" => Some(scopes::TRUST_WRITE),
+        "trust.list" | "trust.compute" => Some(&[scopes::TRUST_READ]),
+        "trust.add" | "trust.remove" => Some(&[scopes::TRUST_WRITE]),
 
         // Recovery methods
-        "recovery.list" | "recovery.status" => Some(scopes::RECOVERY_READ),
+        "recovery.list" | "recovery.status" => Some(&[scopes::RECOVERY_READ]),
         "recovery.initiate" | "recovery.attest" | "recovery.finalize" | "recovery.cancel" => {
-            Some(scopes::RECOVERY_WRITE)
+            Some(&[scopes::RECOVERY_WRITE])
         }
 
         // Dispute methods (ledger entry disputes)
-        "dispute.list" | "dispute.get" => Some(scopes::DISPUTE_READ),
+        "dispute.list" | "dispute.get" => Some(&[scopes::DISPUTE_READ]),
         "dispute.file" | "dispute.add_evidence" | "dispute.assign_mediator" | "dispute.resolve" => {
-            Some(scopes::DISPUTE_WRITE)
+            Some(&[scopes::DISPUTE_WRITE])
         }
 
         // Unknown methods - require admin
-        _ => Some(scopes::ADMIN),
+        _ => Some(&[scopes::ADMIN]),
     }
+}
+
+/// Backwards-compatible single-scope accessor: the **preferred** (first)
+/// required scope for a method, or `None` if the method needs no scope.
+///
+/// Prefer [`required_scopes_for_method`] for authorization — it honours the
+/// full accepted-also candidate list. This accessor returns only the first
+/// candidate, so for methods migrated under #1868 it returns the narrowed
+/// class scope (the broad fallback is not reflected here).
+pub fn required_scope_for_method(method: &str) -> Option<&'static str> {
+    required_scopes_for_method(method).and_then(|scopes| scopes.first().copied())
 }
 
 #[cfg(test)]
@@ -1188,13 +1212,135 @@ mod tests {
             required_scope_for_method("compute.submit"),
             Some(scopes::COMPUTE_WRITE)
         );
+        // #1868 A2b: the preferred (first) required scope for governance writes is
+        // now the narrowed class scope; the broad fallback lives in the candidate
+        // list returned by `required_scopes_for_method`.
         assert_eq!(
             required_scope_for_method("governance.vote.cast"),
-            Some(scopes::GOVERNANCE_WRITE)
+            Some(scopes::GOVERNANCE_PROPOSAL_WRITE)
         );
 
         // Auth revoke doesn't require specific scope
         assert_eq!(required_scope_for_method("auth.revoke"), None);
+    }
+
+    // ------------------------------------------------------------------
+    // #1868 A2b — JSON-RPC accepted-also governance scope decomposition.
+    // ------------------------------------------------------------------
+
+    /// (method, expected candidate list) for the 5 migrated governance writes.
+    fn migrated_governance_methods() -> [(&'static str, &'static [&'static str]); 5] {
+        [
+            (
+                "governance.domain.create",
+                &[scopes::GOVERNANCE_CHARTER_WRITE, scopes::GOVERNANCE_WRITE],
+            ),
+            (
+                "governance.proposal.create",
+                &[scopes::GOVERNANCE_PROPOSAL_WRITE, scopes::GOVERNANCE_WRITE],
+            ),
+            (
+                "governance.proposal.open",
+                &[scopes::GOVERNANCE_PROPOSAL_WRITE, scopes::GOVERNANCE_WRITE],
+            ),
+            (
+                "governance.proposal.close",
+                &[scopes::GOVERNANCE_PROPOSAL_WRITE, scopes::GOVERNANCE_WRITE],
+            ),
+            (
+                "governance.vote.cast",
+                &[scopes::GOVERNANCE_PROPOSAL_WRITE, scopes::GOVERNANCE_WRITE],
+            ),
+        ]
+    }
+
+    fn claims_with(scopes_list: &[&str]) -> RpcTokenClaims {
+        RpcTokenClaims {
+            sub: "did:icn:test".to_string(),
+            jti: "test-jti".to_string(),
+            iat: 0,
+            exp: u64::MAX,
+            scopes: scopes_list.iter().map(|s| s.to_string()).collect(),
+            coop_id: None,
+        }
+    }
+
+    /// The exact authorization predicate the central enforcement site applies.
+    fn method_authorized(method: &str, claims: &RpcTokenClaims) -> bool {
+        required_scopes_for_method(method)
+            .expect("method requires a scope")
+            .iter()
+            .any(|s| claims.has_scope(s))
+    }
+
+    #[test]
+    fn migrated_methods_expose_narrow_first_then_broad_fallback() {
+        for (method, expected) in migrated_governance_methods() {
+            assert_eq!(
+                required_scopes_for_method(method),
+                Some(expected),
+                "candidate list mismatch for {method}"
+            );
+        }
+    }
+
+    #[test]
+    fn required_scopes_for_method_never_empty_for_governance() {
+        // Guards the central enforcement's empty-list-is-misconfig invariant.
+        for (method, _) in migrated_governance_methods() {
+            let list = required_scopes_for_method(method).expect("requires scope");
+            assert!(!list.is_empty(), "{method} must have >=1 candidate scope");
+        }
+        // A representative unchanged write method stays single-candidate.
+        assert_eq!(
+            required_scopes_for_method("compute.submit"),
+            Some(&[scopes::COMPUTE_WRITE][..])
+        );
+    }
+
+    #[test]
+    fn migrated_methods_accept_narrow_and_broad_reject_unrelated_and_sibling() {
+        for (method, expected) in migrated_governance_methods() {
+            let narrow = expected[0];
+            // 1. Narrow class scope accepted.
+            assert!(
+                method_authorized(method, &claims_with(&[narrow])),
+                "{method}: narrow scope {narrow} must be accepted"
+            );
+            // 2. Broad GOVERNANCE_WRITE fallback accepted (backward-compatible).
+            assert!(
+                method_authorized(method, &claims_with(&[scopes::GOVERNANCE_WRITE])),
+                "{method}: governance:write fallback must be accepted"
+            );
+            // 3. Unrelated scope rejected.
+            assert!(
+                !method_authorized(method, &claims_with(&[scopes::GOVERNANCE_READ])),
+                "{method}: governance:read must be rejected"
+            );
+            // 4. Sibling write class rejected.
+            let sibling = if narrow == scopes::GOVERNANCE_PROPOSAL_WRITE {
+                scopes::GOVERNANCE_CHARTER_WRITE
+            } else {
+                scopes::GOVERNANCE_PROPOSAL_WRITE
+            };
+            assert!(
+                !method_authorized(method, &claims_with(&[sibling])),
+                "{method}: sibling class {sibling} must be rejected"
+            );
+        }
+    }
+
+    #[test]
+    fn wildcard_behavior_unchanged_for_migrated_methods() {
+        for (method, _) in migrated_governance_methods() {
+            // Global `*` still grants everything.
+            assert!(method_authorized(method, &claims_with(&["*"])));
+            // 2-part namespace wildcard `governance:*` still authorizes via the
+            // broad `governance:write` fallback candidate (which is 2-part).
+            assert!(method_authorized(method, &claims_with(&["governance:*"])));
+            // No sub-prefix matching: a bare `governance` scope grants nothing.
+            assert!(!method_authorized(method, &claims_with(&["governance"])));
+        }
     }
 
     #[test]
