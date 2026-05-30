@@ -365,7 +365,7 @@ enum AuthCommands {
         #[arg(
             short,
             long,
-            default_value = "ledger:read,ledger:write,coop:read,gov:read,gov:write"
+            default_value = "ledger:read,ledger:write,coop:read,governance:read,governance:write"
         )]
         scopes: String,
     },
@@ -9953,7 +9953,7 @@ async fn get_gateway_token(
         "did": did,
         "signature": hex::encode(signature.to_bytes()),
         "coop_id": coop_id,
-        "scopes": ["gov:read", "gov:write"]
+        "scopes": ["governance:read", "governance:write"]
     });
 
     let resp = client
