@@ -23,7 +23,7 @@ use std::sync::{Arc, RwLock};
 
 use crate::api::receipts::GovernanceReceiptResponse;
 use crate::error::{GatewayError, Result};
-use crate::middleware::{get_claims, require_scope};
+use crate::middleware::{get_claims, require_any_scope, require_scope};
 use crate::receipt_store::ReceiptStore;
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus};
 use icn_kernel_api::receipts::CanonicalReceipt;
@@ -494,7 +494,10 @@ pub async fn create_meeting(
     registry: web::Data<Arc<DecisionRegistry>>,
     req: web::Json<CreateMeetingRequest>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "governance:write")?;
+    // #1868 A2a: narrow the decision-registry meeting-create route to the meeting
+    // class scope, with the broad `governance:write` retained as an accepted-also
+    // fallback.
+    require_any_scope(&http_req, &["governance:meeting:write", "governance:write"])?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -997,6 +1000,57 @@ mod tests {
 
     fn temp_exec_store() -> Arc<dyn Store> {
         Arc::new(SledStore::temporary().expect("temp exec store"))
+    }
+
+    /// #1868 A2a: the decision-registry meeting-create route now gates on
+    /// `["governance:meeting:write", "governance:write"]`. Acceptance is asserted
+    /// as "not 401/403"; rejection is 403 at the gate.
+    #[actix_web::test]
+    async fn create_meeting_scope_gate_accepts_meeting_and_broad_rejects_others() {
+        async fn create_status(scope: &str) -> actix_web::http::StatusCode {
+            let registry = Arc::new(DecisionRegistry::new());
+            let app = actix_test::init_service(
+                App::new()
+                    .app_data(web::Data::new(registry))
+                    .service(web::scope("/registry").configure(configure)),
+            )
+            .await;
+            let claims = TokenClaims {
+                sub: "did:icn:test-user".to_string(),
+                iat: 1_000_000_000,
+                exp: 9_999_999_999,
+                coop_id: "did:icn:test123".to_string(),
+                scopes: vec![scope.to_string()],
+            };
+            let req = actix_test::TestRequest::post()
+                .uri("/registry/meetings")
+                .set_json(serde_json::json!({
+                    "coopId": "did:icn:test123",
+                    "title": "Scope test meeting",
+                    "startsAt": 1_800_000_000u64
+                }))
+                .to_request();
+            req.extensions_mut().insert(claims);
+            actix_test::call_service(&app, req).await.status()
+        }
+
+        use actix_web::http::StatusCode;
+        let narrow = create_status("governance:meeting:write").await;
+        assert_ne!(narrow, StatusCode::UNAUTHORIZED);
+        assert_ne!(narrow, StatusCode::FORBIDDEN);
+
+        let broad = create_status("governance:write").await;
+        assert_ne!(broad, StatusCode::UNAUTHORIZED);
+        assert_ne!(broad, StatusCode::FORBIDDEN);
+
+        assert_eq!(
+            create_status("governance:read").await,
+            StatusCode::FORBIDDEN
+        );
+        assert_eq!(
+            create_status("governance:charter:write").await,
+            StatusCode::FORBIDDEN
+        );
     }
 
     #[test]

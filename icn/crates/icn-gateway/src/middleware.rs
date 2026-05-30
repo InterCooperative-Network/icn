@@ -84,6 +84,45 @@ pub fn require_scope(req: &HttpRequest, required_scope: &str) -> Result<(), Gate
     Ok(())
 }
 
+/// Require the request to carry ANY of the listed scopes (exact match, same
+/// semantics as [`require_scope`]).
+///
+/// List the narrowed class scope first; the broad `governance:write` stays as
+/// an accepted-also fallback during the #1868 capability decomposition. This
+/// preserves the gateway's exact-match semantics — it does **not** introduce
+/// wildcard or sub-prefix matching — so existing tokens behave identically
+/// except that a narrowed class scope is now also accepted. A single
+/// authorization-failure metric (keyed on the preferred/first scope) is emitted
+/// only when none of the candidates match.
+pub fn require_any_scope(req: &HttpRequest, required_scopes: &[&str]) -> Result<(), GatewayError> {
+    // An empty candidate list is a server-side wiring error, not a client auth
+    // failure: returning 403 would hide a miswired route and pollute the
+    // `required_scope` metric with an empty label. Reject it explicitly before
+    // touching request claims (mirrors `icn_http_kit::auth::require_any_scope_matched`).
+    let Some((&preferred, _)) = required_scopes.split_first() else {
+        return Err(GatewayError::InternalError(
+            "require_any_scope called with no candidate scopes".to_string(),
+        ));
+    };
+
+    let claims = get_claims(req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
+
+    if required_scopes
+        .iter()
+        .any(|scope| claims.scopes.contains(&scope.to_string()))
+    {
+        return Ok(());
+    }
+
+    // None matched — track the failure keyed on the preferred (first) scope,
+    // mirroring `require_scope`, then reject.
+    gateway::authorization_failures_inc(preferred);
+    Err(GatewayError::AuthorizationFailed(format!(
+        "Missing required scope (need one of): {required_scopes:?}"
+    )))
+}
+
 /// Check if request has a scope (non-erroring version)
 ///
 /// Returns true if the authenticated user has the given scope, false otherwise.
@@ -211,7 +250,100 @@ where
 mod tests {
     use super::*;
     use crate::auth::AuthManager;
+    use actix_web::test::TestRequest;
     use icn_identity::IdentityBundle;
+
+    /// Build a request carrying the given exact scopes in its `TokenClaims`.
+    fn req_with_scopes(scopes: &[&str]) -> HttpRequest {
+        let req = TestRequest::default().to_http_request();
+        req.extensions_mut().insert(TokenClaims {
+            sub: "did:icn:test-user".to_string(),
+            iat: 1_000_000_000,
+            exp: 9_999_999_999,
+            coop_id: "test-coop".to_string(),
+            scopes: scopes.iter().map(|s| s.to_string()).collect(),
+        });
+        req
+    }
+
+    #[actix_web::test]
+    async fn require_any_scope_accepts_narrow_exact_scope() {
+        let req = req_with_scopes(&["governance:proposal:write"]);
+        assert!(
+            require_any_scope(&req, &["governance:proposal:write", "governance:write"]).is_ok()
+        );
+    }
+
+    #[actix_web::test]
+    async fn require_any_scope_rejects_empty_candidate_list() {
+        // An empty candidate list is a server-side wiring error: surface it as an
+        // internal error (before reading claims), never a 403 with an empty label.
+        let req = req_with_scopes(&["governance:write"]);
+        assert!(matches!(
+            require_any_scope(&req, &[]),
+            Err(GatewayError::InternalError(_))
+        ));
+    }
+
+    #[actix_web::test]
+    async fn require_any_scope_accepts_broad_fallback() {
+        // Accepted-also fallback: pre-migration `governance:write` tokens still pass.
+        let req = req_with_scopes(&["governance:write"]);
+        assert!(
+            require_any_scope(&req, &["governance:proposal:write", "governance:write"]).is_ok()
+        );
+    }
+
+    #[actix_web::test]
+    async fn require_any_scope_rejects_unrelated_read_scope() {
+        let req = req_with_scopes(&["governance:read"]);
+        assert!(matches!(
+            require_any_scope(&req, &["governance:proposal:write", "governance:write"]),
+            Err(GatewayError::AuthorizationFailed(_))
+        ));
+    }
+
+    #[actix_web::test]
+    async fn require_any_scope_rejects_sibling_write_scope() {
+        let req = req_with_scopes(&["governance:charter:write"]);
+        assert!(matches!(
+            require_any_scope(&req, &["governance:proposal:write", "governance:write"]),
+            Err(GatewayError::AuthorizationFailed(_))
+        ));
+    }
+
+    #[actix_web::test]
+    async fn require_any_scope_is_exact_match_not_subprefix() {
+        // Broad `governance:write` must NOT satisfy a narrow-only candidate list,
+        // and a narrow token must NOT satisfy a broad-only requirement: proves we
+        // did not introduce sub-prefix or wildcard matching.
+        let broad = req_with_scopes(&["governance:write"]);
+        assert!(matches!(
+            require_any_scope(&broad, &["governance:proposal:write"]),
+            Err(GatewayError::AuthorizationFailed(_))
+        ));
+        let narrow = req_with_scopes(&["governance:proposal:write"]);
+        assert!(matches!(
+            require_any_scope(&narrow, &["governance:write"]),
+            Err(GatewayError::AuthorizationFailed(_))
+        ));
+    }
+
+    #[actix_web::test]
+    async fn require_scope_remains_exact_match_unchanged() {
+        // Behavior-neutral: the existing exact-match helper is untouched.
+        let req = req_with_scopes(&["governance:write"]);
+        assert!(require_scope(&req, "governance:write").is_ok());
+        assert!(matches!(
+            require_scope(&req, "governance:proposal:write"),
+            Err(GatewayError::AuthorizationFailed(_))
+        ));
+        let bare = TestRequest::default().to_http_request();
+        assert!(matches!(
+            require_scope(&bare, "governance:write"),
+            Err(GatewayError::AuthenticationFailed(_))
+        ));
+    }
 
     #[actix_web::test]
     async fn test_jwt_auth_valid_token() {

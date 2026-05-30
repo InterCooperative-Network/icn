@@ -11,7 +11,7 @@ use crate::api::treasury::{do_get_treasury_position, do_propose_spend, SpendRequ
 use crate::error::{GatewayError, Result};
 use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::governance_mgr::GovernanceManager;
-use crate::middleware::{get_claims, require_scope};
+use crate::middleware::{get_claims, require_any_scope, require_scope};
 use crate::models::CastVoteRequest;
 use crate::notifications::NotificationService;
 use crate::treasury_mgr::GatewayTreasuryManager;
@@ -49,7 +49,12 @@ pub async fn cast_vote_alias(
     id: web::Path<String>,
     req: web::Json<CastVoteRequest>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "governance:write")?;
+    // #1868 A2a: narrow the cast-vote alias to the proposal class scope, with the
+    // broad `governance:write` retained as an accepted-also fallback.
+    require_any_scope(
+        &http_req,
+        &["governance:proposal:write", "governance:write"],
+    )?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -233,6 +238,45 @@ mod tests {
             .to_request();
         let resp = test::call_service(&app, req).await;
         assert_ne!(resp.status(), StatusCode::NOT_FOUND);
+    }
+
+    /// #1868 A2a: the cast-vote alias now gates on
+    /// `["governance:proposal:write", "governance:write"]`. Acceptance is asserted
+    /// as "not 401/403" (a downstream cast on a nonexistent proposal is a non-auth
+    /// error); rejection is 403 at the gate.
+    #[actix_web::test]
+    async fn cast_vote_alias_scope_gate_accepts_proposal_and_broad_rejects_others() {
+        async fn vote_status(scope: &str) -> StatusCode {
+            let app = test::init_service(
+                App::new()
+                    .app_data(web::Data::new(Arc::new(GovernanceManager::new())))
+                    .app_data(web::Data::new(Arc::new(EventBroadcaster::new())))
+                    .app_data(web::Data::new(notification_service()))
+                    .service(web::scope("/proposals").configure(configure_proposals)),
+            )
+            .await;
+            let req = test::TestRequest::post()
+                .uri("/proposals/p-1/vote")
+                .set_json(serde_json::json!({ "choice": "for", "comment": null }))
+                .to_request();
+            req.extensions_mut()
+                .insert(test_claims("test-coop", vec![scope]));
+            test::call_service(&app, req).await.status()
+        }
+
+        let narrow = vote_status("governance:proposal:write").await;
+        assert_ne!(narrow, StatusCode::UNAUTHORIZED);
+        assert_ne!(narrow, StatusCode::FORBIDDEN);
+
+        let broad = vote_status("governance:write").await;
+        assert_ne!(broad, StatusCode::UNAUTHORIZED);
+        assert_ne!(broad, StatusCode::FORBIDDEN);
+
+        assert_eq!(vote_status("governance:read").await, StatusCode::FORBIDDEN);
+        assert_eq!(
+            vote_status("governance:charter:write").await,
+            StatusCode::FORBIDDEN
+        );
     }
 
     #[actix_web::test]
