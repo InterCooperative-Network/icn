@@ -40,105 +40,171 @@
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Workshop Proposal: Democratic Infrastructure for Cooperatives</h1>
 <p><strong>Submitted to:</strong> New York Cooperative Summit — October 2026 Call for Presenters
-<strong>Draft date:</strong> 2026-03-23
+<strong>Draft date:</strong> 2026-03-23 · <strong>Revised:</strong> 2026-05-30 (claims aligned to verified runtime; proven live loop folded in)
 <strong>Track:</strong> Technology &amp; Infrastructure
 <strong>Format:</strong> Workshop (90 minutes)</p>
 <hr>
 <h2>Title</h2>
-<p><strong>Infrastructure That Cooperatives Own: A Live Demo of Democratic Coordination</strong></p>
+<p><strong>Infrastructure That Cooperatives Own: Turning Cooperative Work into Verifiable Records</strong></p>
 <h2>Tagline</h2>
-<p>What if your cooperative&#39;s governance rules were enforced by code you controlled — not a platform that could change its terms on you tomorrow?</p>
+<p>What if your cooperative&#39;s decisions and obligations were recorded by code you controlled — and anyone could verify them without trusting a platform vendor?</p>
 <hr>
 <h2>Abstract</h2>
-<p>Most cooperative technology runs on platforms owned by someone else. You can use Slack until Slack decides to change its pricing. You can organize on Google Drive until Google decides your account violates a policy. The coordination layer — the substrate on which your democratic processes run — is rented infrastructure, not cooperative infrastructure.</p>
-<p>The InterCooperative Network (ICN) is an attempt to fix that. It is free and open-source coordination software, built in Rust, deployed on hardware cooperatives own, where the rules of governance are expressed in a cooperative contract language and enforced by code that anyone can audit.</p>
-<p>This workshop is a live demonstration. We will run five cooperative scenarios, end to end, on a real Kubernetes cluster — not a slide deck, not a mockup. Attendees will watch:</p>
-<ul>
-<li>A cooperative governance vote run and produce a verifiable receipt</li>
-<li>Patronage dividends settled and anchored to the decision that authorized them</li>
-<li>A clearinghouse record cross-cooperative credit positions across member organizations</li>
-<li>A worker cooperative generate a signed compliance report over its own transaction history</li>
-<li>A compute task submitted to a commons resource pool, admitted by trust score, rejected by a restricted token</li>
-</ul>
-<p>Five cooperatives. Five cryptographic proofs. Zero central servers.</p>
-<p>The session is designed for cooperative organizers, not engineers. The math stays off the screen. The questions it answers are: Can your members verify the vote count without trusting the software vendor? Can you prove where your money went without hiring an auditor? Can you share infrastructure with another cooperative without merging your organizations?</p>
+<p>Most cooperative technology runs on platforms owned by someone else. You can use Slack until Slack changes its pricing. You can organize on Google Drive until Google decides your account violated a policy. The coordination layer — the substrate your democratic processes actually run on — is rented infrastructure, not cooperative infrastructure.</p>
+<p>The InterCooperative Network (ICN) is an attempt to fix that. It is free, open-source coordination software, built in Rust, that runs on hardware a cooperative owns — where the rules of the organization are expressed in a cooperative contract language and enforced by code anyone can audit.</p>
+<p>This workshop is a live demonstration, and it is honest about its own maturity. The spine of the session is <strong>one thing we run live, from zero, on a node a cooperative controls</strong>: ICN turning a real piece of organizing work into a <strong>legible obligation</strong> and a <strong>verifiable completion receipt</strong> — a tamper-evident record anyone can check. That loop is not a mockup and not a slide; it runs on a laptop in the room.</p>
+<p>Around that proven core, we walk the fuller picture — democratic decisions, patronage settlement, cross-cooperative clearing, compliance reporting, shared compute — and we are precise, out loud, about what runs today versus what is still being built. No &quot;trust us.&quot; When the system proves something, it shows you the proof. When it doesn&#39;t yet, we say so.</p>
+<p>The session is designed for cooperative organizers, not engineers. The math stays off the screen. The questions it answers: Can your members verify that a decision happened and was carried out, without trusting the software vendor? Can you prove what your organization did without hiring an auditor? Can you run shared infrastructure with another cooperative without merging your organizations?</p>
+<p>One proven loop you can verify in the room. A clear-eyed map of what comes next. Zero central servers.</p>
 <hr>
 <h2>Session Format and Agenda</h2>
 <p><strong>Total time:</strong> 90 minutes</p>
 <h3>Part 1: Why Cooperative Technology Is a Contradiction Right Now (20 minutes)</h3>
-<p>Open with the framing problem: cooperatives organize around democratic ownership, but they run their organizations on platforms owned by venture capital. The governance layer is democratic; the infrastructure layer is not.</p>
-<p>Brief survey of what this costs cooperatives in practice:</p>
+<p>Open with the framing problem: cooperatives organize around democratic ownership but run their organizations on platforms owned by venture capital. The governance layer is democratic; the infrastructure layer is not.</p>
+<p>What this costs cooperatives in practice:</p>
 <ul>
 <li>Platform lock-in prevents data portability between coops</li>
 <li>Pricing changes are imposed, not negotiated</li>
 <li>Surveillance capitalism extracts value from cooperative activity</li>
 <li>No interoperability between organizations without a shared platform</li>
 </ul>
-<p>Introduce the thesis: coordination infrastructure should be a commons. Not a product. Not a service. Infrastructure.</p>
+<p>The thesis: coordination infrastructure should be a commons. Not a product. Not a service. Infrastructure.</p>
 <h3>Part 2: What ICN Does (15 minutes)</h3>
 <p>Non-technical overview of the five-layer stack:</p>
 <ol>
-<li><strong>Identity</strong> — Every member gets a cryptographic identity they control. Not a username in a database. A key pair they own.</li>
-<li><strong>Governance</strong> — Proposals, votes, and tallies produce verifiable receipts. The audit trail is mathematically provable, not organizationally promised.</li>
+<li><strong>Identity</strong> — Every member gets a cryptographic identity they control. Not a username in a database — a key pair they own.</li>
+<li><strong>Governance</strong> — Decisions and obligations produce verifiable receipts. The audit trail is mathematically provable, not organizationally promised.</li>
 <li><strong>Economics</strong> — Mutual credit, patronage settlement, and treasury management without a bank as the trust intermediary.</li>
 <li><strong>Compute</strong> — Shared compute resources allocated by cooperative rules, not market pricing.</li>
 <li><strong>Federation</strong> — Inter-cooperative trust and clearing, without a central clearinghouse.</li>
 </ol>
-<p>Key architectural principle: the rules of your cooperative — your bylaws, your governance procedures — are expressed in a contract language that the system enforces mechanically. The rules and the enforcement are not separated.</p>
-<h3>Part 3: Live Demo — Five Cooperative Flows (40 minutes)</h3>
-<p>Live terminal demo on a real Kubernetes cluster. Five scenarios, five cooperatives:</p>
-<p><strong>Flow 1 — Governance (8 min)</strong>
-Brightworks Collective runs a membership vote. A member proposes expanding digital services. Three members vote. Outcome: accepted, with a cryptographic receipt containing the decision hash. The receipt can be verified by any member at any time without trusting the platform.</p>
-<p><strong>Flow 2 — Patronage Settlement (10 min)</strong>
-Brightworks distributes patronage dividends. The settlement is anchored to the governance receipt from Flow 1 via a provenance chain — the economic outcome is cryptographically linked to the democratic decision that authorized it. Governance and economics are not separate systems; they are the same ledger.</p>
-<p><strong>Flow 3 — Clearinghouse (8 min)</strong>
-Rochester Cooperative Clearinghouse records inter-cooperative credit positions. Mutual credit clearing across organizations without a bank. The network is the bank.</p>
-<p><strong>Flow 4 — Compliance Reporting (8 min)</strong>
-Harbor Freight Workers Cooperative generates a signed compliance report over its transaction history. The report is anchored to governance decisions. An auditor can verify the chain without access to internal systems.</p>
-<p><strong>Flow 5 — Commons Compute (6 min)</strong>
-Finger Lakes CDN submits a compute task to a commons pool. Two gates: the member&#39;s capability token must carry compute:write scope, and their trust score must meet the admission threshold. Both pass. The task enters the queue with a provenance hash. A restricted token is then used to attempt the same submission — and is rejected. Authorization is not advisory.</p>
-<p><strong>What we do not claim:</strong> Task execution by registered executor nodes is next-sprint work. The admission gate — the trust check, the scope enforcement, the provenance hash — is what we demonstrate. We are precise about what is proven.</p>
-<h3>Part 4: Discussion — What Would You Build? (15 minutes)</h3>
-<p>Structured Q&amp;A structured around cooperative use cases:</p>
+<p>Key principle: your cooperative&#39;s rules — your bylaws, your procedures — are expressed in a contract language the system enforces mechanically. The rules and the enforcement are not separated.</p>
+<h3>Part 3: Live Demo (40 minutes)</h3>
+<h4>3a. The proven loop — run live, from zero (15 min)</h4>
+<p>This is the part that runs in the room, every time, on a local node (a laptop is enough — the homelab cluster is the same software at scale). It is the smallest honest claim ICN can make, and it is real today:</p>
+<blockquote>
+<p><strong>ICN turns a piece of cooperative work into a legible obligation and a verifiable receipt.</strong></p>
+</blockquote>
+<p>Live, step by step, in plain language:</p>
+<ol>
+<li><strong>The cooperative&#39;s own node is running</strong> — local, on hardware the group controls. No central server.</li>
+<li><strong>An organizer has a cryptographic identity</strong> (a DID) — like a passport they alone hold.</li>
+<li><strong>We stand up the organization</strong> — a federation and its governance domain — from a cooperative&#39;s own institution package.</li>
+<li><strong>A piece of organizing work becomes a legible obligation</strong> — e.g. <em>&quot;Confirm the Summit venue booking.&quot;</em></li>
+<li><strong>The organizer sees it as a plain-language action card</strong> — what they owe, with a note that a receipt is expected.</li>
+<li><strong>They do the work and mark it done.</strong></li>
+<li><strong>The node issues a verifiable completion receipt</strong> — it binds <em>which</em> obligation (item + domain), <em>who</em> completed it, the <em>transition</em> (<code>pending → completed</code>), and <em>when</em>, into a <code>record_hash</code>: a tamper-evident fingerprint of that completion event. It proves <em>this member discharged this obligation at this time</em> — the editable title/description text is not part of the hash — checkable by anyone, no vendor required.</li>
+<li><strong>The obligation is discharged</strong> — the card clears, and the proof remains for anyone to check.</li>
+</ol>
+<p>No platform vendor sits in the middle. The receipt is the proof.</p>
+<h4>3b. The fuller picture — honestly labeled (25 min)</h4>
+<p>We then walk the scenarios that show where this goes, narrating clearly what is running, what is rehearsed against fixtures, and what is next-build. (See the truth box below.)</p>
 <ul>
-<li>What decisions does your cooperative make that should have verifiable receipts?</li>
-<li>What data do you share with other cooperatives that you currently can&#39;t verify?</li>
+<li><strong>Democratic decisions → receipts.</strong> A proposal, deliberation, and a recorded outcome. <em>Status: the decision-and-obligation machinery runs today; the full member-voting path is in active development (it depends on the cooperative&#39;s standing/membership layer being provisioned).</em> We show the architecture and the fixtures, and we are explicit that live multi-member voting is the next slice — not something we pretend works on stage.</li>
+<li><strong>Patronage settlement anchored to a decision.</strong> The economic outcome cryptographically linked to the decision that authorized it — governance and economics on the same ledger.</li>
+<li><strong>Cross-cooperative clearing.</strong> Mutual credit positions across organizations without a bank. The network is the bank.</li>
+<li><strong>Compliance reporting.</strong> A signed report over a cooperative&#39;s own history, anchored to its decisions — auditable without access to internal systems.</li>
+<li><strong>Commons compute admission.</strong> A task admitted by trust score and capability scope, and a restricted token rejected at the same gate. Authorization is not advisory.</li>
+</ul>
+<p>For each, we say plainly which parts are proven, which are rehearsed against example data, and which are roadmap. That honesty <em>is</em> the demo: a system that overstates its proofs is the opposite of what cooperatives need.</p>
+<h3>Part 4: Discussion — What Would You Build? (15 minutes)</h3>
+<p>Structured Q&amp;A around real cooperative use cases:</p>
+<ul>
+<li>What decisions and commitments does your cooperative make that should have verifiable receipts?</li>
+<li>What do you share with other cooperatives that you currently can&#39;t verify?</li>
 <li>What shared infrastructure could your federation run if you owned the coordination layer?</li>
 </ul>
-<p>Close with the open-source status: ICN is free, self-hosted, and accepts contributions. The code runs on commodity hardware. The cooperatives that ran this demo are fictional; the infrastructure running them is not.</p>
+<p>Close on status: ICN is free, self-hosted, open to contributions, and runs on commodity hardware. The cooperatives in the scenarios are fictional; the infrastructure running the proven loop is not.</p>
+<hr>
+<h2>What&#39;s proven / rehearsed / next (truth box)</h2>
+<p>Shown to attendees, on a slide, in these words:</p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Status (as of the workshop)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Work → legible obligation → <strong>verifiable completion receipt</strong> (the proven loop, 3a)</td>
+<td><strong>Runs live, from zero, on a local node</strong></td>
+</tr>
+<tr>
+<td>Cooperative identity (DID), institution bootstrap (federation + governance domain)</td>
+<td><strong>Runs live</strong></td>
+</tr>
+<tr>
+<td>Decision/obligation records + plain-language action cards</td>
+<td><strong>Runs live</strong></td>
+</tr>
+<tr>
+<td>Full member <strong>voting</strong> (propose → vote → decision receipt)</td>
+<td><strong>In development</strong> — gated on the membership/standing layer; shown as architecture + fixtures, not claimed live</td>
+</tr>
+<tr>
+<td>Patronage settlement, cross-coop clearing, compliance reporting, commons-compute admission</td>
+<td><strong>Rehearsed against example data / roadmap</strong> — narrated as such, not claimed as production</td>
+</tr>
+<tr>
+<td>Production deployment, live federation between real cooperatives</td>
+<td><strong>Not yet</strong> — this is research-grade infrastructure, said plainly</td>
+</tr>
+</tbody></table>
 <hr>
 <h2>Learning Outcomes</h2>
 <p>Attendees will leave with:</p>
 <ol>
-<li>A concrete mental model of what cooperative-owned coordination infrastructure looks like and how it differs from cooperative-controlled tooling on proprietary platforms</li>
-<li>Familiarity with five specific coordination patterns — governance, settlement, clearing, reporting, and compute — and how cryptographic receipts make them auditable</li>
-<li>An understanding of the trust graph model and why cooperative participation history is a better basis for resource allocation than market pricing</li>
-<li>A list of practical questions to ask about their organization&#39;s current technology stack: who owns it, what can you verify, and what happens if the platform changes its terms</li>
-<li>Contact with ICN&#39;s contribution pathways for technically-inclined members</li>
+<li>A concrete mental model of cooperative-<em>owned</em> coordination infrastructure and how it differs from cooperative-<em>controlled</em> tooling on proprietary platforms.</li>
+<li>A first-hand look at the one loop that runs today — work becoming a verifiable, member-checkable record — and a clear map of the coordination patterns being built around it (decisions, settlement, clearing, reporting, compute).</li>
+<li>An understanding of why cooperative participation history (a trust graph) can be a better basis for resource allocation than market pricing.</li>
+<li>A short list of questions to ask about their own technology stack: who owns it, what can you verify, and what happens if the platform changes its terms.</li>
+<li>Contact with ICN&#39;s contribution pathways for technically-inclined members.</li>
 </ol>
 <hr>
 <h2>Who This Is For</h2>
-<p><strong>Primary audience:</strong> Cooperative organizers, federation builders, and cooperative developers who are thinking about long-term infrastructure strategy. No technical background required.</p>
-<p><strong>Secondary audience:</strong> Cooperative technologists who want to understand the ICN architecture and evaluate it for their organization.</p>
-<p><strong>Not for:</strong> People looking for a ready-to-deploy product with support SLAs. ICN is research-grade infrastructure. This session is honest about that.</p>
+<p><strong>Primary audience:</strong> Cooperative organizers, federation builders, and cooperative developers thinking about long-term infrastructure strategy. No technical background required.</p>
+<p><strong>Secondary audience:</strong> Cooperative technologists who want to understand the ICN architecture and evaluate it.</p>
+<p><strong>Not for:</strong> People looking for a ready-to-deploy product with support SLAs. ICN is research-grade infrastructure, and this session is honest about that.</p>
 <hr>
 <h2>Presenter</h2>
-<p><strong>Matthew Faherty</strong> — Software architect and cooperative organizer. Core developer of the InterCooperative Network. Organizer of the NY Cooperative Summit (2nd year running, technology track). Based in the Finger Lakes region of New York.</p>
+<p><strong>Matthew Faherty</strong> — Software architect and cooperative organizer. Core developer of the InterCooperative Network. Organizer of the NY Cooperative Summit (technology track). Based in the Finger Lakes region of New York.</p>
 <p>ICN is maintained at <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">github.com/InterCooperative-Network/icn</a>.</p>
 <hr>
 <h2>Technical Requirements</h2>
 <ul>
-<li>HDMI connection to projector or large display</li>
-<li>Reliable internet connection (demo runs on a remote K3s cluster; fallback is local Docker Compose network)</li>
-<li>Tables or chairs that allow attendees to see the presenter&#39;s screen</li>
-<li>Optional but useful: power strips if attendees want to follow along on laptops</li>
+<li>HDMI connection to a projector or large display.</li>
+<li>The proven loop (3a) runs on a <strong>local node</strong> and needs no internet. The fuller-picture scenarios (3b) can run against a homelab cluster if a reliable connection is available; local Docker Compose is the fallback.</li>
+<li>Seating that lets attendees see the presenter&#39;s screen.</li>
+<li>Optional: power strips for attendees following along on laptops.</li>
 </ul>
 <hr>
 <h2>Notes for Organizers</h2>
-<p>This session intentionally avoids the word &quot;blockchain.&quot; ICN is not a blockchain. It has no token, no coin, and no distributed ledger in the cryptocurrency sense. It is a peer-to-peer coordination substrate built on established cryptographic primitives (Ed25519 signatures, QUIC transport, Blake3 hashes). The terminology that matters: cooperative infrastructure, verifiable receipts, and democratic governance enforcement.</p>
-<p>The demo scenarios use fictional cooperatives but real software. The Brightworks Collective, Harbor Freight Workers Cooperative, Rochester Cooperative Clearinghouse, New England Mesh Network, and Finger Lakes CDN are illustrative; the Kubernetes cluster they run on is physical homelab hardware.</p>
+<p>This session intentionally avoids the word &quot;blockchain.&quot; ICN is not a blockchain — no token, no coin, no cryptocurrency-style distributed ledger. It is a peer-to-peer coordination substrate on established cryptographic primitives (Ed25519 signatures, QUIC transport, Blake3-class hashes). The terms that matter: cooperative infrastructure, legible obligations, verifiable receipts, democratic governance enforcement.</p>
+<p>The scenarios use fictional cooperatives but real software. The proven loop in 3a is reproducible from the project&#39;s own institution package and shipped binaries; a recorded transcript is available as backup if the room&#39;s setup fails.</p>
 <hr>
-<p><em>Draft — 2026-03-23. Not submitted.</em></p>
+<h2>Appendix A — Slide outline (to build)</h2>
+<ol>
+<li><strong>Title</strong> — Infrastructure That Cooperatives Own.</li>
+<li><strong>The contradiction</strong> — democratic org, landlord infrastructure (one image: the rented stack).</li>
+<li><strong>What you&#39;ll see today</strong> — one proven loop + an honest map. Set the truth-telling expectation.</li>
+<li><strong>The five-layer stack</strong> — identity / governance / economics / compute / federation (one line each).</li>
+<li><strong>The proven loop (1 slide per beat, or one build slide)</strong> — node → identity → institution → obligation → action card → done → <strong>receipt (<code>record_hash</code>)</strong> → discharged.</li>
+<li><strong>Truth box</strong> — proven / rehearsed / next (the table above). This is the trust-builder.</li>
+<li><strong>The fuller picture</strong> — decisions, settlement, clearing, reporting, compute (one slide, labeled by status).</li>
+<li><strong>What would you build?</strong> — the three discussion prompts.</li>
+<li><strong>Get involved</strong> — open source, self-hosted, contribution paths, contact.</li>
+</ol>
+<h2>Appendix B — One-page attendee handout (to build)</h2>
+<ul>
+<li><strong>What ICN is</strong> (2–3 sentences) and what it is <em>not</em> (not a blockchain, not a product).</li>
+<li><strong>The one thing proven today</strong>, in plain language: work → obligation → verifiable receipt; what a <code>record_hash</code> means for a member.</li>
+<li><strong>The truth box</strong> (proven / rehearsed / next) — reproduced verbatim.</li>
+<li><strong>Five questions</strong> to ask about your own cooperative&#39;s tech stack.</li>
+<li><strong>Where to look:</strong> the repo, the &quot;What&#39;s Real Now&quot; page, and how to reach the presenter.</li>
+<li><strong>Reproduce it yourself:</strong> a 4-line pointer to running the proven loop on a laptop.</li>
+</ul>
+<hr>
+<p><em>Revised 2026-05-30 — submit-ready pending a presenter voice pass and the Summit call&#39;s deadline/channel. Claims aligned to what the system verifiably does today (see truth box); live multi-member voting deliberately presented as in-development, not staged.</em></p>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
