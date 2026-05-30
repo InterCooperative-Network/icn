@@ -834,7 +834,10 @@ pub async fn create_proposal<E: GovernanceEventEmitter + Clone + 'static>(
     http_req: HttpRequest,
     req: web::Json<CreateProposalRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:proposal:write", "governance:write"],
+    )?;
     let proposer_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     val::validate_domain_id(&req.domain_id)?;
@@ -1168,7 +1171,10 @@ pub async fn open_proposal<E: GovernanceEventEmitter + Clone + 'static>(
     proposal_id: web::Path<String>,
     req: web::Json<OpenProposalRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:proposal:write", "governance:write"],
+    )?;
     let requester_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let proposal_id = ProposalId(proposal_id.into_inner());
@@ -1799,7 +1805,10 @@ pub async fn cast_vote<E: GovernanceEventEmitter + Clone + 'static>(
     proposal_id: web::Path<String>,
     req: web::Json<CastVoteRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:proposal:write", "governance:write"],
+    )?;
     let voter_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     val::validate_vote_comment(&req.comment)?;
@@ -2504,7 +2513,10 @@ pub async fn create_delegation<E: GovernanceEventEmitter + Clone + 'static>(
     http_req: HttpRequest,
     req: web::Json<CreateDelegationRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:proposal:write", "governance:write"],
+    )?;
     let delegator_did = parse_did(&claims.sub, "Invalid DID in token")?;
     let delegate_did = parse_did(&req.delegate, "Invalid delegate DID")?;
     let scope = parse_delegation_scope(&req.scope)?;
@@ -2634,7 +2646,10 @@ pub async fn revoke_delegation<E: GovernanceEventEmitter + Clone + 'static>(
     http_req: HttpRequest,
     delegation_id: web::Path<String>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:proposal:write", "governance:write"],
+    )?;
     let caller_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let id = DelegationId(delegation_id.into_inner());
@@ -3312,7 +3327,10 @@ pub async fn create_appoint_steward_proposal<E: GovernanceEventEmitter + Clone +
     http_req: HttpRequest,
     req: web::Json<AppointStewardProposalRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:proposal:write", "governance:write"],
+    )?;
     let proposer_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     val::validate_domain_id(&req.domain_id)?;
@@ -3392,7 +3410,10 @@ pub async fn create_remove_steward_proposal<E: GovernanceEventEmitter + Clone + 
     http_req: HttpRequest,
     req: web::Json<RemoveStewardProposalRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:proposal:write", "governance:write"],
+    )?;
     let proposer_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     val::validate_domain_id(&req.domain_id)?;
