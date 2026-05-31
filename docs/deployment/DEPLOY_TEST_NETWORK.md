@@ -1,6 +1,10 @@
 # Deploy ICN Test Network
 
-**Status**: ✅ Production-ready configuration
+> Historical test-network deployment snapshot (last verified 2025-12-04).
+> Treat this as archival context, not current deployment truth.
+> For current readiness, rely on live CI/runtime verification and `docs/ci/CI_CURRENT_STATUS.md`.
+
+**Status (2025-12-04 snapshot):** Test-network configuration validated at that date — not a current production-readiness claim.
 **Last Verified**: 2025-12-04
 
 ---

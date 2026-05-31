@@ -21,6 +21,7 @@ env:
   GATE_RATCHET_PHASE_SDK_TESTS: blocking
   GATE_RATCHET_PHASE_A11Y: blocking
   GATE_RATCHET_PHASE_COMPLIANCE: blocking
+  GATE_RATCHET_PHASE_READINESS: warning
   # Scope controls for staged boundary enforcement
   GATE_RATCHET_KERNEL_DEPS_SCOPE: core-only
 
@@ -283,6 +284,38 @@ jobs:
             exit 1
           fi
 
+          echo "Non-blocking phase ($PHASE): allowing CI to continue"
+          exit 0
+
+  readiness-overclaim:
+    name: Readiness Overclaim Check
+    needs: [changes]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Self-test the readiness linter
+        run: python3 .github/scripts/test_readiness_overclaim_linter.py
+
+      - name: Run readiness overclaim linter
+        run: |
+          set -euo pipefail
+          if python3 .github/scripts/readiness_overclaim_linter.py; then
+            echo "Readiness overclaim check passed"
+            exit 0
+          fi
+
+          PHASE="${GATE_RATCHET_PHASE_READINESS}"
+          echo "Ratchet phase: $PHASE"
+          if [ "$PHASE" != "observational" ]; then
+            echo "::warning title=Readiness overclaim detected::Un-disclaimed production/live-federation readiness claim in active deployment guidance. Phase=$PHASE. See docs/dev/language-guide.md and docs/ci/GATE_RATCHET_PLAN.md"
+          fi
+          echo "WARNING: Readiness overclaim detected. See docs/dev/language-guide.md"
+          if [ "$PHASE" = "blocking" ]; then
+            echo "::error title=Readiness overclaim (blocking)::Failing CI because phase=blocking and a readiness overclaim was detected."
+            echo "BLOCKING: failing CI due to readiness overclaim"
+            exit 1
+          fi
           echo "Non-blocking phase ($PHASE): allowing CI to continue"
           exit 0
 
