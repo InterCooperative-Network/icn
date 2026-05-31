@@ -92,24 +92,23 @@ function handleEvent(eventType: CoopEventType, payload: unknown) {
     // -------------------------------------------------------------------------
     // Ledger Events
     // -------------------------------------------------------------------------
-    case 'PaymentCreated': {
+    case 'SettlementCreated': {
       const p = payload as {
-        id: string;
+        coop_id: string;
+        hash: string;
         from: string;
         to: string;
         amount: number;
-        currency: string;
-        memo?: string;
+        unit: string;
       };
 
-      console.log(`[${timestamp}] PAYMENT`);
+      console.log(`[${timestamp}] SETTLEMENT`);
       console.log(`  ${truncate(p.from)} -> ${truncate(p.to)}`);
-      console.log(`  Amount: ${p.amount} ${p.currency}`);
-      if (p.memo) console.log(`  Memo: ${p.memo}`);
+      console.log(`  Amount: ${p.amount} ${p.unit}`);
       console.log();
 
       // Example: Send notification
-      // await sendNotification(p.to, `You received ${p.amount} ${p.currency}`);
+      // await sendNotification(p.to, `You received ${p.amount} ${p.unit}`);
       break;
     }
 
@@ -306,17 +305,17 @@ function notificationExample() {
 
   client.connectWebSocket('timebank-coop', {
     onMessage: async (message) => {
-      if (message.type === 'Event' && message.event_type === 'PaymentCreated') {
-        const payment = message.payload as { to: string; amount: number };
+      if (message.type === 'Event' && message.event_type === 'SettlementCreated') {
+        const settlement = message.payload as { to: string; amount: number };
 
         // Send email notification
-        // await sendEmail(payment.to, `You received ${payment.amount} hours`);
+        // await sendEmail(settlement.to, `You received ${settlement.amount} hours`);
 
         // Or push notification
-        // await sendPushNotification(payment.to, 'New payment received');
+        // await sendPushNotification(settlement.to, 'New settlement received');
 
         // Or update UI
-        // store.dispatch(addTransaction(payment));
+        // store.dispatch(addTransaction(settlement));
       }
     },
   });
@@ -343,7 +342,7 @@ function dashboardExample() {
       if (message.type !== 'Event') return;
 
       switch (message.event_type) {
-        case 'PaymentCreated':
+        case 'SettlementCreated':
           state.recentTransactions.unshift(message.payload);
           state.recentTransactions = state.recentTransactions.slice(0, 10);
           // updateUI();

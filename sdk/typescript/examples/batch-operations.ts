@@ -17,40 +17,40 @@ async function main() {
   // const signature = await signChallenge(challenge.challenge);
   // await client.authenticate('did:icn:admin', { sign: () => signature }, 'food-coop');
 
-  // Example 1: Batch payments
-  console.log('=== Batch Payments ===');
-  const payments = [
+  // Example 1: Batch settlements
+  console.log('=== Batch Settlements ===');
+  const settlements = [
     {
       from: 'did:icn:admin',
       to: 'did:icn:alice',
       amount: 10,
-      currency: 'hours',
+      unit: 'hours',
       memo: 'January coordination work',
     },
     {
       from: 'did:icn:admin',
       to: 'did:icn:bob',
       amount: 5,
-      currency: 'hours',
+      unit: 'hours',
       memo: 'Website updates',
     },
     {
       from: 'did:icn:admin',
       to: 'did:icn:carol',
       amount: 8,
-      currency: 'hours',
+      unit: 'hours',
       memo: 'Bookkeeping',
     },
   ];
 
-  const paymentResults = await client.batchPay('food-coop', payments);
-  console.log(`Payments: ${paymentResults.succeeded} succeeded, ${paymentResults.failed} failed`);
-  
-  paymentResults.results.forEach((result, i) => {
+  const settlementResults = await client.batchSettle('food-coop', settlements);
+  console.log(`Settlements: ${settlementResults.succeeded} succeeded, ${settlementResults.failed} failed`);
+
+  settlementResults.results.forEach((result, i) => {
     if (result.success) {
-      console.log(`  ✓ Payment ${i + 1}: ${result.payment?.hash}`);
+      console.log(`  ✓ Settlement ${i + 1}: ${result.settlement?.id}`);
     } else {
-      console.log(`  ✗ Payment ${i + 1}: ${result.error}`);
+      console.log(`  ✗ Settlement ${i + 1}: ${result.error}`);
     }
   });
 
@@ -77,29 +77,29 @@ async function main() {
 
   // Example 4: Handle partial failures
   console.log('\n=== Handling Partial Failures ===');
-  const mixedPayments = [
+  const mixedSettlements = [
     {
       from: 'did:icn:admin',
       to: 'did:icn:alice',
       amount: 5,
-      currency: 'hours',
-      memo: 'Valid payment',
+      unit: 'hours',
+      memo: 'Valid settlement',
     },
     {
       from: 'did:icn:nonexistent',
       to: 'did:icn:alice',
       amount: 999999,  // This will likely fail
-      currency: 'hours',
-      memo: 'Invalid payment',
+      unit: 'hours',
+      memo: 'Invalid settlement',
     },
   ];
 
-  const mixedResults = await client.batchPay('food-coop', mixedPayments);
+  const mixedResults = await client.batchSettle('food-coop', mixedSettlements);
   if (mixedResults.failed > 0) {
-    console.log('Some payments failed:');
+    console.log('Some settlements failed:');
     mixedResults.results.forEach((result, i) => {
       if (!result.success) {
-        console.log(`  Payment ${i + 1}: ${result.error}`);
+        console.log(`  Settlement ${i + 1}: ${result.error}`);
       }
     });
   }

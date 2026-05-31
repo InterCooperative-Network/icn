@@ -594,6 +594,17 @@ jobs:
         if: needs.changes.outputs.docs_only == 'true' && needs.changes.outputs.has_rust != 'true'
         run: echo "Confirmed docs-only (no SDK files); skipping TypeScript SDK tests."
 
+      # Ties the hand-written SDK docs/examples to the client's actually-exported
+      # methods and the canonical settle/position/unit ledger vocabulary, failing
+      # if deprecated pay/balance/escrow/recurring fintech terms (or methods that
+      # were never shipped) are presented as current API. Runs on every SDK change
+      # incl. docs-only — examples/ are not covered by tsc (rootDir: src). Needs
+      # only python3 (preinstalled). See sdk/typescript/check_sdk_doc_terms.py and
+      # docs/adr/ADR-0006.
+      - name: SDK docs use canonical ICN ledger primitives (no pay/balance/escrow as current)
+        run: python3 check_sdk_doc_terms.py --sdk-root .
+        continue-on-error: false
+
       - name: Free disk space
         if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         uses: ./.github/actions/free-disk-space

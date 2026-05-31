@@ -59,7 +59,7 @@ const appeal = await client.fileAppeal({
 
 Learn how to efficiently process multiple operations:
 
-- **Batch Payments**: Send multiple payments in one operation
+- **Batch Settlements**: Send multiple settlements in one operation
 - **Batch Member Management**: Add or update multiple members at once
 - **Error Handling**: Handle partial failures gracefully
 
@@ -69,10 +69,10 @@ Learn how to efficiently process multiple operations:
 - Batch updates to member roles
 
 ```typescript
-// Send multiple payments at once
-const results = await client.batchPay('food-coop', [
-  { from: 'admin', to: 'alice', amount: 10, currency: 'hours', memo: 'Work' },
-  { from: 'admin', to: 'bob', amount: 5, currency: 'hours', memo: 'Help' },
+// Send multiple settlements at once
+const results = await client.batchSettle('food-coop', [
+  { from: 'admin', to: 'alice', amount: 10, unit: 'hours', memo: 'Work' },
+  { from: 'admin', to: 'bob', amount: 5, unit: 'hours', memo: 'Help' },
 ]);
 console.log(`${results.succeeded} succeeded, ${results.failed} failed`);
 ```
@@ -171,7 +171,7 @@ All SDK methods throw `ICNError` on failure:
 
 ```typescript
 try {
-  await client.pay('food-coop', { ... });
+  await client.settle('food-coop', { ... });
 } catch (error) {
   if (error instanceof ICNError) {
     if (error.statusCode === 401) {
@@ -225,27 +225,27 @@ const all = await client.queryHistory('food-coop')
   .execute();
 
 const csv = all.transactions.map(tx => 
-  `${tx.timestamp},${tx.from},${tx.to},${tx.amount},${tx.currency},${tx.memo}`
+  `${tx.timestamp},${tx.from},${tx.to},${tx.amount},${tx.unit},${tx.memo}`
 ).join('\n');
 
 await fs.writeFile('transactions.csv', csv);
 ```
 
-### Real-time Balance Updates
+### Real-time Position Updates
 
 ```typescript
-let balance = await client.getBalance('food-coop', 'did:icn:alice');
+let position = (await client.getPosition('food-coop', 'did:icn:alice')).position;
 
 subscription.onEvent((event) => {
   if (EventFilter.byDid('did:icn:alice')(event)) {
     if (EventFilter.payments()(event)) {
       const payload = (event as any).payload;
       if (payload.from === 'did:icn:alice') {
-        balance -= payload.amount;
+        position -= payload.amount;
       } else if (payload.to === 'did:icn:alice') {
-        balance += payload.amount;
+        position += payload.amount;
       }
-      console.log(`New balance: ${balance}`);
+      console.log(`New position: ${position}`);
     }
   }
 });
@@ -324,7 +324,7 @@ async function generateMonthlyReport(coopId: string, month: string) {
 4. **Enable auto-reconnect**: For production WebSocket connections
 5. **Set appropriate limits**: Don't fetch more data than you need
 6. **Use query builders**: For complex history queries
-7. **Cache balances**: Update from events instead of polling
+7. **Cache positions**: Update from events instead of polling
 8. **Close connections**: Always clean up WebSocket subscriptions
 
 ## Need Help?
