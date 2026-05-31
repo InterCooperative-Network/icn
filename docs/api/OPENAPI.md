@@ -75,7 +75,7 @@ Most endpoints require JWT authentication:
 - `GET /v1/coops/:coop_id/stats` - Get statistics
 
 #### Ledger Operations
-- `GET /v1/coops/:coop_id/ledger/balance` - Get balance
+- `GET /v1/ledger/:coop_id/position/:did` - Get net position (the legacy `/balance` route was renamed per ADR-0006; the authoritative endpoint list is `docs/api/openapi.generated.yaml`)
 - `POST /v1/coops/:coop_id/ledger/transactions` - Record transaction
 - `GET /v1/coops/:coop_id/ledger/transactions` - List transactions
 - `GET /v1/coops/:coop_id/ledger/transactions/:tx_id` - Get transaction details

@@ -46,6 +46,14 @@ jobs:
           python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml
         continue-on-error: false
 
+      # Ties the hand-written API docs to the gateway's actual ICN-native routes
+      # (settle/position), failing if the deprecated payment/balance vocabulary is
+      # presented as current. See docs/adr/ADR-0006 and docs/api/check_api_doc_terms.py.
+      - name: API docs use canonical ICN primitives (no payment/balance as current)
+        run: |
+          python3 docs/api/check_api_doc_terms.py --repo-root .
+        continue-on-error: false
+
   lint:
     name: Lint Architecture Doc
     runs-on: ubuntu-latest
