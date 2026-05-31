@@ -20,11 +20,11 @@ It is the runnable form of a proof that previously lived only as a transcript.
 
 ## What this proves
 
-- A cooperative can run its **own** coordination node (local, no central server).
+- A cooperative can run its **own** coordination node — local and identity-backed, with a persistent run-local store and no central server.
 - An organizer holds a **cryptographic identity** (a DID) they control.
 - A piece of real work becomes a **tracked obligation** with a plain-language **action card**.
-- Completing it yields a **completion receipt** carrying a `record_hash` — a tamper-evident
-  fingerprint anyone can check, with no platform vendor in the middle.
+- Completing it yields a **completion receipt** carrying a `record_hash` — a 32-byte BLAKE3
+  fingerprint over the receipt's bound fields, with no platform vendor in the middle.
 - The receipt proves **this actor discharged this obligation at this time**.
 
 ## What this does NOT prove
@@ -39,6 +39,10 @@ This section is load-bearing. Be precise about it when showing the demo.
 - The receipt binds exactly `item_id`, `domain_id`, `actor_did`, `transition`, and `completed_at`.
   It does **not** certify the editable task title/description text — it proves the *completion
   event*, not the content of the words.
+- This kit **checks** that the receipt is well-formed (a 32-byte BLAKE3 `record_hash`) and bound to
+  *this* item/domain/actor/transition; it does **not** itself re-derive the BLAKE3 hash. The canonical
+  re-derivation is `ActionItemCompletionReceipt::compute_record_hash` (domain tag
+  `icn:gov:action_item_completion:v1`, `icn/crates/icn-governance/src/proof.rs`).
 
 ## Prerequisites
 
@@ -105,6 +109,9 @@ empty token, no action item, or a receipt without a `record_hash`.
   `governance:write` names (the short form is rejected by the gateway), and that the gateway is healthy.
 - **`:8085 busy`** — another process holds the port. Use a different `GW_PORT=…`, or pass
   `--force-port-cleanup` if you are sure the holder is disposable.
+- **`:7799 busy`** — the run-local **gossip** port is taken. The kit pins gossip to
+  `127.0.0.1:7799` (not the default `:7777`), so an identity-backed run never collides with a
+  developer's already-running default node. Use a different `GOSSIP_PORT=…`, or `--force-port-cleanup`.
 - **`bootstrap apply failed`** — confirm `PKG` points at `institutions/nycn` and the binaries match
   current `main`.
 - **gateway never healthy** — read `runs/<timestamp>/gateway.log`.

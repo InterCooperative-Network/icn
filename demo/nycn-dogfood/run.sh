@@ -15,13 +15,14 @@
 #     --record              tee a transcript and render an HTML recording
 #     --force-port-cleanup  reclaim the port even if held by a non-script process
 #
-# Env overrides: GW_PORT GW ICND ICNCTL PKG COOP_ID DOMAIN SCOPES DOGFOOD_OUT_DIR ICN_PASSPHRASE
+# Env overrides: GW_PORT GOSSIP_PORT GW ICND ICNCTL PKG COOP_ID DOMAIN SCOPES DOGFOOD_OUT_DIR ICN_PASSPHRASE
 set -Eeuo pipefail
 trap 'echo "ERROR: failed near line $LINENO" >&2' ERR
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
 GW_PORT="${GW_PORT:-8085}"
+GOSSIP_PORT="${GOSSIP_PORT:-7799}"   # run-local gossip listener (NOT the default :7777)
 GW="${GW:-http://127.0.0.1:${GW_PORT}}"
 ICND="${ICND:-$REPO/icn/target/release/icnd}"
 ICNCTL="${ICNCTL:-$REPO/icn/target/release/icnctl}"
@@ -78,11 +79,16 @@ LOG="$RUN_DIR/gateway.log"
 LAST_PID="$OUT_BASE/.last-icnd.pid"
 
 gw_health(){ curl -sf -m3 "$GW/v1/health" >/dev/null 2>&1; }
-port_listening(){ (exec 3<>"/dev/tcp/127.0.0.1/$GW_PORT") 2>/dev/null && { exec 3>&- 3<&-; return 0; }; return 1; }
+port_listening(){ local p="${1:-$GW_PORT}"; (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null && { exec 3>&- 3<&-; return 0; }; return 1; }
+# Gossip is UDP (QUIC), so /dev/tcp cannot see it -- probe with ss by source port.
+udp_listening(){ local p="$1"; command -v ss >/dev/null 2>&1 || return 1; [ -n "$(ss -Huln "sport = :$p" 2>/dev/null)" ]; }
 free_port(){
-  if command -v fuser >/dev/null 2>&1; then fuser -k "${GW_PORT}/tcp" 2>/dev/null || true
-  elif command -v lsof >/dev/null 2>&1; then lsof -tiTCP:"$GW_PORT" -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null || true
-  else die "cannot free :$GW_PORT (no fuser/lsof); free it manually"; fi
+  local p="${1:-$GW_PORT}" proto="${2:-tcp}"
+  if command -v fuser >/dev/null 2>&1; then fuser -k "${p}/${proto}" 2>/dev/null || true
+  elif command -v lsof >/dev/null 2>&1; then
+    if [ "$proto" = udp ]; then lsof -tiUDP:"$p" 2>/dev/null | xargs -r kill 2>/dev/null || true
+    else lsof -tiTCP:"$p" -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null || true; fi
+  else die "cannot free :$p/$proto (no fuser/lsof); free it manually"; fi
   sleep 1
 }
 stop_script_gw(){
@@ -96,20 +102,37 @@ stop_script_gw(){
 }
 start_gw(){
   mkdir -p "$DATA_DIR"; chmod 700 "$DATA_DIR"
+  # Init the run-local node identity BEFORE starting the gateway so icnd takes the
+  # identity-backed path (actors + event broadcaster) and the gateway opens the
+  # PERSISTENT run-local store (Some(data_dir)) instead of the ephemeral
+  # GatewayServer::new() fallback (data_dir: None). Without this, --fresh runs the
+  # no-identity HTTP path on temporary storage and the receipt would not persist.
+  # icnd --init reads ICN_PASSPHRASE; see bins/icnd/src/main.rs,
+  # crates/icn-core/src/supervisor/init_gateway.rs, crates/icn-gateway/src/server.rs.
+  #
+  # Pin gateway + gossip to RUN-LOCAL ports and start with the generated --config, so the
+  # identity-backed node never binds the default gossip listener (:7777) and cannot collide
+  # with a developer's already-running default node. Gossip is bound to loopback (init writes
+  # 0.0.0.0); the demo is single-node, so it needs no externally-reachable gossip.
+  "$ICND" --init --data-dir "$DATA_DIR" --init-gateway-port "$GW_PORT" --init-gossip-port "$GOSSIP_PORT" </dev/null >"$RUN_DIR/node-init.log" 2>&1 || die "node identity init failed (see $RUN_DIR/node-init.log)"
+  sed -i "s#^listen_addr = \"0.0.0.0:${GOSSIP_PORT}\"#listen_addr = \"127.0.0.1:${GOSSIP_PORT}\"#" "$DATA_DIR/config.toml" 2>/dev/null || true
   local secret; secret="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-  setsid "$ICND" --data-dir "$DATA_DIR" --gateway-enable \
+  setsid "$ICND" --config "$DATA_DIR/config.toml" --data-dir "$DATA_DIR" --gateway-enable \
     --gateway-bind "127.0.0.1:${GW_PORT}" --gateway-jwt-secret "$secret" \
     --log-level warn >"$LOG" 2>&1 </dev/null &
   local pid=$!
   echo "$pid" > "$LAST_PID"
-  note "started local gateway (pid $pid, data: $DATA_DIR)"
+  note "started identity-backed local gateway (pid $pid, gateway 127.0.0.1:${GW_PORT}, gossip 127.0.0.1:${GOSSIP_PORT}, data: $DATA_DIR)"
 }
 
 say "0. Local gateway lifecycle"
 if [ "$FRESH" = 1 ]; then
   stop_script_gw
-  if port_listening; then
-    if [ "$FORCE_PORT" = 1 ]; then free_port; else die ":$GW_PORT busy (not script-owned). Free it or pass --force-port-cleanup."; fi
+  if port_listening "$GW_PORT"; then
+    if [ "$FORCE_PORT" = 1 ]; then free_port "$GW_PORT" tcp; else die ":$GW_PORT/tcp (gateway) busy (not script-owned). Free it or pass --force-port-cleanup."; fi
+  fi
+  if udp_listening "$GOSSIP_PORT"; then
+    if [ "$FORCE_PORT" = 1 ]; then free_port "$GOSSIP_PORT" udp; else die ":$GOSSIP_PORT/udp (gossip) busy (not script-owned). Free it or pass --force-port-cleanup."; fi
   fi
   start_gw
 else
@@ -152,7 +175,10 @@ ITEM_ID="$(jq -r '.id // empty' <<<"$item_json")"
 note "Recorded as a tracked obligation. id: $ITEM_ID"
 
 say "6. The organizer sees it as a plain-language action card (what they owe)"
-curl -s -H "$AUTH" "$GW/v1/gov/me/action-cards" | jq '.cards[] | {title, summary, receipt_expected}'
+cards_json="$(curl -s -H "$AUTH" "$GW/v1/gov/me/action-cards")"
+card_n="$(jq --arg id "$ITEM_ID" '[.cards[] | select(.source_id==$id)] | length' <<<"$cards_json")"
+[ "$card_n" = "1" ] || die "expected exactly one action card for $ITEM_ID before completion, found $card_n: $cards_json"
+jq --arg id "$ITEM_ID" '.cards[] | select(.source_id==$id) | {title, summary, receipt_expected}' <<<"$cards_json"
 
 say "7. The organizer does the work and marks it done"
 curl -s -X PUT -H "$AUTH" -H 'Content-Type: application/json' -d '{"status":"completed"}' \
@@ -161,9 +187,14 @@ curl -s -X PUT -H "$AUTH" -H 'Content-Type: application/json' -d '{"status":"com
 say "8. The node issues a verifiable completion receipt"
 receipt="$(curl -s -H "$AUTH" "$GW/v1/gov/domains/$DOMAIN/action-items/$ITEM_ID/completion-receipt")"
 jq . <<<"$receipt"
-jq -e '.record_hash | length > 0' <<<"$receipt" >/dev/null || die "no record_hash in receipt: $receipt"
-note "record_hash binds item_id, domain_id, actor_did, transition, completed_at."
-note "It proves THIS actor discharged THIS obligation at THIS time."
+# Verify the receipt is well-formed and binds THIS obligation: a 32-byte BLAKE3
+# record_hash over exactly {item_id, domain_id, actor_did, transition, completed_at}
+# (canonical hasher ActionItemCompletionReceipt::compute_record_hash, domain tag
+# "icn:gov:action_item_completion:v1", in crates/icn-governance/src/proof.rs). This
+# kit checks the binding + 32-byte shape; it does not itself re-derive the BLAKE3.
+jq -e --arg id "$ITEM_ID" --arg dom "$DOMAIN" --arg did "$DID" '(.record_hash | type == "array" and length == 32 and all(.[]; type == "number" and . >= 0 and . <= 255)) and .item_id == $id and .domain_id == $dom and .actor_did == $did and .transition == "completed" and (.completed_at | type == "number" and . > 0)' <<<"$receipt" >/dev/null || die "receipt failed verification (need 32-byte record_hash bound to this item/domain/actor/transition): $receipt"
+note "Verified: 32-byte BLAKE3 record_hash binding item_id, domain_id, actor_did, transition=completed, completed_at."
+note "It proves THIS actor discharged THIS obligation at THIS time (re-derive via proof.rs canonical hasher)."
 
 say "9. The obligation is discharged -- the card clears, the proof remains"
 open_n="$(curl -s -H "$AUTH" "$GW/v1/gov/me/action-cards" | jq --arg id "$ITEM_ID" '[.cards[] | select(.source_id==$id)] | length')"
