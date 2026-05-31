@@ -125,6 +125,22 @@ a <code>--admin</code> merge can otherwise land a violation even when the job fa
 Linter covers all public-facing API surfaces.</p>
 <p>Graduation path: WARNING → BLOCKING → add to branch protection required checks.</p>
 <p>Owner: @core-arch</p>
+<h4>Readiness Overclaim Check (<code>GATE_RATCHET_PHASE_READINESS</code>) — NEW (2026-05-31)</h4>
+<p>Phase: WARNING (observational entry; non-blocking).</p>
+<p>Scans active deployment guidance (<code>docs/deployment/**</code>, <code>docs/operations/deployment/**</code>) for
+un-disclaimed, affirmative production / live-federation / governance-completion claims. A dated
+readiness claim is allowed when the file carries a stale/archive banner; negated/conditional lines
+and an explicit <code>ALLOWLIST</code> are honoured. Complements the Regulatory Compliance Linter (fintech
+vocabulary); does not replace it.</p>
+<p>Scope (by design, to keep precision high): deployment guidance only. It deliberately does NOT yet
+cover the broader SDK / website / user-manual fintech-vocabulary debt — that is tracked separately.
+Widening scope is a later ratchet step, taken as each surface is cleaned.</p>
+<p>Remediation on failure: banner the dated doc (point to <code>docs/ci/CI_CURRENT_STATUS.md</code>), or fix the
+claim, or add an <code>ALLOWLIST</code> entry with a reason. Never weaken the patterns. Self-test:
+<code>.github/scripts/test_readiness_overclaim_linter.py</code> (run by the CI job before scanning).</p>
+<p>Graduation path: WARNING → (widen scope as surfaces are cleaned) → BLOCKING → add
+<code>Readiness Overclaim Check</code> to branch protection required checks.</p>
+<p>Owner: @core-arch</p>
 <h4>TypeScript SDK Tests (<code>GATE_RATCHET_PHASE_SDK_TESTS</code>) ✅ GRADUATED (2026-03-24)</h4>
 <p>Phase advanced to BLOCKING. <code>continue-on-error</code> removed.</p>
 <p>Investigation confirmed: the &quot;tests may need gateway running&quot; comment was incorrect. All 157 tests
@@ -160,6 +176,7 @@ restart command.</p>
 <li>Forbidden deps: @core-arch</li>
 <li>Firewall contracts: @security</li>
 <li>Compliance linter: @core-arch</li>
+<li>Readiness overclaims: @core-arch</li>
 <li>SDK tests: @sdk</li>
 <li>Accessibility: @frontend</li>
 <li>Coverage: @ci</li>
@@ -192,6 +209,11 @@ restart command.</p>
 <td><code>GATE_RATCHET_PHASE_COMPLIANCE</code></td>
 <td><code>blocking</code> GRADUATED</td>
 <td>Regulatory Compliance Linter</td>
+</tr>
+<tr>
+<td><code>GATE_RATCHET_PHASE_READINESS</code></td>
+<td><code>warning</code> (added 2026-05-31)</td>
+<td>Readiness Overclaim Check</td>
 </tr>
 <tr>
 <td><code>GATE_RATCHET_PHASE_SDK_TESTS</code></td>

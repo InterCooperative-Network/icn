@@ -408,14 +408,25 @@ attestations — the economic relationship between participants — not money.</
 </tbody></table>
 <hr>
 <h2>Scope of This Guide</h2>
-<p><strong>In scope</strong> (enforced):</p>
+<p><strong>Enforced by <code>compliance_linter.py</code></strong> (fintech/payment vocabulary) — scanned on every PR:</p>
 <ul>
-<li>Gateway REST API endpoints (<code>/v1/...</code>)</li>
-<li>WebSocket event type names</li>
-<li>OAuth scope strings</li>
-<li>SDK method names and type fields (<code>sdk/typescript/</code>, <code>sdk/react-native/</code>)</li>
+<li>Gateway REST API surface (<code>icn-gateway/src/models.rs</code>, <code>icn-gateway/src/api/**</code>)</li>
+<li>WebSocket event type names and OAuth scope strings on that surface</li>
+<li>SDK method names and type fields (<code>sdk/typescript/src/</code>, <code>sdk/react-native/src/</code>)</li>
 <li>User-visible UI text in <code>web/pilot-ui/</code></li>
-<li>Public documentation in <code>docs/</code></li>
+</ul>
+<p><strong>Enforced by <code>readiness_overclaim_linter.py</code></strong> (production / live-federation / governance-completion claims):</p>
+<ul>
+<li>Active deployment guidance: <code>docs/deployment/**</code>, <code>docs/operations/deployment/**</code>.
+A dated readiness claim must carry a stale/archive banner (see the bannered
+<code>docs/deployment/*.md</code> siblings).</li>
+</ul>
+<p><strong>Guideline, enforced by review (not yet CI-scanned)</strong>:</p>
+<ul>
+<li>Public documentation in <code>docs/</code> more broadly, and the fintech vocabulary above when it appears
+in prose. The compliance linter does <strong>not</strong> currently scan <code>docs/</code> for the fintech term list,
+so reviewers must apply this guide there by hand. Closing this scope gap is a tracked ratchet
+step, not a settled state — do not read &quot;passes CI&quot; as &quot;docs are clean&quot;.</li>
 </ul>
 <p><strong>Out of scope</strong> (internal, not enforced here):</p>
 <ul>
@@ -427,12 +438,40 @@ attestations — the economic relationship between participants — not money.</
 <hr>
 <h2>Enforcement</h2>
 <ol>
-<li><strong>CI gate</strong> — the <code>compliance-linter</code> job (<code>.github/scripts/compliance_linter.py</code>) scans
-gateway, SDK, and UI files for forbidden terms on every PR. Currently <code>warning</code> phase
-(non-blocking); will ratchet to <code>blocking</code> once pre-existing violations are resolved.</li>
+<li><strong>CI gate (fintech vocabulary)</strong> — the <code>Regulatory Compliance Linter</code> job
+(<code>.github/scripts/compliance_linter.py</code>) scans the gateway API, SDK, and UI paths above for
+forbidden fintech terms on every PR. Phase: <code>blocking</code> (<code>GATE_RATCHET_PHASE_COMPLIANCE</code>).</li>
+<li><strong>CI gate (readiness overclaims)</strong> — the <code>Readiness Overclaim Check</code> job
+(<code>.github/scripts/readiness_overclaim_linter.py</code>) scans active deployment guidance for
+un-disclaimed production / live-federation / governance-completion claims. Phase: <code>warning</code>
+(<code>GATE_RATCHET_PHASE_READINESS</code>); graduation tracked in <code>docs/ci/GATE_RATCHET_PLAN.md</code>.</li>
 <li><strong>PR checklist</strong> — the CONTRIBUTING.md regulatory invariants checklist includes a language check.</li>
-<li><strong>Code review</strong> — reviewers should flag forbidden terms in any changed API, SDK, or UI file.</li>
+<li><strong>Code review</strong> — reviewers should flag forbidden terms in any changed API, SDK, UI, or doc file.</li>
 </ol>
+<h3>Readiness claims</h3>
+<p>ICN is research-grade cooperative-coordination infrastructure. Active guidance must not assert, as
+currently true, that ICN is production-ready, that a live federation is operating, or that
+proposal/vote/member-standing governance is complete. Two safe patterns:</p>
+<ul>
+<li><strong>Dated snapshot</strong> — a readiness assessment that was true at a point in time keeps its claims but
+carries a stale/archive <strong>banner</strong> at the top (see the bannered <code>docs/deployment/*.md</code> siblings;
+point readers to <code>docs/ci/CI_CURRENT_STATUS.md</code>). The readiness linter treats a banner as the
+whole-file exemption.</li>
+<li><strong>Non-claim</strong> — phrase as negated / conditional / aspirational (&quot;not production-ready&quot;, &quot;in a
+production deployment, X would…&quot;, &quot;target: …&quot;). The repo already does this extensively in
+<code>STATE.md</code>, <code>PHASE_PROGRESS.md</code>, and the <code>source-of-truth-map</code> / <code>show-readiness-map</code> docs.</li>
+</ul>
+<h3>Exception policy (do not make the firewall stupid)</h3>
+<p>If a check produces a genuine false positive, <strong>do not weaken the patterns</strong>. Instead:</p>
+<ul>
+<li>Readiness linter: add a <code>relpath:line</code> entry to <code>ALLOWLIST</code> in <code>readiness_overclaim_linter.py</code>
+with a one-line reason.</li>
+<li>Compliance linter: add a narrowly-scoped <code>SKIP_PATTERNS</code> / scope exclusion with a reason.</li>
+</ul>
+<p>Allowlist entries are reviewed like code. Broadening a pattern, deleting a rule, or silencing a
+whole path to make CI green is a firewall regression, not a fix. The readiness linter ships a
+self-test (<code>test_readiness_overclaim_linter.py</code>) that the CI job runs before scanning; it must
+keep passing.</p>
 <p><strong>See also</strong>: <a href="/docs/design/regulatory-safe-verifiable-state">Regulatory-Safe Verifiable State Architecture</a></p>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
