@@ -164,13 +164,22 @@ These terms are architecturally accurate and should be used freely:
 
 ## Scope of This Guide
 
-**In scope** (enforced):
-- Gateway REST API endpoints (`/v1/...`)
-- WebSocket event type names
-- OAuth scope strings
-- SDK method names and type fields (`sdk/typescript/`, `sdk/react-native/`)
+**Enforced by `compliance_linter.py`** (fintech/payment vocabulary) — scanned on every PR:
+- Gateway REST API surface (`icn-gateway/src/models.rs`, `icn-gateway/src/api/**`)
+- WebSocket event type names and OAuth scope strings on that surface
+- SDK method names and type fields (`sdk/typescript/src/`, `sdk/react-native/src/`)
 - User-visible UI text in `web/pilot-ui/`
-- Public documentation in `docs/`
+
+**Enforced by `readiness_overclaim_linter.py`** (production / live-federation / governance-completion claims):
+- Active deployment guidance: `docs/deployment/**`, `docs/operations/deployment/**`.
+  A dated readiness claim must carry a stale/archive banner (see the bannered
+  `docs/deployment/*.md` siblings).
+
+**Guideline, enforced by review (not yet CI-scanned)**:
+- Public documentation in `docs/` more broadly, and the fintech vocabulary above when it appears
+  in prose. The compliance linter does **not** currently scan `docs/` for the fintech term list,
+  so reviewers must apply this guide there by hand. Closing this scope gap is a tracked ratchet
+  step, not a settled state — do not read "passes CI" as "docs are clean".
 
 **Out of scope** (internal, not enforced here):
 - `icn-ledger` internals (`get_balance()`, `recompute_balances()`) — standard bookkeeping
@@ -182,10 +191,41 @@ These terms are architecturally accurate and should be used freely:
 
 ## Enforcement
 
-1. **CI gate** — the `compliance-linter` job (`.github/scripts/compliance_linter.py`) scans
-   gateway, SDK, and UI files for forbidden terms on every PR. Currently `warning` phase
-   (non-blocking); will ratchet to `blocking` once pre-existing violations are resolved.
-2. **PR checklist** — the CONTRIBUTING.md regulatory invariants checklist includes a language check.
-3. **Code review** — reviewers should flag forbidden terms in any changed API, SDK, or UI file.
+1. **CI gate (fintech vocabulary)** — the `Regulatory Compliance Linter` job
+   (`.github/scripts/compliance_linter.py`) scans the gateway API, SDK, and UI paths above for
+   forbidden fintech terms on every PR. Phase: `blocking` (`GATE_RATCHET_PHASE_COMPLIANCE`).
+2. **CI gate (readiness overclaims)** — the `Readiness Overclaim Check` job
+   (`.github/scripts/readiness_overclaim_linter.py`) scans active deployment guidance for
+   un-disclaimed production / live-federation / governance-completion claims. Phase: `warning`
+   (`GATE_RATCHET_PHASE_READINESS`); graduation tracked in `docs/ci/GATE_RATCHET_PLAN.md`.
+3. **PR checklist** — the CONTRIBUTING.md regulatory invariants checklist includes a language check.
+4. **Code review** — reviewers should flag forbidden terms in any changed API, SDK, UI, or doc file.
+
+### Readiness claims
+
+ICN is research-grade cooperative-coordination infrastructure. Active guidance must not assert, as
+currently true, that ICN is production-ready, that a live federation is operating, or that
+proposal/vote/member-standing governance is complete. Two safe patterns:
+
+- **Dated snapshot** — a readiness assessment that was true at a point in time keeps its claims but
+  carries a stale/archive **banner** at the top (see the bannered `docs/deployment/*.md` siblings;
+  point readers to `docs/ci/CI_CURRENT_STATUS.md`). The readiness linter treats a banner as the
+  whole-file exemption.
+- **Non-claim** — phrase as negated / conditional / aspirational ("not production-ready", "in a
+  production deployment, X would…", "target: …"). The repo already does this extensively in
+  `STATE.md`, `PHASE_PROGRESS.md`, and the `source-of-truth-map` / `show-readiness-map` docs.
+
+### Exception policy (do not make the firewall stupid)
+
+If a check produces a genuine false positive, **do not weaken the patterns**. Instead:
+
+- Readiness linter: add a `relpath:line` entry to `ALLOWLIST` in `readiness_overclaim_linter.py`
+  with a one-line reason.
+- Compliance linter: add a narrowly-scoped `SKIP_PATTERNS` / scope exclusion with a reason.
+
+Allowlist entries are reviewed like code. Broadening a pattern, deleting a rule, or silencing a
+whole path to make CI green is a firewall regression, not a fix. The readiness linter ships a
+self-test (`test_readiness_overclaim_linter.py`) that the CI job runs before scanning; it must
+keep passing.
 
 **See also**: [Regulatory-Safe Verifiable State Architecture](../design/regulatory-safe-verifiable-state.md)

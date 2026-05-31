@@ -99,6 +99,28 @@ Graduation path: WARNING → BLOCKING → add to branch protection required chec
 
 Owner: @core-arch
 
+#### Readiness Overclaim Check (`GATE_RATCHET_PHASE_READINESS`) — NEW (2026-05-31)
+Phase: WARNING (observational entry; non-blocking).
+
+Scans active deployment guidance (`docs/deployment/**`, `docs/operations/deployment/**`) for
+un-disclaimed, affirmative production / live-federation / governance-completion claims. A dated
+readiness claim is allowed when the file carries a stale/archive banner; negated/conditional lines
+and an explicit `ALLOWLIST` are honoured. Complements the Regulatory Compliance Linter (fintech
+vocabulary); does not replace it.
+
+Scope (by design, to keep precision high): deployment guidance only. It deliberately does NOT yet
+cover the broader SDK / website / user-manual fintech-vocabulary debt — that is tracked separately.
+Widening scope is a later ratchet step, taken as each surface is cleaned.
+
+Remediation on failure: banner the dated doc (point to `docs/ci/CI_CURRENT_STATUS.md`), or fix the
+claim, or add an `ALLOWLIST` entry with a reason. Never weaken the patterns. Self-test:
+`.github/scripts/test_readiness_overclaim_linter.py` (run by the CI job before scanning).
+
+Graduation path: WARNING → (widen scope as surfaces are cleaned) → BLOCKING → add
+`Readiness Overclaim Check` to branch protection required checks.
+
+Owner: @core-arch
+
 #### TypeScript SDK Tests (`GATE_RATCHET_PHASE_SDK_TESTS`) ✅ GRADUATED (2026-03-24)
 Phase advanced to BLOCKING. `continue-on-error` removed.
 
@@ -145,6 +167,7 @@ restart command.
 - Forbidden deps: @core-arch
 - Firewall contracts: @security
 - Compliance linter: @core-arch
+- Readiness overclaims: @core-arch
 - SDK tests: @sdk
 - Accessibility: @frontend
 - Coverage: @ci
@@ -157,6 +180,7 @@ restart command.
 | `GATE_RATCHET_PHASE_KERNEL_DEPS` | `blocking` | Kernel Forbidden Dependencies |
 | `GATE_RATCHET_PHASE_FIREWALL_CONTRACT` | `blocking` | Firewall Contract Enforcement |
 | `GATE_RATCHET_PHASE_COMPLIANCE` | `blocking` GRADUATED | Regulatory Compliance Linter |
+| `GATE_RATCHET_PHASE_READINESS` | `warning` (added 2026-05-31) | Readiness Overclaim Check |
 | `GATE_RATCHET_PHASE_SDK_TESTS` | `blocking` ✅ required check | TypeScript SDK |
 | `GATE_RATCHET_PHASE_A11Y` | `blocking` ✅ required check | Accessibility Tests |
 | `GATE_RATCHET_PHASE_COVERAGE` | `observational` | Test Coverage |
