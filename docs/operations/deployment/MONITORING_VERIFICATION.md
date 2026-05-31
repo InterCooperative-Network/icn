@@ -1,7 +1,11 @@
 # ICN Monitoring Verification Results
 
+> Historical monitoring-verification snapshot from 2025-12-16.
+> Treat this as archival context, not current deployment truth.
+> Readiness statements below describe the monitoring stack as assessed on that date; for current status rely on live CI/runtime verification and `docs/ci/CI_CURRENT_STATUS.md`.
+
 **Verification Date**: 2025-12-16  
-**Status**: ✅ **VERIFIED - PRODUCTION READY**  
+**Status (2025-12-16 snapshot)**: Monitoring stack validated at that date — not a current production-readiness claim.  
 
 ---
 

@@ -1,6 +1,10 @@
 # 🚀 ICN Quick Start - Full Stack
 
-**Status:** ✅ PRODUCTION READY  
+> Historical quick-start snapshot from 2025-12-12.
+> Treat this as archival context, not current deployment truth.
+> For current readiness, rely on live CI/runtime verification and `docs/ci/CI_CURRENT_STATUS.md`.
+
+**Status (2025-12-12 snapshot):** Assessed full-stack-ready at that date — not a current production-readiness claim.  
 **Date:** 2025-12-12
 
 ## 🎯 What We Have
