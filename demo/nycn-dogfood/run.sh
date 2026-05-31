@@ -15,13 +15,14 @@
 #     --record              tee a transcript and render an HTML recording
 #     --force-port-cleanup  reclaim the port even if held by a non-script process
 #
-# Env overrides: GW_PORT GW ICND ICNCTL PKG COOP_ID DOMAIN SCOPES DOGFOOD_OUT_DIR ICN_PASSPHRASE
+# Env overrides: GW_PORT GOSSIP_PORT GW ICND ICNCTL PKG COOP_ID DOMAIN SCOPES DOGFOOD_OUT_DIR ICN_PASSPHRASE
 set -Eeuo pipefail
 trap 'echo "ERROR: failed near line $LINENO" >&2' ERR
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(git -C "$HERE" rev-parse --show-toplevel)"
 GW_PORT="${GW_PORT:-8085}"
+GOSSIP_PORT="${GOSSIP_PORT:-7799}"   # run-local gossip listener (NOT the default :7777)
 GW="${GW:-http://127.0.0.1:${GW_PORT}}"
 ICND="${ICND:-$REPO/icn/target/release/icnd}"
 ICNCTL="${ICNCTL:-$REPO/icn/target/release/icnctl}"
@@ -78,11 +79,12 @@ LOG="$RUN_DIR/gateway.log"
 LAST_PID="$OUT_BASE/.last-icnd.pid"
 
 gw_health(){ curl -sf -m3 "$GW/v1/health" >/dev/null 2>&1; }
-port_listening(){ (exec 3<>"/dev/tcp/127.0.0.1/$GW_PORT") 2>/dev/null && { exec 3>&- 3<&-; return 0; }; return 1; }
+port_listening(){ local p="${1:-$GW_PORT}"; (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null && { exec 3>&- 3<&-; return 0; }; return 1; }
 free_port(){
-  if command -v fuser >/dev/null 2>&1; then fuser -k "${GW_PORT}/tcp" 2>/dev/null || true
-  elif command -v lsof >/dev/null 2>&1; then lsof -tiTCP:"$GW_PORT" -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null || true
-  else die "cannot free :$GW_PORT (no fuser/lsof); free it manually"; fi
+  local p="${1:-$GW_PORT}"
+  if command -v fuser >/dev/null 2>&1; then fuser -k "${p}/tcp" 2>/dev/null || true
+  elif command -v lsof >/dev/null 2>&1; then lsof -tiTCP:"$p" -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null || true
+  else die "cannot free :$p (no fuser/lsof); free it manually"; fi
   sleep 1
 }
 stop_script_gw(){
@@ -103,22 +105,30 @@ start_gw(){
   # no-identity HTTP path on temporary storage and the receipt would not persist.
   # icnd --init reads ICN_PASSPHRASE; see bins/icnd/src/main.rs,
   # crates/icn-core/src/supervisor/init_gateway.rs, crates/icn-gateway/src/server.rs.
-  "$ICND" --init --data-dir "$DATA_DIR" </dev/null >"$RUN_DIR/node-init.log" 2>&1 || die "node identity init failed (see $RUN_DIR/node-init.log)"
+  #
+  # Pin gateway + gossip to RUN-LOCAL ports and start with the generated --config, so the
+  # identity-backed node never binds the default gossip listener (:7777) and cannot collide
+  # with a developer's already-running default node. Gossip is bound to loopback (init writes
+  # 0.0.0.0); the demo is single-node, so it needs no externally-reachable gossip.
+  "$ICND" --init --data-dir "$DATA_DIR" --init-gateway-port "$GW_PORT" --init-gossip-port "$GOSSIP_PORT" </dev/null >"$RUN_DIR/node-init.log" 2>&1 || die "node identity init failed (see $RUN_DIR/node-init.log)"
+  sed -i "s#^listen_addr = \"0.0.0.0:${GOSSIP_PORT}\"#listen_addr = \"127.0.0.1:${GOSSIP_PORT}\"#" "$DATA_DIR/config.toml" 2>/dev/null || true
   local secret; secret="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-  setsid "$ICND" --data-dir "$DATA_DIR" --gateway-enable \
+  setsid "$ICND" --config "$DATA_DIR/config.toml" --data-dir "$DATA_DIR" --gateway-enable \
     --gateway-bind "127.0.0.1:${GW_PORT}" --gateway-jwt-secret "$secret" \
     --log-level warn >"$LOG" 2>&1 </dev/null &
   local pid=$!
   echo "$pid" > "$LAST_PID"
-  note "started identity-backed local gateway (pid $pid, data: $DATA_DIR)"
+  note "started identity-backed local gateway (pid $pid, gateway 127.0.0.1:${GW_PORT}, gossip 127.0.0.1:${GOSSIP_PORT}, data: $DATA_DIR)"
 }
 
 say "0. Local gateway lifecycle"
 if [ "$FRESH" = 1 ]; then
   stop_script_gw
-  if port_listening; then
-    if [ "$FORCE_PORT" = 1 ]; then free_port; else die ":$GW_PORT busy (not script-owned). Free it or pass --force-port-cleanup."; fi
-  fi
+  for _p in "$GW_PORT" "$GOSSIP_PORT"; do
+    if port_listening "$_p"; then
+      if [ "$FORCE_PORT" = 1 ]; then free_port "$_p"; else die ":$_p busy (not script-owned). Free it or pass --force-port-cleanup."; fi
+    fi
+  done
   start_gw
 else
   if gw_health; then note "reusing healthy gateway on $GW"

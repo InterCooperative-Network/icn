@@ -109,6 +109,9 @@ empty token, no action item, or a receipt without a `record_hash`.
   `governance:write` names (the short form is rejected by the gateway), and that the gateway is healthy.
 - **`:8085 busy`** — another process holds the port. Use a different `GW_PORT=…`, or pass
   `--force-port-cleanup` if you are sure the holder is disposable.
+- **`:7799 busy`** — the run-local **gossip** port is taken. The kit pins gossip to
+  `127.0.0.1:7799` (not the default `:7777`), so an identity-backed run never collides with a
+  developer's already-running default node. Use a different `GOSSIP_PORT=…`, or `--force-port-cleanup`.
 - **`bootstrap apply failed`** — confirm `PKG` points at `institutions/nycn` and the binaries match
   current `main`.
 - **gateway never healthy** — read `runs/<timestamp>/gateway.log`.
