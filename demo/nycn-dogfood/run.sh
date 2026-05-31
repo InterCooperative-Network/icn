@@ -96,13 +96,21 @@ stop_script_gw(){
 }
 start_gw(){
   mkdir -p "$DATA_DIR"; chmod 700 "$DATA_DIR"
+  # Init the run-local node identity BEFORE starting the gateway so icnd takes the
+  # identity-backed path (actors + event broadcaster) and the gateway opens the
+  # PERSISTENT run-local store (Some(data_dir)) instead of the ephemeral
+  # GatewayServer::new() fallback (data_dir: None). Without this, --fresh runs the
+  # no-identity HTTP path on temporary storage and the receipt would not persist.
+  # icnd --init reads ICN_PASSPHRASE; see bins/icnd/src/main.rs,
+  # crates/icn-core/src/supervisor/init_gateway.rs, crates/icn-gateway/src/server.rs.
+  "$ICND" --init --data-dir "$DATA_DIR" </dev/null >"$RUN_DIR/node-init.log" 2>&1 || die "node identity init failed (see $RUN_DIR/node-init.log)"
   local secret; secret="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
   setsid "$ICND" --data-dir "$DATA_DIR" --gateway-enable \
     --gateway-bind "127.0.0.1:${GW_PORT}" --gateway-jwt-secret "$secret" \
     --log-level warn >"$LOG" 2>&1 </dev/null &
   local pid=$!
   echo "$pid" > "$LAST_PID"
-  note "started local gateway (pid $pid, data: $DATA_DIR)"
+  note "started identity-backed local gateway (pid $pid, data: $DATA_DIR)"
 }
 
 say "0. Local gateway lifecycle"
@@ -152,7 +160,10 @@ ITEM_ID="$(jq -r '.id // empty' <<<"$item_json")"
 note "Recorded as a tracked obligation. id: $ITEM_ID"
 
 say "6. The organizer sees it as a plain-language action card (what they owe)"
-curl -s -H "$AUTH" "$GW/v1/gov/me/action-cards" | jq '.cards[] | {title, summary, receipt_expected}'
+cards_json="$(curl -s -H "$AUTH" "$GW/v1/gov/me/action-cards")"
+card_n="$(jq --arg id "$ITEM_ID" '[.cards[] | select(.source_id==$id)] | length' <<<"$cards_json")"
+[ "$card_n" = "1" ] || die "expected exactly one action card for $ITEM_ID before completion, found $card_n: $cards_json"
+jq --arg id "$ITEM_ID" '.cards[] | select(.source_id==$id) | {title, summary, receipt_expected}' <<<"$cards_json"
 
 say "7. The organizer does the work and marks it done"
 curl -s -X PUT -H "$AUTH" -H 'Content-Type: application/json' -d '{"status":"completed"}' \
@@ -161,9 +172,14 @@ curl -s -X PUT -H "$AUTH" -H 'Content-Type: application/json' -d '{"status":"com
 say "8. The node issues a verifiable completion receipt"
 receipt="$(curl -s -H "$AUTH" "$GW/v1/gov/domains/$DOMAIN/action-items/$ITEM_ID/completion-receipt")"
 jq . <<<"$receipt"
-jq -e '.record_hash | length > 0' <<<"$receipt" >/dev/null || die "no record_hash in receipt: $receipt"
-note "record_hash binds item_id, domain_id, actor_did, transition, completed_at."
-note "It proves THIS actor discharged THIS obligation at THIS time."
+# Verify the receipt is well-formed and binds THIS obligation: a 32-byte BLAKE3
+# record_hash over exactly {item_id, domain_id, actor_did, transition, completed_at}
+# (canonical hasher ActionItemCompletionReceipt::compute_record_hash, domain tag
+# "icn:gov:action_item_completion:v1", in crates/icn-governance/src/proof.rs). This
+# kit checks the binding + 32-byte shape; it does not itself re-derive the BLAKE3.
+jq -e --arg id "$ITEM_ID" --arg dom "$DOMAIN" --arg did "$DID" '(.record_hash | type == "array" and length == 32 and all(.[]; type == "number" and . >= 0 and . <= 255)) and .item_id == $id and .domain_id == $dom and .actor_did == $did and .transition == "completed" and (.completed_at | type == "number" and . > 0)' <<<"$receipt" >/dev/null || die "receipt failed verification (need 32-byte record_hash bound to this item/domain/actor/transition): $receipt"
+note "Verified: 32-byte BLAKE3 record_hash binding item_id, domain_id, actor_did, transition=completed, completed_at."
+note "It proves THIS actor discharged THIS obligation at THIS time (re-derive via proof.rs canonical hasher)."
 
 say "9. The obligation is discharged -- the card clears, the proof remains"
 open_n="$(curl -s -H "$AUTH" "$GW/v1/gov/me/action-cards" | jq --arg id "$ITEM_ID" '[.cards[] | select(.source_id==$id)] | length')"

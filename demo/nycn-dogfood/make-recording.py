@@ -82,7 +82,15 @@ async function play(){
   }
   s.scrollTop=s.scrollHeight;btn.disabled=false;
 }
-btn.onclick=play;play();
+function renderStatic(){
+  s.innerHTML='';
+  const c=document.createElement('div');c.className='cmd';c.textContent=DATA.cmd;s.appendChild(c);
+  for(const ln of DATA.body.split('\n')){const d=document.createElement('div');const k=cls(ln);if(k)d.className=k;d.textContent=ln||'​';s.appendChild(d);}
+  s.scrollTop=0;
+}
+const reduceMotion=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+btn.onclick=play;
+if(reduceMotion){renderStatic();}else{play();}
 </script></body></html>'''
 
 

@@ -1,6 +1,6 @@
 
 == 0. Local gateway lifecycle ==
-   started local gateway (pid 197476, data: <repo>/demo/nycn-dogfood/runs/20260531-000425Z/icnd-data)
+   started identity-backed local gateway (pid 215922, data: <repo>/demo/nycn-dogfood/runs/20260531-155015Z/icnd-data)
 
 == 1. The cooperative's own node is running (local, on our hardware) ==
 {
@@ -22,19 +22,19 @@ Completed steps:
   - create Cooperative entity nycn-organizers: created entity as entity:icn:cooperative:nycn-organizers; governance domain alias nycn-organizers-gov recorded for subsequent provisioning
   - provision governance domain nycn-federation-gov: provisioned governance domain as nycn-federation-gov
   - provision governance domain nycn-organizers-gov: provisioned governance domain as nycn-organizers-gov
-  - create Committee structure nycn-backbone: created structure as struct-ccf02bfb-ef7e-442b-94f9-535d08033fbb
-  - create Committee structure nycn-steering: created structure as struct-7013af49-762a-4e48-978f-71d4d4e7d992
-  - create Committee structure nycn-content: created structure as struct-29cde495-fed6-4282-b92b-24928e2f8ee6
-  - create Committee structure nycn-logistics: created structure as struct-be71aaed-571d-4dd9-82d9-4d811135c4b6
-  - create Committee structure nycn-marketing: created structure as struct-59eadab5-af6e-4845-a9be-94d6368118c8
-  - create Committee structure nycn-finance: created structure as struct-186ad436-da8e-4510-ad59-980934d64fe0
-  - create WorkingGroup structure nycn-accessibility-wg: created structure as struct-967ec1c7-5271-41a8-83ab-59f9300cf0e9
-  - create program summit-cycle-2026: created program as prog-66ef9877-4b49-4fd1-bd81-bb799d777b3b
-  - create activity summit-2026: created activity as act-e7b627af-4c8a-4d75-9fbd-682fff4035b4
-  - create milestone summit-strategy-locked in summit-cycle-2026: created milestone as mile-b065c3f2-e22c-4c5b-adb6-6963f67cfc4c
-  - create milestone summit-venue-ready in summit-cycle-2026: created milestone as mile-04817845-daf7-40e0-a67f-399ccf7990c0
-  - create milestone summit-public-launch-ready in summit-cycle-2026: created milestone as mile-a09ebbdc-b01b-41b8-b9ba-5846236d58fa
-  - create milestone summit-cycle-closeout in summit-cycle-2026: created milestone as mile-dd1821d4-52a4-455a-935a-7e269436be8d
+  - create Committee structure nycn-backbone: created structure as struct-03a406c5-abe8-41c6-b6e7-0bbaaddc362b
+  - create Committee structure nycn-steering: created structure as struct-f795d788-7009-4777-bceb-89f8dfdfd262
+  - create Committee structure nycn-content: created structure as struct-e7df6193-9ba4-452a-b0a9-7021d77632e5
+  - create Committee structure nycn-logistics: created structure as struct-b3d2d109-5f7c-4810-b4c8-3c80d6dd58fc
+  - create Committee structure nycn-marketing: created structure as struct-a0a56c51-a254-4e67-a5eb-2af91f342cdf
+  - create Committee structure nycn-finance: created structure as struct-a29afa47-75a1-4406-adf7-139048e02528
+  - create WorkingGroup structure nycn-accessibility-wg: created structure as struct-d88959c8-9fb6-46ed-8d19-bec81b549685
+  - create program summit-cycle-2026: created program as prog-3e78b942-ced5-4209-a788-3443dc050197
+  - create activity summit-2026: created activity as act-78c8680a-dffb-430e-8ab7-16ab973bc9d0
+  - create milestone summit-strategy-locked in summit-cycle-2026: created milestone as mile-d757993e-95e5-49e0-942e-5770629098bd
+  - create milestone summit-venue-ready in summit-cycle-2026: created milestone as mile-4d20c2b7-1fac-462d-b3f2-68fde9e17303
+  - create milestone summit-public-launch-ready in summit-cycle-2026: created milestone as mile-7c9983bd-114d-4db7-9ce0-4e501975375c
+  - create milestone summit-cycle-closeout in summit-cycle-2026: created milestone as mile-205ac90c-697b-47e7-acc0-e63ecd14d823
 
 Deferred steps:
   - defer role coordinator on nycn-steering: no DID for holder_label 'steering-coordinator-placeholder' in person directory; awaiting DID for steering-coordinator-placeholder
@@ -47,24 +47,24 @@ Unsupported steps:
 
 Alias bindings:
   - nycn -> entity:icn:federation:nycn
-  - nycn-accessibility-wg -> struct-967ec1c7-5271-41a8-83ab-59f9300cf0e9
-  - nycn-backbone -> struct-ccf02bfb-ef7e-442b-94f9-535d08033fbb
-  - nycn-content -> struct-29cde495-fed6-4282-b92b-24928e2f8ee6
-  - nycn-finance -> struct-186ad436-da8e-4510-ad59-980934d64fe0
-  - nycn-logistics -> struct-be71aaed-571d-4dd9-82d9-4d811135c4b6
-  - nycn-marketing -> struct-59eadab5-af6e-4845-a9be-94d6368118c8
+  - nycn-accessibility-wg -> struct-d88959c8-9fb6-46ed-8d19-bec81b549685
+  - nycn-backbone -> struct-03a406c5-abe8-41c6-b6e7-0bbaaddc362b
+  - nycn-content -> struct-e7df6193-9ba4-452a-b0a9-7021d77632e5
+  - nycn-finance -> struct-a29afa47-75a1-4406-adf7-139048e02528
+  - nycn-logistics -> struct-b3d2d109-5f7c-4810-b4c8-3c80d6dd58fc
+  - nycn-marketing -> struct-a0a56c51-a254-4e67-a5eb-2af91f342cdf
   - nycn-organizers -> entity:icn:cooperative:nycn-organizers
-  - nycn-steering -> struct-7013af49-762a-4e48-978f-71d4d4e7d992
-  - summit-2026 -> act-e7b627af-4c8a-4d75-9fbd-682fff4035b4
-  - summit-cycle-2026 -> prog-66ef9877-4b49-4fd1-bd81-bb799d777b3b
-  - summit-cycle-closeout -> mile-dd1821d4-52a4-455a-935a-7e269436be8d
-  - summit-public-launch-ready -> mile-a09ebbdc-b01b-41b8-b9ba-5846236d58fa
-  - summit-strategy-locked -> mile-b065c3f2-e22c-4c5b-adb6-6963f67cfc4c
-  - summit-venue-ready -> mile-04817845-daf7-40e0-a67f-399ccf7990c0
+  - nycn-steering -> struct-f795d788-7009-4777-bceb-89f8dfdfd262
+  - summit-2026 -> act-78c8680a-dffb-430e-8ab7-16ab973bc9d0
+  - summit-cycle-2026 -> prog-3e78b942-ced5-4209-a788-3443dc050197
+  - summit-cycle-closeout -> mile-205ac90c-697b-47e7-acc0-e63ecd14d823
+  - summit-public-launch-ready -> mile-7c9983bd-114d-4db7-9ce0-4e501975375c
+  - summit-strategy-locked -> mile-d757993e-95e5-49e0-942e-5770629098bd
+  - summit-venue-ready -> mile-4d20c2b7-1fac-462d-b3f2-68fde9e17303
 
 == 5. Turn a piece of organizing work into a legible obligation ==
    Obligation: "Confirm Summit 2026 venue booking"
-   Recorded as a tracked obligation. id: 6f27db2b-02f7-4a8b-b4f4-43ae8f76e611
+   Recorded as a tracked obligation. id: 451a9eaa-8135-4ee6-a47d-bfde91eaa6c4
 
 == 6. The organizer sees it as a plain-language action card (what they owe) ==
 {
@@ -81,48 +81,48 @@ Alias bindings:
 
 == 8. The node issues a verifiable completion receipt ==
 {
-  "item_id": "6f27db2b-02f7-4a8b-b4f4-43ae8f76e611",
+  "item_id": "451a9eaa-8135-4ee6-a47d-bfde91eaa6c4",
   "domain_id": "nycn-federation-gov",
   "actor_did": "did:icn:zCUDk7H8ZQ21wMCKdDigAWkUZN2USUBFBmcK4LrniXkUB",
   "transition": "completed",
-  "completed_at": 1780185873,
+  "completed_at": 1780242626,
   "record_hash": [
-    221,
-    104,
-    90,
-    204,
-    211,
-    38,
-    184,
-    251,
-    244,
-    88,
-    201,
-    244,
-    68,
-    0,
-    20,
-    223,
-    148,
-    58,
-    175,
-    51,
-    100,
-    147,
-    28,
     73,
-    192,
-    157,
-    183,
-    60,
-    80,
-    123,
-    48,
-    200
+    188,
+    38,
+    1,
+    205,
+    97,
+    255,
+    125,
+    2,
+    240,
+    199,
+    247,
+    182,
+    177,
+    156,
+    188,
+    191,
+    249,
+    66,
+    59,
+    113,
+    252,
+    94,
+    172,
+    17,
+    75,
+    3,
+    128,
+    140,
+    37,
+    202,
+    98
   ]
 }
-   record_hash binds item_id, domain_id, actor_did, transition, completed_at.
-   It proves THIS actor discharged THIS obligation at THIS time.
+   Verified: 32-byte BLAKE3 record_hash binding item_id, domain_id, actor_did, transition=completed, completed_at.
+   It proves THIS actor discharged THIS obligation at THIS time (re-derive via proof.rs canonical hasher).
 
 == 9. The obligation is discharged -- the card clears, the proof remains ==
    card cleared -- obligation discharged, proof retained.
