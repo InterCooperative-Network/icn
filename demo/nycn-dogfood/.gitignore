@@ -1,0 +1,4 @@
+# Local run artifacts produced by `run.sh --record`:
+# transcripts, HTML recordings, run-local gateway data/logs, pid files.
+# Keep the whole slice self-contained; never commit run output.
+runs/
