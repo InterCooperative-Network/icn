@@ -80,11 +80,15 @@ LAST_PID="$OUT_BASE/.last-icnd.pid"
 
 gw_health(){ curl -sf -m3 "$GW/v1/health" >/dev/null 2>&1; }
 port_listening(){ local p="${1:-$GW_PORT}"; (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null && { exec 3>&- 3<&-; return 0; }; return 1; }
+# Gossip is UDP (QUIC), so /dev/tcp cannot see it -- probe with ss by source port.
+udp_listening(){ local p="$1"; command -v ss >/dev/null 2>&1 || return 1; [ -n "$(ss -Huln "sport = :$p" 2>/dev/null)" ]; }
 free_port(){
-  local p="${1:-$GW_PORT}"
-  if command -v fuser >/dev/null 2>&1; then fuser -k "${p}/tcp" 2>/dev/null || true
-  elif command -v lsof >/dev/null 2>&1; then lsof -tiTCP:"$p" -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null || true
-  else die "cannot free :$p (no fuser/lsof); free it manually"; fi
+  local p="${1:-$GW_PORT}" proto="${2:-tcp}"
+  if command -v fuser >/dev/null 2>&1; then fuser -k "${p}/${proto}" 2>/dev/null || true
+  elif command -v lsof >/dev/null 2>&1; then
+    if [ "$proto" = udp ]; then lsof -tiUDP:"$p" 2>/dev/null | xargs -r kill 2>/dev/null || true
+    else lsof -tiTCP:"$p" -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null || true; fi
+  else die "cannot free :$p/$proto (no fuser/lsof); free it manually"; fi
   sleep 1
 }
 stop_script_gw(){
@@ -124,11 +128,12 @@ start_gw(){
 say "0. Local gateway lifecycle"
 if [ "$FRESH" = 1 ]; then
   stop_script_gw
-  for _p in "$GW_PORT" "$GOSSIP_PORT"; do
-    if port_listening "$_p"; then
-      if [ "$FORCE_PORT" = 1 ]; then free_port "$_p"; else die ":$_p busy (not script-owned). Free it or pass --force-port-cleanup."; fi
-    fi
-  done
+  if port_listening "$GW_PORT"; then
+    if [ "$FORCE_PORT" = 1 ]; then free_port "$GW_PORT" tcp; else die ":$GW_PORT/tcp (gateway) busy (not script-owned). Free it or pass --force-port-cleanup."; fi
+  fi
+  if udp_listening "$GOSSIP_PORT"; then
+    if [ "$FORCE_PORT" = 1 ]; then free_port "$GOSSIP_PORT" udp; else die ":$GOSSIP_PORT/udp (gossip) busy (not script-owned). Free it or pass --force-port-cleanup."; fi
+  fi
   start_gw
 else
   if gw_health; then note "reusing healthy gateway on $GW"
