@@ -68,9 +68,22 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 | Method | Endpoint | Scope Required | Description |
 |--------|----------|----------------|-------------|
-| GET | `/v1/ledger/{coop}/balance/{did}` | `ledger:read` | Get balance |
-| POST | `/v1/ledger/{coop}/payment` | `ledger:write` | Create payment |
-| GET | `/v1/ledger/{coop}/history` | `ledger:read` | Transaction history |
+| GET | `/v1/ledger/{coop}/position/{did}` | `ledger:read` | Get net position (derived from signed receipts) |
+| POST | `/v1/ledger/{coop}/settle` | `ledger:write` | Record a settlement (transfer of obligations) |
+| POST | `/v1/ledger/{coop}/settle/convert` | `ledger:write` | Record a cross-unit settlement |
+| GET | `/v1/ledger/{coop}/history` | `ledger:read` | State-change journal history |
+| GET | `/v1/ledger/{coop}/entries/by-decision` | `ledger:read` | Journal entries by governance decision |
+
+#### Legacy vocabulary (deprecated — not served)
+
+Earlier drafts of this doc used payment-rail terms. Per [ADR-0006](../adr/ADR-0006-compliance-chain-verifiable-state-architecture.md) (renamed in PR #1315) these were replaced with ICN-native primitives. The old names are **not served** by the gateway and return `404`:
+
+| Deprecated (removed) | Canonical ICN primitive |
+|----------------------|-------------------------|
+| `POST /v1/ledger/{coop}/payment` | `POST /v1/ledger/{coop}/settle` — settlement of obligations |
+| `GET /v1/ledger/{coop}/balance/{did}` | `GET /v1/ledger/{coop}/position/{did}` — net position |
+| `currency` request field | `unit` request field |
+| `PaymentCreated` event | `SettlementCreated` event |
 
 ### Governance
 
@@ -108,16 +121,17 @@ curl -X POST http://localhost:8080/v1/coops \
   }'
 ```
 
-### Make a Payment
+### Record a Settlement
 
 ```bash
-curl -X POST http://localhost:8080/v1/ledger/food-coop/payment \
+curl -X POST http://localhost:8080/v1/ledger/food-coop/settle \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
+    "from": "did:icn:sender",
     "to": "did:icn:recipient",
     "amount": 2,
-    "currency": "hours",
+    "unit": "hours",
     "memo": "Garden help - 2 hours weeding"
   }'
 ```
@@ -189,7 +203,7 @@ All errors return JSON with `error` and `message` fields:
 | 403 | Forbidden - Insufficient permissions |
 | 404 | Not Found - Resource doesn't exist |
 | 409 | Conflict - Resource already exists |
-| 422 | Unprocessable - Business logic error (e.g., insufficient balance) |
+| 422 | Unprocessable - Business logic error (e.g., settlement exceeds the account's credit limit) |
 | 429 | Too Many Requests - Rate limited |
 
 ## WebSocket Events
@@ -198,7 +212,7 @@ After authentication, you'll receive events as they occur:
 
 | Event Type | Description |
 |------------|-------------|
-| `PaymentCreated` | New payment in the ledger |
+| `SettlementCreated` | New settlement recorded in the journal |
 | `MemberAdded` | Member joined cooperative |
 | `MemberRemoved` | Member left cooperative |
 | `RoleUpdated` | Member's role changed |
@@ -226,7 +240,7 @@ The script demonstrates:
 - Health checks
 - Cooperative management
 - Member management
-- Ledger operations (balance, payments)
+- Ledger operations (position, settlement)
 - Governance (domains, proposals, voting)
 
 ## Viewing the OpenAPI Spec

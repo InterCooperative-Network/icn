@@ -63,21 +63,26 @@ curl -s -X POST $BASE_URL/v1/coops/example-coop/members \
     }' | jq
 echo ""
 
-# Get Balance
-echo -e "${GREEN}6. Get Balance${NC}"
-curl -s $BASE_URL/v1/ledger/example-coop/balance/did:icn:alice \
+# Get Position (net position, derived from signed receipts)
+echo -e "${GREEN}6. Get Position${NC}"
+curl -s $BASE_URL/v1/ledger/example-coop/position/did:icn:alice \
     -H "Authorization: Bearer $TOKEN" | jq
 echo ""
 
-# Create Payment
-echo -e "${GREEN}7. Create Payment${NC}"
-curl -s -X POST $BASE_URL/v1/ledger/example-coop/payment \
+# Record a Settlement
+# NOTE: the gateway requires "from" to equal the authenticated DID (the token
+# subject). example-coop and the did:icn:* values below are placeholders for the
+# request shape; substitute your own coop and DIDs (and a token whose subject
+# matches "from") for a runnable call.
+echo -e "${GREEN}7. Record a Settlement${NC}"
+curl -s -X POST $BASE_URL/v1/ledger/example-coop/settle \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
+        "from": "did:icn:alice",
         "to": "did:icn:bob",
         "amount": 5,
-        "currency": "hours",
+        "unit": "hours",
         "memo": "Garden help"
     }' | jq
 echo ""
