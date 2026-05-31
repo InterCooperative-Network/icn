@@ -77,6 +77,33 @@ class TestScanLines(unittest.TestCase):
         finally:
             linter.ALLOWLIST.pop("x.md:2", None)
 
+    # --- governance-completion coverage (firewall contract claims this class) ---
+    def test_flags_governance_completion(self):
+        v = linter.scan_lines("x.md", ["Proposal, vote, and member-standing governance is complete."])
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].rule, "governance-completion")
+
+    def test_governance_completion_negated_not_flagged(self):
+        self.assertEqual(linter.scan_lines("x.md", ["Governance is not complete yet."]), [])
+
+    # --- negation must be scoped to the overclaim's own clause ---
+    def test_negation_in_separate_clause_does_not_mask(self):
+        v = linter.scan_lines("x.md", ["ICN is not experimental; it is PRODUCTION READY."])
+        self.assertEqual(len(v), 1)
+
+    def test_leading_conditional_comma_preserved(self):
+        # Comma is not a clause delimiter: a leading conditional still exempts.
+        self.assertEqual(linter.scan_lines("x.md", ["Once hardened, ICN becomes production-ready."]), [])
+
+    # --- bare word "snapshot" must not exempt a whole file ---
+    def test_snapshot_word_alone_does_not_exempt(self):
+        lines = ["# Deploy", "Snapshot frequency is configurable.", "**Status:** PRODUCTION READY"]
+        self.assertEqual(len(linter.scan_lines("x.md", lines)), 1)
+
+    def test_real_historical_banner_still_exempts(self):
+        lines = ["# Deploy", "> Historical deployment snapshot from 2025-12-12.", "**Status:** PRODUCTION READY"]
+        self.assertEqual(linter.scan_lines("x.md", lines), [])
+
 
 class TestFixturesEndToEnd(unittest.TestCase):
     def test_bad_fixture_flagged(self):

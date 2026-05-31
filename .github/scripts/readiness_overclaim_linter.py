@@ -55,6 +55,11 @@ OVERCLAIM_PATTERNS = [
     (re.compile(r"\blive federation\b", re.IGNORECASE), "live federation"),
     (re.compile(r"\ball systems operational\b", re.IGNORECASE), "all systems operational"),
     (re.compile(r"\bgeneral(ly)? availab", re.IGNORECASE), "general availability"),
+    # Governance-completion overclaims. The firewall contract (docs/dev/language-guide.md
+    # "Readiness claims" and docs/ci/GATE_RATCHET_PLAN.md) names this claim class, so the
+    # gate must actually detect it. Kept narrow to avoid false positives.
+    (re.compile(r"\bgovernance\b[^.\n;|]{0,40}\b(?:is|are)\b[^.\n;|]{0,20}\bcomplete\b", re.IGNORECASE), "governance-completion"),
+    (re.compile(r"\b(?:proposal|vote|voting|member[\s-]standing)\b[^.\n;|]{0,60}\b(?:is|are)\b[^.\n;|]{0,24}\b(?:complete|fully (?:working|operational|implemented))\b", re.IGNORECASE), "governance-completion"),
 ]
 
 # If any of these appear on the line, it is a non-claim (negated / conditional /
@@ -71,8 +76,15 @@ NEGATION_RE = re.compile(
 
 # A recognised stale/archive banner near the top of a file exempts the whole file
 # (the claim is then clearly labelled history, like the bannered deployment siblings).
+# The bare word "snapshot" is NOT sufficient on its own (e.g. "Snapshot frequency is
+# configurable." must not exempt a doc); require explicit archival framing, or
+# "snapshot" qualified as historical/dated.
 BANNER_RE = re.compile(
-    r"(?i)(historical|archiv|point[\s-]in[\s-]time|not current (deployment|operational)|snapshot)"
+    r"(?i)("
+    r"historical|archiv|point[\s-]in[\s-]time|not current (?:deployment|operational)|"
+    r"(?:historical|archived|dated|point[\s-]in[\s-]time)\s+snapshot|"
+    r"snapshot\s+(?:from|as of|dated|date:)"
+    r")"
 )
 BANNER_SCAN_LINES = 15
 
@@ -108,6 +120,25 @@ def is_banner_exempt(lines):
     return False
 
 
+# Clause delimiters used to scope a negation to the same clause as the overclaim,
+# so an unrelated negation in a *separate* clause cannot bypass the gate (e.g.
+# "ICN is not experimental; it is PRODUCTION READY." must still flag on the second
+# clause). Comma is deliberately NOT a delimiter, so a leading conditional clause
+# like "Once hardened, ICN becomes production-ready." stays exempt (precision).
+_CLAUSE_DELIMS = set(".;:|()") | {"—"}  # strong delimiters + em dash; not comma
+
+
+def _clause_around(line, start, end):
+    """Return the clause (between delimiters) containing the [start, end) match."""
+    lo = start
+    while lo > 0 and line[lo - 1] not in _CLAUSE_DELIMS:
+        lo -= 1
+    hi = end
+    while hi < len(line) and line[hi] not in _CLAUSE_DELIMS:
+        hi += 1
+    return line[lo:hi]
+
+
 def scan_lines(rel_path, lines):
     """Flag affirmative readiness claims; honour banner, negation, and allowlist."""
     if is_banner_exempt(lines):
@@ -115,17 +146,21 @@ def scan_lines(rel_path, lines):
 
     violations = []
     for line_num, line in enumerate(lines, start=1):
-        if NEGATION_RE.search(line):
-            continue
         for pattern, rule in OVERCLAIM_PATTERNS:
-            if pattern.search(line):
-                key = rel_path + ":" + str(line_num)
-                if key in ALLOWLIST:
-                    continue
-                violations.append(
-                    Violation(file=rel_path, line=line_num, text=line.rstrip()[:160], rule=rule)
-                )
-                break  # one violation per line is enough
+            m = pattern.search(line)
+            if not m:
+                continue
+            # Only the overclaim's own clause exempts it — not an unrelated
+            # negation/conditional elsewhere on the same line.
+            if NEGATION_RE.search(_clause_around(line, m.start(), m.end())):
+                continue
+            key = rel_path + ":" + str(line_num)
+            if key in ALLOWLIST:
+                continue
+            violations.append(
+                Violation(file=rel_path, line=line_num, text=line.rstrip()[:160], rule=rule)
+            )
+            break  # one violation per line is enough
     return violations
 
 
@@ -169,7 +204,7 @@ def main():
 
     print("=" * 70)
     print("Readiness Overclaim Linter")
-    print("Un-disclaimed production/live-federation readiness claims in active guidance")
+    print("Un-disclaimed production / live-federation / governance-completion claims in active guidance")
     print("=" * 70)
     print()
     print("Repo root: " + repo_root)
@@ -177,7 +212,11 @@ def main():
     print("Reference: docs/dev/language-guide.md")
     print()
 
-    result = run_lint(repo_root)
+    try:
+        result = run_lint(repo_root)
+    except Exception as e:  # documented exit code 2 for unexpected script errors
+        print("ERROR: readiness linter failed: " + str(e), file=sys.stderr)
+        return 2
     print("Scanned " + str(result.files_scanned) + " files; " + str(len(result.files_exempt)) +
           " exempt (stale/archive banner present)")
     print()
