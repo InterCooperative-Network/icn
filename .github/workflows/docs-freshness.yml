@@ -9,6 +9,8 @@ on:
       - 'CONTRIBUTING.md'
       - '.github/workflows/docs-freshness.yml'
       - 'docs/scripts/doc_control_check.py'
+      # gateway route source is code-truth for the API-doc canonical guard
+      - 'icn/crates/icn-gateway/src/api/ledger.rs'
   pull_request:
     paths:
       - 'docs/**'
@@ -16,6 +18,8 @@ on:
       - 'README.md'
       - 'CONTRIBUTING.md'
       - 'docs/scripts/doc_control_check.py'
+      # gateway route source is code-truth for the API-doc canonical guard
+      - 'icn/crates/icn-gateway/src/api/ledger.rs'
   schedule:
     # Sunday at midnight UTC
     - cron: '0 0 * * 0'

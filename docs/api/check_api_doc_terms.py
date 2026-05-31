@@ -10,11 +10,14 @@ Per ADR-0006 (PR #1315) the gateway renamed its ledger surface:
     balance  -> position     (GET  /v1/ledger/{coop}/position/{did})
     currency -> unit         (settlement request field)
 The old routes are NOT served (they 404). The canonical names are verified
-below by reading the route attributes in icn-gateway/src/api/ledger.rs.
+below by reading the route attributes in icn/crates/icn-gateway/src/api/ledger.rs.
 
 This guard checks only the hand-written API docs (the machine spec
-docs/api/openapi.generated.yaml is kept in sync with code by the api-types CI
-job, and the SDK client is already canonical). It is intentionally narrow.
+docs/api/openapi.generated.yaml is regenerated from code by the api-types CI
+job). It is intentionally narrow. NOTE: the SDK *client* methods (settle /
+getPosition) are already canonical, but the SDK README/examples still carry
+legacy pay()/getBalance() naming — that is tracked as separate SDK debt and is
+out of scope here.
 
 Checked docs:
     docs/api/README.md, docs/api/OPENAPI.md, docs/api/examples.sh
@@ -54,6 +57,11 @@ DEPRECATED_PATTERNS = [
     (re.compile(r"ledger/[^\s`'\"]*balance"), "legacy balance route -> GET /v1/ledger/{coop}/position/{did}"),
     (re.compile(r"\bPaymentCreated\b"), "legacy event PaymentCreated -> SettlementCreated"),
     (re.compile(r"(?i)\bmake a payment\b"), '"Make a Payment" -> "Record a Settlement"'),
+    # The settlement request field renamed currency -> unit (ADR-0006). Catch the
+    # JSON field shape so a runnable example cannot regress to a body that
+    # create_settlement rejects. The legacy-mapping table is exempt (it is under a
+    # "Legacy/Deprecated" heading), so the old name can still be documented there.
+    (re.compile(r'(?i)"currency"\s*:'), 'legacy "currency" request field -> "unit"'),
 ]
 
 # A line is exempt if it is clearly labelled as legacy/deprecated context.

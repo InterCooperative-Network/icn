@@ -70,6 +70,10 @@ curl -s $BASE_URL/v1/ledger/example-coop/position/did:icn:alice \
 echo ""
 
 # Record a Settlement
+# NOTE: the gateway requires "from" to equal the authenticated DID (the token
+# subject). example-coop and the did:icn:* values below are placeholders for the
+# request shape; substitute your own coop and DIDs (and a token whose subject
+# matches "from") for a runnable call.
 echo -e "${GREEN}7. Record a Settlement${NC}"
 curl -s -X POST $BASE_URL/v1/ledger/example-coop/settle \
     -H "Authorization: Bearer $TOKEN" \
