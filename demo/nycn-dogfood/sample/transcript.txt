@@ -1,0 +1,132 @@
+
+== 0. Local gateway lifecycle ==
+   started local gateway (pid 197476, data: <repo>/demo/nycn-dogfood/runs/20260531-000425Z/icnd-data)
+
+== 1. The cooperative's own node is running (local, on our hardware) ==
+{
+  "status": "ok",
+  "version": "0.1.0"
+}
+   No central server. This node belongs to the cooperative.
+
+== 2. An organizer's identity -- a DID they alone control ==
+   Organizer DID: did:icn:zCUDk7H8ZQ21wMCKdDigAWkUZN2USUBFBmcK4LrniXkUB
+
+== 3. Authenticate to the node ==
+   Session token acquired.
+
+== 4. Stand up the NYCN institution (federation + governance domain) ==
+Completed steps:
+  - validate charter <repo>/institutions/nycn/charter/nycn-federation.charter.yaml: validated charter locally at <repo>/institutions/nycn/charter/nycn-federation.charter.yaml; live charter registration remains unsupported
+  - create Federation entity nycn: created entity as entity:icn:federation:nycn; governance domain alias nycn-federation-gov recorded for subsequent provisioning
+  - create Cooperative entity nycn-organizers: created entity as entity:icn:cooperative:nycn-organizers; governance domain alias nycn-organizers-gov recorded for subsequent provisioning
+  - provision governance domain nycn-federation-gov: provisioned governance domain as nycn-federation-gov
+  - provision governance domain nycn-organizers-gov: provisioned governance domain as nycn-organizers-gov
+  - create Committee structure nycn-backbone: created structure as struct-ccf02bfb-ef7e-442b-94f9-535d08033fbb
+  - create Committee structure nycn-steering: created structure as struct-7013af49-762a-4e48-978f-71d4d4e7d992
+  - create Committee structure nycn-content: created structure as struct-29cde495-fed6-4282-b92b-24928e2f8ee6
+  - create Committee structure nycn-logistics: created structure as struct-be71aaed-571d-4dd9-82d9-4d811135c4b6
+  - create Committee structure nycn-marketing: created structure as struct-59eadab5-af6e-4845-a9be-94d6368118c8
+  - create Committee structure nycn-finance: created structure as struct-186ad436-da8e-4510-ad59-980934d64fe0
+  - create WorkingGroup structure nycn-accessibility-wg: created structure as struct-967ec1c7-5271-41a8-83ab-59f9300cf0e9
+  - create program summit-cycle-2026: created program as prog-66ef9877-4b49-4fd1-bd81-bb799d777b3b
+  - create activity summit-2026: created activity as act-e7b627af-4c8a-4d75-9fbd-682fff4035b4
+  - create milestone summit-strategy-locked in summit-cycle-2026: created milestone as mile-b065c3f2-e22c-4c5b-adb6-6963f67cfc4c
+  - create milestone summit-venue-ready in summit-cycle-2026: created milestone as mile-04817845-daf7-40e0-a67f-399ccf7990c0
+  - create milestone summit-public-launch-ready in summit-cycle-2026: created milestone as mile-a09ebbdc-b01b-41b8-b9ba-5846236d58fa
+  - create milestone summit-cycle-closeout in summit-cycle-2026: created milestone as mile-dd1821d4-52a4-455a-935a-7e269436be8d
+
+Deferred steps:
+  - defer role coordinator on nycn-steering: no DID for holder_label 'steering-coordinator-placeholder' in person directory; awaiting DID for steering-coordinator-placeholder
+  - defer role treasurer on nycn-finance: no DID for holder_label 'finance-treasurer-placeholder' in person directory; awaiting DID for finance-treasurer-placeholder
+  - defer role program-coordinator on nycn-content: no DID for holder_label 'content-program-coordinator-placeholder' in person directory; awaiting DID for content-program-coordinator-placeholder
+  - defer role operations-lead on nycn-logistics: no DID for holder_label 'logistics-operations-lead-placeholder' in person directory; awaiting DID for logistics-operations-lead-placeholder
+
+Unsupported steps:
+  - store charter: package-owned CCL charters validate locally today, but there is no generic live CCL charter registration/activation sink yet
+
+Alias bindings:
+  - nycn -> entity:icn:federation:nycn
+  - nycn-accessibility-wg -> struct-967ec1c7-5271-41a8-83ab-59f9300cf0e9
+  - nycn-backbone -> struct-ccf02bfb-ef7e-442b-94f9-535d08033fbb
+  - nycn-content -> struct-29cde495-fed6-4282-b92b-24928e2f8ee6
+  - nycn-finance -> struct-186ad436-da8e-4510-ad59-980934d64fe0
+  - nycn-logistics -> struct-be71aaed-571d-4dd9-82d9-4d811135c4b6
+  - nycn-marketing -> struct-59eadab5-af6e-4845-a9be-94d6368118c8
+  - nycn-organizers -> entity:icn:cooperative:nycn-organizers
+  - nycn-steering -> struct-7013af49-762a-4e48-978f-71d4d4e7d992
+  - summit-2026 -> act-e7b627af-4c8a-4d75-9fbd-682fff4035b4
+  - summit-cycle-2026 -> prog-66ef9877-4b49-4fd1-bd81-bb799d777b3b
+  - summit-cycle-closeout -> mile-dd1821d4-52a4-455a-935a-7e269436be8d
+  - summit-public-launch-ready -> mile-a09ebbdc-b01b-41b8-b9ba-5846236d58fa
+  - summit-strategy-locked -> mile-b065c3f2-e22c-4c5b-adb6-6963f67cfc4c
+  - summit-venue-ready -> mile-04817845-daf7-40e0-a67f-399ccf7990c0
+
+== 5. Turn a piece of organizing work into a legible obligation ==
+   Obligation: "Confirm Summit 2026 venue booking"
+   Recorded as a tracked obligation. id: 6f27db2b-02f7-4a8b-b4f4-43ae8f76e611
+
+== 6. The organizer sees it as a plain-language action card (what they owe) ==
+{
+  "title": "Complete: Confirm Summit 2026 venue booking",
+  "summary": "NYCN organizing: confirm the venue contract for the 2026 Summit",
+  "receipt_expected": true
+}
+
+== 7. The organizer does the work and marks it done ==
+{
+  "title": "Confirm Summit 2026 venue booking",
+  "status": "completed"
+}
+
+== 8. The node issues a verifiable completion receipt ==
+{
+  "item_id": "6f27db2b-02f7-4a8b-b4f4-43ae8f76e611",
+  "domain_id": "nycn-federation-gov",
+  "actor_did": "did:icn:zCUDk7H8ZQ21wMCKdDigAWkUZN2USUBFBmcK4LrniXkUB",
+  "transition": "completed",
+  "completed_at": 1780185873,
+  "record_hash": [
+    221,
+    104,
+    90,
+    204,
+    211,
+    38,
+    184,
+    251,
+    244,
+    88,
+    201,
+    244,
+    68,
+    0,
+    20,
+    223,
+    148,
+    58,
+    175,
+    51,
+    100,
+    147,
+    28,
+    73,
+    192,
+    157,
+    183,
+    60,
+    80,
+    123,
+    48,
+    200
+  ]
+}
+   record_hash binds item_id, domain_id, actor_did, transition, completed_at.
+   It proves THIS actor discharged THIS obligation at THIS time.
+
+== 9. The obligation is discharged -- the card clears, the proof remains ==
+   card cleared -- obligation discharged, proof retained.
+
+* ICN turned cooperative work into a legible obligation and a verifiable receipt --
+  on a node the group controls. The receipt proves THIS actor discharged THIS
+  obligation at THIS time. (Rehearsal: local gateway, test identity, in-tree NYCN fixture.)
