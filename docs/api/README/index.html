@@ -178,21 +178,59 @@ curl -H &quot;Authorization: Bearer $TOKEN&quot; \
 </thead>
 <tbody><tr>
 <td>GET</td>
-<td><code>/v1/ledger/{coop}/balance/{did}</code></td>
+<td><code>/v1/ledger/{coop}/position/{did}</code></td>
 <td><code>ledger:read</code></td>
-<td>Get balance</td>
+<td>Get net position (derived from signed receipts)</td>
 </tr>
 <tr>
 <td>POST</td>
-<td><code>/v1/ledger/{coop}/payment</code></td>
+<td><code>/v1/ledger/{coop}/settle</code></td>
 <td><code>ledger:write</code></td>
-<td>Create payment</td>
+<td>Record a settlement (transfer of obligations)</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/v1/ledger/{coop}/settle/convert</code></td>
+<td><code>ledger:write</code></td>
+<td>Record a cross-unit settlement</td>
 </tr>
 <tr>
 <td>GET</td>
 <td><code>/v1/ledger/{coop}/history</code></td>
 <td><code>ledger:read</code></td>
-<td>Transaction history</td>
+<td>State-change journal history</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/v1/ledger/{coop}/entries/by-decision</code></td>
+<td><code>ledger:read</code></td>
+<td>Journal entries by governance decision</td>
+</tr>
+</tbody></table>
+<h4>Legacy vocabulary (deprecated — not served)</h4>
+<p>Earlier drafts of this doc used payment-rail terms. Per <a href="/docs/adr/ADR-0006-compliance-chain-verifiable-state-architecture">ADR-0006</a> (renamed in PR #1315) these were replaced with ICN-native primitives. The old names are <strong>not served</strong> by the gateway and return <code>404</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Deprecated (removed)</th>
+<th>Canonical ICN primitive</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>POST /v1/ledger/{coop}/payment</code></td>
+<td><code>POST /v1/ledger/{coop}/settle</code> — settlement of obligations</td>
+</tr>
+<tr>
+<td><code>GET /v1/ledger/{coop}/balance/{did}</code></td>
+<td><code>GET /v1/ledger/{coop}/position/{did}</code> — net position</td>
+</tr>
+<tr>
+<td><code>currency</code> request field</td>
+<td><code>unit</code> request field</td>
+</tr>
+<tr>
+<td><code>PaymentCreated</code> event</td>
+<td><code>SettlementCreated</code> event</td>
 </tr>
 </tbody></table>
 <h3>Governance</h3>
@@ -290,14 +328,15 @@ curl -H &quot;Authorization: Bearer $TOKEN&quot; \
     &quot;description&quot;: &quot;A community food buying club&quot;
   }&#39;
 </code></pre>
-<h3>Make a Payment</h3>
-<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/ledger/food-coop/payment \
+<h3>Record a Settlement</h3>
+<pre><code class="language-bash">curl -X POST http://localhost:8080/v1/ledger/food-coop/settle \
   -H &quot;Authorization: Bearer $TOKEN&quot; \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{
+    &quot;from&quot;: &quot;did:icn:sender&quot;,
     &quot;to&quot;: &quot;did:icn:recipient&quot;,
     &quot;amount&quot;: 2,
-    &quot;currency&quot;: &quot;hours&quot;,
+    &quot;unit&quot;: &quot;hours&quot;,
     &quot;memo&quot;: &quot;Garden help - 2 hours weeding&quot;
   }&#39;
 </code></pre>
@@ -376,7 +415,7 @@ ws.onmessage = (event) =&gt; {
 </tr>
 <tr>
 <td>422</td>
-<td>Unprocessable - Business logic error (e.g., insufficient balance)</td>
+<td>Unprocessable - Business logic error (e.g., settlement exceeds the account&#39;s credit limit)</td>
 </tr>
 <tr>
 <td>429</td>
@@ -393,8 +432,8 @@ ws.onmessage = (event) =&gt; {
 </tr>
 </thead>
 <tbody><tr>
-<td><code>PaymentCreated</code></td>
-<td>New payment in the ledger</td>
+<td><code>SettlementCreated</code></td>
+<td>New settlement recorded in the journal</td>
 </tr>
 <tr>
 <td><code>MemberAdded</code></td>
@@ -447,7 +486,7 @@ export TOKEN=$(icnctl auth token --coop my-coop)
 <li>Health checks</li>
 <li>Cooperative management</li>
 <li>Member management</li>
-<li>Ledger operations (balance, payments)</li>
+<li>Ledger operations (position, settlement)</li>
 <li>Governance (domains, proposals, voting)</li>
 </ul>
 <h2>Viewing the OpenAPI Spec</h2>

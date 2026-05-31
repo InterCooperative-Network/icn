@@ -105,7 +105,7 @@ View source on GitHub →
 </ul>
 <h4>Ledger Operations</h4>
 <ul>
-<li><code>GET /v1/coops/:coop_id/ledger/balance</code> - Get balance</li>
+<li><code>GET /v1/ledger/:coop_id/position/:did</code> - Get net position (the legacy <code>/balance</code> route was renamed per ADR-0006; for the canonical route list see <code>docs/api/README.md</code> and <code>icn/crates/icn-gateway/src/api/ledger.rs</code>)</li>
 <li><code>POST /v1/coops/:coop_id/ledger/transactions</code> - Record transaction</li>
 <li><code>GET /v1/coops/:coop_id/ledger/transactions</code> - List transactions</li>
 <li><code>GET /v1/coops/:coop_id/ledger/transactions/:tx_id</code> - Get transaction details</li>
