@@ -77,8 +77,8 @@ async function main() {
 
   // Now make authenticated requests
   console.log('\n--- Authenticated Requests ---');
-  const balance = await client.getBalance('my-coop', myDid);
-  console.log('My balance:', balance.balance, balance.currency);
+  const position = await client.getPosition('my-coop', myDid);
+  console.log('My position:', position.position, position.unit);
 }
 
 main().catch(console.error);

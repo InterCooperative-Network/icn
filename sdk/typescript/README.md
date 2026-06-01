@@ -29,8 +29,8 @@ const auth = await client.verify('did:icn:alice', signature, 'my-coop', ['ledger
 client.setToken(auth.token);
 
 // Use authenticated APIs
-const balance = await client.getBalance('my-coop', 'did:icn:alice');
-console.log('Balance:', balance.balance);
+const position = await client.getPosition('my-coop', 'did:icn:alice');
+console.log('Position:', position.position, position.unit);
 ```
 
 ## Authentication
@@ -124,10 +124,10 @@ Retries are automatic for transient errors (5xx, 429 rate limiting).
 Efficiently process multiple operations at once:
 
 ```typescript
-// Batch payments
-const results = await client.batchPay('food-coop', [
-  { from: 'admin', to: 'alice', amount: 10, currency: 'hours', memo: 'January work' },
-  { from: 'admin', to: 'bob', amount: 5, currency: 'hours', memo: 'Website help' },
+// Batch settlements
+const results = await client.batchSettle('food-coop', [
+  { from: 'admin', to: 'alice', amount: 10, unit: 'hours', memo: 'January work' },
+  { from: 'admin', to: 'bob', amount: 5, unit: 'hours', memo: 'Website help' },
 ]);
 console.log(`${results.succeeded} succeeded, ${results.failed} failed`);
 
@@ -190,7 +190,7 @@ Available query methods:
 const coop = await client.createCoop({
   id: 'food-coop',
   name: 'Food Cooperative',
-  settings: { currency: 'hours' }
+  settings: { unit: 'hours' }
 });
 
 // Get cooperative
@@ -214,16 +214,16 @@ await client.removeMember('food-coop', 'did:icn:bob');
 ### Ledger
 
 ```typescript
-// Get balance
-const balance = await client.getBalance('food-coop', 'did:icn:alice');
-console.log(`${balance.balance} ${balance.currency}`);
+// Get position
+const position = await client.getPosition('food-coop', 'did:icn:alice');
+console.log(`${position.position} ${position.unit}`);
 
-// Make payment
-const payment = await client.pay('food-coop', {
+// Record a settlement
+const settlement = await client.settle('food-coop', {
   from: 'did:icn:alice',
   to: 'did:icn:bob',
   amount: 2.5,
-  currency: 'hours',
+  unit: 'hours',
   memo: 'Garden help'
 });
 
@@ -429,7 +429,7 @@ All API methods throw `ICNError` on failure:
 import { ICNError } from '@icn/client';
 
 try {
-  await client.pay('food-coop', { ... });
+  await client.settle('food-coop', { ... });
 } catch (error) {
   if (error instanceof ICNError) {
     console.error(`Error ${error.statusCode}: ${error.message}`);
@@ -529,133 +529,35 @@ MIT OR Apache-2.0
 
 ### Notifications
 
-Subscribe to real-time notifications via WebSocket:
+> **Not implemented in this SDK.** Earlier drafts documented
+> `connectNotifications`, `listNotifications`, `markNotificationRead`, and
+> `getNotificationCount`; none of those methods exist on `ICNClient`, and there
+> is no in-app notification store.
+>
+> For real-time updates, subscribe to the gateway WebSocket event stream with the
+> methods that *do* exist — `client.connectWebSocket(coopId, handlers)` or the
+> managed `client.subscribe(coopId, handlers, opts)` — and react to
+> `SettlementCreated`, governance, and compute events. See **WebSocket Events**
+> above.
 
-```typescript
-// Connect to notification stream
-const ws = client.connectNotifications((notification) => {
-  console.log('Received:', notification);
-  if (notification.type === 'payment_received') {
-    alert(`Payment received: ${notification.data.amount}`);
-  }
-});
+### Recurring payments, escrow & budgets
 
-// List in-app notifications
-const notifications = await client.listNotifications({
-  read: false, // unread only
-  type: 'payment_received',
-  limit: 20
-});
-
-// Mark as read
-await client.markNotificationRead(notificationId);
-
-// Get unread count
-const { total, unread } = await client.getNotificationCount();
-```
-
-### Recurring Payments
-
-Automate recurring payments with flexible scheduling:
-
-```typescript
-// Create recurring payment
-const payment = await client.createRecurringPayment({
-  from_account: 'alice-checking',
-  to_account: 'bob-savings',
-  amount: 100,
-  currency: 'USD',
-  frequency: 'monthly', // daily, weekly, monthly, yearly
-  start_date: Date.now() / 1000,
-  end_date: (Date.now() / 1000) + (365 * 24 * 60 * 60), // 1 year
-});
-
-// List recurring payments
-const payments = await client.listRecurringPayments({
-  status: 'active' // active, paused, cancelled, completed
-});
-
-// Update payment
-await client.updateRecurringPayment(paymentId, {
-  amount: 150, // increase amount
-  status: 'paused' // pause temporarily
-});
-
-// Cancel payment
-await client.cancelRecurringPayment(paymentId);
-```
-
-### Payment Escrow
-
-Hold funds with conditional release:
-
-```typescript
-// Create escrow
-const escrow = await client.createEscrow({
-  from_account: 'alice',
-  to_account: 'bob',
-  amount: 500,
-  currency: 'USD',
-  description: 'Payment for freelance work',
-  conditions: [
-    {
-      requires_approval: { did: 'did:icn:charlie' } // arbitrator
-    },
-    {
-      time_release: { timestamp: futureTimestamp } // auto-release
-    }
-  ],
-  expires_at: expirationTimestamp
-});
-
-// List escrows
-const escrows = await client.listEscrows({
-  status: 'pending' // pending, locked, released, refunded, expired
-});
-
-// Release funds (with approval)
-await client.releaseEscrow(escrowId, {
-  proof: 'delivery-confirmation-hash'
-});
-
-// Refund to sender
-await client.refundEscrow(escrowId);
-```
-
-### Budget Limits
-
-Set spending limits with automatic enforcement:
-
-```typescript
-// Create budget
-const budget = await client.createBudget({
-  account: 'alice-spending',
-  currency: 'USD',
-  limit: 1000,
-  period: 'monthly', // daily, weekly, monthly, yearly
-  description: 'Monthly discretionary spending',
-  notification_thresholds: [80, 90, 100] // notify at 80%, 90%, 100%
-});
-
-// List budgets
-const budgets = await client.listBudgets({
-  status: 'active' // active, paused, exceeded, expired
-});
-
-// Get budget details with usage
-const details = await client.getBudget(budgetId);
-console.log(`Used: ${details.percentage_used}%`);
-console.log(`Remaining: $${details.remaining}`);
-
-// Update budget
-await client.updateBudget(budgetId, {
-  limit: 1500, // increase limit
-  status: 'active'
-});
-
-// Delete budget
-await client.deleteBudget(budgetId);
-```
+> **Not implemented in this SDK.** Earlier drafts of this README documented
+> `createRecurringPayment`, `createEscrow`, `createBudget`, and related helpers
+> using fiat-style fields (`from_account`, `currency: 'USD'`, dollar amounts).
+> Those methods were never shipped on `ICNClient`, and ICN does not provide
+> payment, escrow, or banking facilities.
+>
+> The ledger surface that *does* exist records mutual-credit settlements between
+> members and reports their net positions. Amounts are denominated in a
+> cooperative-defined `unit` (e.g. `hours`), never a currency:
+>
+> - `client.settle(coopId, { from, to, amount, unit, memo })` — record a settlement
+> - `client.getPosition(coopId, did)` — read a member's net position
+> - `client.getHistory(coopId, { offset, limit })` — list recorded settlements
+> - `client.crossPay(coopId, …)` — cross-unit settlement via the exchange-rate oracle
+>
+> See the **Ledger** section above for runnable examples.
 
 ### Governance UI Support
 
@@ -699,13 +601,12 @@ All API responses are fully typed. Import types as needed:
 
 ```typescript
 import type {
-  RecurringPayment,
-  PaymentFrequency,
-  Escrow,
-  EscrowCondition,
-  Budget,
-  BudgetPeriod,
-  Notification,
+  Position,
+  SettlementRequest,
+  SettlementResponse,
+  Transaction,
+  TransactionHistory,
+  TreasuryStatus,
 } from '@icn/client';
 ```
 
@@ -713,7 +614,7 @@ import type {
 
 ```typescript
 try {
-  await client.createRecurringPayment(paymentData);
+  await client.settle('food-coop', settlementRequest);
 } catch (error) {
   if (error.status === 401) {
     console.error('Not authenticated');

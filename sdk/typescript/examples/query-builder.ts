@@ -81,7 +81,7 @@ async function main() {
     console.log(`Page ${offset / pageSize + 1}: ${page.transactions.length} transactions`);
     
     page.transactions.forEach(tx => {
-      console.log(`  ${tx.from} → ${tx.to}: ${tx.amount} ${tx.currency}`);
+      console.log(`  ${tx.from} → ${tx.to}: ${tx.amount} ${tx.unit}`);
     });
 
     offset += pageSize;

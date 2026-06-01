@@ -120,7 +120,7 @@ Environment variables:
       await client.createCoop({
         id: coopId,
         name: `Demo Timebank - ${coopId}`,
-        settings: { currency: 'hours' },
+        settings: { unit: 'hours' },
       });
       console.log(`  Created cooperative "${coopId}"`);
     } catch (createError: any) {
@@ -168,13 +168,13 @@ Environment variables:
     }
 
     try {
-      // Note: In a real system, this would need to be signed by the payer
+      // Note: In a real system, this would need to be signed by the sender
       // For demo purposes, we're using the admin token to create transactions
-      await client.pay(coopId, {
+      await client.settle(coopId, {
         from: fromDid,
         to: toDid,
         amount: tx.amount,
-        currency: 'hours',
+        unit: 'hours',
         memo: tx.memo,
       });
       console.log(`  ${tx.from} -> ${tx.to}: ${tx.amount}h (${tx.memo.substring(0, 30)}...)`);
@@ -236,7 +236,7 @@ Environment variables:
   console.log(`  Transactions: ${txCount}`);
   console.log(`  Proposals: ${proposalCount}`);
   console.log('\nYou can now:');
-  console.log(`  - View balances: GET ${gateway}/v1/ledger/${coopId}/balance/:did`);
+  console.log(`  - View positions: GET ${gateway}/v1/ledger/${coopId}/position/:did`);
   console.log(`  - View history: GET ${gateway}/v1/ledger/${coopId}/history`);
   console.log(`  - Vote on proposals in the web UI`);
   console.log(`  - Connect via WebSocket for real-time updates`);

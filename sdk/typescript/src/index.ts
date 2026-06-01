@@ -19,8 +19,8 @@
  * // Now use authenticated client
  * client.setToken(auth.token);
  *
- * // Get balance
- * const balance = await client.getBalance('my-coop', 'did:icn:alice');
+ * // Get position
+ * const position = await client.getPosition('my-coop', 'did:icn:alice');
  * ```
  */
 
@@ -1362,7 +1362,7 @@ export class ICNClient {
    * @example
    * ```typescript
    * const status = await client.getTreasuryStatus('my-coop');
-   * console.log(`Balance: ${status.balance} ${status.currency}`);
+   * console.log(`Position: ${status.position} ${status.unit}`);
    * ```
    */
   async getTreasuryStatus(coopId: string): Promise<TreasuryStatus> {
@@ -1393,7 +1393,7 @@ export class ICNClient {
    * const proposal = await client.proposeTreasurySpend('my-coop', {
    *   amount: 1000,
    *   recipient: 'did:icn:bob',
-   *   currency: 'credits',
+   *   unit: 'credits',
    *   memo: 'Equipment purchase',
    * });
    * console.log('Proposal created:', proposal.proposal_id);
