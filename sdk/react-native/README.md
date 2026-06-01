@@ -171,8 +171,11 @@ These APIs are a **Device Keyring** — local private-key custody and signing pe
 They generate, store, and sign with a key pair; they do **not** hold balances, tokens, or value, and
 are not an account. The `createWallet` / `ICNWallet` / `HybridWallet` names are kept for backward
 compatibility. Canonical `Keyring` aliases are now available — `createKeyring`, `ICNKeyring`,
-`ICNKeyringImpl`, `HybridKeyring`, `createHybridKeyring` — and the `createWallet` / `ICNWallet` /
-`HybridWallet` names remain as backward-compatible (deprecated) aliases; they are not removed.
+`ICNKeyringImpl`, `HybridKeyring`, `createHybridKeyring`. The legacy factory functions
+`createWallet` and `createHybridWallet` are marked `@deprecated` in favor of the canonical
+factories. The legacy `ICNWallet` / `ICNWalletImpl` / `HybridWallet` names are retained and are
+**not** `@deprecated` — so the canonical aliases that share their symbols stay clean, and
+`ICNWallet` remains the type of `ICNMobileClientOptions.wallet?`. No legacy name is removed.
 
 #### `createKeyring(storage)`  (canonical; alias `createWallet`)
 

@@ -85,8 +85,9 @@ export interface HybridSignOptions extends HybridCryptoOptions {
 /**
  * Hybrid (Ed25519 + ML-DSA-65) Device Keyring implementation.
  *
- * @deprecated Prefer the canonical {@link HybridKeyring}. `HybridWallet` is retained as a
- * backward-compatible alias (identical class; same behavior and storage keys).
+ * Legacy name; prefer the canonical {@link HybridKeyring} (the same class reference). The
+ * class symbol is intentionally not `@deprecated` so the canonical alias does not inherit a
+ * deprecation marker; only the legacy factory {@link createHybridWallet} is `@deprecated`.
  */
 export class HybridWallet {
   private storage: SecureStorage;

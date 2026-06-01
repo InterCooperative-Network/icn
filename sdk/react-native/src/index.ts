@@ -52,7 +52,8 @@ export { QueueManager } from './queue-manager';
 export { parseError, createError, isNetworkError, isAuthError } from './error-utils';
 
 // Device Keyring — local key custody + signing (holds no value).
-// Canonical: ICNKeyringImpl / createKeyring. Legacy aliases (deprecated): ICNWalletImpl / createWallet.
+// Canonical: ICNKeyringImpl / createKeyring. Legacy (retained): ICNWalletImpl / createWallet.
+// Only the legacy factory createWallet is @deprecated; ICNWalletImpl shares the class symbol with ICNKeyringImpl and is not deprecated.
 export {
   ICNWalletImpl,
   createWallet,
@@ -61,7 +62,8 @@ export {
 } from './wallet';
 
 // Hybrid Post-Quantum Device Keyring (Ed25519 + ML-DSA-65).
-// Canonical: HybridKeyring / createHybridKeyring. Legacy aliases (deprecated): HybridWallet / createHybridWallet.
+// Canonical: HybridKeyring / createHybridKeyring. Legacy (retained): HybridWallet / createHybridWallet.
+// Only the legacy factory createHybridWallet is @deprecated; HybridWallet shares the class symbol with HybridKeyring and is not deprecated.
 export {
   HybridWallet,
   createHybridWallet,
