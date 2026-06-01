@@ -55,8 +55,7 @@ const KEYRING_VERSION_KEY = 'icn_keyring_version';
 const CLASSICAL_PRIVATE_KEY = 'icn_keyring_private_key';
 const CLASSICAL_PUBLIC_KEY = 'icn_keyring_public_key';
 
-// Keyring storage-format versions
-const WALLET_VERSION_CLASSICAL = '1';
+// Keyring storage-format version marker (hybrid). Classical keyrings write no version marker.
 const WALLET_VERSION_HYBRID = '2';
 
 // Legacy wallet-named keys, retained ONLY so deleteKeyPair() can defensively purge them

@@ -330,29 +330,36 @@ export class ICNMobileClient extends ICNClient {
   }
 
   /**
-   * Reset this device's identity: delete the configured Device Keyring's keys AND clear all
-   * persisted auth state (`icn_auth_token`, `icn_auth_did`, `icn_coop_id`, `icn_expires_at`).
+   * Reset this device's identity for sign-out-and-forget / re-provision: delete the configured Device
+   * Keyring's keys, clear all persisted auth state (`icn_auth_token`, `icn_auth_did`, `icn_coop_id`,
+   * `icn_expires_at`), and clear the offline operation queue.
    *
-   * Use this for sign-out-and-forget / re-provision. Rotating the keyring alone is not enough:
-   * `initialize()` reloads persisted auth without checking it against the Device Keyring DID, so a
-   * fresh keyring DID would otherwise be shadowed by a stale authenticated session bound to the old
-   * DID. The persisted auth keys are a client-session concern and are NOT part of (nor renamed by)
-   * the keyring storage-key family.
+   * Rotating the keyring alone is not enough: `initialize()` reloads persisted auth without checking
+   * it against the Device Keyring DID, so a fresh keyring DID would otherwise be shadowed by a stale
+   * authenticated session bound to the old DID, and `QueueManager` could replay the forgotten
+   * identity's queued operations under a new DID. Session, queue, and state cleanup run even if keyring
+   * deletion fails. These auth and queue keys are a client-session concern and are NOT part of (nor
+   * renamed by) the keyring storage-key family.
    */
   async resetIdentity(): Promise<void> {
     this.clearToken();
-    if (this.wallet) {
-      await this.wallet.deleteKeyPair();
+    try {
+      if (this.wallet) {
+        await this.wallet.deleteKeyPair();
+      }
+    } finally {
+      // Always clear identity-bound session state and the offline operation queue, even if keyring
+      // deletion fails — otherwise initialize() could reload a stale session, and queued operations
+      // from the forgotten identity could later execute under a newly authenticated DID.
+      await Promise.all([this.clearAuth(), this.queueManager.clear()]);
+      this.disconnectWebSocket();
+      this.updateAuthState({
+        isAuthenticated: false,
+        did: null,
+        coopId: null,
+        expiresAt: null,
+      });
     }
-    await this.clearAuth();
-    this.disconnectWebSocket();
-
-    this.updateAuthState({
-      isAuthenticated: false,
-      did: null,
-      coopId: null,
-      expiresAt: null,
-    });
   }
 
   /**

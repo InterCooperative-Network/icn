@@ -245,6 +245,44 @@ describe('ICNMobileClient', () => {
       });
       await expect(clientNoWallet.resetIdentity()).resolves.toBeUndefined();
     });
+
+    it('should clear the offline operation queue', async () => {
+      storage.store.set(
+        'icn_operation_queue',
+        JSON.stringify([
+          { id: '1', type: 'vote', data: {}, queuedAt: Date.now(), retries: 0, status: 'pending' },
+        ])
+      );
+      await client.initialize();
+      expect(client.queue.length).toBe(1);
+
+      await client.resetIdentity();
+
+      expect(client.queue.length).toBe(0);
+    });
+
+    it('should clear auth and queue even if keyring deletion fails', async () => {
+      const failingKeyring = {
+        ...createMockWallet(),
+        async deleteKeyPair(): Promise<void> {
+          throw new Error('secure storage unavailable');
+        },
+      };
+      const failClient = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        keyring: failingKeyring,
+        storage,
+      });
+      storage.store.set('icn_auth_token', 'test-token');
+      storage.store.set('icn_auth_did', 'did:icn:old');
+
+      await expect(failClient.resetIdentity()).rejects.toThrow('secure storage unavailable');
+
+      // Session cleanup still ran despite the keyring deletion failure.
+      expect(storage.store.has('icn_auth_token')).toBe(false);
+      expect(storage.store.has('icn_auth_did')).toBe(false);
+      expect(failClient.authState.isAuthenticated).toBe(false);
+    });
   });
 
   describe('connectRealtime', () => {
