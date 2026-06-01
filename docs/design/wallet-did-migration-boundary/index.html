@@ -1,0 +1,370 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Wallet DID Migration Boundary — `wallet_did` / `icn_wallet_did` | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>wallet did migration boundary</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/wallet-did-migration-boundary.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Wallet DID Migration Boundary — <code>wallet_did</code> / <code>icn_wallet_did</code></h1>
+<p><strong>Status</strong>: Accepted (design / naming plan) — diagnosis and naming plan for two <code>wallet</code>-rooted DID surfaces. It implements no rename and changes no code, storage keys, or serialized fields.
+<strong>Priority</strong>: Tier 1 — identity / custody naming boundary
+<strong>Companion</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/passport-keyring-position-receipt">`./passport-keyring-position-receipt.md`</a>, <a href="/docs/architecture/CLIENT_MODEL">`../architecture/CLIENT_MODEL.md`</a>
+<strong>Scope</strong>: Diagnosis + naming/migration design only. <strong>This document renames no code, no storage keys, and no serialized fields.</strong></p>
+<hr>
+<h2>Why this exists</h2>
+<p>The parent doctrine names two deferred <code>wallet</code>-rooted DID surfaces — class <strong>C</strong> (<code>wallet_did</code> in
+<code>icn-kernel-api</code>) and the class <strong>A</strong> key-custody internals (the React Native SDK) — but does not say
+what each actually is, what its correct canonical name is, or whether a rename carries any
+compatibility cost. This document answers all three. The two surfaces merely <strong>share the word
+&quot;wallet&quot;</strong>; they are different boundaries with different blast radii, and they must be evaluated
+<strong>separately</strong>.</p>
+<p>Key rule, inherited from the doctrine: <strong>a DID is not a wallet.</strong> A Device Keyring may <em>store or
+protect</em> the key for a DID; a Member Passport may <em>present</em> that DID as subject identity. The field /
+key name must reflect the actual boundary — not the value the DID happens to carry.</p>
+<h2>Deployment reality (installed-base assumption)</h2>
+<p><strong>There is no prior installed React Native client base whose persisted secure-storage keys must be
+preserved.</strong> <code>@icn/react-native</code> is pre-release (<code>0.1.0</code>) and there are no real-world installs holding
+<code>icn_wallet_*</code> / <code>icn_hybrid_wallet_*</code> keys. Consequently:</p>
+<ul>
+<li><strong>Surface 1 (RN secure storage) does not need installed-client migration.</strong> No lazy migration, no
+dual-read, and no cross-version downgrade promise are required to protect a nonexistent installed
+base. The key-string constants can simply be <strong>renamed to canonical <code>icn_keyring_*</code> names before
+release.</strong></li>
+<li><strong>The bundled <code>CoopWallet</code> example app does not change this.</strong> The repo ships a deployable example
+(<code>sdk/react-native/examples/CoopWallet</code>, referenced from <code>docs/deployment/QUICK_DEPLOY.md</code>) that
+persists keys via Expo SecureStore through <code>createWallet(secureStorage)</code>, so a developer or pilot
+device can hold <code>icn_wallet_*</code> keys without any npm release. The project&#39;s decision is that these
+pre-release example / pilot installs are <strong>re-provisioned (reset), not migrated</strong> — they hold no
+production identity, and a fresh keypair on first run after the rename is acceptable. If the project
+later decides a <em>specific</em> pilot install must be preserved, that is an explicit opt-in (not a
+default) that would re-introduce a one-time legacy-key read for that case only.</li>
+<li>This assumption is <strong>specific to Surface 1.</strong> It does <strong>not</strong> decide Surface 2: the Rust <code>wallet_did</code>
+field must still be judged on its own source / wire / test exposure (below).</li>
+<li>The earlier &quot;preserve legacy storage keys for existing installs&quot; framing is therefore <strong>dropped</strong> for
+Surface 1. Legacy storage-key support should be added <strong>only</strong> if some reason <em>other than</em> installed
+clients requires it — and then justified as development convenience, not user migration.</li>
+</ul>
+<h2>The two surfaces</h2>
+<h3>Surface 1 — <code>icn_wallet_did</code>: persisted Device-Keyring storage key (React Native SDK)</h3>
+<ul>
+<li><p><strong>Definition</strong>: the <code>DID_KEY</code> constant set to <code>icn_wallet_did</code> in <code>sdk/react-native/src/wallet.ts:30</code>
+and <code>sdk/react-native/src/hybrid-wallet.ts:47</code>.</p>
+</li>
+<li><p><strong>Family</strong>: one member of the legacy persisted secure-storage key family. The key <em>strings</em>
+<code>icn_wallet_did</code>, <code>icn_wallet_private_key</code>, and <code>icn_wallet_public_key</code> are referenced by <strong>both</strong>
+modules (in <code>hybrid-wallet.ts</code> the classical private/public keys appear under <code>CLASSICAL_*</code> constant
+names); <code>icn_wallet_version</code> and the <code>icn_hybrid_wallet_*</code> keys exist <strong>only</strong> in <code>hybrid-wallet.ts</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Legacy key string</th>
+<th>Module(s)</th>
+<th>Holds</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>PRIVATE_KEY_KEY</code> / <code>CLASSICAL_PRIVATE_KEY</code></td>
+<td><code>icn_wallet_private_key</code></td>
+<td>both</td>
+<td>Ed25519 private key (classical)</td>
+</tr>
+<tr>
+<td><code>PUBLIC_KEY_KEY</code> / <code>CLASSICAL_PUBLIC_KEY</code></td>
+<td><code>icn_wallet_public_key</code></td>
+<td>both</td>
+<td>Ed25519 public key (classical)</td>
+</tr>
+<tr>
+<td><code>DID_KEY</code></td>
+<td><code>icn_wallet_did</code></td>
+<td>both</td>
+<td>DID derived from the keyring keypair</td>
+</tr>
+<tr>
+<td><code>HYBRID_KEYPAIR_KEY</code></td>
+<td><code>icn_hybrid_wallet_keypair</code></td>
+<td>hybrid only</td>
+<td>Hybrid (Ed25519 + ML-DSA-65) keypair</td>
+</tr>
+<tr>
+<td><code>HYBRID_PUBLIC_KEY_KEY</code></td>
+<td><code>icn_hybrid_wallet_public_key</code></td>
+<td>hybrid only</td>
+<td>Hybrid public key</td>
+</tr>
+<tr>
+<td><code>WALLET_VERSION_KEY</code></td>
+<td><code>icn_wallet_version</code></td>
+<td>hybrid only</td>
+<td>Keyring storage-format version (classical / hybrid)</td>
+</tr>
+</tbody></table>
+</li>
+<li><p><strong>What it is</strong>: a <strong>secure-storage key string</strong> under which the SDK persists the DID derived from
+the locally-held Device Keyring keypair. Written via <code>setItem</code> on generate / import / hybrid-upgrade,
+read via <code>getItem</code> on <code>getKeyPair()</code> / <code>getDid()</code>, removed on <code>deleteKeyPair()</code>.</p>
+</li>
+<li><p><strong>Boundary</strong>: <strong>Device Keyring</strong> (local key custody). The stored <em>value</em> is a DID; the <em>key</em> is
+keyring-scoped — it names where and why the value is held locally.</p>
+</li>
+<li><p><strong>Classification</strong>: <strong>persisted secure-storage key</strong> — local to the device. <strong>Pre-release: no
+installed data depends on these key strings</strong> (see Deployment reality), so the strings can be
+canonicalized directly.</p>
+</li>
+<li><p><strong>Why it was not already renamed</strong>: the names are merely legacy, and three tests currently <em>lock</em> the
+exact strings (<code>sdk/react-native/src/keyring-aliases.test.ts:68</code>, titled &quot;persisted secure-storage
+keys are unchanged (no migration)&quot;, plus <code>wallet.test.ts</code> and <code>hybrid-wallet.test.ts</code>). PRs #1966 /
+#1967 preserved the strings while only <em>aliasing</em> the public class / factory names. The storage-key
+rename was deferred to its own slice — which, given no installed base, is now a <strong>direct rename</strong>, not
+a migration.</p>
+</li>
+</ul>
+<h3>Surface 2 — <code>wallet_did</code>: serialized public Rust field (<code>icn-kernel-api</code>)</h3>
+<ul>
+<li><strong>Definition</strong>: <code>wallet_did: Did</code> in <code>OperatorMode::Individual { wallet_did, contributes_to_commons }</code>,
+<code>icn/crates/icn-kernel-api/src/compute.rs:78</code>.</li>
+<li><strong>Exposure</strong>: <code>OperatorMode</code> derives <code>Serialize</code> / <code>Deserialize</code> with snake_case field renaming and
+is re-exported as crate public API (<code>icn/crates/icn-kernel-api/src/lib.rs:78</code>). Consumed by
+<code>operator_id()</code> (<code>compute.rs:123</code>), <code>is_compatible_with()</code> (<code>compute.rs:137</code>), and the cell-join
+checks in <code>services.rs</code> (<code>cell_operator_mode</code> / <code>can_join_cell</code>).</li>
+<li><strong>What it is</strong>: the DID of the <strong>individual who operates</strong> a compute node — the operator identifier
+used for cell-join compatibility (operator boundary E5 / E6). No keys are stored in this field.</li>
+<li><strong>Boundary</strong>: <strong>operator / subject identity</strong> (a Passport-rooted subject DID presented in an operator
+role). This is <strong>not</strong> device-keyring custody and <strong>not</strong> local storage.</li>
+<li><strong>Classification</strong>: <strong>public Rust API field + serde-serializable field.</strong> A unit test
+(<code>compute.rs:744</code>) locks the serialized <code>wallet_did</code> string. <strong>Exposure check (this revision):</strong> the
+only code that serializes <code>OperatorMode</code> is its own unit tests (<code>compute.rs:738</code>, <code>:753</code>); it is
+<strong>not</strong> in any OpenAPI document, HTTP handler, persisted store, gossip path, or the TypeScript SDK,
+and no external crate consumer was found (<code>icn-kernel-api</code> is <code>0.1.0</code>, used in-repo only). So the
+serde shape is a <em>potential</em> wire contract but has <strong>no actual serialized consumer today</strong>.</li>
+<li><strong>Why a rename still needs care</strong>: a rename changes (a) the public Rust field name — source-breaking
+for any consumer of the struct (today only in-repo: <code>operator_id()</code>, <code>is_compatible_with()</code>,
+<code>services.rs</code>, and the lock test) — and (b) the serde field name in <strong>any</strong> field-named format (JSON,
+YAML, and so on). Whether (b) matters depends on whether ICN adopts a wire / persistence contract for
+<code>OperatorMode</code> <em>before</em> such a consumer exists.</li>
+</ul>
+<h3>Side-by-side</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>Surface 1 — <code>icn_wallet_did</code></th>
+<th>Surface 2 — <code>wallet_did</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Location</td>
+<td><code>sdk/react-native</code> (<code>wallet.ts</code>, <code>hybrid-wallet.ts</code>)</td>
+<td><code>icn-kernel-api</code> (<code>compute.rs</code>)</td>
+</tr>
+<tr>
+<td>Kind</td>
+<td>Persisted secure-storage <strong>key string</strong></td>
+<td>Serialized public Rust <strong>struct field</strong></td>
+</tr>
+<tr>
+<td>Boundary</td>
+<td><strong>Device Keyring</strong> (local custody)</td>
+<td><strong>Operator / subject identity</strong> (passport-rooted)</td>
+</tr>
+<tr>
+<td>Installed / external dependents</td>
+<td><strong>None</strong> — pre-release, no installs</td>
+<td><strong>None found</strong> — in-repo only; serialized only in tests</td>
+</tr>
+<tr>
+<td>Canonical target</td>
+<td><code>icn_keyring_did</code> (<code>icn_keyring_*</code> family)</td>
+<td><code>operator_did</code></td>
+</tr>
+<tr>
+<td>Recommended mechanism</td>
+<td><strong>Direct rename</strong> of storage-key constants; tests assert canonical-only</td>
+<td><strong>Direct rename</strong> <em>or</em> serde alias — decide per API-stability policy</td>
+</tr>
+</tbody></table>
+<h2>Canonical target naming (and why)</h2>
+<ul>
+<li><strong>Surface 1 to <code>icn_keyring_did</code></strong> within an <code>icn_keyring_*</code> / <code>icn_hybrid_keyring_*</code> family. The
+persisted key denotes <em>where and why</em> the value is held — device-local key custody — which is the
+<strong>Device Keyring</strong>. It is deliberately <strong>not</strong> <code>passport_did</code>: storage here is custody, not identity
+presentation.</li>
+<li><strong>Surface 2 to <code>operator_did</code></strong> (with <code>subject_did</code> as an acceptable alternative). The field is the
+subject DID of the node operator; the enclosing type is <code>OperatorMode</code> and its accessor is
+<code>operator_id()</code>, so <code>operator_did</code> is the most boundary-accurate. It is <strong>not</strong> <code>keyring_did</code> (no key
+custody occurs here) and <strong>not</strong> a bare <code>passport_did</code> (it is specifically the <em>operator role</em> of a
+subject identity).</li>
+</ul>
+<h2>Implementation plans (for FUTURE, separately-reviewed PRs — not performed here)</h2>
+<h3>Surface 1 — direct canonicalization (no installed-base migration)</h3>
+<p>Because there is no installed client base (see Deployment reality), Surface 1 is a <strong>direct rename</strong>,
+not a migration:</p>
+<ol>
+<li>Rename the RN secure-storage key constants to canonical <code>icn_keyring_*</code> / <code>icn_hybrid_keyring_*</code>
+strings (<code>icn_keyring_did</code>, <code>icn_keyring_private_key</code>, <code>icn_keyring_public_key</code>,
+<code>icn_hybrid_keyring_keypair</code>, <code>icn_hybrid_keyring_public_key</code>, <code>icn_keyring_version</code>). No
+<code>icn_wallet_*</code> storage key remains in the Device Keyring layer.</li>
+<li><strong>Fresh installs write only canonical keyring storage keys.</strong> With no installed base, no dual-read
+and no lazy migrate-write are needed.</li>
+<li>Update the locking tests (<code>keyring-aliases.test.ts</code>, <code>wallet.test.ts</code>, <code>hybrid-wallet.test.ts</code>) to
+assert the <strong>canonical</strong> key strings, and add an assertion that <strong>no <code>wallet</code>-named storage key</strong> is
+used by the RN key-custody layer.</li>
+<li><code>deleteKeyPair()</code> must purge <strong>both</strong> the canonical keyring keys <strong>and</strong> any legacy <code>icn_wallet_*</code> /
+<code>icn_hybrid_wallet_*</code> secrets <strong>unconditionally</strong> — purging an absent key is a harmless no-op, and
+this guarantees no stale signing secret (e.g. a leftover <code>icn_wallet_private_key</code> on a pre-release
+example / pilot device) survives a delete or can be revived by any future legacy reader. Add a test
+asserting an explicit deletion leaves <strong>no</strong> key in either namespace.</li>
+<li><strong>No legacy fallback or downgrade promise is required</strong> — there is no installed base to read from or
+to downgrade onto. If a legacy <code>icn_wallet_*</code> read path is nonetheless kept, justify it explicitly as
+a <strong>development convenience</strong> (not user migration); deletion already purges both families
+unconditionally (step 4), so a &quot;deleted&quot; identity cannot resurface via any reader.</li>
+<li><strong>A reset must be complete.</strong> Re-provisioning a pre-release example / pilot install (the decision
+above) must also clear <strong>identity-bound persisted auth state</strong> — <code>icn_auth_token</code>, <code>icn_auth_did</code>,
+<code>icn_coop_id</code>, <code>icn_expires_at</code> (<code>sdk/react-native/src/client.ts:31</code>) — not only rotate the keypair.
+Otherwise <code>initialize()</code> (<code>client.ts:120</code>) reloads the prior token and auth DID <strong>without</strong> checking
+them against the device keyring DID, so the app could report itself authenticated as the old
+identity and send a still-valid bearer token while signature login uses the new identity. These
+<code>icn_auth_*</code> keys are <strong>not</strong> part of the keyring <code>icn_wallet_*</code> family and are <strong>not</strong> renamed by
+this slice, but the reset path must purge them. Add a test that a reset leaves no stale auth token
+or auth DID.</li>
+</ol>
+<h3>Surface 2 — evaluate direct rename vs. serde alias (separate decision)</h3>
+<p>This is an operator/subject-identity field in the kernel API, <strong>not</strong> a React Native storage migration.
+Decide it on its own API-stability policy:</p>
+<ol>
+<li><strong>Confirm exposure first.</strong> Re-verify (as of this revision) that no OpenAPI / HTTP / TypeScript-SDK /
+persisted / gossiped consumer of <code>OperatorMode</code> exists and that <code>icn-kernel-api</code> is not relied on as
+a published wire contract. The only serializer today is the crate&#39;s own tests.</li>
+<li><strong>If there is no external / wire contract (current finding):</strong> a future PR may <strong>directly rename</strong> the
+Rust field <code>wallet_did</code> → <code>operator_did</code>, updating the in-repo consumers (<code>operator_id()</code>,
+<code>is_compatible_with()</code>, <code>services.rs</code>) and the lock test to assert <code>operator_did</code>. Treat it as a
+semver-relevant change to <code>icn-kernel-api</code> even though no external consumer exists today.</li>
+<li><strong>If / when a wire or persistence contract is adopted</strong> for <code>OperatorMode</code>: do <strong>not</strong> direct-rename
+the emitted field. Use a serde <code>rename</code> + <code>alias</code> and keep emitting the legacy <code>wallet_did</code> until an
+explicit payload / version transition, so old readers and writers interoperate during the window.</li>
+<li>Either way, <strong>do not treat this as a React Native storage migration.</strong></li>
+</ol>
+<h2>Recommended slice ordering</h2>
+<p>A. <strong>RN storage-key canonicalization</strong> — rename <code>icn_wallet_*</code> / <code>icn_hybrid_wallet_*</code> →
+   <code>icn_keyring_*</code> / <code>icn_hybrid_keyring_*</code>. <strong>No installed-client migration required</strong>; tests assert
+   canonical-only key names and that no <code>wallet</code>-named storage key remains in the key-custody layer.
+B. <strong>Rust operator-DID field</strong> — evaluate a <strong>direct rename</strong> <code>wallet_did</code> → <code>operator_did</code> (no external
+   consumer found) versus a serde alias, per the crate&#39;s API-stability policy; separate code PR.
+C. <strong>Docs / examples</strong> — refresh once the new names land.</p>
+<h2>Compatibility requirements</h2>
+<ul>
+<li><strong>Surface 1</strong>: <strong>none for installed clients — there are none.</strong> The only requirement is internal
+consistency: fresh installs and the test suite use the canonical key strings, and no <code>wallet</code>-named
+storage key remains in the Device Keyring layer.</li>
+<li><strong>Surface 2</strong>: <strong>no compatibility obligation today</strong> (no external / wire consumer). <em>If</em> a wire or
+persistence contract is later adopted, a rename must go behind a serde <code>rename</code> + <code>alias</code> with legacy
+output retained until an explicit version transition.</li>
+<li>No change to DID generation, signing semantics, or cryptography in any slice.</li>
+</ul>
+<h2>Non-claims</h2>
+<p>This document is design / naming planning only. It does <strong>not</strong>:</p>
+<ul>
+<li>rename or remove any storage key, field, type, or export;</li>
+<li>perform any installed-client migration (there is no installed base to migrate);</li>
+<li>change any persisted secure-storage key string;</li>
+<li>change any serialized API / wire payload or serde shape;</li>
+<li>promise to preserve pre-release legacy storage-key names;</li>
+<li>change DID generation, signing, or cryptography;</li>
+<li>imply token custody, a wallet balance, or any banking / payment product;</li>
+<li>make any production, live-federation, or governance readiness claim;</li>
+<li>weaken any meaning / regulatory / firewall check.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

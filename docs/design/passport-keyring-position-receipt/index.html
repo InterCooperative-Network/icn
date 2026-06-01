@@ -294,6 +294,14 @@ API rename; deferred.</li>
 <li><strong>Demo speaker notes</strong> — &quot;surplus to member wallets&quot; → &quot;member positions&quot;.</li>
 <li><strong>&quot;wallet&quot; node mode</strong> terminology (plans) → adopt the passport/keyring split.</li>
 </ol>
+<blockquote>
+<p><strong>Detailed boundary analysis:</strong> the persisted React Native key family behind slice #1
+(<code>icn_wallet_did</code> and its <code>icn_wallet_*</code> siblings) and the serialized <code>wallet_did</code> field in
+slice #4 are catalogued together — with their distinct boundaries, canonical target names, and
+per-surface rename plans (the RN keys are pre-release with no installed base, so a direct rename; the
+Rust field is evaluated separately) — in
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/wallet-did-migration-boundary">Wallet DID Migration Boundary</a>.</p>
+</blockquote>
 <hr>
 <h2>Non-claims</h2>
 <p>This document is vocabulary doctrine only. It explicitly does <strong>not</strong> claim that ICN is, or that this
