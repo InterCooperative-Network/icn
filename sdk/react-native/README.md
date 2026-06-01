@@ -4,7 +4,7 @@ React Native SDK for the InterCooperative Network - mobile-first mutual credit a
 
 ## Features
 
-- **Wallet Management** - Secure key storage with iOS Keychain / Android Keystore
+- **Device Keyring** (key custody) - Secure key storage with iOS Keychain / Android Keystore (legacy-named "wallet"; holds no balances or value)
 - **Hybrid Post-Quantum Cryptography** - Ed25519 + ML-DSA-65 for quantum-resistant signatures
 - **Authentication** - Persistent login with automatic token refresh
 - **Real-time Events** - WebSocket with auto-reconnect
@@ -157,17 +157,24 @@ Load persisted authentication state. Call this on app startup.
 
 #### `client.login(coopId?, scopes?)`
 
-Authenticate using the configured wallet.
+Authenticate using the configured Device Keyring (legacy-named "wallet").
 
 #### `client.logout()`
 
 Clear authentication and disconnect WebSocket.
 
-### Wallet
+### Device Keyring (legacy-named "Wallet")
+
+These APIs are a **Device Keyring** — local private-key custody and signing per the
+[passport / keyring / position / receipt doctrine](../../docs/design/passport-keyring-position-receipt.md).
+They generate, store, and sign with a key pair; they do **not** hold balances, tokens, or value, and
+are not an account. The `createWallet` / `ICNWallet` / `HybridWallet` names are kept for backward
+compatibility; canonical `Keyring` aliases may be introduced in a future compatibility-safe release
+without removing them.
 
 #### `createWallet(storage)`
 
-Create a wallet with secure storage.
+Create a Device Keyring (legacy-named `createWallet`) with secure storage.
 
 ```typescript
 const wallet = createWallet(secureStorage);
@@ -185,9 +192,9 @@ Import an existing private key (hex format).
 
 Sign a message with the stored private key.
 
-### Hybrid Post-Quantum Wallet
+### Hybrid Post-Quantum Device Keyring (legacy-named "Wallet")
 
-For quantum-resistant signatures, use the `HybridWallet` which combines Ed25519 with ML-DSA-65 (NIST FIPS 204 Dilithium).
+For quantum-resistant signatures, use the `HybridWallet` (a Device Keyring) which combines Ed25519 with ML-DSA-65 (NIST FIPS 204 Dilithium).
 
 #### Size Considerations
 
@@ -199,7 +206,7 @@ For quantum-resistant signatures, use the `HybridWallet` which combines Ed25519 
 
 #### `createHybridWallet(storage)`
 
-Create a quantum-resistant wallet.
+Create a quantum-resistant Device Keyring (legacy-named `createHybridWallet`).
 
 ```typescript
 import { createHybridWallet } from '@icn/react-native';

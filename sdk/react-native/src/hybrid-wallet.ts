@@ -1,8 +1,13 @@
 /**
- * ICN Hybrid Wallet for React Native
+ * ICN Hybrid Device Keyring for React Native (legacy-named "hybrid wallet")
  *
- * Quantum-resistant wallet using Ed25519 + ML-DSA-65 hybrid signatures.
- * Provides migration path from classical Ed25519-only wallets.
+ * Quantum-resistant local key custody and signing using Ed25519 + ML-DSA-65 hybrid
+ * signatures. In the passport / keyring / position / receipt doctrine this is a
+ * **Device Keyring**: it holds keys and produces signatures — it does NOT hold
+ * balances, tokens, or value. Provides a migration path from classical
+ * Ed25519-only keyrings. The `HybridWallet` / `createHybridWallet` export names are
+ * retained for backward compatibility; canonical `Keyring` aliases may be added
+ * later without removing them.
  *
  * @module hybrid-wallet
  *
