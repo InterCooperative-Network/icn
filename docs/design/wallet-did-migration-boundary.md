@@ -126,6 +126,14 @@ key name must reflect the actual boundary — not the value the DID happens to c
    (c) after one read, the canonical keys are present and every migrated value is unchanged; (d) keypair
    / DID continuity is preserved across the upgrade (the device keeps the same DID and can still sign);
    (e) an explicit `deleteKeyPair()` leaves no key in either namespace.
+7. **Downgrade safety**: a downgraded SDK writes **only** the legacy namespace (`wallet.ts:88` / `:115`,
+   `hybrid-wallet.ts:120` / `:151`), so a canonical-first reader could ignore a legacy keypair that an
+   older binary wrote *after* migration and silently resurrect the pre-downgrade identity. The migration
+   must therefore either (a) treat the two namespaces as versioned and, when both are present and differ,
+   prefer the one the marker says is newer — reconciling, or failing closed on an unreconcilable conflict
+   — or (b) explicitly declare post-migration downgrades unsupported. Until a reconciliation strategy is
+   chosen, this plan declares post-migration downgrades **unsupported**, and adds a test for the
+   both-namespaces-present conflict.
 
 ### Surface 2 — forward-compat alias, then rename with dual output (semver-coordinated)
 
