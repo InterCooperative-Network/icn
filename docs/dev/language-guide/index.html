@@ -211,7 +211,7 @@ The protocol primitive is the signed entry; the position is interpretation.</p>
 <td>&quot;My Account&quot; or &quot;My Accounts&quot;</td>
 </tr>
 <tr>
-<td>SDK type</td>
+<td>SDK type (value / account abstraction)</td>
 <td><code>Wallet</code> interface</td>
 <td><code>Account</code> interface</td>
 </tr>
@@ -221,10 +221,21 @@ The protocol primitive is the signed entry; the position is interpretation.</p>
 <td>&quot;member account&quot; or &quot;DID&quot;</td>
 </tr>
 </tbody></table>
+<p>The <code>Wallet</code> → <code>Account</code> row above is the <em>value/ledger</em> sense only. A <code>Wallet</code> type that is actually
+<strong>key custody</strong> (a signer / key store — e.g. <code>sdk/react-native/src/wallet.ts</code>,
+<code>sdk/react-native/src/hybrid-wallet.ts</code>, <code>createWallet()</code> / <code>HybridWallet</code>) maps to <strong>Device Keyring</strong>,
+not <code>Account</code> — see the identity &amp; custody axis below.</p>
 <p><strong>Why</strong>: &quot;Wallet&quot; in a hosted context implies the operator controls the keys and can move balances
 unilaterally. ICN accounts are identified by DID; the member controls the signing key.</p>
 <p><strong>Exception</strong>: &quot;Unhosted wallet&quot; in regulatory/legal documentation is acceptable — it describes
 ICN&#39;s non-custodial architecture relative to the regulatory concept.</p>
+<p><strong>Identity &amp; custody axis</strong>: The <code>wallet</code> → <code>account</code> rule above covers the <em>value/ledger</em> meaning.
+When &quot;wallet&quot; instead names an <strong>identity app</strong> (e.g. &quot;Open your ICN Wallet app&quot;) or a <strong>key-custody
+type</strong> (e.g. the SDK <code>createWallet()</code> / <code>HybridWallet</code>), the canonical split is <strong>Member Passport</strong>
+(identity / credential presentation) plus <strong>Device Keyring</strong> (local key custody and signing) — never a
+single &quot;wallet&quot;. See <a href="/docs/design/passport-keyring-position-receipt">Passport / Keyring / Position / Receipt</a>
+for the full boundary, the classification of existing <code>wallet</code> hits, and the migration rules. That
+document is doctrine, not an implemented rename — no code is renamed by adopting this vocabulary.</p>
 <hr>
 <h3><code>send funds</code> / <code>transfer funds</code></h3>
 <table>
@@ -404,6 +415,14 @@ attestations — the economic relationship between participants — not money.</
 <tr>
 <td><code>provenance</code></td>
 <td>The authorization chain behind a state change</td>
+</tr>
+<tr>
+<td><code>Member Passport</code></td>
+<td>User-facing identity / membership / credential presentation surface (not value-bearing) — see <a href="/docs/design/passport-keyring-position-receipt">doctrine</a></td>
+</tr>
+<tr>
+<td><code>Device Keyring</code></td>
+<td>Local cryptographic key custody and signing on a device — see <a href="/docs/design/passport-keyring-position-receipt">doctrine</a></td>
 </tr>
 </tbody></table>
 <hr>

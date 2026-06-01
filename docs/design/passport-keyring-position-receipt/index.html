@@ -1,0 +1,386 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Passport / Keyring / Position / Receipt — Identity &amp; Custody Vocabulary Boundary | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>passport keyring position receipt</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/passport-keyring-position-receipt.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Passport / Keyring / Position / Receipt — Identity &amp; Custody Vocabulary Boundary</h1>
+<p><strong>Status</strong>: Accepted (doctrine) — refines <a href="https://github.com/InterCooperative-Network/icn/blob/main/regulatory-safe-verifiable-state">Regulatory-Safe Verifiable State Architecture</a>
+<strong>Priority</strong>: Tier 1 — Foundational positioning
+<strong>Companion</strong>: <a href="/docs/dev/language-guide">`../dev/language-guide.md`</a>, <a href="/docs/architecture/CLIENT_MODEL">`../architecture/CLIENT_MODEL.md`</a>, <a href="/docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE">`../architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md`</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/multi-device-identity-design">`./multi-device-identity-design.md`</a>, <a href="/docs/architecture/AUTH_BRIDGE_AND_DID_LOGIN">`../architecture/AUTH_BRIDGE_AND_DID_LOGIN.md`</a></p>
+<hr>
+<h2>Why this exists</h2>
+<p>ICN&#39;s <a href="/docs/dev/language-guide">language guide</a> already forbids fintech vocabulary on the value
+axis: <code>payment</code> → <code>settle</code>, <code>balance</code> → <code>position</code>, <code>currency</code> → <code>unit</code>. The website and the
+foundational manual already say, plainly, that ICN <strong>is not a wallet</strong> (&quot;position over wallet,
+obligation over debt, settlement over payment, unit over currency&quot; — <code>ICN_VISUAL_EXPLAINER_BIBLE.md</code>).</p>
+<p>But &quot;wallet&quot; is overloaded, and the <em>value</em> meaning is only one of three. The word also gets used for
+the <strong>identity app</strong> a member opens (&quot;Open your ICN Wallet app and scan this code&quot;) and for the
+<strong>key-custody library</strong> in the SDK (<code>createWallet()</code>, <code>HybridWallet</code>). The existing guide resolves
+only the value meaning (<code>wallet</code> → <code>account</code>). The identity and custody meanings have no canonical
+target, so today a single word silently teaches the whole crypto/fintech model:</p>
+<ul>
+<li>assets live in the wallet,</li>
+<li>balances live in the wallet,</li>
+<li>payments move between wallets,</li>
+<li>identity <em>is</em> possession of a wallet,</li>
+<li>and therefore the product is crypto-adjacent.</li>
+</ul>
+<p>The conflation is not only in copy and SDK types — it is written into the client architecture. The
+architecture doc <a href="/docs/architecture/CLIENT_MODEL">`CLIENT_MODEL.md`</a> (titled &quot;ICN Client and Wallet
+Architecture&quot;) defines <strong>&quot;The Wallet&quot;</strong> as the single client object that &quot;manages identity,
+credentials, memberships, and economic interactions&quot; — a <code>pub trait Wallet</code> exposing <code>did()</code>,
+<code>sign()</code> (&quot;keys never leave wallet&quot;), and <code>transfer()</code>. That is the god-object this doctrine
+decomposes: <strong>Passport</strong> (identity / credentials / memberships), <strong>Keyring</strong> (keys / signing),
+<strong>Position</strong> + <strong>Settlement</strong> (economic interactions), and <strong>Receipt</strong> (history).</p>
+<p>ICN does not teach that model. This document defines the canonical split <strong>before</strong> any broad
+migration, so that a future rename has an architectural target instead of becoming a blind
+find-and-replace. It is doctrine, not a migration: <strong>it does not rename any code.</strong></p>
+<hr>
+<h2>The canonical model</h2>
+<table>
+<thead>
+<tr>
+<th>Concept</th>
+<th>What it is</th>
+<th>Existing architecture anchor</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Member Passport</strong></td>
+<td>The user-facing <strong>identity / membership / role / credential / delegation / capability presentation</strong> surface. What a person <em>shows</em> to participate.</td>
+<td><code>IDENTITY_MEMBERSHIP_ARCHITECTURE.md</code>, <code>AUTH_BRIDGE_AND_DID_LOGIN.md</code> (DID login)</td>
+</tr>
+<tr>
+<td><strong>Device Keyring</strong></td>
+<td>Local <strong>cryptographic key custody and signing</strong>. Holds private keys on a device; biometrics/PINs unlock <em>it</em>, not identity itself.</td>
+<td><code>multi-device-identity-design.md</code> (Keystore v3, per-device keys, rotation), <code>sdk/react-native</code> key store</td>
+</tr>
+<tr>
+<td><strong>Position</strong></td>
+<td><strong>Ledger / accounting state</strong> — a <strong>derived view</strong> recomputed from signed entries. The ledger records the signed entries (the protocol primitive); a position is the interpretation over them, never <em>recorded as stored state</em> and never <em>held inside a wallet</em>.</td>
+<td><code>regulatory-safe-verifiable-state.md</code> Invariant 4; <code>language-guide.md</code></td>
+</tr>
+<tr>
+<td><strong>Receipt</strong></td>
+<td>Verifiable <strong>proof that an action/event/transition occurred</strong>.</td>
+<td><code>regulatory-safe-verifiable-state.md</code> (<code>ExecutionReceipt</code>, <code>GovernanceDecisionReceipt</code>); <code>glossary.md</code></td>
+</tr>
+<tr>
+<td><strong>Settlement</strong></td>
+<td>The canonical <strong>recording of an obligation transition</strong> between participants; positions are recomputed as derived views, not <em>moved</em> between accounts.</td>
+<td><code>language-guide.md</code> (<code>payment</code> → <code>settle</code>)</td>
+</tr>
+<tr>
+<td><strong>Credential</strong></td>
+<td>A signed claim a passport presents (membership, role, attestation). Presented, not &quot;held as value&quot;.</td>
+<td><code>glossary.md</code> (Attestation), <code>IDENTITY_MEMBERSHIP_ARCHITECTURE.md</code></td>
+</tr>
+<tr>
+<td><strong>Capability</strong></td>
+<td>An authority grant a passport may exercise / a keyring may sign for. Scoped, delegable, revocable.</td>
+<td><code>multi-device-identity-design.md</code> (capability hierarchy), <code>capability-based-features.md</code></td>
+</tr>
+</tbody></table>
+<h3>The architectural rule</h3>
+<blockquote>
+<p>A <strong>Member Passport</strong> does not hold money, tokens, or balances.
+A <strong>Member Passport</strong> presents credentials and authorizes signing.
+A <strong>Device Keyring</strong> protects private keys and produces signatures.
+The <strong>ledger</strong> records <strong>signed entries</strong>; a <strong>position</strong> is the derived view recomputed from them.
+<strong>Receipts</strong> prove events.
+<strong>Settlements</strong> record obligation transitions; positions follow as recomputed derived views.</p>
+</blockquote>
+<p>Identity is <em>not</em> possession of a wallet. Identity is a DID; the member presents it through a
+<strong>passport</strong> and proves control of it through a <strong>keyring</strong>. The two are deliberately separate: a
+person has one passport (identity) backed by potentially many device keyrings (custody), and losing a
+device loses a keyring, not the passport. This separation is already the design in
+<code>multi-device-identity-design.md</code> — this doctrine only names it.</p>
+<hr>
+<h2>Deprecated / avoid term: <code>wallet</code></h2>
+<p><code>wallet</code> is <strong>not</strong> ICN-native user-facing language. It is allowed <strong>only</strong> for:</p>
+<ul>
+<li>third-party ecosystem references (e.g. an external crypto wallet a user already owns),</li>
+<li>legacy compatibility / deprecation notes,</li>
+<li>historical text,</li>
+<li>the regulatory term of art &quot;<strong>unhosted wallet</strong>&quot;, which describes ICN&#39;s non-custodial posture
+relative to a regulatory concept (see <code>language-guide.md</code> and <code>regulatory-safe-verifiable-state.md</code>),</li>
+<li>low-level existing code where the concept is <em>actually key custody</em> and migration has not happened
+yet (label it, schedule it — see Migration rules).</li>
+</ul>
+<p>It must <strong>not</strong> be introduced as the name of a member-facing surface, an SDK type, an identity app,
+or anything that holds value.</p>
+<h3>Boundary examples</h3>
+<table>
+<thead>
+<tr>
+<th>❌ Avoid</th>
+<th>✅ Use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>&quot;member wallet balance&quot;</td>
+<td>&quot;the ledger records the member&#39;s <strong>position</strong>&quot;</td>
+</tr>
+<tr>
+<td>&quot;send payment from wallet&quot;</td>
+<td>&quot;<strong>settlement</strong> records the obligation transition&quot;</td>
+</tr>
+<tr>
+<td>&quot;wallet holds tokens&quot;</td>
+<td>(no token custody exists — describe the actual obligation/position)</td>
+</tr>
+<tr>
+<td>&quot;connect wallet to vote&quot;</td>
+<td>&quot;the member&#39;s <strong>passport</strong> presents the credential that authorizes the vote&quot;</td>
+</tr>
+<tr>
+<td>&quot;on-chain wallet history&quot;</td>
+<td>&quot;<strong>receipts</strong> prove each action occurred; the <strong>position</strong> is the derived view&quot;</td>
+</tr>
+<tr>
+<td>&quot;Open your ICN Wallet app&quot; (sign-in)</td>
+<td>&quot;approve sign-in with your <strong>ICN Passport</strong>&quot; (identity/session)</td>
+</tr>
+<tr>
+<td>&quot;the wallet signs the action&quot;</td>
+<td>&quot;the <strong>device keyring</strong> signs the action&quot; (key custody)</td>
+</tr>
+<tr>
+<td>&quot;reset wallet / wallet not ready&quot; (keys)</td>
+<td>&quot;rotate/recover the <strong>device keyring</strong>&quot;</td>
+</tr>
+</tbody></table>
+<p>Note the last three rows: a single &quot;wallet app&quot; interaction usually decomposes into <strong>both</strong> a
+passport step (present identity / approve session) <strong>and</strong> a keyring step (sign with a local key).
+&quot;Unlock&quot; is ambiguous on purpose — &quot;<strong>unlock passport</strong>&quot; if the action is user-facing identity/session
+access; &quot;<strong>unlock keyring</strong>&quot; if the action is producing a cryptographic signature.</p>
+<hr>
+<h2>Classification of existing <code>wallet</code> usage</h2>
+<p>A full repo sweep (≈1,288 occurrences across ≈226 files) sorts into these classes. The point of the
+table is to make the <strong>migration target</strong> explicit per class — not to authorize editing anything now.</p>
+<table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Meaning</th>
+<th>Representative hits</th>
+<th>Migration target</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>A — Key custody internals</strong></td>
+<td>A real local key store + signer</td>
+<td><code>sdk/react-native</code> <code>createWallet()</code> / <code>HybridWallet</code> / <code>wallet.sign()</code>; <code>multi-device-identity-design.md</code> Keystore</td>
+<td><strong>Device Keyring</strong> (deferred — breaking SDK API)</td>
+</tr>
+<tr>
+<td><strong>B — User-facing identity surface</strong></td>
+<td>The app a member opens to present identity / approve login</td>
+<td>&quot;Open your ICN Wallet app and scan this code&quot; (<code>web/pilot-ui</code>, <code>icn-gateway</code> static); <code>CoopWallet</code> login; &quot;member wallet UI&quot;</td>
+<td><strong>Member Passport</strong> (identity/session) + <strong>Device Keyring</strong> (the signing it triggers)</td>
+</tr>
+<tr>
+<td><strong>C — Stale crypto metaphor for identity</strong></td>
+<td>identity expressed <em>as</em> a wallet</td>
+<td><code>icn-kernel-api/src/compute.rs</code> <code>wallet_did</code>, &quot;Wallet-rooted identity for all operations&quot;</td>
+<td>DID-/passport-rooted identity (deferred — public API field)</td>
+</tr>
+<tr>
+<td><strong>D — Ledger state mislabeled</strong></td>
+<td>accounting state called &quot;wallet&quot;</td>
+<td><code>demo/notes/flow-4-notes.md</code> &quot;surplus to member wallets&quot;; &quot;member wallet balance&quot;</td>
+<td><strong>Position</strong></td>
+</tr>
+<tr>
+<td><strong>E — Historical / deprecation / non-claim</strong></td>
+<td>&quot;ICN is <em>not</em> a wallet&quot;; &quot;unhosted wallet&quot;; archived text</td>
+<td><code>THE_COMMONS.md</code> &quot;It is not a wallet.&quot;; manual &quot;No wallet balance.&quot;; <code>docs/archive/**</code>; regulatory &quot;unhosted wallet&quot;</td>
+<td>Leave; label historical/deprecated where needed. These are <em>correct</em> as-is.</td>
+</tr>
+<tr>
+<td><strong>F — Third-party / unavoidable</strong></td>
+<td>external wallets / hardware wallets</td>
+<td><code>witness-signature-best-practices.md</code> &quot;hardware wallets or TPM-backed keys&quot;; references to users&#39; own crypto wallets</td>
+<td>Mark <strong>external / third-party only</strong></td>
+</tr>
+<tr>
+<td><strong>G — Generated / enforcement / do-not-edit</strong></td>
+<td>generated output, or firewall code that <em>correctly forbids</em> the word</td>
+<td><code>docs/api/openapi.generated.yaml</code>; the <code>[&quot;payment&quot;,&quot;wallet&quot;,&quot;balance&quot;,...]</code> forbidden-term lists in <code>icn-governance</code> proofs and <code>apps/governance</code> tests; <code>STATE.md</code>/<code>PHASE_PROGRESS.md</code> log lines</td>
+<td>Do not edit. Fix the source, not the generated artifact; never weaken the forbidden-term lists.</td>
+</tr>
+<tr>
+<td><strong>H — Ambiguous / needs design</strong></td>
+<td>bundles concepts this doctrine splits</td>
+<td><code>docs/architecture/CLIENT_MODEL.md</code> <code>pub trait Wallet</code> god-object (identity + credentials + memberships + keys + economics); <code>docs/plans/agent-teams-launch-prompt.md</code> &quot;node modes: wallet (signing+affiliations)&quot;; <code>THE_COMMONS.md</code> &quot;Commons Shell ↔ pilot-ui / CoopWallet&quot; convergence</td>
+<td>Resolve using this doctrine: decompose into passport (identity/credentials/memberships) + keyring (keys/signing) + position/settlement (economic) + receipt (history)</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>Migration rules</h2>
+<p>When a future slice does migrate a <code>wallet</code> hit, the target follows the <em>meaning</em>, not the word:</p>
+<ol>
+<li><strong>Do not blindly rename <code>wallet</code> → <code>passport</code>.</strong> The right target depends on what the hit means.</li>
+<li>If it refers to <strong>key custody / signing</strong>, migrate toward <strong>keyring</strong> (class A).</li>
+<li>If it refers to <strong>identity / membership / credentials / login</strong>, migrate toward <strong>passport</strong>
+(class B/C). If the same interaction also signs, name the keyring step too.</li>
+<li>If it refers to <strong>ledger / accounting state</strong>, migrate toward <strong>position</strong> (class D).</li>
+<li>If it refers to <strong>proof / history</strong>, migrate toward <strong>receipt</strong> (+ the derived <strong>position</strong> view) (class D/E).</li>
+<li>If it refers to an <strong>external crypto wallet</strong>, mark it <strong>external / third-party only</strong> — do not
+adopt it as ICN-native language (class F).</li>
+<li>If it is <strong>historical or a non-claim</strong>, leave it; label it historical/deprecated if it could be
+misread as current (class E).</li>
+<li>If it is <strong>generated or firewall-enforcement code</strong>, do not edit it; fix the upstream source and
+never weaken a forbidden-term list to make examples pass (class G).</li>
+</ol>
+<h3>Disambiguation: &quot;passport&quot; and &quot;keyring&quot; already appear</h3>
+<ul>
+<li><strong><code>passport</code></strong> today means two things, neither of which is the <em>Member Passport</em> product concept,
+so this doctrine does not overwrite an existing meaning — but writers must keep them distinct:
+(a) a <em>metaphor</em> for a DID (&quot;a DID — like a passport they alone hold&quot;, summit workshop docs), which
+is aligned; and (b) the literal <strong>government passport document</strong> used during identity verification
+(<code>icn-identity/src/anchor.rs</code>, <code>web/pilot-ui/sdis-enrollment.html</code> / <code>.js</code>). &quot;Member Passport&quot; is the ICN
+identity-presentation surface; &quot;passport&quot; lowercase in an enrollment/KYC context is a government ID
+document. Do not conflate them.</li>
+<li><strong><code>keyring</code></strong> today means the <strong>OS/system keyring</strong> (Keychain, GNOME Keyring) used to store local
+key material. This is <em>aligned</em> with <strong>Device Keyring</strong>: the Device Keyring is the ICN concept of
+local key custody and may be <em>backed by</em> the OS keyring. No conflict.</li>
+</ul>
+<h3>Future migration slices this doctrine should guide</h3>
+<p>These are <strong>named, not scheduled here</strong> — each is its own future PR with its own review:</p>
+<ol>
+<li><strong>SDK key-custody rename</strong> — <code>createWallet</code> / <code>HybridWallet</code> / <code>Wallet</code> (TypeScript + React Native)
+→ keyring naming. Breaking public-API change; out of scope for this doctrine.</li>
+<li><strong>Login-copy reframe</strong> — &quot;Open your ICN Wallet app&quot;, &quot;Scan with Mobile Wallet&quot; (<code>web/pilot-ui</code>,
+<code>icn-gateway</code> static, OpenAPI QR descriptions) → passport-presentation language.</li>
+<li><strong>Example app</strong> — <code>CoopWallet</code> example → passport+keyring framing.</li>
+<li><strong><code>wallet_did</code> field</strong> (<code>icn-kernel-api</code>) → DID-/passport-rooted identity naming. High-cost public
+API rename; deferred.</li>
+<li><strong>Demo speaker notes</strong> — &quot;surplus to member wallets&quot; → &quot;member positions&quot;.</li>
+<li><strong>&quot;wallet&quot; node mode</strong> terminology (plans) → adopt the passport/keyring split.</li>
+</ol>
+<hr>
+<h2>Non-claims</h2>
+<p>This document is vocabulary doctrine only. It explicitly does <strong>not</strong> claim that ICN is, or that this
+doctrine implements:</p>
+<ul>
+<li>a banking product;</li>
+<li>a crypto wallet product;</li>
+<li>token custody, or any custody of member assets;</li>
+<li>member balances held in a wallet (positions are derived ledger views, not stored value);</li>
+<li>production-ready identity, a live federation, or completed membership/standing governance;</li>
+<li>that passport/keyring/position/receipt migration is implemented anywhere (it is not — this is the
+target, not the state).</li>
+</ul>
+<p>It does <strong>not</strong> rename code, change any public API, alter SDK behaviour, or weaken any
+meaning/regulatory/firewall check.</p>
+<hr>
+<h2>Relationship to the firewalls</h2>
+<p>ICN has two firewalls; this doctrine belongs to the <strong>regulatory/vocabulary</strong> one, not the
+architectural one:</p>
+<ul>
+<li><strong>Regulatory / vocabulary firewall</strong> — <code>language-guide.md</code> + <code>.github/scripts/compliance_linter.py</code>
+(gateway/SDK/UI surfaces) + <code>regulatory-safe-verifiable-state.md</code>. This doctrine refines the <code>wallet</code>
+entry of the language guide along the identity/custody axis.</li>
+<li><strong>Architectural firewall</strong> — kernel/app semantic separation (<code>meaning-firewall-audit.md</code>,
+<code>icn-core/src/meaning_firewall.rs</code>, <code>firewall_denylist.py</code>). Unaffected by this doctrine.</li>
+</ul>
+<p>The compliance linter scans only gateway/SDK/UI paths, not <code>docs/</code>. The bad-examples above are quoted
+illustrations; per the language guide&#39;s exception policy, <strong>do not weaken any linter</strong> to accommodate
+deprecated-term examples — keep them in <code>docs/</code> (out of the linter&#39;s scope) instead.</p>
+<p><strong>See also</strong>: <a href="/docs/dev/language-guide">language-guide.md</a> · <a href="https://github.com/InterCooperative-Network/icn/blob/main/regulatory-safe-verifiable-state">regulatory-safe-verifiable-state.md</a></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
