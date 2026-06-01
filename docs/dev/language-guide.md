@@ -84,6 +84,14 @@ unilaterally. ICN accounts are identified by DID; the member controls the signin
 **Exception**: "Unhosted wallet" in regulatory/legal documentation is acceptable — it describes
 ICN's non-custodial architecture relative to the regulatory concept.
 
+**Identity & custody axis**: The `wallet` → `account` rule above covers the *value/ledger* meaning.
+When "wallet" instead names an **identity app** (e.g. "Open your ICN Wallet app") or a **key-custody
+type** (e.g. the SDK `createWallet()` / `HybridWallet`), the canonical split is **Member Passport**
+(identity / credential presentation) plus **Device Keyring** (local key custody and signing) — never a
+single "wallet". See [Passport / Keyring / Position / Receipt](../design/passport-keyring-position-receipt.md)
+for the full boundary, the classification of existing `wallet` hits, and the migration rules. That
+document is doctrine, not an implemented rename — no code is renamed by adopting this vocabulary.
+
 ---
 
 ### `send funds` / `transfer funds`
@@ -159,6 +167,8 @@ These terms are architecturally accurate and should be used freely:
 | `allocation` | A governance-authorized resource assignment |
 | `proposal` | A governance action requiring member vote |
 | `provenance` | The authorization chain behind a state change |
+| `Member Passport` | User-facing identity / membership / credential presentation surface (not value-bearing) — see [doctrine](../design/passport-keyring-position-receipt.md) |
+| `Device Keyring` | Local cryptographic key custody and signing on a device — see [doctrine](../design/passport-keyring-position-receipt.md) |
 
 ---
 
