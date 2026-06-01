@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Client and Wallet Architecture | InterCooperative Network</title><script>
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Client Architecture: Passport, Keyring, Position, Receipt | InterCooperative Network</title><script>
     const theme = (() => {
       if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
       return 'dark';
@@ -38,11 +38,31 @@
 </script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
           <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>CLIENT MODEL</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/CLIENT_MODEL.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
-</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Client and Wallet Architecture</h1>
-<p><strong>Version</strong>: 0.1.0
-<strong>Status</strong>: Draft
-<strong>Last Updated</strong>: 2025-01-25</p>
-<p>This document describes how end users interact with ICN through wallets and client applications.</p>
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Client Architecture: Passport, Keyring, Position, Receipt</h1>
+<p><strong>Version</strong>: 0.2.0
+<strong>Status</strong>: Living — describes the <em>target</em> client architecture; not a completed code rename
+<strong>Last Updated</strong>: 2026-06-01
+<strong>Doctrine</strong>: <a href="/docs/design/passport-keyring-position-receipt">Passport / Keyring / Position / Receipt</a> · <a href="/docs/dev/language-guide">UX Language Guide</a></p>
+<p>This document describes how end users interact with ICN through a <strong>member client</strong> — the app or
+device a person uses to participate. A member client is <strong>not</strong> a &quot;wallet&quot;. It is composed of
+separate concerns:</p>
+<ul>
+<li><strong>Member Passport</strong> — user-facing identity, membership, roles, credentials, delegations, and capabilities.</li>
+<li><strong>Device Keyring</strong> — local private-key custody and signing. Signs actions locally; holds no value.</li>
+<li><strong>Position</strong> — derived ledger/accounting state recomputed from signed entries; not a balance held in a wallet.</li>
+<li><strong>Receipt</strong> — verifiable proof that an action/event/transition occurred.</li>
+<li><strong>Settlement</strong> — the recording of an obligation/position transition; not &quot;sending payment from a wallet&quot;.</li>
+</ul>
+<blockquote>
+<p><strong>Why this rewrite?</strong> An earlier version of this document defined &quot;The Wallet&quot; as a single client
+object that &quot;manages identity, credentials, memberships, and economic interactions&quot; — a
+<code>pub trait Wallet</code> exposing <code>did()</code>, <code>sign()</code>, and <code>transfer()</code>. That god-object collapses identity,
+key custody, and ledger state into one crypto/fintech metaphor. The
+<a href="/docs/design/passport-keyring-position-receipt">Passport / Keyring / Position / Receipt doctrine</a>
+decomposes it, and this document adopts that split. This is the architectural <strong>target</strong>; it does
+<strong>not</strong> assert that the code has been renamed (see <a href="#migration-note">Migration note</a> and
+<a href="#non-claims">Non-claims</a>).</p>
+</blockquote>
 <hr>
 <h2>Overview</h2>
 <p>The ICN architecture distinguishes between three node types:</p>
@@ -51,7 +71,11 @@ View source on GitHub →
 <li><strong>Personal Nodes</strong> - Run by individuals, subset of state, offline-capable</li>
 <li><strong>Light Clients</strong> - Personal devices, minimal/no state, connect to full nodes</li>
 </ol>
-<p>The <strong>wallet</strong> is the primary user interface for individuals. It manages identity, credentials, memberships, and economic interactions.</p>
+<p>A <strong>member client</strong> is the primary interface for an individual. It is not a single &quot;wallet&quot; object:
+it presents the member&#39;s <strong>passport</strong> (identity), signs with a <strong>device keyring</strong> (key custody),
+displays <strong>positions</strong> derived from the ledger, surfaces <strong>receipts</strong> (proof), and records
+<strong>settlements</strong> (obligation transitions). It manages identity presentation, credentials, and
+memberships — but it does <strong>not</strong> hold money, tokens, or balances.</p>
 <hr>
 <h2>Node Taxonomy</h2>
 <pre><code>┌─────────────────────────────────────────────────────────────────────────────┐
@@ -83,148 +107,210 @@ View source on GitHub →
 │  │ • Connect to full nodes for all operations                           │   │
 │  │ • Hold keys locally (sign without network)                           │   │
 │  │ • Queue signed envelopes when offline                                │   │
-│  │ • Example: Phone wallet app, browser extension                       │   │
+│  │ • Example: Phone client app, browser extension                       │   │
 │  └─────────────────────────────────────────────────────────────────────┘   │
 │                                                                              │
 └─────────────────────────────────────────────────────────────────────────────┘
 </code></pre>
 <hr>
-<h2>The Wallet</h2>
-<p>The <strong>wallet</strong> is the primary user interface for individuals interacting with ICN. It&#39;s NOT just for money - it manages identity, credentials, memberships, and economic interactions.</p>
-<h3>Wallet Contents</h3>
-<pre><code>┌─────────────────────────────────────────────────────────────────┐
-│                         WALLET CONTENTS                          │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  IDENTITY                                                        │
-│  ├── Primary DID (did:icn:z6MkAlice...)                         │
-│  ├── Key material (private keys, NEVER exported)                │
-│  ├── Anchor reference (survives key rotation)                   │
-│  └── Recovery contacts (for social recovery)                    │
-│                                                                  │
-│  CREDENTIALS                                                     │
-│  ├── Membership credentials (signed by orgs)                    │
-│  │   └── &quot;Alice is member of FoodCoop since 2024-01-15&quot;        │
-│  ├── Capability tokens (delegated permissions)                  │
-│  │   └── &quot;Alice can transfer up to 100 credits&quot;                │
-│  ├── Verification credentials (from steward ceremonies)         │
-│  │   └── &quot;Alice completed identity verification&quot;               │
-│  └── Reputation attestations (portable trust)                   │
-│      └── &quot;Alice has 0.75 trust at TechCoop&quot;                    │
-│                                                                  │
-│  CACHED STATE (from connected nodes)                            │
-│  ├── Account balances (across orgs)                             │
-│  ├── Pending transactions                                       │
-│  ├── Active proposals (governance participation)                │
-│  └── Recent activity feed                                       │
-│                                                                  │
-│  OFFLINE QUEUE                                                   │
-│  └── Signed envelopes waiting to sync                           │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
+<h2>The Member Client</h2>
+<p>The <strong>member client</strong> is the primary interface for individuals interacting with ICN. It is <strong>not</strong>
+just for money — and it is <strong>not</strong> a single &quot;wallet&quot; object. It decomposes into distinct concerns,
+each with a different trust and regulatory meaning.</p>
+<h3>Why not &quot;Wallet&quot;?</h3>
+<p>&quot;Wallet&quot; collapses three unrelated things into one crypto/fintech metaphor: <strong>identity</strong>, <strong>key
+custody</strong>, and <strong>ledger state</strong>. The word silently teaches a model ICN does not implement — that
+assets live in the wallet, that balances live in the wallet, that payments move between wallets, and
+that identity <em>is</em> possession of a wallet.</p>
+<p>ICN teaches none of that. Identity is a <strong>DID</strong>, which the member <em>presents</em> through a <strong>passport</strong>
+and <em>proves control of</em> through a <strong>keyring</strong>. The two are deliberately separate: a person has one
+passport (identity) backed by potentially many device keyrings (custody); losing a device loses a
+keyring, not the passport. Accounting is a <strong>position</strong> — a derived view recomputed from signed
+entries, never stored value held inside a client. Obligation movements are <strong>settlements</strong>, not
+payments. History is a trail of <strong>receipts</strong>. See the
+<a href="/docs/design/passport-keyring-position-receipt">Passport / Keyring / Position / Receipt doctrine</a>
+for the full boundary.</p>
+<h3>What a member client holds</h3>
+<pre><code>MEMBER CLIENT (a member&#39;s app or device)
+│
+├── MEMBER PASSPORT  (identity — presents, never holds value)
+│   ├── Primary DID (did:icn:z6MkAlice…) — control proven via the keyring
+│   ├── Anchor reference (survives key rotation)
+│   ├── Social-recovery contacts (recover the passport/identity if all devices are lost)
+│   ├── Membership credentials (signed by orgs)
+│   │   └── &quot;Alice is a member of FoodCoop since 2024-01-15&quot;
+│   ├── Capability grants / delegations (scoped, delegable, revocable)
+│   │   └── &quot;Alice may record a transfer up to 100 units&quot;
+│   └── Verification &amp; reputation attestations (portable)
+│       └── &quot;Alice completed identity verification&quot;; &quot;0.75 trust at TechCoop&quot;
+│
+├── DEVICE KEYRING  (local key custody — signs, never holds value)
+│   ├── Private keys (NEVER exported; may be backed by an OS keyring / TPM / hardware device)
+│   ├── Signing of envelopes and votes
+│   └── Key rotation (rotate this device&#39;s keys; losing the device loses the keyring, not the passport)
+│
+├── POSITION VIEWS  (derived accounting state, cached from connected nodes)
+│   ├── Net positions across orgs — recomputed from signed entries, NOT stored balances
+│   └── Pending / proposed obligation transitions
+│
+├── RECEIPTS  (verifiable proof trail of actions/events that occurred)
+│
+└── OUTBOX  (signed envelopes queued while offline — transport, not value)
 </code></pre>
-<h3>Wallet Interface</h3>
-<pre><code class="language-rust">/// Core wallet interface
-pub trait Wallet {
-    // === Identity ===
-
-    /// Get the wallet&#39;s primary DID
-    fn get_did(&amp;self) -&gt; Did;
-
-    /// Sign payload with wallet keys (keys never leave wallet)
-    fn sign(&amp;self, payload: &amp;[u8]) -&gt; Signature;
-
-    /// Rotate keys (e.g., after compromise suspicion)
-    fn rotate_keys(&amp;self) -&gt; Result&lt;()&gt;;
-
-    // === Credentials ===
-
-    /// List all membership credentials
-    fn list_memberships(&amp;self) -&gt; Vec&lt;MembershipCredential&gt;;
-
-    /// List all capability tokens
-    fn list_capabilities(&amp;self) -&gt; Vec&lt;Capability&gt;;
-
-    /// Create a presentation for a credential request
-    fn present_credential(&amp;self, request: &amp;CredentialRequest) -&gt; Presentation;
-
-    // === Economic (via connected nodes) ===
-
-    /// Get balances across all orgs
-    fn get_balances(&amp;self) -&gt; Vec&lt;(OrgId, Balance)&gt;;
-
-    /// Create a transfer (returns signed envelope)
-    fn create_transfer(&amp;self, to: &amp;Did, amount: Amount, org: &amp;OrgId) -&gt; SignedEnvelope;
-
-    // === Governance (via connected nodes) ===
-
-    /// List active proposals in an org
-    fn list_active_proposals(&amp;self, org: &amp;OrgId) -&gt; Vec&lt;Proposal&gt;;
-
-    /// Cast a vote on a proposal
-    fn cast_vote(&amp;self, proposal: &amp;ProposalId, vote: Vote) -&gt; SignedEnvelope;
-
-    // === Offline Support ===
-
-    /// Queue an envelope for later sync
-    fn queue_envelope(&amp;self, envelope: SignedEnvelope);
-
-    /// Sync queued envelopes with connected node
-    fn sync(&amp;self) -&gt; Result&lt;SyncReport&gt;;
-}
-</code></pre>
-<h3>Wallet Implementations</h3>
+<h3>Canonical split</h3>
+<p>Old <code>Wallet</code> responsibilities map onto the canonical ICN concepts as follows:</p>
 <table>
 <thead>
 <tr>
-<th>Platform</th>
-<th>Description</th>
-<th>Use Case</th>
+<th>Old <code>Wallet</code> responsibility</th>
+<th>Canonical ICN concept</th>
 </tr>
 </thead>
 <tbody><tr>
-<td>Mobile App</td>
+<td><code>did()</code>, anchor, recovery contacts, identity</td>
+<td><strong>Member Passport</strong> (DID <em>control</em> proven by the keyring)</td>
+</tr>
+<tr>
+<td><code>sign()</code>, <code>rotate_keys()</code>, private keys</td>
+<td><strong>Device Keyring</strong></td>
+</tr>
+<tr>
+<td><code>list_memberships()</code>, <code>list_capabilities()</code>, <code>present_credential()</code>, credentials</td>
+<td><strong>Member Passport</strong></td>
+</tr>
+<tr>
+<td><code>get_balances()</code> / &quot;account balances&quot;</td>
+<td><strong>Position</strong> — a derived ledger view, not stored value</td>
+</tr>
+<tr>
+<td><code>create_transfer()</code> / &quot;send / transfer funds&quot;</td>
+<td><strong>Settlement</strong> — records an obligation transition</td>
+</tr>
+<tr>
+<td>transaction history / on-chain history</td>
+<td><strong>Receipt</strong> (proof) + the derived <strong>Position</strong> view</td>
+</tr>
+<tr>
+<td><code>cast_vote()</code> / governance participation</td>
+<td>Passport presents the authorizing credential; keyring signs the vote</td>
+</tr>
+<tr>
+<td>offline queue / <code>sync()</code></td>
+<td>Outbox of signed envelopes — transport, neither identity nor value</td>
+</tr>
+</tbody></table>
+<h3>Conceptual interfaces</h3>
+<blockquote>
+<p><strong>Conceptual architecture — not an implemented API.</strong> The traits below do <strong>not</strong> exist in code.
+They name responsibilities to show how the former <code>Wallet</code> god-object decomposes; they are not a
+proposed Rust surface and nothing should be generated from them. <code>SignedEnvelope</code> <em>does</em> exist
+(in <code>icn-net</code>) but as a distinct node-to-node wire type — not as any of these conceptual shapes (see <a href="#client-operation-envelope">Client operation envelope</a>).</p>
+</blockquote>
+<pre><code class="language-rust">// Identity / membership / credential presentation. Holds no value.
+trait MemberPassport {
+    fn subject(&amp;self) -&gt; Did;                 // the DID this passport presents
+    fn memberships(&amp;self) -&gt; Vec&lt;MembershipCredential&gt;;
+    fn credentials(&amp;self) -&gt; Vec&lt;Credential&gt;;
+    fn capabilities(&amp;self) -&gt; Vec&lt;Capability&gt;; // scoped, delegable, revocable
+}
+
+// Local key custody and signing. Holds no value; may be backed by OS keyring / TPM / hardware.
+trait DeviceKeyring {
+    fn sign(&amp;self, payload: &amp;[u8]) -&gt; Signature; // keys never leave the device
+    fn rotate(&amp;self) -&gt; Result&lt;()&gt;;
+}
+
+// Derived accounting / proof views recomputed from signed entries. Read-only; nothing is &quot;held&quot;.
+trait LedgerView {
+    fn position(&amp;self, org: &amp;OrgId) -&gt; Position; // derived view, NOT a stored balance
+    fn receipts(&amp;self, filter: ReceiptFilter) -&gt; Vec&lt;Receipt&gt;;
+}
+
+// Records an obligation/position transition. Returns a signed client envelope (signed by the keyring).
+trait SettlementClient {
+    fn settle(&amp;self, with: &amp;Did, amount: Amount, org: &amp;OrgId) -&gt; ClientEnvelope;
+}
+</code></pre>
+<p>Governance is not a fifth object: a vote is <strong>authorized</strong> by a credential the passport presents and
+<strong>signed</strong> by the device keyring, then submitted as a signed client envelope like any other operation.</p>
+<h3>Rejected anti-pattern: the <code>Wallet</code> god-object</h3>
+<p>The following interface appeared in earlier drafts of this document. It is retained here <strong>only as a
+rejected, historical anti-pattern</strong> so that anyone migrating code recognises what is being replaced.
+<strong>Do not treat it as the canonical client model.</strong> It conflates identity (<code>get_did</code>), key custody
+(<code>sign</code>, <code>rotate_keys</code>), credentials, ledger state (<code>get_balances</code>), settlement (<code>create_transfer</code>),
+and governance into one object — exactly the collapse this architecture rejects.</p>
+<pre><code class="language-rust">// ❌ REJECTED — historical god-object. Decomposed into Passport / Keyring / Position / Settlement.
+pub trait Wallet {
+    fn get_did(&amp;self) -&gt; Did;                                  // → Member Passport (+ Keyring control)
+    fn sign(&amp;self, payload: &amp;[u8]) -&gt; Signature;               // → Device Keyring
+    fn rotate_keys(&amp;self) -&gt; Result&lt;()&gt;;                       // → Device Keyring
+    fn list_memberships(&amp;self) -&gt; Vec&lt;MembershipCredential&gt;;   // → Member Passport
+    fn list_capabilities(&amp;self) -&gt; Vec&lt;Capability&gt;;            // → Member Passport
+    fn get_balances(&amp;self) -&gt; Vec&lt;(OrgId, Balance)&gt;;           // → Position (derived view)
+    fn create_transfer(&amp;self, to: &amp;Did, amount: Amount, org: &amp;OrgId) -&gt; SignedEnvelope; // → Settlement
+    fn cast_vote(&amp;self, proposal: &amp;ProposalId, vote: Vote) -&gt; SignedEnvelope; // → passport-authorized, keyring-signed
+    // ...offline queue / sync — transport, not a concern of identity or value
+}
+</code></pre>
+<h3>Client form factors</h3>
+<p>A member client can run on many devices. Form factor is independent of the passport/keyring split —
+every form factor presents a passport and signs with a keyring.</p>
+<table>
+<thead>
+<tr>
+<th>Form factor</th>
+<th>Description</th>
+<th>Use case</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Mobile app</td>
 <td>iOS/Android</td>
 <td>Most common, always available</td>
 </tr>
 <tr>
-<td>Browser Extension</td>
+<td>Browser extension</td>
 <td>Web integration</td>
 <td>Web-based interactions</td>
 </tr>
 <tr>
-<td>Desktop App</td>
+<td>Desktop app</td>
 <td>Full-featured</td>
 <td>Power users, developers</td>
 </tr>
 <tr>
-<td>Hardware Wallet</td>
-<td>YubiKey, Ledger</td>
-<td>High-security key storage</td>
+<td>Hardware-backed keyring</td>
+<td>YubiKey, Ledger, TPM</td>
+<td>High-security key custody (third-party hardware backing the <strong>Device Keyring</strong>)</td>
 </tr>
 <tr>
-<td>CLI Wallet</td>
+<td>CLI client</td>
 <td>Command line</td>
 <td>Developers, automation</td>
 </tr>
 </tbody></table>
+<blockquote>
+<p>The &quot;Hardware-backed keyring&quot; row references <strong>third-party hardware</strong> (e.g. a hardware wallet a user
+already owns). &quot;Hardware wallet&quot; is an external product name, not ICN-native vocabulary; in ICN it
+<em>backs</em> a Device Keyring — it does not hold ICN value.</p>
+</blockquote>
 <hr>
-<h2>Client-Node Connection</h2>
+<h2>Client–Node Connection</h2>
 <p>Light clients connect to full nodes. The connection model:</p>
 <pre><code>┌─────────────────────────────────────────────────────────────────┐
 │                    CLIENT CONNECTION MODEL                       │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                  │
-│  WALLET                                                          │
+│  CLIENT                                                          │
 │    │                                                             │
 │    ├──► PRIMARY NODE (org membership)                           │
 │    │    • Alice is FoodCoop member                              │
-│    │    • Wallet connects to FoodCoop node by default           │
+│    │    • Client connects to FoodCoop node by default           │
 │    │    • Full access to FoodCoop apps and state                │
 │    │                                                             │
 │    ├──► SECONDARY NODES (other memberships)                     │
 │    │    • Alice is also TechCoop member                         │
-│    │    • Wallet can connect to TechCoop when needed            │
+│    │    • Client can connect to TechCoop when needed            │
 │    │    • Credentials prove membership                          │
 │    │                                                             │
 │    └──► PUBLIC GATEWAYS (for unaffiliated access)               │
@@ -235,10 +321,10 @@ pub trait Wallet {
 └─────────────────────────────────────────────────────────────────┘
 </code></pre>
 <h3>Connection Configuration</h3>
-<pre><code class="language-yaml"># ~/.icn/wallet-config.yaml
+<pre><code class="language-yaml"># ~/.icn/client-config.yaml  (illustrative)
 identity:
   did: did:icn:z6MkAlice...
-  keystore: local  # or: hardware, tpm
+  keystore: local  # or: hardware, tpm   # backs the Device Keyring
 
 connections:
   primary:
@@ -262,26 +348,29 @@ offline:
   sync_interval: 5m
 </code></pre>
 <hr>
-<h2>Wallet-Node Protocol</h2>
-<h3>SignedEnvelope</h3>
-<p>The <code>SignedEnvelope</code> is the universal unit of wallet→node communication:</p>
-<pre><code class="language-rust">/// Signed envelope - the universal unit of wallet→node communication
-pub struct SignedEnvelope {
-    /// The operation being requested
-    pub operation: Operation,
-    /// Wallet&#39;s DID (author of this envelope)
-    pub author: Did,
-    /// Logical timestamp when created
-    pub timestamp: LogicalTimestamp,
-    /// Nonce for replay protection
-    pub nonce: u64,
-    /// Wallet&#39;s signature over the above fields
-    pub signature: Signature,
+<h2>Client–Node Protocol</h2>
+<h3>Client operation envelope</h3>
+<p>A client operation is carried in a signed envelope whose author DID is presented via the member&#39;s
+<strong>passport</strong> and which is signed by the <strong>device keyring</strong>. The shape below is <strong>conceptual</strong>.</p>
+<blockquote>
+<p><strong>Not the wire type.</strong> <code>icn-net</code> defines a real <code>SignedEnvelope</code>, but it is a <em>node-to-node</em> wire
+envelope with a different shape (<code>from</code>, <code>sequence</code>, <code>timestamp</code>, <code>payload_type</code>, <code>payload</code>,
+<code>signature_type</code>, <code>signature</code>, <code>pq_signature</code>). The illustrative <code>ClientEnvelope</code> below is a
+distinct, conceptual client-operation model — do <strong>not</strong> assume its fields match the <code>icn-net</code>
+wire format or its canonical encoding.</p>
+</blockquote>
+<pre><code class="language-rust">// Conceptual client-operation envelope (NOT the icn-net SignedEnvelope wire type)
+struct ClientEnvelope {
+    operation: Operation,        // the operation being requested
+    author: Did,                 // author DID (presented via the passport; control proven by the keyring)
+    timestamp: LogicalTimestamp,
+    nonce: u64,                  // replay protection
+    signature: Signature,        // produced by the device keyring
 }
 
-/// Operations that can be performed
-pub enum Operation {
-    Transfer(TransferRequest),
+// Operations a client envelope can carry
+enum Operation {
+    Transfer(TransferRequest),   // records a bilateral entry (a settlement), not operator routing
     Vote(VoteRequest),
     Proposal(ProposalRequest),
     MembershipRequest(MembershipRequest),
@@ -289,36 +378,39 @@ pub enum Operation {
 }
 </code></pre>
 <h3>Protocol Interface</h3>
-<pre><code class="language-rust">/// Wallet connects to node via WebSocket or HTTP
-pub trait WalletNodeProtocol {
+<blockquote>
+<p><strong>Conceptual</strong> — the trait name and shape below illustrate the protocol; they are not a frozen API.</p>
+</blockquote>
+<pre><code class="language-rust">/// A client connects to a node via WebSocket or HTTP
+trait ClientNodeProtocol {
     // === Authentication ===
 
-    /// Authenticate wallet to node via challenge-response
+    /// Authenticate to a node via challenge-response (passport presents the DID; keyring signs)
     fn authenticate(&amp;self, did: &amp;Did, challenge_response: &amp;Signature) -&gt; Session;
 
-    // === State Queries (node serves from its state) ===
+    // === State Queries (node serves from its state; all derived, read-only) ===
 
-    /// Get account balances
-    fn get_balances(&amp;self, session: &amp;Session) -&gt; Vec&lt;Balance&gt;;
+    /// Get derived positions (NOT stored balances)
+    fn get_positions(&amp;self, session: &amp;Session) -&gt; Vec&lt;Position&gt;;
 
     /// Get active proposals
     fn get_proposals(&amp;self, session: &amp;Session, filter: ProposalFilter) -&gt; Vec&lt;Proposal&gt;;
 
-    /// Get recent activity
+    /// Get recent activity / receipts
     fn get_activity(&amp;self, session: &amp;Session, since: Timestamp) -&gt; Vec&lt;ActivityItem&gt;;
 
-    // === Submit Operations (wallet signs, node processes) ===
+    // === Submit Operations (keyring signs, node processes) ===
 
-    /// Submit a signed envelope for processing
-    fn submit_envelope(&amp;self, session: &amp;Session, envelope: SignedEnvelope) -&gt; Result&lt;Receipt&gt;;
+    /// Submit a signed envelope for processing; returns a verifiable receipt
+    fn submit_envelope(&amp;self, session: &amp;Session, envelope: ClientEnvelope) -&gt; Result&lt;Receipt&gt;;
 
     // === Sync (for offline support) ===
 
-    /// Get pending operations from queue
+    /// Get pending operations from the outbox
     fn get_pending(&amp;self, session: &amp;Session) -&gt; Vec&lt;PendingOperation&gt;;
 
-    /// Sync offline queue with node
-    fn sync_outbox(&amp;self, session: &amp;Session, envelopes: Vec&lt;SignedEnvelope&gt;) -&gt; SyncResult;
+    /// Sync the offline outbox with the node
+    fn sync_outbox(&amp;self, session: &amp;Session, envelopes: Vec&lt;ClientEnvelope&gt;) -&gt; SyncResult;
 
     // === Subscriptions (real-time updates) ===
 
@@ -327,14 +419,14 @@ pub trait WalletNodeProtocol {
 }
 </code></pre>
 <h3>Offline Operation Flow</h3>
-<pre><code>1. WALLET CREATES OPERATION
-   └── User initiates transfer while offline
-   └── Wallet creates SignedEnvelope
+<pre><code>1. CLIENT CREATES OPERATION
+   └── User initiates a settlement while offline
+   └── Device keyring signs a client envelope
    └── Envelope stored in local outbox
 
-2. WALLET RECONNECTS
+2. CLIENT RECONNECTS
    └── Network becomes available
-   └── Wallet calls sync_outbox()
+   └── Client calls sync_outbox()
    └── Sends all queued envelopes
 
 3. NODE PROCESSES
@@ -344,13 +436,13 @@ pub trait WalletNodeProtocol {
    └── Processes operations in order
 
 4. NODE RESPONDS
-   └── Success: operation applied
-   └── Conflict: &quot;balance insufficient&quot; (state changed while offline)
+   └── Success: operation applied; receipt issued
+   └── Conflict: obligation/position constraint violated (state changed while offline)
    └── Expired: &quot;timestamp too old&quot; (configurable policy)
 
-5. WALLET UPDATES
+5. CLIENT UPDATES
    └── Marks successful envelopes as synced
-   └── Surfaces conflicts to user for resolution
+   └── Surfaces conflicts to the user for resolution
 </code></pre>
 <hr>
 <h2>Unaffiliated Individuals</h2>
@@ -366,10 +458,10 @@ pub trait WalletNodeProtocol {
 </thead>
 <tbody><tr>
 <td>Create a DID (self-sovereign identity)</td>
-<td>Initiate transfers (no account)</td>
+<td>Record settlements (no account)</td>
 </tr>
 <tr>
-<td>Hold credentials (portable)</td>
+<td>Hold credentials in a passport (portable)</td>
 <td>Vote in governance (not a member)</td>
 </tr>
 <tr>
@@ -400,8 +492,8 @@ pub trait WalletNodeProtocol {
 <li><strong>With membership</strong>: Progressive based on participation</li>
 </ul>
 <h3>Onboarding Flow</h3>
-<pre><code>1. DOWNLOAD WALLET
-   └── Create DID locally (no network needed)
+<pre><code>1. INSTALL A MEMBER CLIENT
+   └── Create DID locally (no network needed); the device keyring generates and holds the keys
 
 2. CONNECT TO PUBLIC GATEWAY
    └── Browse coop directory
@@ -413,16 +505,16 @@ pub trait WalletNodeProtocol {
 
 4. REQUEST MEMBERSHIP
    └── Submit application to chosen coop
-   └── Include verification credentials
+   └── Passport presents verification credentials
 
 5. ORG APPROVES (per their governance)
-   └── Membership credential issued
+   └── Membership credential issued to the passport
    └── Account created in org&#39;s ledger
    └── Can now participate fully
 
 6. BUILD TRUST
    └── Participate in governance
-   └── Complete transactions
+   └── Complete settlements
    └── Trust score rises over time
 </code></pre>
 <hr>
@@ -459,7 +551,7 @@ apps:
     namespace: /alice/personal/contacts/
 
   # Org apps (UI only, state from org)
-  - name: food-coop-wallet
+  - name: food-coop-client
     namespace: /food-coop/  # Read from synced state
 
 federation:
@@ -507,17 +599,21 @@ icnctl dev start
 # - Local node at localhost:8080
 # - Test identity (did:icn:dev-alice)
 # - Test org (did:icn:dev-coop)
-# - Pre-funded test accounts
+# - Pre-provisioned test accounts
 # - All apps running locally
 
-# Connect wallet to local node
-icn-wallet connect localhost:8080
+# Connect a member client (passport + device keyring) to the local node at localhost:8080
 
 # Run app in development
 cd my-app/
 icnctl app deploy --local
 </code></pre>
 <h3>Test Harness</h3>
+<blockquote>
+<p><strong>Illustrative</strong> — the <code>icn_testkit</code> shape below is conceptual; method names are not a frozen API.
+Note the framing: the keyring <strong>signs</strong>, the gateway <strong>records a settlement</strong>, and <strong>positions</strong> are
+derived views asserted against — nothing &quot;moves a balance from a wallet&quot;.</p>
+</blockquote>
 <pre><code class="language-rust">#[cfg(test)]
 mod tests {
     use icn_testkit::*;
@@ -534,13 +630,14 @@ mod tests {
         // Deploy app under test
         env.deploy_app(&quot;my-app&quot;, include_bytes!(&quot;my-app.wasm&quot;));
 
-        // Simulate user actions
+        // Simulate user actions. The settlement client records a bilateral obligation
+        // transition; the device keyring signs the envelope locally — it does not move a balance.
         let alice = env.member(&quot;alice&quot;);
-        alice.wallet().transfer(&amp;bob.did(), 100)?;
+        alice.settlement().settle(&amp;bob.did(), 100)?; // keyring signs the envelope under the hood
 
-        // Assert state
-        assert_eq!(env.balance(&amp;alice), 900);
-        assert_eq!(env.balance(&amp;bob), 1100);
+        // Positions are derived views recomputed from signed entries, not stored balances.
+        assert_eq!(env.position(&amp;alice), 900);
+        assert_eq!(env.position(&amp;bob), 1100);
     }
 }
 </code></pre>
@@ -559,7 +656,7 @@ mod tests {
 │           │ connections           │ connections           │ connections     │
 │           │                       │                       │                 │
 │    ┌──────┴──────┐         ┌──────┴──────┐         ┌──────┴──────┐         │
-│    │   WALLETS   │         │   WALLETS   │         │   WALLETS   │         │
+│    │   CLIENTS   │         │   CLIENTS   │         │   CLIENTS   │         │
 │    │  (members)  │         │  (members)  │         │  (members)  │         │
 │    └─────────────┘         └─────────────┘         └─────────────┘         │
 │                                                                              │
@@ -578,18 +675,65 @@ mod tests {
 └─────────────────────────────────────────────────────────────────────────────┘
 </code></pre>
 <hr>
+<h2>Migration note</h2>
+<p>This document defines the <strong>target</strong> client architecture. Existing ICN code, SDK types, CLI names,
+config examples, and prose elsewhere in this repo still use <code>wallet</code> naming. <strong>Adopting this model
+renames no code and changes no public API</strong> — it gives a future rename an architectural target
+instead of becoming a blind find-and-replace.</p>
+<ul>
+<li><code>icn-net</code> defines a <strong>real</strong> node-to-node <code>SignedEnvelope</code> wire type (<code>from</code> / <code>sequence</code> /
+<code>timestamp</code> / <code>payload_type</code> / <code>payload</code> / <code>signature_type</code> / <code>signature</code> / <code>pq_signature</code>); this
+PR does <strong>not</strong> touch it. The <code>ClientEnvelope</code> illustrated above is a separate <strong>conceptual</strong>
+client-operation model with a different shape — not that wire type.</li>
+<li>The conceptual <code>MemberPassport</code> / <code>DeviceKeyring</code> / <code>LedgerView</code> / <code>SettlementClient</code> /
+<code>ClientNodeProtocol</code> / <code>ClientEnvelope</code> shapes above <strong>do not exist in code</strong>.</li>
+<li>The following migrations are <strong>named, not scheduled here</strong> — each is its own future, separately
+reviewed PR (see the doctrine&#39;s <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/passport-keyring-position-receipt#migration-rules#migration-rules">migration rules</a>):<ul>
+<li><strong>SDK key-custody rename</strong> — <code>createWallet</code> / <code>HybridWallet</code> (TypeScript + React Native) → keyring
+naming. Breaking public-API change; deferred.</li>
+<li><strong><code>wallet_did</code> field</strong> (<code>icn-kernel-api</code>) → DID-/passport-rooted naming. Public-API rename; deferred.</li>
+<li><strong>Example app</strong> <code>CoopWallet</code> → passport + keyring framing.</li>
+<li><strong>Residual <code>wallet</code>-named CLI / config</strong> in illustrative examples (this doc shows target naming).</li>
+</ul>
+</li>
+<li>Where the word &quot;wallet&quot; still appears in this document it is either (a) the <strong>rejected
+anti-pattern</strong> shown for contrast, (b) a <strong>third-party / hardware wallet</strong> (external, not
+ICN-native), or (c) the regulatory term of art &quot;<strong>unhosted wallet</strong>&quot;.</li>
+</ul>
+<hr>
+<h2>Non-claims</h2>
+<p>This document is architecture doctrine for the client surface. It explicitly does <strong>not</strong> claim that
+ICN is, or that this architecture implements:</p>
+<ul>
+<li><strong>token custody</strong> or any custody of member assets;</li>
+<li>a <strong>wallet balance</strong> — positions are derived ledger views, not stored value;</li>
+<li>a <strong>banking / payment / wallet</strong> product;</li>
+<li><strong>production-ready identity</strong>, a <strong>live federation</strong>, or completed <strong>membership / standing
+governance</strong>;</li>
+<li>that passport / keyring / position / receipt has been <strong>implemented or renamed in code</strong> — this is
+the target, not the current state.</li>
+</ul>
+<p>Adopting this model does <strong>not</strong> rename code, change any public API, alter SDK behaviour, or weaken
+any meaning / regulatory / firewall check.</p>
+<hr>
 <h2>Key Principles</h2>
 <ol>
-<li><strong>Keys live in wallets</strong> - Never on nodes, never exported</li>
-<li><strong>Wallets sign, nodes verify</strong> - Operations are signed envelopes</li>
-<li><strong>Offline-first</strong> - Queue operations, sync when connected</li>
+<li><strong>Identity is a DID, not a wallet</strong> - presented via a passport, proven via a keyring</li>
+<li><strong>Keys live in the device keyring</strong> - Never on nodes, never exported</li>
+<li><strong>Keyrings sign, nodes verify</strong> - Operations are signed envelopes</li>
+<li><strong>Positions are derived</strong> - accounting state is recomputed from signed entries, never held as value</li>
+<li><strong>Offline-first</strong> - Queue operations in the outbox, sync when connected</li>
 <li><strong>Progressive trust</strong> - Unaffiliated → Verified → Member → Trusted</li>
 <li><strong>Sovereignty gradient</strong> - Light client → Personal node → Org node</li>
-<li><strong>Same primitives everywhere</strong> - Phones and servers use same kernel concepts</li>
+<li><strong>Same primitives everywhere</strong> - Phones and servers use the same kernel concepts</li>
 </ol>
 <hr>
 <h2>Related Documents</h2>
 <ul>
+<li><a href="/docs/design/passport-keyring-position-receipt">Passport / Keyring / Position / Receipt</a> - Identity &amp; custody vocabulary doctrine (canonical split)</li>
+<li><a href="/docs/dev/language-guide">UX Language Guide</a> - Forbidden fintech terms and approved alternatives</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/IDENTITY_MEMBERSHIP_ARCHITECTURE">IDENTITY_MEMBERSHIP_ARCHITECTURE.md</a> - Identity, membership, and the passport surface</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/AUTH_BRIDGE_AND_DID_LOGIN">AUTH_BRIDGE_AND_DID_LOGIN.md</a> - DID login and session bridging</li>
 <li><a href="/docs/spec/KERNEL_CONTRACTS">KERNEL_CONTRACTS.md</a> - Kernel primitive specifications</li>
 <li><a href="/docs/vision/COOPOS">COOPOS.md</a> - Future vision: CoopOS distribution</li>
 </ul>
@@ -606,7 +750,12 @@ mod tests {
 <tbody><tr>
 <td>0.1.0</td>
 <td>2025-01-25</td>
-<td>Initial draft</td>
+<td>Initial draft (&quot;ICN Client and Wallet Architecture&quot;; <code>Wallet</code> god-object)</td>
+</tr>
+<tr>
+<td>0.2.0</td>
+<td>2026-06-01</td>
+<td>Replaced the <code>Wallet</code> god-object with the Passport / Keyring / Position / Settlement / Receipt split; added why-not-Wallet, canonical split table, migration note, and non-claims. Docs-only truth-sync — no code or API change.</td>
 </tr>
 </tbody></table>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
