@@ -246,10 +246,25 @@ export class ICNWalletImpl implements ICNWallet {
 }
 
 /**
- * Create a Device Keyring (legacy-named `createWallet`) backed by secure storage.
+ * Create a Device Keyring backed by secure storage.
  *
  * Returns local key custody + signing only; it holds no balances, tokens, or value.
+ *
+ * @deprecated Prefer the canonical {@link createKeyring}. `createWallet` is retained as a
+ * backward-compatible alias and behaves identically (same return type and storage keys).
  */
 export function createWallet(storage: SecureStorage): ICNWallet {
   return new ICNWalletImpl(storage);
 }
+
+/**
+ * Canonical Device Keyring factory — preferred alias of {@link createWallet}.
+ *
+ * Identical behavior, signature, and persisted storage keys; no migration occurs.
+ */
+export const createKeyring = createWallet;
+
+/**
+ * Canonical Device Keyring implementation class — preferred alias of {@link ICNWalletImpl}.
+ */
+export { ICNWalletImpl as ICNKeyringImpl };

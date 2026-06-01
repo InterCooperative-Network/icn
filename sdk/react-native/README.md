@@ -63,23 +63,24 @@ const secureStorage: SecureStorage = {
 };
 ```
 
-### 2. Create wallet and client
+### 2. Create a keyring and client
 
 ```typescript
-import { createWallet, createMobileClient } from '@icn/react-native';
+import { createKeyring, createMobileClient } from '@icn/react-native';
 
-// Create wallet
-const wallet = createWallet(secureStorage);
+// Create a Device Keyring (local key custody + signing)
+const keyring = createKeyring(secureStorage);
 
 // Generate or load key pair
-if (!(await wallet.hasKeyPair())) {
-  await wallet.generateKeyPair();
+if (!(await keyring.hasKeyPair())) {
+  await keyring.generateKeyPair();
 }
 
 // Create client
 const client = createMobileClient({
   baseUrl: 'https://icn.mycoop.org',
-  wallet,
+  // The client config field is still named `wallet` (legacy); it accepts a keyring.
+  wallet: keyring,
   storage: secureStorage,
 });
 
@@ -169,26 +170,30 @@ These APIs are a **Device Keyring** — local private-key custody and signing pe
 [passport / keyring / position / receipt doctrine](https://github.com/InterCooperative-Network/icn/blob/main/docs/design/passport-keyring-position-receipt.md).
 They generate, store, and sign with a key pair; they do **not** hold balances, tokens, or value, and
 are not an account. The `createWallet` / `ICNWallet` / `HybridWallet` names are kept for backward
-compatibility; canonical `Keyring` aliases may be introduced in a future compatibility-safe release
-without removing them.
+compatibility. Canonical `Keyring` aliases are now available — `createKeyring`, `ICNKeyring`,
+`ICNKeyringImpl`, `HybridKeyring`, `createHybridKeyring`. The legacy factory functions
+`createWallet` and `createHybridWallet` are marked `@deprecated` in favor of the canonical
+factories. The legacy `ICNWallet` / `ICNWalletImpl` / `HybridWallet` names are retained and are
+**not** `@deprecated` — so the canonical aliases that share their symbols stay clean, and
+`ICNWallet` remains the type of `ICNMobileClientOptions.wallet?`. No legacy name is removed.
 
-#### `createWallet(storage)`
+#### `createKeyring(storage)`  (canonical; alias `createWallet`)
 
-Create a Device Keyring (legacy-named `createWallet`) with secure storage.
+Create a Device Keyring with secure storage. `createWallet` is a deprecated, identical alias.
 
 ```typescript
-const wallet = createWallet(secureStorage);
+const keyring = createKeyring(secureStorage);
 ```
 
-#### `wallet.generateKeyPair()`
+#### `keyring.generateKeyPair()`
 
 Generate a new Ed25519 key pair.
 
-#### `wallet.importKeyPair(privateKey)`
+#### `keyring.importKeyPair(privateKey)`
 
 Import an existing private key (hex format).
 
-#### `wallet.sign(message)`
+#### `keyring.sign(message)`
 
 Sign a message with the stored private key.
 
@@ -204,17 +209,17 @@ For quantum-resistant signatures, use the `HybridWallet` (a Device Keyring) whic
 | Public Key | 32 bytes | ~2 KB |
 | Secret Key | 32 bytes | ~4 KB |
 
-#### `createHybridWallet(storage)`
+#### `createHybridKeyring(storage)`  (canonical; alias `createHybridWallet`)
 
-Create a quantum-resistant Device Keyring (legacy-named `createHybridWallet`).
+Create a quantum-resistant Device Keyring. `createHybridWallet` is a deprecated, identical alias.
 
 ```typescript
-import { createHybridWallet } from '@icn/react-native';
+import { createHybridKeyring } from '@icn/react-native';
 
-const hybridWallet = createHybridWallet(secureStorage);
+const hybridKeyring = createHybridKeyring(secureStorage);
 
 // Generate hybrid keypair (Ed25519 + ML-DSA-65)
-const keyInfo = await hybridWallet.generateKeyPair();
+const keyInfo = await hybridKeyring.generateKeyPair();
 console.log('DID:', keyInfo.did);
 console.log('Public key size:', keyInfo.publicKeySize, 'bytes');
 console.log('Is hybrid:', keyInfo.isHybrid);
@@ -224,13 +229,13 @@ console.log('Is hybrid:', keyInfo.isHybrid);
 
 ```typescript
 // Sign with hybrid signatures (both Ed25519 + ML-DSA)
-const signature = await hybridWallet.sign(messageHex);
+const signature = await hybridKeyring.sign(messageHex);
 
 // Sign with Ed25519 only (for short-lived proofs like QR codes)
-const classicalSig = await hybridWallet.signClassicalOnly(messageHex);
+const classicalSig = await hybridKeyring.signClassicalOnly(messageHex);
 
 // Sign with JSON output for interoperability
-const sigJson = await hybridWallet.sign(messageHex, { asJson: true });
+const sigJson = await hybridKeyring.sign(messageHex, { asJson: true });
 ```
 
 #### Verification (Static)

@@ -83,7 +83,11 @@ export interface HybridSignOptions extends HybridCryptoOptions {
 }
 
 /**
- * Hybrid Wallet implementation
+ * Hybrid (Ed25519 + ML-DSA-65) Device Keyring implementation.
+ *
+ * Legacy name; prefer the canonical {@link HybridKeyring} (the same class reference). The
+ * class symbol is intentionally not `@deprecated` so the canonical alias does not inherit a
+ * deprecation marker; only the legacy factory {@link createHybridWallet} is `@deprecated`.
  */
 export class HybridWallet {
   private storage: SecureStorage;
@@ -486,13 +490,27 @@ export class HybridWallet {
 }
 
 /**
- * Create a hybrid wallet instance
+ * Create a hybrid (Ed25519 + ML-DSA-65) Device Keyring instance.
  *
  * @param storage - Secure storage implementation
+ * @deprecated Prefer the canonical {@link createHybridKeyring}. `createHybridWallet` is
+ * retained as a backward-compatible alias and behaves identically (same storage keys).
  */
 export function createHybridWallet(storage: SecureStorage): HybridWallet {
   return new HybridWallet(storage);
 }
+
+/**
+ * Canonical hybrid Device Keyring class — preferred alias of {@link HybridWallet}.
+ */
+export { HybridWallet as HybridKeyring };
+
+/**
+ * Canonical hybrid Device Keyring factory — preferred alias of {@link createHybridWallet}.
+ *
+ * Identical behavior, signature, and persisted storage keys; no migration occurs.
+ */
+export const createHybridKeyring = createHybridWallet;
 
 /**
  * Get hybrid cryptography info (sizes, etc.)
