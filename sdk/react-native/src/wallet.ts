@@ -1,8 +1,18 @@
 /**
- * ICN Wallet for React Native
+ * ICN Device Keyring for React Native (legacy-named "wallet")
  *
- * Manages identity keys with secure storage.
+ * Local private-key custody and signing. Generates / imports / stores an Ed25519
+ * key pair in secure storage (iOS Keychain / Android Keystore) and signs challenges
+ * with it. In the passport / keyring / position / receipt doctrine this is a
+ * **Device Keyring**: it holds keys and produces signatures — it does NOT hold
+ * balances, tokens, or value, and is not an account or a settlement instrument.
+ *
+ * The exported names (`ICNWalletImpl`, `createWallet`, and the `ICNWallet`
+ * interface) are retained for backward compatibility. A future, compatibility-safe
+ * PR may add canonical `Keyring` / `DeviceKeyring` aliases without removing them.
+ *
  * Uses @noble/ed25519 for cryptographic operations.
+ * See https://github.com/InterCooperative-Network/icn/blob/main/docs/design/passport-keyring-position-receipt.md
  */
 
 import * as ed from '@noble/ed25519';
@@ -20,7 +30,7 @@ const PUBLIC_KEY_KEY = 'icn_wallet_public_key';
 const DID_KEY = 'icn_wallet_did';
 
 /**
- * Wallet implementation using secure storage and @noble/ed25519
+ * Device Keyring implementation (legacy-named "wallet") using secure storage and @noble/ed25519
  *
  * @example
  * ```typescript
@@ -236,7 +246,9 @@ export class ICNWalletImpl implements ICNWallet {
 }
 
 /**
- * Create a wallet with secure storage
+ * Create a Device Keyring (legacy-named `createWallet`) backed by secure storage.
+ *
+ * Returns local key custody + signing only; it holds no balances, tokens, or value.
  */
 export function createWallet(storage: SecureStorage): ICNWallet {
   return new ICNWalletImpl(storage);

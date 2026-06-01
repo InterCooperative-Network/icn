@@ -48,7 +48,10 @@ export interface KeyPair {
 }
 
 /**
- * Wallet interface for managing identity and signing
+ * Device Keyring interface (legacy-named `ICNWallet`): local key custody + signing.
+ *
+ * Generates / imports / stores a key pair and signs challenges. It does NOT hold
+ * balances, tokens, or value — see the passport / keyring / position / receipt doctrine.
  */
 export interface ICNWallet {
   /**
@@ -104,7 +107,7 @@ export interface PaymentQRData {
 export interface ICNMobileClientOptions {
   /** Gateway base URL */
   baseUrl: string;
-  /** Optional wallet for automatic signing */
+  /** Optional Device Keyring (legacy-named `wallet`) for automatic signing */
   wallet?: ICNWallet;
   /** Request timeout in milliseconds */
   timeout?: number;

@@ -12,7 +12,7 @@
  *   useBalance,
  * } from '@icn/react-native';
  *
- * // Create wallet with secure storage
+ * // Create a Device Keyring (legacy-named createWallet) with secure storage
  * const wallet = createWallet(secureStorage);
  * await wallet.generateKeyPair();
  *
@@ -51,10 +51,10 @@ export { QueueManager } from './queue-manager';
 // Error utilities
 export { parseError, createError, isNetworkError, isAuthError } from './error-utils';
 
-// Wallet (Classical Ed25519)
+// Device Keyring — local key custody + signing (legacy-named "wallet"; holds no value)
 export { ICNWalletImpl, createWallet } from './wallet';
 
-// Hybrid Post-Quantum Wallet (Ed25519 + ML-DSA-65)
+// Hybrid Post-Quantum Device Keyring (Ed25519 + ML-DSA-65; legacy-named "wallet")
 export {
   HybridWallet,
   createHybridWallet,
