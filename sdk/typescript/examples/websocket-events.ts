@@ -77,7 +77,7 @@ function handleMessage(message: WsMessage) {
       break;
 
     case 'Event':
-      handleEvent(message.event_type, message.payload);
+      handleEvent(message.event.type, message.event);
       break;
 
     default:
@@ -305,8 +305,8 @@ function notificationExample() {
 
   client.connectWebSocket('timebank-coop', {
     onMessage: async (message) => {
-      if (message.type === 'Event' && message.event_type === 'SettlementCreated') {
-        const settlement = message.payload as { to: string; amount: number };
+      if (message.type === 'Event' && message.event.type === 'SettlementCreated') {
+        const settlement = message.event as { to: string; amount: number };
 
         // Send email notification
         // await sendEmail(settlement.to, `You received ${settlement.amount} hours`);
@@ -341,9 +341,9 @@ function dashboardExample() {
     onMessage: (message) => {
       if (message.type !== 'Event') return;
 
-      switch (message.event_type) {
+      switch (message.event.type) {
         case 'SettlementCreated':
-          state.recentTransactions.unshift(message.payload);
+          state.recentTransactions.unshift(message.event);
           state.recentTransactions = state.recentTransactions.slice(0, 10);
           // updateUI();
           break;
@@ -359,26 +359,26 @@ function dashboardExample() {
           break;
 
         case 'GovernanceProposalOpened':
-          state.activeProposals.push(message.payload);
+          state.activeProposals.push(message.event);
           // updateUI();
           break;
 
         case 'GovernanceProposalClosed':
           state.activeProposals = state.activeProposals.filter(
-            (p: any) => p.proposal_id !== (message.payload as any).proposal_id
+            (p: any) => p.proposal_id !== (message.event as any).proposal_id
           );
           // updateUI();
           break;
 
         case 'ComputeTaskSubmitted':
-          state.activeTasks.push(message.payload);
+          state.activeTasks.push(message.event);
           // updateUI();
           break;
 
         case 'ComputeTaskCompleted':
         case 'ComputeTaskCancelled':
           state.activeTasks = state.activeTasks.filter(
-            (t: any) => t.task_hash !== (message.payload as any).task_hash
+            (t: any) => t.task_hash !== (message.event as any).task_hash
           );
           // updateUI();
           break;
@@ -401,8 +401,8 @@ function auditLogExample() {
       if (message.type === 'Event') {
         const logEntry = {
           timestamp: new Date().toISOString(),
-          event_type: message.event_type,
-          payload: message.payload,
+          event_type: message.event.type,
+          payload: message.event,
         };
 
         // Write to log file

@@ -12,6 +12,7 @@
     "dev": "tsc --watch",
     "test": "jest",
     "lint": "eslint src --ext .ts",
+    "typecheck:examples": "tsc --noEmit -p tsconfig.examples.json",
     "clean": "rm -rf dist",
     "prepublishOnly": "npm run build",
     "seed": "ts-node examples/seed-demo-data.ts",

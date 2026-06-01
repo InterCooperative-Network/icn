@@ -1,0 +1,11 @@
+{
+  "//": "Typecheck-only config for the runnable examples in examples/. The library build (tsconfig.json) is unchanged and still emits from src/ only; examples were never under any compilation path, so API-shape drift in them could not be caught. This config typechecks each example and the SDK source it imports (via the relative '../src' import), without emitting. Examples remain runnable with ts-node.",
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "declaration": false
+  },
+  "include": ["examples/**/*"],
+  "exclude": ["node_modules", "dist"]
+}

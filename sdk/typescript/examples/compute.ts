@@ -61,7 +61,7 @@ async function main() {
     code: JSON.stringify(cclContract),
     fuel_limit: 10000,
     priority: 'normal',
-    payment_rate: 100, // 100 credits per 1000 fuel
+    settlement_rate: 100, // 100 credits per 1000 fuel
     inputs: { a: 5, b: 3 },
   });
 
