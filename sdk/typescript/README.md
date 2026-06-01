@@ -529,30 +529,16 @@ MIT OR Apache-2.0
 
 ### Notifications
 
-Subscribe to real-time notifications via WebSocket:
-
-```typescript
-// Connect to notification stream
-const ws = client.connectNotifications((notification) => {
-  console.log('Received:', notification);
-  if (notification.type === 'settlement_recorded') {
-    alert(`Settlement recorded: ${notification.data.amount}`);
-  }
-});
-
-// List in-app notifications
-const notifications = await client.listNotifications({
-  read: false, // unread only
-  type: 'settlement_recorded',
-  limit: 20
-});
-
-// Mark as read
-await client.markNotificationRead(notificationId);
-
-// Get unread count
-const { total, unread } = await client.getNotificationCount();
-```
+> **Not implemented in this SDK.** Earlier drafts documented
+> `connectNotifications`, `listNotifications`, `markNotificationRead`, and
+> `getNotificationCount`; none of those methods exist on `ICNClient`, and there
+> is no in-app notification store.
+>
+> For real-time updates, subscribe to the gateway WebSocket event stream with the
+> methods that *do* exist — `client.connectWebSocket(coopId, handlers)` or the
+> managed `client.subscribe(coopId, handlers, opts)` — and react to
+> `SettlementCreated`, governance, and compute events. See **WebSocket Events**
+> above.
 
 ### Recurring payments, escrow & budgets
 

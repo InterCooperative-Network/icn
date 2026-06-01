@@ -68,6 +68,19 @@ DEPRECATED_PATTERNS = [
      "fiat-budget helpers were never shipped"),
     ("PaymentCreated-event", re.compile(r"""['"]PaymentCreated['"]"""),
      "ledger event type is 'SettlementCreated', not 'PaymentCreated'"),
+    # Field / property vocabulary. The canonical ledger field is `unit` and the
+    # canonical position/treasury property is `position` — never `currency` /
+    # `balance`. These catch copy-paste-invalid examples that the method patterns
+    # miss (examples/ are not type-checked: tsconfig rootDir is src). The live
+    # crossPay() FX surface legitimately uses `from_currency` / `to_currency`, so
+    # those are excluded (the `currency:` lookbehind rejects a leading `_`, and
+    # `\.currency` only matches a bare `.currency` property, not `.from_currency`).
+    ("currency-field", re.compile(r"(?<![A-Za-z_])currency\s*:"),
+     "ledger request/settings field is `unit`, not `currency`"),
+    ("balance-property", re.compile(r"\.balance\b"),
+     "position/treasury responses expose `.position`, not `.balance`"),
+    ("currency-property", re.compile(r"\.currency\b"),
+     "ledger responses expose `.unit`, not `.currency`"),
 ]
 
 # Hand-written developer-facing surface. Generated artifacts (src/api-types.ts,
