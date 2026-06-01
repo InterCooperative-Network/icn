@@ -156,15 +156,20 @@ export class ICNWalletImpl implements ICNWallet {
    * Delete the stored key pair
    */
   async deleteKeyPair(): Promise<void> {
-    await Promise.all([
-      this.storage.removeItem(PRIVATE_KEY_KEY),
-      this.storage.removeItem(PUBLIC_KEY_KEY),
-      this.storage.removeItem(DID_KEY),
-      // Defensive: also purge any legacy wallet-named keys (no-op on fresh installs).
-      ...LEGACY_KEYS.map((k) => this.storage.removeItem(k)),
-    ]);
-    this.cachedKeyPair = null;
-    this.cachedPrivateKey = null;
+    try {
+      await Promise.all([
+        this.storage.removeItem(PRIVATE_KEY_KEY),
+        this.storage.removeItem(PUBLIC_KEY_KEY),
+        this.storage.removeItem(DID_KEY),
+        // Defensive: also purge any legacy wallet-named keys (no-op on fresh installs).
+        ...LEGACY_KEYS.map((k) => this.storage.removeItem(k)),
+      ]);
+    } finally {
+      // Always drop cached secrets, even if a storage removal rejected — otherwise the in-memory
+      // keyring could still return the old DID and sign with the cached private key after deletion.
+      this.cachedKeyPair = null;
+      this.cachedPrivateKey = null;
+    }
   }
 
   /**

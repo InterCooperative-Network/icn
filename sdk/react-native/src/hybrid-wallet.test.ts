@@ -255,6 +255,29 @@ describe('HybridWallet', () => {
       expect(storage.store.has('icn_wallet_public_key')).toBe(false);
     });
 
+    it('clears cached secrets even if a storage removal fails', async () => {
+      const base = createMockStorage();
+      const failing: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        setItem: base.setItem,
+        getItem: base.getItem,
+        hasItem: base.hasItem,
+        async removeItem(key: string): Promise<void> {
+          if (key === 'icn_hybrid_wallet_keypair') {
+            throw new Error('storage unavailable');
+          }
+          base.store.delete(key);
+        },
+      };
+      const w = new HybridWallet(failing);
+      await w.generateKeyPair();
+
+      await expect(w.deleteKeyPair()).rejects.toThrow('storage unavailable');
+
+      // The canonical keypair was removed and the cache cleared, so no keypair is returned.
+      expect(await w.getKeyPairInfo()).toBeNull();
+    });
+
     it('should clear the cache', async () => {
       await wallet.generateKeyPair();
       await wallet.deleteKeyPair();

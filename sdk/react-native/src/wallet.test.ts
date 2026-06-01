@@ -150,6 +150,30 @@ describe('ICNWalletImpl', () => {
       expect(storage.store.has('icn_wallet_did')).toBe(false);
     });
 
+    it('clears cached secrets even if a storage removal fails', async () => {
+      const base = createMockStorage();
+      const failing: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        setItem: base.setItem,
+        getItem: base.getItem,
+        hasItem: base.hasItem,
+        async removeItem(key: string): Promise<void> {
+          if (key === 'icn_wallet_private_key') {
+            throw new Error('storage unavailable');
+          }
+          base.store.delete(key);
+        },
+      };
+      const w = new ICNWalletImpl(failing);
+      await w.generateKeyPair();
+
+      await expect(w.deleteKeyPair()).rejects.toThrow('storage unavailable');
+
+      // The canonical private key was removed; the cache must also be cleared, so signing fails
+      // instead of using a stale cached private key.
+      await expect(w.sign('00')).rejects.toThrow('No private key stored');
+    });
+
     it('should clear the cache', async () => {
       await wallet.generateKeyPair();
       await wallet.deleteKeyPair();

@@ -406,19 +406,22 @@ export class HybridWallet {
    * Delete all keys (classical and hybrid)
    */
   async deleteKeyPair(): Promise<void> {
-    await Promise.all([
-      this.storage.removeItem(HYBRID_KEYPAIR_KEY),
-      this.storage.removeItem(HYBRID_PUBLIC_KEY_KEY),
-      this.storage.removeItem(DID_KEY),
-      this.storage.removeItem(KEYRING_VERSION_KEY),
-      this.storage.removeItem(CLASSICAL_PRIVATE_KEY),
-      this.storage.removeItem(CLASSICAL_PUBLIC_KEY),
-      // Defensive: also purge any legacy wallet-named keys (no-op on fresh installs).
-      ...LEGACY_KEYS.map((k) => this.storage.removeItem(k)),
-    ]);
-
-    this.cachedKeyPair = null;
-    this.isHybridMode = false;
+    try {
+      await Promise.all([
+        this.storage.removeItem(HYBRID_KEYPAIR_KEY),
+        this.storage.removeItem(HYBRID_PUBLIC_KEY_KEY),
+        this.storage.removeItem(DID_KEY),
+        this.storage.removeItem(KEYRING_VERSION_KEY),
+        this.storage.removeItem(CLASSICAL_PRIVATE_KEY),
+        this.storage.removeItem(CLASSICAL_PUBLIC_KEY),
+        // Defensive: also purge any legacy wallet-named keys (no-op on fresh installs).
+        ...LEGACY_KEYS.map((k) => this.storage.removeItem(k)),
+      ]);
+    } finally {
+      // Always drop cached secrets, even if a storage removal rejected.
+      this.cachedKeyPair = null;
+      this.isHybridMode = false;
+    }
   }
 
   /**
