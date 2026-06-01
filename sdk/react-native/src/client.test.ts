@@ -312,6 +312,32 @@ describe('ICNMobileClient', () => {
       expect(c.authState.isAuthenticated).toBe(false);
       expect(c.authState.did).toBeNull();
     });
+
+    it('surfaces a queue persistence failure during reset', async () => {
+      const base = createMockStorage();
+      const failingStorage: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        setItem: base.setItem,
+        getItem: base.getItem,
+        hasItem: base.hasItem,
+        async removeItem(key: string): Promise<void> {
+          if (key === 'icn_operation_queue') {
+            throw new Error('queue storage unavailable');
+          }
+          base.store.delete(key);
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        wallet,
+        storage: failingStorage,
+      });
+
+      // The reset must reject so the caller knows sign-out-and-forget did not fully complete.
+      await expect(c.resetIdentity()).rejects.toThrow('queue storage unavailable');
+      // The in-memory session is still invalidated.
+      expect(c.authState.isAuthenticated).toBe(false);
+    });
   });
 
   describe('connectRealtime', () => {

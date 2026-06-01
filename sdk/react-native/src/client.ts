@@ -351,7 +351,8 @@ export class ICNMobileClient extends ICNClient {
       const results = await Promise.allSettled([
         this.wallet ? this.wallet.deleteKeyPair() : Promise.resolve(),
         this.clearAuth(),
-        this.queueManager.clear(),
+        // purge() (not clear()) so a failure to remove the persisted queue propagates here.
+        this.queueManager.purge(),
       ]);
       const failure = results.find((r) => r.status === 'rejected');
       if (failure && failure.status === 'rejected') {

@@ -146,6 +146,21 @@ export class QueueManager {
   }
 
   /**
+   * Strictly clear the queue, propagating any persistence failure.
+   *
+   * Unlike {@link clear} (best-effort: `persist()` swallows storage errors), `purge()` removes the
+   * persisted queue and lets a storage failure reject, so sign-out-and-forget callers learn that the
+   * persisted queue could not be removed and the reset did not fully complete.
+   */
+  async purge(): Promise<void> {
+    this.queue = [];
+    this.notifyListeners();
+    if (this.storage) {
+      await this.storage.removeItem(QUEUE_STORAGE_KEY);
+    }
+  }
+
+  /**
    * Listen to queue changes
    */
   onChange(listener: (queue: QueuedOperation[]) => void): () => void {
