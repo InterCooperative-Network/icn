@@ -27,7 +27,7 @@ Last Reviewed: 2026-04-15
 
 Welcome to the ICN (Intercooperative Network) documentation! This index provides clear navigation to all documentation.
 
-**Last Updated**: 2026-04-15  
+**Last Updated**: 2026-06-01
 **Version**: 2.1 (canon-sync pass)
 
 ---
@@ -133,6 +133,7 @@ Feature designs, proposals, and evolution plans:
 - [COMMONS_EVOLUTION.md](design/COMMONS_EVOLUTION.md) - Commons-based governance evolution
 - [MINIMAL-VIABLE-COOP.md](design/MINIMAL-VIABLE-COOP.md) - MVC specification
 - [capability-based-features.md](design/capability-based-features.md) - Capability system design
+- [passport-keyring-position-receipt.md](design/passport-keyring-position-receipt.md) - Passport/Keyring/Position/Receipt identity & custody vocabulary boundary (deprecates "wallet")
 - [compute-substrate-design.md](design/compute-substrate-design.md) - Distributed compute layer
 - [scheduler-evolution-plan.md](design/scheduler-evolution-plan.md) - Task scheduler design
 - [multi-device-identity-design.md](design/multi-device-identity-design.md) - Multi-device identity

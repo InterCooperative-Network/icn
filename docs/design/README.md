@@ -40,6 +40,7 @@ Every claim has been verified against the codebase. If a document says "Not Supp
 - [Multi-Device Identity](multi-device-identity-design.md) - Multi-device identity management
 - [Social Recovery](social-recovery-design.md) - Social recovery for key loss
 - [Post-Quantum Crypto](post-quantum-crypto.md) - PQ hybrid cryptography
+- [Passport / Keyring / Position / Receipt](passport-keyring-position-receipt.md) - Identity & custody vocabulary boundary; deprecates "wallet" as ICN-native language
 
 ### Compute
 - [Compute Substrate](compute-substrate-design.md) - Distributed compute design
