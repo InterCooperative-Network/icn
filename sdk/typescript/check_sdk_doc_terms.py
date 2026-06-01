@@ -66,6 +66,9 @@ DEPRECATED_PATTERNS = [
     ("budget-helpers",
      re.compile(r"\bclient\.(?:createBudget|listBudgets|updateBudget|deleteBudget)\("),
      "fiat-budget helpers were never shipped"),
+    ("notification-helpers",
+     re.compile(r"\bclient\.(?:connectNotifications|listNotifications|markNotificationRead|getNotificationCount)\("),
+     "notification helpers were never shipped; use connectWebSocket()/subscribe()"),
     ("PaymentCreated-event", re.compile(r"""['"]PaymentCreated['"]"""),
      "ledger event type is 'SettlementCreated', not 'PaymentCreated'"),
     # Deprecated *balance* surface. The canonical position query is the
@@ -94,6 +97,20 @@ DEPRECATED_PATTERNS = [
 # as a field inside a settle()/batchSettle() request. SettlementRequest uses `unit`.
 _SETTLE_OPEN = re.compile(r"\b(?:settle|batchSettle)\s*\(")
 _SETTLE_CURRENCY = re.compile(r"(?<![A-Za-z_])currency\s*:")
+
+# Context-aware ledger-read check. A `.currency` / `.balance` *property* read is
+# only deprecated on the canonical ledger surfaces (Position/Transaction/Treasury
+# all expose `.unit` / `.position`). We bind variables that come from a canonical
+# ledger getter or transaction iteration, then flag `.currency` / `.balance` reads
+# on exactly those. This leaves the live crossPay() result and the Flow C
+# proposeSpend response (whose `.currency` is valid) untouched.
+_LEDGER_ASSIGN = re.compile(
+    r"\b(?:const|let|var)\s+([A-Za-z0-9_]+)\s*=\s*(?:await\s+)?(?:[A-Za-z0-9_]+\.)?"
+    r"(?:getPosition|getHistory|getTreasuryStatus|getTreasuryPosition|settle|batchSettle)\s*\(")
+_LEDGER_ITER = re.compile(
+    r"\.transactions\.(?:forEach|map|filter|reduce|find|some|every)\(\s*(?:async\s*)?\(?\s*([A-Za-z0-9_]+)")
+_LEDGER_FOROF = re.compile(
+    r"\bfor\s*\(\s*(?:const|let)\s+([A-Za-z0-9_]+)\s+of\b[^)]*\.transactions\b")
 
 # Hand-written developer-facing surface. Generated artifacts (src/api-types.ts,
 # src/generated/**) are deliberately excluded — they are regenerated from the
@@ -129,8 +146,9 @@ def iter_files(sdk_root: Path):
 def scan_file(path: Path, sdk_root: Path):
     violations = []
     rel = str(path.relative_to(sdk_root))
-    in_settle = False   # inside a settle()/batchSettle() call's argument list
-    depth = 0           # paren depth, counted from the opening settle(
+    in_settle = False        # inside a settle()/batchSettle() call's argument list
+    depth = 0                # paren depth, counted from the opening settle(
+    ledger_vars = set()      # identifiers bound to a canonical ledger result
     for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if line.lstrip().startswith(">"):  # markdown blockquote = disclaimer, exempt
             in_settle = False
@@ -157,6 +175,19 @@ def scan_file(path: Path, sdk_root: Path):
                                    line.strip()))
             depth += line.count("(") - line.count(")")
             in_settle = depth > 0
+
+        # Bind ledger-typed variables (assignment must precede/equal the read line).
+        for rx in (_LEDGER_ASSIGN, _LEDGER_ITER, _LEDGER_FOROF):
+            for var in rx.findall(line):
+                ledger_vars.add(var)
+        # Flag deprecated `.currency` reads on canonical ledger variables only.
+        # (`.balance` is already caught globally by the unambiguous balance rule.)
+        for var in ledger_vars:
+            if re.search(r"\b" + re.escape(var) + r"\.currency\b", line):
+                violations.append((rel, i, "ledger-read-currency",
+                                   "ledger reads expose `.unit`, not `.currency`",
+                                   line.strip()))
+                break
     return violations
 
 
