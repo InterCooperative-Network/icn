@@ -151,6 +151,15 @@ not a migration:
    to downgrade onto. If a legacy `icn_wallet_*` read path is nonetheless kept, justify it explicitly as
    a **development convenience** (not user migration); deletion already purges both families
    unconditionally (step 4), so a "deleted" identity cannot resurface via any reader.
+6. **A reset must be complete.** Re-provisioning a pre-release example / pilot install (the decision
+   above) must also clear **identity-bound persisted auth state** — `icn_auth_token`, `icn_auth_did`,
+   `icn_coop_id`, `icn_expires_at` (`sdk/react-native/src/client.ts:31`) — not only rotate the keypair.
+   Otherwise `initialize()` (`client.ts:120`) reloads the prior token and auth DID **without** checking
+   them against the device keyring DID, so the app could report itself authenticated as the old
+   identity and send a still-valid bearer token while signature login uses the new identity. These
+   `icn_auth_*` keys are **not** part of the keyring `icn_wallet_*` family and are **not** renamed by
+   this slice, but the reset path must purge them. Add a test that a reset leaves no stale auth token
+   or auth DID.
 
 ### Surface 2 — evaluate direct rename vs. serde alias (separate decision)
 
