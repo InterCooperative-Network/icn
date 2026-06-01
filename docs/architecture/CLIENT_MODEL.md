@@ -112,6 +112,7 @@ MEMBER CLIENT (a member's app or device)
 ├── MEMBER PASSPORT  (identity — presents, never holds value)
 │   ├── Primary DID (did:icn:z6MkAlice…) — control proven via the keyring
 │   ├── Anchor reference (survives key rotation)
+│   ├── Social-recovery contacts (recover the passport/identity if all devices are lost)
 │   ├── Membership credentials (signed by orgs)
 │   │   └── "Alice is a member of FoodCoop since 2024-01-15"
 │   ├── Capability grants / delegations (scoped, delegable, revocable)
@@ -122,7 +123,7 @@ MEMBER CLIENT (a member's app or device)
 ├── DEVICE KEYRING  (local key custody — signs, never holds value)
 │   ├── Private keys (NEVER exported; may be backed by an OS keyring / TPM / hardware device)
 │   ├── Signing of envelopes and votes
-│   └── Key rotation & social-recovery contacts
+│   └── Key rotation (rotate this device's keys; losing the device loses the keyring, not the passport)
 │
 ├── POSITION VIEWS  (derived accounting state, cached from connected nodes)
 │   ├── Net positions across orgs — recomputed from signed entries, NOT stored balances
@@ -153,7 +154,7 @@ Old `Wallet` responsibilities map onto the canonical ICN concepts as follows:
 > **Conceptual architecture — not an implemented API.** The traits below do **not** exist in code.
 > They name responsibilities to show how the former `Wallet` god-object decomposes; they are not a
 > proposed Rust surface and nothing should be generated from them. `SignedEnvelope` *does* exist
-> (in `icn-net`) and is referenced as a real primitive.
+> (in `icn-net`) but as a distinct node-to-node wire type — not as any of these conceptual shapes (see [Client operation envelope](#client-operation-envelope)).
 
 ```rust
 // Identity / membership / credential presentation. Holds no value.
@@ -176,14 +177,14 @@ trait LedgerView {
     fn receipts(&self, filter: ReceiptFilter) -> Vec<Receipt>;
 }
 
-// Records an obligation/position transition. Returns a SignedEnvelope (signed by the keyring).
+// Records an obligation/position transition. Returns a signed client envelope (signed by the keyring).
 trait SettlementClient {
-    fn settle(&self, with: &Did, amount: Amount, org: &OrgId) -> SignedEnvelope;
+    fn settle(&self, with: &Did, amount: Amount, org: &OrgId) -> ClientEnvelope;
 }
 ```
 
 Governance is not a fifth object: a vote is **authorized** by a credential the passport presents and
-**signed** by the device keyring, then submitted as a `SignedEnvelope` like any other operation.
+**signed** by the device keyring, then submitted as a signed client envelope like any other operation.
 
 ### Rejected anti-pattern: the `Wallet` god-object
 
@@ -290,29 +291,29 @@ offline:
 
 ## Client–Node Protocol
 
-### SignedEnvelope
+### Client operation envelope
 
-The `SignedEnvelope` is the universal unit of client→node communication. It is a real protocol
-primitive (defined in `icn-net`); its author DID is presented via the member's **passport** and the
-envelope is signed by the **device keyring**:
+A client operation is carried in a signed envelope whose author DID is presented via the member's
+**passport** and which is signed by the **device keyring**. The shape below is **conceptual**.
+
+> **Not the wire type.** `icn-net` defines a real `SignedEnvelope`, but it is a *node-to-node* wire
+> envelope with a different shape (`from`, `sequence`, `timestamp`, `payload_type`, `payload`,
+> `signature_type`, `signature`, `pq_signature`). The illustrative `ClientEnvelope` below is a
+> distinct, conceptual client-operation model — do **not** assume its fields match the `icn-net`
+> wire format or its canonical encoding.
 
 ```rust
-/// Signed envelope - the universal unit of client→node communication
-pub struct SignedEnvelope {
-    /// The operation being requested
-    pub operation: Operation,
-    /// Author DID (presented via the member's passport; control proven by the keyring)
-    pub author: Did,
-    /// Logical timestamp when created
-    pub timestamp: LogicalTimestamp,
-    /// Nonce for replay protection
-    pub nonce: u64,
-    /// Signature over the above fields, produced by the device keyring
-    pub signature: Signature,
+// Conceptual client-operation envelope (NOT the icn-net SignedEnvelope wire type)
+struct ClientEnvelope {
+    operation: Operation,        // the operation being requested
+    author: Did,                 // author DID (presented via the passport; control proven by the keyring)
+    timestamp: LogicalTimestamp,
+    nonce: u64,                  // replay protection
+    signature: Signature,        // produced by the device keyring
 }
 
-/// Operations that can be performed
-pub enum Operation {
+// Operations a client envelope can carry
+enum Operation {
     Transfer(TransferRequest),   // records a bilateral entry (a settlement), not operator routing
     Vote(VoteRequest),
     Proposal(ProposalRequest),
@@ -347,7 +348,7 @@ trait ClientNodeProtocol {
     // === Submit Operations (keyring signs, node processes) ===
 
     /// Submit a signed envelope for processing; returns a verifiable receipt
-    fn submit_envelope(&self, session: &Session, envelope: SignedEnvelope) -> Result<Receipt>;
+    fn submit_envelope(&self, session: &Session, envelope: ClientEnvelope) -> Result<Receipt>;
 
     // === Sync (for offline support) ===
 
@@ -355,7 +356,7 @@ trait ClientNodeProtocol {
     fn get_pending(&self, session: &Session) -> Vec<PendingOperation>;
 
     /// Sync the offline outbox with the node
-    fn sync_outbox(&self, session: &Session, envelopes: Vec<SignedEnvelope>) -> SyncResult;
+    fn sync_outbox(&self, session: &Session, envelopes: Vec<ClientEnvelope>) -> SyncResult;
 
     // === Subscriptions (real-time updates) ===
 
@@ -369,7 +370,7 @@ trait ClientNodeProtocol {
 ```
 1. CLIENT CREATES OPERATION
    └── User initiates a settlement while offline
-   └── Device keyring signs a SignedEnvelope
+   └── Device keyring signs a client envelope
    └── Envelope stored in local outbox
 
 2. CLIENT RECONNECTS
@@ -576,10 +577,10 @@ mod tests {
         // Deploy app under test
         env.deploy_app("my-app", include_bytes!("my-app.wasm"));
 
-        // Simulate user actions: the device keyring signs; the gateway records a
-        // settlement (a bilateral obligation transition) — it does not move a balance.
+        // Simulate user actions. The settlement client records a bilateral obligation
+        // transition; the device keyring signs the envelope locally — it does not move a balance.
         let alice = env.member("alice");
-        alice.keyring().settle(&bob.did(), 100)?;
+        alice.settlement().settle(&bob.did(), 100)?; // keyring signs the envelope under the hood
 
         // Positions are derived views recomputed from signed entries, not stored balances.
         assert_eq!(env.position(&alice), 900);
@@ -634,9 +635,12 @@ config examples, and prose elsewhere in this repo still use `wallet` naming. **A
 renames no code and changes no public API** — it gives a future rename an architectural target
 instead of becoming a blind find-and-replace.
 
-- `SignedEnvelope` (in `icn-net`) is a **real** protocol primitive and keeps its name.
+- `icn-net` defines a **real** node-to-node `SignedEnvelope` wire type (`from` / `sequence` /
+  `timestamp` / `payload_type` / `payload` / `signature_type` / `signature` / `pq_signature`); this
+  PR does **not** touch it. The `ClientEnvelope` illustrated above is a separate **conceptual**
+  client-operation model with a different shape — not that wire type.
 - The conceptual `MemberPassport` / `DeviceKeyring` / `LedgerView` / `SettlementClient` /
-  `ClientNodeProtocol` traits above **do not exist in code**.
+  `ClientNodeProtocol` / `ClientEnvelope` shapes above **do not exist in code**.
 - The following migrations are **named, not scheduled here** — each is its own future, separately
   reviewed PR (see the doctrine's [migration rules](../design/passport-keyring-position-receipt.md#migration-rules)):
   - **SDK key-custody rename** — `createWallet` / `HybridWallet` (TypeScript + React Native) → keyring
