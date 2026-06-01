@@ -24,10 +24,17 @@ import { ICNWallet, KeyPair, SecureStorage } from './types';
 // This is required for React Native which doesn't have crypto.subtle
 ed.hashes.sha512 = (message: Uint8Array) => sha512(message);
 
-// SecureStore keys must be alphanumeric with periods, underscores, or hyphens only (no slashes)
-const PRIVATE_KEY_KEY = 'icn_wallet_private_key';
-const PUBLIC_KEY_KEY = 'icn_wallet_public_key';
-const DID_KEY = 'icn_wallet_did';
+// SecureStore keys must be alphanumeric with periods, underscores, or hyphens only (no slashes).
+// Canonical Device Keyring storage keys. The legacy `icn_wallet_*` names are pre-release with no
+// installed base, so they are renamed directly here — no lazy migration is performed
+// (see docs/design/wallet-did-migration-boundary.md).
+const PRIVATE_KEY_KEY = 'icn_keyring_private_key';
+const PUBLIC_KEY_KEY = 'icn_keyring_public_key';
+const DID_KEY = 'icn_keyring_did';
+
+// Legacy wallet-named keys, retained ONLY so deleteKeyPair() can defensively purge them
+// (a no-op on a fresh install). These are never written.
+const LEGACY_KEYS = ['icn_wallet_private_key', 'icn_wallet_public_key', 'icn_wallet_did'];
 
 /**
  * Device Keyring implementation (legacy-named "wallet") using secure storage and @noble/ed25519
@@ -153,6 +160,8 @@ export class ICNWalletImpl implements ICNWallet {
       this.storage.removeItem(PRIVATE_KEY_KEY),
       this.storage.removeItem(PUBLIC_KEY_KEY),
       this.storage.removeItem(DID_KEY),
+      // Defensive: also purge any legacy wallet-named keys (no-op on fresh installs).
+      ...LEGACY_KEYS.map((k) => this.storage.removeItem(k)),
     ]);
     this.cachedKeyPair = null;
     this.cachedPrivateKey = null;

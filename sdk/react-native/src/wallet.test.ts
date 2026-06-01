@@ -43,10 +43,14 @@ describe('ICNWalletImpl', () => {
       expect(keyPair.did).toBeDefined();
       expect(keyPair.did).toMatch(/^did:icn:/);
 
-      // Verify stored in storage (keys use underscores, not slashes - SecureStore requirement)
-      expect(storage.store.has('icn_wallet_private_key')).toBe(true);
-      expect(storage.store.has('icn_wallet_public_key')).toBe(true);
-      expect(storage.store.has('icn_wallet_did')).toBe(true);
+      // Verify stored under canonical keyring keys (underscores, not slashes - SecureStore requirement)
+      expect(storage.store.has('icn_keyring_private_key')).toBe(true);
+      expect(storage.store.has('icn_keyring_public_key')).toBe(true);
+      expect(storage.store.has('icn_keyring_did')).toBe(true);
+      // No legacy wallet-named storage keys are written on a fresh keyring.
+      expect(storage.store.has('icn_wallet_private_key')).toBe(false);
+      expect(storage.store.has('icn_wallet_public_key')).toBe(false);
+      expect(storage.store.has('icn_wallet_did')).toBe(false);
     });
 
     it('should generate unique key pairs', async () => {
@@ -84,9 +88,11 @@ describe('ICNWalletImpl', () => {
       const privateKey = 'b'.repeat(64);
       await wallet.importKeyPair(privateKey);
 
-      expect(storage.store.get('icn_wallet_private_key')).toBe(privateKey);
-      expect(storage.store.has('icn_wallet_public_key')).toBe(true);
-      expect(storage.store.has('icn_wallet_did')).toBe(true);
+      expect(storage.store.get('icn_keyring_private_key')).toBe(privateKey);
+      expect(storage.store.has('icn_keyring_public_key')).toBe(true);
+      expect(storage.store.has('icn_keyring_did')).toBe(true);
+      // No legacy wallet-named storage keys are written on import.
+      expect(storage.store.has('icn_wallet_private_key')).toBe(false);
     });
   });
 
@@ -122,6 +128,20 @@ describe('ICNWalletImpl', () => {
     it('should remove all stored keys', async () => {
       await wallet.generateKeyPair();
       expect(storage.store.size).toBeGreaterThan(0);
+
+      await wallet.deleteKeyPair();
+
+      expect(storage.store.has('icn_keyring_private_key')).toBe(false);
+      expect(storage.store.has('icn_keyring_public_key')).toBe(false);
+      expect(storage.store.has('icn_keyring_did')).toBe(false);
+    });
+
+    it('should defensively purge legacy wallet-named keys', async () => {
+      await wallet.generateKeyPair();
+      // Simulate stray legacy keys (e.g. from a pre-rename dev build); delete must clear them.
+      storage.store.set('icn_wallet_private_key', 'stale');
+      storage.store.set('icn_wallet_public_key', 'stale');
+      storage.store.set('icn_wallet_did', 'did:icn:stale');
 
       await wallet.deleteKeyPair();
 

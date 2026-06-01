@@ -330,6 +330,32 @@ export class ICNMobileClient extends ICNClient {
   }
 
   /**
+   * Reset this device's identity: delete the configured Device Keyring's keys AND clear all
+   * persisted auth state (`icn_auth_token`, `icn_auth_did`, `icn_coop_id`, `icn_expires_at`).
+   *
+   * Use this for sign-out-and-forget / re-provision. Rotating the keyring alone is not enough:
+   * `initialize()` reloads persisted auth without checking it against the Device Keyring DID, so a
+   * fresh keyring DID would otherwise be shadowed by a stale authenticated session bound to the old
+   * DID. The persisted auth keys are a client-session concern and are NOT part of (nor renamed by)
+   * the keyring storage-key family.
+   */
+  async resetIdentity(): Promise<void> {
+    this.clearToken();
+    if (this.wallet) {
+      await this.wallet.deleteKeyPair();
+    }
+    await this.clearAuth();
+    this.disconnectWebSocket();
+
+    this.updateAuthState({
+      isAuthenticated: false,
+      did: null,
+      coopId: null,
+      expiresAt: null,
+    });
+  }
+
+  /**
    * Subscribe to auth state changes
    */
   onAuthStateChange(listener: EventListener<AuthState>): Unsubscribe {

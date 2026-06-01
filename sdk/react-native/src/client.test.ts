@@ -214,6 +214,39 @@ describe('ICNMobileClient', () => {
     });
   });
 
+  describe('resetIdentity', () => {
+    it('should clear persisted auth state and purge the device keyring', async () => {
+      // Persisted auth bound to an old DID, plus a generated keyring key pair.
+      storage.store.set('icn_auth_token', 'test-token');
+      storage.store.set('icn_auth_did', 'did:icn:old');
+      storage.store.set('icn_coop_id', 'test-coop');
+      storage.store.set('icn_expires_at', (Date.now() + 3600000).toString());
+      await wallet.generateKeyPair();
+      expect(await wallet.hasKeyPair()).toBe(true);
+
+      await client.resetIdentity();
+
+      // All identity-bound auth keys are cleared so a new keyring DID is not shadowed.
+      expect(storage.store.has('icn_auth_token')).toBe(false);
+      expect(storage.store.has('icn_auth_did')).toBe(false);
+      expect(storage.store.has('icn_coop_id')).toBe(false);
+      expect(storage.store.has('icn_expires_at')).toBe(false);
+      // The configured Device Keyring is purged.
+      expect(await wallet.hasKeyPair()).toBe(false);
+      // Auth state is reset.
+      expect(client.authState.isAuthenticated).toBe(false);
+      expect(client.authState.did).toBeNull();
+    });
+
+    it('should not throw when no keyring is configured', async () => {
+      const clientNoWallet = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        storage,
+      });
+      await expect(clientNoWallet.resetIdentity()).resolves.toBeUndefined();
+    });
+  });
+
   describe('connectRealtime', () => {
     it('should throw without coop ID', () => {
       expect(() => client.connectRealtime()).toThrow('No coop ID provided');
