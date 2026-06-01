@@ -19,7 +19,7 @@
  * // Create client
  * const client = createMobileClient({
  *   baseUrl: 'https://icn.mycoop.org',
- *   wallet: keyring, // config field is still named `wallet` (legacy); it accepts a keyring
+ *   keyring, // canonical option; the legacy `wallet` option is still accepted
  *   storage: secureStorage,
  * });
  *

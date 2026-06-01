@@ -3,7 +3,7 @@
  */
 
 import { ICNMobileClient, createMobileClient } from './client';
-import { SecureStorage, ICNWallet, KeyPair } from './types';
+import { SecureStorage, ICNWallet, ICNKeyring, KeyPair } from './types';
 
 // Mock secure storage
 function createMockStorage(): SecureStorage & { store: Map<string, string> } {
@@ -273,5 +273,79 @@ describe('createMobileClient', () => {
     });
 
     expect(client).toBeInstanceOf(ICNMobileClient);
+  });
+});
+
+describe('keyring option (canonical alias for legacy wallet)', () => {
+  // A Device Keyring whose sign()/getKeyPair() outputs are tagged, so a test can prove
+  // which configured keyring the client actually used. createCompletionSignature() and
+  // createDeviceProof() exercise only local key custody + signing (no network).
+  function createTaggedKeyring(tag: string): ICNKeyring {
+    const keyPair: KeyPair = { publicKey: `${tag}-pub`, did: `did:icn:${tag}` };
+    return {
+      async generateKeyPair(): Promise<KeyPair> {
+        return keyPair;
+      },
+      async importKeyPair(_privateKey: string): Promise<KeyPair> {
+        return keyPair;
+      },
+      async getKeyPair(): Promise<KeyPair | null> {
+        return keyPair;
+      },
+      async deleteKeyPair(): Promise<void> {},
+      async sign(message: string): Promise<string> {
+        return `${tag}:${message}`;
+      },
+      async hasKeyPair(): Promise<boolean> {
+        return true;
+      },
+    };
+  }
+
+  it('accepts a keyring option and uses it for signing', async () => {
+    const client = new ICNMobileClient({
+      baseUrl: 'https://icn.example.org',
+      keyring: createTaggedKeyring('keyring'),
+    });
+    const sig = await client.createCompletionSignature('enroll-1');
+    expect(sig).toBe('keyring:complete:enroll-1');
+  });
+
+  it('keyring takes precedence over wallet when both are provided', async () => {
+    const client = new ICNMobileClient({
+      baseUrl: 'https://icn.example.org',
+      keyring: createTaggedKeyring('keyring'),
+      wallet: createTaggedKeyring('wallet'),
+    });
+    const sig = await client.createCompletionSignature('enroll-2');
+    expect(sig).toBe('keyring:complete:enroll-2');
+  });
+
+  it('falls back to the legacy wallet option when no keyring is provided', async () => {
+    const client = new ICNMobileClient({
+      baseUrl: 'https://icn.example.org',
+      wallet: createTaggedKeyring('wallet'),
+    });
+    const sig = await client.createCompletionSignature('enroll-3');
+    expect(sig).toBe('wallet:complete:enroll-3');
+  });
+
+  it('throws when neither keyring nor wallet is configured', async () => {
+    const client = new ICNMobileClient({
+      baseUrl: 'https://icn.example.org',
+    });
+    await expect(client.createCompletionSignature('enroll-4')).rejects.toThrow(
+      'No wallet configured'
+    );
+  });
+
+  it('uses the keyring for device-proof key custody (getKeyPair + sign)', async () => {
+    const client = new ICNMobileClient({
+      baseUrl: 'https://icn.example.org',
+      keyring: createTaggedKeyring('keyring'),
+    });
+    const proof = await client.createDeviceProof('enroll-5');
+    expect(proof.ephemeral_did).toBe('did:icn:keyring');
+    expect(proof.signature).toBe('keyring:enroll-5');
   });
 });

@@ -68,7 +68,10 @@ export class ICNMobileClient extends ICNClient {
 
     super(baseOptions);
 
-    this.wallet = options.wallet;
+    // Canonical `keyring` option is preferred; legacy `wallet` is the fallback for
+    // backward compatibility. Same type (ICNKeyring === ICNWallet) and role (a Device
+    // Keyring: local key custody + signing). If both are provided, `keyring` wins.
+    this.wallet = options.keyring ?? options.wallet;
     this.storage = options.storage;
     this.queueManager = new QueueManager(options.storage);
     
