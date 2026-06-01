@@ -349,7 +349,12 @@ export class ICNMobileClient extends ICNClient {
       // others: the keyring keys, the auth-session keys, and the offline operation queue must all be
       // cleared on a sign-out-and-forget, regardless of which one fails.
       const results = await Promise.allSettled([
-        this.wallet ? this.wallet.deleteKeyPair() : Promise.resolve(),
+        // Async wrapper so a *synchronous* throw (e.g. from an app-supplied keyring.deleteKeyPair)
+        // becomes a rejection captured here rather than aborting the array build and skipping the
+        // other cleanups.
+        (async () => {
+          if (this.wallet) await this.wallet.deleteKeyPair();
+        })(),
         this.clearAuth(),
         // purge() (not clear()) so a failure to remove the persisted queue propagates here.
         this.queueManager.purge(),
@@ -500,11 +505,24 @@ export class ICNMobileClient extends ICNClient {
 
   private updateAuthState(state: AuthState): void {
     this._authState = state;
-    this.authListeners.forEach((listener) => listener(state));
+    this.authListeners.forEach((listener) => {
+      try {
+        listener(state);
+      } catch (error) {
+        // A misbehaving subscriber must not break callers (e.g. identity reset).
+        console.error('Auth state listener threw:', error);
+      }
+    });
   }
 
   private notifyNetworkListeners(): void {
-    this.networkListeners.forEach((listener) => listener(this._networkState));
+    this.networkListeners.forEach((listener) => {
+      try {
+        listener(this._networkState);
+      } catch (error) {
+        console.error('Network state listener threw:', error);
+      }
+    });
   }
 
   private createWebSocket(coopId: string): void {
@@ -575,7 +593,14 @@ export class ICNMobileClient extends ICNClient {
 
   private setWsState(state: WebSocketState): void {
     this.wsState = state;
-    this.wsStateListeners.forEach((listener) => listener(state));
+    this.wsStateListeners.forEach((listener) => {
+      try {
+        listener(state);
+      } catch (error) {
+        // A misbehaving subscriber must not break callers (e.g. disconnect during identity reset).
+        console.error('Connection state listener threw:', error);
+      }
+    });
   }
 
   private attemptReconnect(coopId: string): void {

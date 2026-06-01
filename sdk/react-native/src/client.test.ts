@@ -356,6 +356,44 @@ describe('ICNMobileClient', () => {
       // The in-memory session is still invalidated.
       expect(c.authState.isAuthenticated).toBe(false);
     });
+
+    it('clears the session even if keyring deleteKeyPair throws synchronously', async () => {
+      const syncThrowKeyring = {
+        ...createMockWallet(),
+        deleteKeyPair(): Promise<void> {
+          throw new Error('sync boom');
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        keyring: syncThrowKeyring,
+        storage,
+      });
+      storage.store.set('icn_auth_token', 'test-token');
+      storage.store.set('icn_auth_did', 'did:icn:old');
+
+      await expect(c.resetIdentity()).rejects.toThrow('sync boom');
+
+      // A synchronous throw from the keyring must not skip auth/queue cleanup or state reset.
+      expect(storage.store.has('icn_auth_token')).toBe(false);
+      expect(storage.store.has('icn_auth_did')).toBe(false);
+      expect(c.authState.isAuthenticated).toBe(false);
+    });
+
+    it('completes reset even if a connection-state listener throws', async () => {
+      storage.store.set('icn_auth_token', 'test-token');
+      storage.store.set('icn_auth_did', 'did:icn:old');
+      storage.store.set('icn_expires_at', (Date.now() + 3600000).toString());
+      await client.initialize();
+      client.onConnectionStateChange(() => {
+        throw new Error('ws listener boom');
+      });
+
+      // A throwing connection-state subscriber must not skip the auth-state reset.
+      await expect(client.resetIdentity()).resolves.toBeUndefined();
+      expect(client.authState.isAuthenticated).toBe(false);
+      expect(storage.store.has('icn_auth_token')).toBe(false);
+    });
   });
 
   describe('connectRealtime', () => {
