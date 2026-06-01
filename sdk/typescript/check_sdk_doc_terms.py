@@ -44,6 +44,8 @@ FORBIDDEN_METHODS = (
     "createRecurringPayment", "listRecurringPayments",
     "updateRecurringPayment", "cancelRecurringPayment",
     "createBudget", "listBudgets", "updateBudget", "deleteBudget",
+    "connectNotifications", "listNotifications",
+    "markNotificationRead", "getNotificationCount",
 )
 
 # Deprecated tokens that must not appear as *current* SDK API. (rule, regex, hint)
