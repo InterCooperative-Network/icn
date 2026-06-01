@@ -7,19 +7,19 @@
  * ```typescript
  * import {
  *   createMobileClient,
- *   createWallet,
+ *   createKeyring,
  *   useAuth,
  *   useBalance,
  * } from '@icn/react-native';
  *
- * // Create a Device Keyring (legacy-named createWallet) with secure storage
- * const wallet = createWallet(secureStorage);
- * await wallet.generateKeyPair();
+ * // Create a Device Keyring with secure storage
+ * const keyring = createKeyring(secureStorage);
+ * await keyring.generateKeyPair();
  *
  * // Create client
  * const client = createMobileClient({
  *   baseUrl: 'https://icn.mycoop.org',
- *   wallet,
+ *   wallet: keyring, // config field is still named `wallet` (legacy); it accepts a keyring
  *   storage: secureStorage,
  * });
  *
@@ -51,14 +51,23 @@ export { QueueManager } from './queue-manager';
 // Error utilities
 export { parseError, createError, isNetworkError, isAuthError } from './error-utils';
 
-// Device Keyring — local key custody + signing (legacy-named "wallet"; holds no value)
-export { ICNWalletImpl, createWallet } from './wallet';
+// Device Keyring — local key custody + signing (holds no value).
+// Canonical: ICNKeyringImpl / createKeyring. Legacy aliases (deprecated): ICNWalletImpl / createWallet.
+export {
+  ICNWalletImpl,
+  createWallet,
+  ICNKeyringImpl,
+  createKeyring,
+} from './wallet';
 
-// Hybrid Post-Quantum Device Keyring (Ed25519 + ML-DSA-65; legacy-named "wallet")
+// Hybrid Post-Quantum Device Keyring (Ed25519 + ML-DSA-65).
+// Canonical: HybridKeyring / createHybridKeyring. Legacy aliases (deprecated): HybridWallet / createHybridWallet.
 export {
   HybridWallet,
   createHybridWallet,
   getHybridCryptoInfo,
+  HybridKeyring,
+  createHybridKeyring,
 } from './hybrid-wallet';
 export type { HybridKeyPairInfo, HybridSignOptions } from './hybrid-wallet';
 

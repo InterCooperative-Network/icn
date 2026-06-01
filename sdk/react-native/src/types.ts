@@ -48,10 +48,20 @@ export interface KeyPair {
 }
 
 /**
- * Device Keyring interface (legacy-named `ICNWallet`): local key custody + signing.
+ * Canonical name for the Device Keyring interface — local key custody + signing.
+ *
+ * `ICNKeyring` is the preferred alias of {@link ICNWallet}; they are the same type.
+ */
+export type ICNKeyring = ICNWallet;
+
+/**
+ * Device Keyring interface — local key custody + signing.
  *
  * Generates / imports / stores a key pair and signs challenges. It does NOT hold
  * balances, tokens, or value — see the passport / keyring / position / receipt doctrine.
+ *
+ * Canonical alias: {@link ICNKeyring}. The `ICNWallet` name is retained for backward
+ * compatibility and is the type of the legacy `ICNMobileClientOptions.wallet?` field.
  */
 export interface ICNWallet {
   /**
