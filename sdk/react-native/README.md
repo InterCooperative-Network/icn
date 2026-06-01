@@ -79,8 +79,8 @@ if (!(await keyring.hasKeyPair())) {
 // Create client
 const client = createMobileClient({
   baseUrl: 'https://icn.mycoop.org',
-  // The client config field is still named `wallet` (legacy); it accepts a keyring.
-  wallet: keyring,
+  // Canonical `keyring` option; the legacy `wallet` option is still accepted.
+  keyring,
   storage: secureStorage,
 });
 
@@ -146,11 +146,16 @@ Create a new mobile ICN client.
 ```typescript
 const client = createMobileClient({
   baseUrl: 'https://icn.mycoop.org',
-  wallet: myWallet,        // Optional: for automatic signing
+  keyring: myKeyring,      // Optional (canonical): Device Keyring for automatic signing
   storage: secureStorage,  // Optional: for persistent auth
   timeout: 30000,          // Optional: request timeout
 });
 ```
+
+The signing keyring may be passed as either `keyring` (canonical) or `wallet` (legacy,
+retained for backward compatibility). They are the same type and role — a Device Keyring
+(local key custody + signing). If both are provided, `keyring` takes precedence; `wallet`
+is never removed.
 
 #### `client.initialize()`
 

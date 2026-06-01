@@ -117,7 +117,21 @@ export interface PaymentQRData {
 export interface ICNMobileClientOptions {
   /** Gateway base URL */
   baseUrl: string;
-  /** Optional Device Keyring (legacy-named `wallet`) for automatic signing */
+  /**
+   * Optional Device Keyring for automatic signing (canonical option).
+   *
+   * Same type and role as {@link ICNMobileClientOptions.wallet} — a Device Keyring
+   * (local key custody + signing); `keyring` is the preferred, doctrine-aligned name.
+   * If both `keyring` and `wallet` are provided, `keyring` takes precedence and
+   * `wallet` is ignored.
+   */
+  keyring?: ICNKeyring;
+  /**
+   * Optional Device Keyring for automatic signing (legacy-named `wallet`).
+   *
+   * Retained for backward compatibility; prefer {@link ICNMobileClientOptions.keyring}.
+   * Used only when `keyring` is not provided.
+   */
   wallet?: ICNWallet;
   /** Request timeout in milliseconds */
   timeout?: number;
