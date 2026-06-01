@@ -45,9 +45,9 @@ find-and-replace. It is doctrine, not a migration: **it does not rename any code
 |---------|-----------|------------------------------|
 | **Member Passport** | The user-facing **identity / membership / role / credential / delegation / capability presentation** surface. What a person *shows* to participate. | `IDENTITY_MEMBERSHIP_ARCHITECTURE.md`, `AUTH_BRIDGE_AND_DID_LOGIN.md` (DID login) |
 | **Device Keyring** | Local **cryptographic key custody and signing**. Holds private keys on a device; biometrics/PINs unlock *it*, not identity itself. | `multi-device-identity-design.md` (Keystore v3, per-device keys, rotation), `sdk/react-native` key store |
-| **Position** | **Ledger / accounting state** — a derived net view computed from signed entries. Positions are *recorded by the ledger*, never *held inside a wallet*. | `regulatory-safe-verifiable-state.md` Invariant 4; `language-guide.md` |
+| **Position** | **Ledger / accounting state** — a **derived view** recomputed from signed entries. The ledger records the signed entries (the protocol primitive); a position is the interpretation over them, never *recorded as stored state* and never *held inside a wallet*. | `regulatory-safe-verifiable-state.md` Invariant 4; `language-guide.md` |
 | **Receipt** | Verifiable **proof that an action/event/transition occurred**. | `regulatory-safe-verifiable-state.md` (`ExecutionReceipt`, `GovernanceDecisionReceipt`); `glossary.md` |
-| **Settlement** | The canonical **movement / resolution of obligations and positions**. | `language-guide.md` (`payment` → `settle`) |
+| **Settlement** | The canonical **recording of an obligation transition** between participants; positions are recomputed as derived views, not *moved* between accounts. | `language-guide.md` (`payment` → `settle`) |
 | **Credential** | A signed claim a passport presents (membership, role, attestation). Presented, not "held as value". | `glossary.md` (Attestation), `IDENTITY_MEMBERSHIP_ARCHITECTURE.md` |
 | **Capability** | An authority grant a passport may exercise / a keyring may sign for. Scoped, delegable, revocable. | `multi-device-identity-design.md` (capability hierarchy), `capability-based-features.md` |
 
@@ -56,9 +56,9 @@ find-and-replace. It is doctrine, not a migration: **it does not rename any code
 > A **Member Passport** does not hold money, tokens, or balances.
 > A **Member Passport** presents credentials and authorizes signing.
 > A **Device Keyring** protects private keys and produces signatures.
-> The **ledger** records **positions**.
+> The **ledger** records **signed entries**; a **position** is the derived view recomputed from them.
 > **Receipts** prove events.
-> **Settlements** resolve obligations and positions.
+> **Settlements** record obligation transitions; positions follow as recomputed derived views.
 
 Identity is *not* possession of a wallet. Identity is a DID; the member presents it through a
 **passport** and proves control of it through a **keyring**. The two are deliberately separate: a
@@ -144,7 +144,7 @@ When a future slice does migrate a `wallet` hit, the target follows the *meaning
   so this doctrine does not overwrite an existing meaning — but writers must keep them distinct:
   (a) a *metaphor* for a DID ("a DID — like a passport they alone hold", summit workshop docs), which
   is aligned; and (b) the literal **government passport document** used during identity verification
-  (`icn-identity/src/anchor.rs`, `web/pilot-ui/sdis-enrollment`). "Member Passport" is the ICN
+  (`icn-identity/src/anchor.rs`, `web/pilot-ui/sdis-enrollment.html` / `.js`). "Member Passport" is the ICN
   identity-presentation surface; "passport" lowercase in an enrollment/KYC context is a government ID
   document. Do not conflate them.
 - **`keyring`** today means the **OS/system keyring** (Keychain, GNOME Keyring) used to store local
