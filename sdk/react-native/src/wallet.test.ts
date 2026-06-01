@@ -136,18 +136,25 @@ describe('ICNWalletImpl', () => {
       expect(storage.store.has('icn_keyring_did')).toBe(false);
     });
 
-    it('should defensively purge legacy wallet-named keys', async () => {
+    it('should defensively purge legacy and hybrid-namespace keys', async () => {
       await wallet.generateKeyPair();
-      // Simulate stray legacy keys (e.g. from a pre-rename dev build); delete must clear them.
+      // Simulate stray legacy classical keys and a prior hybrid keyring in the same namespace.
       storage.store.set('icn_wallet_private_key', 'stale');
       storage.store.set('icn_wallet_public_key', 'stale');
       storage.store.set('icn_wallet_did', 'did:icn:stale');
+      storage.store.set('icn_hybrid_keyring_keypair', 'stale');
+      storage.store.set('icn_hybrid_wallet_keypair', 'stale');
+      storage.store.set('icn_keyring_version', '2');
 
       await wallet.deleteKeyPair();
 
       expect(storage.store.has('icn_wallet_private_key')).toBe(false);
       expect(storage.store.has('icn_wallet_public_key')).toBe(false);
       expect(storage.store.has('icn_wallet_did')).toBe(false);
+      // A prior hybrid keyring in the same namespace is also forgotten.
+      expect(storage.store.has('icn_hybrid_keyring_keypair')).toBe(false);
+      expect(storage.store.has('icn_hybrid_wallet_keypair')).toBe(false);
+      expect(storage.store.has('icn_keyring_version')).toBe(false);
     });
 
     it('clears cached secrets even if a storage removal fails', async () => {

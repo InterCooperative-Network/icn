@@ -32,9 +32,24 @@ const PRIVATE_KEY_KEY = 'icn_keyring_private_key';
 const PUBLIC_KEY_KEY = 'icn_keyring_public_key';
 const DID_KEY = 'icn_keyring_did';
 
-// Legacy wallet-named keys, retained ONLY so deleteKeyPair() can defensively purge them
-// (a no-op on a fresh install). These are never written.
-const LEGACY_KEYS = ['icn_wallet_private_key', 'icn_wallet_public_key', 'icn_wallet_did'];
+// Defensive purge set for deleteKeyPair(): legacy classical names PLUS the hybrid keyring namespace
+// (canonical + legacy) and the version markers. None of these are written by this classical keyring;
+// removing them is a no-op safety net so a sign-out-and-forget on a device that previously held a
+// hybrid keyring (or pre-rename keys) leaves no stray keyring secret behind.
+const DEFENSIVE_PURGE_KEYS = [
+  // legacy classical
+  'icn_wallet_private_key',
+  'icn_wallet_public_key',
+  'icn_wallet_did',
+  // hybrid keyring namespace (canonical + legacy)
+  'icn_hybrid_keyring_keypair',
+  'icn_hybrid_keyring_public_key',
+  'icn_hybrid_wallet_keypair',
+  'icn_hybrid_wallet_public_key',
+  // version markers (canonical + legacy)
+  'icn_keyring_version',
+  'icn_wallet_version',
+];
 
 /**
  * Device Keyring implementation (legacy-named "wallet") using secure storage and @noble/ed25519
@@ -161,8 +176,9 @@ export class ICNWalletImpl implements ICNWallet {
         this.storage.removeItem(PRIVATE_KEY_KEY),
         this.storage.removeItem(PUBLIC_KEY_KEY),
         this.storage.removeItem(DID_KEY),
-        // Defensive: also purge any legacy wallet-named keys (no-op on fresh installs).
-        ...LEGACY_KEYS.map((k) => this.storage.removeItem(k)),
+        // Defensive: also purge legacy names and the hybrid keyring namespace (no-op on fresh
+        // installs) so a reset leaves no stray keyring secret behind.
+        ...DEFENSIVE_PURGE_KEYS.map((k) => this.storage.removeItem(k)),
       ]);
     } finally {
       // Always drop cached secrets, even if a storage removal rejected — otherwise the in-memory
