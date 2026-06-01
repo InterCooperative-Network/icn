@@ -45,7 +45,7 @@ async function main() {
   // Method 1: Manual challenge-response flow
   console.log('\n--- Manual Auth Flow ---');
   const challenge = await client.getChallenge(myDid);
-  console.log('Got challenge, expires at:', new Date(challenge.expires_at * 1000));
+  console.log('Got challenge, expires in:', challenge.expires_in, 'seconds');
 
   // Sign the challenge (implement your own signing)
   const signature = 'your-hex-signature';

@@ -624,6 +624,15 @@ jobs:
         if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         run: npm run build
 
+      # examples/ are not part of the library build (tsconfig.json is src-only),
+      # so example API/field drift — wrong methods, stale fields, wrong event
+      # envelope shape — escaped tsc. tsconfig.examples.json typechecks them
+      # against the real SDK source (compile-only, no gateway). This is the
+      # structural complement to the docs-vocabulary guard (check_sdk_doc_terms.py).
+      - name: Typecheck examples
+        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
+        run: npm run typecheck:examples
+
       - name: Run tests
         if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
         # All SDK tests use mockFetch — no gateway required. Gate is blocking.
