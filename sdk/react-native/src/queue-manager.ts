@@ -154,10 +154,12 @@ export class QueueManager {
    */
   async purge(): Promise<void> {
     this.queue = [];
-    this.notifyListeners();
+    // Remove the persisted queue BEFORE notifying listeners, so the persisted removal is never
+    // skipped (and any storage failure still propagates to the caller).
     if (this.storage) {
       await this.storage.removeItem(QUEUE_STORAGE_KEY);
     }
+    this.notifyListeners();
   }
 
   /**
@@ -179,6 +181,13 @@ export class QueueManager {
   }
 
   private notifyListeners(): void {
-    this.listeners.forEach((listener) => listener(this.getQueue()));
+    this.listeners.forEach((listener) => {
+      try {
+        listener(this.getQueue());
+      } catch (error) {
+        // A misbehaving subscriber must not break queue operations (e.g. purge during identity reset).
+        console.error('Queue change listener threw:', error);
+      }
+    });
   }
 }

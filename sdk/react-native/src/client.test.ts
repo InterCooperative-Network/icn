@@ -261,6 +261,24 @@ describe('ICNMobileClient', () => {
       expect(client.queue.length).toBe(0);
     });
 
+    it('removes the persisted queue even if a queue-change listener throws', async () => {
+      storage.store.set(
+        'icn_operation_queue',
+        JSON.stringify([
+          { id: '1', type: 'vote', data: {}, queuedAt: Date.now(), retries: 0, status: 'pending' },
+        ])
+      );
+      await client.initialize();
+      client.onQueueChange(() => {
+        throw new Error('listener boom');
+      });
+
+      // A throwing subscriber must not break reset or skip the persisted queue removal.
+      await expect(client.resetIdentity()).resolves.toBeUndefined();
+      expect(storage.store.has('icn_operation_queue')).toBe(false);
+      expect(client.queue.length).toBe(0);
+    });
+
     it('should clear auth and queue even if keyring deletion fails', async () => {
       const failingKeyring = {
         ...createMockWallet(),
