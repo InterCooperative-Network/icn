@@ -12,7 +12,7 @@
  * PR may add canonical `Keyring` / `DeviceKeyring` aliases without removing them.
  *
  * Uses @noble/ed25519 for cryptographic operations.
- * See ../../../docs/design/passport-keyring-position-receipt.md
+ * See https://github.com/InterCooperative-Network/icn/blob/main/docs/design/passport-keyring-position-receipt.md
  */
 
 import * as ed from '@noble/ed25519';

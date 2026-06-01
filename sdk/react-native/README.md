@@ -166,7 +166,7 @@ Clear authentication and disconnect WebSocket.
 ### Device Keyring (legacy-named "Wallet")
 
 These APIs are a **Device Keyring** — local private-key custody and signing per the
-[passport / keyring / position / receipt doctrine](../../docs/design/passport-keyring-position-receipt.md).
+[passport / keyring / position / receipt doctrine](https://github.com/InterCooperative-Network/icn/blob/main/docs/design/passport-keyring-position-receipt.md).
 They generate, store, and sign with a key pair; they do **not** hold balances, tokens, or value, and
 are not an account. The `createWallet` / `ICNWallet` / `HybridWallet` names are kept for backward
 compatibility; canonical `Keyring` aliases may be introduced in a future compatibility-safe release
