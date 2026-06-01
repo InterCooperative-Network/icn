@@ -2,7 +2,7 @@
 
 **Status**: Accepted (doctrine) — refines [Regulatory-Safe Verifiable State Architecture](./regulatory-safe-verifiable-state.md)
 **Priority**: Tier 1 — Foundational positioning
-**Companion**: [`../dev/language-guide.md`](../dev/language-guide.md), [`../architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md`](../architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md), [`./multi-device-identity-design.md`](./multi-device-identity-design.md), [`../architecture/AUTH_BRIDGE_AND_DID_LOGIN.md`](../architecture/AUTH_BRIDGE_AND_DID_LOGIN.md)
+**Companion**: [`../dev/language-guide.md`](../dev/language-guide.md), [`../architecture/CLIENT_MODEL.md`](../architecture/CLIENT_MODEL.md), [`../architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md`](../architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md), [`./multi-device-identity-design.md`](./multi-device-identity-design.md), [`../architecture/AUTH_BRIDGE_AND_DID_LOGIN.md`](../architecture/AUTH_BRIDGE_AND_DID_LOGIN.md)
 
 ---
 
@@ -24,6 +24,14 @@ target, so today a single word silently teaches the whole crypto/fintech model:
 - payments move between wallets,
 - identity *is* possession of a wallet,
 - and therefore the product is crypto-adjacent.
+
+The conflation is not only in copy and SDK types — it is written into the client architecture. The
+architecture doc [`CLIENT_MODEL.md`](../architecture/CLIENT_MODEL.md) (titled "ICN Client and Wallet
+Architecture") defines **"The Wallet"** as the single client object that "manages identity,
+credentials, memberships, and economic interactions" — a `pub trait Wallet` exposing `did()`,
+`sign()` ("keys never leave wallet"), and `transfer()`. That is the god-object this doctrine
+decomposes: **Passport** (identity / credentials / memberships), **Keyring** (keys / signing),
+**Position** + **Settlement** (economic interactions), and **Receipt** (history).
 
 ICN does not teach that model. This document defines the canonical split **before** any broad
 migration, so that a future rename has an architectural target instead of becoming a blind
@@ -109,7 +117,7 @@ table is to make the **migration target** explicit per class — not to authoriz
 | **E — Historical / deprecation / non-claim** | "ICN is *not* a wallet"; "unhosted wallet"; archived text | `THE_COMMONS.md` "It is not a wallet."; manual "No wallet balance."; `docs/archive/**`; regulatory "unhosted wallet" | Leave; label historical/deprecated where needed. These are *correct* as-is. |
 | **F — Third-party / unavoidable** | external wallets / hardware wallets | `witness-signature-best-practices.md` "hardware wallets or TPM-backed keys"; references to users' own crypto wallets | Mark **external / third-party only** |
 | **G — Generated / enforcement / do-not-edit** | generated output, or firewall code that *correctly forbids* the word | `docs/api/openapi.generated.yaml`; the `["payment","wallet","balance",...]` forbidden-term lists in `icn-governance` proofs and `apps/governance` tests; `STATE.md`/`PHASE_PROGRESS.md` log lines | Do not edit. Fix the source, not the generated artifact; never weaken the forbidden-term lists. |
-| **H — Ambiguous / needs design** | bundles concepts this doctrine splits | `docs/plans/agent-teams-launch-prompt.md` "node modes: wallet (signing+affiliations)"; `THE_COMMONS.md` "Commons Shell ↔ pilot-ui / CoopWallet" convergence | Resolve using this doctrine: split "signing" → keyring, "affiliations" → passport |
+| **H — Ambiguous / needs design** | bundles concepts this doctrine splits | `docs/architecture/CLIENT_MODEL.md` `pub trait Wallet` god-object (identity + credentials + memberships + keys + economics); `docs/plans/agent-teams-launch-prompt.md` "node modes: wallet (signing+affiliations)"; `THE_COMMONS.md` "Commons Shell ↔ pilot-ui / CoopWallet" convergence | Resolve using this doctrine: decompose into passport (identity/credentials/memberships) + keyring (keys/signing) + position/settlement (economic) + receipt (history) |
 
 ---
 
