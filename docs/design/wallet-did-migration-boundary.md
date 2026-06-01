@@ -30,6 +30,14 @@ preserved.** `@icn/react-native` is pre-release (`0.1.0`) and there are no real-
   dual-read, and no cross-version downgrade promise are required to protect a nonexistent installed
   base. The key-string constants can simply be **renamed to canonical `icn_keyring_*` names before
   release.**
+- **The bundled `CoopWallet` example app does not change this.** The repo ships a deployable example
+  (`sdk/react-native/examples/CoopWallet`, referenced from `docs/deployment/QUICK_DEPLOY.md`) that
+  persists keys via Expo SecureStore through `createWallet(secureStorage)`, so a developer or pilot
+  device can hold `icn_wallet_*` keys without any npm release. The project's decision is that these
+  pre-release example / pilot installs are **re-provisioned (reset), not migrated** — they hold no
+  production identity, and a fresh keypair on first run after the rename is acceptable. If the project
+  later decides a *specific* pilot install must be preserved, that is an explicit opt-in (not a
+  default) that would re-introduce a one-time legacy-key read for that case only.
 - This assumption is **specific to Surface 1.** It does **not** decide Surface 2: the Rust `wallet_did`
   field must still be judged on its own source / wire / test exposure (below).
 - The earlier "preserve legacy storage keys for existing installs" framing is therefore **dropped** for
@@ -134,13 +142,15 @@ not a migration:
 3. Update the locking tests (`keyring-aliases.test.ts`, `wallet.test.ts`, `hybrid-wallet.test.ts`) to
    assert the **canonical** key strings, and add an assertion that **no `wallet`-named storage key** is
    used by the RN key-custody layer.
-4. `deleteKeyPair()` must purge the canonical keyring keys the implementation writes (after the rename
-   there is a single canonical namespace to clear). Add a test that an explicit deletion leaves **no**
-   key behind.
+4. `deleteKeyPair()` must purge **both** the canonical keyring keys **and** any legacy `icn_wallet_*` /
+   `icn_hybrid_wallet_*` secrets **unconditionally** — purging an absent key is a harmless no-op, and
+   this guarantees no stale signing secret (e.g. a leftover `icn_wallet_private_key` on a pre-release
+   example / pilot device) survives a delete or can be revived by any future legacy reader. Add a test
+   asserting an explicit deletion leaves **no** key in either namespace.
 5. **No legacy fallback or downgrade promise is required** — there is no installed base to read from or
    to downgrade onto. If a legacy `icn_wallet_*` read path is nonetheless kept, justify it explicitly as
-   a **development convenience** (not user migration), and then `deleteKeyPair()` must purge **both** the
-   canonical and the legacy families so a "deleted" identity cannot resurface via the fallback reader.
+   a **development convenience** (not user migration); deletion already purges both families
+   unconditionally (step 4), so a "deleted" identity cannot resurface via any reader.
 
 ### Surface 2 — evaluate direct rename vs. serde alias (separate decision)
 
