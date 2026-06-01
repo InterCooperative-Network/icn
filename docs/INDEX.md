@@ -27,7 +27,7 @@ Last Reviewed: 2026-04-15
 
 Welcome to the ICN (Intercooperative Network) documentation! This index provides clear navigation to all documentation.
 
-**Last Updated**: 2026-04-15  
+**Last Updated**: 2026-06-01
 **Version**: 2.1 (canon-sync pass)
 
 ---

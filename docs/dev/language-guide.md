@@ -75,8 +75,13 @@ The protocol primitive is the signed entry; the position is interpretation.
 | Context | Forbidden | Approved |
 |---------|-----------|----------|
 | UI component | "My Wallet" | "My Account" or "My Accounts" |
-| SDK type | `Wallet` interface | `Account` interface |
+| SDK type (value / account abstraction) | `Wallet` interface | `Account` interface |
 | API concept | "wallet address" | "member account" or "DID" |
+
+The `Wallet` → `Account` row above is the *value/ledger* sense only. A `Wallet` type that is actually
+**key custody** (a signer / key store — e.g. `sdk/react-native/src/wallet.ts`,
+`sdk/react-native/src/hybrid-wallet.ts`, `createWallet()` / `HybridWallet`) maps to **Device Keyring**,
+not `Account` — see the identity & custody axis below.
 
 **Why**: "Wallet" in a hosted context implies the operator controls the keys and can move balances
 unilaterally. ICN accounts are identified by DID; the member controls the signing key.
