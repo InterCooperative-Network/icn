@@ -167,8 +167,9 @@ These are **named, not scheduled here** — each is its own future PR with its o
 
 > **Detailed boundary analysis:** the persisted React Native key family behind slice #1
 > (`icn_wallet_did` and its `icn_wallet_*` siblings) and the serialized `wallet_did` field in
-> slice #4 are catalogued together — with their distinct boundaries, canonical target names,
-> and compatibility-preserving migration sequences — in
+> slice #4 are catalogued together — with their distinct boundaries, canonical target names, and
+> per-surface rename plans (the RN keys are pre-release with no installed base, so a direct rename; the
+> Rust field is evaluated separately) — in
 > [Wallet DID Migration Boundary](./wallet-did-migration-boundary.md).
 
 ---

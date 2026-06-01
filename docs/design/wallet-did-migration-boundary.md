@@ -1,24 +1,40 @@
 # Wallet DID Migration Boundary — `wallet_did` / `icn_wallet_did`
 
-**Status**: Accepted (design / deferred-migration plan) — diagnosis and plan for a deferred compatibility slice of [Passport / Keyring / Position / Receipt](./passport-keyring-position-receipt.md). It implements no migration and renames nothing.
-**Priority**: Tier 1 — Compatibility-sensitive identity / custody surface
+**Status**: Accepted (design / naming plan) — diagnosis and naming plan for two `wallet`-rooted DID surfaces. It implements no rename and changes no code, storage keys, or serialized fields.
+**Priority**: Tier 1 — identity / custody naming boundary
 **Companion**: [`./passport-keyring-position-receipt.md`](./passport-keyring-position-receipt.md), [`../architecture/CLIENT_MODEL.md`](../architecture/CLIENT_MODEL.md)
-**Scope**: Diagnosis + migration design only. **This document renames no code, no storage keys, and no serialized fields.**
+**Scope**: Diagnosis + naming/migration design only. **This document renames no code, no storage keys, and no serialized fields.**
 
 ---
 
 ## Why this exists
 
 The parent doctrine names two deferred `wallet`-rooted DID surfaces — class **C** (`wallet_did` in
-`icn-kernel-api`) and the class **A** key-custody internals (the React Native SDK) — but it does not
-yet specify *how* either can be renamed without breaking existing installs or serialized peers. Both
-are high-cost compatibility surfaces, and they are **different boundaries** that merely share the word
-"wallet". This document catalogs both precisely, fixes the canonical target name per boundary, and
-specifies the exact compatibility-preserving sequence a future migration PR must follow.
+`icn-kernel-api`) and the class **A** key-custody internals (the React Native SDK) — but does not say
+what each actually is, what its correct canonical name is, or whether a rename carries any
+compatibility cost. This document answers all three. The two surfaces merely **share the word
+"wallet"**; they are different boundaries with different blast radii, and they must be evaluated
+**separately**.
 
 Key rule, inherited from the doctrine: **a DID is not a wallet.** A Device Keyring may *store or
 protect* the key for a DID; a Member Passport may *present* that DID as subject identity. The field /
 key name must reflect the actual boundary — not the value the DID happens to carry.
+
+## Deployment reality (installed-base assumption)
+
+**There is no prior installed React Native client base whose persisted secure-storage keys must be
+preserved.** `@icn/react-native` is pre-release (`0.1.0`) and there are no real-world installs holding
+`icn_wallet_*` / `icn_hybrid_wallet_*` keys. Consequently:
+
+- **Surface 1 (RN secure storage) does not need installed-client migration.** No lazy migration, no
+  dual-read, and no cross-version downgrade promise are required to protect a nonexistent installed
+  base. The key-string constants can simply be **renamed to canonical `icn_keyring_*` names before
+  release.**
+- This assumption is **specific to Surface 1.** It does **not** decide Surface 2: the Rust `wallet_did`
+  field must still be judged on its own source / wire / test exposure (below).
+- The earlier "preserve legacy storage keys for existing installs" framing is therefore **dropped** for
+  Surface 1. Legacy storage-key support should be added **only** if some reason *other than* installed
+  clients requires it — and then justified as development convenience, not user migration.
 
 ## The two surfaces
 
@@ -45,16 +61,15 @@ key name must reflect the actual boundary — not the value the DID happens to c
   read via `getItem` on `getKeyPair()` / `getDid()`, removed on `deleteKeyPair()`.
 - **Boundary**: **Device Keyring** (local key custody). The stored *value* is a DID; the *key* is
   keyring-scoped — it names where and why the value is held locally.
-- **Classification**: **persisted secure-storage key** — local to the device, compatibility-sensitive,
-  not serialized over any network / API.
-- **Why it cannot be blindly renamed**: renaming the key string makes `getItem(newKey)` return null on
-  every existing install, so the stored DID and keypair of the device appear absent — DID / identity
-  continuity is lost and the keyring may regenerate a *different* DID. That is silent data loss for
-  installed users.
-- **Existing compatibility lock**: `sdk/react-native/src/keyring-aliases.test.ts:68` (titled
-  "persisted secure-storage keys are unchanged (no migration)") plus `wallet.test.ts` and
-  `hybrid-wallet.test.ts` assert the exact legacy key strings; PRs #1966 / #1967 deliberately preserved
-  them.
+- **Classification**: **persisted secure-storage key** — local to the device. **Pre-release: no
+  installed data depends on these key strings** (see Deployment reality), so the strings can be
+  canonicalized directly.
+- **Why it was not already renamed**: the names are merely legacy, and three tests currently *lock* the
+  exact strings (`sdk/react-native/src/keyring-aliases.test.ts:68`, titled "persisted secure-storage
+  keys are unchanged (no migration)", plus `wallet.test.ts` and `hybrid-wallet.test.ts`). PRs #1966 /
+  #1967 preserved the strings while only *aliasing* the public class / factory names. The storage-key
+  rename was deferred to its own slice — which, given no installed base, is now a **direct rename**, not
+  a migration.
 
 ### Surface 2 — `wallet_did`: serialized public Rust field (`icn-kernel-api`)
 
@@ -68,14 +83,17 @@ key name must reflect the actual boundary — not the value the DID happens to c
   used for cell-join compatibility (operator boundary E5 / E6). No keys are stored in this field.
 - **Boundary**: **operator / subject identity** (a Passport-rooted subject DID presented in an operator
   role). This is **not** device-keyring custody and **not** local storage.
-- **Classification**: **public Rust API field + serialized (serde) field.** A wire-shape unit test
-  (`compute.rs:744`) locks the serialized `wallet_did` string. It is **not** currently present in any
-  OpenAPI document, HTTP handler, or the TypeScript SDK, but the serialized shape is part of the public
-  contract of the crate — any persisted or gossiped `OperatorMode` depends on it.
-- **Why it cannot be blindly renamed**: a rename changes (a) the public Rust field name —
-  source-breaking for any consumer of the struct — and (b) the serde field name in **any** field-named
-  format (JSON, YAML, and so on) — breaking any persisted or gossiped serialized `OperatorMode`, plus
-  the lock test.
+- **Classification**: **public Rust API field + serde-serializable field.** A unit test
+  (`compute.rs:744`) locks the serialized `wallet_did` string. **Exposure check (this revision):** the
+  only code that serializes `OperatorMode` is its own unit tests (`compute.rs:738`, `:753`); it is
+  **not** in any OpenAPI document, HTTP handler, persisted store, gossip path, or the TypeScript SDK,
+  and no external crate consumer was found (`icn-kernel-api` is `0.1.0`, used in-repo only). So the
+  serde shape is a *potential* wire contract but has **no actual serialized consumer today**.
+- **Why a rename still needs care**: a rename changes (a) the public Rust field name — source-breaking
+  for any consumer of the struct (today only in-repo: `operator_id()`, `is_compatible_with()`,
+  `services.rs`, and the lock test) — and (b) the serde field name in **any** field-named format (JSON,
+  YAML, and so on). Whether (b) matters depends on whether ICN adopts a wire / persistence contract for
+  `OperatorMode` *before* such a consumer exists.
 
 ### Side-by-side
 
@@ -84,9 +102,9 @@ key name must reflect the actual boundary — not the value the DID happens to c
 | Location | `sdk/react-native` (`wallet.ts`, `hybrid-wallet.ts`) | `icn-kernel-api` (`compute.rs`) |
 | Kind | Persisted secure-storage **key string** | Serialized public Rust **struct field** |
 | Boundary | **Device Keyring** (local custody) | **Operator / subject identity** (passport-rooted) |
-| Breakage on naive rename | Existing installs lose stored keys (silent data loss) | Source + serde wire break; lock test fails |
-| Canonical target | `icn_keyring_did` (keyring-rooted key family) | `operator_did` |
-| Safe mechanism | Dual-read + lazy migrate-write + version marker, for **every** key | serde alias + dual output until a version transition, semver-coordinated |
+| Installed / external dependents | **None** — pre-release, no installs | **None found** — in-repo only; serialized only in tests |
+| Canonical target | `icn_keyring_did` (`icn_keyring_*` family) | `operator_did` |
+| Recommended mechanism | **Direct rename** of storage-key constants; tests assert canonical-only | **Direct rename** *or* serde alias — decide per API-stability policy |
 
 ## Canonical target naming (and why)
 
@@ -100,86 +118,76 @@ key name must reflect the actual boundary — not the value the DID happens to c
   custody occurs here) and **not** a bare `passport_did` (it is specifically the *operator role* of a
   subject identity).
 
-## Migration sequences (for a FUTURE, separately-reviewed PR — not performed here)
+## Implementation plans (for FUTURE, separately-reviewed PRs — not performed here)
 
-### Surface 1 — dual-read / lazy migrate-write (zero install breakage)
+### Surface 1 — direct canonicalization (no installed-base migration)
 
-1. Introduce canonical constants (`icn_keyring_did`, `icn_keyring_private_key`, and so on) **alongside**
-   the legacy ones; do not remove the legacy constants.
-2. **Read order — for *every* key in the family, not only the DID**: try the canonical key first, then
-   **fall back to the legacy** key (`icn_wallet_did`, `icn_wallet_private_key`, `icn_wallet_public_key`,
-   the `icn_hybrid_wallet_*` keypair / public key, and the `icn_wallet_version` marker). Signing,
-   presence checks, and hybrid detection read keys beyond the DID (`wallet.ts:135` public, `wallet.ts:173`
-   private for signing, `wallet.ts:198` presence; the hybrid reads throughout `hybrid-wallet.ts`), so a
-   DID-only fallback would leave an upgraded install unable to load or sign.
-3. On a successful legacy-fallback read, **write the canonical key** for that same key (lazy migration).
-   Keep the legacy key in place; any eventual removal is a later, separately-reviewed cleanup.
-4. Record migration state explicitly via the existing `icn_wallet_version` marker (or a new
-   keyring-version marker) so the format is self-describing.
-5. **Never** delete a legacy key, and **never** rename a key in place, *as part of the lazy migration*.
-   **Exception — explicit user deletion**: `deleteKeyPair()` must purge **both** the canonical and the
-   legacy namespaces (today each delete path clears only one namespace — `wallet.ts:151` and
-   `hybrid-wallet.ts:394`). Otherwise a "deleted" identity can reappear and still sign via the fallback
-   reader. Add a test asserting that **no** key in either namespace survives an explicit deletion.
-6. **Tests**: (a) a fresh install writes the canonical keys; (b) a legacy-only install still reads its
-   DID **and signs** with its existing key, and hybrid detection still reports the correct version;
-   (c) after one read, the canonical keys are present and every migrated value is unchanged; (d) keypair
-   / DID continuity is preserved across the upgrade (the device keeps the same DID and can still sign);
-   (e) an explicit `deleteKeyPair()` leaves no key in either namespace.
-7. **Downgrade safety**: a downgraded SDK writes **only** the legacy namespace (`wallet.ts:88` / `:115`,
-   `hybrid-wallet.ts:120` / `:151`), so a canonical-first reader could ignore a legacy keypair that an
-   older binary wrote *after* migration and silently resurrect the pre-downgrade identity. The migration
-   must therefore either (a) treat the two namespaces as versioned and, when both are present and differ,
-   prefer the one the marker says is newer — reconciling, or failing closed on an unreconcilable conflict
-   — or (b) explicitly declare post-migration downgrades unsupported. Until a reconciliation strategy is
-   chosen, this plan declares post-migration downgrades **unsupported**, and adds a test for the
-   both-namespaces-present conflict.
+Because there is no installed client base (see Deployment reality), Surface 1 is a **direct rename**,
+not a migration:
 
-### Surface 2 — forward-compat alias, then rename with dual output (semver-coordinated)
+1. Rename the RN secure-storage key constants to canonical `icn_keyring_*` / `icn_hybrid_keyring_*`
+   strings (`icn_keyring_did`, `icn_keyring_private_key`, `icn_keyring_public_key`,
+   `icn_hybrid_keyring_keypair`, `icn_hybrid_keyring_public_key`, `icn_keyring_version`). No
+   `icn_wallet_*` storage key remains in the Device Keyring layer.
+2. **Fresh installs write only canonical keyring storage keys.** With no installed base, no dual-read
+   and no lazy migrate-write are needed.
+3. Update the locking tests (`keyring-aliases.test.ts`, `wallet.test.ts`, `hybrid-wallet.test.ts`) to
+   assert the **canonical** key strings, and add an assertion that **no `wallet`-named storage key** is
+   used by the RN key-custody layer.
+4. `deleteKeyPair()` must purge the canonical keyring keys the implementation writes (after the rename
+   there is a single canonical namespace to clear). Add a test that an explicit deletion leaves **no**
+   key behind.
+5. **No legacy fallback or downgrade promise is required** — there is no installed base to read from or
+   to downgrade onto. If a legacy `icn_wallet_*` read path is nonetheless kept, justify it explicitly as
+   a **development convenience** (not user migration), and then `deleteKeyPair()` must purge **both** the
+   canonical and the legacy families so a "deleted" identity cannot resurface via the fallback reader.
 
-1. **Forward-compat step (changes no emitted output)**: on **today's** `wallet_did` field, add a serde
-   `alias` for `operator_did`, so the *new* name is already accepted as input, and add a test for that
-   input. Output is still `wallet_did`, so no peer breaks.
-2. **Rename step (separate, semver-coordinated PR)**: rename the Rust field to `operator_did`. The field
-   rename is itself a **semver-breaking** change to a public crate type — coordinate it with a crate
-   version bump and update all in-repo consumers.
-3. **Preserve legacy output during the compatibility window**: emitting only `operator_did` would break
-   an older reader that still requires `wallet_did` (and would block downgrade recovery). Because
-   `OperatorMode` may be persisted or gossiped, keep emitting the legacy `wallet_did` — via a dual-field
-   or custom-serde strategy — until an explicit payload / version transition lets all peers move
-   together. A read-side `alias` covers reading old input but is **not** sufficient for old readers of
-   new output.
-4. Update the serde lock test to assert both names are accepted on input **and** that legacy `wallet_did`
-   remains present in output during the window. Before dropping legacy output, re-confirm no
-   OpenAPI / TypeScript-SDK / HTTP surface has begun consuming `OperatorMode`; if one has, treat the
-   emitted name as a wire contract and version it.
+### Surface 2 — evaluate direct rename vs. serde alias (separate decision)
 
-## Compatibility requirements (both surfaces)
+This is an operator/subject-identity field in the kernel API, **not** a React Native storage migration.
+Decide it on its own API-stability policy:
 
-- Existing installs must keep reading **all** of their keys with **zero user action**.
-- No legacy key or field is removed within a migration slice (except an explicit user deletion, which
-  must clear both namespaces).
-- No change to DID generation or signing semantics.
-- No change to cryptography.
-- Serialized output may change **only** behind an explicit payload / version transition: keep emitting
-  the legacy field name (alongside the canonical one) until all peers can move together; a read-side
-  `alias` alone does not protect old readers of new output.
+1. **Confirm exposure first.** Re-verify (as of this revision) that no OpenAPI / HTTP / TypeScript-SDK /
+   persisted / gossiped consumer of `OperatorMode` exists and that `icn-kernel-api` is not relied on as
+   a published wire contract. The only serializer today is the crate's own tests.
+2. **If there is no external / wire contract (current finding):** a future PR may **directly rename** the
+   Rust field `wallet_did` → `operator_did`, updating the in-repo consumers (`operator_id()`,
+   `is_compatible_with()`, `services.rs`) and the lock test to assert `operator_did`. Treat it as a
+   semver-relevant change to `icn-kernel-api` even though no external consumer exists today.
+3. **If / when a wire or persistence contract is adopted** for `OperatorMode`: do **not** direct-rename
+   the emitted field. Use a serde `rename` + `alias` and keep emitting the legacy `wallet_did` until an
+   explicit payload / version transition, so old readers and writers interoperate during the window.
+4. Either way, **do not treat this as a React Native storage migration.**
 
 ## Recommended slice ordering
 
-1. **(this document)** boundary design — diagnosis + plan only.
-2. Surface 1 dual-read / migrate-write for every key + tests — contained, React-Native-only, no wire impact.
-3. Surface 2 forward-compat alias + test — accept the new name as input now (no output change) — *before* any field rename.
-4. Surface 2 field rename to `operator_did`, preserving legacy output until a version transition — semver-coordinated, separate PR.
+A. **RN storage-key canonicalization** — rename `icn_wallet_*` / `icn_hybrid_wallet_*` →
+   `icn_keyring_*` / `icn_hybrid_keyring_*`. **No installed-client migration required**; tests assert
+   canonical-only key names and that no `wallet`-named storage key remains in the key-custody layer.
+B. **Rust operator-DID field** — evaluate a **direct rename** `wallet_did` → `operator_did` (no external
+   consumer found) versus a serde alias, per the crate's API-stability policy; separate code PR.
+C. **Docs / examples** — refresh once the new names land.
+
+## Compatibility requirements
+
+- **Surface 1**: **none for installed clients — there are none.** The only requirement is internal
+  consistency: fresh installs and the test suite use the canonical key strings, and no `wallet`-named
+  storage key remains in the Device Keyring layer.
+- **Surface 2**: **no compatibility obligation today** (no external / wire consumer). *If* a wire or
+  persistence contract is later adopted, a rename must go behind a serde `rename` + `alias` with legacy
+  output retained until an explicit version transition.
+- No change to DID generation, signing semantics, or cryptography in any slice.
 
 ## Non-claims
 
-This document is design / vocabulary planning only. It does **not**:
+This document is design / naming planning only. It does **not**:
 
 - rename or remove any storage key, field, type, or export;
-- migrate any persisted secure-storage data, or change any persisted key string;
+- perform any installed-client migration (there is no installed base to migrate);
+- change any persisted secure-storage key string;
+- change any serialized API / wire payload or serde shape;
+- promise to preserve pre-release legacy storage-key names;
 - change DID generation, signing, or cryptography;
-- change any serialized API / wire payload;
 - imply token custody, a wallet balance, or any banking / payment product;
 - make any production, live-federation, or governance readiness claim;
 - weaken any meaning / regulatory / firewall check.
