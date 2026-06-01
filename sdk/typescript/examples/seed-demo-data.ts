@@ -236,7 +236,7 @@ Environment variables:
   console.log(`  Transactions: ${txCount}`);
   console.log(`  Proposals: ${proposalCount}`);
   console.log('\nYou can now:');
-  console.log(`  - View balances: GET ${gateway}/v1/ledger/${coopId}/balance/:did`);
+  console.log(`  - View positions: GET ${gateway}/v1/ledger/${coopId}/position/:did`);
   console.log(`  - View history: GET ${gateway}/v1/ledger/${coopId}/history`);
   console.log(`  - Vote on proposals in the web UI`);
   console.log(`  - Connect via WebSocket for real-time updates`);

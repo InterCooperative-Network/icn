@@ -68,19 +68,25 @@ DEPRECATED_PATTERNS = [
      "fiat-budget helpers were never shipped"),
     ("PaymentCreated-event", re.compile(r"""['"]PaymentCreated['"]"""),
      "ledger event type is 'SettlementCreated', not 'PaymentCreated'"),
-    # Field / property vocabulary. The canonical ledger field is `unit` and the
-    # canonical position/treasury property is `position` — never `currency` /
-    # `balance`. These catch copy-paste-invalid examples that the method patterns
-    # miss (examples/ are not type-checked: tsconfig rootDir is src). The live
-    # crossPay() FX surface legitimately uses `from_currency` / `to_currency`, so
-    # those are excluded (the `currency:` lookbehind rejects a leading `_`, and
-    # `\.currency` only matches a bare `.currency` property, not `.from_currency`).
-    ("currency-field", re.compile(r"(?<![A-Za-z_])currency\s*:"),
-     "ledger request/settings field is `unit`, not `currency`"),
+    # Deprecated *balance* surface. The canonical position query is the
+    # `/ledger/{coop}/position/{did}` route and the `.position` property. There is
+    # no live `/balance` route and no live `.balance` field anywhere in the SDK
+    # types (TreasuryBalanceResponse exposes `positions`), so these two patterns
+    # are unambiguous and catch copy-paste-invalid examples the method patterns
+    # miss (examples/ are not type-checked: tsconfig rootDir is src).
+    ("balance-route", re.compile(r"/ledger/[^\s'\"`]*?/balance\b"),
+     "ledger route is `/ledger/{coop}/position/{did}`, not `/balance`"),
     ("balance-property", re.compile(r"\.balance\b"),
      "position/treasury responses expose `.position`, not `.balance`"),
-    ("currency-property", re.compile(r"\.currency\b"),
-     "ledger responses expose `.unit`, not `.currency`"),
+    # NOTE: a bare `currency` field/property is deliberately NOT matched. Unlike
+    # the deprecated *balance* surface, `currency` is live vocabulary on two
+    # exported flows: crossPay() FX (`from_currency` / `to_currency`) and the
+    # Flow C `governance.proposeSpend()` treasury API, whose ProposeSpendRequest
+    # accepts `currency?` and ProposeSpendResponse returns `currency` (src/types.ts).
+    # The bare token cannot distinguish deprecated-ledger use from those live uses,
+    # so matching it would reject valid documentation (a worse failure than the
+    # narrow gap of not flagging it). The settlement `unit` field is enforced by
+    # the SDK's own TypeScript types; the method/route/property rules cover the rest.
 ]
 
 # Hand-written developer-facing surface. Generated artifacts (src/api-types.ts,
