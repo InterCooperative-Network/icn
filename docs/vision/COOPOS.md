@@ -571,7 +571,7 @@ Requires stable kernel primitives first. CoopOS builds on:
 ## Related Documents
 
 - [KERNEL_CONTRACTS.md](../spec/KERNEL_CONTRACTS.md) - Kernel primitive specifications
-- [CLIENT_MODEL.md](../architecture/CLIENT_MODEL.md) - Client and wallet architecture
+- [CLIENT_MODEL.md](../architecture/CLIENT_MODEL.md) - Client architecture (passport / keyring / position / receipt)
 
 ---
 
