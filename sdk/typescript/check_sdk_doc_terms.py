@@ -84,10 +84,16 @@ DEPRECATED_PATTERNS = [
     # Flow C `governance.proposeSpend()` treasury API, whose ProposeSpendRequest
     # accepts `currency?` and ProposeSpendResponse returns `currency` (src/types.ts).
     # The bare token cannot distinguish deprecated-ledger use from those live uses,
-    # so matching it would reject valid documentation (a worse failure than the
-    # narrow gap of not flagging it). The settlement `unit` field is enforced by
-    # the SDK's own TypeScript types; the method/route/property rules cover the rest.
+    # so matching it as a blanket rule would reject valid documentation. Instead, a
+    # *settlement-request* `currency:` is caught by the context-aware check in
+    # scan_file() below (only when it appears inside a settle()/batchSettle() call),
+    # which leaves the live crossPay()/Flow C uses untouched.
 ]
+
+# Context-aware settlement check: `currency:` is only deprecated when it appears
+# as a field inside a settle()/batchSettle() request. SettlementRequest uses `unit`.
+_SETTLE_OPEN = re.compile(r"\b(?:settle|batchSettle)\s*\(")
+_SETTLE_CURRENCY = re.compile(r"(?<![A-Za-z_])currency\s*:")
 
 # Hand-written developer-facing surface. Generated artifacts (src/api-types.ts,
 # src/generated/**) are deliberately excluded — they are regenerated from the
@@ -122,12 +128,35 @@ def iter_files(sdk_root: Path):
 
 def scan_file(path: Path, sdk_root: Path):
     violations = []
+    rel = str(path.relative_to(sdk_root))
+    in_settle = False   # inside a settle()/batchSettle() call's argument list
+    depth = 0           # paren depth, counted from the opening settle(
     for i, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if line.lstrip().startswith(">"):  # markdown blockquote = disclaimer, exempt
+            in_settle = False
             continue
         for rule, rx, hint in DEPRECATED_PATTERNS:
             if rx.search(line):
-                violations.append((str(path.relative_to(sdk_root)), i, rule, hint, line.strip()))
+                violations.append((rel, i, rule, hint, line.strip()))
+
+        # Context-aware: flag `currency:` only within a settle()/batchSettle() call.
+        if not in_settle:
+            m = _SETTLE_OPEN.search(line)
+            if m:
+                seg = line[m.end() - 1:]          # from the opening '(' onward
+                if _SETTLE_CURRENCY.search(seg):
+                    violations.append((rel, i, "settlement-currency-field",
+                                       "settlement request field is `unit`, not `currency`",
+                                       line.strip()))
+                depth = seg.count("(") - seg.count(")")
+                in_settle = depth > 0
+        else:
+            if _SETTLE_CURRENCY.search(line):
+                violations.append((rel, i, "settlement-currency-field",
+                                   "settlement request field is `unit`, not `currency`",
+                                   line.strip()))
+            depth += line.count("(") - line.count(")")
+            in_settle = depth > 0
     return violations
 
 
