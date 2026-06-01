@@ -14,7 +14,7 @@
     <link rel="stylesheet" href="style.css?v=2026050802">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
-    <!-- QR Code library for wallet login -->
+    <!-- QR Code library for passport (DID) login -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 </head>
 <body>
@@ -111,7 +111,7 @@
 
                 <button id="show-qr-login-btn" type="button" class="btn btn-secondary btn-qr">
                     <span class="qr-icon">📱</span>
-                    Scan with Mobile Wallet
+                    Scan with Member Passport
                 </button>
 
                 <div class="login-divider">
@@ -250,7 +250,7 @@
                     </div>
 
                     <p id="qr-login-status" class="qr-status">
-                        Open your ICN Wallet app and scan this code
+                        Open your ICN Passport app and scan this code to approve sign-in
                     </p>
 
                     <div id="qr-countdown" class="qr-countdown">
@@ -260,7 +260,7 @@
                     <div class="qr-instructions">
                         <h3>How to use:</h3>
                         <ol>
-                            <li>Open the ICN Wallet app on your phone</li>
+                            <li>Open your ICN Passport app on your phone</li>
                             <li>Tap "Approve Web Login"</li>
                             <li>Point your camera at this QR code</li>
                             <li>Confirm the login on your phone</li>
@@ -2281,7 +2281,7 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
 
     <script src="crypto.js"></script>
     <script src="offline-storage.js"></script>
-    <script src="app.js?v=1771017695"></script>
+    <script src="app.js?v=1780308454"></script>
     <script src="receipts.js"></script>
 </body>
 </html>

@@ -5283,7 +5283,7 @@ async function showQrLogin() {
         });
 
         // Update status
-        qrLoginStatus.textContent = 'Open your ICN Wallet app and scan this code';
+        qrLoginStatus.textContent = 'Open your ICN Passport app and scan this code to approve sign-in';
 
         // Start polling for approval
         startSessionPolling(gatewayUrl);
