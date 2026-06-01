@@ -5,6 +5,13 @@
 **Companion**: [`./passport-keyring-position-receipt.md`](./passport-keyring-position-receipt.md), [`../architecture/CLIENT_MODEL.md`](../architecture/CLIENT_MODEL.md)
 **Scope**: Diagnosis + naming/migration design only. **This document renames no code, no storage keys, and no serialized fields.**
 
+> **Implementation status (2026-06-01):** Surface 1 below (the React Native keyring storage-key
+> canonicalization) has since been implemented in PR #1970: `icn_wallet_*` / `icn_hybrid_wallet_*` →
+> `icn_keyring_*` / `icn_hybrid_keyring_*`, with a defensive legacy purge on delete and a new
+> `ICNMobileClient.resetIdentity()` that also clears persisted auth (`icn_auth_*`) and the offline
+> queue. The Surface 1 sections below are retained as the original design record (this doc itself
+> still changes nothing). Surface 2 (the Rust `wallet_did` field) remains future work as described.
+
 ---
 
 ## Why this exists
