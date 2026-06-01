@@ -337,21 +337,30 @@ export class ICNMobileClient extends ICNClient {
    * Rotating the keyring alone is not enough: `initialize()` reloads persisted auth without checking
    * it against the Device Keyring DID, so a fresh keyring DID would otherwise be shadowed by a stale
    * authenticated session bound to the old DID, and `QueueManager` could replay the forgotten
-   * identity's queued operations under a new DID. Session, queue, and state cleanup run even if keyring
-   * deletion fails. These auth and queue keys are a client-session concern and are NOT part of (nor
+   * identity's queued operations under a new DID. Each persisted cleanup (keyring, auth, queue) is
+   * attempted independently, and the in-memory session is always invalidated, even if a cleanup step
+   * fails. These auth and queue keys are a client-session concern and are NOT part of (nor
    * renamed by) the keyring storage-key family.
    */
   async resetIdentity(): Promise<void> {
     this.clearToken();
     try {
-      if (this.wallet) {
-        await this.wallet.deleteKeyPair();
+      // Attempt every persisted cleanup independently (allSettled) so one failure does not skip the
+      // others: the keyring keys, the auth-session keys, and the offline operation queue must all be
+      // cleared on a sign-out-and-forget, regardless of which one fails.
+      const results = await Promise.allSettled([
+        this.wallet ? this.wallet.deleteKeyPair() : Promise.resolve(),
+        this.clearAuth(),
+        this.queueManager.clear(),
+      ]);
+      const failure = results.find((r) => r.status === 'rejected');
+      if (failure && failure.status === 'rejected') {
+        throw failure.reason;
       }
     } finally {
-      // Always clear identity-bound session state and the offline operation queue, even if keyring
-      // deletion fails — otherwise initialize() could reload a stale session, and queued operations
-      // from the forgotten identity could later execute under a newly authenticated DID.
-      await Promise.all([this.clearAuth(), this.queueManager.clear()]);
+      // Always invalidate the in-memory session, even if a persisted cleanup step rejected —
+      // otherwise the client could keep reporting an authenticated state and hold an authenticated
+      // WebSocket bound to the forgotten identity.
       this.disconnectWebSocket();
       this.updateAuthState({
         isAuthenticated: false,

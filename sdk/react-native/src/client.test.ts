@@ -283,6 +283,35 @@ describe('ICNMobileClient', () => {
       expect(storage.store.has('icn_auth_did')).toBe(false);
       expect(failClient.authState.isAuthenticated).toBe(false);
     });
+
+    it('still invalidates the in-memory session if auth storage removal rejects', async () => {
+      const base = createMockStorage();
+      const failingStorage: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        setItem: base.setItem,
+        getItem: base.getItem,
+        hasItem: base.hasItem,
+        async removeItem(): Promise<void> {
+          throw new Error('keychain unavailable');
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        wallet,
+        storage: failingStorage,
+      });
+      failingStorage.store.set('icn_auth_token', 'test-token');
+      failingStorage.store.set('icn_auth_did', 'did:icn:old');
+      failingStorage.store.set('icn_expires_at', (Date.now() + 3600000).toString());
+      await c.initialize();
+      expect(c.authState.isAuthenticated).toBe(true);
+
+      await expect(c.resetIdentity()).rejects.toThrow('keychain unavailable');
+
+      // The in-memory session is invalidated even though persisted removal failed.
+      expect(c.authState.isAuthenticated).toBe(false);
+      expect(c.authState.did).toBeNull();
+    });
   });
 
   describe('connectRealtime', () => {
