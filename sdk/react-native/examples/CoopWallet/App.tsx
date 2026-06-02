@@ -86,10 +86,12 @@ let initializeClient: () => Promise<boolean> = async () => {
 let retryInitialization: () => Promise<boolean> = async () => false;
 let resetClientState: () => void = () => {};
 let resetIdentity: () => Promise<void> = async () => {};
-// Serializes the full reset-plus-reinitialize sequence (shared by both Reset
-// Identity actions) so a double-tap cannot interleave two reset/initialize runs
-// against the same storage -- which could drop shared handles and provision keys
-// concurrently. A duplicate tap while one is in flight is a no-op.
+// Serializes every identity-mutating sequence -- the two Reset Identity actions
+// AND the initialization-error "Try Again" retry -- against the shared module-level
+// storage/keyring/client handles. Without this, a Reset Identity (which deletes the
+// key pair then reprovisions) could interleave with a retry's doInitialize() (which
+// generates a key pair), racing deletion against generation and overwriting the
+// shared client. A duplicate/competing tap while one is in flight is a no-op.
 let resetInProgress = false;
 let isClientReady: () => boolean = () => false;
 let getClientState: () => string = () => 'uninitialized';
@@ -2293,6 +2295,11 @@ export default function App() {
   const [initError, setInitError] = useState<InitErrorInfo | null>(null);
 
   const handleInitRetry = useCallback(async () => {
+    // Share the reset lock so a retry cannot interleave with an in-flight Reset
+    // Identity: its key deletion/reprovision must not race this retry's
+    // doInitialize() key generation against the same storage/keyring/client.
+    if (resetInProgress) return;
+    resetInProgress = true;
     setInitFailed(false);
     setInitError(null);
 
@@ -2318,6 +2325,8 @@ export default function App() {
         retriable: true,
         details: (error as Error).message,
       });
+    } finally {
+      resetInProgress = false;
     }
   }, []);
 
