@@ -446,6 +446,92 @@ describe('ICNMobileClient', () => {
       expect(typeof unsubscribe).toBe('function');
     });
   });
+
+  describe('identity reset concurrency', () => {
+    function deferred<T>() {
+      let resolve!: (v: T) => void;
+      let reject!: (e: unknown) => void;
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    }
+    const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    it('stale login cannot restore auth after reset', async () => {
+      await wallet.generateKeyPair();
+      const authStates: boolean[] = [];
+      client.onAuthStateChange((st) => authStates.push(st.isAuthenticated));
+
+      const d = deferred<{ token: string; expires_at: number }>();
+      jest.spyOn(client as any, 'authenticate').mockReturnValue(d.promise);
+
+      const loginPromise = client.login('coop-1');
+      await tick(); // let login park at the authenticate() await
+
+      await client.resetIdentity();
+
+      // Resolve the now-superseded authentication response.
+      d.resolve({ token: 'stale-token', expires_at: Date.now() + 3600000 });
+      const result = await loginPromise;
+
+      expect(result.isAuthenticated).toBe(false);
+      expect(client.authState.isAuthenticated).toBe(false);
+      expect(storage.store.has('icn_auth_token')).toBe(false);
+      expect(storage.store.has('icn_auth_did')).toBe(false);
+      // No authenticated state was ever published after the reset.
+      expect(authStates).not.toContain(true);
+    });
+
+    it('stale completeEnrollment cannot restore identity after reset', async () => {
+      const authStates: boolean[] = [];
+      client.onAuthStateChange((st) => authStates.push(st.isAuthenticated));
+
+      const d = deferred<{ ok: boolean; json: () => Promise<unknown>; text: () => Promise<string> }>();
+      const originalFetch = (globalThis as any).fetch;
+      (globalThis as any).fetch = jest.fn().mockReturnValue(d.promise);
+      try {
+        const enrollPromise = client.completeEnrollment(
+          'enroll-1',
+          'did:icn:ephemeral',
+          'sig',
+          { os: 'ios' } as any
+        );
+        await tick();
+
+        await client.resetIdentity();
+
+        d.resolve({
+          ok: true,
+          json: async () => ({ auth_token: 'Bearer stale', did: 'did:icn:old' }),
+          text: async () => '',
+        });
+        const result = (await enrollPromise) as { did: string };
+
+        // The server result is still returned, but no local auth/session is restored.
+        expect(result.did).toBe('did:icn:old');
+        expect(client.authState.isAuthenticated).toBe(false);
+        expect(storage.store.has('icn_auth_token')).toBe(false);
+        expect(authStates).not.toContain(true);
+      } finally {
+        (globalThis as any).fetch = originalFetch;
+      }
+    });
+
+    it('normal login still authenticates (no false fencing)', async () => {
+      await wallet.generateKeyPair();
+      jest
+        .spyOn(client as any, 'authenticate')
+        .mockResolvedValue({ token: 'tok', expires_at: Date.now() + 3600000 });
+
+      const result = await client.login('coop-1');
+
+      expect(result.isAuthenticated).toBe(true);
+      expect(result.did).toBe('did:icn:mock123');
+      expect(storage.store.get('icn_auth_token')).toBe('tok');
+    });
+  });
 });
 
 describe('createMobileClient', () => {

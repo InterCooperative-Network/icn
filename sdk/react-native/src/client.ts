@@ -40,6 +40,10 @@ export class ICNMobileClient extends ICNClient {
   private wallet?: ICNWallet;
   private storage?: SecureStorage;
   private queueManager: QueueManager;
+  // Monotonic identity-boundary token. resetIdentity() bumps it; in-flight login/enrollment/initialize
+  // work captures it before its network await and must not restore or publish identity state if it
+  // changed in the meantime.
+  private identityGeneration = 0;
   private _authState: AuthState = {
     isAuthenticated: false,
     did: null,
@@ -120,6 +124,7 @@ export class ICNMobileClient extends ICNClient {
   async initialize(): Promise<void> {
     if (!this.storage) return;
 
+    const gen = this.identityGeneration;
     try {
       const [token, did, coopId, expiresStr] = await Promise.all([
         this.storage.getItem(TOKEN_KEY),
@@ -137,13 +142,16 @@ export class ICNMobileClient extends ICNClient {
           return;
         }
 
-        this.setToken(token);
-        this.updateAuthState({
-          isAuthenticated: true,
-          did,
-          coopId,
-          expiresAt,
-        });
+        // If resetIdentity() ran during the storage read, do not restore the superseded session.
+        if (gen === this.identityGeneration) {
+          this.setToken(token);
+          this.updateAuthState({
+            isAuthenticated: true,
+            did,
+            coopId,
+            expiresAt,
+          });
+        }
       }
 
       // Initialize queue manager
@@ -258,6 +266,8 @@ export class ICNMobileClient extends ICNClient {
       throw new Error('No wallet configured. Set wallet in options or use loginWithSignature.');
     }
 
+    const gen = this.identityGeneration;
+
     const keyPair = await this.wallet.getKeyPair();
     if (!keyPair) {
       throw new Error('No key pair in wallet. Generate or import a key pair first.');
@@ -270,6 +280,12 @@ export class ICNMobileClient extends ICNClient {
 
     // Authenticate
     const result = await this.authenticate(keyPair.did, signer, coopId, scopes);
+
+    // If resetIdentity() ran while we were authenticating, this login is superseded: do not restore
+    // the forgotten identity's token/DID or publish authenticated state.
+    if (gen !== this.identityGeneration) {
+      return this.authState;
+    }
 
     // Use server's expiration time
     const expiresAt = result.expires_at;
@@ -297,7 +313,13 @@ export class ICNMobileClient extends ICNClient {
     coopId?: string,
     scopes?: string[]
   ): Promise<AuthState> {
+    const gen = this.identityGeneration;
     const result = await this.authenticate(did, signer, coopId, scopes);
+
+    // Superseded by resetIdentity() during authentication — do not restore the forgotten identity.
+    if (gen !== this.identityGeneration) {
+      return this.authState;
+    }
 
     // Use server's expiration time
     const expiresAt = result.expires_at;
@@ -343,6 +365,9 @@ export class ICNMobileClient extends ICNClient {
    * renamed by) the keyring storage-key family.
    */
   async resetIdentity(): Promise<void> {
+    // Bump synchronously, before any await, so all in-flight login/enrollment/initialize work is
+    // fenced and cannot restore or publish the forgotten identity after this point.
+    this.identityGeneration += 1;
     this.clearToken();
     try {
       // Attempt every persisted cleanup independently (allSettled) so one failure does not skip the
@@ -1025,6 +1050,7 @@ export class ICNMobileClient extends ICNClient {
     deviceInfo: import('./steward-types').DeviceInfo
   ): Promise<import('./steward-types').CompleteEnrollmentResponse> {
     const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const gen = this.identityGeneration;
     const response = await fetch(`${baseUrl}/v1/enrollment/complete`, {
       method: 'POST',
       headers: {
@@ -1047,6 +1073,11 @@ export class ICNMobileClient extends ICNClient {
 
     // Store the auth token and update state
     if (result.auth_token && this.storage) {
+      // Superseded by resetIdentity() during enrollment — do not restore local auth/session for the
+      // forgotten identity (the server-issued token is simply left unused).
+      if (gen !== this.identityGeneration) {
+        return result;
+      }
       const token = result.auth_token.replace(/^Bearer\s+/i, '');
       this.setToken(token);
 
