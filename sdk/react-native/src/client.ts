@@ -330,6 +330,54 @@ export class ICNMobileClient extends ICNClient {
   }
 
   /**
+   * Reset this device's identity for sign-out-and-forget / re-provision: delete the configured Device
+   * Keyring's keys, clear all persisted auth state (`icn_auth_token`, `icn_auth_did`, `icn_coop_id`,
+   * `icn_expires_at`), and clear the offline operation queue.
+   *
+   * Rotating the keyring alone is not enough: `initialize()` reloads persisted auth without checking
+   * it against the Device Keyring DID, so a fresh keyring DID would otherwise be shadowed by a stale
+   * authenticated session bound to the old DID, and `QueueManager` could replay the forgotten
+   * identity's queued operations under a new DID. Each persisted cleanup (keyring, auth, queue) is
+   * attempted independently, and the in-memory session is always invalidated, even if a cleanup step
+   * fails. These auth and queue keys are a client-session concern and are NOT part of (nor
+   * renamed by) the keyring storage-key family.
+   */
+  async resetIdentity(): Promise<void> {
+    this.clearToken();
+    try {
+      // Attempt every persisted cleanup independently (allSettled) so one failure does not skip the
+      // others: the keyring keys, the auth-session keys, and the offline operation queue must all be
+      // cleared on a sign-out-and-forget, regardless of which one fails.
+      const results = await Promise.allSettled([
+        // Async wrapper so a *synchronous* throw (e.g. from an app-supplied keyring.deleteKeyPair)
+        // becomes a rejection captured here rather than aborting the array build and skipping the
+        // other cleanups.
+        (async () => {
+          if (this.wallet) await this.wallet.deleteKeyPair();
+        })(),
+        this.clearAuth(),
+        // purge() (not clear()) so a failure to remove the persisted queue propagates here.
+        this.queueManager.purge(),
+      ]);
+      const failure = results.find((r) => r.status === 'rejected');
+      if (failure && failure.status === 'rejected') {
+        throw failure.reason;
+      }
+    } finally {
+      // Always invalidate the in-memory session, even if a persisted cleanup step rejected —
+      // otherwise the client could keep reporting an authenticated state and hold an authenticated
+      // WebSocket bound to the forgotten identity.
+      this.disconnectWebSocket();
+      this.updateAuthState({
+        isAuthenticated: false,
+        did: null,
+        coopId: null,
+        expiresAt: null,
+      });
+    }
+  }
+
+  /**
    * Subscribe to auth state changes
    */
   onAuthStateChange(listener: EventListener<AuthState>): Unsubscribe {
@@ -457,11 +505,24 @@ export class ICNMobileClient extends ICNClient {
 
   private updateAuthState(state: AuthState): void {
     this._authState = state;
-    this.authListeners.forEach((listener) => listener(state));
+    this.authListeners.forEach((listener) => {
+      try {
+        listener(state);
+      } catch (error) {
+        // A misbehaving subscriber must not break callers (e.g. identity reset).
+        console.error('Auth state listener threw:', error);
+      }
+    });
   }
 
   private notifyNetworkListeners(): void {
-    this.networkListeners.forEach((listener) => listener(this._networkState));
+    this.networkListeners.forEach((listener) => {
+      try {
+        listener(this._networkState);
+      } catch (error) {
+        console.error('Network state listener threw:', error);
+      }
+    });
   }
 
   private createWebSocket(coopId: string): void {
@@ -532,7 +593,14 @@ export class ICNMobileClient extends ICNClient {
 
   private setWsState(state: WebSocketState): void {
     this.wsState = state;
-    this.wsStateListeners.forEach((listener) => listener(state));
+    this.wsStateListeners.forEach((listener) => {
+      try {
+        listener(state);
+      } catch (error) {
+        // A misbehaving subscriber must not break callers (e.g. disconnect during identity reset).
+        console.error('Connection state listener threw:', error);
+      }
+    });
   }
 
   private attemptReconnect(coopId: string): void {

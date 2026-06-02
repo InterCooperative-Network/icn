@@ -214,6 +214,188 @@ describe('ICNMobileClient', () => {
     });
   });
 
+  describe('resetIdentity', () => {
+    it('should clear persisted auth state and purge the device keyring', async () => {
+      // Persisted auth bound to an old DID, plus a generated keyring key pair.
+      storage.store.set('icn_auth_token', 'test-token');
+      storage.store.set('icn_auth_did', 'did:icn:old');
+      storage.store.set('icn_coop_id', 'test-coop');
+      storage.store.set('icn_expires_at', (Date.now() + 3600000).toString());
+      await wallet.generateKeyPair();
+      expect(await wallet.hasKeyPair()).toBe(true);
+
+      await client.resetIdentity();
+
+      // All identity-bound auth keys are cleared so a new keyring DID is not shadowed.
+      expect(storage.store.has('icn_auth_token')).toBe(false);
+      expect(storage.store.has('icn_auth_did')).toBe(false);
+      expect(storage.store.has('icn_coop_id')).toBe(false);
+      expect(storage.store.has('icn_expires_at')).toBe(false);
+      // The configured Device Keyring is purged.
+      expect(await wallet.hasKeyPair()).toBe(false);
+      // Auth state is reset.
+      expect(client.authState.isAuthenticated).toBe(false);
+      expect(client.authState.did).toBeNull();
+    });
+
+    it('should not throw when no keyring is configured', async () => {
+      const clientNoWallet = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        storage,
+      });
+      await expect(clientNoWallet.resetIdentity()).resolves.toBeUndefined();
+    });
+
+    it('should clear the offline operation queue', async () => {
+      storage.store.set(
+        'icn_operation_queue',
+        JSON.stringify([
+          { id: '1', type: 'vote', data: {}, queuedAt: Date.now(), retries: 0, status: 'pending' },
+        ])
+      );
+      await client.initialize();
+      expect(client.queue.length).toBe(1);
+
+      await client.resetIdentity();
+
+      expect(client.queue.length).toBe(0);
+    });
+
+    it('removes the persisted queue even if a queue-change listener throws', async () => {
+      storage.store.set(
+        'icn_operation_queue',
+        JSON.stringify([
+          { id: '1', type: 'vote', data: {}, queuedAt: Date.now(), retries: 0, status: 'pending' },
+        ])
+      );
+      await client.initialize();
+      client.onQueueChange(() => {
+        throw new Error('listener boom');
+      });
+
+      // A throwing subscriber must not break reset or skip the persisted queue removal.
+      await expect(client.resetIdentity()).resolves.toBeUndefined();
+      expect(storage.store.has('icn_operation_queue')).toBe(false);
+      expect(client.queue.length).toBe(0);
+    });
+
+    it('should clear auth and queue even if keyring deletion fails', async () => {
+      const failingKeyring = {
+        ...createMockWallet(),
+        async deleteKeyPair(): Promise<void> {
+          throw new Error('secure storage unavailable');
+        },
+      };
+      const failClient = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        keyring: failingKeyring,
+        storage,
+      });
+      storage.store.set('icn_auth_token', 'test-token');
+      storage.store.set('icn_auth_did', 'did:icn:old');
+
+      await expect(failClient.resetIdentity()).rejects.toThrow('secure storage unavailable');
+
+      // Session cleanup still ran despite the keyring deletion failure.
+      expect(storage.store.has('icn_auth_token')).toBe(false);
+      expect(storage.store.has('icn_auth_did')).toBe(false);
+      expect(failClient.authState.isAuthenticated).toBe(false);
+    });
+
+    it('still invalidates the in-memory session if auth storage removal rejects', async () => {
+      const base = createMockStorage();
+      const failingStorage: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        setItem: base.setItem,
+        getItem: base.getItem,
+        hasItem: base.hasItem,
+        async removeItem(): Promise<void> {
+          throw new Error('keychain unavailable');
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        wallet,
+        storage: failingStorage,
+      });
+      failingStorage.store.set('icn_auth_token', 'test-token');
+      failingStorage.store.set('icn_auth_did', 'did:icn:old');
+      failingStorage.store.set('icn_expires_at', (Date.now() + 3600000).toString());
+      await c.initialize();
+      expect(c.authState.isAuthenticated).toBe(true);
+
+      await expect(c.resetIdentity()).rejects.toThrow('keychain unavailable');
+
+      // The in-memory session is invalidated even though persisted removal failed.
+      expect(c.authState.isAuthenticated).toBe(false);
+      expect(c.authState.did).toBeNull();
+    });
+
+    it('surfaces a queue persistence failure during reset', async () => {
+      const base = createMockStorage();
+      const failingStorage: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        setItem: base.setItem,
+        getItem: base.getItem,
+        hasItem: base.hasItem,
+        async removeItem(key: string): Promise<void> {
+          if (key === 'icn_operation_queue') {
+            throw new Error('queue storage unavailable');
+          }
+          base.store.delete(key);
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        wallet,
+        storage: failingStorage,
+      });
+
+      // The reset must reject so the caller knows sign-out-and-forget did not fully complete.
+      await expect(c.resetIdentity()).rejects.toThrow('queue storage unavailable');
+      // The in-memory session is still invalidated.
+      expect(c.authState.isAuthenticated).toBe(false);
+    });
+
+    it('clears the session even if keyring deleteKeyPair throws synchronously', async () => {
+      const syncThrowKeyring = {
+        ...createMockWallet(),
+        deleteKeyPair(): Promise<void> {
+          throw new Error('sync boom');
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        keyring: syncThrowKeyring,
+        storage,
+      });
+      storage.store.set('icn_auth_token', 'test-token');
+      storage.store.set('icn_auth_did', 'did:icn:old');
+
+      await expect(c.resetIdentity()).rejects.toThrow('sync boom');
+
+      // A synchronous throw from the keyring must not skip auth/queue cleanup or state reset.
+      expect(storage.store.has('icn_auth_token')).toBe(false);
+      expect(storage.store.has('icn_auth_did')).toBe(false);
+      expect(c.authState.isAuthenticated).toBe(false);
+    });
+
+    it('completes reset even if a connection-state listener throws', async () => {
+      storage.store.set('icn_auth_token', 'test-token');
+      storage.store.set('icn_auth_did', 'did:icn:old');
+      storage.store.set('icn_expires_at', (Date.now() + 3600000).toString());
+      await client.initialize();
+      client.onConnectionStateChange(() => {
+        throw new Error('ws listener boom');
+      });
+
+      // A throwing connection-state subscriber must not skip the auth-state reset.
+      await expect(client.resetIdentity()).resolves.toBeUndefined();
+      expect(client.authState.isAuthenticated).toBe(false);
+      expect(storage.store.has('icn_auth_token')).toBe(false);
+    });
+  });
+
   describe('connectRealtime', () => {
     it('should throw without coop ID', () => {
       expect(() => client.connectRealtime()).toThrow('No coop ID provided');

@@ -41,19 +41,33 @@ import {
   getHybridCryptoInfo,
 } from './hybrid-crypto';
 
-// Storage keys for hybrid wallet
-const HYBRID_KEYPAIR_KEY = 'icn_hybrid_wallet_keypair';
-const HYBRID_PUBLIC_KEY_KEY = 'icn_hybrid_wallet_public_key';
-const DID_KEY = 'icn_wallet_did';
-const WALLET_VERSION_KEY = 'icn_wallet_version';
+// Canonical hybrid Device Keyring storage keys. The legacy `icn_hybrid_wallet_*` / `icn_wallet_*`
+// names are pre-release with no installed base, so they are renamed directly here — no lazy
+// migration is performed (see docs/design/wallet-did-migration-boundary.md).
+const HYBRID_KEYPAIR_KEY = 'icn_hybrid_keyring_keypair';
+const HYBRID_PUBLIC_KEY_KEY = 'icn_hybrid_keyring_public_key';
+const DID_KEY = 'icn_keyring_did';
+const KEYRING_VERSION_KEY = 'icn_keyring_version';
 
-// Classical wallet keys (for migration)
-const CLASSICAL_PRIVATE_KEY = 'icn_wallet_private_key';
-const CLASSICAL_PUBLIC_KEY = 'icn_wallet_public_key';
+// Classical (Ed25519-only) keyring keys — the same canonical strings the classical Device Keyring
+// (wallet.ts) writes, so the in-app classical -> hybrid upgrade path still finds an existing
+// classical keyring.
+const CLASSICAL_PRIVATE_KEY = 'icn_keyring_private_key';
+const CLASSICAL_PUBLIC_KEY = 'icn_keyring_public_key';
 
-// Wallet versions
-const WALLET_VERSION_CLASSICAL = '1';
+// Keyring storage-format version marker (hybrid). Classical keyrings write no version marker.
 const WALLET_VERSION_HYBRID = '2';
+
+// Legacy wallet-named keys, retained ONLY so deleteKeyPair() can defensively purge them
+// (a no-op on a fresh install). These are never written.
+const LEGACY_KEYS = [
+  'icn_hybrid_wallet_keypair',
+  'icn_hybrid_wallet_public_key',
+  'icn_wallet_did',
+  'icn_wallet_version',
+  'icn_wallet_private_key',
+  'icn_wallet_public_key',
+];
 
 /**
  * Hybrid key pair info (safe to expose - no secrets)
@@ -121,7 +135,7 @@ export class HybridWallet {
       this.storage.setItem(HYBRID_KEYPAIR_KEY, keypairJson),
       this.storage.setItem(HYBRID_PUBLIC_KEY_KEY, HybridCrypto.serializePublicKey(keypair.publicKey)),
       this.storage.setItem(DID_KEY, keypair.did),
-      this.storage.setItem(WALLET_VERSION_KEY, WALLET_VERSION_HYBRID),
+      this.storage.setItem(KEYRING_VERSION_KEY, WALLET_VERSION_HYBRID),
     ]);
 
     this.cachedKeyPair = keypair;
@@ -152,7 +166,7 @@ export class HybridWallet {
       this.storage.setItem(HYBRID_KEYPAIR_KEY, keypairJson),
       this.storage.setItem(HYBRID_PUBLIC_KEY_KEY, HybridCrypto.serializePublicKey(keypair.publicKey)),
       this.storage.setItem(DID_KEY, keypair.did),
-      this.storage.setItem(WALLET_VERSION_KEY, WALLET_VERSION_HYBRID),
+      this.storage.setItem(KEYRING_VERSION_KEY, WALLET_VERSION_HYBRID),
     ]);
 
     this.cachedKeyPair = keypair;
@@ -201,7 +215,7 @@ export class HybridWallet {
    * Check if this is a hybrid wallet (vs classical-only)
    */
   async isHybrid(): Promise<boolean> {
-    const version = await this.storage.getItem(WALLET_VERSION_KEY);
+    const version = await this.storage.getItem(KEYRING_VERSION_KEY);
     return version === WALLET_VERSION_HYBRID;
   }
 
@@ -371,7 +385,7 @@ export class HybridWallet {
       this.storage.setItem(HYBRID_KEYPAIR_KEY, keypairJson),
       this.storage.setItem(HYBRID_PUBLIC_KEY_KEY, HybridCrypto.serializePublicKey(keypair.publicKey)),
       this.storage.setItem(DID_KEY, did),
-      this.storage.setItem(WALLET_VERSION_KEY, WALLET_VERSION_HYBRID),
+      this.storage.setItem(KEYRING_VERSION_KEY, WALLET_VERSION_HYBRID),
     ]);
 
     // Clean up old classical-only keys (optional - keep for backwards compat)
@@ -392,17 +406,22 @@ export class HybridWallet {
    * Delete all keys (classical and hybrid)
    */
   async deleteKeyPair(): Promise<void> {
-    await Promise.all([
-      this.storage.removeItem(HYBRID_KEYPAIR_KEY),
-      this.storage.removeItem(HYBRID_PUBLIC_KEY_KEY),
-      this.storage.removeItem(DID_KEY),
-      this.storage.removeItem(WALLET_VERSION_KEY),
-      this.storage.removeItem(CLASSICAL_PRIVATE_KEY),
-      this.storage.removeItem(CLASSICAL_PUBLIC_KEY),
-    ]);
-
-    this.cachedKeyPair = null;
-    this.isHybridMode = false;
+    try {
+      await Promise.all([
+        this.storage.removeItem(HYBRID_KEYPAIR_KEY),
+        this.storage.removeItem(HYBRID_PUBLIC_KEY_KEY),
+        this.storage.removeItem(DID_KEY),
+        this.storage.removeItem(KEYRING_VERSION_KEY),
+        this.storage.removeItem(CLASSICAL_PRIVATE_KEY),
+        this.storage.removeItem(CLASSICAL_PUBLIC_KEY),
+        // Defensive: also purge any legacy wallet-named keys (no-op on fresh installs).
+        ...LEGACY_KEYS.map((k) => this.storage.removeItem(k)),
+      ]);
+    } finally {
+      // Always drop cached secrets, even if a storage removal rejected.
+      this.cachedKeyPair = null;
+      this.isHybridMode = false;
+    }
   }
 
   /**

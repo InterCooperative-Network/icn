@@ -43,10 +43,14 @@ describe('ICNWalletImpl', () => {
       expect(keyPair.did).toBeDefined();
       expect(keyPair.did).toMatch(/^did:icn:/);
 
-      // Verify stored in storage (keys use underscores, not slashes - SecureStore requirement)
-      expect(storage.store.has('icn_wallet_private_key')).toBe(true);
-      expect(storage.store.has('icn_wallet_public_key')).toBe(true);
-      expect(storage.store.has('icn_wallet_did')).toBe(true);
+      // Verify stored under canonical keyring keys (underscores, not slashes - SecureStore requirement)
+      expect(storage.store.has('icn_keyring_private_key')).toBe(true);
+      expect(storage.store.has('icn_keyring_public_key')).toBe(true);
+      expect(storage.store.has('icn_keyring_did')).toBe(true);
+      // No legacy wallet-named storage keys are written on a fresh keyring.
+      expect(storage.store.has('icn_wallet_private_key')).toBe(false);
+      expect(storage.store.has('icn_wallet_public_key')).toBe(false);
+      expect(storage.store.has('icn_wallet_did')).toBe(false);
     });
 
     it('should generate unique key pairs', async () => {
@@ -84,9 +88,11 @@ describe('ICNWalletImpl', () => {
       const privateKey = 'b'.repeat(64);
       await wallet.importKeyPair(privateKey);
 
-      expect(storage.store.get('icn_wallet_private_key')).toBe(privateKey);
-      expect(storage.store.has('icn_wallet_public_key')).toBe(true);
-      expect(storage.store.has('icn_wallet_did')).toBe(true);
+      expect(storage.store.get('icn_keyring_private_key')).toBe(privateKey);
+      expect(storage.store.has('icn_keyring_public_key')).toBe(true);
+      expect(storage.store.has('icn_keyring_did')).toBe(true);
+      // No legacy wallet-named storage keys are written on import.
+      expect(storage.store.has('icn_wallet_private_key')).toBe(false);
     });
   });
 
@@ -125,9 +131,54 @@ describe('ICNWalletImpl', () => {
 
       await wallet.deleteKeyPair();
 
+      expect(storage.store.has('icn_keyring_private_key')).toBe(false);
+      expect(storage.store.has('icn_keyring_public_key')).toBe(false);
+      expect(storage.store.has('icn_keyring_did')).toBe(false);
+    });
+
+    it('should defensively purge legacy and hybrid-namespace keys', async () => {
+      await wallet.generateKeyPair();
+      // Simulate stray legacy classical keys and a prior hybrid keyring in the same namespace.
+      storage.store.set('icn_wallet_private_key', 'stale');
+      storage.store.set('icn_wallet_public_key', 'stale');
+      storage.store.set('icn_wallet_did', 'did:icn:stale');
+      storage.store.set('icn_hybrid_keyring_keypair', 'stale');
+      storage.store.set('icn_hybrid_wallet_keypair', 'stale');
+      storage.store.set('icn_keyring_version', '2');
+
+      await wallet.deleteKeyPair();
+
       expect(storage.store.has('icn_wallet_private_key')).toBe(false);
       expect(storage.store.has('icn_wallet_public_key')).toBe(false);
       expect(storage.store.has('icn_wallet_did')).toBe(false);
+      // A prior hybrid keyring in the same namespace is also forgotten.
+      expect(storage.store.has('icn_hybrid_keyring_keypair')).toBe(false);
+      expect(storage.store.has('icn_hybrid_wallet_keypair')).toBe(false);
+      expect(storage.store.has('icn_keyring_version')).toBe(false);
+    });
+
+    it('clears cached secrets even if a storage removal fails', async () => {
+      const base = createMockStorage();
+      const failing: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        setItem: base.setItem,
+        getItem: base.getItem,
+        hasItem: base.hasItem,
+        async removeItem(key: string): Promise<void> {
+          if (key === 'icn_wallet_private_key') {
+            throw new Error('storage unavailable');
+          }
+          base.store.delete(key);
+        },
+      };
+      const w = new ICNWalletImpl(failing);
+      await w.generateKeyPair();
+
+      await expect(w.deleteKeyPair()).rejects.toThrow('storage unavailable');
+
+      // The canonical private key was removed; the cache must also be cleared, so signing fails
+      // instead of using a stale cached private key.
+      await expect(w.sign('00')).rejects.toThrow('No private key stored');
     });
 
     it('should clear the cache', async () => {

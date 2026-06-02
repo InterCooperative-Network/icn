@@ -65,14 +65,26 @@ describe('Keyring aliases', () => {
     expect(await legacy.hasKeyPair()).toBe(false);
   });
 
-  it('persisted secure-storage keys are unchanged (no migration)', async () => {
+  it('writes canonical keyring storage keys (no wallet-named keys)', async () => {
     const storage = createMockStorage();
     const keyring = createKeyring(storage);
     await keyring.generateKeyPair();
-    // Canonical naming must not migrate or rename the legacy persisted keys.
-    expect(storage.store.has('icn_wallet_private_key')).toBe(true);
-    expect(storage.store.has('icn_wallet_public_key')).toBe(true);
-    expect(storage.store.has('icn_wallet_did')).toBe(true);
+    // The Device Keyring persists under canonical `icn_keyring_*` storage keys.
+    expect(storage.store.has('icn_keyring_private_key')).toBe(true);
+    expect(storage.store.has('icn_keyring_public_key')).toBe(true);
+    expect(storage.store.has('icn_keyring_did')).toBe(true);
+    // No legacy wallet-named storage keys remain in the key-custody layer.
+    expect(storage.store.has('icn_wallet_private_key')).toBe(false);
+    expect(storage.store.has('icn_wallet_public_key')).toBe(false);
+    expect(storage.store.has('icn_wallet_did')).toBe(false);
+  });
+
+  it('legacy createWallet still writes canonical keyring storage keys', async () => {
+    const storage = createMockStorage();
+    const legacy = createWallet(storage);
+    await legacy.generateKeyPair();
+    expect(storage.store.has('icn_keyring_did')).toBe(true);
+    expect(storage.store.has('icn_wallet_did')).toBe(false);
   });
 
   it('createHybridKeyring produces a working hybrid Device Keyring', async () => {

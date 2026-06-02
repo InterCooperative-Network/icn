@@ -46,11 +46,16 @@ describe('HybridWallet', () => {
       expect(keyPairInfo.isHybrid).toBe(true);
       expect(keyPairInfo.publicKeySize).toBe(32 + ML_DSA_SIZES.PUBLIC_KEY);
 
-      // Verify stored
-      expect(storage.store.has('icn_hybrid_wallet_keypair')).toBe(true);
-      expect(storage.store.has('icn_hybrid_wallet_public_key')).toBe(true);
-      expect(storage.store.has('icn_wallet_did')).toBe(true);
-      expect(storage.store.get('icn_wallet_version')).toBe('2');
+      // Verify stored under canonical hybrid keyring keys
+      expect(storage.store.has('icn_hybrid_keyring_keypair')).toBe(true);
+      expect(storage.store.has('icn_hybrid_keyring_public_key')).toBe(true);
+      expect(storage.store.has('icn_keyring_did')).toBe(true);
+      expect(storage.store.get('icn_keyring_version')).toBe('2');
+      // No legacy wallet-named storage keys are written on a fresh hybrid keyring.
+      expect(storage.store.has('icn_hybrid_wallet_keypair')).toBe(false);
+      expect(storage.store.has('icn_hybrid_wallet_public_key')).toBe(false);
+      expect(storage.store.has('icn_wallet_did')).toBe(false);
+      expect(storage.store.has('icn_wallet_version')).toBe(false);
     });
 
     it('should generate unique keypairs', async () => {
@@ -225,9 +230,52 @@ describe('HybridWallet', () => {
 
       await wallet.deleteKeyPair();
 
+      expect(storage.store.has('icn_hybrid_keyring_keypair')).toBe(false);
+      expect(storage.store.has('icn_hybrid_keyring_public_key')).toBe(false);
+      expect(storage.store.has('icn_keyring_did')).toBe(false);
+    });
+
+    it('should defensively purge legacy wallet-named keys', async () => {
+      await wallet.generateKeyPair();
+      // Simulate stray legacy keys (e.g. from a pre-rename dev build); delete must clear them.
+      storage.store.set('icn_hybrid_wallet_keypair', 'stale');
+      storage.store.set('icn_hybrid_wallet_public_key', 'stale');
+      storage.store.set('icn_wallet_did', 'did:icn:stale');
+      storage.store.set('icn_wallet_version', '1');
+      storage.store.set('icn_wallet_private_key', 'stale');
+      storage.store.set('icn_wallet_public_key', 'stale');
+
+      await wallet.deleteKeyPair();
+
       expect(storage.store.has('icn_hybrid_wallet_keypair')).toBe(false);
       expect(storage.store.has('icn_hybrid_wallet_public_key')).toBe(false);
       expect(storage.store.has('icn_wallet_did')).toBe(false);
+      expect(storage.store.has('icn_wallet_version')).toBe(false);
+      expect(storage.store.has('icn_wallet_private_key')).toBe(false);
+      expect(storage.store.has('icn_wallet_public_key')).toBe(false);
+    });
+
+    it('clears cached secrets even if a storage removal fails', async () => {
+      const base = createMockStorage();
+      const failing: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        setItem: base.setItem,
+        getItem: base.getItem,
+        hasItem: base.hasItem,
+        async removeItem(key: string): Promise<void> {
+          if (key === 'icn_hybrid_wallet_keypair') {
+            throw new Error('storage unavailable');
+          }
+          base.store.delete(key);
+        },
+      };
+      const w = new HybridWallet(failing);
+      await w.generateKeyPair();
+
+      await expect(w.deleteKeyPair()).rejects.toThrow('storage unavailable');
+
+      // The canonical keypair was removed and the cache cleared, so no keypair is returned.
+      expect(await w.getKeyPairInfo()).toBeNull();
     });
 
     it('should clear the cache', async () => {
@@ -296,16 +344,16 @@ describe('HybridWallet', () => {
 
   describe('migration from classical', () => {
     it('should detect classical-only keys', async () => {
-      // Simulate classical-only wallet
-      storage.store.set('icn_wallet_private_key', 'a'.repeat(64));
-      storage.store.set('icn_wallet_public_key', 'b'.repeat(64));
+      // Simulate classical-only keyring (canonical key names)
+      storage.store.set('icn_keyring_private_key', 'a'.repeat(64));
+      storage.store.set('icn_keyring_public_key', 'b'.repeat(64));
 
       expect(await wallet.hasClassicalOnlyKeys()).toBe(true);
     });
 
     it('should not detect classical-only when hybrid exists', async () => {
-      // Set both classical and hybrid
-      storage.store.set('icn_wallet_private_key', 'a'.repeat(64));
+      // Set both classical and hybrid (canonical key names)
+      storage.store.set('icn_keyring_private_key', 'a'.repeat(64));
       await wallet.generateKeyPair();
 
       expect(await wallet.hasClassicalOnlyKeys()).toBe(false);
@@ -316,10 +364,10 @@ describe('HybridWallet', () => {
       // Use a valid 32-byte private key
       const privateKeyHex = '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef';
       // Derive the public key (we'll just use a placeholder for test)
-      storage.store.set('icn_wallet_private_key', privateKeyHex);
-      storage.store.set('icn_wallet_public_key', 'c'.repeat(64));
-      storage.store.set('icn_wallet_did', 'did:icn:zTest123');
-      storage.store.set('icn_wallet_version', '1');
+      storage.store.set('icn_keyring_private_key', privateKeyHex);
+      storage.store.set('icn_keyring_public_key', 'c'.repeat(64));
+      storage.store.set('icn_keyring_did', 'did:icn:zTest123');
+      storage.store.set('icn_keyring_version', '1');
 
       expect(await wallet.hasClassicalOnlyKeys()).toBe(true);
 
