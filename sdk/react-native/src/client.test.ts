@@ -446,6 +446,325 @@ describe('ICNMobileClient', () => {
       expect(typeof unsubscribe).toBe('function');
     });
   });
+
+  describe('identity reset concurrency', () => {
+    function deferred<T>() {
+      let resolve!: (v: T) => void;
+      let reject!: (e: unknown) => void;
+      const promise = new Promise<T>((res, rej) => {
+        resolve = res;
+        reject = rej;
+      });
+      return { promise, resolve, reject };
+    }
+    const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
+    it('stale login cannot restore auth after reset', async () => {
+      await wallet.generateKeyPair();
+      const authStates: boolean[] = [];
+      client.onAuthStateChange((st) => authStates.push(st.isAuthenticated));
+
+      const d = deferred<{ token: string; expires_at: number }>();
+      jest.spyOn(client as any, 'authenticate').mockReturnValue(d.promise);
+
+      const loginPromise = client.login('coop-1');
+      await tick(); // let login park at the authenticate() await
+
+      await client.resetIdentity();
+
+      // Resolve the now-superseded authentication response.
+      d.resolve({ token: 'stale-token', expires_at: Date.now() + 3600000 });
+      const result = await loginPromise;
+
+      expect(result.isAuthenticated).toBe(false);
+      expect(client.authState.isAuthenticated).toBe(false);
+      expect(storage.store.has('icn_auth_token')).toBe(false);
+      expect(storage.store.has('icn_auth_did')).toBe(false);
+      // No authenticated state was ever published after the reset.
+      expect(authStates).not.toContain(true);
+    });
+
+    it('stale completeEnrollment cannot restore identity after reset', async () => {
+      const authStates: boolean[] = [];
+      client.onAuthStateChange((st) => authStates.push(st.isAuthenticated));
+
+      const d = deferred<{ ok: boolean; json: () => Promise<unknown>; text: () => Promise<string> }>();
+      const originalFetch = (globalThis as any).fetch;
+      (globalThis as any).fetch = jest.fn().mockReturnValue(d.promise);
+      try {
+        const enrollPromise = client.completeEnrollment(
+          'enroll-1',
+          'did:icn:ephemeral',
+          'sig',
+          { os: 'ios' } as any
+        );
+        await tick();
+
+        await client.resetIdentity();
+
+        d.resolve({
+          ok: true,
+          json: async () => ({ auth_token: 'Bearer stale', did: 'did:icn:old' }),
+          text: async () => '',
+        });
+        const result = (await enrollPromise) as { did: string };
+
+        // The server result is still returned, but no local auth/session is restored.
+        expect(result.did).toBe('did:icn:old');
+        expect(client.authState.isAuthenticated).toBe(false);
+        expect(storage.store.has('icn_auth_token')).toBe(false);
+        expect(authStates).not.toContain(true);
+      } finally {
+        (globalThis as any).fetch = originalFetch;
+      }
+    });
+
+    it('normal login still authenticates (no false fencing)', async () => {
+      await wallet.generateKeyPair();
+      jest
+        .spyOn(client as any, 'authenticate')
+        .mockResolvedValue({ token: 'tok', expires_at: Date.now() + 3600000 });
+
+      const result = await client.login('coop-1');
+
+      expect(result.isAuthenticated).toBe(true);
+      expect(result.did).toBe('did:icn:mock123');
+      expect(storage.store.get('icn_auth_token')).toBe('tok');
+    });
+
+    it('clears the inherited token that a stale authenticate restored after reset', async () => {
+      await wallet.generateKeyPair();
+      const d = deferred<{ token: string; expires_at: number }>();
+      // The real base ICNClient.authenticate() calls setToken() before resolving; mimic that so the
+      // forgotten identity's JWT is set on the base/WASM client during the stale login.
+      jest.spyOn(client as any, 'authenticate').mockImplementation(() =>
+        d.promise.then((auth: { token: string; expires_at: number }) => {
+          (client as any).setToken(auth.token, auth.expires_at);
+          return auth;
+        })
+      );
+
+      const loginPromise = client.login('coop-1');
+      await tick();
+      await client.resetIdentity();
+      d.resolve({ token: 'stale-jwt', expires_at: Date.now() + 3600000 });
+      await loginPromise;
+
+      expect(client.authState.isAuthenticated).toBe(false);
+      // The token authenticate() restored after the reset must be cleared from the base client.
+      expect((client as any).hasToken()).toBe(false);
+      expect(storage.store.has('icn_auth_token')).toBe(false);
+    });
+
+    it('stale persistAuth cannot resurrect auth after reset (serialized auth writes)', async () => {
+      await wallet.generateKeyPair();
+      const gate = deferred<void>();
+      let gateOnce = true;
+      const base = createMockStorage();
+      // First setItem is gated, so login's persistAuth holds the auth write lock while the reset's
+      // clearAuth is forced to wait behind it.
+      const gatedStorage: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        getItem: base.getItem,
+        hasItem: base.hasItem,
+        removeItem: base.removeItem,
+        async setItem(k: string, v: string): Promise<void> {
+          if (gateOnce) {
+            gateOnce = false;
+            await gate.promise;
+          }
+          base.store.set(k, v);
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        wallet,
+        storage: gatedStorage,
+      });
+      jest
+        .spyOn(c as any, 'authenticate')
+        .mockResolvedValue({ token: 'tok', expires_at: Date.now() + 3600000 });
+
+      const loginPromise = c.login('coop-1'); // parks inside persistAuth at the gated setItem
+      await tick();
+      const resetPromise = c.resetIdentity(); // clearAuth serialized behind persistAuth
+      gate.resolve();
+      await Promise.all([loginPromise, resetPromise]);
+
+      // clearAuth wins (serialized after persistAuth): no resurrected auth, not authenticated.
+      expect(gatedStorage.store.has('icn_auth_token')).toBe(false);
+      expect(gatedStorage.store.has('icn_auth_did')).toBe(false);
+      expect(c.authState.isAuthenticated).toBe(false);
+    });
+
+    it('a partially-failed persistAuth batch cannot resurrect auth after reset (allSettled barrier)', async () => {
+      await wallet.generateKeyPair();
+      // DID write rejects immediately; TOKEN write is slow (gated). The allSettled barrier must keep
+      // the auth-write lock held until BOTH settle, so the reset's clearAuth runs strictly afterward
+      // and the slow token write cannot land after it.
+      const tokenGate = deferred<void>();
+      const base = createMockStorage();
+      const gatedStorage: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        getItem: base.getItem,
+        hasItem: base.hasItem,
+        removeItem: base.removeItem,
+        async setItem(k: string, v: string): Promise<void> {
+          if (k === 'icn_auth_did') {
+            throw new Error('did write failed');
+          }
+          if (k === 'icn_auth_token') {
+            await tokenGate.promise; // straggler write that must not outlive the lock
+          }
+          base.store.set(k, v);
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        wallet,
+        storage: gatedStorage,
+      });
+      jest
+        .spyOn(c as any, 'authenticate')
+        .mockResolvedValue({ token: 'tok', expires_at: Date.now() + 3600000 });
+
+      const loginPromise = c.login('coop-1'); // parks in persistAuth holding the auth-write lock
+      await tick();
+      const resetPromise = c.resetIdentity(); // clearAuth queued strictly behind persistAuth
+      tokenGate.resolve(); // release the slow token write
+      await Promise.allSettled([loginPromise, resetPromise]);
+
+      // The straggler token write completed inside the lock; clearAuth then removed it. No resurrection.
+      expect(gatedStorage.store.has('icn_auth_token')).toBe(false);
+      expect(gatedStorage.store.has('icn_auth_did')).toBe(false);
+      expect(c.authState.isAuthenticated).toBe(false);
+    });
+
+    it('a synchronous storage throw cannot resurrect auth after reset (sync-throw normalized)', async () => {
+      await wallet.generateKeyPair();
+      // DID write throws SYNCHRONOUSLY; TOKEN write is slow (gated). The async-wrapped allSettled
+      // barrier must still await the in-flight token write before releasing the lock.
+      const tokenGate = deferred<void>();
+      const base = createMockStorage();
+      const gatedStorage: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        getItem: base.getItem,
+        hasItem: base.hasItem,
+        removeItem: base.removeItem,
+        // Intentionally NOT async so it can throw synchronously, like a misbehaving native adapter.
+        setItem(k: string, v: string): Promise<void> {
+          if (k === 'icn_auth_did') {
+            throw new Error('sync did write failed');
+          }
+          if (k === 'icn_auth_token') {
+            return tokenGate.promise.then(() => {
+              base.store.set(k, v);
+            });
+          }
+          base.store.set(k, v);
+          return Promise.resolve();
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        wallet,
+        storage: gatedStorage,
+      });
+      jest
+        .spyOn(c as any, 'authenticate')
+        .mockResolvedValue({ token: 'tok', expires_at: Date.now() + 3600000 });
+
+      const loginPromise = c.login('coop-1');
+      await tick();
+      const resetPromise = c.resetIdentity();
+      tokenGate.resolve();
+      await Promise.allSettled([loginPromise, resetPromise]);
+
+      expect(gatedStorage.store.has('icn_auth_token')).toBe(false);
+      expect(c.authState.isAuthenticated).toBe(false);
+    });
+
+    it('initialize() running during a reset cannot restore a token mid-removal', async () => {
+      // A valid persisted session exists; resetIdentity()'s clearAuth removals are gated so they are
+      // still in flight while initialize() runs concurrently.
+      const removeGate = deferred<void>();
+      let removeGateOnce = true;
+      const base = createMockStorage();
+      base.store.set('icn_auth_token', 'old-token');
+      base.store.set('icn_auth_did', 'did:icn:old');
+      base.store.set('icn_expires_at', (Date.now() + 3600000).toString());
+      const gatedStorage: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        getItem: base.getItem,
+        setItem: base.setItem,
+        hasItem: base.hasItem,
+        async removeItem(k: string): Promise<void> {
+          if (removeGateOnce && k === 'icn_auth_token') {
+            removeGateOnce = false;
+            await removeGate.promise;
+          }
+          base.store.delete(k);
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        wallet,
+        storage: gatedStorage,
+      });
+
+      const resetPromise = c.resetIdentity(); // gen++, clearAuth removals gated (auth lock held)
+      const initPromise = c.initialize(); // its serialized auth read is queued behind clearAuth
+      removeGate.resolve();
+      await Promise.all([resetPromise, initPromise]);
+
+      // initialize read after clearAuth completed -> empty -> nothing restored.
+      expect(c.authState.isAuthenticated).toBe(false);
+      expect(gatedStorage.store.has('icn_auth_token')).toBe(false);
+      expect((c as any).hasToken()).toBe(false);
+    });
+
+    it('a superseded initialize does not clear auth in its expiry branch', async () => {
+      // initialize() reads an EXPIRED old session; its read is gated so a reset can bump the
+      // generation before initialize reaches the expiry branch.
+      const readGate = deferred<void>();
+      let readGateOnce = true;
+      const base = createMockStorage();
+      base.store.set('icn_auth_token', 'old-expired');
+      base.store.set('icn_auth_did', 'did:icn:old');
+      base.store.set('icn_expires_at', (Date.now() - 1000).toString()); // already expired
+      const gatedStorage: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        setItem: base.setItem,
+        hasItem: base.hasItem,
+        removeItem: base.removeItem,
+        async getItem(k: string): Promise<string | null> {
+          const snapshot = base.store.get(k) ?? null; // value at read time (the old expired session)
+          if (readGateOnce && k === 'icn_auth_token') {
+            readGateOnce = false;
+            await readGate.promise;
+          }
+          return snapshot;
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        wallet,
+        storage: gatedStorage,
+      });
+      const clearAuthSpy = jest.spyOn(c as any, 'clearAuth');
+
+      const initPromise = c.initialize(); // read gated; generation captured before reset
+      await tick();
+      const resetPromise = c.resetIdentity(); // gen++; its own clearAuth is the only legitimate one
+      readGate.resolve();
+      await Promise.all([initPromise, resetPromise]);
+
+      // resetIdentity legitimately calls clearAuth once; the superseded initialize must NOT call it
+      // again from its expiry branch (which would clobber any replacement session).
+      expect(clearAuthSpy).toHaveBeenCalledTimes(1);
+      expect(c.authState.isAuthenticated).toBe(false);
+    });
+  });
 });
 
 describe('createMobileClient', () => {

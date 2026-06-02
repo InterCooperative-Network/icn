@@ -40,6 +40,13 @@ export class ICNMobileClient extends ICNClient {
   private wallet?: ICNWallet;
   private storage?: SecureStorage;
   private queueManager: QueueManager;
+  // Monotonic identity-boundary token. resetIdentity() bumps it; in-flight login/enrollment/initialize
+  // work captures it before its network await and must not restore or publish identity state if it
+  // changed in the meantime.
+  private identityGeneration = 0;
+  // Serializes persisted-auth storage mutations (persistAuth/clearAuth) so a late persistAuth() write
+  // cannot interleave with — or land after — a reset's clearAuth() and resurrect the forgotten token.
+  private authWriteChain: Promise<unknown> = Promise.resolve();
   private _authState: AuthState = {
     isAuthenticated: false,
     did: null,
@@ -120,15 +127,24 @@ export class ICNMobileClient extends ICNClient {
   async initialize(): Promise<void> {
     if (!this.storage) return;
 
+    const gen = this.identityGeneration;
     try {
-      const [token, did, coopId, expiresStr] = await Promise.all([
-        this.storage.getItem(TOKEN_KEY),
-        this.storage.getItem(DID_KEY),
-        this.storage.getItem(COOP_KEY),
-        this.storage.getItem(EXPIRES_KEY),
-      ]);
+      // Read auth state through the auth-write lock so a concurrent resetIdentity()'s clearAuth() has
+      // completed first (read-after-write consistency); otherwise we could read a token that is
+      // mid-removal and restore the forgotten identity.
+      const [token, did, coopId, expiresStr] = await this.runAuthExclusive(() =>
+        Promise.all([
+          this.storage!.getItem(TOKEN_KEY),
+          this.storage!.getItem(DID_KEY),
+          this.storage!.getItem(COOP_KEY),
+          this.storage!.getItem(EXPIRES_KEY),
+        ])
+      );
 
-      if (token && did) {
+      // Only touch auth state if this initialize has not been superseded by a reset (or a newer
+      // login). This fences BOTH the restore AND the expired-token clearAuth, so a stale initializer
+      // can neither resurrect the forgotten identity nor clear a replacement session.
+      if (token && did && gen === this.identityGeneration) {
         const expiresAt = expiresStr ? parseInt(expiresStr, 10) : null;
 
         // Check if token is expired
@@ -258,6 +274,8 @@ export class ICNMobileClient extends ICNClient {
       throw new Error('No wallet configured. Set wallet in options or use loginWithSignature.');
     }
 
+    const gen = this.identityGeneration;
+
     const keyPair = await this.wallet.getKeyPair();
     if (!keyPair) {
       throw new Error('No key pair in wallet. Generate or import a key pair first.');
@@ -271,11 +289,26 @@ export class ICNMobileClient extends ICNClient {
     // Authenticate
     const result = await this.authenticate(keyPair.did, signer, coopId, scopes);
 
+    // If resetIdentity() ran while we were authenticating, this login is superseded. authenticate()
+    // already set the inherited bearer token (+ auto-refresh creds + WASM token); clear them so the
+    // forgotten identity cannot keep making authenticated requests, and do not publish auth state.
+    if (gen !== this.identityGeneration) {
+      this.clearToken();
+      return this.authState;
+    }
+
     // Use server's expiration time
     const expiresAt = result.expires_at;
 
-    // Persist auth state
-    await this.persistAuth(result.token, keyPair.did, coopId || null, expiresAt);
+    // Persist auth state (generation-fenced: skipped if a reset supersedes it mid-write)
+    await this.persistAuth(result.token, keyPair.did, coopId || null, expiresAt, gen);
+
+    // Re-check: a reset may have run while persistAuth was awaiting storage. If so, drop the token
+    // and do not publish authenticated state.
+    if (gen !== this.identityGeneration) {
+      this.clearToken();
+      return this.authState;
+    }
 
     // Update state
     this.updateAuthState({
@@ -297,11 +330,25 @@ export class ICNMobileClient extends ICNClient {
     coopId?: string,
     scopes?: string[]
   ): Promise<AuthState> {
+    const gen = this.identityGeneration;
     const result = await this.authenticate(did, signer, coopId, scopes);
+
+    // Superseded by resetIdentity() during authentication. authenticate() already set the inherited
+    // token (+ auto-refresh creds + WASM token); clear them and do not restore the forgotten identity.
+    if (gen !== this.identityGeneration) {
+      this.clearToken();
+      return this.authState;
+    }
 
     // Use server's expiration time
     const expiresAt = result.expires_at;
-    await this.persistAuth(result.token, did, coopId || null, expiresAt);
+    await this.persistAuth(result.token, did, coopId || null, expiresAt, gen);
+
+    // Re-check after the awaited persist; a reset may have superseded us mid-write.
+    if (gen !== this.identityGeneration) {
+      this.clearToken();
+      return this.authState;
+    }
 
     this.updateAuthState({
       isAuthenticated: true,
@@ -343,6 +390,9 @@ export class ICNMobileClient extends ICNClient {
    * renamed by) the keyring storage-key family.
    */
   async resetIdentity(): Promise<void> {
+    // Bump synchronously, before any await, so all in-flight login/enrollment/initialize work is
+    // fenced and cannot restore or publish the forgotten identity after this point.
+    this.identityGeneration += 1;
     this.clearToken();
     try {
       // Attempt every persisted cleanup independently (allSettled) so one failure does not skip the
@@ -476,31 +526,66 @@ export class ICNMobileClient extends ICNClient {
   // Private methods
   // ===========================================================================
 
+  /**
+   * Run a persisted-auth storage mutation exclusively, serialized after any prior one, so persistAuth
+   * and a reset's clearAuth cannot interleave (which could otherwise resurrect a cleared token). The
+   * chain survives a failed write so a rejection never poisons subsequent operations.
+   */
+  private runAuthExclusive<T>(fn: () => Promise<T>): Promise<T> {
+    const result = this.authWriteChain.then(fn, fn);
+    this.authWriteChain = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
+  }
+
   private async persistAuth(
     token: string,
     did: string,
     coopId: string | null,
-    expiresAt: number
+    expiresAt: number,
+    gen: number
   ): Promise<void> {
     if (!this.storage) return;
 
-    await Promise.all([
-      this.storage.setItem(TOKEN_KEY, token),
-      this.storage.setItem(DID_KEY, did),
-      coopId ? this.storage.setItem(COOP_KEY, coopId) : this.storage.removeItem(COOP_KEY),
-      this.storage.setItem(EXPIRES_KEY, expiresAt.toString()),
-    ]);
+    await this.runAuthExclusive(async () => {
+      // Skip if a reset superseded this write while it was queued — the reset's clearAuth wins.
+      if (gen !== this.identityGeneration) return;
+      // allSettled barrier: hold the lock until EVERY write settles. Promise.all would reject on the
+      // first failure and release the lock while a sibling setItem was still pending, letting that
+      // straggler land after a concurrent clearAuth and resurrect the forgotten token/DID.
+      // Async wrappers so a *synchronous* throw from an app-supplied storage method becomes a captured
+      // rejection rather than aborting array construction (which would orphan an already-pending
+      // sibling write and release the lock before it settled).
+      const results = await Promise.allSettled([
+        (async () => this.storage!.setItem(TOKEN_KEY, token))(),
+        (async () => this.storage!.setItem(DID_KEY, did))(),
+        (async () =>
+          coopId ? this.storage!.setItem(COOP_KEY, coopId) : this.storage!.removeItem(COOP_KEY))(),
+        (async () => this.storage!.setItem(EXPIRES_KEY, expiresAt.toString()))(),
+      ]);
+      const failure = results.find((r) => r.status === 'rejected');
+      if (failure && failure.status === 'rejected') throw failure.reason;
+    });
   }
 
   private async clearAuth(): Promise<void> {
     if (!this.storage) return;
 
-    await Promise.all([
-      this.storage.removeItem(TOKEN_KEY),
-      this.storage.removeItem(DID_KEY),
-      this.storage.removeItem(COOP_KEY),
-      this.storage.removeItem(EXPIRES_KEY),
-    ]);
+    await this.runAuthExclusive(async () => {
+      // allSettled barrier (symmetric to persistAuth): hold the lock until every removal settles so a
+      // delayed removal cannot land after — and clobber — a serialized replacement write.
+      // Async wrappers normalize a synchronous storage throw to a captured rejection (see persistAuth).
+      const results = await Promise.allSettled([
+        (async () => this.storage!.removeItem(TOKEN_KEY))(),
+        (async () => this.storage!.removeItem(DID_KEY))(),
+        (async () => this.storage!.removeItem(COOP_KEY))(),
+        (async () => this.storage!.removeItem(EXPIRES_KEY))(),
+      ]);
+      const failure = results.find((r) => r.status === 'rejected');
+      if (failure && failure.status === 'rejected') throw failure.reason;
+    });
   }
 
   private updateAuthState(state: AuthState): void {
@@ -1025,6 +1110,7 @@ export class ICNMobileClient extends ICNClient {
     deviceInfo: import('./steward-types').DeviceInfo
   ): Promise<import('./steward-types').CompleteEnrollmentResponse> {
     const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
+    const gen = this.identityGeneration;
     const response = await fetch(`${baseUrl}/v1/enrollment/complete`, {
       method: 'POST',
       headers: {
@@ -1047,12 +1133,24 @@ export class ICNMobileClient extends ICNClient {
 
     // Store the auth token and update state
     if (result.auth_token && this.storage) {
+      // Superseded by resetIdentity() during enrollment — do not restore local auth/session for the
+      // forgotten identity (the server-issued token is simply left unused).
+      if (gen !== this.identityGeneration) {
+        return result;
+      }
       const token = result.auth_token.replace(/^Bearer\s+/i, '');
       this.setToken(token);
 
       // Persist auth state - enrollment doesn't return expiry, use 1 hour default
       const expiresAt = Date.now() + 3600000;
-      await this.persistAuth(token, result.did, deviceInfo.os, expiresAt);
+      await this.persistAuth(token, result.did, deviceInfo.os, expiresAt, gen);
+
+      // Re-check: a reset may have run while persistAuth was awaiting storage. If so, drop the token
+      // we set and do not publish authenticated state.
+      if (gen !== this.identityGeneration) {
+        this.clearToken();
+        return result;
+      }
 
       this.updateAuthState({
         isAuthenticated: true,

@@ -15,6 +15,13 @@ export class QueueManager {
   private queue: QueuedOperation[] = [];
   private processing = false;
   private listeners: Set<(queue: QueuedOperation[]) => void> = new Set();
+  // Bumped whenever the queue is emptied (purge/clear). An in-flight processQueue() run captures the
+  // value at start and stops if it changes, so a run begun before an identity reset cannot keep
+  // replaying or re-persisting the forgotten identity's operations afterwards.
+  private generation = 0;
+  // Serializes durable storage mutations (persist/purge) so a late persist() write cannot interleave
+  // with — or land after — purge()'s removal and resurrect the queue.
+  private writeChain: Promise<unknown> = Promise.resolve();
 
   constructor(storage?: SecureStorage) {
     this.storage = storage;
@@ -26,9 +33,13 @@ export class QueueManager {
   async initialize(): Promise<void> {
     if (!this.storage) return;
 
+    // Capture the generation before the (awaited) read; if a purge()/clear() runs while getItem is in
+    // flight (e.g. an identity reset), the loaded result is stale and must be discarded so the
+    // forgotten identity's queued operations cannot reappear in memory after the reset.
+    const gen = this.generation;
     try {
       const stored = await this.storage.getItem(QUEUE_STORAGE_KEY);
-      if (stored) {
+      if (stored && gen === this.generation) {
         this.queue = JSON.parse(stored);
         this.notifyListeners();
       }
@@ -100,14 +111,20 @@ export class QueueManager {
     if (this.processing) return;
 
     this.processing = true;
+    // Capture the queue generation; if it changes (purge/clear, e.g. during an identity reset) this
+    // run is stale and must stop without executing or persisting further operations.
+    const gen = this.generation;
 
     try {
       const pending = this.queue.filter((op) => op.status === 'pending');
 
       for (const op of pending) {
+        if (gen !== this.generation) break; // queue was emptied (reset) — stop replaying
         try {
           await this.updateStatus(op.id, 'processing');
+          if (gen !== this.generation) break; // re-check before executing a forgotten operation
           await executor(op);
+          if (gen !== this.generation) break; // re-check before durable removal
           await this.remove(op.id); // Success - remove from queue
         } catch (error) {
           op.retries += 1;
@@ -140,6 +157,7 @@ export class QueueManager {
    * Clear entire queue
    */
   async clear(): Promise<void> {
+    this.generation += 1; // fence any in-flight processQueue() run
     this.queue = [];
     await this.persist();
     this.notifyListeners();
@@ -153,11 +171,12 @@ export class QueueManager {
    * persisted queue could not be removed and the reset did not fully complete.
    */
   async purge(): Promise<void> {
+    this.generation += 1; // fence any in-flight processQueue() run
     this.queue = [];
-    // Remove the persisted queue BEFORE notifying listeners, so the persisted removal is never
-    // skipped (and any storage failure still propagates to the caller).
+    // Remove the persisted queue under the write lock (so a late persist() cannot resurrect it) and
+    // BEFORE notifying listeners. Any storage failure propagates to the caller (strict reset).
     if (this.storage) {
-      await this.storage.removeItem(QUEUE_STORAGE_KEY);
+      await this.runExclusive(() => this.storage!.removeItem(QUEUE_STORAGE_KEY));
     }
     this.notifyListeners();
   }
@@ -170,14 +189,32 @@ export class QueueManager {
     return () => this.listeners.delete(listener);
   }
 
+  /**
+   * Run a durable storage mutation exclusively, serialized after any prior one. Returns the
+   * operation's own result/rejection while keeping the chain alive regardless of outcome, so a
+   * failed write never poisons subsequent operations.
+   */
+  private runExclusive<T>(fn: () => Promise<T>): Promise<T> {
+    const result = this.writeChain.then(fn, fn);
+    this.writeChain = result.then(
+      () => undefined,
+      () => undefined
+    );
+    return result;
+  }
+
   private async persist(): Promise<void> {
     if (!this.storage) return;
 
-    try {
-      await this.storage.setItem(QUEUE_STORAGE_KEY, JSON.stringify(this.queue));
-    } catch (error) {
-      console.error('Failed to persist queue:', error);
-    }
+    // Best-effort, but serialized: compute the snapshot INSIDE the lock so it reflects the live queue
+    // at write time and cannot land out of order with a concurrent purge().
+    await this.runExclusive(async () => {
+      try {
+        await this.storage!.setItem(QUEUE_STORAGE_KEY, JSON.stringify(this.queue));
+      } catch (error) {
+        console.error('Failed to persist queue:', error);
+      }
+    });
   }
 
   private notifyListeners(): void {
