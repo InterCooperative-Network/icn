@@ -2299,29 +2299,45 @@ export default function App() {
   }, []);
 
   const handleInitReset = useCallback(async () => {
-    // Forget the on-device identity (Device Keyring key pair, auth session, and
-    // queued operations) before dropping in-memory state, so a reset cannot leave
-    // stale auth bound to a discarded keyring DID.
-    await resetIdentity();
+    try {
+      // Forget the on-device identity (Device Keyring key pair, auth session, and
+      // queued operations) before dropping in-memory state, so a reset cannot leave
+      // stale auth bound to a discarded keyring DID. resetIdentity() rejects if any
+      // persisted cleanup fails, so we catch below to surface that instead of
+      // leaving an unhandled promise rejection or falsely claiming success.
+      await resetIdentity();
 
-    // Clear localStorage on web
-    if (Platform.OS === 'web') {
-      try {
-        localStorage.clear();
-        console.log('localStorage cleared');
-      } catch (e) {
-        console.error('Failed to clear localStorage:', e);
+      // Clear localStorage on web
+      if (Platform.OS === 'web') {
+        try {
+          localStorage.clear();
+          console.log('localStorage cleared');
+        } catch (e) {
+          console.error('Failed to clear localStorage:', e);
+        }
       }
-    }
 
-    // Retry initialization
-    setInitFailed(false);
-    setInitError(null);
+      // Retry initialization
+      setInitFailed(false);
+      setInitError(null);
 
-    const success = await initializeClient();
-    if (!success) {
+      const success = await initializeClient();
+      if (!success) {
+        setInitFailed(true);
+        setInitError(getLastInitError());
+      }
+    } catch (error) {
+      // A persisted cleanup failure means the identity was NOT fully forgotten --
+      // surface a recovery message instead of an unhandled rejection, and do not
+      // claim the reset succeeded.
+      console.error('Identity reset error:', error);
       setInitFailed(true);
-      setInitError(getLastInitError());
+      setInitError({
+        message: 'Could not fully reset this device identity. Some stored keys may remain. Try again, or reinstall the app.',
+        code: 'RESET_ERROR',
+        retriable: true,
+        details: (error as Error).message,
+      });
     }
   }, []);
 

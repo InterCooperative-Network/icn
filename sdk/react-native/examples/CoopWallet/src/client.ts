@@ -276,10 +276,34 @@ export function resetClientState(): void {
  */
 export async function resetIdentity(): Promise<void> {
   try {
+    // Pre-client case: initialization can fail after the Device Keyring and secure
+    // storage are created but before createMobileClient() runs (e.g. a transient
+    // hasKeyPair()/generateKeyPair()/getKeyPair() storage error), leaving `client`
+    // null while persisted identity still exists. Construct the client now so the
+    // canonical ICNMobileClient.resetIdentity() can clear the keyring key pair, the
+    // auth session, and the offline queue -- otherwise the reset would only drop
+    // in-memory references and a later init could silently reuse the old identity.
+    if (!client && keyring && secureStorage) {
+      client = createMobileClient({
+        baseUrl: GATEWAY_URL,
+        keyring,
+        storage: secureStorage,
+      });
+    }
     if (client) {
+      // Rejects if any persisted cleanup fails, so the caller can report that the
+      // identity was not fully forgotten (we must not swallow this).
       await client.resetIdentity();
+    } else if (keyring) {
+      // Last resort if no secure storage is available to build a client from
+      // (should not happen, since the keyring is created from secure storage):
+      // still clear the persisted keyring key pair, and let a failure propagate.
+      await keyring.deleteKeyPair();
     }
   } finally {
+    // Always drop in-memory references so state is coherent for a fresh init. This
+    // runs after any throw above WITHOUT masking it -- the rejection still
+    // propagates to the caller, which surfaces the failure in the UI.
     resetClientState();
   }
 }
