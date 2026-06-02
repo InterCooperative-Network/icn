@@ -935,6 +935,131 @@ describe('authentication flow', () => {
   });
 });
 
+describe('authenticate concurrency (auth-generation guard)', () => {
+  // Reads otherwise-private auth state for white-box assertions (no public getter for the raw token).
+  type ClientInternals = { token?: string; signer?: unknown; did?: string };
+  const internals = (c: ICNClient): ClientInternals => c as unknown as ClientInternals;
+
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+
+  type VerifyBody = { token: string; expires_in: number };
+
+  // Answers /auth/challenge immediately; routes each /auth/verify to a per-DID promise so a test can
+  // hold one authenticate()'s verify response while another authenticate()/setToken()/clearToken() runs.
+  function makeAuthFetch(verifyByDid: Record<string, Promise<VerifyBody>>) {
+    return jest.fn().mockImplementation(async (url: string, options: { body: string }) => {
+      if (url.includes('/auth/challenge')) {
+        return { ok: true, status: 200, json: async () => ({ nonce: 'nonce', expires_in: 60 }) };
+      }
+      const body = JSON.parse(options.body) as { did: string };
+      const verifyResponse = await verifyByDid[body.did];
+      return { ok: true, status: 200, json: async () => verifyResponse };
+    });
+  }
+
+  const signer = { sign: async (msg: string): Promise<string> => `signed-${msg}` };
+
+  function makeClient(mockFetch: jest.Mock, autoRefresh = false): ICNClient {
+    return new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+      autoRefresh,
+    });
+  }
+
+  it('a late authenticate A cannot overwrite a newer authenticate B', async () => {
+    const aVerify = deferred<VerifyBody>();
+    const bVerify = deferred<VerifyBody>();
+    const client = makeClient(
+      makeAuthFetch({ 'did:icn:alice': aVerify.promise, 'did:icn:bob': bVerify.promise })
+    );
+
+    const pA = client.authenticate('did:icn:alice', signer); // older attempt, parks at verify
+    const pB = client.authenticate('did:icn:bob', signer); // newer attempt, parks at verify
+
+    bVerify.resolve({ token: 'token-B', expires_in: 3600 });
+    await pB;
+    expect(internals(client).token).toBe('token-B');
+
+    aVerify.resolve({ token: 'token-A', expires_in: 3600 });
+    await pA;
+    expect(internals(client).token).toBe('token-B'); // stale A did not clobber B
+  });
+
+  it('a late authenticate cannot restore a token after clearToken()', async () => {
+    const aVerify = deferred<VerifyBody>();
+    const client = makeClient(makeAuthFetch({ 'did:icn:alice': aVerify.promise }));
+
+    const pA = client.authenticate('did:icn:alice', signer);
+    client.clearToken(); // supersede the in-flight login
+    aVerify.resolve({ token: 'token-A', expires_in: 3600 });
+    await pA;
+
+    expect(client.hasToken()).toBe(false);
+    expect(internals(client).token).toBeUndefined();
+  });
+
+  it('a late authenticate cannot overwrite an explicit setToken()', async () => {
+    const aVerify = deferred<VerifyBody>();
+    const client = makeClient(makeAuthFetch({ 'did:icn:alice': aVerify.promise }));
+
+    const pA = client.authenticate('did:icn:alice', signer);
+    client.setToken('manual-token', Date.now() + 3_600_000); // explicit token supersedes the login
+    aVerify.resolve({ token: 'token-A', expires_in: 3600 });
+    await pA;
+
+    expect(internals(client).token).toBe('manual-token');
+  });
+
+  it('a normal (uncontested) authenticate still installs its token', async () => {
+    const aVerify = deferred<VerifyBody>();
+    const client = makeClient(makeAuthFetch({ 'did:icn:alice': aVerify.promise }));
+
+    const pA = client.authenticate('did:icn:alice', signer);
+    aVerify.resolve({ token: 'token-A', expires_in: 3600 });
+    const auth = await pA;
+
+    expect(auth.token).toBe('token-A');
+    expect(client.hasToken()).toBe(true);
+    expect(internals(client).token).toBe('token-A');
+  });
+
+  it('a superseded authenticate still returns its auth response (public behavior unchanged)', async () => {
+    const aVerify = deferred<VerifyBody>();
+    const client = makeClient(makeAuthFetch({ 'did:icn:alice': aVerify.promise }));
+
+    const pA = client.authenticate('did:icn:alice', signer);
+    client.clearToken();
+    aVerify.resolve({ token: 'token-A', expires_in: 3600 });
+
+    const auth = await pA;
+    expect(auth.token).toBe('token-A'); // response still returned
+    expect(auth.expires_at).toBeGreaterThan(Date.now());
+    expect(client.hasToken()).toBe(false); // but token state not mutated
+  });
+
+  it('does not register auto-refresh credentials for a superseded authenticate', async () => {
+    const aVerify = deferred<VerifyBody>();
+    const client = makeClient(makeAuthFetch({ 'did:icn:alice': aVerify.promise }), true);
+
+    const pA = client.authenticate('did:icn:alice', signer);
+    client.clearToken();
+    aVerify.resolve({ token: 'token-A', expires_in: 3600 });
+    await pA;
+
+    expect(internals(client).signer).toBeUndefined();
+    expect(internals(client).did).toBeUndefined();
+  });
+});
+
 describe('health endpoint', () => {
   it('should get health status without auth', async () => {
     const mockResponse = {

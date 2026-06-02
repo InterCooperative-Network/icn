@@ -319,6 +319,11 @@ export class ICNClient {
   private baseUrl: string;
   private token?: string;
   private tokenExpiresAt?: number;
+  // Monotonic auth-generation counter. Bumped by every auth-affecting mutation (authenticate() start,
+  // setToken(), clearToken()). An in-flight authenticate() captures the value it bumped to and commits
+  // its token only if that value is still current, so a stale, late-resolving authenticate() cannot
+  // overwrite a newer token or restore one after a clear.
+  private authGeneration = 0;
   private timeout: number;
   private fetchImpl: typeof fetch;
   private retryOptions: Required<RetryOptions>;
@@ -412,18 +417,42 @@ export class ICNClient {
   }
 
   /**
-   * Set the JWT token for authenticated requests
+   * Bump the auth-generation, superseding any in-flight authenticate(), and return the new value.
+   * Every auth-affecting mutation calls this so a stale, late-resolving authenticate() can detect it
+   * has been superseded and skip its commit.
    */
-  setToken(token: string, expiresAt?: number): void {
+  private bumpAuthGeneration(): number {
+    this.authGeneration += 1;
+    return this.authGeneration;
+  }
+
+  /**
+   * Apply token state WITHOUT touching the auth-generation. Internal commit path shared by setToken()
+   * and a winning authenticate(); callers that must supersede in-flight auth bump the generation first.
+   */
+  private applyToken(token: string, expiresAt?: number): void {
     this.token = token;
     this.tokenExpiresAt = expiresAt;
     this.wasm.setToken(token);
   }
 
   /**
+   * Set the JWT token for authenticated requests
+   */
+  setToken(token: string, expiresAt?: number): void {
+    // Explicitly setting a token supersedes any in-flight authenticate() so a late login cannot
+    // overwrite the token the caller just installed.
+    this.bumpAuthGeneration();
+    this.applyToken(token, expiresAt);
+  }
+
+  /**
    * Clear the JWT token and authentication state
    */
   clearToken(): void {
+    // Clearing supersedes any in-flight authenticate() so a late login cannot restore a token after
+    // the caller cleared it.
+    this.bumpAuthGeneration();
     this.token = undefined;
     this.tokenExpiresAt = undefined;
     this.signer = undefined;
@@ -656,17 +685,28 @@ export class ICNClient {
     coopId?: string,
     scopes?: string[]
   ): Promise<VerifyResponse> {
+    // Claim the newest auth-generation before any await. If a newer authenticate(), setToken(), or
+    // clearToken() runs while we await the challenge/signature/verify below, it bumps the generation
+    // past this value and this (now stale) result must not mutate shared client state — otherwise a
+    // late-resolving login could clobber a newer token or restore one after clearToken().
+    const generation = this.bumpAuthGeneration();
     const challenge = await this.getChallenge(did);
     const signature = await signer.sign(challenge.nonce);
     const auth = await this.verify(did, signature, coopId, scopes);
-    this.setToken(auth.token, auth.expires_at);
 
-    // Store credentials for auto-refresh
-    if (this.autoRefresh) {
-      this.signer = signer;
-      this.did = did;
-      this.coopId = coopId;
-      this.scopes = scopes;
+    // Commit only if no newer auth-affecting operation superseded this attempt while it was in flight.
+    // The auth response is still returned to the caller either way (unchanged public behavior).
+    if (this.authGeneration === generation) {
+      this.applyToken(auth.token, auth.expires_at);
+
+      // Store credentials for auto-refresh — only for the winning attempt, so a superseded login does
+      // not install its identity for silent re-authentication.
+      if (this.autoRefresh) {
+        this.signer = signer;
+        this.did = did;
+        this.coopId = coopId;
+        this.scopes = scopes;
+      }
     }
 
     return auth;
