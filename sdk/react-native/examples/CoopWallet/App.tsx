@@ -2,7 +2,7 @@
  * Coop Wallet - ICN React Native App
  *
  * Features:
- * - Authentication with secure wallet
+ * - Authentication with an on-device Device Keyring
  * - Balance display and payment
  * - QR code scan-to-pay
  * - Governance voting
@@ -85,6 +85,7 @@ let initializeClient: () => Promise<boolean> = async () => {
 };
 let retryInitialization: () => Promise<boolean> = async () => false;
 let resetClientState: () => void = () => {};
+let resetIdentity: () => Promise<void> = async () => {};
 let isClientReady: () => boolean = () => false;
 let getClientState: () => string = () => 'uninitialized';
 let getLastInitError: () => any = () => null;
@@ -98,6 +99,7 @@ try {
   initializeClient = clientModule.initializeClient;
   retryInitialization = clientModule.retryInitialization || (async () => initializeClient());
   resetClientState = clientModule.resetClientState || (() => {});
+  resetIdentity = clientModule.resetIdentity || (async () => resetClientState());
   isClientReady = clientModule.isClientReady || (() => getClient() !== null);
   getClientState = () => clientModule?.clientState || 'uninitialized';
   getLastInitError = () => clientModule?.lastInitError || null;
@@ -217,12 +219,12 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => vo
       }
 
       if (client) {
-        // Get the wallet's DID for debugging
-        const walletModule = require('./src/client');
-        const wallet = walletModule.wallet;
-        if (wallet) {
-          const keyPair = await wallet.getKeyPair();
-          console.log('Wallet DID:', keyPair?.did);
+        // Get the Device Keyring's DID for debugging
+        const keyringModule = require('./src/client');
+        const keyring = keyringModule.keyring;
+        if (keyring) {
+          const keyPair = await keyring.getKeyPair();
+          console.log('Keyring DID:', keyPair?.did);
           if (keyPair?.did) {
             console.log('DID length:', keyPair.did.length);
             // Show first 50 chars to verify format
@@ -241,7 +243,7 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => vo
         console.log('Login successful:', authState);
         onLogin(coopId.trim(), authState.did || '');
       } else {
-        throw new Error('Wallet not ready. Please wait for initialization or restart the app.');
+        throw new Error('Identity not ready. Please wait for initialization or restart the app.');
       }
     } catch (err) {
       console.error('Login error details:', err);
@@ -323,28 +325,32 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => vo
           style={[styles.secondaryButton, { marginTop: 20 }]}
           onPress={async () => {
             try {
-              // Clear localStorage on web
+              // Forget the on-device identity (Device Keyring key pair, auth
+              // session, and queued operations) so stale identity/auth state
+              // cannot survive the reset.
+              await resetIdentity();
+              // Clear any web localStorage fallback as well.
               if (Platform.OS === 'web') {
                 localStorage.clear();
                 console.log('localStorage cleared');
               }
-              // Reinitialize client
+              // Reinitialize to provision a fresh Device Keyring.
               await initializeClient();
               setError(null);
               // Alert doesn't work on web, use console and update UI
-              console.log('Wallet reset! New keys generated.');
+              console.log('Identity reset. A new Device Keyring was generated.');
               if (Platform.OS === 'web') {
-                window.alert('Wallet reset! New keys generated. Please try logging in again.');
+                window.alert('Identity reset. A new Device Keyring was generated. Please try logging in again.');
               } else {
-                Alert.alert('Wallet Reset', 'New keys generated. Please try logging in again.');
+                Alert.alert('Identity Reset', 'A new Device Keyring was generated. Please try logging in again.');
               }
             } catch (e) {
               console.error('Reset error:', e);
-              setError('Failed to reset wallet: ' + (e as Error).message);
+              setError('Failed to reset identity: ' + (e as Error).message);
             }
           }}
         >
-          <Text style={[styles.buttonText, { color: '#666' }]}>Reset Wallet</Text>
+          <Text style={[styles.buttonText, { color: '#666' }]}>Reset Identity</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -746,7 +752,7 @@ function PaymentScreen({
     try {
       const client = getClient();
       if (!client) {
-        throw new Error('Wallet not ready. Please wait for initialization or restart the app.');
+        throw new Error('Identity not ready. Please wait for initialization or restart the app.');
       }
 
       // Make real payment via API
@@ -1605,7 +1611,7 @@ function VerifyScreen({ navigation }: { navigation: any }) {
     try {
       const client = getClient();
       if (!client) {
-        throw new Error('Wallet not ready. Please wait for initialization or restart the app.');
+        throw new Error('Identity not ready. Please wait for initialization or restart the app.');
       }
 
       // Call SDIS verification API
@@ -2092,7 +2098,7 @@ function BiometricLockScreen({ onUnlock }: { onUnlock: () => void }) {
     <View style={styles.biometricContainer}>
       <View style={styles.biometricContent}>
         <Text style={styles.biometricIcon}>🔒</Text>
-        <Text style={styles.biometricTitle}>Wallet Locked</Text>
+        <Text style={styles.biometricTitle}>App Locked</Text>
         <Text style={styles.biometricSubtitle}>
           Use your fingerprint or face to unlock
         </Text>
@@ -2191,13 +2197,13 @@ function InitializationErrorScreen({
             onPress={onReset}
           >
             <Text style={[styles.initErrorButtonText, { color: '#666' }]}>
-              Reset Wallet
+              Reset Identity
             </Text>
           </TouchableOpacity>
         </View>
 
         <Text style={styles.initErrorHint}>
-          If problems persist, try resetting your wallet. This will generate new keys.
+          If problems persist, try resetting your identity. This clears this device's keyring and signs you out.
         </Text>
       </View>
     </View>
@@ -2293,7 +2299,10 @@ export default function App() {
   }, []);
 
   const handleInitReset = useCallback(async () => {
-    resetClientState();
+    // Forget the on-device identity (Device Keyring key pair, auth session, and
+    // queued operations) before dropping in-memory state, so a reset cannot leave
+    // stale auth bound to a discarded keyring DID.
+    await resetIdentity();
 
     // Clear localStorage on web
     if (Platform.OS === 'web') {

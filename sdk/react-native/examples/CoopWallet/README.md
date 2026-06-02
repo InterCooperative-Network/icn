@@ -2,9 +2,15 @@
 
 Example React Native app demonstrating the ICN mobile SDK.
 
+> **Identity model.** "Coop Wallet" is this example app's brand name only. The app
+> follows ICN doctrine: a member's identity and standing is their **Member Passport**,
+> on-device key custody and signing is the **Device Keyring** (the SDK's `createKeyring`),
+> and economic state is tracked as **positions, receipts, and obligations** -- not as a
+> stored-value wallet balance.
+
 ## Features
 
-- **Secure Authentication** - Login with your cooperative using Ed25519 keys stored in device secure storage
+- **Secure Authentication** - Login with your cooperative using a Device Keyring (Ed25519 keys held in device secure storage)
 - **Balance Display** - View your hour balance with real-time updates
 - **Send Payments** - Transfer hours to other members
 - **QR Payments** - Scan-to-pay and receive via QR codes
@@ -113,7 +119,7 @@ CoopWallet/
 ### Setup Client
 
 ```typescript
-import { createWallet, createMobileClient, SecureStorage } from '@icn/react-native';
+import { createKeyring, createMobileClient, SecureStorage } from '@icn/react-native';
 import * as SecureStore from 'expo-secure-store';
 
 const storage: SecureStorage = {
@@ -123,10 +129,10 @@ const storage: SecureStorage = {
   hasItem: async (key) => (await SecureStore.getItemAsync(key)) !== null,
 };
 
-const wallet = createWallet(storage);
+const keyring = createKeyring(storage);
 const client = createMobileClient({
   baseUrl: 'https://icn.mycoop.org',
-  wallet,
+  keyring,
   storage,
 });
 ```

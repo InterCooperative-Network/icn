@@ -6,7 +6,7 @@
  */
 
 import { Platform } from 'react-native';
-import { createWallet, createMobileClient, SecureStorage, ICNWallet, ICNMobileClient } from '@icn/react-native';
+import { createKeyring, createMobileClient, SecureStorage, ICNKeyring, ICNMobileClient } from '@icn/react-native';
 import { GATEWAY_URL, APP_CONFIG } from './config';
 
 /** Client initialization state */
@@ -72,9 +72,14 @@ const getNativeStorage = async (): Promise<SecureStorage> => {
   };
 };
 
-// Storage, wallet, and client are initialized asynchronously
+// Storage, Device Keyring, and client are initialized asynchronously
 let secureStorage: SecureStorage | null = null;
-export let wallet: ICNWallet | null = null;
+/**
+ * The Device Keyring: on-device key custody + signing. Bound to the SDK's
+ * canonical createKeyring()/ICNKeyring (the legacy createWallet alias is
+ * @deprecated). Holds no value -- economic state lives in positions/receipts.
+ */
+export let keyring: ICNKeyring | null = null;
 export let client: ICNMobileClient | null = null;
 
 /**
@@ -149,24 +154,24 @@ async function doInitialize(): Promise<void> {
   }
   if (APP_CONFIG.debug) console.log('Storage initialized');
 
-  // Create wallet for key management
-  wallet = createWallet(secureStorage);
-  if (APP_CONFIG.debug) console.log('Wallet created');
+  // Create the Device Keyring for on-device key custody + signing
+  keyring = createKeyring(secureStorage);
+  if (APP_CONFIG.debug) console.log('Device Keyring created');
 
-  // Ensure wallet has a key pair
-  if (!(await wallet.hasKeyPair())) {
+  // Ensure the keyring has a key pair
+  if (!(await keyring.hasKeyPair())) {
     if (APP_CONFIG.debug) console.log('Generating new key pair...');
-    const keyPair = await wallet.generateKeyPair();
+    const keyPair = await keyring.generateKeyPair();
     if (APP_CONFIG.debug) console.log('Key pair generated, DID:', keyPair.did);
   } else {
-    const keyPair = await wallet.getKeyPair();
+    const keyPair = await keyring.getKeyPair();
     if (APP_CONFIG.debug) console.log('Existing key pair found, DID:', keyPair?.did);
   }
 
   // Create mobile client
   client = createMobileClient({
     baseUrl: GATEWAY_URL,
-    wallet,
+    keyring,
     storage: secureStorage,
   });
   if (APP_CONFIG.debug) console.log('Mobile client created');
@@ -245,15 +250,38 @@ export async function retryInitialization(): Promise<boolean> {
 }
 
 /**
- * Reset client state completely (for wallet reset scenarios).
+ * Reset the in-memory client state (for identity reset / reprovision scenarios).
+ *
+ * This only drops the in-memory references; it does NOT clear persisted identity.
+ * To forget the on-device identity (Device Keyring key pair, auth session, and the
+ * offline operation queue) call `resetIdentity()` first, then re-initialize.
  */
 export function resetClientState(): void {
   clientState = ClientState.Uninitialized;
   lastInitError = null;
   initAttempts = 0;
-  wallet = null;
+  keyring = null;
   client = null;
   secureStorage = null;
+}
+
+/**
+ * Forget the on-device identity, then drop in-memory client state.
+ *
+ * Delegates to `ICNMobileClient.resetIdentity()` (added in #1970), which clears the
+ * Device Keyring key pair, the persisted auth session, and the queued offline
+ * operations, and invalidates the in-memory session so stale auth/identity state
+ * cannot survive a reset. After this returns, call `initializeClient()` to provision
+ * a fresh Device Keyring.
+ */
+export async function resetIdentity(): Promise<void> {
+  try {
+    if (client) {
+      await client.resetIdentity();
+    }
+  } finally {
+    resetClientState();
+  }
 }
 
 /**
