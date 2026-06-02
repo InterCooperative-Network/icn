@@ -334,8 +334,19 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => vo
                 localStorage.clear();
                 console.log('localStorage cleared');
               }
-              // Reinitialize to provision a fresh Device Keyring.
-              await initializeClient();
+              // Reinitialize to provision a fresh Device Keyring. Check the result:
+              // the persisted identity is cleared, but if reprovisioning fails we must
+              // not clear the error and claim a new keyring was generated.
+              const reinitialized = await initializeClient();
+              if (!reinitialized) {
+                const initErr = getLastInitError();
+                setError(
+                  'Identity cleared, but setting up a new Device Keyring failed: ' +
+                    (initErr?.message || 'initialization failed') +
+                    '. Please try again.',
+                );
+                return;
+              }
               setError(null);
               // Alert doesn't work on web, use console and update UI
               console.log('Identity reset. A new Device Keyring was generated.');
