@@ -10,7 +10,7 @@
 > `icn_keyring_*` / `icn_hybrid_keyring_*`, with a defensive legacy purge on delete and a new
 > `ICNMobileClient.resetIdentity()` that also clears persisted auth (`icn_auth_*`) and the offline
 > queue. The Surface 1 sections below are retained as the original design record (this doc itself
-> still changes nothing). Surface 2 (the Rust `wallet_did` field) remains future work as described.
+> still changes nothing). Surface 2 (the Rust `wallet_did` field) has since been implemented (2026-06-02) as a direct rename to `operator_did` (the canonical serialized / public field name). Per the exposure re-check (Surface 2 below) — no OpenAPI, HTTP handler, persisted store, gossip path, or TypeScript-SDK consumer of `OperatorMode`, serialized only by its own unit tests — it was a **direct rename with no serde alias**, treated as a semver-relevant change to `icn-kernel-api`. This doc itself still changes nothing.
 
 ---
 

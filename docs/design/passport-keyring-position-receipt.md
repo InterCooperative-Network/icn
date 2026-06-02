@@ -112,7 +112,7 @@ table is to make the **migration target** explicit per class — not to authoriz
 |-------|---------|---------------------|------------------|
 | **A — Key custody internals** | A real local key store + signer | `sdk/react-native` `createWallet()` / `HybridWallet` / `wallet.sign()`; `multi-device-identity-design.md` Keystore | **Device Keyring** (deferred — breaking SDK API) |
 | **B — User-facing identity surface** | The app a member opens to present identity / approve login | "Open your ICN Wallet app and scan this code" (`web/pilot-ui`, `icn-gateway` static); `CoopWallet` login; "member wallet UI" | **Member Passport** (identity/session) + **Device Keyring** (the signing it triggers) |
-| **C — Stale crypto metaphor for identity** | identity expressed *as* a wallet | `icn-kernel-api/src/compute.rs` `wallet_did`, "Wallet-rooted identity for all operations" | DID-/passport-rooted identity (deferred — public API field) |
+| **C — Stale crypto metaphor for identity** | identity expressed *as* a wallet | `icn-kernel-api/src/compute.rs` `wallet_did`, "Wallet-rooted identity for all operations" | DID-/passport-rooted identity (**done** — renamed to `operator_did`) |
 | **D — Ledger state mislabeled** | accounting state called "wallet" | `demo/notes/flow-4-notes.md` "surplus to member wallets"; "member wallet balance" | **Position** |
 | **E — Historical / deprecation / non-claim** | "ICN is *not* a wallet"; "unhosted wallet"; archived text | `THE_COMMONS.md` "It is not a wallet."; manual "No wallet balance."; `docs/archive/**`; regulatory "unhosted wallet" | Leave; label historical/deprecated where needed. These are *correct* as-is. |
 | **F — Third-party / unavoidable** | external wallets / hardware wallets | `witness-signature-best-practices.md` "hardware wallets or TPM-backed keys"; references to users' own crypto wallets | Mark **external / third-party only** |
@@ -161,7 +161,8 @@ These are **named, not scheduled here** — each is its own future PR with its o
    `icn-gateway` static, OpenAPI QR descriptions) → passport-presentation language.
 3. **Example app** — `CoopWallet` example → passport+keyring framing.
 4. **`wallet_did` field** (`icn-kernel-api`) → DID-/passport-rooted identity naming. High-cost public
-   API rename; deferred.
+   API rename; **done** — direct rename to `operator_did` (no serde alias; see
+   [Wallet DID Migration Boundary](./wallet-did-migration-boundary.md)).
 5. **Demo speaker notes** — "surplus to member wallets" → "member positions".
 6. **"wallet" node mode** terminology (plans) → adopt the passport/keyring split.
 
