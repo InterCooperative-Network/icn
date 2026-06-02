@@ -2388,7 +2388,26 @@ export default function App() {
         const timeoutPromise = new Promise<boolean>((_, reject) =>
           setTimeout(() => reject(new Error('Init timeout after 15s')), 15000)
         );
-        const success = await Promise.race([initializeClient(), timeoutPromise]);
+        // Serialize the startup initializer with the Reset Identity / Try Again
+        // actions through the shared lock. Hold it for the REAL initializeClient()
+        // run -- released when that promise settles, below -- not just until the 15s
+        // UI race resolves. Otherwise an init slower than the timeout keeps
+        // doInitialize() running (reading/generating keys) after the login screen
+        // renders, so a Reset Identity tap could delete + regenerate keys against
+        // the same module-level handles concurrently.
+        resetInProgress = true;
+        const initPromise = initializeClient();
+        // Release on settle (fulfilled OR rejected); both branches are handled so
+        // this side-channel never raises an unhandled rejection.
+        void initPromise.then(
+          () => {
+            resetInProgress = false;
+          },
+          () => {
+            resetInProgress = false;
+          },
+        );
+        const success = await Promise.race([initPromise, timeoutPromise]);
         console.log('initializeClient completed, success:', success);
 
         if (!success) {
