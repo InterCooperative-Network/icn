@@ -1058,6 +1058,48 @@ describe('authenticate concurrency (auth-generation guard)', () => {
     expect(internals(client).signer).toBeUndefined();
     expect(internals(client).did).toBeUndefined();
   });
+
+  it('coalesces concurrent automatic token refreshes into a single authenticate', async () => {
+    let challengeCount = 0;
+    let verifyCount = 0;
+    const authHeaders: Array<string | undefined> = [];
+    const mockFetch = jest.fn().mockImplementation(
+      async (url: string, options: { headers?: Record<string, string> }) => {
+        if (url.includes('/auth/challenge')) {
+          challengeCount += 1;
+          return { ok: true, status: 200, json: async () => ({ nonce: 'n', expires_in: 60 }) };
+        }
+        if (url.includes('/auth/verify')) {
+          verifyCount += 1;
+          return { ok: true, status: 200, json: async () => ({ token: 'fresh-token', expires_in: 3600 }) };
+        }
+        authHeaders.push(options.headers?.['Authorization']);
+        return { ok: true, status: 200, json: async () => [] };
+      }
+    );
+
+    const client = new ICNClient({
+      baseUrl: 'http://localhost:8080',
+      fetch: mockFetch as unknown as typeof fetch,
+      autoRefresh: true,
+      refreshBeforeExpiry: 120,
+    });
+
+    // Establish stored auto-refresh credentials, then force the token to look expired.
+    await client.authenticate('did:icn:alice', signer, 'my-coop', ['coop:read']);
+    client.setToken('stale-token', Math.floor(Date.now() / 1000) + 60); // inside the 120s refresh window
+    expect(client.isTokenExpired()).toBe(true);
+    challengeCount = 0;
+    verifyCount = 0;
+
+    // Two requests race the refresh: they must share ONE authenticate and both send the fresh token,
+    // never the stale one that triggered the refresh.
+    await Promise.all([client.listCoops(), client.listCoops()]);
+
+    expect(challengeCount).toBe(1);
+    expect(verifyCount).toBe(1);
+    expect(authHeaders).toEqual(['Bearer fresh-token', 'Bearer fresh-token']);
+  });
 });
 
 describe('health endpoint', () => {

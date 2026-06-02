@@ -324,6 +324,9 @@ export class ICNClient {
   // its token only if that value is still current, so a stale, late-resolving authenticate() cannot
   // overwrite a newer token or restore one after a clear.
   private authGeneration = 0;
+  // In-flight automatic token refresh, shared by every request that finds the token expired at the
+  // same time so a single authenticate() refresh serves them all (see refreshTokenIfNeeded).
+  private refreshPromise?: Promise<void>;
   private timeout: number;
   private fetchImpl: typeof fetch;
   private retryOptions: Required<RetryOptions>;
@@ -527,8 +530,23 @@ export class ICNClient {
     if (!this.isTokenExpired()) {
       return;
     }
-    // Re-authenticate with stored credentials
-    await this.authenticate(this.did, this.signer, this.coopId, this.scopes);
+    // Coalesce concurrent automatic refreshes: if several authenticated requests find the token
+    // expired at the same time, they share ONE in-flight authenticate() and each proceeds only after
+    // that refresh commits. Without this, every request would start its own authenticate() and the
+    // auth-generation guard would let only the newest commit — leaving the earlier requests to send a
+    // stale/expired bearer token (a 401 the default retry policy does not recover).
+    if (!this.refreshPromise) {
+      const did = this.did;
+      const signer = this.signer;
+      const coopId = this.coopId;
+      const scopes = this.scopes;
+      this.refreshPromise = this.authenticate(did, signer, coopId, scopes)
+        .then(() => undefined)
+        .finally(() => {
+          this.refreshPromise = undefined;
+        });
+    }
+    await this.refreshPromise;
   }
 
   // ===========================================================================

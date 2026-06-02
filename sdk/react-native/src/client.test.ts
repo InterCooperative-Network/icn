@@ -767,6 +767,95 @@ describe('ICNMobileClient', () => {
   });
 });
 
+describe('login concurrency (auth-attempt fence)', () => {
+  type AuthResp = { token: string; expires_at: number };
+  function deferred<T>() {
+    let resolve!: (value: T) => void;
+    let reject!: (reason?: unknown) => void;
+    const promise = new Promise<T>((res, rej) => {
+      resolve = res;
+      reject = rej;
+    });
+    return { promise, resolve, reject };
+  }
+  const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+  const signer = { sign: async (msg: string) => 'sig-' + msg };
+
+  // Mimics the base ICNClient.authenticate() generation guard (the fix in this PR): it claims the
+  // base auth-generation up front and commits the token (applyToken) only if still current, so only
+  // the newest authenticate() wins. Drives realistic base behavior with a gated, per-DID verify
+  // response instead of a live gateway.
+  function mockBaseAuthenticate(
+    client: ICNMobileClient,
+    responseByDid: Record<string, Promise<AuthResp>>
+  ) {
+    jest.spyOn(client as any, 'authenticate').mockImplementation(async (did: unknown) => {
+      const c = client as any;
+      const generation = (c.authGeneration += 1);
+      const auth = await responseByDid[did as string];
+      if (c.authGeneration === generation) {
+        c.applyToken(auth.token, auth.expires_at);
+      }
+      return auth;
+    });
+  }
+
+  it('overlapping logins: a stale login cannot publish identity A while the base token is B', async () => {
+    const storage = createMockStorage();
+    const client = new ICNMobileClient({ baseUrl: 'https://icn.example.org', storage });
+    const aResp = deferred<AuthResp>();
+    const bResp = deferred<AuthResp>();
+    mockBaseAuthenticate(client, { 'did:icn:A': aResp.promise, 'did:icn:B': bResp.promise });
+
+    const pA = client.loginWithSignature('did:icn:A', signer); // older attempt
+    const pB = client.loginWithSignature('did:icn:B', signer); // newer attempt
+    await tick();
+
+    // B (newer) resolves first and publishes.
+    bResp.resolve({ token: 'token-B', expires_at: Date.now() + 3600000 });
+    await pB;
+    expect(client.authState.did).toBe('did:icn:B');
+    expect((client as any).token).toBe('token-B');
+
+    // A (older) resolves late: base keeps B, and the wrapper must NOT publish A over B.
+    aResp.resolve({ token: 'token-A', expires_at: Date.now() + 3600000 });
+    await pA;
+    expect(client.authState.did).toBe('did:icn:B');
+    expect((client as any).token).toBe('token-B');
+    expect(storage.store.get('icn_auth_did')).toBe('did:icn:B');
+  });
+
+  it('a reset-stale login cleanup cannot cancel a replacement login', async () => {
+    const wallet = createMockWallet();
+    await wallet.generateKeyPair();
+    const storage = createMockStorage();
+    const client = new ICNMobileClient({ baseUrl: 'https://icn.example.org', wallet, storage });
+    const aResp = deferred<AuthResp>();
+    const bResp = deferred<AuthResp>();
+    mockBaseAuthenticate(client, { 'did:icn:A': aResp.promise, 'did:icn:B': bResp.promise });
+
+    const pA = client.loginWithSignature('did:icn:A', signer); // parks in the mocked authenticate
+    await tick();
+    await client.resetIdentity(); // bumps identity gen + base clearToken
+    const pB = client.loginWithSignature('did:icn:B', signer); // replacement login, newer attempt
+    await tick();
+
+    // The old login resolves: it is reset-stale, but a newer login exists, so it must NOT call base
+    // clearToken() (which would bump the base auth-generation and cancel B).
+    aResp.resolve({ token: 'token-A', expires_at: Date.now() + 3600000 });
+    await pA;
+
+    // The replacement login resolves and must end authenticated with its own token intact.
+    bResp.resolve({ token: 'token-B', expires_at: Date.now() + 3600000 });
+    await pB;
+
+    expect(client.authState.isAuthenticated).toBe(true);
+    expect(client.authState.did).toBe('did:icn:B');
+    expect((client as any).hasToken()).toBe(true);
+    expect((client as any).token).toBe('token-B');
+  });
+});
+
 describe('createMobileClient', () => {
   it('should create a mobile client instance', () => {
     const client = createMobileClient({

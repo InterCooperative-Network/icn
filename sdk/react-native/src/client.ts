@@ -44,6 +44,12 @@ export class ICNMobileClient extends ICNClient {
   // work captures it before its network await and must not restore or publish identity state if it
   // changed in the meantime.
   private identityGeneration = 0;
+  // Monotonic login/enrollment-attempt counter, SEPARATE from identityGeneration. Each login(),
+  // loginWithSignature(), and completeEnrollment() bumps it at the start; an in-flight attempt may
+  // publish auth state or perform defensive base-token cleanup only while it is still the newest
+  // attempt. The base ICNClient now commits only the newest authenticate(), so the wrapper must not
+  // publish a superseded login nor let a stale defensive clearToken cancel a newer login.
+  private authAttemptGeneration = 0;
   // Serializes persisted-auth storage mutations (persistAuth/clearAuth) so a late persistAuth() write
   // cannot interleave with — or land after — a reset's clearAuth() and resurrect the forgotten token.
   private authWriteChain: Promise<unknown> = Promise.resolve();
@@ -275,6 +281,7 @@ export class ICNMobileClient extends ICNClient {
     }
 
     const gen = this.identityGeneration;
+    const attempt = this.beginAuthAttempt();
 
     const keyPair = await this.wallet.getKeyPair();
     if (!keyPair) {
@@ -289,24 +296,24 @@ export class ICNMobileClient extends ICNClient {
     // Authenticate
     const result = await this.authenticate(keyPair.did, signer, coopId, scopes);
 
-    // If resetIdentity() ran while we were authenticating, this login is superseded. authenticate()
-    // already set the inherited bearer token (+ auto-refresh creds + WASM token); clear them so the
-    // forgotten identity cannot keep making authenticated requests, and do not publish auth state.
-    if (gen !== this.identityGeneration) {
-      this.clearToken();
+    // Superseded by a reset OR a newer login/enrollment while we were authenticating. The base
+    // ICNClient now commits only the newest authenticate(), so this stale result owns no token; do
+    // not publish it, and clear defensively only if this is still the newest attempt (clearing on
+    // behalf of a stale attempt would bump the base auth-generation and cancel the newer attempt).
+    if (this.authAttemptSuperseded(gen, attempt)) {
+      this.clearTokenIfNewestAttempt(attempt);
       return this.authState;
     }
 
     // Use server's expiration time
     const expiresAt = result.expires_at;
 
-    // Persist auth state (generation-fenced: skipped if a reset supersedes it mid-write)
-    await this.persistAuth(result.token, keyPair.did, coopId || null, expiresAt, gen);
+    // Persist auth state (fenced: skipped if a reset or a newer attempt supersedes it mid-write)
+    await this.persistAuth(result.token, keyPair.did, coopId || null, expiresAt, gen, attempt);
 
-    // Re-check: a reset may have run while persistAuth was awaiting storage. If so, drop the token
-    // and do not publish authenticated state.
-    if (gen !== this.identityGeneration) {
-      this.clearToken();
+    // Re-check after the awaited persist.
+    if (this.authAttemptSuperseded(gen, attempt)) {
+      this.clearTokenIfNewestAttempt(attempt);
       return this.authState;
     }
 
@@ -331,22 +338,25 @@ export class ICNMobileClient extends ICNClient {
     scopes?: string[]
   ): Promise<AuthState> {
     const gen = this.identityGeneration;
+    const attempt = this.beginAuthAttempt();
     const result = await this.authenticate(did, signer, coopId, scopes);
 
-    // Superseded by resetIdentity() during authentication. authenticate() already set the inherited
-    // token (+ auto-refresh creds + WASM token); clear them and do not restore the forgotten identity.
-    if (gen !== this.identityGeneration) {
-      this.clearToken();
+    // Superseded by a reset OR a newer login/enrollment during authentication. The base ICNClient
+    // commits only the newest authenticate(), so this stale result owns no token; do not publish it,
+    // and clear defensively only if this is still the newest attempt (a stale clear would bump the
+    // base auth-generation and cancel the newer attempt token commit).
+    if (this.authAttemptSuperseded(gen, attempt)) {
+      this.clearTokenIfNewestAttempt(attempt);
       return this.authState;
     }
 
     // Use server's expiration time
     const expiresAt = result.expires_at;
-    await this.persistAuth(result.token, did, coopId || null, expiresAt, gen);
+    await this.persistAuth(result.token, did, coopId || null, expiresAt, gen, attempt);
 
-    // Re-check after the awaited persist; a reset may have superseded us mid-write.
-    if (gen !== this.identityGeneration) {
-      this.clearToken();
+    // Re-check after the awaited persist.
+    if (this.authAttemptSuperseded(gen, attempt)) {
+      this.clearTokenIfNewestAttempt(attempt);
       return this.authState;
     }
 
@@ -540,18 +550,49 @@ export class ICNMobileClient extends ICNClient {
     return result;
   }
 
+  /**
+   * Begin a login/enrollment attempt: bump the attempt counter and return the new value. A newer
+   * login/enrollment supersedes this attempt, so its captured value is no longer current.
+   */
+  private beginAuthAttempt(): number {
+    this.authAttemptGeneration += 1;
+    return this.authAttemptGeneration;
+  }
+
+  /**
+   * True if a login/enrollment attempt has been superseded by a later resetIdentity() (identity
+   * generation moved) or by a newer login/enrollment attempt (attempt generation moved).
+   */
+  private authAttemptSuperseded(gen: number, attempt: number): boolean {
+    return gen !== this.identityGeneration || attempt !== this.authAttemptGeneration;
+  }
+
+  /**
+   * Defensive base-token cleanup for a superseded attempt. Clears the inherited token ONLY when this
+   * attempt is still the newest one (it was invalidated by a reset, not by a newer login): base
+   * clearToken() bumps the base auth-generation, so a stale attempt clearing here would cancel the
+   * newer login token commit. A newer attempt owns and manages the token.
+   */
+  private clearTokenIfNewestAttempt(attempt: number): void {
+    if (attempt === this.authAttemptGeneration) {
+      this.clearToken();
+    }
+  }
+
   private async persistAuth(
     token: string,
     did: string,
     coopId: string | null,
     expiresAt: number,
-    gen: number
+    gen: number,
+    attempt: number
   ): Promise<void> {
     if (!this.storage) return;
 
     await this.runAuthExclusive(async () => {
-      // Skip if a reset superseded this write while it was queued — the reset's clearAuth wins.
-      if (gen !== this.identityGeneration) return;
+      // Skip if a reset OR a newer login/enrollment superseded this write while it was queued: the
+      // reset clearAuth or the newer attempt persist wins.
+      if (gen !== this.identityGeneration || attempt !== this.authAttemptGeneration) return;
       // allSettled barrier: hold the lock until EVERY write settles. Promise.all would reject on the
       // first failure and release the lock while a sibling setItem was still pending, letting that
       // straggler land after a concurrent clearAuth and resurrect the forgotten token/DID.
@@ -1111,6 +1152,7 @@ export class ICNMobileClient extends ICNClient {
   ): Promise<import('./steward-types').CompleteEnrollmentResponse> {
     const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
     const gen = this.identityGeneration;
+    const attempt = this.beginAuthAttempt();
     const response = await fetch(`${baseUrl}/v1/enrollment/complete`, {
       method: 'POST',
       headers: {
@@ -1133,22 +1175,23 @@ export class ICNMobileClient extends ICNClient {
 
     // Store the auth token and update state
     if (result.auth_token && this.storage) {
-      // Superseded by resetIdentity() during enrollment — do not restore local auth/session for the
-      // forgotten identity (the server-issued token is simply left unused).
-      if (gen !== this.identityGeneration) {
+      // Superseded by a reset OR a newer login/enrollment during the enrollment request: do not
+      // install or publish this (now stale) identity. Nothing was set on the base client yet, so
+      // there is nothing to clear here.
+      if (this.authAttemptSuperseded(gen, attempt)) {
         return result;
       }
       const token = result.auth_token.replace(/^Bearer\s+/i, '');
       this.setToken(token);
 
-      // Persist auth state - enrollment doesn't return expiry, use 1 hour default
+      // Persist auth state - enrollment does not return expiry, use 1 hour default
       const expiresAt = Date.now() + 3600000;
-      await this.persistAuth(token, result.did, deviceInfo.os, expiresAt, gen);
+      await this.persistAuth(token, result.did, deviceInfo.os, expiresAt, gen, attempt);
 
-      // Re-check: a reset may have run while persistAuth was awaiting storage. If so, drop the token
-      // we set and do not publish authenticated state.
-      if (gen !== this.identityGeneration) {
-        this.clearToken();
+      // Re-check after the awaited persist. If superseded, drop the token this attempt set, but only
+      // if it is still the newest attempt, so a stale clear cannot cancel a newer login commit.
+      if (this.authAttemptSuperseded(gen, attempt)) {
+        this.clearTokenIfNewestAttempt(attempt);
         return result;
       }
 
