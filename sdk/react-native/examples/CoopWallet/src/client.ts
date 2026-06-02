@@ -6,7 +6,7 @@
  */
 
 import { Platform } from 'react-native';
-import { createWallet, createMobileClient, SecureStorage, ICNWallet, ICNMobileClient } from '@icn/react-native';
+import { createKeyring, createMobileClient, SecureStorage, ICNKeyring, ICNMobileClient } from '@icn/react-native';
 import { GATEWAY_URL, APP_CONFIG } from './config';
 
 /** Client initialization state */
@@ -72,9 +72,25 @@ const getNativeStorage = async (): Promise<SecureStorage> => {
   };
 };
 
-// Storage, wallet, and client are initialized asynchronously
+/**
+ * Resolve the platform-appropriate secure storage adapter. Shared by init and by
+ * resetIdentity(), which must be able to reacquire storage that initialization
+ * never assigned (e.g. when an early failure left no retained handles).
+ */
+async function getPlatformStorage(): Promise<SecureStorage> {
+  if (Platform.OS === 'web') return webStorage;
+  // Use native secure storage on iOS/Android.
+  return getNativeStorage();
+}
+
+// Storage, Device Keyring, and client are initialized asynchronously
 let secureStorage: SecureStorage | null = null;
-export let wallet: ICNWallet | null = null;
+/**
+ * The Device Keyring: on-device key custody + signing. Bound to the SDK's
+ * canonical createKeyring()/ICNKeyring (the legacy createWallet alias is
+ * @deprecated). Holds no value -- economic state lives in positions/receipts.
+ */
+export let keyring: ICNKeyring | null = null;
 export let client: ICNMobileClient | null = null;
 
 /**
@@ -141,32 +157,27 @@ async function doInitialize(): Promise<void> {
   }
 
   // Get platform-appropriate storage
-  if (Platform.OS === 'web') {
-    secureStorage = webStorage;
-  } else {
-    // Use native secure storage on iOS/Android
-    secureStorage = await getNativeStorage();
-  }
+  secureStorage = await getPlatformStorage();
   if (APP_CONFIG.debug) console.log('Storage initialized');
 
-  // Create wallet for key management
-  wallet = createWallet(secureStorage);
-  if (APP_CONFIG.debug) console.log('Wallet created');
+  // Create the Device Keyring for on-device key custody + signing
+  keyring = createKeyring(secureStorage);
+  if (APP_CONFIG.debug) console.log('Device Keyring created');
 
-  // Ensure wallet has a key pair
-  if (!(await wallet.hasKeyPair())) {
+  // Ensure the keyring has a key pair
+  if (!(await keyring.hasKeyPair())) {
     if (APP_CONFIG.debug) console.log('Generating new key pair...');
-    const keyPair = await wallet.generateKeyPair();
+    const keyPair = await keyring.generateKeyPair();
     if (APP_CONFIG.debug) console.log('Key pair generated, DID:', keyPair.did);
   } else {
-    const keyPair = await wallet.getKeyPair();
+    const keyPair = await keyring.getKeyPair();
     if (APP_CONFIG.debug) console.log('Existing key pair found, DID:', keyPair?.did);
   }
 
   // Create mobile client
   client = createMobileClient({
     baseUrl: GATEWAY_URL,
-    wallet,
+    keyring,
     storage: secureStorage,
   });
   if (APP_CONFIG.debug) console.log('Mobile client created');
@@ -245,15 +256,61 @@ export async function retryInitialization(): Promise<boolean> {
 }
 
 /**
- * Reset client state completely (for wallet reset scenarios).
+ * Reset the in-memory client state (for identity reset / reprovision scenarios).
+ *
+ * This only drops the in-memory references; it does NOT clear persisted identity.
+ * To forget the on-device identity (Device Keyring key pair, auth session, and the
+ * offline operation queue) call `resetIdentity()` first, then re-initialize.
  */
 export function resetClientState(): void {
   clientState = ClientState.Uninitialized;
   lastInitError = null;
   initAttempts = 0;
-  wallet = null;
+  keyring = null;
   client = null;
   secureStorage = null;
+}
+
+/**
+ * Forget the on-device identity, then drop in-memory client state.
+ *
+ * Delegates to `ICNMobileClient.resetIdentity()` (added in #1970), which clears the
+ * Device Keyring key pair, the persisted auth session, and the queued offline
+ * operations, and invalidates the in-memory session so stale auth/identity state
+ * cannot survive a reset. After this returns, call `initializeClient()` to provision
+ * a fresh Device Keyring.
+ */
+export async function resetIdentity(): Promise<void> {
+  // Reacquire any handles that initialization never created, so a reset can still
+  // clear a previously-persisted identity even when init failed early -- e.g. a
+  // transient expo-secure-store import failure in getPlatformStorage() before
+  // `secureStorage` or `keyring` were ever assigned. If storage or the keyring
+  // cannot be reacquired, the throw below rejects the reset (the caller surfaces
+  // it) rather than falsely reporting success after clearing only in-memory state.
+  // We assign to the module-level handles so a failed reset retains them for a
+  // retry. (Constructing the client mirrors the normal init/reset->reinit flow.)
+  // `??=` assigns the module-level handle only when missing and yields a non-null
+  // local, so this both reacquires what init never created AND keeps the handles
+  // assigned (retained for a retry) if cleanup later rejects.
+  const storage = (secureStorage ??= await getPlatformStorage());
+  const deviceKeyring = (keyring ??= createKeyring(storage));
+  const mobileClient = (client ??= createMobileClient({
+    baseUrl: GATEWAY_URL,
+    keyring: deviceKeyring,
+    storage,
+  }));
+
+  // Canonical cleanup: clears the keyring key pair, the persisted auth session, and
+  // the offline queue. Rejects if any persisted removal fails; let that propagate
+  // WITHOUT clearing the in-memory handles, so a retry can re-run cleanup against
+  // the surviving state. resetIdentity()/deleteKeyPair() are idempotent, so
+  // re-attempting after a partial failure is safe.
+  await mobileClient.resetIdentity();
+
+  // Only reached once cleanup SUCCEEDED: drop the in-memory references so the next
+  // initializeClient() provisions a fresh identity. On failure we keep the handles
+  // above so the user can retry the reset.
+  resetClientState();
 }
 
 /**
