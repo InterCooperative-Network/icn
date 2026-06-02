@@ -639,6 +639,50 @@ describe('ICNMobileClient', () => {
       expect(gatedStorage.store.has('icn_auth_did')).toBe(false);
       expect(c.authState.isAuthenticated).toBe(false);
     });
+
+    it('a synchronous storage throw cannot resurrect auth after reset (sync-throw normalized)', async () => {
+      await wallet.generateKeyPair();
+      // DID write throws SYNCHRONOUSLY; TOKEN write is slow (gated). The async-wrapped allSettled
+      // barrier must still await the in-flight token write before releasing the lock.
+      const tokenGate = deferred<void>();
+      const base = createMockStorage();
+      const gatedStorage: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        getItem: base.getItem,
+        hasItem: base.hasItem,
+        removeItem: base.removeItem,
+        // Intentionally NOT async so it can throw synchronously, like a misbehaving native adapter.
+        setItem(k: string, v: string): Promise<void> {
+          if (k === 'icn_auth_did') {
+            throw new Error('sync did write failed');
+          }
+          if (k === 'icn_auth_token') {
+            return tokenGate.promise.then(() => {
+              base.store.set(k, v);
+            });
+          }
+          base.store.set(k, v);
+          return Promise.resolve();
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        wallet,
+        storage: gatedStorage,
+      });
+      jest
+        .spyOn(c as any, 'authenticate')
+        .mockResolvedValue({ token: 'tok', expires_at: Date.now() + 3600000 });
+
+      const loginPromise = c.login('coop-1');
+      await tick();
+      const resetPromise = c.resetIdentity();
+      tokenGate.resolve();
+      await Promise.allSettled([loginPromise, resetPromise]);
+
+      expect(gatedStorage.store.has('icn_auth_token')).toBe(false);
+      expect(c.authState.isAuthenticated).toBe(false);
+    });
   });
 });
 

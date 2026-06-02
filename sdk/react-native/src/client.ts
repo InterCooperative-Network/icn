@@ -550,11 +550,15 @@ export class ICNMobileClient extends ICNClient {
       // allSettled barrier: hold the lock until EVERY write settles. Promise.all would reject on the
       // first failure and release the lock while a sibling setItem was still pending, letting that
       // straggler land after a concurrent clearAuth and resurrect the forgotten token/DID.
+      // Async wrappers so a *synchronous* throw from an app-supplied storage method becomes a captured
+      // rejection rather than aborting array construction (which would orphan an already-pending
+      // sibling write and release the lock before it settled).
       const results = await Promise.allSettled([
-        this.storage!.setItem(TOKEN_KEY, token),
-        this.storage!.setItem(DID_KEY, did),
-        coopId ? this.storage!.setItem(COOP_KEY, coopId) : this.storage!.removeItem(COOP_KEY),
-        this.storage!.setItem(EXPIRES_KEY, expiresAt.toString()),
+        (async () => this.storage!.setItem(TOKEN_KEY, token))(),
+        (async () => this.storage!.setItem(DID_KEY, did))(),
+        (async () =>
+          coopId ? this.storage!.setItem(COOP_KEY, coopId) : this.storage!.removeItem(COOP_KEY))(),
+        (async () => this.storage!.setItem(EXPIRES_KEY, expiresAt.toString()))(),
       ]);
       const failure = results.find((r) => r.status === 'rejected');
       if (failure && failure.status === 'rejected') throw failure.reason;
@@ -567,11 +571,12 @@ export class ICNMobileClient extends ICNClient {
     await this.runAuthExclusive(async () => {
       // allSettled barrier (symmetric to persistAuth): hold the lock until every removal settles so a
       // delayed removal cannot land after — and clobber — a serialized replacement write.
+      // Async wrappers normalize a synchronous storage throw to a captured rejection (see persistAuth).
       const results = await Promise.allSettled([
-        this.storage!.removeItem(TOKEN_KEY),
-        this.storage!.removeItem(DID_KEY),
-        this.storage!.removeItem(COOP_KEY),
-        this.storage!.removeItem(EXPIRES_KEY),
+        (async () => this.storage!.removeItem(TOKEN_KEY))(),
+        (async () => this.storage!.removeItem(DID_KEY))(),
+        (async () => this.storage!.removeItem(COOP_KEY))(),
+        (async () => this.storage!.removeItem(EXPIRES_KEY))(),
       ]);
       const failure = results.find((r) => r.status === 'rejected');
       if (failure && failure.status === 'rejected') throw failure.reason;
