@@ -72,6 +72,17 @@ const getNativeStorage = async (): Promise<SecureStorage> => {
   };
 };
 
+/**
+ * Resolve the platform-appropriate secure storage adapter. Shared by init and by
+ * resetIdentity(), which must be able to reacquire storage that initialization
+ * never assigned (e.g. when an early failure left no retained handles).
+ */
+async function getPlatformStorage(): Promise<SecureStorage> {
+  if (Platform.OS === 'web') return webStorage;
+  // Use native secure storage on iOS/Android.
+  return getNativeStorage();
+}
+
 // Storage, Device Keyring, and client are initialized asynchronously
 let secureStorage: SecureStorage | null = null;
 /**
@@ -146,12 +157,7 @@ async function doInitialize(): Promise<void> {
   }
 
   // Get platform-appropriate storage
-  if (Platform.OS === 'web') {
-    secureStorage = webStorage;
-  } else {
-    // Use native secure storage on iOS/Android
-    secureStorage = await getNativeStorage();
-  }
+  secureStorage = await getPlatformStorage();
   if (APP_CONFIG.debug) console.log('Storage initialized');
 
   // Create the Device Keyring for on-device key custody + signing
@@ -275,39 +281,35 @@ export function resetClientState(): void {
  * a fresh Device Keyring.
  */
 export async function resetIdentity(): Promise<void> {
-  // Pre-client case: initialization can fail after the Device Keyring and secure
-  // storage are created but before createMobileClient() runs (e.g. a transient
-  // hasKeyPair()/generateKeyPair()/getKeyPair() storage error), leaving `client`
-  // null while persisted identity still exists. Construct the client now so the
-  // canonical ICNMobileClient.resetIdentity() can clear the keyring key pair, the
-  // auth session, and the offline queue -- otherwise the reset would only drop
-  // in-memory references and a later init could silently reuse the old identity.
-  if (!client && keyring && secureStorage) {
-    client = createMobileClient({
-      baseUrl: GATEWAY_URL,
-      keyring,
-      storage: secureStorage,
-    });
-  }
+  // Reacquire any handles that initialization never created, so a reset can still
+  // clear a previously-persisted identity even when init failed early -- e.g. a
+  // transient expo-secure-store import failure in getPlatformStorage() before
+  // `secureStorage` or `keyring` were ever assigned. If storage or the keyring
+  // cannot be reacquired, the throw below rejects the reset (the caller surfaces
+  // it) rather than falsely reporting success after clearing only in-memory state.
+  // We assign to the module-level handles so a failed reset retains them for a
+  // retry. (Constructing the client mirrors the normal init/reset->reinit flow.)
+  // `??=` assigns the module-level handle only when missing and yields a non-null
+  // local, so this both reacquires what init never created AND keeps the handles
+  // assigned (retained for a retry) if cleanup later rejects.
+  const storage = (secureStorage ??= await getPlatformStorage());
+  const deviceKeyring = (keyring ??= createKeyring(storage));
+  const mobileClient = (client ??= createMobileClient({
+    baseUrl: GATEWAY_URL,
+    keyring: deviceKeyring,
+    storage,
+  }));
 
-  // Attempt the persisted cleanup. These reject if any removal fails; let that
-  // propagate (the caller surfaces it) WITHOUT clearing the in-memory handles, so a
-  // retry can re-run the cleanup against the surviving keyring/auth/queue. The
-  // canonical resetIdentity()/deleteKeyPair() are idempotent, so re-attempting
-  // after a partial failure is safe.
-  if (client) {
-    await client.resetIdentity();
-  } else if (keyring) {
-    // Last resort if no secure storage is available to build a client from (should
-    // not happen, since the keyring is created from secure storage): still clear the
-    // persisted keyring key pair.
-    await keyring.deleteKeyPair();
-  }
+  // Canonical cleanup: clears the keyring key pair, the persisted auth session, and
+  // the offline queue. Rejects if any persisted removal fails; let that propagate
+  // WITHOUT clearing the in-memory handles, so a retry can re-run cleanup against
+  // the surviving state. resetIdentity()/deleteKeyPair() are idempotent, so
+  // re-attempting after a partial failure is safe.
+  await mobileClient.resetIdentity();
 
-  // Only reached once cleanup SUCCEEDED: now it is safe to drop the in-memory
-  // references so the next initializeClient() provisions a fresh identity. On a
-  // cleanup failure we intentionally keep the handles above so the user can retry
-  // the reset instead of being left with a stranded, partially-cleared identity.
+  // Only reached once cleanup SUCCEEDED: drop the in-memory references so the next
+  // initializeClient() provisions a fresh identity. On failure we keep the handles
+  // above so the user can retry the reset.
   resetClientState();
 }
 

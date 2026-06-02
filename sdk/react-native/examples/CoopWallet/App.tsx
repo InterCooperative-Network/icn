@@ -86,6 +86,11 @@ let initializeClient: () => Promise<boolean> = async () => {
 let retryInitialization: () => Promise<boolean> = async () => false;
 let resetClientState: () => void = () => {};
 let resetIdentity: () => Promise<void> = async () => {};
+// Serializes the full reset-plus-reinitialize sequence (shared by both Reset
+// Identity actions) so a double-tap cannot interleave two reset/initialize runs
+// against the same storage -- which could drop shared handles and provision keys
+// concurrently. A duplicate tap while one is in flight is a no-op.
+let resetInProgress = false;
 let isClientReady: () => boolean = () => false;
 let getClientState: () => string = () => 'uninitialized';
 let getLastInitError: () => any = () => null;
@@ -324,6 +329,11 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => vo
         <TouchableOpacity
           style={[styles.secondaryButton, { marginTop: 20 }]}
           onPress={async () => {
+            // Serialize: ignore a duplicate tap while a reset is already running,
+            // so two reset/reinitialize sequences cannot interleave against the same
+            // storage. The skipped tap makes no UI claim of success.
+            if (resetInProgress) return;
+            resetInProgress = true;
             try {
               // Forget the on-device identity (Device Keyring key pair, auth
               // session, and queued operations) so stale identity/auth state
@@ -358,6 +368,8 @@ function LoginScreen({ onLogin }: { onLogin: (coopId: string, did: string) => vo
             } catch (e) {
               console.error('Reset error:', e);
               setError('Failed to reset identity: ' + (e as Error).message);
+            } finally {
+              resetInProgress = false;
             }
           }}
         >
@@ -2310,6 +2322,10 @@ export default function App() {
   }, []);
 
   const handleInitReset = useCallback(async () => {
+    // Serialize: ignore a duplicate tap while a reset is already running so two
+    // reset/reinitialize sequences cannot interleave against the same storage.
+    if (resetInProgress) return;
+    resetInProgress = true;
     try {
       // Forget the on-device identity (Device Keyring key pair, auth session, and
       // queued operations) before dropping in-memory state, so a reset cannot leave
@@ -2349,6 +2365,8 @@ export default function App() {
         retriable: true,
         details: (error as Error).message,
       });
+    } finally {
+      resetInProgress = false;
     }
   }, []);
 
