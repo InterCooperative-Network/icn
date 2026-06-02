@@ -49,7 +49,7 @@ canonicalization) has since been implemented in PR #1970: <code>icn_wallet_*</co
 <code>icn_keyring_*</code> / <code>icn_hybrid_keyring_*</code>, with a defensive legacy purge on delete and a new
 <code>ICNMobileClient.resetIdentity()</code> that also clears persisted auth (<code>icn_auth_*</code>) and the offline
 queue. The Surface 1 sections below are retained as the original design record (this doc itself
-still changes nothing). Surface 2 (the Rust <code>wallet_did</code> field) remains future work as described.</p>
+still changes nothing). Surface 2 (the Rust <code>wallet_did</code> field) has since been implemented (2026-06-02) as a direct rename to <code>operator_did</code> (the canonical serialized / public field name). Per the exposure re-check (Surface 2 below) — no OpenAPI, HTTP handler, persisted store, gossip path, or TypeScript-SDK consumer of <code>OperatorMode</code>, serialized only by its own unit tests — it was a <strong>direct rename with no serde alias</strong>, treated as a semver-relevant change to <code>icn-kernel-api</code>. This doc itself still changes nothing.</p>
 </blockquote>
 <hr>
 <h2>Why this exists</h2>

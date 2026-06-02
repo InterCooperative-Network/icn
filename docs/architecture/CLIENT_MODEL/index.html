@@ -691,7 +691,7 @@ client-operation model with a different shape — not that wire type.</li>
 reviewed PR (see the doctrine&#39;s <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/passport-keyring-position-receipt#migration-rules#migration-rules">migration rules</a>):<ul>
 <li><strong>SDK key-custody rename</strong> — <code>createWallet</code> / <code>HybridWallet</code> (TypeScript + React Native) → keyring
 naming. Breaking public-API change; deferred.</li>
-<li><strong><code>wallet_did</code> field</strong> (<code>icn-kernel-api</code>) → DID-/passport-rooted naming. Public-API rename; deferred.</li>
+<li><strong><code>wallet_did</code> → <code>operator_did</code> field</strong> (<code>icn-kernel-api</code>) → operator-DID naming. Public-API rename; <strong>done</strong> — direct rename, no serde alias (see <a href="/docs/design/wallet-did-migration-boundary">Wallet DID Migration Boundary</a>).</li>
 <li><strong>Example app</strong> <code>CoopWallet</code> → passport + keyring framing.</li>
 <li><strong>Residual <code>wallet</code>-named CLI / config</strong> in illustrative examples (this doc shows target naming).</li>
 </ul>
