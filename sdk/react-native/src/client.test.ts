@@ -683,6 +683,87 @@ describe('ICNMobileClient', () => {
       expect(gatedStorage.store.has('icn_auth_token')).toBe(false);
       expect(c.authState.isAuthenticated).toBe(false);
     });
+
+    it('initialize() running during a reset cannot restore a token mid-removal', async () => {
+      // A valid persisted session exists; resetIdentity()'s clearAuth removals are gated so they are
+      // still in flight while initialize() runs concurrently.
+      const removeGate = deferred<void>();
+      let removeGateOnce = true;
+      const base = createMockStorage();
+      base.store.set('icn_auth_token', 'old-token');
+      base.store.set('icn_auth_did', 'did:icn:old');
+      base.store.set('icn_expires_at', (Date.now() + 3600000).toString());
+      const gatedStorage: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        getItem: base.getItem,
+        setItem: base.setItem,
+        hasItem: base.hasItem,
+        async removeItem(k: string): Promise<void> {
+          if (removeGateOnce && k === 'icn_auth_token') {
+            removeGateOnce = false;
+            await removeGate.promise;
+          }
+          base.store.delete(k);
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        wallet,
+        storage: gatedStorage,
+      });
+
+      const resetPromise = c.resetIdentity(); // gen++, clearAuth removals gated (auth lock held)
+      const initPromise = c.initialize(); // its serialized auth read is queued behind clearAuth
+      removeGate.resolve();
+      await Promise.all([resetPromise, initPromise]);
+
+      // initialize read after clearAuth completed -> empty -> nothing restored.
+      expect(c.authState.isAuthenticated).toBe(false);
+      expect(gatedStorage.store.has('icn_auth_token')).toBe(false);
+      expect((c as any).hasToken()).toBe(false);
+    });
+
+    it('a superseded initialize does not clear auth in its expiry branch', async () => {
+      // initialize() reads an EXPIRED old session; its read is gated so a reset can bump the
+      // generation before initialize reaches the expiry branch.
+      const readGate = deferred<void>();
+      let readGateOnce = true;
+      const base = createMockStorage();
+      base.store.set('icn_auth_token', 'old-expired');
+      base.store.set('icn_auth_did', 'did:icn:old');
+      base.store.set('icn_expires_at', (Date.now() - 1000).toString()); // already expired
+      const gatedStorage: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        setItem: base.setItem,
+        hasItem: base.hasItem,
+        removeItem: base.removeItem,
+        async getItem(k: string): Promise<string | null> {
+          const snapshot = base.store.get(k) ?? null; // value at read time (the old expired session)
+          if (readGateOnce && k === 'icn_auth_token') {
+            readGateOnce = false;
+            await readGate.promise;
+          }
+          return snapshot;
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        wallet,
+        storage: gatedStorage,
+      });
+      const clearAuthSpy = jest.spyOn(c as any, 'clearAuth');
+
+      const initPromise = c.initialize(); // read gated; generation captured before reset
+      await tick();
+      const resetPromise = c.resetIdentity(); // gen++; its own clearAuth is the only legitimate one
+      readGate.resolve();
+      await Promise.all([initPromise, resetPromise]);
+
+      // resetIdentity legitimately calls clearAuth once; the superseded initialize must NOT call it
+      // again from its expiry branch (which would clobber any replacement session).
+      expect(clearAuthSpy).toHaveBeenCalledTimes(1);
+      expect(c.authState.isAuthenticated).toBe(false);
+    });
   });
 });
 

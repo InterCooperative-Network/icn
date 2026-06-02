@@ -129,14 +129,22 @@ export class ICNMobileClient extends ICNClient {
 
     const gen = this.identityGeneration;
     try {
-      const [token, did, coopId, expiresStr] = await Promise.all([
-        this.storage.getItem(TOKEN_KEY),
-        this.storage.getItem(DID_KEY),
-        this.storage.getItem(COOP_KEY),
-        this.storage.getItem(EXPIRES_KEY),
-      ]);
+      // Read auth state through the auth-write lock so a concurrent resetIdentity()'s clearAuth() has
+      // completed first (read-after-write consistency); otherwise we could read a token that is
+      // mid-removal and restore the forgotten identity.
+      const [token, did, coopId, expiresStr] = await this.runAuthExclusive(() =>
+        Promise.all([
+          this.storage!.getItem(TOKEN_KEY),
+          this.storage!.getItem(DID_KEY),
+          this.storage!.getItem(COOP_KEY),
+          this.storage!.getItem(EXPIRES_KEY),
+        ])
+      );
 
-      if (token && did) {
+      // Only touch auth state if this initialize has not been superseded by a reset (or a newer
+      // login). This fences BOTH the restore AND the expired-token clearAuth, so a stale initializer
+      // can neither resurrect the forgotten identity nor clear a replacement session.
+      if (token && did && gen === this.identityGeneration) {
         const expiresAt = expiresStr ? parseInt(expiresStr, 10) : null;
 
         // Check if token is expired
@@ -145,16 +153,13 @@ export class ICNMobileClient extends ICNClient {
           return;
         }
 
-        // If resetIdentity() ran during the storage read, do not restore the superseded session.
-        if (gen === this.identityGeneration) {
-          this.setToken(token);
-          this.updateAuthState({
-            isAuthenticated: true,
-            did,
-            coopId,
-            expiresAt,
-          });
-        }
+        this.setToken(token);
+        this.updateAuthState({
+          isAuthenticated: true,
+          did,
+          coopId,
+          expiresAt,
+        });
       }
 
       // Initialize queue manager
