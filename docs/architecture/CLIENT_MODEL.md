@@ -645,7 +645,7 @@ instead of becoming a blind find-and-replace.
   reviewed PR (see the doctrine's [migration rules](../design/passport-keyring-position-receipt.md#migration-rules)):
   - **SDK key-custody rename** — `createWallet` / `HybridWallet` (TypeScript + React Native) → keyring
     naming. Breaking public-API change; deferred.
-  - **`wallet_did` field** (`icn-kernel-api`) → DID-/passport-rooted naming. Public-API rename; deferred.
+  - **`wallet_did` → `operator_did` field** (`icn-kernel-api`) → operator-DID naming. Public-API rename; **done** — direct rename, no serde alias (see [Wallet DID Migration Boundary](../design/wallet-did-migration-boundary.md)).
   - **Example app** `CoopWallet` → passport + keyring framing.
   - **Residual `wallet`-named CLI / config** in illustrative examples (this doc shows target naming).
 - Where the word "wallet" still appears in this document it is either (a) the **rejected

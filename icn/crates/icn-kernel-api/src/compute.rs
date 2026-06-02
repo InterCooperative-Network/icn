@@ -45,11 +45,11 @@ use serde::{Deserialize, Serialize};
 ///
 /// # Individual Nodes
 ///
-/// Individual nodes are operated by a person using their wallet DID as the
+/// Individual nodes are operated by a person using their operator DID as the
 /// root identity. This enables:
 /// - Personal data sovereignty (your node, your data)
 /// - Optional contribution to commons compute
-/// - Wallet-rooted identity for all operations
+/// - Operator-rooted identity for all operations
 ///
 /// # Organizational Nodes
 ///
@@ -74,8 +74,8 @@ pub enum OperatorMode {
     },
     /// Node operated by an individual (personal infrastructure)
     Individual {
-        /// The wallet DID that owns this node
-        wallet_did: Did,
+        /// The operator DID that owns this node
+        operator_did: Did,
         /// Whether this node contributes to commons compute
         contributes_to_commons: bool,
     },
@@ -114,13 +114,13 @@ impl OperatorMode {
         }
     }
 
-    /// Get the operator identifier (entity_id or wallet_did as string).
+    /// Get the operator identifier (entity_id or operator_did as string).
     ///
     /// This is used for cell join compatibility checks.
     pub fn operator_id(&self) -> &str {
         match self {
             Self::Organization { entity_id, .. } => entity_id,
-            Self::Individual { wallet_did, .. } => wallet_did.as_str(),
+            Self::Individual { operator_did, .. } => operator_did.as_str(),
         }
     }
 
@@ -134,9 +134,14 @@ impl OperatorMode {
             (Self::Organization { entity_id: a, .. }, Self::Organization { entity_id: b, .. }) => {
                 a == b
             }
-            (Self::Individual { wallet_did: a, .. }, Self::Individual { wallet_did: b, .. }) => {
-                a == b
-            }
+            (
+                Self::Individual {
+                    operator_did: a, ..
+                },
+                Self::Individual {
+                    operator_did: b, ..
+                },
+            ) => a == b,
             _ => false, // Mixed modes not compatible
         }
     }
@@ -635,7 +640,7 @@ mod tests {
         assert!(org.is_organization());
 
         let individual = OperatorMode::Individual {
-            wallet_did: "did:icn:abc123".into(),
+            operator_did: "did:icn:abc123".into(),
             contributes_to_commons: true,
         };
         assert!(individual.is_individual());
@@ -653,14 +658,14 @@ mod tests {
 
         // Individuals can opt in
         let ind_yes = OperatorMode::Individual {
-            wallet_did: "did:icn:abc123".into(),
+            operator_did: "did:icn:abc123".into(),
             contributes_to_commons: true,
         };
         assert!(ind_yes.contributes_to_commons());
 
         // Individuals can opt out
         let ind_no = OperatorMode::Individual {
-            wallet_did: "did:icn:abc123".into(),
+            operator_did: "did:icn:abc123".into(),
             contributes_to_commons: false,
         };
         assert!(!ind_no.contributes_to_commons());
@@ -675,7 +680,7 @@ mod tests {
         assert_eq!(org.operator_id(), "coop-123");
 
         let individual = OperatorMode::Individual {
-            wallet_did: "did:icn:abc123".into(),
+            operator_did: "did:icn:abc123".into(),
             contributes_to_commons: true,
         };
         assert_eq!(individual.operator_id(), "did:icn:abc123");
@@ -702,21 +707,21 @@ mod tests {
         assert!(!org1.is_compatible_with(&org2));
 
         let ind1 = OperatorMode::Individual {
-            wallet_did: "did:icn:abc123".into(),
+            operator_did: "did:icn:abc123".into(),
             contributes_to_commons: true,
         };
         let ind1_clone = OperatorMode::Individual {
-            wallet_did: "did:icn:abc123".into(),
+            operator_did: "did:icn:abc123".into(),
             contributes_to_commons: false, // Different contrib setting
         };
         let ind2 = OperatorMode::Individual {
-            wallet_did: "did:icn:def456".into(),
+            operator_did: "did:icn:def456".into(),
             contributes_to_commons: true,
         };
 
-        // Same wallet DID = compatible
+        // Same operator DID = compatible
         assert!(ind1.is_compatible_with(&ind1_clone));
-        // Different wallet DID = incompatible
+        // Different operator DID = incompatible
         assert!(!ind1.is_compatible_with(&ind2));
 
         // Mixed modes = incompatible
@@ -742,12 +747,16 @@ mod tests {
     #[test]
     fn test_operator_mode_serde_individual() {
         let ind = OperatorMode::Individual {
-            wallet_did: "did:icn:abc123".into(),
+            operator_did: "did:icn:abc123".into(),
             contributes_to_commons: true,
         };
         let json = serde_json::to_string(&ind).unwrap();
         assert!(json.contains(r#""individual""#));
-        assert!(json.contains(r#""wallet_did":"did:icn:abc123""#));
+        assert!(json.contains(r#""operator_did":"did:icn:abc123""#));
+        assert!(
+            !json.contains("wallet_did"),
+            "serialized OperatorMode must use canonical operator_did, never legacy wallet_did"
+        );
         assert!(json.contains(r#""contributes_to_commons":true"#));
 
         let parsed: OperatorMode = serde_json::from_str(&json).unwrap();
