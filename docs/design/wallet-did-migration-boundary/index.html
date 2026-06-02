@@ -43,6 +43,14 @@ View source on GitHub →
 <strong>Priority</strong>: Tier 1 — identity / custody naming boundary
 <strong>Companion</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/passport-keyring-position-receipt">`./passport-keyring-position-receipt.md`</a>, <a href="/docs/architecture/CLIENT_MODEL">`../architecture/CLIENT_MODEL.md`</a>
 <strong>Scope</strong>: Diagnosis + naming/migration design only. <strong>This document renames no code, no storage keys, and no serialized fields.</strong></p>
+<blockquote>
+<p><strong>Implementation status (2026-06-01):</strong> Surface 1 below (the React Native keyring storage-key
+canonicalization) has since been implemented in PR #1970: <code>icn_wallet_*</code> / <code>icn_hybrid_wallet_*</code> →
+<code>icn_keyring_*</code> / <code>icn_hybrid_keyring_*</code>, with a defensive legacy purge on delete and a new
+<code>ICNMobileClient.resetIdentity()</code> that also clears persisted auth (<code>icn_auth_*</code>) and the offline
+queue. The Surface 1 sections below are retained as the original design record (this doc itself
+still changes nothing). Surface 2 (the Rust <code>wallet_did</code> field) remains future work as described.</p>
+</blockquote>
 <hr>
 <h2>Why this exists</h2>
 <p>The parent doctrine names two deferred <code>wallet</code>-rooted DID surfaces — class <strong>C</strong> (<code>wallet_did</code> in
