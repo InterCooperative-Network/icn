@@ -596,6 +596,49 @@ describe('ICNMobileClient', () => {
       expect(gatedStorage.store.has('icn_auth_did')).toBe(false);
       expect(c.authState.isAuthenticated).toBe(false);
     });
+
+    it('a partially-failed persistAuth batch cannot resurrect auth after reset (allSettled barrier)', async () => {
+      await wallet.generateKeyPair();
+      // DID write rejects immediately; TOKEN write is slow (gated). The allSettled barrier must keep
+      // the auth-write lock held until BOTH settle, so the reset's clearAuth runs strictly afterward
+      // and the slow token write cannot land after it.
+      const tokenGate = deferred<void>();
+      const base = createMockStorage();
+      const gatedStorage: SecureStorage & { store: Map<string, string> } = {
+        store: base.store,
+        getItem: base.getItem,
+        hasItem: base.hasItem,
+        removeItem: base.removeItem,
+        async setItem(k: string, v: string): Promise<void> {
+          if (k === 'icn_auth_did') {
+            throw new Error('did write failed');
+          }
+          if (k === 'icn_auth_token') {
+            await tokenGate.promise; // straggler write that must not outlive the lock
+          }
+          base.store.set(k, v);
+        },
+      };
+      const c = new ICNMobileClient({
+        baseUrl: 'https://icn.example.org',
+        wallet,
+        storage: gatedStorage,
+      });
+      jest
+        .spyOn(c as any, 'authenticate')
+        .mockResolvedValue({ token: 'tok', expires_at: Date.now() + 3600000 });
+
+      const loginPromise = c.login('coop-1'); // parks in persistAuth holding the auth-write lock
+      await tick();
+      const resetPromise = c.resetIdentity(); // clearAuth queued strictly behind persistAuth
+      tokenGate.resolve(); // release the slow token write
+      await Promise.allSettled([loginPromise, resetPromise]);
+
+      // The straggler token write completed inside the lock; clearAuth then removed it. No resurrection.
+      expect(gatedStorage.store.has('icn_auth_token')).toBe(false);
+      expect(gatedStorage.store.has('icn_auth_did')).toBe(false);
+      expect(c.authState.isAuthenticated).toBe(false);
+    });
   });
 });
 

@@ -547,26 +547,35 @@ export class ICNMobileClient extends ICNClient {
     await this.runAuthExclusive(async () => {
       // Skip if a reset superseded this write while it was queued — the reset's clearAuth wins.
       if (gen !== this.identityGeneration) return;
-      await Promise.all([
+      // allSettled barrier: hold the lock until EVERY write settles. Promise.all would reject on the
+      // first failure and release the lock while a sibling setItem was still pending, letting that
+      // straggler land after a concurrent clearAuth and resurrect the forgotten token/DID.
+      const results = await Promise.allSettled([
         this.storage!.setItem(TOKEN_KEY, token),
         this.storage!.setItem(DID_KEY, did),
         coopId ? this.storage!.setItem(COOP_KEY, coopId) : this.storage!.removeItem(COOP_KEY),
         this.storage!.setItem(EXPIRES_KEY, expiresAt.toString()),
       ]);
+      const failure = results.find((r) => r.status === 'rejected');
+      if (failure && failure.status === 'rejected') throw failure.reason;
     });
   }
 
   private async clearAuth(): Promise<void> {
     if (!this.storage) return;
 
-    await this.runAuthExclusive(() =>
-      Promise.all([
+    await this.runAuthExclusive(async () => {
+      // allSettled barrier (symmetric to persistAuth): hold the lock until every removal settles so a
+      // delayed removal cannot land after — and clobber — a serialized replacement write.
+      const results = await Promise.allSettled([
         this.storage!.removeItem(TOKEN_KEY),
         this.storage!.removeItem(DID_KEY),
         this.storage!.removeItem(COOP_KEY),
         this.storage!.removeItem(EXPIRES_KEY),
-      ]).then(() => undefined)
-    );
+      ]);
+      const failure = results.find((r) => r.status === 'rejected');
+      if (failure && failure.status === 'rejected') throw failure.reason;
+    });
   }
 
   private updateAuthState(state: AuthState): void {
