@@ -108,6 +108,42 @@ describe('QueueManager identity-reset concurrency', () => {
     await expect(qm.purge()).rejects.toThrow('storage boom');
   });
 
+  it('initialize() discards a stale read if the queue is purged during the read', async () => {
+    const store = new Map<string, string>();
+    store.set(
+      QUEUE_KEY,
+      JSON.stringify([{ id: '1', type: 'vote', data: {}, queuedAt: 0, retries: 0, status: 'pending' }])
+    );
+    const gate = deferred<void>();
+    const storage: SecureStorage & { store: Map<string, string> } = {
+      store,
+      async getItem(k: string): Promise<string | null> {
+        if (k === QUEUE_KEY) await gate.promise; // hold the load in flight
+        return store.get(k) ?? null;
+      },
+      async setItem(k: string, v: string): Promise<void> {
+        store.set(k, v);
+      },
+      async removeItem(k: string): Promise<void> {
+        store.delete(k);
+      },
+      async hasItem(k: string): Promise<boolean> {
+        return store.has(k);
+      },
+    };
+    const qm = new QueueManager(storage);
+
+    const initP = qm.initialize(); // getItem gated; generation captured = 0
+    await tick();
+    await qm.purge(); // generation -> 1, queue emptied, storage removed
+    gate.resolve(); // the stale read now resolves with the old queue JSON
+    await initP;
+
+    // The stale read is discarded by the generation fence; purge wins.
+    expect(qm.getQueue().length).toBe(0);
+    expect(storage.store.has(QUEUE_KEY)).toBe(false);
+  });
+
   it('normal enqueue + processQueue still works (no regression)', async () => {
     const storage = makeStorage();
     const qm = new QueueManager(storage);

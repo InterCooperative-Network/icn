@@ -33,9 +33,13 @@ export class QueueManager {
   async initialize(): Promise<void> {
     if (!this.storage) return;
 
+    // Capture the generation before the (awaited) read; if a purge()/clear() runs while getItem is in
+    // flight (e.g. an identity reset), the loaded result is stale and must be discarded so the
+    // forgotten identity's queued operations cannot reappear in memory after the reset.
+    const gen = this.generation;
     try {
       const stored = await this.storage.getItem(QUEUE_STORAGE_KEY);
-      if (stored) {
+      if (stored && gen === this.generation) {
         this.queue = JSON.parse(stored);
         this.notifyListeners();
       }
