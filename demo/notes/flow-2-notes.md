@@ -1,7 +1,7 @@
 # Flow 2 — Presenter Notes: BrightWorks Patronage Distribution
 **Audience**: Cooperative members, organizers, community leaders (non-technical)
 **Duration**: ~15 minutes with pauses
-**Key message**: Surplus went from Q1 close → democratic vote → ledger settlement → member balances. The whole chain is verifiable.
+**Key message**: Surplus went from Q1 close → democratic vote → ledger settlement → member positions. The whole chain is verifiable.
 
 ---
 
@@ -68,15 +68,15 @@
 
 ---
 
-## Beat: Step 9 — Live balance
-**Say**: "The cooperative account balance is live. Any member can query their own balance at any time — the coop doesn't have to send a statement."
-**Point to**: The balance result
+## Beat: Step 9 — Live position
+**Say**: "The cooperative account position is live. Any member can query their own position at any time — the coop doesn't have to send a statement."
+**Point to**: The position result
 **If asked**: "Yes, this is real-time. No waiting for month-end accounting."
 
 ---
 
 ## Beat: Step 10 — Full history
-**Say**: "Here's the whole chain: Q1 surplus → allocation formula → member vote → ledger entry → member balance. Every step traceable. This is what a cooperative financial record looks like when it's on the network."
+**Say**: "Here's the whole chain: Q1 surplus → allocation formula → member vote → ledger entry → member position. Every step traceable. This is what a cooperative financial record looks like when it's on the network."
 **Point to**: The history entries
 
 ---

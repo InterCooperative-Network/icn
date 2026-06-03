@@ -38,7 +38,7 @@
 ---
 
 ## Beat: Step 4 — Full allocation trail
-**Say**: "Every transaction in order. The foundation can trace the full chain from surplus to member wallets. This is not a summary — it's the raw record."
+**Say**: "Every transaction in order. The foundation can trace the full chain from surplus to member positions. This is not a summary — it's the raw record."
 **Point to**: The history
 **If asked**: "Yes, a forensic accountant could follow this. It's designed to be auditable."
 

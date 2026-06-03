@@ -32,10 +32,10 @@
 
 ## Beat: Step 3 — Ledger position
 **Say**: "Here's Finger Lakes CDN's standing in the mutual credit system. Before any task executes, the system checks whether they have the credit line to cover it. This is credit reservation — like a hold on a card, except it belongs to a cooperative and not a bank."
-**Point to**: The ledger position response (or the 404 / zero balance message)
+**Point to**: The ledger position response (or the 404 / zero position message)
 **If position is 404 or zero**: "They have no prior activity — this is their first interaction with the commons pool. That's allowed. New members can participate; their credit line grows as they contribute. Trust gates access; credits settle after the work is done."
 **If asked "What is mutual credit?"**: "It's a credit system where the cooperative network issues credit based on real contributions — not capital. When Finger Lakes CDN routes traffic for other cooperatives, they earn credits. When they spend compute, they spend credits. No bank, no interest, no extraction."
-**If asked "What if they go negative?"**: "The system has a credit floor — configured by governance, not hard-coded. Going below the floor blocks further spending until the balance is restored through contribution. The cooperative's members set the floor through their own governance policy."
+**If asked "What if they go negative?"**: "The system has a credit floor — configured by governance, not hard-coded. Going below the floor blocks further spending until the position is restored through contribution. The cooperative's members set the floor through their own governance policy."
 
 ---
 
