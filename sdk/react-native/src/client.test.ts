@@ -396,6 +396,95 @@ describe('ICNMobileClient', () => {
     });
   });
 
+  describe('dispose', () => {
+    it('is idempotent and safe to call more than once', () => {
+      const unsub = jest.fn();
+      // Simulate the NetInfo path having captured an unsubscribe handle.
+      (client as any).netInfoUnsubscribe = unsub;
+      expect(() => {
+        client.dispose();
+        client.dispose();
+      }).not.toThrow();
+      // Second dispose() is a no-op (guarded), so unsubscribe runs exactly once.
+      expect(unsub).toHaveBeenCalledTimes(1);
+    });
+
+    it('releases the NetInfo unsubscribe handle when present', () => {
+      const unsub = jest.fn();
+      (client as any).netInfoUnsubscribe = unsub;
+      client.dispose();
+      expect(unsub).toHaveBeenCalledTimes(1);
+      expect((client as any).netInfoUnsubscribe).toBeNull();
+    });
+
+    it('clears the fallback network-monitoring interval (no timer survives)', () => {
+      jest.useFakeTimers();
+      try {
+        // In the SDK test env @react-native-community/netinfo is not installed, so
+        // the constructor takes the basic-monitoring path and schedules one 30s
+        // heartbeat interval. dispose() must clear it.
+        const c = new ICNMobileClient({
+          baseUrl: 'https://icn.example.org',
+          storage: createMockStorage(),
+        });
+        const before = jest.getTimerCount();
+        c.dispose();
+        const after = jest.getTimerCount();
+        expect(after).toBe(0);
+        expect(after).toBeLessThanOrEqual(before);
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('does not clear identity / auth / storage state (lifecycle teardown only)', async () => {
+      await storage.setItem('icn_auth_token', 'preserved-token');
+      client.dispose();
+      expect(await storage.getItem('icn_auth_token')).toBe('preserved-token');
+      expect(client.authState.isAuthenticated).toBe(false);
+    });
+
+    it('skips a basic-monitor tick still in flight when dispose() runs (no post-teardown side effects)', async () => {
+      jest.useFakeTimers();
+      const realFetch = (globalThis as any).fetch;
+      let resolveFetch: (value?: unknown) => void = () => {};
+      (globalThis as any).fetch = jest.fn(
+        () => new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+      );
+      try {
+        // @react-native-community/netinfo is absent in the SDK test env, so this
+        // client runs the basic-monitoring (setInterval) path.
+        const c = new ICNMobileClient({
+          baseUrl: 'https://icn.example.org',
+          storage: createMockStorage(),
+        });
+        const processQueueSpy = jest
+          .spyOn(c, 'processQueue')
+          .mockResolvedValue(undefined);
+        // Force a transition-to-online on the next successful probe.
+        (c as any)._networkState = 'offline';
+
+        // Fire one heartbeat; its fetch is now pending (awaiting).
+        jest.advanceTimersByTime(30000);
+        // Tear down while the probe is in flight, then let it resolve.
+        c.dispose();
+        resolveFetch({});
+        // Flush the awaited continuation inside the tick callback.
+        await Promise.resolve();
+        await Promise.resolve();
+
+        // The post-dispose tick must NOT flip network state or process the queue.
+        expect(processQueueSpy).not.toHaveBeenCalled();
+        expect(c.networkState).toBe('offline');
+      } finally {
+        (globalThis as any).fetch = realFetch;
+        jest.useRealTimers();
+      }
+    });
+  });
+
   describe('connectRealtime', () => {
     it('should throw without coop ID', () => {
       expect(() => client.connectRealtime()).toThrow('No coop ID provided');

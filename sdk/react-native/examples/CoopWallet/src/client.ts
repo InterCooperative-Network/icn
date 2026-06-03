@@ -294,23 +294,37 @@ export async function resetIdentity(): Promise<void> {
   // assigned (retained for a retry) if cleanup later rejects.
   const storage = (secureStorage ??= await getPlatformStorage());
   const deviceKeyring = (keyring ??= createKeyring(storage));
+  // Whether we are constructing the client SOLELY to run this cleanup (init never
+  // built one). If so we dispose its network monitor afterwards; a reused live
+  // client is left intact. (Deferred #1975 5-B: a cleanup-only client would
+  // otherwise leak the network monitor ICNMobileClient's constructor starts.)
+  const constructedForCleanup = client === null;
   const mobileClient = (client ??= createMobileClient({
     baseUrl: GATEWAY_URL,
     keyring: deviceKeyring,
     storage,
   }));
 
-  // Canonical cleanup: clears the keyring key pair, the persisted auth session, and
-  // the offline queue. Rejects if any persisted removal fails; let that propagate
-  // WITHOUT clearing the in-memory handles, so a retry can re-run cleanup against
-  // the surviving state. resetIdentity()/deleteKeyPair() are idempotent, so
-  // re-attempting after a partial failure is safe.
-  await mobileClient.resetIdentity();
+  try {
+    // Canonical cleanup: clears the keyring key pair, the persisted auth session,
+    // and the offline queue. Rejects if any persisted removal fails; let that
+    // propagate WITHOUT clearing the in-memory handles, so a retry can re-run
+    // cleanup against the surviving state. resetIdentity()/deleteKeyPair() are
+    // idempotent, so re-attempting after a partial failure is safe.
+    await mobileClient.resetIdentity();
 
-  // Only reached once cleanup SUCCEEDED: drop the in-memory references so the next
-  // initializeClient() provisions a fresh identity. On failure we keep the handles
-  // above so the user can retry the reset.
-  resetClientState();
+    // Only reached once cleanup SUCCEEDED: drop the in-memory references so the
+    // next initializeClient() provisions a fresh identity. On failure we keep the
+    // handles above so the user can retry the reset.
+    resetClientState();
+  } finally {
+    // Release the network monitor of a client we built only for cleanup, whether
+    // the reset succeeded or threw (a retry reuses this same client purely for
+    // idempotent storage cleanup, which needs no monitor).
+    if (constructedForCleanup) {
+      mobileClient.dispose();
+    }
+  }
 }
 
 /**

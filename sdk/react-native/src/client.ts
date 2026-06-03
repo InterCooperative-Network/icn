@@ -71,6 +71,13 @@ export class ICNMobileClient extends ICNClient {
   private reconnectDelay = 1000;
   private intentionalDisconnect = false;
   private reconnectTimeoutId: ReturnType<typeof setTimeout> | null = null;
+  // Network-monitoring teardown handles, captured so dispose() can release them.
+  // setupNetworkMonitoring() stores EITHER the NetInfo subscription's unsubscribe
+  // function OR the basic fallback polling interval id (whichever path is active).
+  private netInfoUnsubscribe: (() => void) | null = null;
+  private networkMonitorIntervalId: ReturnType<typeof setInterval> | null = null;
+  // Idempotency guard for dispose().
+  private disposed = false;
 
   constructor(options: ICNMobileClientOptions) {
     // Create base client options
@@ -90,6 +97,41 @@ export class ICNMobileClient extends ICNClient {
     
     // Setup network state monitoring if available
     this.setupNetworkMonitoring();
+  }
+
+  /**
+   * Release lifecycle resources held by this client: the network-state monitor
+   * started in the constructor (the NetInfo subscription, or the basic polling
+   * interval fallback) plus any live WebSocket / pending reconnect timer.
+   *
+   * Idempotent and synchronous -- safe to call on a short-lived or cleanup-only
+   * client (e.g. one constructed solely to run resetIdentity()). This is lifecycle
+   * teardown ONLY: it does NOT clear the Device Keyring, the persisted auth
+   * session, or the offline queue -- use resetIdentity() to forget the on-device
+   * identity.
+   */
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+
+    // Stop network monitoring: release whichever handle setupNetworkMonitoring()
+    // captured (both are null if neither path started).
+    if (this.netInfoUnsubscribe) {
+      try {
+        this.netInfoUnsubscribe();
+      } catch (error) {
+        // A misbehaving unsubscribe must not break teardown.
+        console.error('NetInfo unsubscribe threw during dispose:', error);
+      }
+      this.netInfoUnsubscribe = null;
+    }
+    if (this.networkMonitorIntervalId !== null) {
+      clearInterval(this.networkMonitorIntervalId);
+      this.networkMonitorIntervalId = null;
+    }
+
+    // Release any open socket and cancel a pending reconnect timer (no-op if none).
+    this.disconnectWebSocket();
   }
 
   /**
@@ -184,7 +226,7 @@ export class ICNMobileClient extends ICNClient {
       // @ts-ignore - dynamic import
       const NetInfo = require('@react-native-community/netinfo');
       
-      NetInfo.addEventListener((state: any) => {
+      this.netInfoUnsubscribe = NetInfo.addEventListener((state: any) => {
         const newState: NetworkState = state.isConnected
           ? state.isInternetReachable === false
             ? 'slow'
@@ -212,6 +254,9 @@ export class ICNMobileClient extends ICNClient {
    */
   private startBasicNetworkMonitoring(): void {
     const intervalId = setInterval(async () => {
+      // A tick may already have been queued when dispose() cleared the interval;
+      // skip it so teardown stops the heartbeat completely.
+      if (this.disposed) return;
       const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
@@ -224,12 +269,18 @@ export class ICNMobileClient extends ICNClient {
           signal: controller.signal,
         });
 
+        // dispose() may have run while this probe was in flight; do not apply
+        // network-state changes or trigger queue processing after teardown.
+        if (this.disposed) return;
         if (this._networkState !== 'online') {
           this._networkState = 'online';
           this.notifyNetworkListeners();
           this.processQueue();
         }
       } catch {
+        // dispose() may have run while this probe was in flight (e.g. abort);
+        // do not apply post-teardown network-state changes.
+        if (this.disposed) return;
         if (this._networkState !== 'offline') {
           this._networkState = 'offline';
           this.notifyNetworkListeners();
@@ -245,6 +296,8 @@ export class ICNMobileClient extends ICNClient {
     // on Node timers (so Jest/Node can exit cleanly); on React Native the timer id
     // is a number and this optional call is a safe no-op.
     (intervalId as { unref?: () => void }).unref?.();
+    // Retain the id so dispose() can clear the heartbeat when the client is torn down.
+    this.networkMonitorIntervalId = intervalId;
   }
 
   /**
