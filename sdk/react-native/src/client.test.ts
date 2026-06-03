@@ -443,6 +443,46 @@ describe('ICNMobileClient', () => {
       expect(await storage.getItem('icn_auth_token')).toBe('preserved-token');
       expect(client.authState.isAuthenticated).toBe(false);
     });
+
+    it('skips a basic-monitor tick still in flight when dispose() runs (no post-teardown side effects)', async () => {
+      jest.useFakeTimers();
+      const realFetch = (globalThis as any).fetch;
+      let resolveFetch: (value?: unknown) => void = () => {};
+      (globalThis as any).fetch = jest.fn(
+        () => new Promise((resolve) => {
+          resolveFetch = resolve;
+        }),
+      );
+      try {
+        // @react-native-community/netinfo is absent in the SDK test env, so this
+        // client runs the basic-monitoring (setInterval) path.
+        const c = new ICNMobileClient({
+          baseUrl: 'https://icn.example.org',
+          storage: createMockStorage(),
+        });
+        const processQueueSpy = jest
+          .spyOn(c, 'processQueue')
+          .mockResolvedValue(undefined);
+        // Force a transition-to-online on the next successful probe.
+        (c as any)._networkState = 'offline';
+
+        // Fire one heartbeat; its fetch is now pending (awaiting).
+        jest.advanceTimersByTime(30000);
+        // Tear down while the probe is in flight, then let it resolve.
+        c.dispose();
+        resolveFetch({});
+        // Flush the awaited continuation inside the tick callback.
+        await Promise.resolve();
+        await Promise.resolve();
+
+        // The post-dispose tick must NOT flip network state or process the queue.
+        expect(processQueueSpy).not.toHaveBeenCalled();
+        expect(c.networkState).toBe('offline');
+      } finally {
+        (globalThis as any).fetch = realFetch;
+        jest.useRealTimers();
+      }
+    });
   });
 
   describe('connectRealtime', () => {

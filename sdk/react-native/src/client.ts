@@ -254,6 +254,9 @@ export class ICNMobileClient extends ICNClient {
    */
   private startBasicNetworkMonitoring(): void {
     const intervalId = setInterval(async () => {
+      // A tick may already have been queued when dispose() cleared the interval;
+      // skip it so teardown stops the heartbeat completely.
+      if (this.disposed) return;
       const baseUrl = (this as unknown as { baseUrl: string }).baseUrl;
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 5000);
@@ -266,12 +269,18 @@ export class ICNMobileClient extends ICNClient {
           signal: controller.signal,
         });
 
+        // dispose() may have run while this probe was in flight; do not apply
+        // network-state changes or trigger queue processing after teardown.
+        if (this.disposed) return;
         if (this._networkState !== 'online') {
           this._networkState = 'online';
           this.notifyNetworkListeners();
           this.processQueue();
         }
       } catch {
+        // dispose() may have run while this probe was in flight (e.g. abort);
+        // do not apply post-teardown network-state changes.
+        if (this.disposed) return;
         if (this._networkState !== 'offline') {
           this._networkState = 'offline';
           this.notifyNetworkListeners();
