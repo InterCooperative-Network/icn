@@ -17,13 +17,18 @@
 //!   execution record → journal entry,
 //! with provenance linked at every hop.
 //!
-//! The 13 conditions asserted below mirror, one-for-one, the checks in
+//! The 13 conditions asserted below correspond to the checks in
 //! `icnctl audit verify`'s `verify_receipt_chain` (icn/bins/icnctl/src/main.rs).
-//! That verifier is private to the `icnctl` binary (not a library), so — exactly
-//! as `icn/bins/icnctl/tests/audit_verify_test.rs` already does — the conditions
-//! are re-expressed here against the real persisted artifacts rather than calling
-//! the function. They operate on the same data `GET /v1/receipts/chain/{hash}`
-//! returns to the CLI.
+//! That verifier is private to the `icnctl` binary (not a library), so — like
+//! `icn/bins/icnctl/tests/audit_verify_test.rs` — the conditions are re-expressed
+//! here rather than by calling the function. They are asserted directly against
+//! the persisted artifacts the chain endpoint reads (the receipt store, the
+//! execution store, and the ledger), not against an assembled
+//! `ReceiptChainResponse`. A few checks are therefore close equivalents of the
+//! endpoint's field-level computation rather than byte-identical — e.g.
+//! `structural_complete` is computed here with the same formula `get_full_chain`
+//! uses. This proves the chain a governed settlement produces would satisfy
+//! `icnctl audit verify`, without standing up the HTTP layer.
 //!
 //! ## What is reconstructed vs. real
 //!
@@ -262,13 +267,26 @@ async fn governed_settlement_by_demo_member_produces_audit_verifiable_chain() ->
     };
     subscription(event);
 
-    // Let the spawned execution task settle.
-    tokio::time::sleep(Duration::from_millis(500)).await;
-
-    // ── Read execution record + journal entries ───────────────────────────────
-    let exec_record = exec_store
-        .get(&decision_hash_hex)?
-        .expect("execution record must exist after dispatch");
+    // Poll (bounded) until the spawned execution task has persisted a *terminal*
+    // record — `truth_summary` is only populated once dispatch completes — instead
+    // of a fixed sleep that flakes on slow/loaded CI runners. This waits for
+    // completion without asserting success (a failed run still sets the summary),
+    // and guarantees the journal entries (written during dispatch) are visible
+    // before we read them below.
+    let exec_record = {
+        let mut settled = None;
+        for _ in 0..100 {
+            match exec_store.get(&decision_hash_hex)? {
+                Some(record) if record.truth_summary.is_some() => {
+                    settled = Some(record);
+                    break;
+                }
+                _ => tokio::time::sleep(Duration::from_millis(50)).await,
+            }
+        }
+        settled
+            .expect("execution record must reach a terminal state after dispatch (waited up to 5s)")
+    };
     let truth = exec_record.truth_summary_or_fallback();
 
     let journal_entries: Vec<_> = ledger
@@ -288,8 +306,15 @@ async fn governed_settlement_by_demo_member_produces_audit_verifiable_chain() ->
     let all_intent_hashes: HashSet<Hash> =
         allocations.iter().flat_map(|a| a.intent_hashes()).collect();
 
+    // Same formula as icn-gateway `get_full_chain`: governance present && every
+    // allocation carries >=1 intent (it does NOT require allocations to be
+    // non-empty). Allocation presence is asserted separately as check #3.
+    let governance_present = backend
+        .get_governance_by_decision(&decision_hash)
+        .map_err(|e| anyhow!(e))?
+        .is_some();
     let structural_complete =
-        !allocations.is_empty() && allocations.iter().all(|a| !a.intents.is_empty());
+        governance_present && allocations.iter().all(|a| !a.intents.is_empty());
 
     let checks: Vec<(&str, bool)> = vec![
         // 1
