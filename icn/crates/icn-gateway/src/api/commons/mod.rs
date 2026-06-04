@@ -15,7 +15,10 @@ use utoipa::ToSchema;
 use crate::commons_mgr::CommonsManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::get_claims;
-use icn_identity::{Affiliation, CommonsHolderRecord, Did, JurisdictionId, MembershipStatus};
+use icn_identity::{
+    Affiliation, CommonsHolderRecord, Did, JurisdictionId, KeyPair, MembershipCapability,
+    MembershipStatus,
+};
 
 // ============================================================================
 // Response/Request DTOs
@@ -377,6 +380,130 @@ pub async fn leave_jurisdiction(
 }
 
 // ============================================================================
+// Dev/Demo-only standing bootstrap
+// ============================================================================
+
+/// Request body for [`dev_bootstrap_standing`].
+#[derive(Debug, Deserialize)]
+pub struct DevBootstrapStandingRequest {
+    /// Jurisdiction (governance domain id) to establish Member standing in.
+    pub jurisdiction_id: String,
+}
+
+/// Returns `true` only when BOTH dev gates are satisfied:
+/// 1. `ICN_ENABLE_ADMIN_ENDPOINTS=true` (same explicit opt-in as the SDIS
+///    `approve_ceremony` / `approve_recovery` admin endpoints), AND
+/// 2. the governance build posture is NOT `Production`
+///    (`ICN_GOVERNANCE_BUILD_MODE=production`).
+///
+/// Default (no env set) is `false` → the endpoint is unavailable. The posture
+/// gate makes it impossible to enable in production even if the opt-in flag is
+/// set by mistake.
+fn demo_standing_bootstrap_enabled() -> bool {
+    let admin_enabled = std::env::var("ICN_ENABLE_ADMIN_ENDPOINTS")
+        .unwrap_or_else(|_| "false".to_string())
+        .to_lowercase()
+        == "true";
+    let is_production = icn_governance_actor::http::GovernanceContextBuildMode::from_env()
+        == icn_governance_actor::http::GovernanceContextBuildMode::Production;
+    admin_enabled && !is_production
+}
+
+/// POST /v1/commons/dev/bootstrap-standing — DEV/DEMO-ONLY.
+///
+/// Establishes commons `Member` standing for the **authenticated caller's own
+/// DID** (`claims.sub`) in `jurisdiction_id`, so a local secured-gateway demo
+/// (e.g. a NYCN v4 bash flow) can then submit governed proposals, which the
+/// gateway gates on Member standing via `member_checker`.
+///
+/// This deliberately bypasses the multi-steward SDIS proof-of-personhood
+/// ceremony and is therefore **double dev-gated** (see
+/// [`demo_standing_bootstrap_enabled`]): it returns `403 Forbidden` unless
+/// `ICN_ENABLE_ADMIN_ENDPOINTS=true` AND the posture is non-`Production`.
+///
+/// Safety: it grants standing for the caller's own DID only — never an
+/// arbitrary DID — and removes no membership/SDIS/governance check. It adds a
+/// dev path to *create* a commons holder; production enrollment, SDIS, and the
+/// `member_checker` gate are unchanged and still enforced for every request.
+/// It is NOT a production "make me a Member" route.
+#[post("/dev/bootstrap-standing")]
+pub async fn dev_bootstrap_standing(
+    http_req: HttpRequest,
+    body: web::Json<DevBootstrapStandingRequest>,
+    commons_manager: web::Data<Arc<CommonsManager>>,
+) -> Result<HttpResponse> {
+    // Dev gate: disabled by default; impossible to enable in Production posture.
+    if !demo_standing_bootstrap_enabled() {
+        return Err(GatewayError::Forbidden(
+            "Demo standing bootstrap is disabled (requires ICN_ENABLE_ADMIN_ENDPOINTS=true and \
+             non-production posture)"
+                .to_string(),
+        ));
+    }
+
+    // Operate on the caller's own DID only.
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
+    let did = claims
+        .sub
+        .parse::<Did>()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+
+    let jurisdiction = JurisdictionId::new(&body.jurisdiction_id);
+
+    // Idempotent enrollment: reuse an existing holder if the DID already has one.
+    let holder = match commons_manager.get_holder_by_did(&did).await? {
+        Some(existing) => existing,
+        None => {
+            // Demo enrollment. The commons Sybil gate (`join_jurisdiction`)
+            // requires at least `Strong` POP level, so we mint a synthetic demo
+            // voucher (a throwaway key) to produce a WebOfTrust/`Strong` anchor —
+            // the same shape PR #1980's proven in-process helper uses. This
+            // SATISFIES the Sybil gate rather than weakening it; production
+            // instead obtains real steward attestations via the SDIS ceremony.
+            let voucher = KeyPair::generate().map_err(|e| {
+                GatewayError::InternalError(format!("demo voucher key generation failed: {e}"))
+            })?;
+            let anchor = commons_manager
+                .create_anchor_from_enrollment(&did, Some(voucher.did()))
+                .await?;
+            let anchor_id = hex::encode(anchor.id());
+            commons_manager
+                .create_holder_from_anchor(&anchor_id, &did)
+                .await?
+        }
+    };
+    let holder_id = hex::encode(holder.id());
+
+    // Join the jurisdiction if not already affiliated, then advance to Member.
+    let already_affiliated = commons_manager
+        .list_affiliations(&holder_id)
+        .await?
+        .iter()
+        .any(|a| a.jurisdiction_id == jurisdiction);
+    if !already_affiliated {
+        commons_manager
+            .join_jurisdiction(
+                &holder_id,
+                jurisdiction.clone(),
+                vec![MembershipCapability::Vote],
+            )
+            .await?;
+    }
+    commons_manager
+        .update_affiliation_status(&holder_id, &jurisdiction, MembershipStatus::Member)
+        .await?;
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "status": "member_standing_bootstrapped",
+        "did": did.to_string(),
+        "jurisdiction_id": body.jurisdiction_id,
+        "holder_id": holder_id,
+        "note": "dev/demo-only; not a production enrollment path",
+    })))
+}
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -405,6 +532,9 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(join_jurisdiction)
         .service(update_affiliation)
         .service(leave_jurisdiction)
+        // Dev/demo-only; refuses unless ICN_ENABLE_ADMIN_ENDPOINTS=true and
+        // non-Production posture (see dev_bootstrap_standing).
+        .service(dev_bootstrap_standing)
         .service(web::scope("/anchor").configure(anchor::configure));
 }
 
