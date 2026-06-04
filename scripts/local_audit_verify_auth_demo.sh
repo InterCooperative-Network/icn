@@ -124,7 +124,11 @@ log "  decisionHash = $HASH"
 
 # --- THE POINT: audit verify WITHOUT vs WITH a token --------------------------
 log "[4/5] icnctl audit verify WITHOUT a token (expected: 401 Unauthorized)"
-NOAUTH_OUT="$("$ICNCTL" audit verify "$HASH" --gateway "$GW" 2>&1 || true)"
+# Clear any ambient ICN_TOKEN so this leg is genuinely unauthenticated even when
+# the demo is run from a shell that already exports ICN_TOKEN (audit verify now
+# falls back to ICN_TOKEN). Without this, the "no-token" call could silently
+# authenticate and defeat the boundary it proves.
+NOAUTH_OUT="$(env -u ICN_TOKEN "$ICNCTL" audit verify "$HASH" --gateway "$GW" 2>&1 || true)"
 echo "$NOAUTH_OUT" | sed 's/^/    /'
 # This script exists to PROVE the auth boundary, so fail closed if the
 # unauthenticated request is NOT rejected with 401.
