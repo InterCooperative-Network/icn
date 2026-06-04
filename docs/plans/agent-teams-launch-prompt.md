@@ -101,8 +101,8 @@ ICN is "online" when:
 4. **Rights are durable**: cooperatives can revoke membership; they cannot revoke personhood/commons rights.
 5. **Receipts for everything**: if it's a decision, allocation, settlement, or enforcement — it produces an inspectable receipt.
 6. **CCL is living law**: orgs author policies that compile to enforceable constraints. Humans must be able to read what governs them.
-7. **Passport-first UX** for regular humans; CLI remains for power users.
-8. **Node modes are explicit**: passport/individual, org-operator, dev/service — each with clear "must do / may do / must never be required to do."
+7. **Member Passport**-first UX for regular humans; CLI remains for power users.
+8. **Node modes are explicit**: individual-member, org-operator, dev/service — each with clear "must do / may do / must never be required to do."
 
 ## Team Roles
 
@@ -114,9 +114,9 @@ ICN is "online" when:
 
 4. **CCL + DISPUTES**: Map CCL as living constitutional layer. Current state: ContractRegistry with deploy/revoke/deprecate, DisputeResolutionSystem with mediation/penalties, governance Appeals. Identify gaps: policy registry browsing, human-readable policy rendering, dispute filing UX, evidence chain-of-custody, cross-org dispute escalation, federation agreement authoring.
 
-5. **HUMAN INTERFACE**: Define citizen/member/steward/operator journeys across scope. Map existing surfaces (pilot-ui, CoopWallet, icnctl) to what's needed. Design scope navigation, affiliations home screen, receipts provenance view, "what law applies here?" surface. Account for node modes: passport/keyring (affiliations + signing), org-operator (services+monitoring), dev (build+deploy under policy).
+5. **HUMAN INTERFACE**: Define citizen/member/steward/operator journeys across scope. Map existing surfaces (pilot-ui, CoopWallet, icnctl) to what's needed. Design scope navigation, affiliations home screen, receipts provenance view, "what law applies here?" surface. Account for node modes: individual-member (Member Passport for affiliations + Device Keyring for signing), org-operator (services+monitoring), dev (build+deploy under policy).
 
-6. **SECURITY / OPS / RESILIENCE**: Threat model (capture, sybil, coercion, censorship, dependency attacks). NAT traversal plan. Naming resilience (no single DNS choke). Key management + recovery. Operational playbooks. Packaging/distribution for nodes + the member passport/keyring client. Observability mapping to scope.
+6. **SECURITY / OPS / RESILIENCE**: Threat model (capture, sybil, coercion, censorship, dependency attacks). NAT traversal plan. Naming resilience (no single DNS choke). Key management + recovery. Operational playbooks. Packaging/distribution for nodes + the member client (Member Passport + Device Keyring). Observability mapping to scope.
 
 ## Mission
 
@@ -136,7 +136,7 @@ Produce a single "State → Vision → Gap → Phase Plan" document that enginee
 - **Phase 1**: Scope-aware governance + treasury + membership end-to-end. Decision→treasury spend→receipt→audit loop complete and visible. Multi-org affiliations experience begins.
 - **Phase 2**: CCL as living law — policy registry browsing, human-readable rendering, "what governs this?" surfaces. Dispute filing MVP (claims, evidence, mediation, appeals) integrated with receipts.
 - **Phase 3**: Federation as contract — agreement authoring in CCL, cross-org credit clearing UX, federation-scoped governance. Naming/discovery primitive for human navigation.
-- **Phase 4**: Member client evolution — keyring/signer → lightweight node → optional commons participation. Mobile-first identity + offline queue + affiliations.
+- **Phase 4**: Member client evolution — Device Keyring (signer) → lightweight node → optional commons participation. Mobile-first identity + offline queue + affiliations.
 - **Phase 5**: Resilience hardening — NAT traversal, naming without DNS dependence, anti-censorship, packaging/distribution.
 
 **E) Phase 0 Execution Plan**: 15-25 concrete tasks mapped to files/issues, with validation steps. Every task must be demonstrable on LAN from a workstation.
