@@ -21,7 +21,7 @@ ICN is a civilizational consensus technology. Not a blockchain. Not a federation
 - **CCL** (Cooperative Contract Language) is the constitutional layer where cooperatives, communities, and federations write enforceable policies and inter-org contracts
 - **Cooperatives, communities, and federations** are the primary organizational units — each with their own policies, governance, economics, and dispute resolution
 - **Federations** can be any shape/size — overlapping, temporary, regional, sectoral — and they operate via cooperative contracts (treaties), not centralized authority
-- **Individuals** participate through wallet/mobile as their primary interface, with rights that persist beyond any single membership
+- **Individuals** participate through their Member Passport on mobile as their primary interface, with rights that persist beyond any single membership
 - **Developers/operators** run services on nodes for their orgs or as commons/public services
 
 The purpose is to defang state and capital by making legitimacy computable, coordination auditable, and participation non-capturable.
@@ -87,7 +87,7 @@ ICN is "online" when:
 3. A **community** can govern shared resources, resolve disputes, and coordinate members without external authority
 4. A **federation** can form via cooperative contracts (CCL treaties), clear credit across member orgs, resolve cross-org disputes, and govern shared resources — with the federation itself governed by its member orgs
 5. All of the above operates through **scope-aware interfaces** where users always know: "Where am I?" (jurisdiction), "What law applies?" (policies/contracts), "What can I do?" (capabilities), "What happened and why?" (receipt chain)
-6. **Wallet/mobile** is the citizen interface for identity, rights, affiliations, signing, and daily participation — with offline capability
+6. The **Member Passport** on mobile (signing via the **Device Keyring**) is the citizen interface for identity, rights, affiliations, and daily participation — with offline capability
 7. Every significant action produces **inspectable receipts** (decision→effect→settlement→audit)
 8. **Disputes** have a procedural pathway (evidence→mediation→arbitration→appeal) with enforced outcomes and receipt provenance
 9. **Services** are how orgs "exist" — discoverable, named, capability-gated, scoped
@@ -101,8 +101,8 @@ ICN is "online" when:
 4. **Rights are durable**: cooperatives can revoke membership; they cannot revoke personhood/commons rights.
 5. **Receipts for everything**: if it's a decision, allocation, settlement, or enforcement — it produces an inspectable receipt.
 6. **CCL is living law**: orgs author policies that compile to enforceable constraints. Humans must be able to read what governs them.
-7. **Wallet-first UX** for regular humans; CLI remains for power users.
-8. **Node modes are explicit**: wallet/individual, org-operator, dev/service — each with clear "must do / may do / must never be required to do."
+7. **Passport-first UX** for regular humans; CLI remains for power users.
+8. **Node modes are explicit**: passport/individual, org-operator, dev/service — each with clear "must do / may do / must never be required to do."
 
 ## Team Roles
 
@@ -114,9 +114,9 @@ ICN is "online" when:
 
 4. **CCL + DISPUTES**: Map CCL as living constitutional layer. Current state: ContractRegistry with deploy/revoke/deprecate, DisputeResolutionSystem with mediation/penalties, governance Appeals. Identify gaps: policy registry browsing, human-readable policy rendering, dispute filing UX, evidence chain-of-custody, cross-org dispute escalation, federation agreement authoring.
 
-5. **HUMAN INTERFACE**: Define citizen/member/steward/operator journeys across scope. Map existing surfaces (pilot-ui, CoopWallet, icnctl) to what's needed. Design scope navigation, affiliations home screen, receipts provenance view, "what law applies here?" surface. Account for node modes: wallet (signing+affiliations), org-operator (services+monitoring), dev (build+deploy under policy).
+5. **HUMAN INTERFACE**: Define citizen/member/steward/operator journeys across scope. Map existing surfaces (pilot-ui, CoopWallet, icnctl) to what's needed. Design scope navigation, affiliations home screen, receipts provenance view, "what law applies here?" surface. Account for node modes: passport/keyring (affiliations + signing), org-operator (services+monitoring), dev (build+deploy under policy).
 
-6. **SECURITY / OPS / RESILIENCE**: Threat model (capture, sybil, coercion, censorship, dependency attacks). NAT traversal plan. Naming resilience (no single DNS choke). Key management + recovery. Operational playbooks. Packaging/distribution for nodes + wallet. Observability mapping to scope.
+6. **SECURITY / OPS / RESILIENCE**: Threat model (capture, sybil, coercion, censorship, dependency attacks). NAT traversal plan. Naming resilience (no single DNS choke). Key management + recovery. Operational playbooks. Packaging/distribution for nodes + the member passport/keyring client. Observability mapping to scope.
 
 ## Mission
 
@@ -136,7 +136,7 @@ Produce a single "State → Vision → Gap → Phase Plan" document that enginee
 - **Phase 1**: Scope-aware governance + treasury + membership end-to-end. Decision→treasury spend→receipt→audit loop complete and visible. Multi-org affiliations experience begins.
 - **Phase 2**: CCL as living law — policy registry browsing, human-readable rendering, "what governs this?" surfaces. Dispute filing MVP (claims, evidence, mediation, appeals) integrated with receipts.
 - **Phase 3**: Federation as contract — agreement authoring in CCL, cross-org credit clearing UX, federation-scoped governance. Naming/discovery primitive for human navigation.
-- **Phase 4**: Wallet evolution — signer → lightweight node → optional commons participation. Mobile-first identity + offline queue + affiliations.
+- **Phase 4**: Member client evolution — keyring/signer → lightweight node → optional commons participation. Mobile-first identity + offline queue + affiliations.
 - **Phase 5**: Resilience hardening — NAT traversal, naming without DNS dependence, anti-censorship, packaging/distribution.
 
 **E) Phase 0 Execution Plan**: 15-25 concrete tasks mapped to files/issues, with validation steps. Every task must be demonstrable on LAN from a workstation.
