@@ -56,7 +56,7 @@ View source on GitHub →
 <li><strong>CCL</strong> (Cooperative Contract Language) is the constitutional layer where cooperatives, communities, and federations write enforceable policies and inter-org contracts</li>
 <li><strong>Cooperatives, communities, and federations</strong> are the primary organizational units — each with their own policies, governance, economics, and dispute resolution</li>
 <li><strong>Federations</strong> can be any shape/size — overlapping, temporary, regional, sectoral — and they operate via cooperative contracts (treaties), not centralized authority</li>
-<li><strong>Individuals</strong> participate through wallet/mobile as their primary interface, with rights that persist beyond any single membership</li>
+<li><strong>Individuals</strong> participate through their Member Passport on mobile as their primary interface, with rights that persist beyond any single membership</li>
 <li><strong>Developers/operators</strong> run services on nodes for their orgs or as commons/public services</li>
 </ul>
 <p>The purpose is to defang state and capital by making legitimacy computable, coordination auditable, and participation non-capturable.</p>
@@ -98,7 +98,7 @@ View source on GitHub →
 <li>A <strong>community</strong> can govern shared resources, resolve disputes, and coordinate members without external authority</li>
 <li>A <strong>federation</strong> can form via cooperative contracts (CCL treaties), clear credit across member orgs, resolve cross-org disputes, and govern shared resources — with the federation itself governed by its member orgs</li>
 <li>All of the above operates through <strong>scope-aware interfaces</strong> where users always know: &quot;Where am I?&quot; (jurisdiction), &quot;What law applies?&quot; (policies/contracts), &quot;What can I do?&quot; (capabilities), &quot;What happened and why?&quot; (receipt chain)</li>
-<li><strong>Wallet/mobile</strong> is the citizen interface for identity, rights, affiliations, signing, and daily participation — with offline capability</li>
+<li>The <strong>Member Passport</strong> on mobile (signing via the <strong>Device Keyring</strong>) is the citizen interface for identity, rights, affiliations, and daily participation — with offline capability</li>
 <li>Every significant action produces <strong>inspectable receipts</strong> (decision→effect→settlement→audit)</li>
 <li><strong>Disputes</strong> have a procedural pathway (evidence→mediation→arbitration→appeal) with enforced outcomes and receipt provenance</li>
 <li><strong>Services</strong> are how orgs &quot;exist&quot; — discoverable, named, capability-gated, scoped</li>
@@ -112,8 +112,8 @@ View source on GitHub →
 <li><strong>Rights are durable</strong>: cooperatives can revoke membership; they cannot revoke personhood/commons rights.</li>
 <li><strong>Receipts for everything</strong>: if it&#39;s a decision, allocation, settlement, or enforcement — it produces an inspectable receipt.</li>
 <li><strong>CCL is living law</strong>: orgs author policies that compile to enforceable constraints. Humans must be able to read what governs them.</li>
-<li><strong>Wallet-first UX</strong> for regular humans; CLI remains for power users.</li>
-<li><strong>Node modes are explicit</strong>: wallet/individual, org-operator, dev/service — each with clear &quot;must do / may do / must never be required to do.&quot;</li>
+<li><strong>Member Passport</strong>-first UX for regular humans; CLI remains for power users.</li>
+<li><strong>Node modes are explicit</strong>: individual-member, org-operator, dev/service — each with clear &quot;must do / may do / must never be required to do.&quot;</li>
 </ol>
 <h2>Team Roles</h2>
 <ol>
@@ -125,9 +125,9 @@ View source on GitHub →
 </li>
 <li><p><strong>CCL + DISPUTES</strong>: Map CCL as living constitutional layer. Current state: ContractRegistry with deploy/revoke/deprecate, DisputeResolutionSystem with mediation/penalties, governance Appeals. Identify gaps: policy registry browsing, human-readable policy rendering, dispute filing UX, evidence chain-of-custody, cross-org dispute escalation, federation agreement authoring.</p>
 </li>
-<li><p><strong>HUMAN INTERFACE</strong>: Define citizen/member/steward/operator journeys across scope. Map existing surfaces (pilot-ui, CoopWallet, icnctl) to what&#39;s needed. Design scope navigation, affiliations home screen, receipts provenance view, &quot;what law applies here?&quot; surface. Account for node modes: wallet (signing+affiliations), org-operator (services+monitoring), dev (build+deploy under policy).</p>
+<li><p><strong>HUMAN INTERFACE</strong>: Define citizen/member/steward/operator journeys across scope. Map existing surfaces (pilot-ui, CoopWallet, icnctl) to what&#39;s needed. Design scope navigation, affiliations home screen, receipts provenance view, &quot;what law applies here?&quot; surface. Account for node modes: individual-member (Member Passport for affiliations + Device Keyring for signing), org-operator (services+monitoring), dev (build+deploy under policy).</p>
 </li>
-<li><p><strong>SECURITY / OPS / RESILIENCE</strong>: Threat model (capture, sybil, coercion, censorship, dependency attacks). NAT traversal plan. Naming resilience (no single DNS choke). Key management + recovery. Operational playbooks. Packaging/distribution for nodes + wallet. Observability mapping to scope.</p>
+<li><p><strong>SECURITY / OPS / RESILIENCE</strong>: Threat model (capture, sybil, coercion, censorship, dependency attacks). NAT traversal plan. Naming resilience (no single DNS choke). Key management + recovery. Operational playbooks. Packaging/distribution for nodes + the member client (Member Passport + Device Keyring). Observability mapping to scope.</p>
 </li>
 </ol>
 <h2>Mission</h2>
@@ -142,7 +142,7 @@ View source on GitHub →
 <li><strong>Phase 1</strong>: Scope-aware governance + treasury + membership end-to-end. Decision→treasury spend→receipt→audit loop complete and visible. Multi-org affiliations experience begins.</li>
 <li><strong>Phase 2</strong>: CCL as living law — policy registry browsing, human-readable rendering, &quot;what governs this?&quot; surfaces. Dispute filing MVP (claims, evidence, mediation, appeals) integrated with receipts.</li>
 <li><strong>Phase 3</strong>: Federation as contract — agreement authoring in CCL, cross-org credit clearing UX, federation-scoped governance. Naming/discovery primitive for human navigation.</li>
-<li><strong>Phase 4</strong>: Wallet evolution — signer → lightweight node → optional commons participation. Mobile-first identity + offline queue + affiliations.</li>
+<li><strong>Phase 4</strong>: Member client evolution — Device Keyring (signer) → lightweight node → optional commons participation. Mobile-first identity + offline queue + affiliations.</li>
 <li><strong>Phase 5</strong>: Resilience hardening — NAT traversal, naming without DNS dependence, anti-censorship, packaging/distribution.</li>
 </ul>
 <p><strong>E) Phase 0 Execution Plan</strong>: 15-25 concrete tasks mapped to files/issues, with validation steps. Every task must be demonstrable on LAN from a workstation.</p>
