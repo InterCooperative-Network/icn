@@ -302,6 +302,14 @@ enum AuditCommands {
         /// for forced accepts even when journal entries are successfully found.
         #[arg(long, value_name = "ID")]
         domain_id: Option<String>,
+
+        /// Bearer token for authentication (defaults to ICN_TOKEN env var).
+        ///
+        /// Required when the gateway enforces JWT auth on the receipts endpoint
+        /// (the default for a secured local gateway). Omit it for a gateway that
+        /// serves the receipts chain without authentication.
+        #[arg(short, long)]
+        token: Option<String>,
     },
 }
 
@@ -10491,6 +10499,7 @@ async fn handle_audit_command(cmd: AuditCommands) -> Result<()> {
             gateway,
             json,
             domain_id,
+            token,
         } => {
             if decision_hash.len() != 64 || !decision_hash.chars().all(|c| c.is_ascii_hexdigit()) {
                 bail!("Invalid decision hash: expected 64 hex characters");
@@ -10504,8 +10513,15 @@ async fn handle_audit_command(cmd: AuditCommands) -> Result<()> {
                 ),
                 None => format!("{}/v1/receipts/chain/{}", gateway, decision_hash),
             };
-            let resp = client
-                .get(&url)
+            // Authenticate when a token is available. The receipts-chain endpoint
+            // is JWT-gated on a secured gateway; without a token it returns 401.
+            // The token is optional so an unauthenticated gateway still works.
+            let token = token.or_else(|| std::env::var("ICN_TOKEN").ok());
+            let mut request = client.get(&url);
+            if let Some(ref t) = token {
+                request = request.bearer_auth(t);
+            }
+            let resp = request
                 .send()
                 .await
                 .context("Failed to connect to gateway")?;
