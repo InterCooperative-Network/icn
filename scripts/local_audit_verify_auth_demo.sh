@@ -66,7 +66,14 @@ DPID=""
 
 log(){ echo "[$(date -u +%H:%M:%SZ)] $*"; }
 fatal(){ echo "FATAL: $*" >&2; exit 1; }
-cleanup(){ [ -n "$DPID" ] && kill "$DPID" 2>/dev/null; wait 2>/dev/null; rm -rf "$OUT" 2>/dev/null; [ -n "$DPID" ] && log "gateway torn down"; }
+cleanup(){
+  if [ -n "$DPID" ]; then
+    kill "$DPID" 2>/dev/null
+    wait "$DPID" 2>/dev/null
+    log "gateway torn down"
+  fi
+  rm -rf "$OUT" 2>/dev/null
+}
 trap cleanup EXIT INT TERM
 
 [ -n "$ICND" ] && [ -x "$ICND" ]     || fatal "icnd not found (build it or set ICND=...)"
@@ -118,18 +125,25 @@ log "  decisionHash = $HASH"
 # --- THE POINT: audit verify WITHOUT vs WITH a token --------------------------
 log "[4/5] icnctl audit verify WITHOUT a token (expected: 401 Unauthorized)"
 NOAUTH_OUT="$("$ICNCTL" audit verify "$HASH" --gateway "$GW" 2>&1 || true)"
-echo "    $NOAUTH_OUT"
+echo "$NOAUTH_OUT" | sed 's/^/    /'
+# This script exists to PROVE the auth boundary, so fail closed if the
+# unauthenticated request is NOT rejected with 401.
 echo "$NOAUTH_OUT" | grep -q '401' \
-  && log "  CONFIRMED: no-token request is rejected with 401 (the v3 boundary)" \
-  || log "  NOTE: gateway did not 401 without a token (is it running unauthenticated?)"
+  || fatal "no-token request did NOT return 401 - the auth boundary is not being enforced; refusing to claim the auth proof"
+log "  CONFIRMED: no-token request is rejected with 401 (the v3 boundary)"
 
 log "[5/5] icnctl audit verify WITH --token (expected: reaches endpoint, NOT 401)"
 AUTH_OUT="$("$ICNCTL" audit verify "$HASH" --gateway "$GW" --token "$TOKEN" 2>&1 || true)"
 echo "$AUTH_OUT" | sed 's/^/    /'
-if echo "$AUTH_OUT" | grep -q '401'; then
-  fatal "audit verify still returned 401 WITH a token — the auth fix is not effective"
+# Fail closed on ANY transport/auth error (401/403/404/5xx/connect/parse) — none
+# of those prove the tokened request reached and exercised the verifier.
+if echo "$AUTH_OUT" | grep -qiE 'Gateway returned error|Failed to connect|No receipt chain found|schema mismatch'; then
+  fatal "with --token the request did not cleanly reach the receipts endpoint: $AUTH_OUT"
 fi
-log "  CONFIRMED: with --token the request authenticates and reaches the receipts endpoint."
+# Positively assert the tokened request reached and ran the receipt-chain verifier.
+echo "$AUTH_OUT" | grep -q 'Receipt Chain Audit' \
+  || fatal "with --token the receipt-chain verifier output was not produced — the request did not reach the verifier: $AUTH_OUT"
+log "  CONFIRMED: with --token the request authenticates, reaches the endpoint, and runs the receipt-chain verifier."
 log ""
 log "Honest boundary: for this decision-registry record there is no economic"
 log "receipt chain yet, so audit verify reports an incomplete chain (a truthful"
@@ -137,5 +151,6 @@ log "result, not a 401). Producing a chain that PASSES needs a voted"
 log "budget/treasury decision with active Member standing — see this script's"
 log "header and icn/crates/icn-core/tests/receipt_chain_vertical_slice.rs."
 log ""
-log "RESULT: audit-verify authentication works (no-token -> 401; with-token -> reaches endpoint)."
-echo "RESULT: PASS"
+log "RESULT: audit-verify AUTHENTICATION works (no-token -> 401; with-token -> reaches the receipt-chain verifier)."
+log "Note: this proves the AUTH boundary only; it does not assert that the economic chain itself verifies."
+echo "RESULT: PASS (audit-verify authentication only)"
