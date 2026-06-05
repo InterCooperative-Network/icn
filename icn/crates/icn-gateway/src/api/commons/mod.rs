@@ -467,7 +467,21 @@ pub async fn dev_bootstrap_standing(
             // #1980's proven in-process helper uses). Production obtains real
             // steward attestations via the SDIS ceremony.
             let anchor_id = match commons_manager.get_anchor_by_did(&did).await? {
-                Some(existing_anchor) => hex::encode(existing_anchor.id()),
+                Some(existing_anchor) => {
+                    // A reused anchor that was suspended/revoked at the SDIS-anchor
+                    // level must not yield fresh standing: `create_holder_from_anchor`
+                    // builds an active holder regardless of anchor status, so fail
+                    // closed here before reusing it.
+                    if !existing_anchor.is_active() {
+                        return Err(GatewayError::Forbidden(format!(
+                            "cannot bootstrap standing: personhood anchor is not active \
+                             ({}); a suspended/revoked anchor must be resolved via \
+                             SDIS/governance, not the demo bridge",
+                            existing_anchor.status
+                        )));
+                    }
+                    hex::encode(existing_anchor.id())
+                }
                 None => {
                     let voucher = KeyPair::generate().map_err(|e| {
                         GatewayError::InternalError(format!(

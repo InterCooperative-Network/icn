@@ -570,3 +570,45 @@ async fn dev_bootstrap_refuses_inactive_holder() {
         "an inactive holder must not gain a Member affiliation"
     );
 }
+
+// ── Review fix (codex P2): a suspended/revoked anchor is rejected on reuse ──
+#[actix_web::test]
+async fn dev_bootstrap_refuses_inactive_anchor() {
+    let _env = EnvGuard::acquire(Some("true"), Some("test"));
+    let commons = Arc::new(CommonsManager::new());
+    let gov = Arc::new(GovernanceManager::new());
+    let bundle = IdentityBundle::generate().unwrap();
+    let did = bundle.did().clone();
+
+    // Pre-existing personhood anchor for the DID, suspended at the SDIS-anchor
+    // level, with NO holder record yet — only the anchor-active guard can catch
+    // this (create_holder_from_anchor would otherwise build a fresh active holder).
+    let voucher = KeyPair::generate().unwrap();
+    let anchor = commons
+        .create_anchor_from_enrollment(&did, Some(voucher.did()))
+        .await
+        .unwrap();
+    let anchor_id = hex::encode(anchor.id());
+    let mut removed = commons.get_anchor(&anchor_id).await.unwrap().unwrap();
+    removed.suspend("test removal".to_string(), voucher.did().clone(), None);
+    commons
+        .update_anchor_status(&anchor_id, removed.status)
+        .await
+        .unwrap();
+
+    let app = build_app(commons.clone(), gov, std::slice::from_ref(&did)).await;
+    let token = get_jwt(&app, &did.to_string(), &bundle).await;
+
+    let resp = test::call_service(&app, bootstrap_request(&token).to_request()).await;
+    assert_eq!(
+        resp.status().as_u16(),
+        403,
+        "the dev bridge must refuse a suspended/revoked personhood anchor"
+    );
+
+    // No holder (and thus no Member standing) was created from the inactive anchor.
+    assert!(
+        commons.get_holder_by_did(&did).await.unwrap().is_none(),
+        "no holder may be created from an inactive anchor"
+    );
+}
