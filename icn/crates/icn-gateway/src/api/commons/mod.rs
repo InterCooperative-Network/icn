@@ -513,6 +513,25 @@ pub async fn dev_bootstrap_standing(
         )));
     }
 
+    // The holder's backing personhood anchor must also be active. Anchor status
+    // changes do not cascade to holders, so a reused `Active` holder may be backed
+    // by an anchor that was suspended/revoked after the holder was created. (For
+    // the freshly enrolled path the anchor was just minted/validated `Active`, so
+    // this is a no-op there.)
+    let backing_anchor = commons_manager
+        .get_anchor(&hex::encode(holder.anchor_id))
+        .await?
+        .ok_or_else(|| {
+            GatewayError::InternalError("backing personhood anchor missing for holder".to_string())
+        })?;
+    if !backing_anchor.is_active() {
+        return Err(GatewayError::Forbidden(format!(
+            "cannot bootstrap standing: backing personhood anchor is not active ({}); a \
+             suspended/revoked anchor must be resolved via SDIS/governance, not the demo bridge",
+            backing_anchor.status
+        )));
+    }
+
     let holder_id = hex::encode(holder.id());
 
     // Resolve the caller's current affiliation (if any) in this jurisdiction.

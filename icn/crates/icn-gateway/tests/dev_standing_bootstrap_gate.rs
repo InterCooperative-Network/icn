@@ -612,3 +612,66 @@ async fn dev_bootstrap_refuses_inactive_anchor() {
         "no holder may be created from an inactive anchor"
     );
 }
+
+// ── Review fix (codex P2): existing holder with a revoked backing anchor → 403 ─
+#[actix_web::test]
+async fn dev_bootstrap_refuses_holder_with_inactive_backing_anchor() {
+    let _env = EnvGuard::acquire(Some("true"), Some("test"));
+    let commons = Arc::new(CommonsManager::new());
+    let gov = Arc::new(GovernanceManager::new());
+    let bundle = IdentityBundle::generate().unwrap();
+    let did = bundle.did().clone();
+
+    // An ACTIVE holder whose backing anchor is suspended AFTER holder creation.
+    // Anchor status does not cascade to the holder, so the holder stays `Active`
+    // and only the backing-anchor guard can catch this (the no-holder anchor guard
+    // does not run because a holder already exists).
+    let voucher = KeyPair::generate().unwrap();
+    let anchor = commons
+        .create_anchor_from_enrollment(&did, Some(voucher.did()))
+        .await
+        .unwrap();
+    let anchor_id = hex::encode(anchor.id());
+    let holder = commons
+        .create_holder_from_anchor(&anchor_id, &did)
+        .await
+        .unwrap();
+    let holder_id = hex::encode(holder.id());
+    let mut removed_anchor = commons.get_anchor(&anchor_id).await.unwrap().unwrap();
+    removed_anchor.suspend("test removal".to_string(), voucher.did().clone(), None);
+    commons
+        .update_anchor_status(&anchor_id, removed_anchor.status)
+        .await
+        .unwrap();
+
+    // Precondition: the holder is still `Active` (anchor status did not cascade).
+    assert!(
+        commons
+            .get_holder(&holder_id)
+            .await
+            .unwrap()
+            .unwrap()
+            .is_active(),
+        "precondition: holder stays Active when its backing anchor is suspended"
+    );
+
+    let app = build_app(commons.clone(), gov, std::slice::from_ref(&did)).await;
+    let token = get_jwt(&app, &did.to_string(), &bundle).await;
+
+    let resp = test::call_service(&app, bootstrap_request(&token).to_request()).await;
+    assert_eq!(
+        resp.status().as_u16(),
+        403,
+        "an Active holder backed by a suspended/revoked anchor must be refused"
+    );
+
+    // No Member affiliation was granted.
+    let affiliations = commons.list_affiliations(&holder_id).await.unwrap();
+    assert!(
+        !affiliations.iter().any(|a| {
+            a.jurisdiction_id == JurisdictionId::new(DOMAIN_ID)
+                && a.membership_status == MembershipStatus::Member
+        }),
+        "no Member affiliation may be granted when the backing anchor is inactive"
+    );
+}
