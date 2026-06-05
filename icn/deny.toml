@@ -49,6 +49,19 @@ ignore = [
     # (no URI name constraints in ICN's TLS setup; no wildcard cert validation).
     "RUSTSEC-2026-0098",  # rustls-webpki URI name constraints (transitive via reqwest)
     "RUSTSEC-2026-0099",  # rustls-webpki wildcard name constraints (transitive via reqwest)
+
+    # The pqcrypto-* crates (NIST PQ crypto: ML-DSA signatures, ML-KEM KEM) were
+    # all flagged unmaintained on 2026-06-04 because upstream PQClean is being
+    # archived (July 2026, see PQClean/PQClean#604). These are "unmaintained"
+    # advisories, not exploitable vulnerabilities, and the advisories state that
+    # no safe upgrade is available. ICN depends on them via icn-crypto →
+    # icn-crypto-pq. Migrating to a maintained PQ provider (RustCrypto ml-dsa/ml-kem
+    # or aws-lc-rs) is tracked as future work; until then these are ignored so the
+    # unmaintained-no-fix advisories don't block CI.
+    "RUSTSEC-2026-0161",  # pqcrypto-mlkem unmaintained (PQClean archived)
+    "RUSTSEC-2026-0162",  # pqcrypto-traits unmaintained (PQClean archived)
+    "RUSTSEC-2026-0163",  # pqcrypto-internals unmaintained (PQClean archived)
+    "RUSTSEC-2026-0166",  # pqcrypto-mldsa unmaintained (PQClean archived)
 ]
 
 [licenses]
