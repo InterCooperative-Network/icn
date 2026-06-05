@@ -519,3 +519,54 @@ async fn dev_bootstrap_idempotent_when_anchor_exists_without_holder() {
         "caller must hold Member standing after bootstrap reuses the anchor"
     );
 }
+
+// ── Review fix (codex P2): a holder removed at the holder level is rejected ──
+#[actix_web::test]
+async fn dev_bootstrap_refuses_inactive_holder() {
+    let _env = EnvGuard::acquire(Some("true"), Some("test"));
+    let commons = Arc::new(CommonsManager::new());
+    let gov = Arc::new(GovernanceManager::new());
+    let bundle = IdentityBundle::generate().unwrap();
+    let did = bundle.did().clone();
+
+    // Pre-existing holder removed at the commons-holder level (`Suspended`) — the
+    // shape a holder-level governance removal leaves behind. There is NO blocked
+    // affiliation in the target jurisdiction, so only the holder-status guard can
+    // catch this; `member_checker` would otherwise honor a fresh Member affiliation.
+    let voucher = KeyPair::generate().unwrap();
+    let anchor = commons
+        .create_anchor_from_enrollment(&did, Some(voucher.did()))
+        .await
+        .unwrap();
+    let holder = commons
+        .create_holder_from_anchor(&hex::encode(anchor.id()), &did)
+        .await
+        .unwrap();
+    let holder_id = hex::encode(holder.id());
+    let mut removed = commons.get_holder(&holder_id).await.unwrap().unwrap();
+    removed.suspend("test removal".to_string(), 0);
+    commons
+        .update_holder_status(&holder_id, removed.status)
+        .await
+        .unwrap();
+
+    let app = build_app(commons.clone(), gov, std::slice::from_ref(&did)).await;
+    let token = get_jwt(&app, &did.to_string(), &bundle).await;
+
+    let resp = test::call_service(&app, bootstrap_request(&token).to_request()).await;
+    assert_eq!(
+        resp.status().as_u16(),
+        403,
+        "the dev bridge must refuse a holder that is not active (holder-level removal)"
+    );
+
+    // No Member affiliation was created for the removed holder.
+    let affiliations = commons.list_affiliations(&holder_id).await.unwrap();
+    assert!(
+        !affiliations.iter().any(|a| {
+            a.jurisdiction_id == JurisdictionId::new(DOMAIN_ID)
+                && a.membership_status == MembershipStatus::Member
+        }),
+        "an inactive holder must not gain a Member affiliation"
+    );
+}

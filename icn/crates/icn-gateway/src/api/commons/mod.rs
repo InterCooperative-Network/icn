@@ -485,6 +485,20 @@ pub async fn dev_bootstrap_standing(
                 .await?
         }
     };
+
+    // A holder removed at the commons-holder level (`Suspended`/`Exited`/`Revoked`)
+    // must not regain standing via the dev bridge: the gateway `member_checker`
+    // only checks the jurisdiction affiliation, not the holder's lifecycle status,
+    // so fail closed here before touching affiliations. A freshly enrolled holder
+    // is `Active`, so this only rejects a reused, removed holder.
+    if !holder.is_active() {
+        return Err(GatewayError::Forbidden(format!(
+            "cannot bootstrap standing: commons holder is not active ({}); a removed holder \
+             must be resolved via governance/recovery, not the demo bridge",
+            holder.status
+        )));
+    }
+
     let holder_id = hex::encode(holder.id());
 
     // Resolve the caller's current affiliation (if any) in this jurisdiction.
