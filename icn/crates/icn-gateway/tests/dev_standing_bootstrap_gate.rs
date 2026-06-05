@@ -43,8 +43,8 @@ use icn_governance_actor::{
     manager::GovernanceManager,
 };
 use icn_identity::{
-    commons::{JurisdictionId, MembershipStatus},
-    Did, IdentityBundle,
+    commons::{JurisdictionId, MembershipCapability, MembershipStatus},
+    Did, IdentityBundle, KeyPair,
 };
 use serde_json::{json, Value};
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -416,5 +416,106 @@ async fn other_did_without_bootstrap_still_rejected() {
         b_prop.status().as_u16(),
         403,
         "DID B (no bootstrap) must still be rejected — member_checker is not bypassed"
+    );
+}
+
+// ── Review fix (codex P2): a removed/blocked affiliation is NOT reactivated ──
+#[actix_web::test]
+async fn dev_bootstrap_refuses_to_reactivate_removed_member() {
+    let _env = EnvGuard::acquire(Some("true"), Some("test"));
+    let commons = Arc::new(CommonsManager::new());
+    let gov = Arc::new(GovernanceManager::new());
+    let bundle = IdentityBundle::generate().unwrap();
+    let did = bundle.did().clone();
+    let jurisdiction = JurisdictionId::new(DOMAIN_ID);
+
+    // Pre-existing affiliation in a governance-imposed `Banned` state (the shape a
+    // FreezeMember/removal decision leaves behind).
+    let voucher = KeyPair::generate().unwrap();
+    let anchor = commons
+        .create_anchor_from_enrollment(&did, Some(voucher.did()))
+        .await
+        .unwrap();
+    let holder = commons
+        .create_holder_from_anchor(&hex::encode(anchor.id()), &did)
+        .await
+        .unwrap();
+    let holder_id = hex::encode(holder.id());
+    commons
+        .join_jurisdiction(
+            &holder_id,
+            jurisdiction.clone(),
+            vec![MembershipCapability::Vote],
+        )
+        .await
+        .unwrap();
+    commons
+        .update_affiliation_status(&holder_id, &jurisdiction, MembershipStatus::Banned)
+        .await
+        .unwrap();
+
+    let app = build_app(commons.clone(), gov, std::slice::from_ref(&did)).await;
+    let token = get_jwt(&app, &did.to_string(), &bundle).await;
+
+    let resp = test::call_service(&app, bootstrap_request(&token).to_request()).await;
+    assert_eq!(
+        resp.status().as_u16(),
+        403,
+        "the dev bridge must refuse to reactivate a Banned affiliation"
+    );
+
+    // The affiliation must remain `Banned` — the bridge did not override it.
+    let affiliations = commons.list_affiliations(&holder_id).await.unwrap();
+    assert!(
+        affiliations.iter().any(|a| {
+            a.jurisdiction_id == jurisdiction && a.membership_status == MembershipStatus::Banned
+        }),
+        "Banned affiliation must be left unchanged by the dev bridge"
+    );
+}
+
+// ── Review fix (Copilot): idempotent when an anchor exists but no holder ──
+#[actix_web::test]
+async fn dev_bootstrap_idempotent_when_anchor_exists_without_holder() {
+    let _env = EnvGuard::acquire(Some("true"), Some("test"));
+    let commons = Arc::new(CommonsManager::new());
+    let gov = Arc::new(GovernanceManager::new());
+    let bundle = IdentityBundle::generate().unwrap();
+    let did = bundle.did().clone();
+
+    // Simulate a prior partial run / earlier SDIS enrollment: an anchor exists for
+    // the DID but no commons holder record yet.
+    let voucher = KeyPair::generate().unwrap();
+    commons
+        .create_anchor_from_enrollment(&did, Some(voucher.did()))
+        .await
+        .unwrap();
+
+    let app = build_app(commons.clone(), gov, std::slice::from_ref(&did)).await;
+    let token = get_jwt(&app, &did.to_string(), &bundle).await;
+
+    // Must reuse the existing anchor rather than erroring on "Anchor already exists".
+    let resp = test::call_service(&app, bootstrap_request(&token).to_request()).await;
+    assert_eq!(
+        resp.status().as_u16(),
+        200,
+        "bootstrap must reuse an existing anchor and succeed (idempotent enrollment)"
+    );
+
+    let holder = commons
+        .get_holder_by_did(&did)
+        .await
+        .unwrap()
+        .expect("holder created from the reused anchor");
+    let affiliations = commons
+        .list_affiliations(&hex::encode(holder.id()))
+        .await
+        .unwrap();
+    assert!(
+        affiliations.iter().any(|a| {
+            a.jurisdiction_id == JurisdictionId::new(DOMAIN_ID)
+                && a.membership_status == MembershipStatus::Member
+        }),
+        "caller must hold Member standing after bootstrap reuses the anchor"
     );
 }

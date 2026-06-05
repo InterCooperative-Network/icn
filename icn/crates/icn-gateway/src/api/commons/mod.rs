@@ -455,19 +455,31 @@ pub async fn dev_bootstrap_standing(
     let holder = match commons_manager.get_holder_by_did(&did).await? {
         Some(existing) => existing,
         None => {
-            // Demo enrollment. The commons Sybil gate (`join_jurisdiction`)
-            // requires at least `Strong` POP level, so we mint a synthetic demo
-            // voucher (a throwaway key) to produce a WebOfTrust/`Strong` anchor —
-            // the same shape PR #1980's proven in-process helper uses. This
-            // SATISFIES the Sybil gate rather than weakening it; production
-            // instead obtains real steward attestations via the SDIS ceremony.
-            let voucher = KeyPair::generate().map_err(|e| {
-                GatewayError::InternalError(format!("demo voucher key generation failed: {e}"))
-            })?;
-            let anchor = commons_manager
-                .create_anchor_from_enrollment(&did, Some(voucher.did()))
-                .await?;
-            let anchor_id = hex::encode(anchor.id());
+            // Idempotent enrollment: reuse an existing personhood anchor for this
+            // DID if one is already present (e.g. from a prior partial run or an
+            // earlier SDIS enrollment) — `create_anchor_from_enrollment` errors on
+            // a duplicate anchor, so only mint a new one when none exists.
+            //
+            // A freshly minted demo anchor uses a synthetic voucher (a throwaway
+            // key) to produce a WebOfTrust/`Strong` anchor: the commons Sybil gate
+            // (`join_jurisdiction`) requires at least `Strong` POP level, so this
+            // SATISFIES the gate rather than weakening it (the same shape PR
+            // #1980's proven in-process helper uses). Production obtains real
+            // steward attestations via the SDIS ceremony.
+            let anchor_id = match commons_manager.get_anchor_by_did(&did).await? {
+                Some(existing_anchor) => hex::encode(existing_anchor.id()),
+                None => {
+                    let voucher = KeyPair::generate().map_err(|e| {
+                        GatewayError::InternalError(format!(
+                            "demo voucher key generation failed: {e}"
+                        ))
+                    })?;
+                    let anchor = commons_manager
+                        .create_anchor_from_enrollment(&did, Some(voucher.did()))
+                        .await?;
+                    hex::encode(anchor.id())
+                }
+            };
             commons_manager
                 .create_holder_from_anchor(&anchor_id, &did)
                 .await?
@@ -475,24 +487,49 @@ pub async fn dev_bootstrap_standing(
     };
     let holder_id = hex::encode(holder.id());
 
-    // Join the jurisdiction if not already affiliated, then advance to Member.
-    let already_affiliated = commons_manager
+    // Resolve the caller's current affiliation (if any) in this jurisdiction.
+    // The dev bridge advances onboarding to `Member`, but it must NOT override
+    // governance-imposed removed/blocked states (`Suspended`/`Banned`/`Exited`):
+    // those must be cleared via the governance/recovery path, not this route, so
+    // a removed identity cannot regain proposal standing through the demo bridge.
+    let existing_status = commons_manager
         .list_affiliations(&holder_id)
         .await?
-        .iter()
-        .any(|a| a.jurisdiction_id == jurisdiction);
-    if !already_affiliated {
-        commons_manager
-            .join_jurisdiction(
-                &holder_id,
-                jurisdiction.clone(),
-                vec![MembershipCapability::Vote],
-            )
-            .await?;
+        .into_iter()
+        .find(|a| a.jurisdiction_id == jurisdiction)
+        .map(|a| a.membership_status);
+
+    match existing_status {
+        // Already an active Member — idempotent no-op.
+        Some(MembershipStatus::Member) => {}
+        // Mid-onboarding — advance to Member (the intended demo path).
+        Some(MembershipStatus::Candidate) | Some(MembershipStatus::Provisional) => {
+            commons_manager
+                .update_affiliation_status(&holder_id, &jurisdiction, MembershipStatus::Member)
+                .await?;
+        }
+        // Not yet affiliated — join (lands at Candidate) then advance to Member.
+        None => {
+            commons_manager
+                .join_jurisdiction(
+                    &holder_id,
+                    jurisdiction.clone(),
+                    vec![MembershipCapability::Vote],
+                )
+                .await?;
+            commons_manager
+                .update_affiliation_status(&holder_id, &jurisdiction, MembershipStatus::Member)
+                .await?;
+        }
+        // Governance-imposed removed/blocked status — refuse; do not reactivate.
+        Some(blocked) => {
+            return Err(GatewayError::Forbidden(format!(
+                "cannot bootstrap standing: existing affiliation status is {blocked:?}; a \
+                 Suspended/Banned/Exited membership must be resolved via governance/recovery, \
+                 not the demo bridge"
+            )));
+        }
     }
-    commons_manager
-        .update_affiliation_status(&holder_id, &jurisdiction, MembershipStatus::Member)
-        .await?;
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "status": "member_standing_bootstrapped",
