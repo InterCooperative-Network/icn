@@ -15,7 +15,10 @@ use utoipa::ToSchema;
 use crate::commons_mgr::CommonsManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::get_claims;
-use icn_identity::{Affiliation, CommonsHolderRecord, Did, JurisdictionId, MembershipStatus};
+use icn_identity::{
+    Affiliation, CommonsHolderRecord, Did, JurisdictionId, KeyPair, MembershipCapability,
+    MembershipStatus,
+};
 
 // ============================================================================
 // Response/Request DTOs
@@ -377,6 +380,214 @@ pub async fn leave_jurisdiction(
 }
 
 // ============================================================================
+// Dev/Demo-only standing bootstrap
+// ============================================================================
+
+/// Request body for [`dev_bootstrap_standing`].
+#[derive(Debug, Deserialize)]
+pub struct DevBootstrapStandingRequest {
+    /// Jurisdiction (governance domain id) to establish Member standing in.
+    pub jurisdiction_id: String,
+}
+
+/// Returns `true` only when BOTH dev gates are satisfied:
+/// 1. `ICN_ENABLE_ADMIN_ENDPOINTS=true` (same explicit opt-in as the SDIS
+///    `approve_ceremony` / `approve_recovery` admin endpoints), AND
+/// 2. the governance build posture is NOT `Production`
+///    (`ICN_GOVERNANCE_BUILD_MODE=production`).
+///
+/// Default (no env set) is `false` → the endpoint is unavailable. The posture
+/// gate makes it impossible to enable in production even if the opt-in flag is
+/// set by mistake.
+fn demo_standing_bootstrap_enabled() -> bool {
+    let admin_enabled = std::env::var("ICN_ENABLE_ADMIN_ENDPOINTS")
+        .unwrap_or_else(|_| "false".to_string())
+        .to_lowercase()
+        == "true";
+    let is_production = icn_governance_actor::http::GovernanceContextBuildMode::from_env()
+        == icn_governance_actor::http::GovernanceContextBuildMode::Production;
+    admin_enabled && !is_production
+}
+
+/// POST /v1/commons/dev/bootstrap-standing — DEV/DEMO-ONLY.
+///
+/// Establishes commons `Member` standing for the **authenticated caller's own
+/// DID** (`claims.sub`) in `jurisdiction_id`, so a local secured-gateway demo
+/// (e.g. a NYCN v4 bash flow) can then submit governed proposals, which the
+/// gateway gates on Member standing via `member_checker`.
+///
+/// This deliberately bypasses the multi-steward SDIS proof-of-personhood
+/// ceremony and is therefore **double dev-gated** (see
+/// [`demo_standing_bootstrap_enabled`]): it returns `403 Forbidden` unless
+/// `ICN_ENABLE_ADMIN_ENDPOINTS=true` AND the posture is non-`Production`.
+///
+/// Safety: it grants standing for the caller's own DID only — never an
+/// arbitrary DID — and removes no membership/SDIS/governance check. It adds a
+/// dev path to *create* a commons holder; production enrollment, SDIS, and the
+/// `member_checker` gate are unchanged and still enforced for every request.
+/// It is NOT a production "make me a Member" route.
+#[post("/dev/bootstrap-standing")]
+pub async fn dev_bootstrap_standing(
+    http_req: HttpRequest,
+    body: web::Json<DevBootstrapStandingRequest>,
+    commons_manager: web::Data<Arc<CommonsManager>>,
+) -> Result<HttpResponse> {
+    // Dev gate: disabled by default; impossible to enable in Production posture.
+    if !demo_standing_bootstrap_enabled() {
+        return Err(GatewayError::Forbidden(
+            "Demo standing bootstrap is disabled (requires ICN_ENABLE_ADMIN_ENDPOINTS=true and \
+             non-production posture)"
+                .to_string(),
+        ));
+    }
+
+    // Operate on the caller's own DID only.
+    let claims = get_claims(&http_req)
+        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
+    let did = claims
+        .sub
+        .parse::<Did>()
+        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
+
+    let jurisdiction = JurisdictionId::new(&body.jurisdiction_id);
+
+    // Idempotent enrollment: reuse an existing holder if the DID already has one.
+    let holder = match commons_manager.get_holder_by_did(&did).await? {
+        Some(existing) => existing,
+        None => {
+            // Idempotent enrollment: reuse an existing personhood anchor for this
+            // DID if one is already present (e.g. from a prior partial run or an
+            // earlier SDIS enrollment) — `create_anchor_from_enrollment` errors on
+            // a duplicate anchor, so only mint a new one when none exists.
+            //
+            // A freshly minted demo anchor uses a synthetic voucher (a throwaway
+            // key) to produce a WebOfTrust/`Strong` anchor: the commons Sybil gate
+            // (`join_jurisdiction`) requires at least `Strong` POP level, so this
+            // SATISFIES the gate rather than weakening it (the same shape PR
+            // #1980's proven in-process helper uses). Production obtains real
+            // steward attestations via the SDIS ceremony.
+            let anchor_id = match commons_manager.get_anchor_by_did(&did).await? {
+                Some(existing_anchor) => {
+                    // A reused anchor that was suspended/revoked at the SDIS-anchor
+                    // level must not yield fresh standing: `create_holder_from_anchor`
+                    // builds an active holder regardless of anchor status, so fail
+                    // closed here before reusing it.
+                    if !existing_anchor.is_active() {
+                        return Err(GatewayError::Forbidden(format!(
+                            "cannot bootstrap standing: personhood anchor is not active \
+                             ({}); a suspended/revoked anchor must be resolved via \
+                             SDIS/governance, not the demo bridge",
+                            existing_anchor.status
+                        )));
+                    }
+                    hex::encode(existing_anchor.id())
+                }
+                None => {
+                    let voucher = KeyPair::generate().map_err(|e| {
+                        GatewayError::InternalError(format!(
+                            "demo voucher key generation failed: {e}"
+                        ))
+                    })?;
+                    let anchor = commons_manager
+                        .create_anchor_from_enrollment(&did, Some(voucher.did()))
+                        .await?;
+                    hex::encode(anchor.id())
+                }
+            };
+            commons_manager
+                .create_holder_from_anchor(&anchor_id, &did)
+                .await?
+        }
+    };
+
+    // A holder removed at the commons-holder level (`Suspended`/`Exited`/`Revoked`)
+    // must not regain standing via the dev bridge: the gateway `member_checker`
+    // only checks the jurisdiction affiliation, not the holder's lifecycle status,
+    // so fail closed here before touching affiliations. A freshly enrolled holder
+    // is `Active`, so this only rejects a reused, removed holder.
+    if !holder.is_active() {
+        return Err(GatewayError::Forbidden(format!(
+            "cannot bootstrap standing: commons holder is not active ({}); a removed holder \
+             must be resolved via governance/recovery, not the demo bridge",
+            holder.status
+        )));
+    }
+
+    // The holder's backing personhood anchor must also be active. Anchor status
+    // changes do not cascade to holders, so a reused `Active` holder may be backed
+    // by an anchor that was suspended/revoked after the holder was created. (For
+    // the freshly enrolled path the anchor was just minted/validated `Active`, so
+    // this is a no-op there.)
+    let backing_anchor = commons_manager
+        .get_anchor(&hex::encode(holder.anchor_id))
+        .await?
+        .ok_or_else(|| {
+            GatewayError::InternalError("backing personhood anchor missing for holder".to_string())
+        })?;
+    if !backing_anchor.is_active() {
+        return Err(GatewayError::Forbidden(format!(
+            "cannot bootstrap standing: backing personhood anchor is not active ({}); a \
+             suspended/revoked anchor must be resolved via SDIS/governance, not the demo bridge",
+            backing_anchor.status
+        )));
+    }
+
+    let holder_id = hex::encode(holder.id());
+
+    // Resolve the caller's current affiliation (if any) in this jurisdiction.
+    // The dev bridge advances onboarding to `Member`, but it must NOT override
+    // governance-imposed removed/blocked states (`Suspended`/`Banned`/`Exited`):
+    // those must be cleared via the governance/recovery path, not this route, so
+    // a removed identity cannot regain proposal standing through the demo bridge.
+    let existing_status = commons_manager
+        .list_affiliations(&holder_id)
+        .await?
+        .into_iter()
+        .find(|a| a.jurisdiction_id == jurisdiction)
+        .map(|a| a.membership_status);
+
+    match existing_status {
+        // Already an active Member — idempotent no-op.
+        Some(MembershipStatus::Member) => {}
+        // Mid-onboarding — advance to Member (the intended demo path).
+        Some(MembershipStatus::Candidate) | Some(MembershipStatus::Provisional) => {
+            commons_manager
+                .update_affiliation_status(&holder_id, &jurisdiction, MembershipStatus::Member)
+                .await?;
+        }
+        // Not yet affiliated — join (lands at Candidate) then advance to Member.
+        None => {
+            commons_manager
+                .join_jurisdiction(
+                    &holder_id,
+                    jurisdiction.clone(),
+                    vec![MembershipCapability::Vote],
+                )
+                .await?;
+            commons_manager
+                .update_affiliation_status(&holder_id, &jurisdiction, MembershipStatus::Member)
+                .await?;
+        }
+        // Governance-imposed removed/blocked status — refuse; do not reactivate.
+        Some(blocked) => {
+            return Err(GatewayError::Forbidden(format!(
+                "cannot bootstrap standing: existing affiliation status is {blocked:?}; a \
+                 Suspended/Banned/Exited membership must be resolved via governance/recovery, \
+                 not the demo bridge"
+            )));
+        }
+    }
+
+    Ok(HttpResponse::Ok().json(serde_json::json!({
+        "status": "member_standing_bootstrapped",
+        "did": did.to_string(),
+        "jurisdiction_id": body.jurisdiction_id,
+        "holder_id": holder_id,
+        "note": "dev/demo-only; not a production enrollment path",
+    })))
+}
+
+// ============================================================================
 // Helper Functions
 // ============================================================================
 
@@ -405,6 +616,9 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(join_jurisdiction)
         .service(update_affiliation)
         .service(leave_jurisdiction)
+        // Dev/demo-only; refuses unless ICN_ENABLE_ADMIN_ENDPOINTS=true and
+        // non-Production posture (see dev_bootstrap_standing).
+        .service(dev_bootstrap_standing)
         .service(web::scope("/anchor").configure(anchor::configure));
 }
 
