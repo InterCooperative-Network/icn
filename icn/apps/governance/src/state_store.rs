@@ -105,6 +105,15 @@ pub trait GovernanceStateStore: Send + Sync {
     fn list_close_intents(&self) -> Result<Vec<CloseJournalEntry>> {
         Ok(vec![])
     }
+
+    /// Force buffered state-store writes durable (fsync).
+    ///
+    /// Default no-op; the sled-backed store overrides it. `save_close_intent`
+    /// uses this so the write-ahead record is durable before the caller writes
+    /// cross-store provenance artifacts.
+    fn flush(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 // ---- Key helpers ----
@@ -290,11 +299,21 @@ impl GovernanceStateStore for SledGovernanceStateStore {
         self.store.put(
             &close_intent_key(&entry.proposal.id),
             &serde_json::to_vec(entry)?,
-        )
+        )?;
+        // Force the write-ahead record durable BEFORE the caller writes any
+        // cross-store provenance artifact. `Store::put` only buffers the sled
+        // insert; without this fsync a crash could persist a Db-A governance
+        // receipt while losing the unflushed intent in Db-B, reviving the
+        // phantom-accepted half-close the journal exists to prevent.
+        self.store.flush()
     }
 
     fn delete_close_intent(&self, proposal_id: &ProposalId) -> Result<()> {
         self.store.delete(&close_intent_key(proposal_id))
+    }
+
+    fn flush(&self) -> Result<()> {
+        self.store.flush()
     }
 
     fn list_close_intents(&self) -> Result<Vec<CloseJournalEntry>> {

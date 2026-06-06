@@ -71,6 +71,7 @@ struct PrefixFailStore {
     inner: SledStore,
     fail_prefix: Vec<u8>,
     fail: AtomicBool,
+    flushes: AtomicUsize,
 }
 
 impl PrefixFailStore {
@@ -79,6 +80,7 @@ impl PrefixFailStore {
             inner,
             fail_prefix: fail_prefix.to_vec(),
             fail: AtomicBool::new(false),
+            flushes: AtomicUsize::new(0),
         }
     }
     fn arm(&self) {
@@ -86,6 +88,9 @@ impl PrefixFailStore {
     }
     fn disarm(&self) {
         self.fail.store(false, Ordering::SeqCst);
+    }
+    fn flush_count(&self) -> usize {
+        self.flushes.load(Ordering::SeqCst)
     }
 }
 
@@ -113,6 +118,10 @@ impl Store for PrefixFailStore {
     }
     fn list_replica_hashes(&self) -> anyhow::Result<Vec<ContentHash>> {
         self.inner.list_replica_hashes()
+    }
+    fn flush(&self) -> anyhow::Result<()> {
+        self.flushes.fetch_add(1, Ordering::SeqCst);
+        self.inner.flush().map(|_| ())
     }
 }
 
@@ -1082,4 +1091,48 @@ async fn recovery_completes_partially_materialized_action_items() {
         "journal cleared once every action-item obligation is materialized"
     );
     actor2.shutdown().await;
+}
+
+/// The write-ahead close intent must be forced durable (fsync) before the close
+/// writes any cross-store provenance artifact. Otherwise a crash could persist a
+/// receipt in the receipt store while losing the unflushed intent in the state
+/// store, so startup recovery would have nothing to replay and the original
+/// phantom-accepted/Open proposal could recur.
+#[tokio::test(flavor = "current_thread")]
+async fn save_close_intent_forces_durable_flush() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp.path().to_path_buf();
+
+    let (backend, fail_store, actor_handle, proposal_id) =
+        open_voted_proposal(&db_path, None).await;
+    actor_handle.install_receipt_store(backend.clone()).await;
+
+    let flushes_before = fail_store.flush_count();
+    // Fail the terminal proposal save so the close stops right after writing (and
+    // fsyncing) the write-ahead intent — exercising the durability barrier.
+    fail_store.arm();
+    let _ = actor_handle
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: proposal_id.clone(),
+            eligible_voters: None,
+            excluded_delegators: None,
+            capability_scope: None,
+        })
+        .await;
+
+    assert!(
+        fail_store.flush_count() > flushes_before,
+        "save_close_intent must fsync the write-ahead record before any receipt is written"
+    );
+    let state: Arc<dyn GovernanceStateStore> =
+        Arc::new(SledGovernanceStateStore::new(fail_store.clone()));
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        1,
+        "the flushed close-journal entry must be durably present for recovery"
+    );
+    actor_handle.shutdown().await;
 }
