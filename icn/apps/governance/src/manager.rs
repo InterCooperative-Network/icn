@@ -329,35 +329,44 @@ impl ActionItemStoreBackend for SledActionItemStore {
     fn save(&self, item: &ActionItem) -> std::result::Result<(), GovernanceError> {
         let key = Self::item_key(&item.domain_id, &item.id);
 
-        // Remove stale assignee index entry if the assignee changed on update.
-        if let Ok(Some(existing)) = self.get(&item.domain_id, &item.id) {
-            if existing.assignee != item.assignee {
-                if let Some(ref old_assignee) = existing.assignee {
-                    let old_idx = Self::assignee_idx_key(old_assignee, &item.domain_id, &item.id);
-                    self.db.remove(old_idx.as_bytes()).map_err(|e| {
-                        GovernanceError::Internal(format!(
-                            "Sled assignee-idx remove (stale) failed: {e}"
-                        ))
-                    })?;
-                }
-            }
-        }
+        // If the assignee changed on update, the OLD by-assignee index entry must
+        // be removed. Resolve it before the transaction (a read), then remove it
+        // and (re)write the primary row + new index atomically below.
+        let stale_assignee_idx: Option<String> = match self.get(&item.domain_id, &item.id) {
+            Ok(Some(existing)) if existing.assignee != item.assignee => existing
+                .assignee
+                .as_ref()
+                .map(|old| Self::assignee_idx_key(old, &item.domain_id, &item.id)),
+            _ => None,
+        };
 
         let value = icn_encoding::encode_versioned(item)
             .map_err(|e| GovernanceError::Internal(format!("Failed to encode action item: {e}")))?;
-        self.db
-            .insert(key.as_bytes(), value)
-            .map_err(|e| GovernanceError::Internal(format!("Sled insert failed: {e}")))?;
+        let new_assignee_idx: Option<String> = item
+            .assignee
+            .as_ref()
+            .map(|assignee| Self::assignee_idx_key(assignee, &item.domain_id, &item.id));
 
-        // Maintain assignee secondary index
-        if let Some(ref assignee) = item.assignee {
-            let idx_key = Self::assignee_idx_key(assignee, &item.domain_id, &item.id);
-            self.db
-                .insert(idx_key.as_bytes(), b"1" as &[u8])
-                .map_err(|e| {
-                    GovernanceError::Internal(format!("Sled assignee-idx insert failed: {e}"))
-                })?;
-        }
+        // Atomic: the primary row, the assignee secondary index, and any stale
+        // index removal commit together in a single sled transaction. A partial
+        // write (primary row present but its assignee index missing) can
+        // therefore never occur, so by-assignee readers never miss a persisted
+        // item and close-journal recovery can trust a present primary row as a
+        // fully-persisted obligation.
+        self.db
+            .transaction(|tx| {
+                if let Some(ref stale) = stale_assignee_idx {
+                    tx.remove(stale.as_bytes())?;
+                }
+                tx.insert(key.as_bytes(), value.as_slice())?;
+                if let Some(ref idx) = new_assignee_idx {
+                    tx.insert(idx.as_bytes(), b"1" as &[u8])?;
+                }
+                Ok::<(), sled::transaction::ConflictableTransactionError<()>>(())
+            })
+            .map_err(|e: sled::transaction::TransactionError<()>| {
+                GovernanceError::Internal(format!("Sled action-item save tx failed: {e:?}"))
+            })?;
         Ok(())
     }
 
