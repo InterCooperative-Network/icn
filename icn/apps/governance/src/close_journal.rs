@@ -106,7 +106,10 @@ impl CloseReceipts {
                     error = %e,
                     "Failed to store v3 decision receipt — process-authority evidence not persisted"
                 );
-                return Err(e);
+                return Err(format!(
+                    "v3 decision receipt persistence failed for proposal '{}': {e}",
+                    v3.receipt.proposal_id
+                ));
             }
         }
         if let Some(receipt) = &self.governance_receipt {
@@ -120,7 +123,10 @@ impl CloseReceipts {
                     "Failed to store governance decision receipt — provenance chain broken"
                 );
                 if governance_receipt_fatal {
-                    return Err(e);
+                    return Err(format!(
+                        "governance decision receipt persistence failed for proposal '{}': {e}",
+                        receipt.proposal_id
+                    ));
                 }
             }
         }

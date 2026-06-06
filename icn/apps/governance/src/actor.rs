@@ -2286,7 +2286,23 @@ impl GovernanceActor {
                 };
                 self.store.save_close_intent(&journal_entry)?;
                 journal_entry.commit(self.receipt_store.as_deref(), self.store.as_ref())?;
-                self.store.delete_close_intent(&proposal_id)?;
+                // Post-commit cleanup ONLY: the proposal is now durably closed and
+                // every provenance artifact is durable. A failure to clear the
+                // write-ahead journal marker must NOT abort the close with `?` —
+                // doing so would skip the proposal-closed broadcast, event-bus
+                // emission, and action-item materialization below even though the
+                // close already committed, and recovery (which restores durable
+                // state but not these transient side effects) would not re-fire
+                // them. Match recovery's discipline instead: log and leave the
+                // entry for idempotent replay on the next startup.
+                if let Err(e) = self.store.delete_close_intent(&proposal_id) {
+                    warn!(
+                        proposal_id = %proposal_id.0,
+                        error = %e,
+                        "Close committed durably but clearing its write-ahead journal entry \
+                         failed; it will be replayed idempotently on the next startup"
+                    );
+                }
 
                 // Create tally snapshot for broadcast
                 let tally_snapshot = TallySnapshot::new(
