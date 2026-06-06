@@ -3561,22 +3561,20 @@ impl GovernanceManager {
             }
 
             if let Some(ref store) = self.receipt_store {
-                // #1868: persist a process-authorized GovernanceDecisionReceiptV3
-                // as a PREFLIGHT — before the v1 receipt below and before the
-                // terminal `proposal.close(...)` — ONLY when a capability scope was
-                // actually presented (the scoped HTTP close path). `capability_scope`
-                // is `None` for unscoped/timer entry points, which emit no v3
-                // because nothing was presented (the field is evidence, never a
-                // constant). Mirrors the actor close path so the in-memory and
-                // actor backends produce the same v3 evidence.
-                //
-                // Ordering matters: persisting v3 first means a v3 persistence
-                // failure fails closed (bail below) before any durable v1 decision
-                // receipt is written, so a still-Open proposal never has a
-                // contradictory committed receipt exposed via `get_chain`. Routes
-                // through the fail-closed `put_governance_decision_v3` →
-                // `put_opaque` seam.
-                if let Some(scope) = capability_scope {
+                // Cross-store close provenance, emitted through the SHARED
+                // `CloseReceipts::apply` helper so the standalone manager and the
+                // actor close path cannot drift. The manager keeps proposals
+                // in-memory (the terminal flip below is `proposal.close(...)`, not
+                // a durable `save_proposal`), so unlike the actor path there is no
+                // durable cross-store phantom to recover from here — but the
+                // receipt-emission order and the fail-closed v3 / fatal-when-
+                // execution v1 / best-effort allocation split are exactly the ones
+                // the actor's write-ahead journal replays (crate::close_journal).
+
+                // #1868 v3 — scoped closes only (a capability scope was actually
+                // presented). `::new` validation fails closed before any durable
+                // write; the field is evidence, never a constant.
+                let decision_v3 = if let Some(scope) = capability_scope {
                     let receipt_v3 = icn_governance::GovernanceDecisionReceiptV3::new(
                         proposal_id.0.clone(),
                         proposal.domain_id.0.clone(),
@@ -3592,32 +3590,16 @@ impl GovernanceManager {
                             proposal_id.0
                         )
                     })?;
-                    if let Err(e) = store.put_governance_decision_v3(&receipt_v3, now) {
-                        tracing::error!(
-                            proposal_id = %proposal_id.0,
-                            error = %e,
-                            "Failed to store v3 decision receipt — process-authority evidence not persisted"
-                        );
-                        // Fail closed, unconditionally. A scoped close emits the
-                        // v3 receipt as required decision evidence; this runs
-                        // before the v1 receipt write and the terminal
-                        // `proposal.close(...)` below, so bailing leaves the
-                        // proposal Open with NO durable decision artifact rather
-                        // than half-persisting a close (a durable v1 receipt for an
-                        // Open proposal). Not guarded by `requires_execution_closure`
-                        // (which only gates the v1 provenance-chain bail below).
-                        anyhow::bail!(
-                            "Proposal '{}' close aborted: v3 decision receipt persistence failed: {e}",
-                            proposal_id.0
-                        );
-                    }
-                }
+                    Some(crate::close_journal::DecisionV3Entry {
+                        receipt: receipt_v3,
+                        recorded_at: now,
+                    })
+                } else {
+                    None
+                };
 
-                // v1 GovernanceDecisionReceipt, emitted after the v3 preflight
-                // above. For a scoped close the v3 evidence is already durable by
-                // this point; an unscoped close has no v3 and this v1 receipt is
-                // the decision record. A put_governance failure here is fatal only
-                // when execution closure is required (PS-3 provenance chain).
+                // v1 GovernanceDecisionReceipt — the decision record, and the
+                // source of `decision_hash` for the ADR-0014 mandate below.
                 let receipt = GovernanceDecisionReceipt::new(
                     proposal_id.0.clone(),
                     proposal.domain_id.0.clone(),
@@ -3625,21 +3607,34 @@ impl GovernanceManager {
                     tally.clone(),
                     &proposal_votes,
                 );
-                if let Err(e) = store.put_governance(&receipt) {
-                    tracing::error!(
-                        proposal_id = %proposal_id.0,
-                        error = %e,
-                        "Failed to store governance decision receipt — provenance chain broken"
-                    );
-                    // Escalated from warn to error: receipt store failure means
-                    // the governance→economics provenance chain is broken (PS-3).
-                    if requires_execution_closure {
-                        anyhow::bail!(
-                            "Proposal '{}' requires execution closure but governance receipt persistence failed: {e}",
-                            proposal_id.0
-                        );
-                    }
-                }
+
+                // governance→economics allocation receipt (INV-2: Allocation
+                // Completeness), for accepted budget/treasury/allocation proposals.
+                // Built here; the "required but not generated" gate is preserved
+                // after emission below.
+                let allocation_receipt = if matches!(outcome, ProofOutcome::Accepted) {
+                    Self::create_allocation_receipt(
+                        &proposal.payload,
+                        receipt.decision_hash,
+                        &proposal_id,
+                        &proposal.domain_id,
+                    )
+                } else {
+                    None
+                };
+
+                // SHARED emission: v3 → v1 → allocation. v3 is fail-closed; v1 is
+                // fatal only under execution closure (PS-3 provenance chain);
+                // allocation is best-effort (a missing allocation yields a
+                // detectably incomplete chain, never a falsely-verified one).
+                let close_receipts = crate::close_journal::CloseReceipts {
+                    decision_v3,
+                    governance_receipt: Some(receipt.clone()),
+                    allocation_receipt,
+                };
+                close_receipts
+                    .apply(store.as_ref(), requires_execution_closure)
+                    .map_err(|e| anyhow::anyhow!(e))?;
 
                 // ADR-0014 constitutional-memory seam.
                 //
@@ -3704,36 +3699,18 @@ impl GovernanceManager {
                     }
                 }
 
-                // Wire governance→economics binding (INV-2: Allocation Completeness)
-                // When a budget/treasury/allocation proposal is accepted, create an
-                // AllocationReceipt linking the decision to economic intents.
-                if matches!(outcome, ProofOutcome::Accepted) {
-                    let decision_hash = receipt.decision_hash;
-                    if let Some(allocation_receipt) = Self::create_allocation_receipt(
-                        &proposal.payload,
-                        decision_hash,
-                        &proposal_id,
-                        &proposal.domain_id,
-                    ) {
-                        if let Err(e) = store.put_allocation(&allocation_receipt) {
-                            tracing::error!(
-                                proposal_id = %proposal_id.0,
-                                error = %e,
-                                "Failed to store allocation receipt — economics binding broken"
-                            );
-                        } else {
-                            tracing::info!(
-                                proposal_id = %proposal_id.0,
-                                intent_count = allocation_receipt.intents.len(),
-                                "Allocation receipt created: governance→economics chain bound"
-                            );
-                        }
-                    } else if payload_requires_allocation_receipt(&proposal.payload) {
-                        anyhow::bail!(
-                            "Proposal '{}' requires an allocation receipt closure artifact, but no receipt was generated.",
-                            proposal_id.0
-                        );
-                    }
+                // Allocation-required closure-artifact gate (preserved): an
+                // accepted payload that demands an allocation receipt but produced
+                // none is a fail-closed error. The successful allocation write
+                // itself already happened in `close_receipts.apply` above.
+                if matches!(outcome, ProofOutcome::Accepted)
+                    && close_receipts.allocation_receipt.is_none()
+                    && payload_requires_allocation_receipt(&proposal.payload)
+                {
+                    anyhow::bail!(
+                        "Proposal '{}' requires an allocation receipt closure artifact, but no receipt was generated.",
+                        proposal_id.0
+                    );
                 }
             }
 

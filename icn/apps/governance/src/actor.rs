@@ -576,6 +576,10 @@ impl GovernanceHandle {
     ) {
         let mut actor = self.inner.write().await;
         actor.receipt_store = Some(store);
+        // Both stores are now available; replay any write-ahead close-journal
+        // entries left by a close whose terminal commit did not finish (e.g. a
+        // crash or terminal-save failure after a receipt was already durable).
+        actor.recover_incomplete_closes();
     }
 
     /// List all protocol parameters
@@ -1505,6 +1509,58 @@ impl GovernanceActor {
         Some(icn_governance::ProposalThresholds::new(quorum, approval))
     }
 
+    /// Replay any lingering write-ahead close-journal entries to completion.
+    ///
+    /// Called once a receipt backend is installed — the point at which both the
+    /// proposal state store (Db-B) and the receipt store (Db-A) are available.
+    /// For each durable [`CloseJournalEntry`](crate::close_journal::CloseJournalEntry)
+    /// left behind by a close whose terminal commit did not finish (the process
+    /// crashed, or the terminal `save_proposal` failed after a receipt was
+    /// already durable), re-run `commit` — every artifact write is idempotent —
+    /// and clear the entry. This heals a phantom-accepted half-close: receipts
+    /// already durable in the receipt store are matched by the now-committed
+    /// terminal proposal state. Recovery never deletes an append-only receipt;
+    /// it only completes the close that was already decided.
+    fn recover_incomplete_closes(&self) {
+        let intents = match self.store.list_close_intents() {
+            Ok(intents) => intents,
+            Err(e) => {
+                warn!("Could not scan governance close-journal for recovery: {e}");
+                return;
+            }
+        };
+        if intents.is_empty() {
+            return;
+        }
+        info!(
+            count = intents.len(),
+            "Replaying incomplete governance close(s) from the write-ahead journal"
+        );
+        for entry in intents {
+            let proposal_id = entry.proposal.id.clone();
+            match entry.commit(self.receipt_store.as_deref(), self.store.as_ref()) {
+                Ok(()) => match self.store.delete_close_intent(&proposal_id) {
+                    Ok(()) => info!(
+                        proposal_id = %proposal_id.0,
+                        "Recovered incomplete governance close from the write-ahead journal"
+                    ),
+                    Err(e) => warn!(
+                        proposal_id = %proposal_id.0,
+                        error = %e,
+                        "Recovered close committed but clearing its journal entry failed; \
+                         the next startup will replay it idempotently"
+                    ),
+                },
+                Err(e) => warn!(
+                    proposal_id = %proposal_id.0,
+                    error = %e,
+                    "Could not complete a journaled governance close on startup; \
+                     leaving the journal entry for replay on the next startup"
+                ),
+            }
+        }
+    }
+
     /// Handle a governance command
     async fn handle(&mut self, cmd: GovernanceCommand) -> Result<()> {
         match cmd {
@@ -2093,46 +2149,55 @@ impl GovernanceActor {
                 // artifact — behind for a still-Open proposal. Routes through the
                 // fail-closed `put_governance_decision_v3` → `put_opaque` seam; the
                 // gateway never imports the v3 type.
-                if let Some(scope) = capability_scope.as_deref() {
-                    if let Some(ref store) = self.receipt_store {
-                        use icn_governance::proof::ProofOutcome;
-                        let v3_outcome = match outcome_result {
-                            DecisionOutcome::Accepted => ProofOutcome::Accepted,
-                            DecisionOutcome::Rejected => ProofOutcome::Rejected,
-                            DecisionOutcome::NoQuorum => ProofOutcome::NoQuorum,
-                        };
-                        let receipt_v3 = icn_governance::GovernanceDecisionReceiptV3::new(
-                            proposal_id.0.clone(),
-                            proposal.domain_id.0.clone(),
-                            v3_outcome,
-                            tally.clone(),
-                            &votes,
-                            scope.to_string(),
-                            icn_governance::ReceiptMandateAttestation::ProcessAuthorized,
-                        )
-                        .map_err(|e| {
-                            anyhow::anyhow!(
-                                "Invalid v3 decision receipt for proposal {}: {e}",
-                                proposal_id.0
+                // Build the v3 receipt here — its `::new` validation still fails
+                // closed BEFORE the close-journal intent is written — but DEFER its
+                // durable write into the write-ahead `CloseJournalEntry` commit
+                // below. Bundling the v3, proof, v1, and allocation writes with the
+                // terminal proposal save behind the journal is what makes the close
+                // cross-store-atomic and recoverable (crate::close_journal).
+                let pending_v3: Option<crate::close_journal::DecisionV3Entry> =
+                    if let Some(scope) = capability_scope.as_deref() {
+                        if self.receipt_store.is_some() {
+                            use icn_governance::proof::ProofOutcome;
+                            let v3_outcome = match outcome_result {
+                                DecisionOutcome::Accepted => ProofOutcome::Accepted,
+                                DecisionOutcome::Rejected => ProofOutcome::Rejected,
+                                DecisionOutcome::NoQuorum => ProofOutcome::NoQuorum,
+                            };
+                            let receipt_v3 = icn_governance::GovernanceDecisionReceiptV3::new(
+                                proposal_id.0.clone(),
+                                proposal.domain_id.0.clone(),
+                                v3_outcome,
+                                tally.clone(),
+                                &votes,
+                                scope.to_string(),
+                                icn_governance::ReceiptMandateAttestation::ProcessAuthorized,
                             )
-                        })?;
-                        store
-                            .put_governance_decision_v3(&receipt_v3, now)
                             .map_err(|e| {
                                 anyhow::anyhow!(
-                                    "Failed to persist v3 decision receipt for proposal {}: {e}",
+                                    "Invalid v3 decision receipt for proposal {}: {e}",
                                     proposal_id.0
                                 )
                             })?;
-                    }
-                }
+                            Some(crate::close_journal::DecisionV3Entry {
+                                receipt: receipt_v3,
+                                recorded_at: now,
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
 
-                // Generate + persist GovernanceProofV2 after the v3 preflight and
-                // BEFORE terminal proposal save. If proof persistence fails, the
-                // proposal must not be persisted as closed — otherwise the API
-                // returns Err while the store disagrees. Non-Accepted outcomes
-                // still emit a proof (useful for audit of rejection / no-quorum
-                // signals) but they bypass the Invariant 7 gate above.
+                // Build + sign GovernanceProofV2 after the v3 build and BEFORE the
+                // terminal proposal save. Its durable write is DEFERRED into the
+                // close-journal commit below (same as v3), so a proof-write failure
+                // can never leave a durable closed-outcome proof behind for a
+                // still-Open proposal — the journal replays it on recovery instead.
+                // Non-Accepted outcomes still emit a proof (useful for audit of
+                // rejection / no-quorum signals) but they bypass the Invariant 7
+                // gate above.
                 let proof_bytes = if let Some(ref signing_key) = self.signing_key {
                     use icn_governance::ProofOutcome;
 
@@ -2160,11 +2225,6 @@ impl GovernanceActor {
 
                     let serialized = serde_json::to_vec(&proof)?;
 
-                    // Persist proof for later retrieval. A failure here bails
-                    // before terminal proposal persistence — see block comment
-                    // above.
-                    self.store.save_proof_bytes(&proposal_id, &serialized)?;
-
                     info!(
                         "GovernanceProofV2 signed for proposal {} (decision_hash: {})",
                         proposal_id.0,
@@ -2180,52 +2240,53 @@ impl GovernanceActor {
                     None
                 };
 
-                // Drain the deferred v1 coordination receipt-chain writes now that the
-                // v3 receipt and GovernanceProofV2 preflights have both persisted. This
-                // is the LAST preflight before the terminal save, mirroring
-                // manager.rs's v3-before-v1 ordering AND its fatal/best-effort split
-                // for the two v1 writes (manager.rs::close_proposal_inner):
-                //
-                //  - Governance receipt: FATAL under execution closure. Bailing here
-                //    (before `proposal.close()`/`save_proposal()`) leaves the proposal
-                //    Open with NO chain-observable accepted receipt.
-                //  - Allocation receipt: BEST-EFFORT. A write failure is logged but not
-                //    fatal, so a transient store error after the governance receipt is
-                //    already durable cannot leave the proposal stuck Open with a
-                //    half-persisted chain — the close proceeds, exactly as the
-                //    standalone manager does. No audit check is weakened: a missing
-                //    allocation yields a detectably incomplete chain (`icnctl audit
-                //    verify` fails the allocation checks), never a falsely-verified one.
-                if let Some((gov_receipt, allocation_receipt)) = pending_chain_receipts {
-                    if let Some(ref store) = self.receipt_store {
-                        store.put_governance(&gov_receipt).map_err(|e| {
-                            anyhow::anyhow!(
-                                "Proposal '{}' requires execution closure but governance receipt persistence failed: {e}",
-                                proposal_id.0
-                            )
-                        })?;
-                        if let Some(allocation_receipt) = allocation_receipt {
-                            if let Err(e) = store.put_allocation(&allocation_receipt) {
-                                tracing::error!(
-                                    proposal_id = %proposal_id.0,
-                                    error = %e,
-                                    "Failed to store allocation receipt — economics binding broken (non-fatal, matches standalone manager)"
-                                );
-                            }
-                        }
-                    }
-                }
-
-                // Update proposal
+                // Flip the proposal to its terminal state in memory. A bail here
+                // (not Open / non-terminal state) leaves nothing durable behind.
                 proposal.close(new_state)?;
 
-                // Persist updated state. Invariant 7 gate has passed and,
-                // for execution-required Accepted payloads, IER + mandate
-                // preflight writes have already landed. Proof bytes (when
-                // present) were persisted above. IER / mandate for
-                // Accepted + non-execution-required payloads may still be
-                // written below in the guarded post-save block.
-                self.store.save_proposal(&proposal)?;
+                // Cross-store-atomic close via the write-ahead close journal
+                // (Codex P2 on PR #1985). The v3 receipt, GovernanceProofV2 bytes,
+                // and the v1 governance/allocation receipts (`pending_chain_receipts`)
+                // were all BUILT above but not yet written durably. We now:
+                //
+                //   1. assemble a self-contained `CloseJournalEntry`;
+                //   2. persist it FIRST (`save_close_intent`) — Db-B;
+                //   3. replay every artifact idempotently then the terminal
+                //      proposal state (`commit`) — Db-A receipts (v3→v1→allocation)
+                //      then Db-B proof then the terminal proposal save. Every write
+                //      is idempotent, so the exact ordering is not load-bearing:
+                //      recovery covers any partial-failure interleaving.
+                //   4. delete the journal entry only once everything is durable.
+                //
+                // The receipt store (Db-A) and proposal store (Db-B) are separate
+                // sled `Db`s, so a single transaction cannot span them. If the
+                // terminal save (or any artifact write) fails after a receipt is
+                // already durable, the journal entry survives and
+                // `recover_incomplete_closes` replays it to completion on the next
+                // startup — converting a permanent phantom-accepted half-close into
+                // an eventually-consistent, self-healing one. No append-only
+                // audit/provenance receipt is ever rolled back, and the two stores
+                // are never merged. The v1 fatal / allocation best-effort split and
+                // the manager-parity v3-before-v1 ordering are preserved inside
+                // `CloseReceipts::apply` (crate::close_journal).
+                let (governance_receipt, allocation_receipt) = match pending_chain_receipts {
+                    Some((gov_receipt, allocation_receipt)) => {
+                        (Some(gov_receipt), allocation_receipt)
+                    }
+                    None => (None, None),
+                };
+                let journal_entry = crate::close_journal::CloseJournalEntry {
+                    proposal: proposal.clone(),
+                    proof_bytes: proof_bytes.clone(),
+                    receipts: crate::close_journal::CloseReceipts {
+                        decision_v3: pending_v3,
+                        governance_receipt,
+                        allocation_receipt,
+                    },
+                };
+                self.store.save_close_intent(&journal_entry)?;
+                journal_entry.commit(self.receipt_store.as_deref(), self.store.as_ref())?;
+                self.store.delete_close_intent(&proposal_id)?;
 
                 // Create tally snapshot for broadcast
                 let tally_snapshot = TallySnapshot::new(
