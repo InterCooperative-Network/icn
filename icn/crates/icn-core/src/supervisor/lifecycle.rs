@@ -148,6 +148,7 @@ pub async fn run_supervisor(
             federation_service: gateway_handles.federation_service,
             settlement_engine: gateway_handles.settlement_engine,
             dispatch_evidence_sink_installer: gateway_handles.dispatch_evidence_sink_installer,
+            execution_query_store: gateway_handles.execution_query_store,
         },
     );
 
@@ -864,6 +865,14 @@ async fn spawn_actors_with_identity(
         let exec_store_path = config.store_path().join("execution");
         let exec_sled_store: Arc<icn_store::SledStore> =
             Arc::new(icn_store::SledStore::open(&exec_store_path)?);
+        // Gap C: share this runtime-owned execution store with the gateway audit
+        // read API. The gateway spawns after this point (see `run` in this file),
+        // so passing the handle here lets `/v1/receipts/chain/{decision_hash}`
+        // read the decision executor's real execution records (keyed
+        // `exec:<decision_hash>`) instead of re-opening the exclusively-locked
+        // sled path and falling back to an empty temporary store.
+        gateway_handles.execution_query_store =
+            Some(exec_sled_store.clone() as Arc<dyn icn_store::Store>);
         let execution_store: Arc<dyn icn_kernel_api::execution::ExecutionStore> = Arc::new(
             super::execution_store::SledExecutionStore::new(exec_sled_store),
         );

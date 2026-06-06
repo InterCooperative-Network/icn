@@ -1952,7 +1952,12 @@ impl GovernanceReceiptBackend for ReceiptStore {
     }
 
     fn put_allocation(&self, receipt: &AllocationReceipt) -> Result<Hash, String> {
-        self.put_allocation(receipt)
+        // Gap C: persist the allocation AND its settlement/contribution intents,
+        // so `get_chain_by_decision` (which reads the separate intent index)
+        // surfaces the intents that back the allocation. Without this the
+        // backend stored the allocation alone and the audit chain reported
+        // "0 settlement intents" even though the allocation carried them.
+        self.put_allocation_with_intents(receipt)
     }
 
     fn get_governance_by_decision(

@@ -195,7 +195,9 @@ pub struct ReceiptChainResponse {
     /// Settlement intents for this decision
     pub intents: Vec<SettlementIntentResponse>,
     /// Journal entries whose ProvenanceRef::Governance.decision_hash matches.
-    /// Populated when a LedgerManager is available and governance.domain_id resolves a ledger.
+    /// Sourced from the shared kernel-ledger service (where governed treasury
+    /// entries are written), falling back to the per-domain LedgerManager when
+    /// the kernel service is not wired and governance.domain_id resolves a ledger.
     pub journal_entries: Vec<JournalEntryProvenanceResponse>,
     /// Structural chain completeness (receipt-link integrity only).
     pub structural_complete: bool,
@@ -366,11 +368,13 @@ pub async fn get_chain(
 /// Returns the full receipt chain for a decision: governance receipt,
 /// allocation receipts, settlement intents, and journal entry provenance refs.
 ///
-/// Journal entries are populated when a `LedgerManager` is registered in app data
-/// and a domain_id can be resolved. For normal voted decisions the domain_id comes
-/// from the stored governance receipt. For forced-accept decisions (no stored
-/// governance receipt), the caller may supply `?domain_id=<id>` as a hint;
-/// without it `journal_entries` remains empty.
+/// Journal entries come from the shared kernel-ledger service when it is wired
+/// (the authoritative store for governed treasury entries), needing no domain_id.
+/// When that service is absent, the endpoint falls back to the per-domain
+/// `LedgerManager`: for normal voted decisions the domain_id comes from the stored
+/// governance receipt; for forced-accept decisions (no stored governance receipt)
+/// the caller may supply `?domain_id=<id>` as a hint, and without it (and without
+/// the kernel service) `journal_entries` remains empty.
 ///
 /// Providing `domain_id` never implies a governance receipt is present — the
 /// `governance` field reflects actual receipt-store state.
@@ -379,6 +383,7 @@ pub async fn get_full_chain(
     receipt_store: web::Data<Arc<ReceiptStore>>,
     execution_store: web::Data<Arc<dyn Store>>,
     ledger_mgr: Option<web::Data<Arc<LedgerManager>>>,
+    ledger_service: Option<web::Data<Option<Arc<icn_api::LedgerService>>>>,
     path: web::Path<String>,
     query: web::Query<ChainQuery>,
 ) -> HttpResponse {
@@ -422,15 +427,28 @@ pub async fn get_full_chain(
     };
 
     // Query journal entries whose ProvenanceRef::Governance.decision_hash matches.
-    // domain_id is derived from the governance receipt when present; for forced-accept
-    // decisions (no stored receipt) the caller may supply it as a query parameter.
-    let receipt_domain_id = governance.as_ref().map(|g| g.domain_id.as_str());
-    let journal_entries = query_journal_entries_for_decision(
-        &ledger_mgr,
-        receipt_domain_id.or(query.domain_id.as_deref()),
-        &normalized_decision_hash,
-    )
-    .await;
+    //
+    // Primary source: the shared kernel-ledger service. The decision executor
+    // writes governed treasury entries into the kernel ledger (the same handle
+    // this service wraps), so it is authoritative for the
+    // governance -> treasury -> journal chain and needs no domain_id hint.
+    //
+    // Fallback: the per-domain LedgerManager, used for forced-accept and test
+    // contexts where the kernel ledger service is not wired. domain_id is
+    // derived from the governance receipt when present; for forced-accept
+    // decisions (no stored receipt) the caller may supply it as a query param.
+    let mut journal_entries =
+        query_journal_entries_via_decision_service(&ledger_service, &normalized_decision_hash)
+            .await;
+    if journal_entries.is_empty() {
+        let receipt_domain_id = governance.as_ref().map(|g| g.domain_id.as_str());
+        journal_entries = query_journal_entries_for_decision(
+            &ledger_mgr,
+            receipt_domain_id.or(query.domain_id.as_deref()),
+            &normalized_decision_hash,
+        )
+        .await;
+    }
 
     let structural_complete =
         governance.is_some() && allocations.iter().all(|a| !a.intents.is_empty());
@@ -502,6 +520,44 @@ async fn query_journal_entries_for_decision(
                 timestamp: entry.timestamp,
             }),
             _ => None,
+        })
+        .collect()
+}
+
+/// Query journal entries authorized by `decision_hash_hex` via the shared
+/// kernel-ledger service.
+///
+/// This is the authoritative source for governed economic chains: the decision
+/// executor submits treasury entries into the kernel ledger that this service
+/// wraps. Matching is by `ProvenanceRef::Governance.decision_hash` (performed
+/// inside the service), so no domain_id hint is required.
+///
+/// Returns an empty vec when the service is not wired (e.g. unit tests without a
+/// daemon ledger) or when the lookup fails, letting the caller fall back to the
+/// per-domain LedgerManager.
+async fn query_journal_entries_via_decision_service(
+    ledger_service: &Option<web::Data<Option<Arc<icn_api::LedgerService>>>>,
+    decision_hash_hex: &str,
+) -> Vec<JournalEntryProvenanceResponse> {
+    let svc = match ledger_service.as_ref().and_then(|d| d.get_ref().as_ref()) {
+        Some(svc) => svc,
+        None => return Vec::new(),
+    };
+
+    // Bounded read; the chain audit only needs the entries for this decision.
+    let page = match svc.get_entries_by_decision(decision_hash_hex, 100).await {
+        Ok(page) => page,
+        Err(_) => return Vec::new(),
+    };
+
+    page.entries
+        .into_iter()
+        .map(|view| JournalEntryProvenanceResponse {
+            entry_id: view.id,
+            decision_receipt_id: view.decision_receipt_id.unwrap_or_default(),
+            decision_hash: view.decision_hash.unwrap_or_default(),
+            account_count: view.accounts.len(),
+            timestamp: view.timestamp,
         })
         .collect()
 }

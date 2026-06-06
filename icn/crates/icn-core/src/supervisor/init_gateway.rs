@@ -71,6 +71,10 @@ pub struct GatewayHandles {
     /// `ReceiptStore`, activating durable actor-path dispatch evidence.
     pub dispatch_evidence_sink_installer:
         Option<Arc<icn_governance_actor::DeferredDispatchEvidenceSink>>,
+    /// Runtime-owned execution-record store the decision executor writes to.
+    /// Shared into the gateway receipt-chain read API so audit reads see real
+    /// execution records instead of an empty temp-store fallback (Gap C).
+    pub execution_query_store: Option<Arc<dyn icn_store::Store>>,
 }
 
 /// Spawn the Gateway API server if enabled
@@ -139,6 +143,7 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let federation_service_handle = handles.federation_service;
     let settlement_engine_handle = handles.settlement_engine;
     let dispatch_evidence_sink_installer = handles.dispatch_evidence_sink_installer;
+    let execution_query_store = handles.execution_query_store;
     let default_trust_score = config.default_trust_score;
 
     // Spawn gateway in a dedicated thread (actix-web has its own runtime)
@@ -237,6 +242,10 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
 
             if let Some(installer) = dispatch_evidence_sink_installer {
                 gateway_server = gateway_server.with_dispatch_evidence_sink_installer(installer);
+            }
+
+            if let Some(store) = execution_query_store {
+                gateway_server = gateway_server.with_execution_query_store(store);
             }
 
             if let Err(e) = gateway_server.run().await {

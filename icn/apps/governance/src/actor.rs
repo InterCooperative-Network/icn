@@ -2025,6 +2025,40 @@ impl GovernanceActor {
                                     );
                                 }
                             }
+
+                            // Gap C parity: persist the v1 GovernanceDecisionReceipt
+                            // + allocation/contribution receipt that the in-process
+                            // GovernanceManager close path persists
+                            // (`manager.rs::close_proposal_inner`). The actor already
+                            // wrote the institutional-effect record and the mandate
+                            // above; this adds the coordination receipt-chain
+                            // artifacts the audit read path indexes by `decision_hash`
+                            // (`GET /v1/receipts/chain/{decision_hash}` / `icnctl
+                            // audit verify`), so the daemon normal-close path produces
+                            // the same retrievable chain as the in-process proof.
+                            // `gate_receipt` is the canonical v1 receipt built above
+                            // for the Invariant-7 gate (same `decision_hash`).
+                            store.put_governance(&gate_receipt).map_err(|e| {
+                                anyhow::anyhow!(
+                                    "Proposal '{}' requires execution closure but governance receipt persistence failed: {e}",
+                                    proposal_id.0
+                                )
+                            })?;
+                            if let Some(allocation_receipt) =
+                                crate::manager::GovernanceManager::create_allocation_receipt(
+                                    &proposal.payload,
+                                    decision_hash,
+                                    &proposal_id,
+                                    &proposal.domain_id,
+                                )
+                            {
+                                store.put_allocation(&allocation_receipt).map_err(|e| {
+                                    anyhow::anyhow!(
+                                        "Proposal '{}' requires execution closure but allocation receipt persistence failed: {e}",
+                                        proposal_id.0
+                                    )
+                                })?;
+                            }
                         }
                     }
 

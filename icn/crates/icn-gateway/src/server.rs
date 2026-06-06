@@ -146,6 +146,11 @@ pub struct GatewayServer {
     /// `EffectDispatchEvidence` as the gateway-close HTTP path.
     dispatch_evidence_sink_installer:
         Option<Arc<icn_governance_actor::DeferredDispatchEvidenceSink>>,
+    /// Runtime-owned execution-record store shared from the daemon supervisor.
+    /// When present, the receipt-chain audit read endpoints use it instead of
+    /// re-opening the (exclusively `sled`-locked) execution path — which would
+    /// otherwise fall back to an empty temporary store (Gap C).
+    execution_query_store: Option<Arc<dyn icn_store::Store>>,
 }
 
 impl GatewayServer {
@@ -182,6 +187,7 @@ impl GatewayServer {
             commons_handle: None,
             settlement_engine: None,
             dispatch_evidence_sink_installer: None,
+            execution_query_store: None,
         }
     }
 
@@ -230,6 +236,7 @@ impl GatewayServer {
             commons_handle: None,
             settlement_engine: None,
             dispatch_evidence_sink_installer: None,
+            execution_query_store: None,
         }
     }
 
@@ -279,6 +286,7 @@ impl GatewayServer {
             commons_handle: None,
             settlement_engine: None,
             dispatch_evidence_sink_installer: None,
+            execution_query_store: None,
         }
     }
 
@@ -526,6 +534,22 @@ impl GatewayServer {
         self
     }
 
+    /// Share the daemon's runtime-owned execution-record store with the
+    /// receipt-chain audit read endpoints.
+    ///
+    /// In `icnd --gateway-enable`, the decision executor holds the exclusive
+    /// `sled` lock on `<data_dir>/store/execution`, so the gateway re-opening
+    /// that path fails and falls back to an empty temporary store — making
+    /// `/v1/receipts/chain/{decision_hash}` report no execution record. Passing
+    /// the same `Arc<dyn Store>` here lets the audit reads see the executor's
+    /// real records (keyed `exec:<decision_hash>`). Standalone/test gateways
+    /// that have no runtime store leave this `None` and keep the path-open
+    /// fallback (Gap C).
+    pub fn with_execution_query_store(mut self, store: Arc<dyn icn_store::Store>) -> Self {
+        self.execution_query_store = Some(store);
+        self
+    }
+
     /// Run the gateway server
     pub async fn run(self) -> Result<()> {
         info!("Starting ICN Gateway on {}", self.bind_addr);
@@ -678,10 +702,16 @@ impl GatewayServer {
         }
 
         // Execution record query store (read-only API surface).
-        // Uses the daemon core store path when available: <data_dir>/store/execution
-        // and falls back to a temporary store in standalone mode.
+        // Gap C: prefer the runtime-owned execution store shared from the daemon
+        // supervisor (the same store the decision executor writes to). Only when
+        // no runtime handle is present (standalone/test gateway) do we open the
+        // path ourselves — which in the real daemon would hit the executor's
+        // exclusive sled lock and fall back to an empty temporary store.
         let execution_query_store: Arc<dyn icn_store::Store> =
-            if let Some(ref data_dir) = self.data_dir {
+            if let Some(store) = self.execution_query_store.clone() {
+                info!("Execution query store: using runtime-shared handle (Gap C)");
+                store
+            } else if let Some(ref data_dir) = self.data_dir {
                 let exec_path = data_dir.join("store").join("execution");
                 match SledStore::open(&exec_path) {
                     Ok(store) => {
