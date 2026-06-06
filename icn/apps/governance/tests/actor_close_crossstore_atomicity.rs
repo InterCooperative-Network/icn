@@ -136,6 +136,8 @@ struct RecordingReceiptBackend {
     allocations: Mutex<Vec<icn_kernel_api::AllocationReceipt>>,
     mandates: Mutex<Vec<icn_governance::Mandate>>,
     grants: Mutex<HashMap<icn_governance::AuthorityGrantId, icn_governance::AuthorityGrant>>,
+    flushes: AtomicUsize,
+    fail_flush: AtomicBool,
 }
 
 impl RecordingReceiptBackend {
@@ -144,6 +146,15 @@ impl RecordingReceiptBackend {
     }
     fn put_governance_calls(&self) -> usize {
         self.put_governance_calls.load(Ordering::SeqCst)
+    }
+    fn flush_count(&self) -> usize {
+        self.flushes.load(Ordering::SeqCst)
+    }
+    fn arm_flush_failure(&self) {
+        self.fail_flush.store(true, Ordering::SeqCst);
+    }
+    fn disarm_flush_failure(&self) {
+        self.fail_flush.store(false, Ordering::SeqCst);
     }
 }
 
@@ -157,6 +168,13 @@ impl GovernanceReceiptBackend for RecordingReceiptBackend {
             .lock()
             .unwrap()
             .insert(receipt.decision_hash, receipt.clone());
+        Ok(())
+    }
+    fn flush(&self) -> Result<(), String> {
+        self.flushes.fetch_add(1, Ordering::SeqCst);
+        if self.fail_flush.load(Ordering::SeqCst) {
+            return Err("injected receipt-store flush failure".to_string());
+        }
         Ok(())
     }
     fn get_governance_by_proposal(
@@ -1135,4 +1153,77 @@ async fn save_close_intent_forces_durable_flush() {
         "the flushed close-journal entry must be durably present for recovery"
     );
     actor_handle.shutdown().await;
+}
+
+/// The receipt store's writes only become durable on flush, and it is a separate
+/// sled DB from the proposal state store. The journal entry must NOT be cleared
+/// until the receipt store has fsynced — otherwise a crash could leave a terminal
+/// proposal whose v1/v3 receipt was never made durable, breaking the audit chain.
+#[tokio::test(flavor = "current_thread")]
+async fn receipt_flush_failure_retains_journal() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp.path().to_path_buf();
+
+    let (backend, fail_store, actor_handle, proposal_id) =
+        open_voted_proposal(&db_path, None).await;
+    actor_handle.install_receipt_store(backend.clone()).await;
+
+    // The terminal save succeeds (state store not armed), but the receipt store's
+    // durability barrier fails — the close must commit yet RETAIN the journal.
+    backend.arm_flush_failure();
+    actor_handle
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: proposal_id.clone(),
+            eligible_voters: None,
+            excluded_delegators: None,
+            capability_scope: None,
+        })
+        .await
+        .expect("close submit");
+
+    let state: Arc<dyn GovernanceStateStore> =
+        Arc::new(SledGovernanceStateStore::new(fail_store.clone()));
+    let persisted = state
+        .get_proposal(&proposal_id)
+        .expect("get_proposal")
+        .expect("proposal exists");
+    assert!(
+        matches!(persisted.state, ProposalState::Accepted { .. }),
+        "close commits durable state even when the receipt flush fails; got {:?}",
+        persisted.state
+    );
+    assert!(
+        backend.flush_count() >= 1,
+        "the close must attempt the receipt-store durability barrier"
+    );
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        1,
+        "a receipt-store flush failure must retain the close-journal entry"
+    );
+    actor_handle.shutdown().await;
+
+    // Recovery with the durability barrier healthy clears the journal.
+    backend.disarm_flush_failure();
+    let bundle = IdentityBundle::generate().expect("IdentityBundle::generate");
+    let gossip = gossip_with_governance_topic(bundle.did().clone()).await;
+    let resolver = Arc::new(StaticMembershipResolver::new());
+    let store2: Arc<dyn Store> = fail_store.clone();
+    let actor2 = GovernanceActor::spawn(bundle.did().clone(), store2, gossip, resolver, None, None)
+        .await
+        .expect("spawn restart");
+    actor2.install_receipt_store(backend.clone()).await;
+    actor2.recover_incomplete_closes().await;
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        0,
+        "recovery clears the journal once the receipt durability barrier succeeds"
+    );
+    actor2.shutdown().await;
 }

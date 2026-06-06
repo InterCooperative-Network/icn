@@ -539,6 +539,15 @@ impl ActionItemStoreBackend for SledActionItemStore {
 
         Ok(deleted_count)
     }
+
+    fn flush(&self) -> std::result::Result<(), GovernanceError> {
+        // Force buffered action-item writes durable so the governance close
+        // journal cannot be cleared while a materialized item is still un-fsynced.
+        self.db
+            .flush()
+            .map(|_| ())
+            .map_err(|e| GovernanceError::Internal(format!("Sled action-item flush failed: {e}")))
+    }
 }
 
 // ========== Sled store for Structures (Tranche 2) ==========

@@ -58,6 +58,19 @@ pub trait GovernanceReceiptBackend: Send + Sync {
     /// Persist a governance decision receipt.
     fn put_governance(&self, receipt: &GovernanceDecisionReceipt) -> Result<(), String>;
 
+    /// Force all buffered receipt-store writes durable (fsync).
+    ///
+    /// Default no-op for in-memory / non-durable backends. The gateway
+    /// sled-backed `ReceiptStore` overrides it. The governance close write-ahead
+    /// journal calls this (alongside the state and action-item stores) before
+    /// clearing a completed close's journal entry, so the entry can never be
+    /// cleared while a receipt is still un-fsynced in a separate sled DB — which
+    /// would leave a terminal proposal with a missing v1/v3 receipt and break the
+    /// audit chain the journal protects.
+    fn flush(&self) -> Result<(), String> {
+        Ok(())
+    }
+
     /// Retrieve a governance decision receipt by proposal ID.
     fn get_governance_by_proposal(
         &self,

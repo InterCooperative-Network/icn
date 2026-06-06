@@ -1592,8 +1592,19 @@ impl GovernanceActor {
                 );
                 continue;
             }
-            // 3. Clear the entry only once the whole completion — durable state
-            //    AND durable side effects — has succeeded.
+            // 3. Force every artifact store durable before clearing the entry; if
+            //    any fsync fails, leave the entry for another idempotent replay.
+            if let Err(e) = self.flush_close_durability() {
+                warn!(
+                    proposal_id = %proposal_id.0,
+                    error = %e,
+                    "Recovered close completed but a durable artifact store did not fsync; \
+                     leaving the journal entry for replay on the next startup"
+                );
+                continue;
+            }
+            // 4. Clear the entry only once the whole completion — durable state,
+            //    durable side effects, AND every artifact fsynced — has succeeded.
             match self.store.delete_close_intent(&proposal_id) {
                 Ok(()) => info!(
                     proposal_id = %proposal_id.0,
@@ -1607,6 +1618,33 @@ impl GovernanceActor {
                 ),
             }
         }
+    }
+
+    /// Force every durable store a completed close wrote to fsync, before its
+    /// write-ahead journal entry is cleared.
+    ///
+    /// A close persists artifacts across up to three independent sled DBs — the
+    /// receipt store (v1/v3/allocation receipts), the action-item store
+    /// (materialized obligations), and the proposal state store (proof bytes +
+    /// terminal proposal) — each with independent flush timing. Without this
+    /// barrier the state DB could flush the proposal + journal-clear while the
+    /// receipt DB has not flushed, leaving a terminal proposal with a missing
+    /// receipt and a broken audit chain. Returns `Err` (naming the failing store)
+    /// so the caller retains the journal entry for an idempotent replay rather
+    /// than clearing it over an un-fsynced artifact.
+    fn flush_close_durability(&self) -> std::result::Result<(), String> {
+        if let Some(ref backend) = self.receipt_store {
+            backend.flush().map_err(|e| format!("receipt store: {e}"))?;
+        }
+        if let Some(ref store) = self.action_item_store {
+            store
+                .flush()
+                .map_err(|e| format!("action item store: {e}"))?;
+        }
+        self.store
+            .flush()
+            .map_err(|e| format!("state store: {e}"))?;
+        Ok(())
     }
 
     /// Run the durable, idempotent post-commit side effects of a close —
@@ -2539,16 +2577,29 @@ impl GovernanceActor {
                 // than dropping the obligation. A crash before this point has the
                 // same effect: the entry survives for replay.
                 match side_effects {
-                    Ok(()) => {
-                        if let Err(e) = self.store.delete_close_intent(&proposal_id) {
+                    Ok(()) => match self.flush_close_durability() {
+                        // Every artifact store is now fsynced; safe to clear the
+                        // journal entry.
+                        Ok(()) => {
+                            if let Err(e) = self.store.delete_close_intent(&proposal_id) {
+                                warn!(
+                                    proposal_id = %proposal_id.0,
+                                    error = %e,
+                                    "Close fully completed but clearing its write-ahead journal \
+                                     entry failed; it will be replayed idempotently on the next startup"
+                                );
+                            }
+                        }
+                        Err(e) => {
                             warn!(
                                 proposal_id = %proposal_id.0,
                                 error = %e,
-                                "Close fully completed but clearing its write-ahead journal \
-                                 entry failed; it will be replayed idempotently on the next startup"
+                                "Close committed but a durable artifact store did not fsync; \
+                                 leaving the write-ahead journal entry so recovery can replay it \
+                                 once durability succeeds"
                             );
                         }
-                    }
+                    },
                     Err(e) => {
                         warn!(
                             proposal_id = %proposal_id.0,
