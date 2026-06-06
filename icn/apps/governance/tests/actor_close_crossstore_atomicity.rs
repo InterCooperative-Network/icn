@@ -443,6 +443,9 @@ async fn terminal_save_failure_after_receipt_is_recovered_on_restart() {
         .await
         .expect("GovernanceActor::spawn (restart)");
     actor2.install_receipt_store(backend.clone()).await;
+    // Recovery is decoupled from receipt-store installation (the gateway runs it
+    // only after all downstream sinks are wired); trigger it explicitly here.
+    actor2.recover_incomplete_closes().await;
 
     // The phantom is healed: proposal is now Accepted and the journal is clear.
     let persisted = state
@@ -518,6 +521,9 @@ async fn recovery_replay_is_idempotent() {
         .await
         .expect("spawn restart");
     actor2.install_receipt_store(backend.clone()).await;
+    // Recovery is decoupled from receipt-store installation (the gateway runs it
+    // only after all downstream sinks are wired); trigger it explicitly here.
+    actor2.recover_incomplete_closes().await;
     actor2.shutdown().await;
 
     // Re-inject the same journal entry and recover again.
@@ -539,6 +545,8 @@ async fn recovery_replay_is_idempotent() {
     .await
     .expect("spawn restart 2");
     actor3.install_receipt_store(backend.clone()).await;
+    // Recovery is decoupled from receipt-store installation; trigger it explicitly.
+    actor3.recover_incomplete_closes().await;
 
     // Idempotent: still exactly one governance receipt, still Accepted, journal clear.
     assert_eq!(
@@ -622,6 +630,9 @@ async fn recovery_replays_downstream_side_effects() {
     .await
     .expect("GovernanceActor::spawn (restart)");
     actor2.install_receipt_store(backend.clone()).await;
+    // Recovery is decoupled from receipt-store installation (the gateway runs it
+    // only after all downstream sinks are wired); trigger it explicitly here.
+    actor2.recover_incomplete_closes().await;
 
     assert_eq!(
         events.accepted.load(Ordering::SeqCst),
@@ -756,6 +767,9 @@ async fn recovery_retains_journal_when_durable_side_effect_fails() {
         .expect("spawn restart")
         .with_action_item_store(action_items.clone());
     actor2.install_receipt_store(backend.clone()).await;
+    // Recovery is decoupled from receipt-store installation (the gateway runs it
+    // only after all downstream sinks are wired); trigger it explicitly here.
+    actor2.recover_incomplete_closes().await;
     assert_eq!(
         state
             .list_close_intents()
@@ -775,6 +789,8 @@ async fn recovery_retains_journal_when_durable_side_effect_fails() {
         .expect("spawn restart 2")
         .with_action_item_store(action_items.clone());
     actor3.install_receipt_store(backend.clone()).await;
+    // Recovery is decoupled from receipt-store installation; trigger it explicitly.
+    actor3.recover_incomplete_closes().await;
     assert_eq!(
         state
             .list_close_intents()
@@ -784,4 +800,83 @@ async fn recovery_retains_journal_when_durable_side_effect_fails() {
         "once the durable side effect succeeds, recovery clears the journal entry"
     );
     actor3.shutdown().await;
+}
+
+/// `install_receipt_store` must NOT auto-trigger recovery. Recovery re-emits
+/// `ProposalAccepted` events that can drive executable effects, and the gateway
+/// installs downstream sinks (e.g. the deferred dispatch-evidence sink) AFTER the
+/// receipt store; replaying at install time would let a recovered close execute
+/// while a sink still drops its evidence. Recovery is therefore a separate,
+/// explicit step the deployment invokes once all sinks are wired.
+#[tokio::test(flavor = "current_thread")]
+async fn install_receipt_store_does_not_trigger_recovery() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp.path().to_path_buf();
+
+    // Drive a close that fails at the terminal save, leaving a journal entry.
+    let (backend, fail_store, actor_handle, proposal_id) =
+        open_voted_proposal(&db_path, None).await;
+    actor_handle.install_receipt_store(backend.clone()).await;
+    fail_store.arm();
+    let _ = actor_handle
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: proposal_id.clone(),
+            eligible_voters: None,
+            excluded_delegators: None,
+            capability_scope: None,
+        })
+        .await;
+    let state: Arc<dyn GovernanceStateStore> =
+        Arc::new(SledGovernanceStateStore::new(fail_store.clone()));
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        1,
+        "precondition: a close-journal entry is pending"
+    );
+    actor_handle.shutdown().await;
+    fail_store.disarm();
+
+    // Restart and install ONLY the receipt store — recovery must not auto-run.
+    let bundle = IdentityBundle::generate().expect("IdentityBundle::generate");
+    let gossip = gossip_with_governance_topic(bundle.did().clone()).await;
+    let resolver = Arc::new(StaticMembershipResolver::new());
+    let store2: Arc<dyn Store> = fail_store.clone();
+    let actor2 = GovernanceActor::spawn(bundle.did().clone(), store2, gossip, resolver, None, None)
+        .await
+        .expect("spawn restart");
+    actor2.install_receipt_store(backend.clone()).await;
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        1,
+        "install_receipt_store must NOT auto-trigger recovery; the entry must remain \
+         until recovery is invoked explicitly (after all downstream sinks are wired)"
+    );
+
+    // The explicit recovery step (what the gateway calls after wiring all sinks)
+    // completes the close.
+    actor2.recover_incomplete_closes().await;
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        0,
+        "explicit recover_incomplete_closes must complete the close and clear the entry"
+    );
+    let persisted = state
+        .get_proposal(&proposal_id)
+        .expect("get_proposal")
+        .expect("proposal exists");
+    assert!(
+        matches!(persisted.state, ProposalState::Accepted { .. }),
+        "explicit recovery completes the close; got {:?}",
+        persisted.state
+    );
+    actor2.shutdown().await;
 }

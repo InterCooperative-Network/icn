@@ -701,6 +701,20 @@ impl GatewayServer {
             info!("Dispatch-evidence sink backend installed (actor-path evidence parity active)");
         }
 
+        // Replay any incomplete write-ahead governance close-journal entries NOW
+        // that every durable downstream sink a recovered close can feed — the
+        // receipt store (installed above) AND the deferred dispatch-evidence sink
+        // (installed just above) — is ready. This MUST run after the dispatch-sink
+        // install: a recovered `ProposalAccepted` can drive executable effects,
+        // and the deferred sink drops `EffectDispatchEvidence` batches until its
+        // backend is installed, so replaying earlier could permanently lose that
+        // evidence. Recovery is decoupled from `install_receipt_store` for exactly
+        // this reason.
+        if let Some(ref actor_handle) = self.governance_actor_handle {
+            actor_handle.recover_incomplete_closes().await;
+            info!("Replayed incomplete governance close-journal entries (post-sink recovery)");
+        }
+
         // Execution record query store (read-only API surface).
         // Gap C: prefer the runtime-owned execution store shared from the daemon
         // supervisor (the same store the decision executor writes to). Only when

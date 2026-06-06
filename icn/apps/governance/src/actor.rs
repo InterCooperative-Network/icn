@@ -576,11 +576,23 @@ impl GovernanceHandle {
     ) {
         let mut actor = self.inner.write().await;
         actor.receipt_store = Some(store);
-        // Both stores are now available; replay any write-ahead close-journal
-        // entries left by a close whose terminal commit did not finish (e.g. a
-        // crash or terminal-save failure after a receipt was already durable),
-        // completing each one's durable state AND its post-commit side effects.
-        actor.recover_incomplete_closes().await;
+    }
+
+    /// Replay any incomplete write-ahead close-journal entries to completion.
+    ///
+    /// Deployment wiring MUST call this once at startup, AFTER every durable
+    /// downstream sink a recovered close can feed is installed — in particular
+    /// the receipt store ([`Self::install_receipt_store`]) AND the deferred
+    /// dispatch-evidence sink. Recovery re-emits recovered `ProposalAccepted`
+    /// events, which can drive executable effects whose `EffectDispatchEvidence`
+    /// would be permanently dropped if its sink were not yet installed (the
+    /// deferred sink drops batches until its backend is wired). This is
+    /// deliberately DECOUPLED from `install_receipt_store` so the dispatch sink
+    /// can be installed in between — see the gateway `server.rs` wiring.
+    ///
+    /// A no-op when there is nothing to recover.
+    pub async fn recover_incomplete_closes(&self) {
+        self.inner.read().await.recover_incomplete_closes().await;
     }
 
     /// List all protocol parameters
