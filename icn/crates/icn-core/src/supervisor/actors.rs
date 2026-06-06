@@ -51,6 +51,12 @@ pub struct GatewayActorHandles {
     /// install the receipt store as the concrete backend once it is open.
     pub dispatch_evidence_sink_installer:
         Option<Arc<icn_governance_actor::DeferredDispatchEvidenceSink>>,
+    /// Runtime-owned execution-record store — the same sled store the decision
+    /// executor writes execution records to. Shared into the gateway
+    /// receipt-chain read API so `/v1/receipts/chain/{decision_hash}` reads real
+    /// execution records instead of re-opening the (exclusively locked) sled
+    /// path and falling back to an empty temporary store.
+    pub execution_query_store: Option<Arc<dyn icn_store::Store>>,
 }
 
 /// Core actor handles returned from initialization

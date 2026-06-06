@@ -1143,6 +1143,17 @@ impl GossipActor {
         self.topics.keys().cloned().collect()
     }
 
+    /// Returns true if a topic with the given name has been declared.
+    ///
+    /// Used by publishers (e.g. the ledger) to ensure a topic exists before
+    /// publishing, so they can create it once with an explicit ACL instead of
+    /// relying on the auto-creation policy. Avoids the destructive re-create
+    /// path: `create_topic` resets a topic's entries, so callers must guard
+    /// creation behind this check.
+    pub fn has_topic(&self, topic: &str) -> bool {
+        self.topics.contains_key(topic)
+    }
+
     /// Get a reference to this node's vector clock
     pub fn get_clock(&self) -> &VectorClock {
         &self.clock

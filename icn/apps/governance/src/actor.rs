@@ -1951,6 +1951,20 @@ impl GovernanceActor {
                 // The gate receipt here is canonical: its decision_hash keys the
                 // institutional-effect record, the ADR-0014 mandate, and the
                 // ProposalAccepted event. Construct it once and reuse.
+                //
+                // Deferred v1 coordination receipt-chain writes. Captured during the
+                // execution-closure preflight but PERFORMED only after the v3 receipt
+                // and GovernanceProofV2 preflights succeed (mirrors manager.rs's
+                // deliberate v3-before-v1 ordering). Writing the v1 receipts here —
+                // before those preflights — would let `GET /v1/receipts/chain` observe
+                // an accepted governance/allocation receipt for a proposal whose close
+                // later fails and stays Open. The chain audit reads exactly these v1
+                // artifacts, so they must be the last preflight writes before the
+                // terminal save.
+                let mut pending_chain_receipts: Option<(
+                    GovernanceDecisionReceipt,
+                    Option<icn_kernel_api::AllocationReceipt>,
+                )> = None;
                 let governance_decision_hash: Option<String> = if matches!(
                     outcome_result,
                     DecisionOutcome::Accepted
@@ -2025,6 +2039,31 @@ impl GovernanceActor {
                                     );
                                 }
                             }
+
+                            // Gap C parity: capture the v1 GovernanceDecisionReceipt
+                            // + allocation/contribution receipt that the in-process
+                            // GovernanceManager close path persists
+                            // (`manager.rs::close_proposal_inner`). The actor already
+                            // wrote the institutional-effect record and the mandate
+                            // above; these v1 artifacts are what the audit read path
+                            // indexes by `decision_hash`
+                            // (`GET /v1/receipts/chain/{decision_hash}` / `icnctl
+                            // audit verify`). They are DEFERRED to after the v3 +
+                            // proof preflights (drained just before the terminal save)
+                            // so a later preflight failure can never leave a
+                            // chain-observable accepted receipt behind for a still-Open
+                            // proposal. `gate_receipt` is the canonical v1 receipt
+                            // built above for the Invariant-7 gate (same
+                            // `decision_hash`) and is unused afterwards, so it moves
+                            // into the deferred holder.
+                            let allocation_receipt =
+                                crate::manager::GovernanceManager::create_allocation_receipt(
+                                    &proposal.payload,
+                                    decision_hash,
+                                    &proposal_id,
+                                    &proposal.domain_id,
+                                );
+                            pending_chain_receipts = Some((gate_receipt, allocation_receipt));
                         }
                     }
 
@@ -2140,6 +2179,42 @@ impl GovernanceActor {
                     );
                     None
                 };
+
+                // Drain the deferred v1 coordination receipt-chain writes now that the
+                // v3 receipt and GovernanceProofV2 preflights have both persisted. This
+                // is the LAST preflight before the terminal save, mirroring
+                // manager.rs's v3-before-v1 ordering AND its fatal/best-effort split
+                // for the two v1 writes (manager.rs::close_proposal_inner):
+                //
+                //  - Governance receipt: FATAL under execution closure. Bailing here
+                //    (before `proposal.close()`/`save_proposal()`) leaves the proposal
+                //    Open with NO chain-observable accepted receipt.
+                //  - Allocation receipt: BEST-EFFORT. A write failure is logged but not
+                //    fatal, so a transient store error after the governance receipt is
+                //    already durable cannot leave the proposal stuck Open with a
+                //    half-persisted chain — the close proceeds, exactly as the
+                //    standalone manager does. No audit check is weakened: a missing
+                //    allocation yields a detectably incomplete chain (`icnctl audit
+                //    verify` fails the allocation checks), never a falsely-verified one.
+                if let Some((gov_receipt, allocation_receipt)) = pending_chain_receipts {
+                    if let Some(ref store) = self.receipt_store {
+                        store.put_governance(&gov_receipt).map_err(|e| {
+                            anyhow::anyhow!(
+                                "Proposal '{}' requires execution closure but governance receipt persistence failed: {e}",
+                                proposal_id.0
+                            )
+                        })?;
+                        if let Some(allocation_receipt) = allocation_receipt {
+                            if let Err(e) = store.put_allocation(&allocation_receipt) {
+                                tracing::error!(
+                                    proposal_id = %proposal_id.0,
+                                    error = %e,
+                                    "Failed to store allocation receipt — economics binding broken (non-fatal, matches standalone manager)"
+                                );
+                            }
+                        }
+                    }
+                }
 
                 // Update proposal
                 proposal.close(new_state)?;

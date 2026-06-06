@@ -1756,6 +1756,21 @@ impl Ledger {
 
             // Publish via gossip
             let mut gossip_actor = gossip.write().await;
+            // Ensure the currency topic exists before publishing. Each subsystem
+            // owns its gossip topics and declares them with an ACL consistent
+            // with its own trust gate (mirrors the compute/contract-registry
+            // pattern). The ledger owns `ledger:<currency>` topics; without this
+            // the first append of a currency fails under the strict Reject
+            // auto-creation policy. The ACL mirrors `min_trust_for_entry` so a
+            // peer that could not append an entry also cannot publish to the
+            // topic. Guarded by `has_topic` because `create_topic` is
+            // destructive (it resets a topic's stored entries).
+            if !gossip_actor.has_topic(&topic) {
+                gossip_actor.create_topic(icn_gossip::Topic::new(
+                    topic.clone(),
+                    icn_gossip::AccessControl::MinTrustScore(self.min_trust_for_entry),
+                ));
+            }
             gossip_actor.publish(&topic, data).await?;
 
             debug!(
