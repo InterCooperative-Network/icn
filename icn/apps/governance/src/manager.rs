@@ -3709,7 +3709,7 @@ impl GovernanceManager {
                 // AllocationReceipt linking the decision to economic intents.
                 if matches!(outcome, ProofOutcome::Accepted) {
                     let decision_hash = receipt.decision_hash;
-                    if let Some(allocation_receipt) = self.create_allocation_receipt(
+                    if let Some(allocation_receipt) = Self::create_allocation_receipt(
                         &proposal.payload,
                         decision_hash,
                         &proposal_id,
@@ -4147,8 +4147,11 @@ impl GovernanceManager {
     /// (e.g., Text, Membership, ConfigChange).
     ///
     /// This is the governance→economics binding point (INV-2).
-    fn create_allocation_receipt(
-        &self,
+    /// Shared with the actor-backed close path (`actor.rs`) so the daemon
+    /// normal-close path persists the same allocation/contribution receipt the
+    /// in-process path does (Gap C parity). Uses no `&self` state — derivation
+    /// is a pure function of the accepted payload + decision hash.
+    pub(crate) fn create_allocation_receipt(
         payload: &ProposalPayload,
         decision_hash: icn_kernel_api::Hash,
         proposal_id: &ProposalId,

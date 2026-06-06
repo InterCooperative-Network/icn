@@ -127,7 +127,39 @@ async fn build_services(
 
     // Create TrustGraph with tokio lock (for icn-core compatibility)
     let trust_store_for_sequences = trust_store.clone();
-    let trust_graph = icn_trust::TrustGraph::new(trust_store, own_did.clone());
+    let mut trust_graph = icn_trust::TrustGraph::new(trust_store, own_did.clone());
+
+    // Gap C — DEV/DEMO/LOCAL ONLY: seed the node's own DID with self-trust.
+    //
+    // The ledger gates journal appends on author trust (>= 0.1) — a real
+    // security invariant that is NOT weakened here. On a fresh node the trust
+    // graph has no edges, so the node's own DID scores 0.0 and the ledger
+    // rejects the node's own governed-settlement entries. On a single-operator
+    // local node the operator legitimately roots their own trust web, so we
+    // seed a genesis self-trust edge (own_did -> own_did). The ledger then runs
+    // its normal trust query and accepts the entry because the author *really*
+    // has trust >= 0.1 — no gate bypass, no AllowAllOracle, no fabricated
+    // journal. Gated behind an explicit env so it never runs in production,
+    // where trust must be earned through real attestations.
+    if std::env::var("ICN_DEV_SELF_TRUST")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+    {
+        let self_score = icn_trust::TrustScore::new(1.0)
+            .map_err(|e| anyhow::anyhow!("invalid dev self-trust score: {e}"))?;
+        trust_graph
+            .add_edge(icn_trust::TrustEdge::new(
+                own_did.clone(),
+                own_did.clone(),
+                self_score,
+            ))
+            .map_err(|e| anyhow::anyhow!("failed to seed dev self-trust edge: {e}"))?;
+        tracing::warn!(
+            did = %own_did,
+            "ICN_DEV_SELF_TRUST set — seeded node self-trust (DEV/LOCAL ONLY; never enable in production)"
+        );
+    }
+
     let trust_graph_handle = Arc::new(RwLock::new(trust_graph));
 
     // Create TrustService from apps/trust.

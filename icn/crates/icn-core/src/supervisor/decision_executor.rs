@@ -681,6 +681,19 @@ pub fn create_decision_executor_callback_with_sink(
     executor: Arc<DecisionExecutor>,
     sink: Option<Arc<dyn DispatchEvidenceSink>>,
 ) -> Arc<dyn Fn(Vec<KernelEffect>, String) + Send + Sync> {
+    // Gap C: capture the runtime active at construction — the daemon's main
+    // MULTI-THREADED runtime (`icnd` is `#[tokio::main]`). This callback is
+    // invoked from the gateway HTTP proposal-close path, which runs on an
+    // Actix worker's CURRENT-THREAD runtime. The ledger service's sync→async
+    // bridge (`tokio::task::block_in_place`) panics there
+    // ("can call blocking only when running on the multi-threaded runtime"),
+    // leaving the accepted decision's execution record stuck `Executing` with
+    // no terminal outcome or journal entry. Spawning the execution onto the
+    // captured multi-thread handle runs the executor + ledger in a valid
+    // context with their semantics unchanged. Falls back to `tokio::spawn`
+    // when constructed outside a runtime (e.g. unit tests), preserving prior
+    // behavior.
+    let runtime_handle = tokio::runtime::Handle::try_current().ok();
     Arc::new(move |effects, decision_receipt_id| {
         if effects.is_empty() {
             debug!(
@@ -704,7 +717,7 @@ pub fn create_decision_executor_callback_with_sink(
         // pass a richer context once the bridge is fully wired.
         let proposal_id = decision_receipt_id.clone();
 
-        tokio::spawn(async move {
+        let execution = async move {
             // Backpressure: wait for a slot before executing.
             // Track wait time to detect saturation.
             let wait_start = std::time::Instant::now();
@@ -780,7 +793,20 @@ pub fn create_decision_executor_callback_with_sink(
                     );
                 }
             }
-        });
+        };
+
+        // Gap C: run the accepted execution on the captured multi-threaded
+        // runtime when available (so the ledger's `block_in_place` bridge is
+        // valid even though this callback fires on an Actix current-thread
+        // worker). Outside a runtime (tests), fall back to `tokio::spawn`.
+        match runtime_handle.as_ref() {
+            Some(handle) => {
+                handle.spawn(execution);
+            }
+            None => {
+                tokio::spawn(execution);
+            }
+        }
     })
 }
 
