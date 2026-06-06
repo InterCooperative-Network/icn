@@ -2182,11 +2182,20 @@ impl GovernanceActor {
 
                 // Drain the deferred v1 coordination receipt-chain writes now that the
                 // v3 receipt and GovernanceProofV2 preflights have both persisted. This
-                // is the LAST preflight before the terminal save, mirroring manager.rs's
-                // v3-before-v1 ordering: a failure here still bails before
-                // `proposal.close()`/`save_proposal()`, leaving the proposal in its
-                // prior state, and no earlier preflight failure can have left a
-                // chain-observable accepted governance/allocation receipt behind.
+                // is the LAST preflight before the terminal save, mirroring
+                // manager.rs's v3-before-v1 ordering AND its fatal/best-effort split
+                // for the two v1 writes (manager.rs::close_proposal_inner):
+                //
+                //  - Governance receipt: FATAL under execution closure. Bailing here
+                //    (before `proposal.close()`/`save_proposal()`) leaves the proposal
+                //    Open with NO chain-observable accepted receipt.
+                //  - Allocation receipt: BEST-EFFORT. A write failure is logged but not
+                //    fatal, so a transient store error after the governance receipt is
+                //    already durable cannot leave the proposal stuck Open with a
+                //    half-persisted chain — the close proceeds, exactly as the
+                //    standalone manager does. No audit check is weakened: a missing
+                //    allocation yields a detectably incomplete chain (`icnctl audit
+                //    verify` fails the allocation checks), never a falsely-verified one.
                 if let Some((gov_receipt, allocation_receipt)) = pending_chain_receipts {
                     if let Some(ref store) = self.receipt_store {
                         store.put_governance(&gov_receipt).map_err(|e| {
@@ -2196,12 +2205,13 @@ impl GovernanceActor {
                             )
                         })?;
                         if let Some(allocation_receipt) = allocation_receipt {
-                            store.put_allocation(&allocation_receipt).map_err(|e| {
-                                anyhow::anyhow!(
-                                    "Proposal '{}' requires execution closure but allocation receipt persistence failed: {e}",
-                                    proposal_id.0
-                                )
-                            })?;
+                            if let Err(e) = store.put_allocation(&allocation_receipt) {
+                                tracing::error!(
+                                    proposal_id = %proposal_id.0,
+                                    error = %e,
+                                    "Failed to store allocation receipt — economics binding broken (non-fatal, matches standalone manager)"
+                                );
+                            }
                         }
                     }
                 }
