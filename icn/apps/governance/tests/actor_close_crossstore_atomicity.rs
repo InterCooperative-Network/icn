@@ -38,7 +38,28 @@ use icn_governance_actor::{
     GovernanceCommand, GovernanceManager,
 };
 use icn_identity::IdentityBundle;
+use icn_kernel_api::events::{EventEmitter, SystemEvent};
 use icn_store::{ContentHash, ReplicaMetadata, SledStore, Store};
+
+/// Records downstream `SystemEvent`s emitted via the actor's event bus so a test
+/// can assert that write-ahead recovery replays the post-commit close side
+/// effects (here: the `ProposalAccepted` event that drives event-driven
+/// execution), not just the durable proposal/receipt state.
+#[derive(Default)]
+struct RecordingEventEmitter {
+    accepted: AtomicUsize,
+    accepted_ids: Mutex<Vec<String>>,
+}
+
+#[async_trait::async_trait]
+impl EventEmitter for RecordingEventEmitter {
+    async fn emit(&self, event: SystemEvent) {
+        if let SystemEvent::ProposalAccepted { proposal_id, .. } = &event {
+            self.accepted.fetch_add(1, Ordering::SeqCst);
+            self.accepted_ids.lock().unwrap().push(proposal_id.clone());
+        }
+    }
+}
 
 /// Sled-backed `Store` wrapper that delegates everything to an inner
 /// `SledStore`, but can be *armed* to fail `put` for keys carrying a configured
@@ -235,6 +256,7 @@ fn appoint_steward_payload(
 /// proposal id. The fail store is created disarmed.
 async fn open_voted_proposal(
     db_path: &std::path::Path,
+    event_bus: Option<Arc<dyn EventEmitter>>,
 ) -> (
     Arc<RecordingReceiptBackend>,
     Arc<PrefixFailStore>,
@@ -252,9 +274,10 @@ async fn open_voted_proposal(
     let gossip = gossip_with_governance_topic(did.clone()).await;
     let resolver = Arc::new(StaticMembershipResolver::new());
 
-    let actor_handle = GovernanceActor::spawn(did.clone(), store, gossip, resolver, None, None)
-        .await
-        .expect("GovernanceActor::spawn");
+    let actor_handle =
+        GovernanceActor::spawn(did.clone(), store, gossip, resolver, event_bus, None)
+            .await
+            .expect("GovernanceActor::spawn");
 
     let domain_id = GovernanceDomainId("crossstore-domain".to_string());
     let manager = GovernanceManager::with_handle(
@@ -311,7 +334,8 @@ async fn terminal_save_failure_after_receipt_is_recovered_on_restart() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let db_path = tmp.path().to_path_buf();
 
-    let (backend, fail_store, actor_handle, proposal_id) = open_voted_proposal(&db_path).await;
+    let (backend, fail_store, actor_handle, proposal_id) =
+        open_voted_proposal(&db_path, None).await;
     actor_handle.install_receipt_store(backend.clone()).await;
 
     // Arm the terminal-save fault and close. The receipt write lands; the
@@ -408,7 +432,8 @@ async fn recovery_replay_is_idempotent() {
     let tmp = tempfile::tempdir().expect("tempdir");
     let db_path = tmp.path().to_path_buf();
 
-    let (backend, fail_store, actor_handle, proposal_id) = open_voted_proposal(&db_path).await;
+    let (backend, fail_store, actor_handle, proposal_id) =
+        open_voted_proposal(&db_path, None).await;
     actor_handle.install_receipt_store(backend.clone()).await;
 
     fail_store.arm();
@@ -496,4 +521,70 @@ async fn recovery_replay_is_idempotent() {
     );
 
     actor3.shutdown().await;
+}
+
+/// Recovery must replay the post-commit close side effects, not just the durable
+/// proposal/receipt state. A close that fails at the terminal save (before its
+/// downstream `ProposalAccepted` event is emitted) leaves a journal entry; the
+/// next startup must complete the close AND emit the downstream event so
+/// event-driven execution and other obligations are not permanently skipped.
+#[tokio::test(flavor = "current_thread")]
+async fn recovery_replays_downstream_side_effects() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp.path().to_path_buf();
+
+    let events = Arc::new(RecordingEventEmitter::default());
+    let (backend, fail_store, actor_handle, proposal_id) =
+        open_voted_proposal(&db_path, Some(events.clone() as Arc<dyn EventEmitter>)).await;
+    actor_handle.install_receipt_store(backend.clone()).await;
+
+    // Terminal-save failure: the close aborts before its downstream event fires.
+    fail_store.arm();
+    let result = actor_handle
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: proposal_id.clone(),
+            eligible_voters: None,
+            excluded_delegators: None,
+            capability_scope: None,
+        })
+        .await;
+    assert!(result.is_err(), "terminal-save failure must surface as Err");
+    assert_eq!(
+        events.accepted.load(Ordering::SeqCst),
+        0,
+        "a close that failed before its durable commit must not have emitted the downstream event"
+    );
+
+    actor_handle.shutdown().await;
+    fail_store.disarm();
+
+    // Restart: recovery completes the close and must replay the downstream event.
+    let bundle = IdentityBundle::generate().expect("IdentityBundle::generate");
+    let gossip = gossip_with_governance_topic(bundle.did().clone()).await;
+    let resolver = Arc::new(StaticMembershipResolver::new());
+    let store2: Arc<dyn Store> = fail_store.clone();
+    let actor2 = GovernanceActor::spawn(
+        bundle.did().clone(),
+        store2,
+        gossip,
+        resolver,
+        Some(events.clone() as Arc<dyn EventEmitter>),
+        None,
+    )
+    .await
+    .expect("GovernanceActor::spawn (restart)");
+    actor2.install_receipt_store(backend.clone()).await;
+
+    assert_eq!(
+        events.accepted.load(Ordering::SeqCst),
+        1,
+        "recovery must replay the downstream ProposalAccepted event exactly once"
+    );
+    assert_eq!(
+        events.accepted_ids.lock().unwrap().as_slice(),
+        std::slice::from_ref(&proposal_id.0),
+        "the replayed event must be for the recovered proposal"
+    );
+
+    actor2.shutdown().await;
 }

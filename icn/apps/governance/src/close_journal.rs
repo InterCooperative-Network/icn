@@ -155,6 +155,14 @@ pub struct CloseJournalEntry {
     pub proof_bytes: Option<Vec<u8>>,
     /// Db-A receipt-store artifacts.
     pub receipts: CloseReceipts,
+    /// Close timestamp (`now`) used for the downstream event + side effects, so
+    /// recovery reproduces the same `decided_at` rather than using restart time.
+    pub decided_at: u64,
+    /// Hex-encoded accepted decision hash (when the outcome is Accepted). Lets
+    /// recovery replay the downstream `ProposalAccepted` event and the
+    /// non-execution-required institutional-effect / mandate emission without
+    /// re-deriving the hash from votes/tally.
+    pub governance_decision_hash: Option<String>,
 }
 
 impl CloseJournalEntry {
