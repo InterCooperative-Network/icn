@@ -225,6 +225,54 @@ impl GovernanceReceiptBackend for RecordingReceiptBackend {
     }
 }
 
+/// Action-item store that can be armed to fail every `save`, simulating a
+/// transient side-effect-store failure during a close. `list` returns empty so
+/// the materialize dedup check proceeds to the (failing) save.
+struct FailingActionItemStore {
+    fail: AtomicBool,
+}
+impl icn_governance::ActionItemStoreBackend for FailingActionItemStore {
+    fn save(&self, _item: &icn_governance::ActionItem) -> icn_governance::Result<()> {
+        if self.fail.load(Ordering::SeqCst) {
+            return Err(icn_governance::GovernanceError::Storage(
+                "injected action-item save failure".to_string(),
+            ));
+        }
+        Ok(())
+    }
+    fn get(
+        &self,
+        _domain_id: &GovernanceDomainId,
+        _id: &icn_governance::ActionItemId,
+    ) -> icn_governance::Result<Option<icn_governance::ActionItem>> {
+        Ok(None)
+    }
+    fn list(
+        &self,
+        _domain_id: &GovernanceDomainId,
+        _filter: &icn_governance::ActionItemFilter,
+    ) -> icn_governance::Result<Vec<icn_governance::ActionItem>> {
+        Ok(vec![])
+    }
+    fn delete(
+        &self,
+        _domain_id: &GovernanceDomainId,
+        _id: &icn_governance::ActionItemId,
+    ) -> icn_governance::Result<bool> {
+        Ok(false)
+    }
+    fn count(
+        &self,
+        _domain_id: &GovernanceDomainId,
+        _filter: &icn_governance::ActionItemFilter,
+    ) -> icn_governance::Result<usize> {
+        Ok(0)
+    }
+    fn delete_all(&self, _domain_id: &GovernanceDomainId) -> icn_governance::Result<usize> {
+        Ok(0)
+    }
+}
+
 async fn gossip_with_governance_topic(
     did: icn_identity::Did,
 ) -> Arc<tokio::sync::RwLock<GossipActor>> {
@@ -587,4 +635,153 @@ async fn recovery_replays_downstream_side_effects() {
     );
 
     actor2.shutdown().await;
+}
+
+/// A transient side-effect-store failure during recovery (or live close) must
+/// NOT clear the close-journal entry. The proposal commits its durable terminal
+/// state, but a failed durable obligation (here: action-item materialization)
+/// leaves the entry so a later idempotent replay can complete the obligation —
+/// the durable obligation is never permanently skipped.
+#[tokio::test(flavor = "current_thread")]
+async fn recovery_retains_journal_when_durable_side_effect_fails() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp.path().to_path_buf();
+
+    let bundle = IdentityBundle::generate().expect("IdentityBundle::generate");
+    let did = bundle.did().clone();
+    let candidate = IdentityBundle::generate().expect("candidate").did().clone();
+
+    let sled: Arc<dyn Store> = Arc::new(SledStore::open(&db_path).expect("SledStore::open"));
+    let action_items = Arc::new(FailingActionItemStore {
+        fail: AtomicBool::new(true),
+    });
+    let backend = Arc::new(RecordingReceiptBackend::default());
+    let state: Arc<dyn GovernanceStateStore> =
+        Arc::new(SledGovernanceStateStore::new(sled.clone()));
+
+    // --- Phase A: live close whose durable action-item side effect fails ---
+    let resolver = Arc::new(StaticMembershipResolver::new());
+    let gossip = gossip_with_governance_topic(did.clone()).await;
+    let actor = GovernanceActor::spawn(did.clone(), sled.clone(), gossip, resolver, None, None)
+        .await
+        .expect("spawn")
+        .with_action_item_store(action_items.clone());
+    actor.install_receipt_store(backend.clone()).await;
+
+    let domain_id = GovernanceDomainId("crossstore-se-domain".to_string());
+    let manager = GovernanceManager::with_handle(
+        Arc::new(actor.clone()) as Arc<dyn GovernanceOps + Send + Sync>
+    );
+    manager
+        .create_domain(
+            domain_id.clone(),
+            "side-effect domain".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(50, 50, 3600),
+            MembershipConfig::static_list(vec![did.clone()]),
+        )
+        .await
+        .expect("create_domain");
+    let spec = icn_governance::ActionItemSpec {
+        title: "follow-up obligation".to_string(),
+        description: None,
+        assignee: None,
+        due_offset_seconds: None,
+        priority: Default::default(),
+        tags: vec![],
+    };
+    let proposal_id = manager
+        .create_proposal_with_actions(
+            ProposalId("_ignored".to_string()),
+            domain_id.clone(),
+            did.clone(),
+            "Appoint steward (side-effect)".to_string(),
+            "".to_string(),
+            appoint_steward_payload(candidate, did.clone()),
+            ProposalScope::Local,
+            vec![spec],
+        )
+        .await
+        .expect("create_proposal_with_actions");
+    manager
+        .open_proposal(proposal_id.clone(), 3600)
+        .await
+        .expect("open_proposal");
+    manager
+        .cast_vote(
+            proposal_id.clone(),
+            did.clone(),
+            icn_governance::VoteChoice::For,
+            None,
+        )
+        .await
+        .expect("cast_vote");
+
+    actor
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: proposal_id.clone(),
+            eligible_voters: None,
+            excluded_delegators: None,
+            capability_scope: None,
+        })
+        .await
+        .expect("close submit");
+
+    // The close commits durable terminal state...
+    let persisted = state
+        .get_proposal(&proposal_id)
+        .expect("get_proposal")
+        .expect("proposal exists");
+    assert!(
+        matches!(persisted.state, ProposalState::Accepted { .. }),
+        "close still commits durable terminal state; got {:?}",
+        persisted.state
+    );
+    // ...but the failed durable side effect must RETAIN the journal entry.
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        1,
+        "a durable side-effect failure must retain the close-journal entry, not clear it"
+    );
+    actor.shutdown().await;
+
+    // --- Phase B: recovery while the side-effect store still fails ---
+    let gossip2 = gossip_with_governance_topic(did.clone()).await;
+    let resolver2 = Arc::new(StaticMembershipResolver::new());
+    let actor2 = GovernanceActor::spawn(did.clone(), sled.clone(), gossip2, resolver2, None, None)
+        .await
+        .expect("spawn restart")
+        .with_action_item_store(action_items.clone());
+    actor2.install_receipt_store(backend.clone()).await;
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        1,
+        "recovery must NOT clear the journal entry while the durable side effect still fails"
+    );
+    actor2.shutdown().await;
+
+    // --- Phase C: the side-effect store recovers; replay completes the close ---
+    action_items.fail.store(false, Ordering::SeqCst);
+    let gossip3 = gossip_with_governance_topic(did.clone()).await;
+    let resolver3 = Arc::new(StaticMembershipResolver::new());
+    let actor3 = GovernanceActor::spawn(did.clone(), sled.clone(), gossip3, resolver3, None, None)
+        .await
+        .expect("spawn restart 2")
+        .with_action_item_store(action_items.clone());
+    actor3.install_receipt_store(backend.clone()).await;
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        0,
+        "once the durable side effect succeeds, recovery clears the journal entry"
+    );
+    actor3.shutdown().await;
 }

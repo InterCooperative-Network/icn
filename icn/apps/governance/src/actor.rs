@@ -1559,14 +1559,29 @@ impl GovernanceActor {
                 ProposalState::NoQuorum { .. } => DecisionOutcome::NoQuorum,
                 _ => DecisionOutcome::Rejected,
             };
-            self.emit_close_downstream_effects(
-                &entry.proposal,
-                outcome,
-                entry.decided_at,
-                entry.governance_decision_hash.clone(),
-            )
-            .await;
-            // 3. Clear the entry only once the whole completion is durable.
+            if let Err(e) = self
+                .emit_close_downstream_effects(
+                    &entry.proposal,
+                    outcome,
+                    entry.decided_at,
+                    entry.governance_decision_hash.clone(),
+                )
+                .await
+            {
+                // A durable obligation did not persist (e.g. a transient
+                // action-item / institutional-effect store error). Leave the
+                // journal entry so the next startup replays it idempotently —
+                // never clear it while obligations are still outstanding.
+                warn!(
+                    proposal_id = %proposal_id.0,
+                    error = %e,
+                    "Recovered close committed durable state but a durable side effect did \
+                     not persist; leaving the journal entry for replay on the next startup"
+                );
+                continue;
+            }
+            // 3. Clear the entry only once the whole completion — durable state
+            //    AND durable side effects — has succeeded.
             match self.store.delete_close_intent(&proposal_id) {
                 Ok(()) => info!(
                     proposal_id = %proposal_id.0,
@@ -1601,7 +1616,14 @@ impl GovernanceActor {
         outcome: DecisionOutcome,
         decided_at: u64,
         governance_decision_hash: Option<String>,
-    ) {
+    ) -> std::result::Result<(), String> {
+        // Accumulates failures of the DURABLE obligations (action items,
+        // institutional effect, mandate). If non-empty, the caller keeps the
+        // write-ahead journal entry so a later idempotent replay can complete
+        // them rather than dropping the obligation. The downstream event is a
+        // fire-and-forget trigger and does not gate (re-emit is at-least-once).
+        let mut failures: Vec<String> = Vec::new();
+
         // Downstream event — drives ledger transactions / event-driven execution.
         if let Some(ref event_bus) = self.event_bus {
             let event = match outcome {
@@ -1647,7 +1669,11 @@ impl GovernanceActor {
             && !proposal.action_items_on_accept.is_empty()
         {
             if let Some(ref store) = self.action_item_store {
-                Self::materialize_action_items(store, proposal, &proposal.id, decided_at);
+                if let Err(e) =
+                    Self::materialize_action_items(store, proposal, &proposal.id, decided_at)
+                {
+                    failures.push(e);
+                }
             }
         }
 
@@ -1675,8 +1701,9 @@ impl GovernanceActor {
                     error!(
                         proposal_id = %proposal.id.0,
                         error = %e,
-                        "Actor failed to emit InstitutionalEffectRecord (non-fatal)"
+                        "Actor failed to emit InstitutionalEffectRecord"
                     );
+                    failures.push(format!("institutional effect: {e}"));
                 }
                 if let Some(decision_hash) = decision_hash {
                     if let Err(e) = crate::grant_minting::mint_and_persist_for_accepted(
@@ -1690,11 +1717,18 @@ impl GovernanceActor {
                         error!(
                             proposal_id = %proposal.id.0,
                             error = %e,
-                            "Actor failed to persist ADR-0014 mandate (non-fatal)"
+                            "Actor failed to persist ADR-0014 mandate"
                         );
+                        failures.push(format!("mandate: {e}"));
                     }
                 }
             }
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures.join("; "))
         }
     }
 
@@ -2477,27 +2511,41 @@ impl GovernanceActor {
                 // (The gossip broadcast above is live-path only; it is
                 // eventually-consistent via anti-entropy, so a recovered close does
                 // not need to re-broadcast.)
-                self.emit_close_downstream_effects(
-                    &proposal,
-                    outcome_result.clone(),
-                    now,
-                    governance_decision_hash.clone(),
-                )
-                .await;
+                let side_effects = self
+                    .emit_close_downstream_effects(
+                        &proposal,
+                        outcome_result.clone(),
+                        now,
+                        governance_decision_hash.clone(),
+                    )
+                    .await;
 
-                // Now that the close is fully complete — durable state committed
-                // AND its durable side effects applied — clear the write-ahead
-                // journal entry, LAST and non-fatally. A crash or error anywhere
-                // above leaves the entry for `recover_incomplete_closes` to replay
-                // the whole completion idempotently, so a recovered close never
-                // loses its downstream obligations.
-                if let Err(e) = self.store.delete_close_intent(&proposal_id) {
-                    warn!(
-                        proposal_id = %proposal_id.0,
-                        error = %e,
-                        "Close fully completed but clearing its write-ahead journal entry \
-                         failed; it will be replayed idempotently on the next startup"
-                    );
+                // Clear the write-ahead journal entry LAST — and ONLY once every
+                // durable obligation has persisted. If a durable side effect
+                // failed, keep the entry so `recover_incomplete_closes` replays
+                // the whole completion idempotently on the next startup rather
+                // than dropping the obligation. A crash before this point has the
+                // same effect: the entry survives for replay.
+                match side_effects {
+                    Ok(()) => {
+                        if let Err(e) = self.store.delete_close_intent(&proposal_id) {
+                            warn!(
+                                proposal_id = %proposal_id.0,
+                                error = %e,
+                                "Close fully completed but clearing its write-ahead journal \
+                                 entry failed; it will be replayed idempotently on the next startup"
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        warn!(
+                            proposal_id = %proposal_id.0,
+                            error = %e,
+                            "Close committed durable state but a durable side effect did not \
+                             persist; leaving the write-ahead journal entry for idempotent \
+                             replay on the next startup"
+                        );
+                    }
                 }
 
                 info!(
@@ -2729,7 +2777,18 @@ impl GovernanceActor {
                 {
                     if let Some(ref store) = self.action_item_store {
                         let now = now_seconds();
-                        Self::materialize_action_items(store, &proposal, &proposal_id, now);
+                        // Force-close is outside the write-ahead-journal close path,
+                        // so this stays best-effort: log materialization failures
+                        // rather than gating (there is no journal entry to retain).
+                        if let Err(e) =
+                            Self::materialize_action_items(store, &proposal, &proposal_id, now)
+                        {
+                            warn!(
+                                proposal_id = %proposal_id.0,
+                                error = %e,
+                                "Force-close failed to materialize one or more action items"
+                            );
+                        }
                     }
                 }
 
@@ -3055,8 +3114,9 @@ impl GovernanceActor {
         proposal: &Proposal,
         proposal_id: &ProposalId,
         now: u64,
-    ) {
-        // Dedup check: skip if action items already exist for this proposal
+    ) -> std::result::Result<(), String> {
+        // Dedup check: skip if action items already exist for this proposal.
+        // Already-materialized is success — it makes replay idempotent.
         let filter = icn_governance::ActionItemFilter {
             linked_proposal: Some(proposal_id.clone()),
             ..Default::default()
@@ -3068,7 +3128,7 @@ impl GovernanceActor {
                     proposal_id.0,
                     existing.len()
                 );
-                return;
+                return Ok(());
             }
             Err(e) => {
                 warn!(
@@ -3082,6 +3142,7 @@ impl GovernanceActor {
 
         let specs = &proposal.action_items_on_accept;
         let mut created = 0usize;
+        let mut failures: Vec<String> = Vec::new();
         for spec in specs {
             let item = spec.materialize(
                 proposal.domain_id.clone(),
@@ -3096,6 +3157,7 @@ impl GovernanceActor {
                         "Failed to create action item '{}' from proposal {}: {e}",
                         spec.title, proposal_id.0
                     );
+                    failures.push(format!("{}: {e}", spec.title));
                 }
             }
         }
@@ -3105,6 +3167,19 @@ impl GovernanceActor {
                 specs.len(),
                 proposal_id.0
             );
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            // A durable obligation did not persist — surface it so the caller can
+            // keep the write-ahead journal entry for an idempotent replay rather
+            // than dropping the obligation.
+            Err(format!(
+                "{} action item(s) failed to persist for proposal {}: {}",
+                failures.len(),
+                proposal_id.0,
+                failures.join("; ")
+            ))
         }
     }
 
