@@ -83,10 +83,15 @@ except Exception:
 # Prints "<label> (<code>):" + the response body and fails closed on HTTP >= 400
 # so a bad lifecycle step is named immediately. (AUTH is set after token mint.)
 post(){
-  local label="$1" url="$2" out="$3" body="$4" code
-  code="$(curl -s -o "$out" -w '%{http_code}' -X POST "$url" "${AUTH[@]}" -d "$body")"
+  local label="$1" url="$2" out="$3" body="$4" code rc
+  code="$(curl -s -o "$out" -w '%{http_code}' -X POST "$url" "${AUTH[@]}" -d "$body")"; rc=$?
   echo "  $label (HTTP $code):"; indent <"$out"; echo
-  [ "${code:-000}" -lt 400 ] 2>/dev/null || fatal "$label returned HTTP $code"
+  # Fail closed on transport errors: curl's own exit code catches connection
+  # failures (refused/reset/DNS), and HTTP 000 is curl's "no response" sentinel.
+  # Neither must slip through the "< 400" success check and be read as success.
+  [ "$rc" -eq 0 ] || fatal "$label: curl transport failure (exit $rc, code ${code:-none})"
+  { [ "${code:-000}" -ge 100 ] && [ "${code:-000}" -lt 400 ]; } 2>/dev/null \
+    || fatal "$label returned HTTP ${code:-000}"
 }
 
 [ -n "$ICND" ] && [ -x "$ICND" ]     || fatal "icnd not found (build it: cargo build --release -p icnd, or set ICND=...)"
