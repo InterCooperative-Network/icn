@@ -138,6 +138,7 @@ struct RecordingReceiptBackend {
     grants: Mutex<HashMap<icn_governance::AuthorityGrantId, icn_governance::AuthorityGrant>>,
     flushes: AtomicUsize,
     fail_flush: AtomicBool,
+    put_institutional_effect_calls: AtomicUsize,
 }
 
 impl RecordingReceiptBackend {
@@ -146,6 +147,9 @@ impl RecordingReceiptBackend {
     }
     fn put_governance_calls(&self) -> usize {
         self.put_governance_calls.load(Ordering::SeqCst)
+    }
+    fn institutional_effect_calls(&self) -> usize {
+        self.put_institutional_effect_calls.load(Ordering::SeqCst)
     }
     fn flush_count(&self) -> usize {
         self.flushes.load(Ordering::SeqCst)
@@ -209,6 +213,8 @@ impl GovernanceReceiptBackend for RecordingReceiptBackend {
         Ok(self.allocations.lock().unwrap().clone())
     }
     fn put_institutional_effect(&self, _record: &InstitutionalEffectRecord) -> Result<(), String> {
+        self.put_institutional_effect_calls
+            .fetch_add(1, Ordering::SeqCst);
         Ok(())
     }
     fn put_mandate(&self, mandate: &icn_governance::Mandate) -> Result<(), String> {
@@ -1226,4 +1232,96 @@ async fn receipt_flush_failure_retains_journal() {
         "recovery clears the journal once the receipt durability barrier succeeds"
     );
     actor2.shutdown().await;
+}
+
+/// If a close commits a receipt then fails before the terminal save, the journal
+/// entry is retained. A caller that retries the close BEFORE restart must NOT
+/// overwrite that entry with a freshly-recomputed close — doing so would orphan
+/// the first attempt's already-durable, append-only receipt. The retry must
+/// complete the existing entry instead.
+#[tokio::test(flavor = "current_thread")]
+async fn close_retry_completes_existing_intent_without_overwrite() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp.path().to_path_buf();
+
+    let (backend, fail_store, actor_handle, proposal_id) =
+        open_voted_proposal(&db_path, None).await;
+    actor_handle.install_receipt_store(backend.clone()).await;
+
+    // Attempt 1: the terminal save fails after the execution-closure preflight +
+    // receipt write → the journal entry is retained and the proposal stays Open.
+    fail_store.arm();
+    let _ = actor_handle
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: proposal_id.clone(),
+            eligible_voters: None,
+            excluded_delegators: None,
+            capability_scope: None,
+        })
+        .await;
+    let state: Arc<dyn GovernanceStateStore> =
+        Arc::new(SledGovernanceStateStore::new(fail_store.clone()));
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        1,
+        "attempt 1 leaves a journal entry"
+    );
+    assert_eq!(
+        backend.governance_count(),
+        1,
+        "attempt 1 wrote the accepted receipt"
+    );
+    assert_eq!(
+        backend.institutional_effect_calls(),
+        1,
+        "attempt 1 ran the execution-closure preflight exactly once"
+    );
+
+    // Attempt 2 (retried before restart): the handler must COMPLETE the existing
+    // journal entry, not run a fresh close. A fresh close would re-run the
+    // preflight (a 2nd institutional-effect emission) and `save_close_intent`
+    // would overwrite the entry.
+    fail_store.disarm();
+    actor_handle
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: proposal_id.clone(),
+            eligible_voters: None,
+            excluded_delegators: None,
+            capability_scope: None,
+        })
+        .await
+        .expect("retry close submit");
+
+    let persisted = state
+        .get_proposal(&proposal_id)
+        .expect("get_proposal")
+        .expect("proposal exists");
+    assert!(
+        matches!(persisted.state, ProposalState::Accepted { .. }),
+        "the retry completes the existing close; got {:?}",
+        persisted.state
+    );
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        0,
+        "the completed journal entry is cleared"
+    );
+    assert_eq!(
+        backend.governance_count(),
+        1,
+        "no second/different receipt — the original append-only receipt is preserved"
+    );
+    assert_eq!(
+        backend.institutional_effect_calls(),
+        1,
+        "the retry must complete the existing journaled close, NOT re-run a fresh close's preflight"
+    );
+
+    actor_handle.shutdown().await;
 }

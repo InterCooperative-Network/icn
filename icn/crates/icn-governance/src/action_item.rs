@@ -637,6 +637,15 @@ impl ActionItemStoreBackend for SledActionItemStore {
         Ok(())
     }
 
+    fn flush(&self) -> Result<()> {
+        // Force buffered action-item writes durable so the governance close
+        // journal cannot be cleared while a materialized item is still un-fsynced.
+        self.db
+            .flush()
+            .map(|_| ())
+            .map_err(|e| crate::GovernanceError::Storage(e.to_string()))
+    }
+
     fn get(&self, domain_id: &GovernanceDomainId, id: &ActionItemId) -> Result<Option<ActionItem>> {
         let key = Self::item_key(domain_id, id);
         match self

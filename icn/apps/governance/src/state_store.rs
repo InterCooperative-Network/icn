@@ -106,6 +106,15 @@ pub trait GovernanceStateStore: Send + Sync {
         Ok(vec![])
     }
 
+    /// Fetch the close-journal entry for a specific proposal, if one is in
+    /// flight. Lets the close handler detect a prior incomplete attempt and
+    /// complete THAT entry rather than overwriting it with a fresh close (which
+    /// would orphan the first attempt's already-durable append-only receipt).
+    /// Default impl returns `None`.
+    fn get_close_intent(&self, _proposal_id: &ProposalId) -> Result<Option<CloseJournalEntry>> {
+        Ok(None)
+    }
+
     /// Force buffered state-store writes durable (fsync).
     ///
     /// Default no-op; the sled-backed store overrides it. `save_close_intent`
@@ -321,5 +330,12 @@ impl GovernanceStateStore for SledGovernanceStateStore {
         rows.into_iter()
             .map(|(_k, v)| Ok(serde_json::from_slice::<CloseJournalEntry>(&v)?))
             .collect()
+    }
+
+    fn get_close_intent(&self, proposal_id: &ProposalId) -> Result<Option<CloseJournalEntry>> {
+        match self.store.get(&close_intent_key(proposal_id))? {
+            Some(bytes) => Ok(Some(serde_json::from_slice::<CloseJournalEntry>(&bytes)?)),
+            None => Ok(None),
+        }
     }
 }
