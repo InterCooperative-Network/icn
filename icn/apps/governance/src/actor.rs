@@ -3121,55 +3121,73 @@ impl GovernanceActor {
     /// Materialize action items from an accepted proposal's specs.
     ///
     /// Idempotent: checks for existing linked items before creating new ones.
+    /// Deterministic, position-stable action-item id for the `index`-th
+    /// `action_items_on_accept` spec of a proposal.
+    ///
+    /// Materialization otherwise assigns a random id, which makes replay
+    /// non-idempotent: re-running would duplicate items, so the prior dedup
+    /// skipped *all* creation as soon as *any* linked item existed — which
+    /// silently dropped the rest of a partially-materialized set on replay.
+    /// A deterministic id keyed by `(proposal_id, index)` lets recovery
+    /// reconcile each spec individually: an already-present item is detected
+    /// and left untouched, and a missing one is created, without duplicating.
+    fn deterministic_action_item_id(
+        proposal_id: &ProposalId,
+        index: usize,
+    ) -> icn_governance::ActionItemId {
+        let seed = format!("gov:action-item:{}:{index}", proposal_id.0);
+        let digest = blake3::hash(seed.as_bytes());
+        let mut bytes = [0u8; 16];
+        bytes.copy_from_slice(&digest.as_bytes()[..16]);
+        icn_governance::ActionItemId::from_uuid(uuid::Uuid::from_bytes(bytes))
+    }
+
     fn materialize_action_items(
         store: &Arc<dyn icn_governance::ActionItemStoreBackend>,
         proposal: &Proposal,
         proposal_id: &ProposalId,
         now: u64,
     ) -> std::result::Result<(), String> {
-        // Dedup check: skip if action items already exist for this proposal.
-        // Already-materialized is success — it makes replay idempotent.
-        let filter = icn_governance::ActionItemFilter {
-            linked_proposal: Some(proposal_id.clone()),
-            ..Default::default()
-        };
-        match store.list(&proposal.domain_id, &filter) {
-            Ok(existing) if !existing.is_empty() => {
-                info!(
-                    "📋 Skipping action item creation for proposal {} — {} linked item(s) already exist",
-                    proposal_id.0,
-                    existing.len()
-                );
-                return Ok(());
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to check existing action items for proposal {}: {e}",
-                    proposal_id.0
-                );
-                // Continue anyway — better to risk duplicates than lose items
-            }
-            _ => {}
-        }
-
         let specs = &proposal.action_items_on_accept;
         let mut created = 0usize;
         let mut failures: Vec<String> = Vec::new();
-        for spec in specs {
-            let item = spec.materialize(
+        // Reconcile per spec/item (NOT "skip all if any exist"): each spec has a
+        // deterministic, position-stable id, so a close and any later recovery
+        // replay create exactly the missing items and never duplicate or clobber
+        // already-materialized ones. This completes a partially-materialized set
+        // on replay instead of dropping the remaining obligations.
+        for (index, spec) in specs.iter().enumerate() {
+            let mut item = spec.materialize(
                 proposal.domain_id.clone(),
                 proposal_id.clone(),
                 proposal.proposer.clone(),
                 now,
             );
-            match store.save(&item) {
-                Ok(()) => created += 1,
+            item.id = Self::deterministic_action_item_id(proposal_id, index);
+            match store.get(&proposal.domain_id, &item.id) {
+                // Already materialized — preserve its current state (e.g. an
+                // in-progress/completed status), do not re-create.
+                Ok(Some(_)) => continue,
+                Ok(None) => match store.save(&item) {
+                    Ok(()) => created += 1,
+                    Err(e) => {
+                        warn!(
+                            "Failed to create action item '{}' from proposal {}: {e}",
+                            spec.title, proposal_id.0
+                        );
+                        failures.push(format!("{}: {e}", spec.title));
+                    }
+                },
                 Err(e) => {
+                    // Cannot confirm whether this obligation already exists, so do
+                    // not risk duplicating or clobbering it. Treat as a failure so
+                    // the write-ahead journal entry is retained for a later
+                    // idempotent replay.
                     warn!(
-                        "Failed to create action item '{}' from proposal {}: {e}",
+                        "Failed to check existing action item '{}' for proposal {}: {e}",
                         spec.title, proposal_id.0
                     );
-                    failures.push(format!("{}: {e}", spec.title));
+                    failures.push(format!("{} (existence check failed): {e}", spec.title));
                 }
             }
         }

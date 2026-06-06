@@ -27,8 +27,9 @@ use std::sync::{Arc, Mutex};
 
 use icn_gossip::{AccessControl, GossipActor, Topic};
 use icn_governance::{
-    sdis::SdisProposal, GovernanceDomainId, GovernanceOps, GovernanceParams, MembershipConfig,
-    ProposalId, ProposalPayload, ProposalScope, ProposalState, StaticMembershipResolver,
+    sdis::SdisProposal, ActionItemStoreBackend, GovernanceDomainId, GovernanceOps,
+    GovernanceParams, MembershipConfig, ProposalId, ProposalPayload, ProposalScope, ProposalState,
+    StaticMembershipResolver,
 };
 use icn_governance_actor::{
     actor::GovernanceActor,
@@ -877,6 +878,208 @@ async fn install_receipt_store_does_not_trigger_recovery() {
         matches!(persisted.state, ProposalState::Accepted { .. }),
         "explicit recovery completes the close; got {:?}",
         persisted.state
+    );
+    actor2.shutdown().await;
+}
+
+/// Persisting action-item store that succeeds the first `save` and then fails
+/// every subsequent `save` while armed — used to leave a proposal's
+/// `action_items_on_accept` set PARTIALLY materialized (item 0 saved, item 1
+/// failed) so we can assert recovery completes the missing items rather than
+/// treating "one linked item exists" as the whole obligation set.
+struct PartialFailActionItemStore {
+    inner: icn_governance::InMemoryActionItemStore,
+    saves: AtomicUsize,
+    fail_after_first: AtomicBool,
+}
+impl PartialFailActionItemStore {
+    fn new() -> Self {
+        Self {
+            inner: icn_governance::InMemoryActionItemStore::new(),
+            saves: AtomicUsize::new(0),
+            fail_after_first: AtomicBool::new(true),
+        }
+    }
+    fn disarm(&self) {
+        self.fail_after_first.store(false, Ordering::SeqCst);
+    }
+}
+impl icn_governance::ActionItemStoreBackend for PartialFailActionItemStore {
+    fn save(&self, item: &icn_governance::ActionItem) -> icn_governance::Result<()> {
+        let n = self.saves.fetch_add(1, Ordering::SeqCst);
+        if n >= 1 && self.fail_after_first.load(Ordering::SeqCst) {
+            return Err(icn_governance::GovernanceError::Storage(
+                "injected: action-item save after the first fails".to_string(),
+            ));
+        }
+        self.inner.save(item)
+    }
+    fn get(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &icn_governance::ActionItemId,
+    ) -> icn_governance::Result<Option<icn_governance::ActionItem>> {
+        self.inner.get(domain_id, id)
+    }
+    fn list(
+        &self,
+        domain_id: &GovernanceDomainId,
+        filter: &icn_governance::ActionItemFilter,
+    ) -> icn_governance::Result<Vec<icn_governance::ActionItem>> {
+        self.inner.list(domain_id, filter)
+    }
+    fn delete(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &icn_governance::ActionItemId,
+    ) -> icn_governance::Result<bool> {
+        self.inner.delete(domain_id, id)
+    }
+    fn count(
+        &self,
+        domain_id: &GovernanceDomainId,
+        filter: &icn_governance::ActionItemFilter,
+    ) -> icn_governance::Result<usize> {
+        self.inner.count(domain_id, filter)
+    }
+    fn delete_all(&self, domain_id: &GovernanceDomainId) -> icn_governance::Result<usize> {
+        self.inner.delete_all(domain_id)
+    }
+}
+
+/// When a multi-item `action_items_on_accept` set is only PARTIALLY materialized
+/// at close (one item saved, a later one failed), recovery must complete the
+/// remaining items — not treat the single existing linked item as the whole set
+/// and clear the journal. Pins per-item reconciliation on replay.
+#[tokio::test(flavor = "current_thread")]
+async fn recovery_completes_partially_materialized_action_items() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp.path().to_path_buf();
+
+    let bundle = IdentityBundle::generate().expect("IdentityBundle::generate");
+    let did = bundle.did().clone();
+    let candidate = IdentityBundle::generate().expect("candidate").did().clone();
+
+    let sled: Arc<dyn Store> = Arc::new(SledStore::open(&db_path).expect("SledStore::open"));
+    let action_items = Arc::new(PartialFailActionItemStore::new());
+    let backend = Arc::new(RecordingReceiptBackend::default());
+    let state: Arc<dyn GovernanceStateStore> =
+        Arc::new(SledGovernanceStateStore::new(sled.clone()));
+    let domain_id = GovernanceDomainId("crossstore-partial-domain".to_string());
+    let filter = icn_governance::ActionItemFilter {
+        linked_proposal: None,
+        ..Default::default()
+    };
+
+    // --- Phase A: live close where the SECOND action-item save fails ---
+    let resolver = Arc::new(StaticMembershipResolver::new());
+    let gossip = gossip_with_governance_topic(did.clone()).await;
+    let actor = GovernanceActor::spawn(did.clone(), sled.clone(), gossip, resolver, None, None)
+        .await
+        .expect("spawn")
+        .with_action_item_store(action_items.clone());
+    actor.install_receipt_store(backend.clone()).await;
+
+    let manager = GovernanceManager::with_handle(
+        Arc::new(actor.clone()) as Arc<dyn GovernanceOps + Send + Sync>
+    );
+    manager
+        .create_domain(
+            domain_id.clone(),
+            "partial domain".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(50, 50, 3600),
+            MembershipConfig::static_list(vec![did.clone()]),
+        )
+        .await
+        .expect("create_domain");
+    let make_spec = |title: &str| icn_governance::ActionItemSpec {
+        title: title.to_string(),
+        description: None,
+        assignee: None,
+        due_offset_seconds: None,
+        priority: Default::default(),
+        tags: vec![],
+    };
+    let proposal_id = manager
+        .create_proposal_with_actions(
+            ProposalId("_ignored".to_string()),
+            domain_id.clone(),
+            did.clone(),
+            "Appoint steward (partial)".to_string(),
+            "".to_string(),
+            appoint_steward_payload(candidate, did.clone()),
+            ProposalScope::Local,
+            vec![
+                make_spec("first obligation"),
+                make_spec("second obligation"),
+            ],
+        )
+        .await
+        .expect("create_proposal_with_actions");
+    manager
+        .open_proposal(proposal_id.clone(), 3600)
+        .await
+        .expect("open_proposal");
+    manager
+        .cast_vote(
+            proposal_id.clone(),
+            did.clone(),
+            icn_governance::VoteChoice::For,
+            None,
+        )
+        .await
+        .expect("cast_vote");
+
+    actor
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: proposal_id.clone(),
+            eligible_voters: None,
+            excluded_delegators: None,
+            capability_scope: None,
+        })
+        .await
+        .expect("close submit");
+
+    // Only the first item materialized; the second failed → journal retained.
+    assert_eq!(
+        action_items.list(&domain_id, &filter).expect("list").len(),
+        1,
+        "only the first action item should materialize before the injected failure"
+    );
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        1,
+        "a partially-materialized obligation set must retain the close-journal entry"
+    );
+    actor.shutdown().await;
+
+    // --- Phase B: recovery (failure cleared) completes the MISSING item ---
+    action_items.disarm();
+    let gossip2 = gossip_with_governance_topic(did.clone()).await;
+    let resolver2 = Arc::new(StaticMembershipResolver::new());
+    let actor2 = GovernanceActor::spawn(did.clone(), sled.clone(), gossip2, resolver2, None, None)
+        .await
+        .expect("spawn restart")
+        .with_action_item_store(action_items.clone());
+    actor2.install_receipt_store(backend.clone()).await;
+    actor2.recover_incomplete_closes().await;
+
+    assert_eq!(
+        action_items.list(&domain_id, &filter).expect("list").len(),
+        2,
+        "recovery must materialize the remaining action item — no loss, no duplicates"
+    );
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        0,
+        "journal cleared once every action-item obligation is materialized"
     );
     actor2.shutdown().await;
 }
