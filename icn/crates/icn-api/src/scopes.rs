@@ -33,12 +33,6 @@ pub mod ledger {
 
 /// Governance permission scopes
 pub mod governance {
-    /// Create governance domains
-    pub const CREATE_DOMAIN: &str = "governance:create_domain";
-    /// Create proposals
-    pub const CREATE_PROPOSAL: &str = "governance:create_proposal";
-    /// Cast votes
-    pub const VOTE: &str = "governance:vote";
     /// Query proposals and votes
     pub const READ: &str = "governance:read";
     /// Modify governance state (proposals, domains, voting)
@@ -160,6 +154,6 @@ mod tests {
     fn test_admin_wildcard() {
         assert!(matches(admin::WILDCARD, compute::SUBMIT));
         assert!(matches(admin::WILDCARD, ledger::READ));
-        assert!(matches(admin::WILDCARD, governance::VOTE));
+        assert!(matches(admin::WILDCARD, governance::WRITE));
     }
 }
