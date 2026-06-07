@@ -107,6 +107,16 @@ impl LedgerService {
         decision_hash: &str,
         limit: usize,
     ) -> Result<DecisionEntriesPage, ApiError> {
+        // A zero-sized page has nothing to return; short-circuit without scanning.
+        // Gateway callers already clamp `limit` to >= 1; this guards the public
+        // method against a degenerate request triggering a full-ledger walk.
+        if limit == 0 {
+            return Ok(DecisionEntriesPage {
+                entries: Vec::new(),
+                has_more: false,
+            });
+        }
+
         // Number of journal entries fetched per page. Memory stays bounded to one
         // page regardless of total ledger size.
         const PAGE_SIZE: usize = 1000;
@@ -207,17 +217,15 @@ mod tests {
         let bob = KeyPair::generate().unwrap().did().clone();
 
         // Fill the ledger past the old fixed 1000-entry scan window with
-        // unrelated, self-balancing system-provenance entries. A unique nonce per
+        // unrelated, self-balancing system-provenance entries. A unique amount per
         // entry guarantees distinct content hashes (a collision would overwrite an
         // existing entry and corrupt the count).
         const FILLER_ENTRIES: usize = 1005;
         for i in 0..FILLER_ENTRIES {
-            let mut nonce = [0u8; 32];
-            nonce[..8].copy_from_slice(&(i as u64).to_le_bytes());
+            let amount = (i as i64) + 1;
             let entry = JournalEntryBuilder::new(alice.clone())
-                .debit(alice.clone(), "hours".to_string(), 1)
-                .credit(bob.clone(), "hours".to_string(), 1)
-                .nonce(nonce)
+                .debit(alice.clone(), "hours".to_string(), amount)
+                .credit(bob.clone(), "hours".to_string(), amount)
                 .with_system_provenance("filler")
                 .build()
                 .unwrap();
@@ -231,12 +239,12 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_millis(5));
 
         let decision_hash = "decision-hash-beyond-scan-window";
-        let mut gov_nonce = [0u8; 32];
-        gov_nonce[..8].copy_from_slice(&(FILLER_ENTRIES as u64).to_le_bytes());
+        // Distinct from every filler amount above, keeping this entry's content
+        // hash unique.
+        let gov_amount = (FILLER_ENTRIES as i64) + 1;
         let gov_entry = JournalEntryBuilder::new(alice.clone())
-            .debit(alice.clone(), "hours".to_string(), 1)
-            .credit(bob.clone(), "hours".to_string(), 1)
-            .nonce(gov_nonce)
+            .debit(alice.clone(), "hours".to_string(), gov_amount)
+            .credit(bob.clone(), "hours".to_string(), gov_amount)
             .with_governance_provenance("receipt-beyond-window", decision_hash)
             .build()
             .unwrap();
