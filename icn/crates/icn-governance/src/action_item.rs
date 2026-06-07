@@ -449,6 +449,16 @@ pub trait ActionItemStoreBackend: Send + Sync {
     fn list_by_assignee(&self, _assignee: &Did) -> Result<Vec<ActionItem>> {
         Ok(vec![])
     }
+
+    /// Force all buffered writes durable (fsync).
+    ///
+    /// Default no-op for in-memory backends. The sled-backed store overrides it.
+    /// The governance close write-ahead journal calls this before clearing a
+    /// completed close's journal entry, so the entry cannot be cleared while a
+    /// materialized action item is still un-fsynced in a separate sled DB.
+    fn flush(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// In-memory action item store for testing
@@ -625,6 +635,15 @@ impl ActionItemStoreBackend for SledActionItemStore {
             .insert(key.as_bytes(), value)
             .map_err(|e| crate::GovernanceError::Storage(e.to_string()))?;
         Ok(())
+    }
+
+    fn flush(&self) -> Result<()> {
+        // Force buffered action-item writes durable so the governance close
+        // journal cannot be cleared while a materialized item is still un-fsynced.
+        self.db
+            .flush()
+            .map(|_| ())
+            .map_err(|e| crate::GovernanceError::Storage(e.to_string()))
     }
 
     fn get(&self, domain_id: &GovernanceDomainId, id: &ActionItemId) -> Result<Option<ActionItem>> {

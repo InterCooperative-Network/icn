@@ -25,6 +25,7 @@
 //! [`ProtocolExecutor`]: icn_kernel_api::governance::ProtocolExecutor
 
 pub mod actor;
+pub mod close_journal;
 pub mod dispatch_evidence;
 pub mod dispatch_evidence_sink;
 pub mod events;
@@ -41,6 +42,7 @@ pub mod registry;
 pub mod state_store;
 
 pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};
+pub use close_journal::{CloseJournalEntry, CloseReceipts, DecisionV3Entry};
 pub use dispatch_evidence::{
     derive_reconciliation_status, reconciliation_label, EffectDispatchEvidence,
     ReconciliationStatus,
