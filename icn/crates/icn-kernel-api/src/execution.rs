@@ -23,6 +23,14 @@ use serde::{Deserialize, Serialize};
 
 use crate::effects::{EffectResult, KernelEffect};
 
+/// Canonical key prefix for persisted execution records (`exec:<decision_hash>`).
+///
+/// Single source of truth shared by the execution store that writes these
+/// records (`icn-core`'s `SledExecutionStore`) and any reader that scans them
+/// (e.g. the gateway's dispatch-evidence backfill). Centralized here so the two
+/// sides cannot silently drift to different prefixes.
+pub const EXECUTION_RECORD_KEY_PREFIX: &str = "exec:";
+
 /// Status of a governance decision's execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]

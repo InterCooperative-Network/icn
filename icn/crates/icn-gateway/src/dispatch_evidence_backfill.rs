@@ -20,14 +20,15 @@
 use std::sync::Arc;
 
 use icn_governance_actor::DeferredDispatchEvidenceSink;
-use icn_kernel_api::execution::ExecutionRecord;
+use icn_kernel_api::execution::{ExecutionRecord, EXECUTION_RECORD_KEY_PREFIX};
 use icn_store::Store;
 
 /// Execution-store key prefix the decision executor writes under
-/// (`exec:<decision_hash>`). Must match `SledExecutionStore::PREFIX` in
-/// `icn-core`; the gateway reads the very records the executor persists
-/// (the same store is shared via `with_execution_query_store`).
-const EXECUTION_PREFIX: &[u8] = b"exec:";
+/// (`exec:<decision_hash>`). Sourced from the canonical
+/// [`EXECUTION_RECORD_KEY_PREFIX`] in `icn-kernel-api` (the same const
+/// `icn-core`'s `SledExecutionStore` keys with), so the gateway reads exactly
+/// the records the executor persists without the two sides drifting.
+const EXECUTION_PREFIX: &[u8] = EXECUTION_RECORD_KEY_PREFIX.as_bytes();
 
 /// Summary of a dispatch-evidence backfill scan (for startup logging).
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -155,7 +156,7 @@ mod tests {
         record.mark_confirmed(vec![], vec!["sch".into()]);
         store
             .put(
-                format!("exec:{decision_hash}").as_bytes(),
+                format!("{EXECUTION_RECORD_KEY_PREFIX}{decision_hash}").as_bytes(),
                 &serde_json::to_vec(&record).unwrap(),
             )
             .unwrap();
@@ -246,8 +247,11 @@ mod tests {
             "gov:dom:prop-pending:receipt",
             vec![approve_effect("prop-pending")],
         );
-        exec.put(b"exec:hash-pending", &serde_json::to_vec(&pending).unwrap())
-            .unwrap();
+        exec.put(
+            format!("{EXECUTION_RECORD_KEY_PREFIX}hash-pending").as_bytes(),
+            &serde_json::to_vec(&pending).unwrap(),
+        )
+        .unwrap();
 
         let report = backfill_pending_dispatch_evidence(&exec, &sink).unwrap();
         assert_eq!(report.scanned, 1);

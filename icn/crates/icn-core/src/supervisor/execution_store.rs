@@ -17,7 +17,10 @@ pub struct SledExecutionStore<S: icn_store::Store> {
 }
 
 impl<S: icn_store::Store> SledExecutionStore<S> {
-    const PREFIX: &'static [u8] = b"exec:";
+    /// Sourced from the canonical prefix in `icn-kernel-api` so the store that
+    /// writes `exec:<decision_hash>` records and any external reader that scans
+    /// them (e.g. the gateway dispatch-evidence backfill) cannot drift apart.
+    const PREFIX: &'static [u8] = icn_kernel_api::execution::EXECUTION_RECORD_KEY_PREFIX.as_bytes();
 
     /// Create a new execution store backed by the given sled store.
     pub fn new(store: Arc<S>) -> Self {
