@@ -526,6 +526,14 @@ impl DecisionExecutor {
             execution_complete,
         });
 
+        // Issue #1987: persist the per-effect results alongside the stored
+        // effects so a post-crash dispatch-evidence backfill can re-derive
+        // `EffectDispatchEvidence` from the durable `(effects, results)` pair
+        // without re-executing. Set once here (before the terminal-status
+        // branching below) so every terminal outcome — Confirmed, NotExecuted,
+        // or Failed — carries the results the dispatch-evidence sink consumes.
+        record.set_results(results.clone());
+
         let all_non_executable = !results.is_empty() && results.iter().all(|r| r.not_executed);
         let mixed_non_executable =
             results.iter().any(|r| r.success) && results.iter().any(|r| r.not_executed);

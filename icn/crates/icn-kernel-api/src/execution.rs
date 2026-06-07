@@ -21,7 +21,7 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::effects::KernelEffect;
+use crate::effects::{EffectResult, KernelEffect};
 
 /// Status of a governance decision's execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -104,6 +104,19 @@ pub struct ExecutionRecord {
     #[serde(default)]
     pub effects: Vec<KernelEffect>,
 
+    /// The per-effect results produced by dispatch, stored alongside
+    /// `effects` once execution reaches a terminal status.
+    ///
+    /// This is the durable input that lets a post-crash backfill re-derive
+    /// `EffectDispatchEvidence` (Issue #1987) *without re-executing* the
+    /// effects — the dispatch-evidence sink consumes `(effects, results)`
+    /// pairs, so persisting the results here makes evidence persistence
+    /// idempotently recoverable across a crash/restart in the async
+    /// execution window. Empty for non-terminal records and for pre-upgrade
+    /// records serialized before this field existed (`#[serde(default)]`).
+    #[serde(default)]
+    pub results: Vec<EffectResult>,
+
     /// Canonical execution-truth summary for audit/API/CLI boundary surfaces.
     ///
     /// `None` means this record predates tranche-2 summary persistence and
@@ -137,8 +150,18 @@ impl ExecutionRecord {
             error: None,
             retries: 0,
             effects,
+            results: Vec::new(),
             truth_summary: None,
         }
+    }
+
+    /// Store the per-effect dispatch results on this record.
+    ///
+    /// Called once execution produces results (terminal status), so a later
+    /// dispatch-evidence backfill can re-derive evidence from the durable
+    /// `(effects, results)` pair without re-executing (Issue #1987).
+    pub fn set_results(&mut self, results: Vec<EffectResult>) {
+        self.results = results;
     }
 
     /// Transition to Executing.
@@ -271,6 +294,7 @@ pub trait ExecutionStore: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::effects::{EffectOutcome, EffectResult};
 
     #[test]
     fn test_execution_record_lifecycle() {
@@ -373,6 +397,64 @@ mod tests {
         assert!(
             record.effects.is_empty(),
             "effects should default to empty vec"
+        );
+    }
+
+    /// The per-effect `results` produced at dispatch are persisted on the
+    /// record so a post-crash backfill can re-derive `EffectDispatchEvidence`
+    /// without re-executing the effects (Issue #1987).
+    #[test]
+    fn test_execution_record_persists_results_for_evidence_backfill() {
+        let mut record = ExecutionRecord::new_pending("h-res", "prop-res", "receipt-res", vec![]);
+        assert!(
+            record.results.is_empty(),
+            "a fresh record carries no dispatch results yet"
+        );
+
+        let results = vec![EffectResult {
+            effect_id: "receipt-res".to_string(),
+            success: true,
+            message: "applied".to_string(),
+            state_change_hash: Some("sch-1".to_string()),
+            ledger_entry_id: Some("ledger-1".to_string()),
+            not_executed: false,
+            receipt_ref: Some("steward-hex".to_string()),
+            outcome: Some(EffectOutcome::Applied),
+        }];
+        record.set_results(results.clone());
+        record.mark_confirmed(vec!["ledger-1".into()], vec!["sch-1".into()]);
+
+        let json = serde_json::to_string(&record).unwrap();
+        let parsed: ExecutionRecord = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.results, results, "results survive a serde roundtrip");
+        assert_eq!(
+            parsed.results[0].receipt_ref.as_deref(),
+            Some("steward-hex")
+        );
+    }
+
+    /// Records persisted before the `results` field existed must still
+    /// deserialize, defaulting to an empty results vec (additive, serde-default).
+    #[test]
+    fn test_execution_record_backward_compat_without_results() {
+        let json = r#"{
+            "decision_hash": "old-hash",
+            "proposal_id": "old-proposal",
+            "decision_receipt_id": "old-receipt",
+            "status": "confirmed",
+            "started_at": 1700000000,
+            "finished_at": 1700000001,
+            "ledger_entry_ids": ["e1"],
+            "state_change_hashes": [],
+            "error": null,
+            "retries": 0,
+            "effects": []
+        }"#;
+
+        let record: ExecutionRecord = serde_json::from_str(json).unwrap();
+        assert!(
+            record.results.is_empty(),
+            "results should default to empty vec for pre-upgrade records"
         );
     }
 }

@@ -963,6 +963,105 @@ async fn two_sink_invocations_produce_duplicate_evidence_rows() {
     );
 }
 
+// =============================================================================
+// Issue #1987: idempotent dispatch-evidence backfill (recovery path)
+// =============================================================================
+//
+// `backfill_effects` is the recovery-only entry point. Unlike `record_effects`
+// (which is intentionally non-deduplicating — see
+// `two_sink_invocations_produce_duplicate_evidence_rows`), it reads back the
+// evidence already durable for the effect record and skips content-equivalent
+// rows. This makes a post-crash re-drive of the stored `(effects, results)`
+// idempotent: missing evidence is written exactly once; replays add nothing.
+
+/// First backfill writes the evidence that a crash dropped; a replay with the
+/// same stored results is a read-back no-op (no duplicate row).
+#[tokio::test(flavor = "current_thread")]
+async fn backfill_effects_writes_missing_evidence_then_is_idempotent() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    // The IER (durable close intent) survives the crash; only the async
+    // dispatch evidence was lost — exactly the #1987 window.
+    let ier = InstitutionalEffectRecord::new(
+        "prop-backfill",
+        "coop",
+        None,
+        "appoint_steward",
+        Some("did:icn:s".into()),
+        Some("region-bf".into()),
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![sdis_approve_effect(&candidate, "prop-backfill")];
+    let results = vec![ok_result_with_receipt_ref("eff-bf", "handle-bf")];
+    let receipt_id = "gov:domain-bf:prop-backfill:receipt";
+
+    // Crash recovery, attempt 1: evidence is missing → backfill writes it.
+    sink.backfill_effects(receipt_id, &effects, &results, 1_700_050_000);
+    let after_first = backend.evidence_for("prop-backfill");
+    assert_eq!(
+        after_first.len(),
+        1,
+        "backfill must write the evidence a crash dropped"
+    );
+    assert_eq!(after_first[0].effect_record_id, ier.record_id);
+    assert_eq!(after_first[0].receipt_ref.as_deref(), Some("handle-bf"));
+
+    // Recovery runs again (e.g. another restart) with the SAME stored results:
+    // read-back dedup must skip — no duplicate row.
+    sink.backfill_effects(receipt_id, &effects, &results, 1_700_050_999);
+    assert_eq!(
+        backend.evidence_for("prop-backfill").len(),
+        1,
+        "replaying backfill with identical stored results must not duplicate evidence"
+    );
+}
+
+/// Dedup is content-based, not record-based: a genuinely different result for
+/// the same effect record is still a distinct audit row (audit discipline is
+/// preserved — backfill never suppresses a different outcome).
+#[tokio::test(flavor = "current_thread")]
+async fn backfill_effects_keeps_distinct_outcomes() {
+    let backend = Arc::new(MemoryReceiptBackend::new());
+    let ier = InstitutionalEffectRecord::new(
+        "prop-bf-distinct",
+        "coop",
+        None,
+        "appoint_steward",
+        Some("did:icn:s".into()),
+        Some("region-d".into()),
+        None,
+        1,
+        serde_json::json!({}),
+    );
+    backend.put_institutional_effect(&ier).unwrap();
+
+    let sink =
+        GovernanceDispatchEvidenceSink::new(backend.clone() as Arc<dyn GovernanceReceiptBackend>);
+    let candidate: icn_identity::Did = IdentityBundle::generate().unwrap().did().clone();
+    let effects = vec![sdis_approve_effect(&candidate, "prop-bf-distinct")];
+    let receipt_id = "gov:domain-d:prop-bf-distinct:receipt";
+
+    sink.backfill_effects(
+        receipt_id,
+        &effects,
+        &[failure_result("eff-d", "commons error")],
+        1,
+    );
+    sink.backfill_effects(receipt_id, &effects, &[ok_result("eff-d")], 2);
+
+    assert_eq!(
+        backend.evidence_for("prop-bf-distinct").len(),
+        2,
+        "a different (success/error) outcome is a distinct audit row, not a dedup hit"
+    );
+}
+
 /// Daemon-bootstrap wiring parity:
 ///
 /// The daemon constructs a [`DeferredDispatchEvidenceSink`] *before* the

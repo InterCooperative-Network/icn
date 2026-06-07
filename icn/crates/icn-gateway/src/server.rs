@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use tracing_actix_web::TracingLogger;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -713,6 +713,44 @@ impl GatewayServer {
         if let Some(ref actor_handle) = self.governance_actor_handle {
             actor_handle.recover_incomplete_closes().await;
             info!("Replayed incomplete governance close-journal entries (post-sink recovery)");
+        }
+
+        // Issue #1987: backfill any EffectDispatchEvidence dropped in the async
+        // execution window. Runs AFTER the dispatch-evidence sink backend is
+        // installed (above) and the close-journal replay, using the same
+        // execution-record store the decision executor writes to. The sink's
+        // backfill path is idempotent (read-back dedup), so a clean restart
+        // re-scans and writes nothing, and replay never duplicates evidence.
+        if let (Some(execution_store), Some(sink)) = (
+            self.execution_query_store.as_ref(),
+            self.dispatch_evidence_sink_installer.as_ref(),
+        ) {
+            match crate::dispatch_evidence_backfill::backfill_pending_dispatch_evidence(
+                execution_store,
+                sink,
+            ) {
+                Ok(report) if report.redriven > 0 => {
+                    info!(
+                        scanned = report.scanned,
+                        redriven = report.redriven,
+                        skipped = report.skipped,
+                        unparsable = report.unparsable,
+                        "Backfilled dispatch evidence for recovered execution records (post-sink recovery)"
+                    );
+                }
+                Ok(report) => {
+                    debug!(
+                        scanned = report.scanned,
+                        "Dispatch-evidence backfill: no terminal records required healing"
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        error = %e,
+                        "Dispatch-evidence backfill scan failed (non-fatal; evidence may remain incomplete until next startup)"
+                    );
+                }
+            }
         }
 
         // Execution record query store (read-only API surface).

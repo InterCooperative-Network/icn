@@ -111,6 +111,16 @@ impl GovernanceDispatchEvidenceSink {
     /// pre-resolved `InstitutionalEffectRecord.record_id`. Kept
     /// separate so the batch entry point can amortize the IER lookup
     /// across all pairs.
+    ///
+    /// `dedup` is set only on the recovery/backfill path ([`backfill_effects`]):
+    /// when true, the existing evidence for `effect_record_id` is read back and
+    /// a content-equivalent row short-circuits the write, so a post-crash
+    /// re-drive of the stored `(effects, results)` is idempotent (Issue #1987).
+    /// The live `record_effects` path passes `false` — it is intentionally
+    /// non-deduplicating (single-owner invariant; see the regression test
+    /// `two_sink_invocations_produce_duplicate_evidence_rows`).
+    ///
+    /// [`backfill_effects`]: GovernanceDispatchEvidenceSink::backfill_effects
     fn write_one(
         &self,
         proposal_id: &str,
@@ -119,6 +129,7 @@ impl GovernanceDispatchEvidenceSink {
         effect: &KernelEffect,
         result: &EffectResult,
         recorded_at: u64,
+        dedup: bool,
     ) {
         let subsystem = kernel_effect_subsystem(effect).to_string();
         let error_message = if result.success {
@@ -126,6 +137,49 @@ impl GovernanceDispatchEvidenceSink {
         } else {
             Some(result.message.clone())
         };
+
+        if dedup {
+            // Read-back idempotency for the backfill path. Compare on the
+            // semantic identity of a dispatch outcome — subsystem, success,
+            // downstream handle, diagnostic, and structural outcome class —
+            // ignoring the row's own `evidence_id`/`recorded_at`. A
+            // content-equivalent row already present means this evidence was
+            // durably written before the crash; skip to avoid a duplicate.
+            match self
+                .backend
+                .list_effect_dispatch_evidence_by_record(effect_record_id)
+            {
+                Ok(existing) => {
+                    let already_present = existing.iter().any(|e| {
+                        e.subsystem == subsystem
+                            && e.success == result.success
+                            && e.receipt_ref == result.receipt_ref
+                            && e.error_message == error_message
+                            && e.outcome == result.outcome
+                    });
+                    if already_present {
+                        tracing::debug!(
+                            proposal_id = %proposal_id,
+                            effect_kind = %effect_kind,
+                            "dispatch-evidence backfill: equivalent evidence already durable; skipping (idempotent)"
+                        );
+                        return;
+                    }
+                }
+                Err(e) => {
+                    // A flaky read must not strand evidence: fall through and
+                    // write. A rare duplicate is preferable to a permanent gap;
+                    // a subsequent clean backfill will dedup against this row.
+                    tracing::warn!(
+                        proposal_id = %proposal_id,
+                        effect_kind = %effect_kind,
+                        error = %e,
+                        "dispatch-evidence backfill: read-back for dedup failed; writing to avoid a permanent gap"
+                    );
+                }
+            }
+        }
+
         let evidence = EffectDispatchEvidence::new(
             effect_record_id.to_string(),
             proposal_id.to_string(),
@@ -161,13 +215,42 @@ impl GovernanceDispatchEvidenceSink {
     }
 }
 
-impl DispatchEvidenceSink for GovernanceDispatchEvidenceSink {
-    fn record_effects(
+impl GovernanceDispatchEvidenceSink {
+    /// Idempotent recovery/backfill entry point (Issue #1987).
+    ///
+    /// Re-drives the same `(effects, results)` the dispatcher stored on its
+    /// durable [`ExecutionRecord`], persisting any `EffectDispatchEvidence`
+    /// that a crash in the async execution window dropped. Unlike
+    /// [`record_effects`], this path reads back the evidence already durable
+    /// for each effect record and skips content-equivalent rows, so replaying
+    /// across multiple restarts never duplicates evidence.
+    ///
+    /// This is deliberately a *separate* method from `record_effects`: the
+    /// live dispatch path stays non-deduplicating (single-owner invariant),
+    /// and only the recovery path opts into read-back dedup.
+    ///
+    /// [`record_effects`]: DispatchEvidenceSink::record_effects
+    /// [`ExecutionRecord`]: icn_kernel_api::execution::ExecutionRecord
+    pub fn backfill_effects(
         &self,
         decision_receipt_id: &str,
         effects: &[KernelEffect],
         results: &[EffectResult],
         recorded_at: u64,
+    ) {
+        self.record_effects_inner(decision_receipt_id, effects, results, recorded_at, true);
+    }
+
+    /// Shared body for [`DispatchEvidenceSink::record_effects`] (the live,
+    /// non-deduplicating path, `dedup = false`) and [`backfill_effects`] (the
+    /// recovery path, `dedup = true`).
+    fn record_effects_inner(
+        &self,
+        decision_receipt_id: &str,
+        effects: &[KernelEffect],
+        results: &[EffectResult],
+        recorded_at: u64,
+        dedup: bool,
     ) {
         let Some(proposal_id) = parse_proposal_id(decision_receipt_id) else {
             tracing::debug!(
@@ -219,8 +302,23 @@ impl DispatchEvidenceSink for GovernanceDispatchEvidenceSink {
                 effect,
                 result,
                 recorded_at,
+                dedup,
             );
         }
+    }
+}
+
+impl DispatchEvidenceSink for GovernanceDispatchEvidenceSink {
+    fn record_effects(
+        &self,
+        decision_receipt_id: &str,
+        effects: &[KernelEffect],
+        results: &[EffectResult],
+        recorded_at: u64,
+    ) {
+        // Live dispatch path: intentionally non-deduplicating (single-owner
+        // invariant). The recovery path uses `backfill_effects` instead.
+        self.record_effects_inner(decision_receipt_id, effects, results, recorded_at, false);
     }
 }
 
@@ -277,6 +375,31 @@ impl DeferredDispatchEvidenceSink {
     /// health checks.
     pub fn is_installed(&self) -> bool {
         self.inner.get().is_some()
+    }
+
+    /// Idempotent recovery/backfill entry point (Issue #1987), forwarded to the
+    /// installed [`GovernanceDispatchEvidenceSink`]. The daemon installs the
+    /// backend before recovery runs, so this normally delegates; a pre-install
+    /// call is a logged no-op (honest best-effort, mirroring `record_effects`).
+    pub fn backfill_effects(
+        &self,
+        decision_receipt_id: &str,
+        effects: &[KernelEffect],
+        results: &[EffectResult],
+        recorded_at: u64,
+    ) {
+        match self.inner.get() {
+            Some(inner) => {
+                inner.backfill_effects(decision_receipt_id, effects, results, recorded_at)
+            }
+            None => {
+                tracing::debug!(
+                    receipt_id = %decision_receipt_id,
+                    effect_count = effects.len(),
+                    "DeferredDispatchEvidenceSink: no backend installed yet; dropping backfill batch"
+                );
+            }
+        }
     }
 }
 
