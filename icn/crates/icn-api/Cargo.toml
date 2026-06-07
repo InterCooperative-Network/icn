@@ -38,6 +38,8 @@ base64 = "0.22"
 
 [dev-dependencies]
 tokio = { version = "1.49", features = ["rt-multi-thread", "macros"] }
+icn-store = { path = "../icn-store" }
+tempfile = "3.24"
 
 [lints]
 workspace = true
