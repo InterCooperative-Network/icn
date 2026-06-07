@@ -1550,7 +1550,10 @@ impl GovernanceActor {
             "Replaying incomplete governance close(s) from the write-ahead journal"
         );
         for entry in intents {
-            self.complete_journaled_close(entry).await;
+            // Best-effort on startup: failures are logged inside and the entry is
+            // left for the next startup's replay, so the result is intentionally
+            // ignored here (unlike the close handler's retry path, which surfaces it).
+            let _ = self.complete_journaled_close(entry).await;
         }
     }
 
@@ -1564,7 +1567,18 @@ impl GovernanceActor {
     /// rather than overwriting it with a fresh (possibly different tally /
     /// decision-hash) one — so the first attempt's already-durable, append-only
     /// receipt is never orphaned.
-    async fn complete_journaled_close(&self, entry: crate::close_journal::CloseJournalEntry) {
+    ///
+    /// Returns `Ok(())` once the close is fully durable (proposal committed,
+    /// side effects persisted, every artifact fsynced) — even if clearing the
+    /// now-redundant journal marker afterward fails, since a recovery sweep
+    /// clears it idempotently. Returns `Err` if completion did NOT reach
+    /// durability, so the close handler's retry path can report the close as
+    /// unfinished rather than falsely successful. Startup recovery ignores the
+    /// result (best-effort; failures are logged and replayed next startup).
+    async fn complete_journaled_close(
+        &self,
+        entry: crate::close_journal::CloseJournalEntry,
+    ) -> std::result::Result<(), String> {
         let proposal_id = entry.proposal.id.clone();
         // 1. Re-commit the durable state (receipts + proof + proposal),
         //    idempotently. On failure, leave the entry for replay.
@@ -1574,7 +1588,7 @@ impl GovernanceActor {
                 error = %e,
                 "Could not complete a journaled governance close; leaving the journal entry for replay"
             );
-            return;
+            return Err(format!("commit failed: {e}"));
         }
         // 2. Replay the durable post-commit side effects (downstream event,
         //    action items, non-execution-required institutional-effect +
@@ -1599,7 +1613,7 @@ impl GovernanceActor {
                 "Journaled close committed durable state but a durable side effect did not \
                  persist; leaving the journal entry for replay"
             );
-            return;
+            return Err(format!("durable side effect failed: {e}"));
         }
         // 3. Force every artifact store durable before clearing the entry.
         if let Err(e) = self.flush_close_durability() {
@@ -1609,9 +1623,11 @@ impl GovernanceActor {
                 "Journaled close completed but a durable artifact store did not fsync; \
                  leaving the journal entry for replay"
             );
-            return;
+            return Err(format!("durability flush failed: {e}"));
         }
-        // 4. Clear the entry only once the whole completion is durable.
+        // 4. The close is now fully durable. Clearing the journal marker is
+        //    best-effort: a failure here leaves the now-redundant entry for an
+        //    idempotent recovery sweep, but the close itself has succeeded.
         match self.store.delete_close_intent(&proposal_id) {
             Ok(()) => info!(
                 proposal_id = %proposal_id.0,
@@ -1624,6 +1640,7 @@ impl GovernanceActor {
                  it will be replayed idempotently"
             ),
         }
+        Ok(())
     }
 
     /// Force every durable store a completed close wrote to fsync, before its
@@ -2104,8 +2121,17 @@ impl GovernanceActor {
                         proposal_id = %proposal_id.0,
                         "In-flight close-journal entry found; completing it instead of re-running the close"
                     );
-                    self.complete_journaled_close(existing).await;
-                    return Ok(());
+                    // Propagate whether completion actually reached durability:
+                    // a transient store failure here must surface as an error, not
+                    // a falsely-successful close (the proposal may still be Open
+                    // with the journal left for replay).
+                    return self.complete_journaled_close(existing).await.map_err(|e| {
+                        anyhow::anyhow!(
+                            "Close retry for proposal '{}' could not complete the in-flight \
+                             journal entry: {e}",
+                            proposal_id.0
+                        )
+                    });
                 }
 
                 // Load proposal

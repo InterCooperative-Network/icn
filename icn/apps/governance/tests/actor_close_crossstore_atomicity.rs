@@ -1325,3 +1325,72 @@ async fn close_retry_completes_existing_intent_without_overwrite() {
 
     actor_handle.shutdown().await;
 }
+
+/// A retry that finds an in-flight journal entry but still cannot complete the
+/// close durably (e.g. the terminal save keeps failing) must surface an error —
+/// not report a falsely-successful close while the proposal is still Open and
+/// the journal is left for replay.
+#[tokio::test(flavor = "current_thread")]
+async fn close_retry_propagates_completion_failure() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp.path().to_path_buf();
+
+    let (backend, fail_store, actor_handle, proposal_id) =
+        open_voted_proposal(&db_path, None).await;
+    actor_handle.install_receipt_store(backend.clone()).await;
+
+    // Attempt 1: terminal save fails → journal entry retained, proposal Open.
+    fail_store.arm();
+    let _ = actor_handle
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: proposal_id.clone(),
+            eligible_voters: None,
+            excluded_delegators: None,
+            capability_scope: None,
+        })
+        .await;
+    let state: Arc<dyn GovernanceStateStore> =
+        Arc::new(SledGovernanceStateStore::new(fail_store.clone()));
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        1,
+        "attempt 1 leaves a journal entry"
+    );
+
+    // Attempt 2 (retry) while the terminal save STILL fails: completing the
+    // existing entry cannot reach durability, so the retry must report Err.
+    let result = actor_handle
+        .submit(GovernanceCommand::CloseProposal {
+            proposal_id: proposal_id.clone(),
+            eligible_voters: None,
+            excluded_delegators: None,
+            capability_scope: None,
+        })
+        .await;
+    assert!(
+        result.is_err(),
+        "a retry that cannot complete the close must surface an error, not a falsely-successful Ok"
+    );
+    let persisted = state
+        .get_proposal(&proposal_id)
+        .expect("get_proposal")
+        .expect("proposal exists");
+    assert!(
+        matches!(persisted.state, ProposalState::Open { .. }),
+        "the proposal remains Open when completion fails; got {:?}",
+        persisted.state
+    );
+    assert_eq!(
+        state
+            .list_close_intents()
+            .expect("list_close_intents")
+            .len(),
+        1,
+        "the journal entry is retained for a later replay"
+    );
+
+    actor_handle.shutdown().await;
+}
