@@ -1944,6 +1944,15 @@ impl GovernanceReceiptBackend for ReceiptStore {
         self.put_governance(receipt).map(|_| ())
     }
 
+    fn flush(&self) -> Result<(), String> {
+        // Force the receipt DB's buffered writes durable so the governance close
+        // journal cannot be cleared while a v1/v3 receipt is still un-fsynced.
+        self.db
+            .flush()
+            .map(|_| ())
+            .map_err(|e| format!("receipt store flush: {e}"))
+    }
+
     fn get_governance_by_proposal(
         &self,
         proposal_id: &str,

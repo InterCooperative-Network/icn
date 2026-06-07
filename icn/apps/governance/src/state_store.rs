@@ -14,6 +14,8 @@ use icn_governance::{
 use icn_identity::Did;
 use icn_store::Store;
 
+use crate::close_journal::CloseJournalEntry;
+
 // ---- Trait ----
 
 /// State storage abstraction for the GovernanceActor.
@@ -76,6 +78,51 @@ pub trait GovernanceStateStore: Send + Sync {
 
     /// Persist raw proof bytes for a proposal.
     fn save_proof_bytes(&self, proposal_id: &ProposalId, proof: &[u8]) -> Result<()>;
+
+    // --- Close journal (write-ahead log for cross-store-atomic close) ---
+
+    /// Persist a write-ahead [`CloseJournalEntry`] recording an in-flight
+    /// proposal close, keyed by the proposal id. Written before any
+    /// terminal-region provenance write so a crash or terminal-save failure
+    /// after a receipt is durable can be replayed to completion rather than
+    /// left as a permanent phantom-accepted half-close. See
+    /// [`crate::close_journal`].
+    ///
+    /// Default impl is a no-op so non-durable test stores opt out of
+    /// write-ahead recovery without breaking; the sled-backed store overrides.
+    fn save_close_intent(&self, _entry: &CloseJournalEntry) -> Result<()> {
+        Ok(())
+    }
+
+    /// Delete the close-journal entry for a proposal once its close is fully
+    /// durable. Idempotent: deleting a missing entry is `Ok(())`.
+    fn delete_close_intent(&self, _proposal_id: &ProposalId) -> Result<()> {
+        Ok(())
+    }
+
+    /// List all lingering close-journal entries, for replay on actor startup.
+    /// Default impl returns an empty list (the store opts out of recovery).
+    fn list_close_intents(&self) -> Result<Vec<CloseJournalEntry>> {
+        Ok(vec![])
+    }
+
+    /// Fetch the close-journal entry for a specific proposal, if one is in
+    /// flight. Lets the close handler detect a prior incomplete attempt and
+    /// complete THAT entry rather than overwriting it with a fresh close (which
+    /// would orphan the first attempt's already-durable append-only receipt).
+    /// Default impl returns `None`.
+    fn get_close_intent(&self, _proposal_id: &ProposalId) -> Result<Option<CloseJournalEntry>> {
+        Ok(None)
+    }
+
+    /// Force buffered state-store writes durable (fsync).
+    ///
+    /// Default no-op; the sled-backed store overrides it. `save_close_intent`
+    /// uses this so the write-ahead record is durable before the caller writes
+    /// cross-store provenance artifacts.
+    fn flush(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 // ---- Key helpers ----
@@ -114,6 +161,14 @@ fn delegation_key_prefix() -> &'static [u8] {
 
 fn proof_key(proposal_id: &ProposalId) -> Vec<u8> {
     format!("governance:proof:{}", proposal_id.0).into_bytes()
+}
+
+fn close_intent_key(id: &ProposalId) -> Vec<u8> {
+    format!("gov:close-intent:{}", id.0).into_bytes()
+}
+
+fn close_intent_key_prefix() -> &'static [u8] {
+    b"gov:close-intent:"
 }
 
 // ---- Utility ----
@@ -245,5 +300,42 @@ impl GovernanceStateStore for SledGovernanceStateStore {
 
     fn save_proof_bytes(&self, proposal_id: &ProposalId, proof: &[u8]) -> Result<()> {
         self.store.put(&proof_key(proposal_id), proof)
+    }
+
+    // --- Close journal ---
+
+    fn save_close_intent(&self, entry: &CloseJournalEntry) -> Result<()> {
+        self.store.put(
+            &close_intent_key(&entry.proposal.id),
+            &serde_json::to_vec(entry)?,
+        )?;
+        // Force the write-ahead record durable BEFORE the caller writes any
+        // cross-store provenance artifact. `Store::put` only buffers the sled
+        // insert; without this fsync a crash could persist a Db-A governance
+        // receipt while losing the unflushed intent in Db-B, reviving the
+        // phantom-accepted half-close the journal exists to prevent.
+        self.store.flush()
+    }
+
+    fn delete_close_intent(&self, proposal_id: &ProposalId) -> Result<()> {
+        self.store.delete(&close_intent_key(proposal_id))
+    }
+
+    fn flush(&self) -> Result<()> {
+        self.store.flush()
+    }
+
+    fn list_close_intents(&self) -> Result<Vec<CloseJournalEntry>> {
+        let rows = self.store.scan(close_intent_key_prefix())?;
+        rows.into_iter()
+            .map(|(_k, v)| Ok(serde_json::from_slice::<CloseJournalEntry>(&v)?))
+            .collect()
+    }
+
+    fn get_close_intent(&self, proposal_id: &ProposalId) -> Result<Option<CloseJournalEntry>> {
+        match self.store.get(&close_intent_key(proposal_id))? {
+            Some(bytes) => Ok(Some(serde_json::from_slice::<CloseJournalEntry>(&bytes)?)),
+            None => Ok(None),
+        }
     }
 }

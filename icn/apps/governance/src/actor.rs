@@ -578,6 +578,23 @@ impl GovernanceHandle {
         actor.receipt_store = Some(store);
     }
 
+    /// Replay any incomplete write-ahead close-journal entries to completion.
+    ///
+    /// Deployment wiring MUST call this once at startup, AFTER every durable
+    /// downstream sink a recovered close can feed is installed — in particular
+    /// the receipt store ([`Self::install_receipt_store`]) AND the deferred
+    /// dispatch-evidence sink. Recovery re-emits recovered `ProposalAccepted`
+    /// events, which can drive executable effects whose `EffectDispatchEvidence`
+    /// would be permanently dropped if its sink were not yet installed (the
+    /// deferred sink drops batches until its backend is wired). This is
+    /// deliberately DECOUPLED from `install_receipt_store` so the dispatch sink
+    /// can be installed in between — see the gateway `server.rs` wiring.
+    ///
+    /// A no-op when there is nothing to recover.
+    pub async fn recover_incomplete_closes(&self) {
+        self.inner.read().await.recover_incomplete_closes().await;
+    }
+
     /// List all protocol parameters
     pub fn list_protocol_parameters(&self) -> Result<Vec<ProtocolParameter>> {
         match &self.protocol_params {
@@ -1505,6 +1522,289 @@ impl GovernanceActor {
         Some(icn_governance::ProposalThresholds::new(quorum, approval))
     }
 
+    /// Replay any lingering write-ahead close-journal entries to completion.
+    ///
+    /// Called once a receipt backend is installed — the point at which both the
+    /// proposal state store (Db-B) and the receipt store (Db-A) are available.
+    /// For each durable [`CloseJournalEntry`](crate::close_journal::CloseJournalEntry)
+    /// left behind by a close whose terminal commit did not finish (the process
+    /// crashed, or the terminal `save_proposal` failed after a receipt was
+    /// already durable), re-run `commit` — every artifact write is idempotent —
+    /// and clear the entry. This heals a phantom-accepted half-close: receipts
+    /// already durable in the receipt store are matched by the now-committed
+    /// terminal proposal state. Recovery never deletes an append-only receipt;
+    /// it only completes the close that was already decided.
+    async fn recover_incomplete_closes(&self) {
+        let intents = match self.store.list_close_intents() {
+            Ok(intents) => intents,
+            Err(e) => {
+                warn!("Could not scan governance close-journal for recovery: {e}");
+                return;
+            }
+        };
+        if intents.is_empty() {
+            return;
+        }
+        info!(
+            count = intents.len(),
+            "Replaying incomplete governance close(s) from the write-ahead journal"
+        );
+        for entry in intents {
+            // Best-effort on startup: failures are logged inside and the entry is
+            // left for the next startup's replay, so the result is intentionally
+            // ignored here (unlike the close handler's retry path, which surfaces it).
+            let _ = self.complete_journaled_close(entry).await;
+        }
+    }
+
+    /// Drive a single write-ahead close-journal entry to completion: re-commit
+    /// its durable state (idempotent), replay the durable post-commit side
+    /// effects, fsync every artifact store, and only then clear the entry. On any
+    /// failure the entry is LEFT for an idempotent replay.
+    ///
+    /// Shared by startup recovery AND the close handler: if a close is retried
+    /// before restart, the handler completes the EXISTING entry through here
+    /// rather than overwriting it with a fresh (possibly different tally /
+    /// decision-hash) one — so the first attempt's already-durable, append-only
+    /// receipt is never orphaned.
+    ///
+    /// Returns `Ok(())` once the close is fully durable (proposal committed,
+    /// side effects persisted, every artifact fsynced) — even if clearing the
+    /// now-redundant journal marker afterward fails, since a recovery sweep
+    /// clears it idempotently. Returns `Err` if completion did NOT reach
+    /// durability, so the close handler's retry path can report the close as
+    /// unfinished rather than falsely successful. Startup recovery ignores the
+    /// result (best-effort; failures are logged and replayed next startup).
+    async fn complete_journaled_close(
+        &self,
+        entry: crate::close_journal::CloseJournalEntry,
+    ) -> std::result::Result<(), String> {
+        let proposal_id = entry.proposal.id.clone();
+        // 1. Re-commit the durable state (receipts + proof + proposal),
+        //    idempotently. On failure, leave the entry for replay.
+        if let Err(e) = entry.commit(self.receipt_store.as_deref(), self.store.as_ref()) {
+            warn!(
+                proposal_id = %proposal_id.0,
+                error = %e,
+                "Could not complete a journaled governance close; leaving the journal entry for replay"
+            );
+            return Err(format!("commit failed: {e}"));
+        }
+        // 2. Replay the durable post-commit side effects (downstream event,
+        //    action items, non-execution-required institutional-effect +
+        //    mandate). All idempotent.
+        let outcome = match &entry.proposal.state {
+            ProposalState::Accepted { .. } => DecisionOutcome::Accepted,
+            ProposalState::NoQuorum { .. } => DecisionOutcome::NoQuorum,
+            _ => DecisionOutcome::Rejected,
+        };
+        if let Err(e) = self
+            .emit_close_downstream_effects(
+                &entry.proposal,
+                outcome,
+                entry.decided_at,
+                entry.governance_decision_hash.clone(),
+            )
+            .await
+        {
+            warn!(
+                proposal_id = %proposal_id.0,
+                error = %e,
+                "Journaled close committed durable state but a durable side effect did not \
+                 persist; leaving the journal entry for replay"
+            );
+            return Err(format!("durable side effect failed: {e}"));
+        }
+        // 3. Force every artifact store durable before clearing the entry.
+        if let Err(e) = self.flush_close_durability() {
+            warn!(
+                proposal_id = %proposal_id.0,
+                error = %e,
+                "Journaled close completed but a durable artifact store did not fsync; \
+                 leaving the journal entry for replay"
+            );
+            return Err(format!("durability flush failed: {e}"));
+        }
+        // 4. The close is now fully durable. Clearing the journal marker is
+        //    best-effort: a failure here leaves the now-redundant entry for an
+        //    idempotent recovery sweep, but the close itself has succeeded.
+        match self.store.delete_close_intent(&proposal_id) {
+            Ok(()) => info!(
+                proposal_id = %proposal_id.0,
+                "Completed journaled governance close from the write-ahead journal"
+            ),
+            Err(e) => warn!(
+                proposal_id = %proposal_id.0,
+                error = %e,
+                "Journaled close completed but clearing its journal entry failed; \
+                 it will be replayed idempotently"
+            ),
+        }
+        Ok(())
+    }
+
+    /// Force every durable store a completed close wrote to fsync, before its
+    /// write-ahead journal entry is cleared.
+    ///
+    /// A close persists artifacts across up to three independent sled DBs — the
+    /// receipt store (v1/v3/allocation receipts), the action-item store
+    /// (materialized obligations), and the proposal state store (proof bytes +
+    /// terminal proposal) — each with independent flush timing. Without this
+    /// barrier the state DB could flush the proposal + journal-clear while the
+    /// receipt DB has not flushed, leaving a terminal proposal with a missing
+    /// receipt and a broken audit chain. Returns `Err` (naming the failing store)
+    /// so the caller retains the journal entry for an idempotent replay rather
+    /// than clearing it over an un-fsynced artifact.
+    fn flush_close_durability(&self) -> std::result::Result<(), String> {
+        if let Some(ref backend) = self.receipt_store {
+            backend.flush().map_err(|e| format!("receipt store: {e}"))?;
+        }
+        if let Some(ref store) = self.action_item_store {
+            store
+                .flush()
+                .map_err(|e| format!("action item store: {e}"))?;
+        }
+        self.store
+            .flush()
+            .map_err(|e| format!("state store: {e}"))?;
+        Ok(())
+    }
+
+    /// Run the durable, idempotent post-commit side effects of a close —
+    /// downstream `SystemEvent` emission (event-driven execution), action-item
+    /// materialization, and, for non-execution-required accepted proposals,
+    /// institutional-effect + ADR-0014 mandate emission.
+    ///
+    /// Shared by the live close path and write-ahead recovery so a recovered
+    /// close reproduces the same downstream obligations rather than losing them.
+    /// Every effect is idempotent: action items dedup by linked proposal, and
+    /// the institutional-effect / mandate seams are AlreadyEmitted/AlreadyMinted
+    /// no-ops, so replaying on recovery (at-least-once) converges. The gossip
+    /// broadcast is deliberately NOT run here — it is fired only on the live
+    /// close path and is eventually-consistent via anti-entropy, so a recovered
+    /// close does not need to re-broadcast.
+    async fn emit_close_downstream_effects(
+        &self,
+        proposal: &Proposal,
+        outcome: DecisionOutcome,
+        decided_at: u64,
+        governance_decision_hash: Option<String>,
+    ) -> std::result::Result<(), String> {
+        // Accumulates failures of the DURABLE obligations (action items,
+        // institutional effect, mandate). If non-empty, the caller keeps the
+        // write-ahead journal entry so a later idempotent replay can complete
+        // them rather than dropping the obligation. The downstream event is a
+        // fire-and-forget trigger and does not gate (re-emit is at-least-once).
+        let mut failures: Vec<String> = Vec::new();
+
+        // Downstream event — drives ledger transactions / event-driven execution.
+        if let Some(ref event_bus) = self.event_bus {
+            let event = match outcome {
+                DecisionOutcome::Accepted => match serde_json::to_value(&proposal.payload) {
+                    Ok(payload) => {
+                        let canonical_payload_hash = serde_json::to_string(&payload)
+                            .ok()
+                            .map(|s| blake3::hash(s.as_bytes()).to_hex().to_string());
+                        SystemEvent::ProposalAccepted {
+                            proposal_id: proposal.id.0.clone(),
+                            domain_id: proposal.domain_id.0.clone(),
+                            payload,
+                            decided_at,
+                            canonical_payload_hash,
+                            governance_decision_hash: governance_decision_hash.clone(),
+                        }
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to serialize payload for accepted proposal {}: {e}",
+                            proposal.id.0
+                        );
+                        SystemEvent::ProposalExecutionFailed {
+                            proposal_id: proposal.id.0.clone(),
+                            proposal_type: proposal.payload.type_name().to_string(),
+                            error: format!("payload serialization failed: {e}"),
+                            failed_at: decided_at,
+                        }
+                    }
+                },
+                _ => SystemEvent::ProposalRejected {
+                    proposal_id: proposal.id.0.clone(),
+                    domain_id: proposal.domain_id.0.clone(),
+                    decided_at,
+                },
+            };
+            event_bus.emit(event).await;
+        }
+
+        // Decision-to-Action bridge — materialize durable action items
+        // (idempotent: `materialize_action_items` dedups by linked proposal).
+        if matches!(outcome, DecisionOutcome::Accepted)
+            && !proposal.action_items_on_accept.is_empty()
+        {
+            if let Some(ref store) = self.action_item_store {
+                if let Err(e) =
+                    Self::materialize_action_items(store, proposal, &proposal.id, decided_at)
+                {
+                    failures.push(e);
+                }
+            }
+        }
+
+        // Non-execution-required accepted proposals emit their
+        // InstitutionalEffectRecord + ADR-0014 mandate here; execution-required
+        // ones already did so as a preflight before the journal. Idempotent on
+        // (proposal_id, effect_kind) / mandate id.
+        let requires_execution_closure = matches!(outcome, DecisionOutcome::Accepted)
+            && proposal.payload.requires_execution_closure();
+        if matches!(outcome, DecisionOutcome::Accepted) && !requires_execution_closure {
+            if let Some(ref store) = self.receipt_store {
+                let decision_hash: Option<icn_kernel_api::receipts::Hash> =
+                    governance_decision_hash
+                        .as_deref()
+                        .and_then(|h| hex::decode(h).ok())
+                        .and_then(|v| <[u8; 32]>::try_from(v.as_slice()).ok());
+                if let Err(e) = crate::institutional_effect::emit_accepted_effect(
+                    store.as_ref(),
+                    &proposal.id.0,
+                    &proposal.domain_id.0,
+                    decision_hash,
+                    &proposal.payload,
+                    decided_at,
+                ) {
+                    error!(
+                        proposal_id = %proposal.id.0,
+                        error = %e,
+                        "Actor failed to emit InstitutionalEffectRecord"
+                    );
+                    failures.push(format!("institutional effect: {e}"));
+                }
+                if let Some(decision_hash) = decision_hash {
+                    if let Err(e) = crate::grant_minting::mint_and_persist_for_accepted(
+                        store.as_ref(),
+                        &proposal.id.0,
+                        &proposal.domain_id,
+                        decision_hash,
+                        &proposal.payload,
+                        decided_at,
+                    ) {
+                        error!(
+                            proposal_id = %proposal.id.0,
+                            error = %e,
+                            "Actor failed to persist ADR-0014 mandate"
+                        );
+                        failures.push(format!("mandate: {e}"));
+                    }
+                }
+            }
+        }
+
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            Err(failures.join("; "))
+        }
+    }
+
     /// Handle a governance command
     async fn handle(&mut self, cmd: GovernanceCommand) -> Result<()> {
         match cmd {
@@ -1808,6 +2108,32 @@ impl GovernanceActor {
                 // Notify scheduler to cancel any pending events (if scheduled)
                 let _ = self.cancel_tx.send(proposal_id.clone());
 
+                // If a prior close attempt for this proposal already wrote a
+                // durable write-ahead journal entry (it committed a receipt but
+                // did not finish), COMPLETE that entry instead of starting a fresh
+                // close. Re-running would recompute the tally / decision hash from
+                // whatever votes/eligibility now exist and `save_close_intent`
+                // would overwrite the only replay record — orphaning the first
+                // attempt's already-durable, append-only receipt so recovery could
+                // never reconcile it. Completing the existing entry is idempotent.
+                if let Some(existing) = self.store.get_close_intent(&proposal_id)? {
+                    info!(
+                        proposal_id = %proposal_id.0,
+                        "In-flight close-journal entry found; completing it instead of re-running the close"
+                    );
+                    // Propagate whether completion actually reached durability:
+                    // a transient store failure here must surface as an error, not
+                    // a falsely-successful close (the proposal may still be Open
+                    // with the journal left for replay).
+                    return self.complete_journaled_close(existing).await.map_err(|e| {
+                        anyhow::anyhow!(
+                            "Close retry for proposal '{}' could not complete the in-flight \
+                             journal entry: {e}",
+                            proposal_id.0
+                        )
+                    });
+                }
+
                 // Load proposal
                 let mut proposal = self
                     .load_proposal(&proposal_id)?
@@ -2093,46 +2419,55 @@ impl GovernanceActor {
                 // artifact — behind for a still-Open proposal. Routes through the
                 // fail-closed `put_governance_decision_v3` → `put_opaque` seam; the
                 // gateway never imports the v3 type.
-                if let Some(scope) = capability_scope.as_deref() {
-                    if let Some(ref store) = self.receipt_store {
-                        use icn_governance::proof::ProofOutcome;
-                        let v3_outcome = match outcome_result {
-                            DecisionOutcome::Accepted => ProofOutcome::Accepted,
-                            DecisionOutcome::Rejected => ProofOutcome::Rejected,
-                            DecisionOutcome::NoQuorum => ProofOutcome::NoQuorum,
-                        };
-                        let receipt_v3 = icn_governance::GovernanceDecisionReceiptV3::new(
-                            proposal_id.0.clone(),
-                            proposal.domain_id.0.clone(),
-                            v3_outcome,
-                            tally.clone(),
-                            &votes,
-                            scope.to_string(),
-                            icn_governance::ReceiptMandateAttestation::ProcessAuthorized,
-                        )
-                        .map_err(|e| {
-                            anyhow::anyhow!(
-                                "Invalid v3 decision receipt for proposal {}: {e}",
-                                proposal_id.0
+                // Build the v3 receipt here — its `::new` validation still fails
+                // closed BEFORE the close-journal intent is written — but DEFER its
+                // durable write into the write-ahead `CloseJournalEntry` commit
+                // below. Bundling the v3, proof, v1, and allocation writes with the
+                // terminal proposal save behind the journal is what makes the close
+                // cross-store-atomic and recoverable (crate::close_journal).
+                let pending_v3: Option<crate::close_journal::DecisionV3Entry> =
+                    if let Some(scope) = capability_scope.as_deref() {
+                        if self.receipt_store.is_some() {
+                            use icn_governance::proof::ProofOutcome;
+                            let v3_outcome = match outcome_result {
+                                DecisionOutcome::Accepted => ProofOutcome::Accepted,
+                                DecisionOutcome::Rejected => ProofOutcome::Rejected,
+                                DecisionOutcome::NoQuorum => ProofOutcome::NoQuorum,
+                            };
+                            let receipt_v3 = icn_governance::GovernanceDecisionReceiptV3::new(
+                                proposal_id.0.clone(),
+                                proposal.domain_id.0.clone(),
+                                v3_outcome,
+                                tally.clone(),
+                                &votes,
+                                scope.to_string(),
+                                icn_governance::ReceiptMandateAttestation::ProcessAuthorized,
                             )
-                        })?;
-                        store
-                            .put_governance_decision_v3(&receipt_v3, now)
                             .map_err(|e| {
                                 anyhow::anyhow!(
-                                    "Failed to persist v3 decision receipt for proposal {}: {e}",
+                                    "Invalid v3 decision receipt for proposal {}: {e}",
                                     proposal_id.0
                                 )
                             })?;
-                    }
-                }
+                            Some(crate::close_journal::DecisionV3Entry {
+                                receipt: receipt_v3,
+                                recorded_at: now,
+                            })
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    };
 
-                // Generate + persist GovernanceProofV2 after the v3 preflight and
-                // BEFORE terminal proposal save. If proof persistence fails, the
-                // proposal must not be persisted as closed — otherwise the API
-                // returns Err while the store disagrees. Non-Accepted outcomes
-                // still emit a proof (useful for audit of rejection / no-quorum
-                // signals) but they bypass the Invariant 7 gate above.
+                // Build + sign GovernanceProofV2 after the v3 build and BEFORE the
+                // terminal proposal save. Its durable write is DEFERRED into the
+                // close-journal commit below (same as v3), so a proof-write failure
+                // can never leave a durable closed-outcome proof behind for a
+                // still-Open proposal — the journal replays it on recovery instead.
+                // Non-Accepted outcomes still emit a proof (useful for audit of
+                // rejection / no-quorum signals) but they bypass the Invariant 7
+                // gate above.
                 let proof_bytes = if let Some(ref signing_key) = self.signing_key {
                     use icn_governance::ProofOutcome;
 
@@ -2160,11 +2495,6 @@ impl GovernanceActor {
 
                     let serialized = serde_json::to_vec(&proof)?;
 
-                    // Persist proof for later retrieval. A failure here bails
-                    // before terminal proposal persistence — see block comment
-                    // above.
-                    self.store.save_proof_bytes(&proposal_id, &serialized)?;
-
                     info!(
                         "GovernanceProofV2 signed for proposal {} (decision_hash: {})",
                         proposal_id.0,
@@ -2180,52 +2510,59 @@ impl GovernanceActor {
                     None
                 };
 
-                // Drain the deferred v1 coordination receipt-chain writes now that the
-                // v3 receipt and GovernanceProofV2 preflights have both persisted. This
-                // is the LAST preflight before the terminal save, mirroring
-                // manager.rs's v3-before-v1 ordering AND its fatal/best-effort split
-                // for the two v1 writes (manager.rs::close_proposal_inner):
-                //
-                //  - Governance receipt: FATAL under execution closure. Bailing here
-                //    (before `proposal.close()`/`save_proposal()`) leaves the proposal
-                //    Open with NO chain-observable accepted receipt.
-                //  - Allocation receipt: BEST-EFFORT. A write failure is logged but not
-                //    fatal, so a transient store error after the governance receipt is
-                //    already durable cannot leave the proposal stuck Open with a
-                //    half-persisted chain — the close proceeds, exactly as the
-                //    standalone manager does. No audit check is weakened: a missing
-                //    allocation yields a detectably incomplete chain (`icnctl audit
-                //    verify` fails the allocation checks), never a falsely-verified one.
-                if let Some((gov_receipt, allocation_receipt)) = pending_chain_receipts {
-                    if let Some(ref store) = self.receipt_store {
-                        store.put_governance(&gov_receipt).map_err(|e| {
-                            anyhow::anyhow!(
-                                "Proposal '{}' requires execution closure but governance receipt persistence failed: {e}",
-                                proposal_id.0
-                            )
-                        })?;
-                        if let Some(allocation_receipt) = allocation_receipt {
-                            if let Err(e) = store.put_allocation(&allocation_receipt) {
-                                tracing::error!(
-                                    proposal_id = %proposal_id.0,
-                                    error = %e,
-                                    "Failed to store allocation receipt — economics binding broken (non-fatal, matches standalone manager)"
-                                );
-                            }
-                        }
-                    }
-                }
-
-                // Update proposal
+                // Flip the proposal to its terminal state in memory. A bail here
+                // (not Open / non-terminal state) leaves nothing durable behind.
                 proposal.close(new_state)?;
 
-                // Persist updated state. Invariant 7 gate has passed and,
-                // for execution-required Accepted payloads, IER + mandate
-                // preflight writes have already landed. Proof bytes (when
-                // present) were persisted above. IER / mandate for
-                // Accepted + non-execution-required payloads may still be
-                // written below in the guarded post-save block.
-                self.store.save_proposal(&proposal)?;
+                // Cross-store-atomic close via the write-ahead close journal
+                // (Codex P2 on PR #1985). The v3 receipt, GovernanceProofV2 bytes,
+                // and the v1 governance/allocation receipts (`pending_chain_receipts`)
+                // were all BUILT above but not yet written durably. We now:
+                //
+                //   1. assemble a self-contained `CloseJournalEntry`;
+                //   2. persist it FIRST (`save_close_intent`) — Db-B;
+                //   3. replay every artifact idempotently then the terminal
+                //      proposal state (`commit`) — Db-A receipts (v3→v1→allocation)
+                //      then Db-B proof then the terminal proposal save. Every write
+                //      is idempotent, so the exact ordering is not load-bearing:
+                //      recovery covers any partial-failure interleaving.
+                //   4. delete the journal entry only once everything is durable.
+                //
+                // The receipt store (Db-A) and proposal store (Db-B) are separate
+                // sled `Db`s, so a single transaction cannot span them. If the
+                // terminal save (or any artifact write) fails after a receipt is
+                // already durable, the journal entry survives and
+                // `recover_incomplete_closes` replays it to completion on the next
+                // startup — converting a permanent phantom-accepted half-close into
+                // an eventually-consistent, self-healing one. No append-only
+                // audit/provenance receipt is ever rolled back, and the two stores
+                // are never merged. The v1 fatal / allocation best-effort split and
+                // the manager-parity v3-before-v1 ordering are preserved inside
+                // `CloseReceipts::apply` (crate::close_journal).
+                let (governance_receipt, allocation_receipt) = match pending_chain_receipts {
+                    Some((gov_receipt, allocation_receipt)) => {
+                        (Some(gov_receipt), allocation_receipt)
+                    }
+                    None => (None, None),
+                };
+                let journal_entry = crate::close_journal::CloseJournalEntry {
+                    proposal: proposal.clone(),
+                    proof_bytes: proof_bytes.clone(),
+                    receipts: crate::close_journal::CloseReceipts {
+                        decision_v3: pending_v3,
+                        governance_receipt,
+                        allocation_receipt,
+                    },
+                    decided_at: now,
+                    governance_decision_hash: governance_decision_hash.clone(),
+                };
+                self.store.save_close_intent(&journal_entry)?;
+                journal_entry.commit(self.receipt_store.as_deref(), self.store.as_ref())?;
+                // The journal entry is NOT cleared here. It is cleared at the very
+                // end of this arm, after the durable post-commit side effects have
+                // run, so a crash or error anywhere below leaves the entry for
+                // `recover_incomplete_closes` to replay the WHOLE completion
+                // (durable state + side effects) idempotently.
 
                 // Create tally snapshot for broadcast
                 let tally_snapshot = TallySnapshot::new(
@@ -2265,157 +2602,61 @@ impl GovernanceActor {
                 )
                 .await;
 
-                // Emit event for downstream processing (e.g., ledger transactions)
-                if let Some(ref event_bus) = self.event_bus {
-                    let event = match outcome_result {
-                        DecisionOutcome::Accepted => {
-                            match serde_json::to_value(&proposal.payload) {
-                                Ok(payload) => {
-                                    let canonical_payload_hash = serde_json::to_string(&payload)
-                                        .ok()
-                                        .map(|s| blake3::hash(s.as_bytes()).to_hex().to_string());
-                                    SystemEvent::ProposalAccepted {
-                                        proposal_id: proposal_id.0.clone(),
-                                        domain_id: proposal.domain_id.0.clone(),
-                                        payload,
-                                        decided_at: now,
-                                        canonical_payload_hash,
-                                        governance_decision_hash: governance_decision_hash.clone(),
-                                    }
-                                }
-                                Err(e) => {
-                                    warn!(
-                                        "Failed to serialize payload for accepted proposal {}: {e}",
-                                        proposal_id.0
-                                    );
-                                    SystemEvent::ProposalExecutionFailed {
-                                        proposal_id: proposal_id.0.clone(),
-                                        proposal_type: proposal.payload.type_name().to_string(),
-                                        error: format!("payload serialization failed: {e}"),
-                                        failed_at: now,
-                                    }
-                                }
+                // Replay the durable, idempotent post-commit side effects through
+                // the shared helper so write-ahead recovery reproduces them too:
+                // downstream event emission (event-driven execution), action-item
+                // materialization, and — for non-execution-required accepted
+                // proposals — institutional-effect + ADR-0014 mandate emission.
+                // (The gossip broadcast above is live-path only; it is
+                // eventually-consistent via anti-entropy, so a recovered close does
+                // not need to re-broadcast.)
+                let side_effects = self
+                    .emit_close_downstream_effects(
+                        &proposal,
+                        outcome_result.clone(),
+                        now,
+                        governance_decision_hash.clone(),
+                    )
+                    .await;
+
+                // Clear the write-ahead journal entry LAST — and ONLY once every
+                // durable obligation has persisted. If a durable side effect
+                // failed, keep the entry so `recover_incomplete_closes` replays
+                // the whole completion idempotently on the next startup rather
+                // than dropping the obligation. A crash before this point has the
+                // same effect: the entry survives for replay.
+                match side_effects {
+                    Ok(()) => match self.flush_close_durability() {
+                        // Every artifact store is now fsynced; safe to clear the
+                        // journal entry.
+                        Ok(()) => {
+                            if let Err(e) = self.store.delete_close_intent(&proposal_id) {
+                                warn!(
+                                    proposal_id = %proposal_id.0,
+                                    error = %e,
+                                    "Close fully completed but clearing its write-ahead journal \
+                                     entry failed; it will be replayed idempotently on the next startup"
+                                );
                             }
                         }
-                        _ => SystemEvent::ProposalRejected {
-                            proposal_id: proposal_id.0.clone(),
-                            domain_id: proposal.domain_id.0.clone(),
-                            decided_at: now,
-                        },
-                    };
-
-                    event_bus.emit(event).await;
-                }
-
-                // Decision-to-Action bridge: materialize action items from accepted proposals.
-                if matches!(outcome_result, DecisionOutcome::Accepted)
-                    && !proposal.action_items_on_accept.is_empty()
-                {
-                    if let Some(ref store) = self.action_item_store {
-                        Self::materialize_action_items(store, &proposal, &proposal_id, now);
-                    }
-                }
-
-                // Canonical institutional-effect emission for actor-backed
-                // normal close (non-execution-required payloads only).
-                // Execution-required payloads already emitted + minted in the
-                // preflight block above; repeating the call would be wasted
-                // work on the idempotent helpers. The HTTP close handler's
-                // post-actor emission remains idempotent on (proposal_id,
-                // effect_kind), so it returns AlreadyEmitted rather than
-                // duplicating. When no receipt store is wired, emission is a
-                // no-op and the HTTP handler remains the sole writer.
-                //
-                // ADR-0014 constitutional-memory seam: mandate + narrow
-                // authority grants are minted through the shared helper
-                // so this actor path produces the same constitutional
-                // artifacts as the standalone `close_proposal_inner`.
-                // Idempotent on `proposal_id` via `get_mandate_by_proposal`.
-                if matches!(outcome_result, DecisionOutcome::Accepted)
-                    && !requires_execution_closure
-                {
-                    if let Some(ref store) = self.receipt_store {
-                        use icn_governance::proof::ProofOutcome;
-                        let gate_receipt = GovernanceDecisionReceipt::new(
-                            proposal_id.0.clone(),
-                            proposal.domain_id.0.clone(),
-                            ProofOutcome::Accepted,
-                            tally.clone(),
-                            &votes,
+                        Err(e) => {
+                            warn!(
+                                proposal_id = %proposal_id.0,
+                                error = %e,
+                                "Close committed but a durable artifact store did not fsync; \
+                                 leaving the write-ahead journal entry so recovery can replay it \
+                                 once durability succeeds"
+                            );
+                        }
+                    },
+                    Err(e) => {
+                        warn!(
+                            proposal_id = %proposal_id.0,
+                            error = %e,
+                            "Close committed durable state but a durable side effect did not \
+                             persist; leaving the write-ahead journal entry for idempotent \
+                             replay on the next startup"
                         );
-                        let decision_hash = gate_receipt.decision_hash;
-                        let decision_hash_bytes: Option<icn_kernel_api::receipts::Hash> =
-                            Some(decision_hash);
-                        match crate::institutional_effect::emit_accepted_effect(
-                            store.as_ref(),
-                            &proposal_id.0,
-                            &proposal.domain_id.0,
-                            decision_hash_bytes,
-                            &proposal.payload,
-                            now,
-                        ) {
-                            Ok(
-                                crate::institutional_effect::AcceptanceEmissionOutcome::Emitted {
-                                    ..
-                                },
-                            ) => {
-                                debug!(
-                                    proposal_id = %proposal_id.0,
-                                    "Actor emitted InstitutionalEffectRecord"
-                                );
-                            }
-                            Ok(_) => {}
-                            Err(e) => {
-                                error!(
-                                    proposal_id = %proposal_id.0,
-                                    error = %e,
-                                    "Actor failed to emit InstitutionalEffectRecord (non-fatal)"
-                                );
-                            }
-                        }
-
-                        match crate::grant_minting::mint_and_persist_for_accepted(
-                            store.as_ref(),
-                            &proposal_id.0,
-                            &proposal.domain_id,
-                            decision_hash,
-                            &proposal.payload,
-                            now,
-                        ) {
-                            Ok(crate::grant_minting::MandateMintOutcome::Minted {
-                                mandate_id,
-                                grants_persisted,
-                            }) => {
-                                debug!(
-                                    proposal_id = %proposal_id.0,
-                                    %mandate_id,
-                                    grants_persisted,
-                                    "Actor minted ADR-0014 mandate"
-                                );
-                            }
-                            Ok(crate::grant_minting::MandateMintOutcome::AlreadyMinted {
-                                mandate_id,
-                            }) => {
-                                debug!(
-                                    proposal_id = %proposal_id.0,
-                                    %mandate_id,
-                                    "Actor: ADR-0014 mandate already present; idempotent no-op"
-                                );
-                            }
-                            Ok(crate::grant_minting::MandateMintOutcome::HashFailed) => {
-                                error!(
-                                    proposal_id = %proposal_id.0,
-                                    "Actor failed to hash payload for mandate — declining to mint"
-                                );
-                            }
-                            Err(e) => {
-                                error!(
-                                    proposal_id = %proposal_id.0,
-                                    error = %e,
-                                    "Actor failed to persist ADR-0014 mandate (non-fatal)"
-                                );
-                            }
-                        }
                     }
                 }
 
@@ -2648,7 +2889,18 @@ impl GovernanceActor {
                 {
                     if let Some(ref store) = self.action_item_store {
                         let now = now_seconds();
-                        Self::materialize_action_items(store, &proposal, &proposal_id, now);
+                        // Force-close is outside the write-ahead-journal close path,
+                        // so this stays best-effort: log materialization failures
+                        // rather than gating (there is no journal entry to retain).
+                        if let Err(e) =
+                            Self::materialize_action_items(store, &proposal, &proposal_id, now)
+                        {
+                            warn!(
+                                proposal_id = %proposal_id.0,
+                                error = %e,
+                                "Force-close failed to materialize one or more action items"
+                            );
+                        }
                     }
                 }
 
@@ -2969,52 +3221,73 @@ impl GovernanceActor {
     /// Materialize action items from an accepted proposal's specs.
     ///
     /// Idempotent: checks for existing linked items before creating new ones.
+    /// Deterministic, position-stable action-item id for the `index`-th
+    /// `action_items_on_accept` spec of a proposal.
+    ///
+    /// Materialization otherwise assigns a random id, which makes replay
+    /// non-idempotent: re-running would duplicate items, so the prior dedup
+    /// skipped *all* creation as soon as *any* linked item existed — which
+    /// silently dropped the rest of a partially-materialized set on replay.
+    /// A deterministic id keyed by `(proposal_id, index)` lets recovery
+    /// reconcile each spec individually: an already-present item is detected
+    /// and left untouched, and a missing one is created, without duplicating.
+    fn deterministic_action_item_id(
+        proposal_id: &ProposalId,
+        index: usize,
+    ) -> icn_governance::ActionItemId {
+        let seed = format!("gov:action-item:{}:{index}", proposal_id.0);
+        let digest = blake3::hash(seed.as_bytes());
+        let mut bytes = [0u8; 16];
+        bytes.copy_from_slice(&digest.as_bytes()[..16]);
+        icn_governance::ActionItemId::from_uuid(uuid::Uuid::from_bytes(bytes))
+    }
+
     fn materialize_action_items(
         store: &Arc<dyn icn_governance::ActionItemStoreBackend>,
         proposal: &Proposal,
         proposal_id: &ProposalId,
         now: u64,
-    ) {
-        // Dedup check: skip if action items already exist for this proposal
-        let filter = icn_governance::ActionItemFilter {
-            linked_proposal: Some(proposal_id.clone()),
-            ..Default::default()
-        };
-        match store.list(&proposal.domain_id, &filter) {
-            Ok(existing) if !existing.is_empty() => {
-                info!(
-                    "📋 Skipping action item creation for proposal {} — {} linked item(s) already exist",
-                    proposal_id.0,
-                    existing.len()
-                );
-                return;
-            }
-            Err(e) => {
-                warn!(
-                    "Failed to check existing action items for proposal {}: {e}",
-                    proposal_id.0
-                );
-                // Continue anyway — better to risk duplicates than lose items
-            }
-            _ => {}
-        }
-
+    ) -> std::result::Result<(), String> {
         let specs = &proposal.action_items_on_accept;
         let mut created = 0usize;
-        for spec in specs {
-            let item = spec.materialize(
+        let mut failures: Vec<String> = Vec::new();
+        // Reconcile per spec/item (NOT "skip all if any exist"): each spec has a
+        // deterministic, position-stable id, so a close and any later recovery
+        // replay create exactly the missing items and never duplicate or clobber
+        // already-materialized ones. This completes a partially-materialized set
+        // on replay instead of dropping the remaining obligations.
+        for (index, spec) in specs.iter().enumerate() {
+            let mut item = spec.materialize(
                 proposal.domain_id.clone(),
                 proposal_id.clone(),
                 proposal.proposer.clone(),
                 now,
             );
-            match store.save(&item) {
-                Ok(()) => created += 1,
+            item.id = Self::deterministic_action_item_id(proposal_id, index);
+            match store.get(&proposal.domain_id, &item.id) {
+                // Already materialized — preserve its current state (e.g. an
+                // in-progress/completed status), do not re-create.
+                Ok(Some(_)) => continue,
+                Ok(None) => match store.save(&item) {
+                    Ok(()) => created += 1,
+                    Err(e) => {
+                        warn!(
+                            "Failed to create action item '{}' from proposal {}: {e}",
+                            spec.title, proposal_id.0
+                        );
+                        failures.push(format!("{}: {e}", spec.title));
+                    }
+                },
                 Err(e) => {
+                    // Cannot confirm whether this obligation already exists, so do
+                    // not risk duplicating or clobbering it. Treat as a failure so
+                    // the write-ahead journal entry is retained for a later
+                    // idempotent replay.
                     warn!(
-                        "Failed to create action item '{}' from proposal {}: {e}",
+                        "Failed to check existing action item '{}' for proposal {}: {e}",
                         spec.title, proposal_id.0
                     );
+                    failures.push(format!("{} (existence check failed): {e}", spec.title));
                 }
             }
         }
@@ -3024,6 +3297,19 @@ impl GovernanceActor {
                 specs.len(),
                 proposal_id.0
             );
+        }
+        if failures.is_empty() {
+            Ok(())
+        } else {
+            // A durable obligation did not persist — surface it so the caller can
+            // keep the write-ahead journal entry for an idempotent replay rather
+            // than dropping the obligation.
+            Err(format!(
+                "{} action item(s) failed to persist for proposal {}: {}",
+                failures.len(),
+                proposal_id.0,
+                failures.join("; ")
+            ))
         }
     }
 

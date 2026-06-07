@@ -467,6 +467,18 @@ pub trait Store: Send + Sync {
     fn supports_transactions(&self) -> bool {
         false
     }
+
+    /// Force all buffered writes durable (fsync).
+    ///
+    /// Default is a no-op for in-memory / non-durable backends. Durable
+    /// backends (sled) override it to flush the page cache and write-ahead log.
+    /// Used by the governance close write-ahead journal to force the close
+    /// intent durable before any cross-store provenance artifact is written, so
+    /// a crash cannot persist a receipt in one store while losing the unflushed
+    /// intent in another.
+    fn flush(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 /// Operations available within a transaction
@@ -750,6 +762,12 @@ impl Store for SledStore {
     fn delete(&self, key: &[u8]) -> Result<()> {
         self.db.remove(key)?;
         Ok(())
+    }
+
+    fn flush(&self) -> Result<()> {
+        // Delegate to the inherent flush (fsync + metrics); the trait flush
+        // returns `()` since callers only need the durability barrier.
+        SledStore::flush(self).map(|_| ())
     }
 
     fn scan(&self, prefix: &[u8]) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
