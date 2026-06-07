@@ -20,6 +20,34 @@ use super::actors::{
     CoreActorHandles, EventSubscriptionHandles, GatewayActorHandles, ShutdownHandles,
 };
 
+/// Best-effort startup retention cleanup of old terminal execution records.
+///
+/// Extracted so it can run either inline (no gateway) or be deferred to run
+/// *after* the gateway's dispatch-evidence backfill (Issue #1987 follow-up):
+/// pruning before the backfill could delete a terminal record whose
+/// `EffectDispatchEvidence` was lost in the crash window before it can be healed.
+fn run_execution_record_cleanup(executor: &super::decision_executor::DecisionExecutor) {
+    match executor.cleanup_old_records() {
+        Ok(report) => {
+            if report.deleted_old > 0 || report.deleted_excess > 0 {
+                info!(
+                    deleted_old = report.deleted_old,
+                    deleted_excess = report.deleted_excess,
+                    "Startup cleanup pruned terminal execution records"
+                );
+            } else {
+                debug!("Startup cleanup: no terminal execution records pruned");
+            }
+        }
+        Err(e) => {
+            warn!(
+                error = %e,
+                "Startup cleanup failed (non-fatal, continuing startup)"
+            );
+        }
+    }
+}
+
 /// Run the supervisor lifecycle
 ///
 /// This is the main entry point for supervisor operation. It:
@@ -149,6 +177,7 @@ pub async fn run_supervisor(
             settlement_engine: gateway_handles.settlement_engine,
             dispatch_evidence_sink_installer: gateway_handles.dispatch_evidence_sink_installer,
             execution_query_store: gateway_handles.execution_query_store,
+            post_backfill_cleanup: gateway_handles.post_backfill_cleanup,
         },
     );
 
@@ -913,26 +942,22 @@ async fn spawn_actors_with_identity(
             }
         }
 
-        // Best-effort startup retention cleanup (non-fatal).
-        // Must run after recovery so pending/in-flight records are not pruned.
-        match decision_executor.cleanup_old_records() {
-            Ok(report) => {
-                if report.deleted_old > 0 || report.deleted_excess > 0 {
-                    info!(
-                        deleted_old = report.deleted_old,
-                        deleted_excess = report.deleted_excess,
-                        "Startup cleanup pruned terminal execution records"
-                    );
-                } else {
-                    debug!("Startup cleanup: no terminal execution records pruned");
-                }
-            }
-            Err(e) => {
-                warn!(
-                    error = %e,
-                    "Startup cleanup failed (non-fatal, continuing startup)"
-                );
-            }
+        // Best-effort startup retention cleanup (non-fatal). Must run after
+        // recovery so pending/in-flight records are not pruned.
+        //
+        // Issue #1987 follow-up: when a gateway will start, it runs the
+        // dispatch-evidence backfill at its own (later) startup. Defer cleanup
+        // until after that backfill so pruning cannot delete a terminal record
+        // whose evidence was lost in the crash window before it can be healed.
+        // When no gateway will start, run cleanup inline now.
+        let gateway_will_start = config.gateway.enabled && !config.gateway.jwt_secret.is_empty();
+        if gateway_will_start {
+            let cleanup_executor = decision_executor.clone();
+            gateway_handles.post_backfill_cleanup = Some(Arc::new(move || {
+                run_execution_record_cleanup(&cleanup_executor)
+            }));
+        } else {
+            run_execution_record_cleanup(&decision_executor);
         }
 
         // Create callback that routes effects through DecisionExecutor.

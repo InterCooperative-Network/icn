@@ -75,6 +75,10 @@ pub struct GatewayHandles {
     /// Shared into the gateway receipt-chain read API so audit reads see real
     /// execution records instead of an empty temp-store fallback (Gap C).
     pub execution_query_store: Option<Arc<dyn icn_store::Store>>,
+    /// Execution-record retention cleanup deferred to run after the gateway's
+    /// dispatch-evidence backfill (Issue #1987 follow-up), so pruning cannot
+    /// delete a terminal record whose evidence the backfill still needs to heal.
+    pub post_backfill_cleanup: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
 /// Spawn the Gateway API server if enabled
@@ -144,6 +148,7 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let settlement_engine_handle = handles.settlement_engine;
     let dispatch_evidence_sink_installer = handles.dispatch_evidence_sink_installer;
     let execution_query_store = handles.execution_query_store;
+    let post_backfill_cleanup = handles.post_backfill_cleanup;
     let default_trust_score = config.default_trust_score;
 
     // Spawn gateway in a dedicated thread (actix-web has its own runtime)
@@ -246,6 +251,10 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
 
             if let Some(store) = execution_query_store {
                 gateway_server = gateway_server.with_execution_query_store(store);
+            }
+
+            if let Some(cleanup) = post_backfill_cleanup {
+                gateway_server = gateway_server.with_post_backfill_cleanup(cleanup);
             }
 
             if let Err(e) = gateway_server.run().await {
