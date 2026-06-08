@@ -78,12 +78,14 @@ pub(crate) fn backfill_pending_dispatch_evidence(
 
 /// Page-bounded core of the backfill (see [`backfill_pending_dispatch_evidence`]).
 ///
-/// Walks the `exec:` keyspace one [`Store::scan_paginated`] page at a time so at
-/// most `page_size` execution records are resident at once, instead of loading
-/// the whole keyspace into a single `Vec`. Offset-based paging is safe here
-/// because the backfill runs at startup *before* the gateway serves and *before*
-/// retention cleanup prunes (so no concurrent writer can shift offsets), and the
-/// sink dedups on read-back, so even a re-observed record cannot double-write.
+/// Pages the `exec:` keyspace with [`Store::scan_after`] cursor pagination — each
+/// page resumes strictly after the previous page's last key — so at most
+/// `page_size` records are resident at once *and* the whole keyspace is
+/// traversed in `O(n)` (a numeric-offset scan would re-walk from the start every
+/// page, `O(n²/page_size)`). The backfill runs at startup before the gateway
+/// serves and before retention cleanup prunes, so no concurrent writer mutates
+/// the keyspace mid-walk; and the sink dedups on read-back, so a re-observed
+/// record cannot double-write.
 fn backfill_pending_dispatch_evidence_paged(
     execution_store: &Arc<dyn Store>,
     sink: &DeferredDispatchEvidenceSink,
@@ -92,16 +94,16 @@ fn backfill_pending_dispatch_evidence_paged(
     // A zero page would never make progress; clamp defensively.
     let page_size = page_size.max(1);
     let mut report = EvidenceBackfillReport::default();
-    let mut offset = 0usize;
+    let mut cursor: Option<Vec<u8>> = None;
 
     loop {
-        let (page, _total) = execution_store.scan_paginated(EXECUTION_PREFIX, offset, page_size)?;
+        let page = execution_store.scan_after(EXECUTION_PREFIX, cursor.as_deref(), page_size)?;
         if page.is_empty() {
             break;
         }
-        // Advance by raw entries returned (parsable or not) so the offset tracks
-        // store positions; `report.scanned` counts only decoded records.
         let page_len = page.len();
+        // Resume the next page strictly after this page's last key.
+        cursor = page.last().map(|(k, _)| k.clone());
 
         for (_key, value) in page {
             let record: ExecutionRecord = match serde_json::from_slice(&value) {
@@ -138,7 +140,6 @@ fn backfill_pending_dispatch_evidence_paged(
             report.redriven += 1;
         }
 
-        offset += page_len;
         // A short page means the keyspace is exhausted; an exact-multiple final
         // page is caught by the empty-page check on the next iteration.
         if page_len < page_size {
