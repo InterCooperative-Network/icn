@@ -1466,7 +1466,22 @@ impl Ledger {
             }
         }
 
-        // Serialize and store
+        // Secondary decision-hash index: make governance-authorized entries
+        // discoverable by `decision_hash` without scanning the journal.
+        //
+        // Written *before* the journal record on purpose. The decision lookup is
+        // now index-backed, so the safety invariant is "a journaled governance
+        // entry always has an index hint". Writing the hint first preserves that
+        // invariant across a crash in this write window: the only reachable
+        // inconsistency is a hint with no journal entry, which is harmless — the
+        // lookup re-reads the journal and skips it. (Writing it after the journal
+        // would instead allow a journaled-but-unindexed entry that the lookup
+        // could never find.) Non-governance entries are not indexed.
+        if let crate::types::ProvenanceRef::Governance { decision_hash, .. } = &entry.provenance {
+            self.index_entry_by_decision(decision_hash, &hash)?;
+        }
+
+        // Serialize and store the journal entry.
         let key = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());
         let value = serde_json::to_vec(&entry)?;
         self.store.put(key.as_bytes(), &value)?;
@@ -1481,15 +1496,6 @@ impl Ledger {
             hash.to_hex()
         );
         self.store.put(ts_key.as_bytes(), hash.as_bytes())?;
-
-        // Secondary index: make governance-authorized entries discoverable by
-        // `decision_hash` without scanning the journal. Written here on the
-        // single canonical entry-write path, right beside the timestamp index,
-        // so it cannot drift from the primary store. Non-governance entries are
-        // intentionally not indexed.
-        if let crate::types::ProvenanceRef::Governance { decision_hash, .. } = &entry.provenance {
-            self.index_entry_by_decision(decision_hash, &hash)?;
-        }
 
         debug!(
             entry_hash = %hash,
@@ -2241,17 +2247,17 @@ impl Ledger {
     /// index stays consistent with the journal it mirrors. Re-indexing an
     /// already-present hash is a no-op (idempotent re-append safe).
     fn index_entry_by_decision(&self, decision_hash: &str, hash: &ContentHash) -> Result<()> {
-        let key = format!("{}{}", DECISION_INDEX_PREFIX, decision_hash);
-        let mut hashes: Vec<String> = match self.store.get(key.as_bytes())? {
-            Some(bytes) => serde_json::from_slice(&bytes).context("decode decision index row")?,
-            None => Vec::new(),
-        };
-        let hex = hash.to_hex();
-        if !hashes.contains(&hex) {
-            hashes.push(hex);
-            self.store
-                .put(key.as_bytes(), &serde_json::to_vec(&hashes)?)?;
-        }
+        // One key per (decision, entry): `ledger:decision_idx:{dh}:{hash}` with an
+        // empty value (the locator lives entirely in the key). This makes each
+        // append O(1) — no read-modify-write of a growing blob — so a decision
+        // authorizing many entries stays linear, and the put is idempotent.
+        let key = format!(
+            "{}{}:{}",
+            DECISION_INDEX_PREFIX,
+            decision_hash,
+            hash.to_hex()
+        );
+        self.store.put(key.as_bytes(), &[])?;
         Ok(())
     }
 

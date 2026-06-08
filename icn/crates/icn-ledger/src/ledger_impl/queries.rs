@@ -405,15 +405,20 @@ pub(crate) fn get_entries_by_decision_hash(
     offset: usize,
     limit: usize,
 ) -> Result<(Vec<JournalEntry>, usize)> {
-    let key = format!("{}{}", DECISION_INDEX_PREFIX, decision_hash);
-    let hash_hexes: Vec<String> = match ledger.store.get(key.as_bytes())? {
-        Some(bytes) => serde_json::from_slice(&bytes)?,
-        None => return Ok((Vec::new(), 0)),
-    };
+    // Per-entry index keys: `ledger:decision_idx:{decision_hash}:{entry_hash_hex}`.
+    // Scanning this prefix touches only this decision's keys, so the lookup stays
+    // O(matches). The provenance re-check below makes the trailing `:` delimiter
+    // safe even if a `decision_hash` value were a prefix of another.
+    let scan_prefix = format!("{}{}:", DECISION_INDEX_PREFIX, decision_hash);
+    let rows = ledger.store.scan(scan_prefix.as_bytes())?;
 
-    let mut matches: Vec<JournalEntry> = Vec::with_capacity(hash_hexes.len());
-    for hash_hex in &hash_hexes {
-        // Decode the locator; a malformed row simply can't resolve, so skip it.
+    let mut matches: Vec<JournalEntry> = Vec::with_capacity(rows.len());
+    for (key, _value) in rows {
+        let key_str = String::from_utf8_lossy(&key);
+        let Some(hash_hex) = key_str.strip_prefix(scan_prefix.as_str()) else {
+            continue;
+        };
+        // Decode the locator; a malformed key simply can't resolve, so skip it.
         let Ok(raw) = hex::decode(hash_hex) else {
             continue;
         };
@@ -442,22 +447,20 @@ pub(crate) fn get_entries_by_decision_hash(
         matches.push(entry);
     }
 
-    // Deterministic order: timestamp ascending, ties broken by hash hex — the
-    // same ordering the chronological journal scan produced.
+    // Deterministic order: timestamp ascending, ties broken by hash bytes — the
+    // same ordering the chronological journal scan produced. Comparing the raw
+    // `ContentHash` bytes avoids a per-comparison hex allocation.
     matches.sort_by(|a, b| {
-        a.timestamp
-            .cmp(&b.timestamp)
-            .then_with(|| entry_hash_hex(a).cmp(&entry_hash_hex(b)))
+        a.timestamp.cmp(&b.timestamp).then_with(|| {
+            a.id.as_ref()
+                .map(|h| h.as_bytes())
+                .cmp(&b.id.as_ref().map(|h| h.as_bytes()))
+        })
     });
 
     let total = matches.len();
     let page = matches.into_iter().skip(offset).take(limit).collect();
     Ok((page, total))
-}
-
-/// Hex of an entry's restored content hash, for deterministic tie-breaking.
-fn entry_hash_hex(entry: &JournalEntry) -> String {
-    entry.id.as_ref().map(|h| h.to_hex()).unwrap_or_default()
 }
 
 #[cfg(test)]
@@ -587,12 +590,11 @@ mod decision_index_tests {
         assert!(entries.is_empty(), "removed entry is not surfaced");
         assert_eq!(total, 0);
 
-        // (b) A stale row pointing at a non-existent hash is skipped (no panic).
-        let key = format!("{}{}", DECISION_INDEX_PREFIX, "dh-bogus");
+        // (b) A stale per-entry row pointing at a non-existent hash is skipped
+        // (no panic).
         let fake = "00".repeat(32);
-        store
-            .put(key.as_bytes(), &serde_json::to_vec(&vec![fake]).unwrap())
-            .unwrap();
+        let key = format!("{}{}:{}", DECISION_INDEX_PREFIX, "dh-bogus", fake);
+        store.put(key.as_bytes(), &[]).unwrap();
         let (entries, total) = ledger
             .get_entries_by_decision_hash("dh-bogus", 0, 10)
             .unwrap();

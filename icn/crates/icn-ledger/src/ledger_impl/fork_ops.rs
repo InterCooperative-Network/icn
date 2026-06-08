@@ -412,8 +412,7 @@ pub(crate) fn ensure_decision_index(ledger: &Ledger) -> Result<()> {
     const PAGE: usize = 1000;
     let journal_prefix = JOURNAL_PREFIX.as_bytes();
     let mut cursor: Option<Vec<u8>> = None;
-    let mut index: std::collections::HashMap<String, Vec<String>> =
-        std::collections::HashMap::new();
+    let mut indexed = 0usize;
 
     loop {
         let page = ledger
@@ -429,11 +428,12 @@ pub(crate) fn ensure_decision_index(ledger: &Ledger) -> Result<()> {
             let entry: JournalEntry = serde_json::from_slice(&value)?;
             if let ProvenanceRef::Governance { decision_hash, .. } = &entry.provenance {
                 let key_str = String::from_utf8_lossy(&key);
-                let hash_hex = key_str.trim_start_matches(JOURNAL_PREFIX).to_string();
-                let hashes = index.entry(decision_hash.clone()).or_default();
-                if !hashes.contains(&hash_hex) {
-                    hashes.push(hash_hex);
-                }
+                let hash_hex = key_str.trim_start_matches(JOURNAL_PREFIX);
+                // Per-entry key, mirroring the write-through format. `put` is
+                // idempotent, so re-running the backfill is safe.
+                let idx_key = format!("{}{}:{}", DECISION_INDEX_PREFIX, decision_hash, hash_hex);
+                ledger.store.put(idx_key.as_bytes(), &[])?;
+                indexed += 1;
             }
         }
 
@@ -442,22 +442,14 @@ pub(crate) fn ensure_decision_index(ledger: &Ledger) -> Result<()> {
         }
     }
 
-    let decisions = index.len();
-    for (decision_hash, hashes) in index {
-        let key = format!("{}{}", DECISION_INDEX_PREFIX, decision_hash);
-        ledger
-            .store
-            .put(key.as_bytes(), &serde_json::to_vec(&hashes)?)?;
-    }
-
     // Set the marker last so a crash before this point re-runs the (idempotent)
     // backfill rather than leaving a half-built index marked as complete.
     ledger
         .store
         .put(DECISION_INDEX_BUILT_KEY.as_bytes(), b"1")?;
 
-    if decisions > 0 {
-        info!(decisions, "Migrating ledger: built decision-hash index");
+    if indexed > 0 {
+        info!(indexed, "Migrating ledger: built decision-hash index");
     }
     Ok(())
 }
