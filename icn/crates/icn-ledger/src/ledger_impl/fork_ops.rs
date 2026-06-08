@@ -25,9 +25,11 @@
 //! which delegates to these functions.
 
 use crate::fork_resolution::{Fork, ForkResolution};
-use crate::ledger::{Ledger, JOURNAL_PREFIX, JOURNAL_TS_PREFIX};
+use crate::ledger::{
+    Ledger, DECISION_INDEX_BUILT_KEY, DECISION_INDEX_PREFIX, JOURNAL_PREFIX, JOURNAL_TS_PREFIX,
+};
 use crate::merge::QuarantineItem;
-use crate::types::{ContentHash, JournalEntry, QuarantineReason};
+use crate::types::{ContentHash, JournalEntry, ProvenanceRef, QuarantineReason};
 use anyhow::{Context, Result};
 use std::time::SystemTime;
 use tracing::{debug, info, instrument, warn};
@@ -381,5 +383,81 @@ pub(crate) fn ensure_timestamp_index(ledger: &Ledger) -> Result<()> {
     }
 
     info!("Timestamp index migration complete");
+    Ok(())
+}
+
+/// Build the decision-hash secondary index for ledgers created before it
+/// existed.
+///
+/// Marker-gated so it runs at most once per store: a ledger holding no
+/// governance entries would otherwise be rescanned on every startup. New
+/// entries are indexed write-through on append (see
+/// [`crate::ledger::Ledger::get_entries_by_decision_hash`]); this only backfills
+/// pre-existing entries.
+///
+/// Bounded: pages the journal with the store key-cursor (`scan_after`) so a
+/// large historical ledger never materializes every entry at once. The backfill
+/// is idempotent — a crash before the marker is set simply re-runs it, and the
+/// per-decision rows are rewritten wholesale from a deduped scan.
+pub(crate) fn ensure_decision_index(ledger: &Ledger) -> Result<()> {
+    // Already built — write-through keeps the index current from here on.
+    if ledger
+        .store
+        .get(DECISION_INDEX_BUILT_KEY.as_bytes())?
+        .is_some()
+    {
+        return Ok(());
+    }
+
+    const PAGE: usize = 1000;
+    let journal_prefix = JOURNAL_PREFIX.as_bytes();
+    let mut cursor: Option<Vec<u8>> = None;
+    let mut index: std::collections::HashMap<String, Vec<String>> =
+        std::collections::HashMap::new();
+
+    loop {
+        let page = ledger
+            .store
+            .scan_after(journal_prefix, cursor.as_deref(), PAGE)?;
+        if page.is_empty() {
+            break;
+        }
+        let page_len = page.len();
+        cursor = page.last().map(|(k, _)| k.clone());
+
+        for (key, value) in page {
+            let entry: JournalEntry = serde_json::from_slice(&value)?;
+            if let ProvenanceRef::Governance { decision_hash, .. } = &entry.provenance {
+                let key_str = String::from_utf8_lossy(&key);
+                let hash_hex = key_str.trim_start_matches(JOURNAL_PREFIX).to_string();
+                let hashes = index.entry(decision_hash.clone()).or_default();
+                if !hashes.contains(&hash_hex) {
+                    hashes.push(hash_hex);
+                }
+            }
+        }
+
+        if page_len < PAGE {
+            break;
+        }
+    }
+
+    let decisions = index.len();
+    for (decision_hash, hashes) in index {
+        let key = format!("{}{}", DECISION_INDEX_PREFIX, decision_hash);
+        ledger
+            .store
+            .put(key.as_bytes(), &serde_json::to_vec(&hashes)?)?;
+    }
+
+    // Set the marker last so a crash before this point re-runs the (idempotent)
+    // backfill rather than leaving a half-built index marked as complete.
+    ledger
+        .store
+        .put(DECISION_INDEX_BUILT_KEY.as_bytes(), b"1")?;
+
+    if decisions > 0 {
+        info!(decisions, "Migrating ledger: built decision-hash index");
+    }
     Ok(())
 }

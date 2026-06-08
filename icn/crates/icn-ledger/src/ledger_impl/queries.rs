@@ -17,9 +17,10 @@
 //! - Integration tests in `crates/icn-ledger/tests/` also exercise these functions
 
 use crate::ledger::{
-    ArchiveRecord, Ledger, PaginationCursor, ARCHIVE_PREFIX, JOURNAL_PREFIX, JOURNAL_TS_PREFIX,
+    ArchiveRecord, Ledger, PaginationCursor, ARCHIVE_PREFIX, DECISION_INDEX_PREFIX, JOURNAL_PREFIX,
+    JOURNAL_TS_PREFIX,
 };
-use crate::types::{ContentHash, JournalEntry};
+use crate::types::{ContentHash, JournalEntry, ProvenanceRef};
 use anyhow::Result;
 use icn_identity::Did;
 use tracing::warn;
@@ -386,4 +387,254 @@ pub(crate) fn list_rollback_timestamps(ledger: &Ledger) -> Result<Vec<u64>> {
     let mut sorted: Vec<_> = timestamps.into_iter().collect();
     sorted.sort();
     Ok(sorted)
+}
+
+/// Get governance-authorized entries for a `decision_hash` via the secondary
+/// index. See [`crate::ledger::Ledger::get_entries_by_decision_hash`].
+///
+/// The index (`ledger:decision_idx:{decision_hash}` -> `Vec<entry_hash_hex>`) is
+/// only a hint; the journal entry is the source of truth. Each indexed hash is
+/// resolved against the live journal and its provenance re-verified, so rows for
+/// entries removed by archival/quarantine — or otherwise stale — are skipped.
+/// This makes the result identical to the old full-journal scan (which also read
+/// only live `journal:`/`journal_ts:` rows) while costing O(matches), not
+/// O(ledger).
+pub(crate) fn get_entries_by_decision_hash(
+    ledger: &Ledger,
+    decision_hash: &str,
+    offset: usize,
+    limit: usize,
+) -> Result<(Vec<JournalEntry>, usize)> {
+    let key = format!("{}{}", DECISION_INDEX_PREFIX, decision_hash);
+    let hash_hexes: Vec<String> = match ledger.store.get(key.as_bytes())? {
+        Some(bytes) => serde_json::from_slice(&bytes)?,
+        None => return Ok((Vec::new(), 0)),
+    };
+
+    let mut matches: Vec<JournalEntry> = Vec::with_capacity(hash_hexes.len());
+    for hash_hex in &hash_hexes {
+        // Decode the locator; a malformed row simply can't resolve, so skip it.
+        let Ok(raw) = hex::decode(hash_hex) else {
+            continue;
+        };
+        let Ok(arr) = <[u8; 32]>::try_from(raw.as_slice()) else {
+            continue;
+        };
+
+        let entry_key = format!("{}{}", JOURNAL_PREFIX, hash_hex);
+        let Some(bytes) = ledger.store.get(entry_key.as_bytes())? else {
+            // Entry removed by archival/quarantine, or a stale index row.
+            continue;
+        };
+
+        let mut entry: JournalEntry = serde_json::from_slice(&bytes)?;
+        // Re-verify against the journal: the entry, not the index, is authoritative.
+        let still_matches = matches!(
+            &entry.provenance,
+            ProvenanceRef::Governance { decision_hash: dh, .. } if dh == decision_hash
+        );
+        if !still_matches {
+            continue;
+        }
+
+        // Restore id from the hash (not serialized; `#[serde(skip)]`).
+        entry.id = Some(ContentHash::from_bytes(arr));
+        matches.push(entry);
+    }
+
+    // Deterministic order: timestamp ascending, ties broken by hash hex — the
+    // same ordering the chronological journal scan produced.
+    matches.sort_by(|a, b| {
+        a.timestamp
+            .cmp(&b.timestamp)
+            .then_with(|| entry_hash_hex(a).cmp(&entry_hash_hex(b)))
+    });
+
+    let total = matches.len();
+    let page = matches.into_iter().skip(offset).take(limit).collect();
+    Ok((page, total))
+}
+
+/// Hex of an entry's restored content hash, for deterministic tie-breaking.
+fn entry_hash_hex(entry: &JournalEntry) -> String {
+    entry.id.as_ref().map(|h| h.to_hex()).unwrap_or_default()
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod decision_index_tests {
+    use crate::entry::JournalEntryBuilder;
+    use crate::ledger::{Ledger, DECISION_INDEX_BUILT_KEY, DECISION_INDEX_PREFIX, JOURNAL_PREFIX};
+    use crate::types::JournalEntry;
+    use icn_identity::{Did, KeyPair};
+    use icn_store::{SledStore, Store};
+    use std::sync::Arc;
+    use tempfile::TempDir;
+
+    fn did() -> Did {
+        KeyPair::generate().unwrap().did().clone()
+    }
+
+    /// Self-balancing governance entry; the unique `amount` makes the content
+    /// hash distinct so appends don't collide/overwrite.
+    fn gov_entry(author: &Did, peer: &Did, amount: i64, decision_hash: &str) -> JournalEntry {
+        JournalEntryBuilder::new(author.clone())
+            .debit(author.clone(), "hours".to_string(), amount)
+            .credit(peer.clone(), "hours".to_string(), amount)
+            .with_governance_provenance(format!("receipt-{amount}"), decision_hash)
+            .build()
+            .unwrap()
+    }
+
+    /// Test B: paging over indexed matches is deterministic with no skip/dup.
+    #[tokio::test]
+    async fn decision_index_pages_deterministically_without_skip_or_dup() {
+        let tmp = TempDir::new().unwrap();
+        let store = Arc::new(SledStore::open(tmp.path()).unwrap());
+        let mut ledger = Ledger::new(store).unwrap();
+        let (a, b) = (did(), did());
+        let dh = "dh-paging";
+
+        for i in 0..5 {
+            ledger
+                .append_entry(gov_entry(&a, &b, (i as i64) + 1, dh))
+                .await
+                .unwrap();
+        }
+        // An unrelated decision's entry must never leak into this lookup.
+        ledger
+            .append_entry(gov_entry(&a, &b, 100, "dh-other"))
+            .await
+            .unwrap();
+
+        let (p1, total) = ledger.get_entries_by_decision_hash(dh, 0, 2).unwrap();
+        assert_eq!(total, 5, "total counts all live matches");
+        assert_eq!(p1.len(), 2);
+        let (p2, _) = ledger.get_entries_by_decision_hash(dh, 2, 2).unwrap();
+        assert_eq!(p2.len(), 2);
+        let (p3, _) = ledger.get_entries_by_decision_hash(dh, 4, 2).unwrap();
+        assert_eq!(p3.len(), 1, "final partial page");
+
+        // Pages cover all 5 matches exactly once (no skip, no duplicate).
+        let mut ids: Vec<String> = p1
+            .iter()
+            .chain(&p2)
+            .chain(&p3)
+            .map(|e| e.id.as_ref().unwrap().to_hex())
+            .collect();
+        ids.sort();
+        ids.dedup();
+        assert_eq!(ids.len(), 5);
+
+        // Deterministic chronological order across the full sequence.
+        let seq: Vec<u64> = p1
+            .iter()
+            .chain(&p2)
+            .chain(&p3)
+            .map(|e| e.timestamp)
+            .collect();
+        assert!(seq.windows(2).all(|w| w[0] <= w[1]));
+    }
+
+    /// Test D: non-governance entries create no index rows and never match.
+    #[tokio::test]
+    async fn non_governance_entries_create_no_decision_index_rows() {
+        let tmp = TempDir::new().unwrap();
+        let store = Arc::new(SledStore::open(tmp.path()).unwrap());
+        let mut ledger = Ledger::new(store.clone()).unwrap();
+        let (a, b) = (did(), did());
+
+        for i in 0..3 {
+            let e = JournalEntryBuilder::new(a.clone())
+                .debit(a.clone(), "hours".to_string(), (i as i64) + 1)
+                .credit(b.clone(), "hours".to_string(), (i as i64) + 1)
+                .with_system_provenance("filler")
+                .build()
+                .unwrap();
+            ledger.append_entry(e).await.unwrap();
+        }
+
+        assert_eq!(
+            store.scan_count(DECISION_INDEX_PREFIX.as_bytes()).unwrap(),
+            0,
+            "no bogus index rows for non-governance entries"
+        );
+        let (entries, total) = ledger
+            .get_entries_by_decision_hash("anything", 0, 10)
+            .unwrap();
+        assert!(entries.is_empty());
+        assert_eq!(total, 0);
+    }
+
+    /// Test E: rows for removed entries (archival/quarantine) and stale rows are
+    /// skipped — the journal, not the index, is authoritative.
+    #[tokio::test]
+    async fn lookup_skips_removed_and_stale_index_rows() {
+        let tmp = TempDir::new().unwrap();
+        let store = Arc::new(SledStore::open(tmp.path()).unwrap());
+        let mut ledger = Ledger::new(store.clone()).unwrap();
+        let (a, b) = (did(), did());
+        let dh = "dh-stale";
+
+        let hash = ledger.append_entry(gov_entry(&a, &b, 1, dh)).await.unwrap();
+        assert_eq!(ledger.get_entries_by_decision_hash(dh, 0, 10).unwrap().1, 1);
+
+        // (a) Simulate archival/quarantine: delete the entry from the journal but
+        // leave the index row behind. The lookup must skip it.
+        let jkey = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());
+        store.delete(jkey.as_bytes()).unwrap();
+        let (entries, total) = ledger.get_entries_by_decision_hash(dh, 0, 10).unwrap();
+        assert!(entries.is_empty(), "removed entry is not surfaced");
+        assert_eq!(total, 0);
+
+        // (b) A stale row pointing at a non-existent hash is skipped (no panic).
+        let key = format!("{}{}", DECISION_INDEX_PREFIX, "dh-bogus");
+        let fake = "00".repeat(32);
+        store
+            .put(key.as_bytes(), &serde_json::to_vec(&vec![fake]).unwrap())
+            .unwrap();
+        let (entries, total) = ledger
+            .get_entries_by_decision_hash("dh-bogus", 0, 10)
+            .unwrap();
+        assert!(entries.is_empty());
+        assert_eq!(total, 0);
+    }
+
+    /// Test F: a store written before the index existed is migrated on open, so
+    /// old stores never return incomplete results.
+    #[tokio::test]
+    async fn decision_index_rebuilds_for_pre_index_store() {
+        let tmp = TempDir::new().unwrap();
+        let store = Arc::new(SledStore::open(tmp.path()).unwrap());
+        let dh = "dh-migrate";
+        let (a, b) = (did(), did());
+
+        {
+            let mut ledger = Ledger::new(store.clone()).unwrap();
+            for i in 0..3 {
+                ledger
+                    .append_entry(gov_entry(&a, &b, (i as i64) + 1, dh))
+                    .await
+                    .unwrap();
+            }
+            assert_eq!(ledger.get_entries_by_decision_hash(dh, 0, 10).unwrap().1, 3);
+        }
+
+        // Strip the index rows and the migration marker, keeping the journal —
+        // the shape of a store written before this index existed.
+        for (k, _) in store.scan(DECISION_INDEX_PREFIX.as_bytes()).unwrap() {
+            store.delete(&k).unwrap();
+        }
+        store.delete(DECISION_INDEX_BUILT_KEY.as_bytes()).unwrap();
+        assert_eq!(
+            store.scan_count(DECISION_INDEX_PREFIX.as_bytes()).unwrap(),
+            0
+        );
+
+        // Reopening rebuilds the index from the journal (ensure_decision_index).
+        let ledger2 = Ledger::new(store.clone()).unwrap();
+        let (entries, total) = ledger2.get_entries_by_decision_hash(dh, 0, 10).unwrap();
+        assert_eq!(total, 3, "migration backfilled the decision index");
+        assert_eq!(entries.len(), 3);
+    }
 }
