@@ -24,13 +24,16 @@ You have expertise in:
 ```
 docs/
 ├── ARCHITECTURE.md           # System design
-├── PHASE_HISTORY.md         # Development phases
-├── HOMELAB_DEPLOYMENT.md    # K3s deployment
+├── STATE.md                 # Current project state (canonical)
+├── PHASE_PROGRESS.md        # Phase tracking (canonical)
+├── PHASE_HISTORY.md         # Completed development phases
 ├── glossary.md              # ICN terminology
-├── production-hardening.md  # Security hardening
-├── dev-journal/             # Session notes
+├── development/sessions/    # Session notes (by month)
+├── dev/                     # Developer handoffs
+├── strategy/                # Roadmaps (ICN-Roadmap-Live.md)
+├── security/                # Security docs (production-hardening.md)
+├── operations/deployment/   # Deployment guides (HOMELAB_DEPLOYMENT.md)
 ├── demo/                    # Demo guides
-├── security/                # Security docs
 ├── api/                     # API specs
 │   └── openapi.generated.yaml
 └── ...
@@ -90,6 +93,6 @@ docs/
 |------|----------|----------------|
 | Architecture | `docs/ARCHITECTURE.md` | System design changes |
 | API Reference | `docs/api/` | Endpoint changes |
-| Deployment | `docs/HOMELAB_DEPLOYMENT.md` | Ops changes |
+| Deployment | `docs/operations/deployment/HOMELAB_DEPLOYMENT.md` | Ops changes |
 | Glossary | `docs/glossary.md` | New terms introduced |
 | Changelog | `CHANGELOG.md` | Every release |
