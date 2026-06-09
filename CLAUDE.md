@@ -287,7 +287,7 @@ Each phase in documentation must follow this format:
 ### Source of Truth
 
 - **Completed phases**: [docs/PHASE_HISTORY.md](docs/PHASE_HISTORY.md)
-- **Current & planned phases**: [docs/dev-journal/ROADMAP.md](docs/dev-journal/ROADMAP.md)
+- **Current & planned phases**: [docs/STATE.md](docs/STATE.md) and [docs/PHASE_PROGRESS.md](docs/PHASE_PROGRESS.md) (truth-synced, canonical); long-arc planning: [docs/strategy/ICN-Roadmap-Live.md](docs/strategy/ICN-Roadmap-Live.md)
 - **This file**: Quick reference only, not authoritative
 
 ### Current Status
@@ -305,14 +305,14 @@ Each phase in documentation must follow this format:
 - 34: Release Candidate
 - 35: Pilot Deployment
 
-See [docs/dev-journal/ROADMAP.md](docs/dev-journal/ROADMAP.md) for full details and issue mapping.
+See [docs/PHASE_PROGRESS.md](docs/PHASE_PROGRESS.md) and [docs/STATE.md](docs/STATE.md) for current state and issue mapping, and [docs/strategy/ICN-Roadmap-Live.md](docs/strategy/ICN-Roadmap-Live.md) for the long-arc roadmap.
 
 ### Rules for Agents
 
 1. **Never invent new tracking systems** - use phases with sequential numbers
 2. **Never use "Track A/B/C"** - everything is sequential
 3. **Update PHASE_HISTORY.md** when completing a phase
-4. **Update ROADMAP.md** when planning changes
+4. **Update docs/strategy/ICN-Roadmap-Live.md** when planning changes
 5. **Keep this section as quick reference only** - detail goes in the dedicated docs
 
 ## Common Development Workflows
