@@ -312,7 +312,7 @@ See [docs/PHASE_PROGRESS.md](docs/PHASE_PROGRESS.md) and [docs/STATE.md](docs/ST
 1. **Never invent new tracking systems** - use phases with sequential numbers
 2. **Never use "Track A/B/C"** - everything is sequential
 3. **Update PHASE_HISTORY.md** when completing a phase
-4. **Update docs/strategy/ICN-Roadmap-Live.md** when planning changes
+4. **Update docs/STATE.md and docs/PHASE_PROGRESS.md** when phase state changes (they are canonical); update docs/strategy/ICN-Roadmap-Live.md when long-arc planning changes — never the strategy doc alone while canonical phase tracking goes stale
 5. **Keep this section as quick reference only** - detail goes in the dedicated docs
 
 ## Common Development Workflows
