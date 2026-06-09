@@ -3432,6 +3432,22 @@ domain_tags = ["contracts", "pilots", "review", "evidence", "accessibility"]
 recommended_action = "keep"
 last_reviewed = "2026-05-05"
 
+[docs."docs/contracts/pending-publish-summary.md"]
+category = "reference"
+status = "living"
+title = "Pending-publish summary — contract notes"
+description = "Companion notes for the substrate-level row-level read-model contract for pending-publish summaries (urn:icn:contract:pending-publish-summary:v1). Composed body for preview-review.preview_kind = pending_publish_summary; does not replace urn:icn:contract:preview-review:v1. Defines the per-row shape (action item / decision / attendance / obligation / allocation / settlement / evidence note / risk note), review affordances, mutation_preview, expected receipt category, provenance reference, must-not-include list, and validation guidance. Read-only; not a mutation API. JSON schema and fictional example live alongside; validated via docs/scripts/validate-preview-review.py --schema."
+last_updated = "2026-06-09"
+owner = "matt"
+audiences = ["contributors", "architects", "organizers"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["contracts", "pilots", "review", "evidence", "accessibility", "privacy"]
+recommended_action = "keep"
+last_reviewed = "2026-06-09"
+
 # ============================================================================
 # PLANNING AND STRATEGY (Additional)
 # ============================================================================

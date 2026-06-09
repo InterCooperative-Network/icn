@@ -1,0 +1,344 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:icn:contract:pending-publish-summary:v1",
+  "title": "PendingPublishSummary",
+  "description": "A repo-safe, read-only **row-level** read-model for a 'pending publish' summary: the set of individual proposed items (action items, decisions, attendance records, obligations, allocations, settlements, evidence notes, risk notes) that an organizer reviews — one row at a time — before any documented next step. This contract is the **composed body** of `preview-review.preview_kind = \"pending_publish_summary\"`; it does **not** replace `urn:icn:contract:preview-review:v1`. The wrapper contract (`urn:icn:contract:preview-review:v1`) defines the human **review boundary** (one preview, one review status, one privacy posture); this contract defines the **pending-publish rows rendered inside that boundary**. The schema is read-only: it does not mutate, publish, apply, or export anything. Each row's `review_actions` are affordances the organizer *could* take (approve / reject / edit / request more info); rendering them performs nothing. Each row's `mutation_preview` *describes* what a separate, named, documented endpoint would create later if the row were approved — it carries no executable payload. `source_provenance_ref` is a category plus a safe reference label, never a private path. `receipt_expected` describes the expected receipt/evidence *category*, never live receipt data. Human-readable labels (roles, bodies, scopes) are permitted; DIDs are never required. Partner-internal data does not enter this contract; partner repositories define their own opt-in fields out-of-band. The schema $id is a non-DNS URN so contract identity does not depend on centralized DNS or registrar infrastructure; see docs/contracts/pending-publish-summary.md for the rationale and the architectural principle in docs/architecture/ARCHITECTURE_DUE_DILIGENCE.md.",
+  "x-icn-status": "rfc",
+  "x-icn-contract-name": "icn.contract.pending_publish_summary.v1",
+  "x-icn-composes-with": "urn:icn:contract:preview-review:v1",
+  "x-icn-composition-note": "Row-level body for preview-review.preview_kind = 'pending_publish_summary'. This contract does not replace preview-review; it is rendered inside that review boundary.",
+  "x-icn-distribution-hints": [
+    "docs/contracts/pending-publish-summary.schema.json",
+    "docs/contracts/pending-publish-summary.md",
+    "docs/contracts/pending-publish-summary.example.json"
+  ],
+  "x-icn-references": [
+    "GitHub icn#1728",
+    "GitHub icn#1724",
+    "GitHub icn#1726",
+    "GitHub icn#1727",
+    "GitHub icn#1730"
+  ],
+  "x-icn-must-not-include": [
+    "real personal names (unless explicitly fictional / example-only)",
+    "real email addresses",
+    "real phone numbers",
+    "sponsor contact details",
+    "accommodation or access needs tied to an identifiable person",
+    "raw attendee or member rolls",
+    "API tokens, secrets, signed URLs, or session credentials",
+    "private Drive / Groups / Sheets paths or content",
+    "private overlay contents",
+    "live partner operational details",
+    "any field that implies production deployment or formal pilot authorization",
+    "DIDs of unconsented participants",
+    "free-form mutation payloads (this is a read-model contract; mutation is performed by separate documented endpoints)"
+  ],
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "contract_id",
+    "generated_at",
+    "source_package",
+    "source_material",
+    "preview_rows",
+    "privacy_review",
+    "non_claims"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Semver-style version of this schema the packet was authored against. Accepts 'MAJOR.MINOR.PATCH' or 'MAJOR.MINOR'. Bumped only when the schema's required fields or closed enums change.",
+      "pattern": "^[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+    },
+    "contract_id": {
+      "type": "string",
+      "description": "The non-DNS URN identifying this contract. Pin to the URN, not to a file path or DNS URL.",
+      "const": "urn:icn:contract:pending-publish-summary:v1"
+    },
+    "generated_at": {
+      "type": "string",
+      "description": "RFC 3339 'date-time' (e.g. 2026-06-09T00:00:00Z). Wall-clock moment the pending-publish summary was finalized for review.",
+      "format": "date-time"
+    },
+    "source_package": {
+      "description": "Generic, package-agnostic description of the producing system. Categories and labels only — never a partner noun, private path, or live operational detail.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "category"],
+      "properties": {
+        "label": {
+          "type": "string",
+          "description": "Generic human-readable label for the producing package (e.g. 'Example institution package'). Never a real partner name.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "category": {
+          "type": "string",
+          "description": "Closed taxonomy of generic producer categories. 'institution_package' = a package that adapts an institution's local material into ICN shapes. 'fixture_pack' = a committed fixture bundle. 'meeting_notes_parser' = a parser that lifts proposals from meeting notes. 'governance_export' = an export of staged governance state. 'other' = any other generic producer.",
+          "enum": [
+            "institution_package",
+            "fixture_pack",
+            "meeting_notes_parser",
+            "governance_export",
+            "other"
+          ]
+        }
+      }
+    },
+    "source_material": {
+      "description": "Inputs the rows were derived from. Each entry is described by safe basename and category — never by raw external path. 'committed-fixture' = file already in the repository. 'example-snippet' = inline fictional content authored for the preview. 'repo-safe-paste' = content reviewed and confirmed to contain no private fields before being pasted into the preview surface. 'sha256' is optional and only meaningful for committed fixtures or otherwise public content.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "basename", "summary"],
+        "properties": {
+          "kind": {
+            "type": "string",
+            "enum": ["committed-fixture", "example-snippet", "repo-safe-paste"]
+          },
+          "basename": {
+            "type": "string",
+            "description": "File or snippet basename only — no directory paths, no Drive URLs, no external links to private content.",
+            "minLength": 1
+          },
+          "sha256": {
+            "type": "string",
+            "description": "Optional content hash; include only when the underlying content is itself repo-safe (committed fixture or fictional example).",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "summary": {
+            "type": "string",
+            "description": "One-sentence plain-language description of what this material is. Generic enough to publish in a public issue comment.",
+            "minLength": 1,
+            "maxLength": 400
+          }
+        }
+      }
+    },
+    "preview_rows": {
+      "description": "The pending-publish rows the organizer reviews. Each row is one proposed item that a separate, documented next step would create if approved. Rendering rows performs nothing.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/preview_row" }
+    },
+    "privacy_review": {
+      "description": "Privacy review status of this summary. 'reviewer_role' is a generic role label — never a person name. 'status' captures whether the rows were reviewed and whether redactions were applied before display. 'not-reviewed' is permitted but should be uncommon; downstream consumers may treat it as a red flag.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reviewer_role", "status"],
+      "properties": {
+        "reviewer_role": {
+          "type": "string",
+          "enum": ["organizer", "steward", "facilitator", "reviewer", "operator"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["reviewed-clean", "redactions-applied", "not-reviewed"]
+        },
+        "notes": { "type": "string", "minLength": 1, "maxLength": 600 }
+      }
+    },
+    "non_claims": {
+      "description": "Required free-text array enumerating the standing non-claims this summary preserves. At minimum: not a mutation, not production deployment, not formal pilot authorization, not private-data handling. Producers may add summary-specific non-claims; producers MUST NOT remove the standing four.",
+      "type": "array",
+      "minItems": 4,
+      "items": { "type": "string", "minLength": 1, "maxLength": 400 }
+    }
+  },
+  "$defs": {
+    "preview_row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "plain_summary",
+        "status",
+        "target_scope_label",
+        "governing_body_label",
+        "source_provenance_ref",
+        "authority_basis",
+        "risk_level",
+        "accessibility_hint",
+        "review_actions",
+        "mutation_preview",
+        "receipt_expected"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable, locally-unique identifier for the row. Producers choose the format; consumers treat it as opaque. Must not encode private data (no emails, phones, sponsor names, or DIDs of unconsented participants).",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "kind": {
+          "description": "Closed taxonomy of pending-publish row kinds. Economic-adjacent kinds use regulatory-safe vocabulary only: 'obligation', 'allocation', and 'settlement' describe internal cooperative coordination primitives, never money transmission or stored value. 'action_item' = a proposed task. 'decision' = a proposed governance decision/proposal. 'attendance' = a proposed attendance/participation record. 'evidence_note' = a proposed evidence/provenance note. 'risk_note' = a flagged risk for the reviewer's attention.",
+          "type": "string",
+          "enum": [
+            "action_item",
+            "decision",
+            "attendance",
+            "obligation",
+            "allocation",
+            "settlement",
+            "evidence_note",
+            "risk_note"
+          ]
+        },
+        "plain_summary": {
+          "type": "string",
+          "description": "One- or two-sentence plain-language summary of the row. The organizer should be able to understand what they would be approving from this summary alone. No private data; regulatory-safe vocabulary for economic-adjacent rows.",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "status": {
+          "description": "Closed taxonomy of per-row review status. 'pending_review' = awaiting an organizer decision. 'approved_for_publish' = organizer approved the row for the next documented step. **'approved_for_publish' is not production deployment, not pilot authorization, and not a mutation** — it only records that a human review boundary was crossed for this row. 'rejected' = organizer declined; the row must not proceed. 'needs_edit' = organizer wants changes before approval. 'needs_more_info' = organizer wants more context before deciding.",
+          "type": "string",
+          "enum": [
+            "pending_review",
+            "approved_for_publish",
+            "rejected",
+            "needs_edit",
+            "needs_more_info"
+          ]
+        },
+        "target_scope_label": {
+          "type": "string",
+          "description": "Generic human-readable label for what the row targets (e.g. 'Example Working Group — next organizing cycle'). A label for rendering, not a DID and not a private identifier.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "governing_body_label": {
+          "type": "string",
+          "description": "Generic human-readable label for the governing body whose authority the row sits under (e.g. 'Example Stewards Circle'). A label for rendering, never a DID or private roster.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "assignee_label": {
+          "type": "string",
+          "description": "Optional generic role/holder label for who would be assigned (e.g. 'Example steward'). A label only — never a DID, email, or real name. Holder-label to DID binding is a separate documented step under the private-overlay / DID activation flow (icn#1730).",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "source_provenance_ref": {
+          "description": "Where this row was derived from, as a category plus a safe reference label — never a raw external path or private URL. The optional 'contract_urn' links the provenance to a related public contract when applicable.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["category", "ref_label"],
+          "properties": {
+            "category": {
+              "type": "string",
+              "description": "Closed taxonomy of provenance categories. 'committed_fixture' = a file in the repository. 'meeting_record' = a meeting note/record. 'governance_record' = staged governance state. 'example_snippet' = inline fictional content. 'repo_safe_paste' = content confirmed repo-safe before pasting. 'prior_evidence_packet' = a previously exported repo-safe evidence packet.",
+              "enum": [
+                "committed_fixture",
+                "meeting_record",
+                "governance_record",
+                "example_snippet",
+                "repo_safe_paste",
+                "prior_evidence_packet"
+              ]
+            },
+            "ref_label": {
+              "type": "string",
+              "description": "Safe basename or opaque reference label for the provenance source. No directory paths, no Drive/Groups/Sheets URLs, no private links.",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "contract_urn": {
+              "type": "string",
+              "description": "Optional non-DNS URN for a related contract (e.g. urn:icn:contract:rehearsal-evidence-export:v1).",
+              "pattern": "^urn:[a-z0-9-]+:[a-z0-9:_-]+(?::v[0-9]+)?$"
+            }
+          }
+        },
+        "authority_basis": {
+          "type": "string",
+          "description": "Why the actor would have the right to act on this row, in plain language. Examples: 'domain_membership', 'meeting_attendee', 'assigned_action_item'. Mirrors the action-card authority_basis axis.",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "risk_level": {
+          "description": "Coarse risk indicator surfaced to the organizer. UI may sort or annotate but must not hide rows. Mirrors the action-card risk axis; exact semantics are a policy concern.",
+          "type": "string",
+          "enum": ["low", "normal", "elevated"]
+        },
+        "accessibility_hint": {
+          "type": "string",
+          "description": "Plain-language accessibility note for the rendering shell. Per ADR-0028 discipline (mirrored from action cards), every row must carry one. Generic across institutions.",
+          "minLength": 1,
+          "maxLength": 400
+        },
+        "review_actions": {
+          "description": "The set of review affordances the organizer may take on this row. These are possible choices, NOT commands and NOT a record of actions taken — rendering them performs nothing. 'approve' = approve the row for the next documented step. 'reject' = decline the row. 'edit' = request changes before approval. 'request_info' = ask for more context before deciding. 'defer' = postpone a decision on this row to a later review pass.",
+          "type": "array",
+          "uniqueItems": true,
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": ["approve", "reject", "edit", "request_info", "defer"]
+          }
+        },
+        "mutation_preview": {
+          "description": "A read-only DESCRIPTION of what a separate, named, documented endpoint would create later if this row were approved. It is not a mutation, not an executable command, and carries no free-form payload (additionalProperties: false). The contract never performs the described creation.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["would_create", "summary"],
+          "properties": {
+            "would_create": {
+              "type": "string",
+              "description": "Closed taxonomy of what would be created if approved. Economic-adjacent record kinds use regulatory-safe vocabulary only ('obligation_record', 'allocation_record', 'settlement_record' describe internal cooperative coordination primitives, never money transmission or stored value).",
+              "enum": [
+                "governance_proposal",
+                "governance_vote_record",
+                "attendance_record",
+                "action_item_record",
+                "obligation_record",
+                "allocation_record",
+                "settlement_record",
+                "evidence_note_record"
+              ]
+            },
+            "summary": {
+              "type": "string",
+              "description": "One- or two-sentence plain-language description of what would be created and by which generic next step. No executable payload, no private data.",
+              "minLength": 1,
+              "maxLength": 600
+            }
+          }
+        },
+        "receipt_expected": {
+          "description": "Describes the receipt/evidence CATEGORY expected if the row's next step were taken. Never live receipt data. 'expected: false' with 'category: none' means no receipt is expected.",
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["expected", "category"],
+          "properties": {
+            "expected": {
+              "type": "boolean",
+              "description": "Whether a receipt is expected at all if the row's next step were taken."
+            },
+            "category": {
+              "type": "string",
+              "description": "Closed taxonomy of expected receipt categories. 'none' when no receipt is expected.",
+              "enum": [
+                "governance_receipt",
+                "attendance_receipt",
+                "action_item_completion_receipt",
+                "settlement_receipt",
+                "none"
+              ]
+            }
+          }
+        },
+        "privacy_notes": {
+          "type": "string",
+          "description": "Optional plain-language privacy note for this row (e.g. 'No attendee roll is present; only a generic count is summarized.'). Generic phrasing; no private fields. Consumers must not treat this field as machine-actionable.",
+          "minLength": 1,
+          "maxLength": 600
+        }
+      }
+    }
+  }
+}
