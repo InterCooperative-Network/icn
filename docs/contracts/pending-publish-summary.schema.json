@@ -2,11 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:icn:contract:pending-publish-summary:v1",
   "title": "PendingPublishSummary",
-  "description": "A repo-safe, read-only **row-level** read-model for a 'pending publish' summary: the set of individual proposed items (action items, decisions, attendance records, obligations, allocations, settlements, evidence notes, risk notes) that an organizer reviews — one row at a time — before any documented next step. This contract is the **composed body** of `preview-review.preview_kind = \"pending_publish_summary\"`; it does **not** replace `urn:icn:contract:preview-review:v1`. The wrapper contract (`urn:icn:contract:preview-review:v1`) defines the human **review boundary** (one preview, one review status, one privacy posture); this contract defines the **pending-publish rows rendered inside that boundary**. The schema is read-only: it does not mutate, publish, apply, or export anything. Each row's `review_actions` are affordances the organizer *could* take (approve / reject / edit / request more info); rendering them performs nothing. Each row's `mutation_preview` *describes* what a separate, named, documented endpoint would create later if the row were approved — it carries no executable payload. `source_provenance_ref` is a category plus a safe reference label, never a private path. `receipt_expected` describes the expected receipt/evidence *category*, never live receipt data. Human-readable labels (roles, bodies, scopes) are permitted; DIDs are never required. Partner-internal data does not enter this contract; partner repositories define their own opt-in fields out-of-band. The schema $id is a non-DNS URN so contract identity does not depend on centralized DNS or registrar infrastructure; see docs/contracts/pending-publish-summary.md for the rationale and the architectural principle in docs/architecture/ARCHITECTURE_DUE_DILIGENCE.md.",
+  "description": "A repo-safe, read-only **row-level** read-model for a 'pending publish' summary: the set of individual proposed items (action items, decisions, attendance records, obligations, allocations, settlements, evidence notes, risk notes) that an organizer reviews — one row at a time — before any documented next step. This contract is the **composed body** of `preview-review.preview_kind = \"pending_publish_summary\"`; it does **not** replace `urn:icn:contract:preview-review:v1`. The wrapper contract (`urn:icn:contract:preview-review:v1`) defines the human **review boundary** (one preview, one review status, one privacy posture); this contract defines the **pending-publish rows that back a `pending_publish_summary` preview**. The producing system uses this contract to populate and summarize those rows; the two are sibling packets linked by role/URN, not nested (the wrapper schema is additionalProperties:false and defines no field for an embedded body). The schema is read-only: it does not mutate, publish, apply, or export anything. Each row's `review_actions` are affordances the organizer *could* take (approve / reject / edit / request more info); rendering them performs nothing. Each row's `mutation_preview` *describes* what a separate, named, documented endpoint would create later if the row were approved — it carries no executable payload. `source_provenance_ref` is a category plus a safe reference label, never a private path. `receipt_expected` describes the expected receipt/evidence *category*, never live receipt data. Human-readable labels (roles, bodies, scopes) are permitted; DIDs are never required. Partner-internal data does not enter this contract; partner repositories define their own opt-in fields out-of-band. The schema $id is a non-DNS URN so contract identity does not depend on centralized DNS or registrar infrastructure; see docs/contracts/pending-publish-summary.md for the rationale and the architectural principle in docs/architecture/ARCHITECTURE_DUE_DILIGENCE.md.",
   "x-icn-status": "rfc",
   "x-icn-contract-name": "icn.contract.pending_publish_summary.v1",
   "x-icn-composes-with": "urn:icn:contract:preview-review:v1",
-  "x-icn-composition-note": "Row-level body for preview-review.preview_kind = 'pending_publish_summary'. This contract does not replace preview-review; it is rendered inside that review boundary.",
+  "x-icn-composition-note": "Row-level body for preview-review.preview_kind = 'pending_publish_summary'. This contract does not replace preview-review; the producing system uses it to populate and summarize a pending_publish_summary preview. The two are sibling packets linked by role/URN, not nested (the wrapper schema is additionalProperties:false and carries no field for an embedded body).",
   "x-icn-distribution-hints": [
     "docs/contracts/pending-publish-summary.schema.json",
     "docs/contracts/pending-publish-summary.md",
@@ -101,8 +101,10 @@
           },
           "basename": {
             "type": "string",
-            "description": "File or snippet basename only — no directory paths, no Drive URLs, no external links to private content.",
-            "minLength": 1
+            "description": "File or snippet basename only — no directory paths, no Drive URLs, no external links to private content. Enforced by pattern: any value containing '/', ':', or a backslash is rejected at validation time, so directory paths and Drive/Groups/Sheets URLs cannot validate.",
+            "minLength": 1,
+            "maxLength": 200,
+            "pattern": "^[^/\\\\:]+$"
           },
           "sha256": {
             "type": "string",
@@ -243,9 +245,10 @@
             },
             "ref_label": {
               "type": "string",
-              "description": "Safe basename or opaque reference label for the provenance source. No directory paths, no Drive/Groups/Sheets URLs, no private links.",
+              "description": "Safe basename or opaque reference label for the provenance source. No directory paths, no Drive/Groups/Sheets URLs, no private links. Enforced by pattern: any value containing '/', ':', or a backslash is rejected at validation time.",
               "minLength": 1,
-              "maxLength": 200
+              "maxLength": 200,
+              "pattern": "^[^/\\\\:]+$"
             },
             "contract_urn": {
               "type": "string",

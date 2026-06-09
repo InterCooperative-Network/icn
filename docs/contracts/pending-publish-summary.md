@@ -18,7 +18,7 @@ Last Reviewed: 2026-06-09
 
 [`preview-review.schema.json`](preview-review.schema.json) (`urn:icn:contract:preview-review:v1`, landed in icn#1745) defines the **review boundary** — one preview, one `review_status`, one privacy posture, one `proposed_artifact`. It names `pending_publish_summary` as one of its `preview_kind` values but does **not** specify the shape of the individual rows inside such a summary.
 
-This contract fills exactly that gap: it is the **row-level read-model** an organizer reviews one item at a time before any documented next step — the data the rehearsal shell needs at the no-CLI workflow's §3 step 3 ("Preview parsed proposals") and step 6 ("Preview before mutation"). Until this contract landed, each package invented its own row shape; this names the substrate-level row shape every package's pending-publish surface binds to.
+This contract fills exactly that gap: it is the **row-level read-model** an organizer reviews one item at a time before any documented next step — the data the rehearsal shell needs at the no-CLI workflow's §3 step 6 ("Preview before mutation"). (§3 step 3, "Preview parsed proposals", is a *different* preview moment with its own `preview_kind: meeting_notes_action_items`, covered by `preview-review` directly — not by this contract.) Until this contract landed, each package invented its own row shape; this names the substrate-level row shape every package's pending-publish surface binds to.
 
 ## How it composes with `preview-review`
 
@@ -32,7 +32,7 @@ urn:icn:contract:preview-review:v1            (the review boundary / wrapper)
 - The **wrapper** (`preview-review`) answers: *was this summary reviewed, by what generic role, under what privacy posture, before the next step?*
 - The **body** (this contract) answers: *what are the individual pending-publish rows the organizer is reviewing — their kind, plain summary, governing body, scope, provenance, status, and what each would create if approved?*
 
-This contract **does not replace** `preview-review`. The schema records the composition in machine-readable form via the `x-icn-composes-with` companion field (`urn:icn:contract:preview-review:v1`). A producing system renders a `pending-publish-summary` packet **inside** a `preview-review` packet whose `preview_kind` is `pending_publish_summary`.
+This contract **does not replace** `preview-review`. The schema records the composition in machine-readable form via the `x-icn-composes-with` companion field (`urn:icn:contract:preview-review:v1`). The relationship is **by role/URN, not literal nesting**: a producing system uses this contract to populate and summarize the rows behind a `preview_kind: pending_publish_summary` preview, producing the two as **sibling packets**. `preview-review.schema.json` is `additionalProperties: false` and defines no field that can carry this packet as an embedded object (its only free-text expansion is the string `proposed_artifact.detail`); the wrapper's `proposed_artifact` summarizes what these rows contain, while the rows themselves live in this contract's packet.
 
 ## What this contract is — and is not
 
@@ -63,7 +63,7 @@ Same rationale as [`./preview-review.md`](preview-review.md) and [`./rehearsal-e
 
 ## How this fits the no-CLI organizer/member workflow
 
-The no-CLI workflow at [`../pilots/no-cli-organizer-member-rehearsal-workflow.md`](../pilots/no-cli-organizer-member-rehearsal-workflow.md) describes the human path through a rehearsal. §3 steps 3 and 6 are the explicit **preview** moments. A `preview-review` packet with `preview_kind: pending_publish_summary` wraps the review; the rows inside it conform to this contract. The contract runs none of those steps; it just names the read-model the human review surface renders.
+The no-CLI workflow at [`../pilots/no-cli-organizer-member-rehearsal-workflow.md`](../pilots/no-cli-organizer-member-rehearsal-workflow.md) describes the human path through a rehearsal. §3 step 6 ("Preview before mutation") is the preview moment this contract serves (§3 step 3, "Preview parsed proposals", is the separate `preview_kind: meeting_notes_action_items` moment). A `preview-review` packet with `preview_kind: pending_publish_summary` records the review boundary; the rows it summarizes conform to this contract. The contract runs none of those steps; it just names the read-model the human review surface renders.
 
 A surface that renders these rows is in scope for [`../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`](../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md) (§3.7 cognitive load, §3.11 receipts/provenance/evidence access, §3.12 governance/action access). Each row carries an `accessibility_hint` (ADR-0028 discipline, mirrored from action cards) so the gate has something concrete to check.
 
@@ -153,7 +153,7 @@ A producing system (a parser, a fixture loader, a publish-staging tool) walks it
 6. List the `review_actions` the organizer may take. Fill `mutation_preview` with what *would* be created (no payload) and `receipt_expected` with the expected category.
 7. Run the privacy check; set `privacy_review.status`. Add `privacy_notes` per row where helpful.
 8. Validate the packet against the schema before committing or rendering it in a public surface.
-9. Render the packet inside a `preview-review` packet whose `preview_kind` is `pending_publish_summary`.
+9. Pair the packet with a `preview-review` packet whose `preview_kind` is `pending_publish_summary` — as sibling packets linked by role/URN, not nested (the wrapper carries no field for an embedded body).
 
 ## Out of scope
 
@@ -171,7 +171,7 @@ A producing system (a parser, a fixture loader, a publish-staging tool) walks it
 - [`./schema-id-audit.md`](schema-id-audit.md) — audit of every contract `$id` in the repo (this schema is in §3, recommendation: keep)
 - [`../architecture/ARCHITECTURE_DUE_DILIGENCE.md`](../architecture/ARCHITECTURE_DUE_DILIGENCE.md) — convenience-vs-authority and participation-access checklist
 - [`../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`](../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md) — surface-side PR-time review gate that runs against any UI rendering these rows
-- [`../pilots/no-cli-organizer-member-rehearsal-workflow.md`](../pilots/no-cli-organizer-member-rehearsal-workflow.md) — no-CLI organizer / member rehearsal workflow; §3 steps 3 + 6 are the preview moments these rows populate
+- [`../pilots/no-cli-organizer-member-rehearsal-workflow.md`](../pilots/no-cli-organizer-member-rehearsal-workflow.md) — no-CLI organizer / member rehearsal workflow; §3 step 6 ("Preview before mutation") is the preview moment these rows populate
 - [icn#1728](https://github.com/InterCooperative-Network/icn/issues/1728) — issue this contract's row-level read-model addresses
 - [icn#1724](https://github.com/InterCooperative-Network/icn/issues/1724) — umbrella issue for the no-CLI organizer / member rehearsal UX
 - [icn#1726](https://github.com/InterCooperative-Network/icn/issues/1726) / [icn#1727](https://github.com/InterCooperative-Network/icn/issues/1727) — open follow-ups: organizer rehearsal shell + fixture-backed demo mode (separate; this contract is the read-model they will render)
