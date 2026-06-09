@@ -379,10 +379,13 @@ Comprehensive documentation is available in the `docs/` directory:
 
 - **ARCHITECTURE.md**: System architecture and design decisions
 - **GETTING_STARTED.md**: Quick start guide for new contributors
-- **production-hardening.md**: Security hardening measures
-- **governance-primitives.md**: Governance system design
-- **scheduler-evolution-plan.md**: Distributed compute scheduler design
-- **dev-journal/**: Detailed development session notes
+- **STATE.md** / **PHASE_PROGRESS.md**: Current project state and phase tracking (canonical)
+- **strategy/ICN-Roadmap-Live.md**: Long-arc roadmap
+- **security/production-hardening.md**: Security hardening measures
+- **design/governance/governance-primitives.md**: Governance system design
+- **design/scheduler-evolution-plan.md**: Distributed compute scheduler design
+- **development/sessions/**: Development session notes (organized by month)
+- **dev/**: Developer handoffs and working notes
 
 ## Design Principles
 
