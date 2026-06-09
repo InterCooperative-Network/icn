@@ -465,4 +465,4 @@ All core infrastructure is complete (Phases 1-20, 1134+ tests passing). The syst
 - Distributed compute layer with intelligent scheduling
 - Comprehensive Prometheus metrics
 
-See `ROADMAP.md` for upcoming features and `CHANGELOG.md` for recent changes.
+See `docs/STATE.md` and `docs/PHASE_PROGRESS.md` for current state, `docs/strategy/ICN-Roadmap-Live.md` for upcoming direction, and `CHANGELOG.md` for recent changes.

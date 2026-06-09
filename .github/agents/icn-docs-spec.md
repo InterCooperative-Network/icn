@@ -93,6 +93,6 @@ docs/
 |------|----------|----------------|
 | Architecture | `docs/ARCHITECTURE.md` | System design changes |
 | API Reference | `docs/api/` | Endpoint changes |
-| Deployment | `docs/HOMELAB_DEPLOYMENT.md` | Ops changes |
+| Deployment | `docs/operations/deployment/HOMELAB_DEPLOYMENT.md` | Ops changes |
 | Glossary | `docs/glossary.md` | New terms introduced |
 | Changelog | `CHANGELOG.md` | Every release |
