@@ -3356,8 +3356,8 @@ audiences = ["team"]
 category = "reference"
 status = "living"
 title = "No-CLI organizer and member rehearsal workflow (generic ICN)"
-description = "Guided browser/mobile-first rehearsal story: standing, action cards, action items, receipts, provenance, repo-safe evidence; organizer vs steward vs member paths; preview-before-mutation; CLI as operator layer only; follow-ups for UI/API/evidence contracts. Partner companion doc lives in NYCN repo."
-last_updated = "2026-05-04"
+description = "Guided browser/mobile-first rehearsal story: standing, action cards, action items, receipts, provenance, repo-safe evidence; organizer vs steward vs member paths; preview-before-mutation; CLI as operator layer only; follow-ups for UI/API/evidence contracts including the landed fixture-backed demo-mode bridge slice. Partner companion doc lives in NYCN repo."
+last_updated = "2026-06-09"
 owner = "matt"
 audiences = ["team", "organizers"]
 truth_class = "descriptive"
@@ -3366,7 +3366,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["pilot", "nycn", "communications", "action-cards", "accessibility"]
 recommended_action = "keep"
-last_reviewed = "2026-05-04"
+last_reviewed = "2026-06-09"
 
 [docs."docs/contracts/institution-package/README.md"]
 category = "reference"
