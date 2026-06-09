@@ -1480,7 +1480,7 @@ last_reviewed = "2026-06-09"
 category = "strategy"
 status = "living"
 title = "ICN one-page handbill"
-description = "One-page handbill: the problem, what ICN does, and where it actually stands (pre-pilot, not production-ready). Links to the evidence map and skeptic Q&A."
+description = "One-page handbill: the problem, what ICN does, and where it actually stands (pre-pilot, not production-ready). Links to the evidence map and hard-questions Q&A."
 last_updated = "2026-06-09"
 owner = "matt"
 audiences = ["public", "organizers"]
@@ -1492,10 +1492,10 @@ domain_tags = ["strategy", "introduction", "outreach", "handbill"]
 recommended_action = "keep"
 last_reviewed = "2026-06-09"
 
-[docs."docs/strategy/ICN_SKEPTIC_QA.md"]
+[docs."docs/strategy/ICN_HARD_QUESTIONS.md"]
 category = "strategy"
 status = "living"
-title = "ICN Skeptic Q&A"
+title = "ICN Hard Questions and Evidence-Bound Answers"
 description = "Hard questions answered directly in bad-answer/honest-answer format: production use (no), what works now, fixture-backed vs live vs design-only, capture, surveillance, private data, regulation, blockchain (no), bus factor, smallest safe next step. Adapted from internal hardball rehearsal practice; generalized and depersonalized."
 last_updated = "2026-06-09"
 owner = "matt"
@@ -1504,7 +1504,7 @@ truth_class = "descriptive"
 role = "strategy"
 canonical = "no"
 freshness = "current"
-domain_tags = ["strategy", "introduction", "skeptic", "anti-overclaim"]
+domain_tags = ["strategy", "introduction", "hard-questions", "anti-overclaim"]
 recommended_action = "keep"
 last_reviewed = "2026-06-09"
 

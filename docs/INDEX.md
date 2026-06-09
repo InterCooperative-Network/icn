@@ -452,7 +452,7 @@ Public introduction materials (June 2026, claims bounded by the evidence map):
 - [ICN_FOR_COOPERATIVE_MOVEMENT.md](strategy/ICN_FOR_COOPERATIVE_MOVEMENT.md) - Plain-English ICN introduction for cooperative developers, federation organizers, TA providers, and member-owners; honest tool comparisons, explicit non-claims
 - [ICN_FOR_EVERYONE.md](strategy/ICN_FOR_EVERYONE.md) - General-public introduction starting from "what is a cooperative"; receipts as evidence records, not crypto; explicit non-claims
 - [ICN_HANDBILL.md](strategy/ICN_HANDBILL.md) - One-page handbill with honest "where it actually stands" framing
-- [ICN_SKEPTIC_QA.md](strategy/ICN_SKEPTIC_QA.md) - Hard questions answered directly (bad-answer/honest-answer format): production use, fixture vs live vs design-only, capture, surveillance, private data, regulation, bus factor
+- [ICN_HARD_QUESTIONS.md](strategy/ICN_HARD_QUESTIONS.md) - Hard questions answered directly (bad-answer/honest-answer format): production use, fixture vs live vs design-only, capture, surveillance, private data, regulation, bus factor
 - [ICN_INTRODUCTION_EVIDENCE_MAP.md](strategy/ICN_INTRODUCTION_EVIDENCE_MAP.md) - Maps every introduction claim to verifiable merged artifacts and states what each does NOT prove
 
 Strategic direction and gap analysis (March 2026):

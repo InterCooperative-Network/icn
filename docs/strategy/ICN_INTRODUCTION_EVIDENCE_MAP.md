@@ -6,7 +6,7 @@ Last Reviewed: 2026-06-09
 
 # ICN Introduction Evidence Map
 
-> Every public claim in ICN's introduction materials should trace to a verifiable artifact, and every artifact has limits. This map lists the artifacts behind the claims in [ICN_FOR_COOPERATIVE_MOVEMENT.md](ICN_FOR_COOPERATIVE_MOVEMENT.md), [ICN_FOR_EVERYONE.md](ICN_FOR_EVERYONE.md), [ICN_HANDBILL.md](ICN_HANDBILL.md), and [ICN_SKEPTIC_QA.md](ICN_SKEPTIC_QA.md) — and states explicitly what each one does **not** prove.
+> Every public claim in ICN's introduction materials should trace to a verifiable artifact, and every artifact has limits. This map lists the artifacts behind the claims in [ICN_FOR_COOPERATIVE_MOVEMENT.md](ICN_FOR_COOPERATIVE_MOVEMENT.md), [ICN_FOR_EVERYONE.md](ICN_FOR_EVERYONE.md), [ICN_HANDBILL.md](ICN_HANDBILL.md), and [ICN_HARD_QUESTIONS.md](ICN_HARD_QUESTIONS.md) — and states explicitly what each one does **not** prove.
 >
 > For current project truth, defer to [`docs/STATE.md`](../STATE.md) and [`docs/PHASE_PROGRESS.md`](../PHASE_PROGRESS.md). Merge states below were verified against GitHub on 2026-06-09.
 

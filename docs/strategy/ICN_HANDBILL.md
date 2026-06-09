@@ -25,6 +25,6 @@ Each cooperative runs its own copy on its own server — no central platform, no
 
 ## Where it actually stands
 
-ICN is **pre-pilot and not production-ready**. The substrate runs in development and demo environments; the member-facing apps are still being built. No cooperative is using ICN in production, and no one should put real member data on it today. What the evidence supports, and what it doesn't, is spelled out in the [evidence map](ICN_INTRODUCTION_EVIDENCE_MAP.md); the hard questions get direct answers in the [skeptic Q&A](ICN_SKEPTIC_QA.md).
+ICN is **pre-pilot and not production-ready**. The substrate runs in development and demo environments; the member-facing apps are still being built. No cooperative is using ICN in production, and no one should put real member data on it today. What the evidence supports, and what it doesn't, is spelled out in the [evidence map](ICN_INTRODUCTION_EVIDENCE_MAP.md); the hard questions get direct answers in the [hard-questions Q&A](ICN_HARD_QUESTIONS.md).
 
 **Open source · Not a vendor · Not for sale · github.com/InterCooperative-Network/icn**

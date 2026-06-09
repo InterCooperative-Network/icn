@@ -245,7 +245,7 @@ Where to find more:
 - Architecture overview: [docs/ARCHITECTURE.md](../ARCHITECTURE.md)
 - Threat model: [docs/security/threat-model.md](../security/threat-model.md)
 - Economic vision: [docs/design/economics/ECONOMIC_VISION.md](../design/economics/ECONOMIC_VISION.md)
-- The skeptic's version of this document: [ICN_SKEPTIC_QA.md](ICN_SKEPTIC_QA.md)
+- The hard-questions version of this document: [ICN_HARD_QUESTIONS.md](ICN_HARD_QUESTIONS.md)
 - What the evidence actually supports: [ICN_INTRODUCTION_EVIDENCE_MAP.md](ICN_INTRODUCTION_EVIDENCE_MAP.md)
 
 ---

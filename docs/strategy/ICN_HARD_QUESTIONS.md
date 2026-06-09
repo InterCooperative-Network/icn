@@ -4,7 +4,7 @@ Canonical: no
 Last Reviewed: 2026-06-09
 ---
 
-# ICN Skeptic Q&A — the hard questions, answered directly
+# ICN Hard Questions and Evidence-Bound Answers
 
 > For cooperative developers, federation organizers, movement reviewers, funders, and anyone who has been pitched cooperative tech before and is rightly tired of it.
 >

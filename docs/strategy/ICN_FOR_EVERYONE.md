@@ -223,7 +223,7 @@ Three catches, honestly:
 Mastodon is federated social media — good for messaging across servers. ICN is federated *governance and records* — designed for the institutional work that has to survive turnover and verify across organizational boundaries. Different problem, different shape.
 
 ### "Who's behind it?"
-Currently a very small team — in practice one primary maintainer plus collaborators, doing this work on grant applications and volunteer time. That's an honest constraint, not a humble brag; the [skeptic Q&A](ICN_SKEPTIC_QA.md) addresses it directly. The intention is for ICN's governance to eventually pass to a federation of the cooperatives that use it. Not a company. Not a foundation owned by tech billionaires.
+Currently a very small team — in practice one primary maintainer plus collaborators, doing this work on grant applications and volunteer time. That's an honest constraint, not a humble brag; the [hard-questions Q&A](ICN_HARD_QUESTIONS.md) addresses it directly. The intention is for ICN's governance to eventually pass to a federation of the cooperatives that use it. Not a company. Not a foundation owned by tech billionaires.
 
 ### "What if it fails?"
 The software is open source. If the people doing this work step away tomorrow, anyone can fork it. The parts that run keep running. The pieces that don't work yet don't disappear; they just stay unfinished until someone picks them up. That's the resilience of open infrastructure as opposed to a startup.
@@ -232,7 +232,7 @@ The software is open source. If the people doing this work step away tomorrow, a
 Three good starts:
 - **About cooperatives**: the US Federation of Worker Cooperatives (usworker.coop), the International Cooperative Alliance (ica.coop), or any of the books on the cooperative movement by Jessica Gordon Nembhard or John Restakis.
 - **About cooperative-friendly tech**: Co-op Cloud (coopcloud.tech), MayFirst (mayfirst.coop).
-- **About ICN specifically**: the source code at [github.com/InterCooperative-Network/icn](https://github.com/InterCooperative-Network/icn), the longer document for cooperative-movement folks at [ICN_FOR_COOPERATIVE_MOVEMENT.md](ICN_FOR_COOPERATIVE_MOVEMENT.md), or the hard-questions version at [ICN_SKEPTIC_QA.md](ICN_SKEPTIC_QA.md).
+- **About ICN specifically**: the source code at [github.com/InterCooperative-Network/icn](https://github.com/InterCooperative-Network/icn), the longer document for cooperative-movement folks at [ICN_FOR_COOPERATIVE_MOVEMENT.md](ICN_FOR_COOPERATIVE_MOVEMENT.md), or the hard-questions version at [ICN_HARD_QUESTIONS.md](ICN_HARD_QUESTIONS.md).
 
 ---
 
