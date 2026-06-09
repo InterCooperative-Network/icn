@@ -236,6 +236,7 @@ Show-ready orientation layer — routes outside readers, contributors, and agent
 - [runtime-surface-map.md](reference/project-index/runtime-surface-map.md) - Real runtime surfaces (member standing, action cards, completion-receipt retrieval)
 - [ci-ops-deploy-map.md](reference/project-index/ci-ops-deploy-map.md) - Workflows, deploy paths, K3s smoke runbooks
 - [show-readiness-map.md](reference/project-index/show-readiness-map.md) - What can be shown now, what should not be shown as finished, red lines
+- [proof-level-taxonomy-capability-matrix.md](reference/project-index/proof-level-taxonomy-capability-matrix.md) - Proof-level taxonomy (L0-L8) and a capability matrix for the organizer-rehearsal path
 
 ---
 
