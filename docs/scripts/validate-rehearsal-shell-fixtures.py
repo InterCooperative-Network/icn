@@ -68,6 +68,11 @@ DEFAULT_MANIFEST = (
     / "rehearsal-shell.manifest.json"
 )
 
+# Bound each delegated contract validator so a hung/deadlocked subprocess can
+# never hang the offline bundle check (or CI). Mirrors the explicit timeouts
+# other repo scripts (e.g. docs/scripts/freshness-check.py) use for determinism.
+DELEGATE_TIMEOUT_SECONDS = 60
+
 # Standing safety themes the manifest's non_claims must mention. Each entry
 # is a list of acceptable substrings (any one satisfies the theme). Mirrors
 # the machine-enforced non_claims discipline in the contract validators.
@@ -169,16 +174,49 @@ def forbidden_reference_findings(
     return findings
 
 
+def resolve_repo_relative(rel: object, label: str) -> tuple:
+    """Resolve a manifest-supplied path, failing CLOSED on anything that is not
+    a committed, in-repo, repo-relative path. Returns (Path, None) on success or
+    (None, finding) on rejection. This validator's whole purpose is to prove the
+    bundle is repo-safe, so a manifest that points outside the repo root (absolute
+    path, `..` traversal, symlink escape, or non-string) must not be trusted."""
+    if not isinstance(rel, str) or not rel:
+        return None, f"{label}: path must be a non-empty string (got {rel!r})"
+    p = Path(rel)
+    if p.is_absolute():
+        return None, f"{label}: path must be repo-relative, not absolute: {rel!r}"
+    if ".." in p.parts:
+        return None, f"{label}: path must not contain '..' traversal: {rel!r}"
+    resolved = (REPO_ROOT / p).resolve()
+    try:
+        resolved.relative_to(REPO_ROOT.resolve())
+    except ValueError:
+        return None, f"{label}: path escapes the repo root: {rel!r}"
+    return resolved, None
+
+
 def run_contract_validator(validator_rel: str, schema_rel: str, packet: Path) -> tuple:
     """Shell out to an existing docs/scripts/validate-*.py. Returns (ok, output)."""
-    validator = REPO_ROOT / validator_rel
+    validator, err = resolve_repo_relative(validator_rel, "validator")
+    if err:
+        return False, err
     if not validator.exists():
         return False, f"validator not found: {validator_rel}"
     cmd = [sys.executable, str(validator)]
     if schema_rel:
-        cmd += ["--schema", str(REPO_ROOT / schema_rel)]
+        schema, serr = resolve_repo_relative(schema_rel, "schema")
+        if serr:
+            return False, serr
+        cmd += ["--schema", str(schema)]
     cmd.append(str(packet))
-    proc = subprocess.run(cmd, capture_output=True, text=True)
+    try:
+        proc = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=DELEGATE_TIMEOUT_SECONDS
+        )
+    except subprocess.TimeoutExpired:
+        return False, (
+            f"validator timed out after {DELEGATE_TIMEOUT_SECONDS}s: {validator_rel}"
+        )
     output = (proc.stdout + proc.stderr).strip()
     return proc.returncode == 0, output
 
@@ -240,7 +278,10 @@ def main() -> int:
     for rm in read_models:
         name = rm.get("name", "<unnamed>")
         rel = rm.get("path", "")
-        packet_path = REPO_ROOT / rel
+        packet_path, path_err = resolve_repo_relative(rel, name)
+        if path_err:
+            failures.append(path_err)
+            continue
         if not packet_path.exists():
             failures.append(f"{name}: referenced packet missing: {rel}")
             continue

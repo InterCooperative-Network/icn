@@ -62,13 +62,13 @@ at committed read-model packets:
 | Member standing | [`standing.json`](standing.json) | shape-only (no committed schema; shape pinned by the e2e tests) |
 | Per-member action cards | [`action-cards.json`](action-cards.json) | shape-only wrapper; each card matches `action-card.schema.json` |
 | Pending-publish **review boundary** | [`preview-review.pending-publish-summary.json`](preview-review.pending-publish-summary.json) | `urn:icn:contract:preview-review:v1`, `preview_kind: pending_publish_summary` |
-| Pending-publish **rows** | [`../../../docs/contracts/pending-publish-summary.example.json`](../../../docs/contracts/pending-publish-summary.example.json) | `urn:icn:contract:pending-publish-summary:v1` |
-| Rehearsal evidence export | [`../../../docs/contracts/rehearsal-evidence-export.example.json`](../../../docs/contracts/rehearsal-evidence-export.example.json) | `urn:icn:contract:rehearsal-evidence-export:v1` |
+| Pending-publish **rows** | [`pending-publish-summary.example.json`](../../../../docs/contracts/pending-publish-summary.example.json) | `urn:icn:contract:pending-publish-summary:v1` |
+| Rehearsal evidence export | [`rehearsal-evidence-export.example.json`](../../../../docs/contracts/rehearsal-evidence-export.example.json) | `urn:icn:contract:rehearsal-evidence-export:v1` |
 
 The pending-publish **review boundary** and **rows** are composed **by
 URN, not nested** — `preview-review` is `additionalProperties: false`
 and carries no field that can embed the rows (see
-[`pending-publish-summary.md`](../../../docs/contracts/pending-publish-summary.md)).
+[`pending-publish-summary.md`](../../../../docs/contracts/pending-publish-summary.md)).
 
 Validate the whole bundle **offline** (no network, no gateway), from the
 repo root:
@@ -84,7 +84,7 @@ live/private-reference guard. **It does not implement the backend
 `--demo-mode` flag on icnd; that remains OPEN at
 [#1727](https://github.com/InterCooperative-Network/icn/issues/1727).**
 Rendering any of these packets in a UI is still subject to the
-[`ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`](../../../docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md)
+[`ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`](../../../../docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md)
 gate (a future #1726 concern; no UI ships in this slice).
 
 ## What this slice does NOT cover
