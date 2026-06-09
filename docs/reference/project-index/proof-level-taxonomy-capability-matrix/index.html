@@ -1,0 +1,404 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Proof-Level Taxonomy and Capability Matrix | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>project index</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>proof level taxonomy capability matrix</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/project-index/proof-level-taxonomy-capability-matrix.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Proof-Level Taxonomy and Capability Matrix</h1>
+<blockquote>
+<p>For current project truth, defer to <a href="/docs/STATE">`docs/STATE.md`</a> and <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>. This map adds a shared <strong>proof-level vocabulary</strong> and a capability matrix for the current organizer-rehearsal path. It is a claim-boundary aid, not a new source of truth.</p>
+</blockquote>
+<p>This map exists for issue <a href="https://github.com/InterCooperative-Network/icn/issues/1796" target="_blank" rel="noopener">#1796</a> and directly supports the organizer-rehearsal milestone <a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a>. ICN now has many overlapping readiness states — implemented, partial, fixture-backed, local proof loop, live daemon proof, K3s/devnet proof, design-only, stale, aspirational. Without shared proof language, a contributor, facilitator, reviewer, or agent can accidentally over- or under-claim. This doc gives everyone the same words so the current demo/rehearsal state is honest, legible, and reusable.</p>
+<p>It answers, for each capability: <strong>what is real, what is fixture-backed, what runs locally, what has live-daemon proof, what is partner-rehearsal-ready, what is not production, what privacy boundary applies, and which issue/PR owns the next step.</strong></p>
+<h2>Proof-level taxonomy (L0–L8)</h2>
+<p>Proof levels are <strong>claim-boundaries</strong>, not moral rankings. A higher level is not &quot;better&quot; and a lower level is not &quot;bad&quot; — the level states <em>how much evidence backs a claim</em> so the claim does not outrun the proof. A schema-only contract at L1 may be exactly the right maturity for its purpose; calling it L5 would be the error.</p>
+<table>
+<thead>
+<tr>
+<th>Level</th>
+<th>Name</th>
+<th>What the level asserts</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>L0</strong></td>
+<td>Named / design-only</td>
+<td>The concept exists in docs or issue text only. No stable schema, no implementation.</td>
+</tr>
+<tr>
+<td><strong>L1</strong></td>
+<td>Schema / contract exists</td>
+<td>A stable-ish schema, ADR, contract URN, or type exists. No meaningful runtime proof required yet.</td>
+</tr>
+<tr>
+<td><strong>L2</strong></td>
+<td>Unit-tested</td>
+<td>An implementation or schema has focused unit / round-trip validation (e.g. a schema with a validated example, a unit-tested function).</td>
+</tr>
+<tr>
+<td><strong>L3</strong></td>
+<td>Integration-tested</td>
+<td>Multiple components interact under test.</td>
+</tr>
+<tr>
+<td><strong>L4</strong></td>
+<td>Local proof loop</td>
+<td>A local operator can run a documented loop and produce the expected artifacts.</td>
+</tr>
+<tr>
+<td><strong>L5</strong></td>
+<td>Live daemon / gateway proof</td>
+<td>The path runs against real <code>icnd</code> / gateway components, not just fixtures.</td>
+</tr>
+<tr>
+<td><strong>L6</strong></td>
+<td>Multi-node / devnet proof</td>
+<td>More than one node or a federated runtime participates (e.g. the homelab K3s smoke path).</td>
+</tr>
+<tr>
+<td><strong>L7</strong></td>
+<td>Partner / organizer rehearsal</td>
+<td>A non-core participant can review or rehearse with bounded, honest claims, behind the accessibility/privacy checklist below.</td>
+</tr>
+<tr>
+<td><strong>L8</strong></td>
+<td>Production hardening</td>
+<td>Operational security, privacy, accessibility, recovery, observability, upgrade, and governance controls are hardened enough to support production claims.</td>
+</tr>
+</tbody></table>
+<p>Levels are not strictly cumulative across axes: a capability can have a live path (L5) on a single node while its multi-node story (L6) is unproven, and a contract can be schema-validated (L2) without ever touching a daemon (L5). State the level that matches the strongest <em>honest</em> evidence, and note the gaps.</p>
+<h3>Relationship to the existing status vocabulary</h3>
+<p>This taxonomy does <strong>not</strong> replace the implementation-state vocabulary in <a href="https://github.com/InterCooperative-Network/icn/blob/main/project-coverage-matrix">`project-coverage-matrix.md`</a> (<code>implemented</code>, <code>implemented but partial</code>, <code>feature-gated</code>, <code>fixture-backed</code>, <code>package-local</code>, <code>design-direction</code>, <code>historical</code>, <code>unknown</code>). The two are <strong>orthogonal axes</strong>:</p>
+<ul>
+<li><strong>Status</strong> answers <em>&quot;is the code written, and how completely?&quot;</em></li>
+<li><strong>Proof level</strong> answers <em>&quot;how much verification evidence stands behind the claim?&quot;</em></li>
+</ul>
+<p>A surface can be <code>implemented</code> (status) yet only L2 (proof) because no integration or live evidence has been recorded. Use both: status for what exists, proof level for what may be claimed. Rough alignment, not a lookup table:</p>
+<table>
+<thead>
+<tr>
+<th>Proof level</th>
+<th>Typical status band</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>L0–L1</td>
+<td><code>design-direction</code></td>
+</tr>
+<tr>
+<td>L2</td>
+<td><code>implemented but partial</code> / <code>fixture-backed</code></td>
+</tr>
+<tr>
+<td>L3</td>
+<td><code>implemented</code> (tested)</td>
+</tr>
+<tr>
+<td>L4–L5</td>
+<td><code>implemented</code> (local / live proof)</td>
+</tr>
+<tr>
+<td>L6</td>
+<td><code>implemented</code> (devnet / K3s)</td>
+</tr>
+<tr>
+<td>L7</td>
+<td><code>package-local</code> / rehearsal</td>
+</tr>
+<tr>
+<td>L8</td>
+<td>no current ICN capability claims L8</td>
+</tr>
+</tbody></table>
+<h2>Capability matrix (organizer-rehearsal path)</h2>
+<p>Evidence is grounded in merged commits on <code>main</code> and committed artifacts. <strong><code>STATE.md</code>&#39;s last sync edit (2026-05-22) predates this cycle</strong>, so it does not yet record <a href="https://github.com/InterCooperative-Network/icn/pull/1985" target="_blank" rel="noopener">#1985</a>→<a href="https://github.com/InterCooperative-Network/icn/pull/1999" target="_blank" rel="noopener">#1999</a>; <code>STATE.md</code> remains the canonical per-PR record and should be read as lagging this matrix until its next sync. Where this matrix and a future <code>STATE.md</code> sync disagree, <code>STATE.md</code> wins.</p>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Capability</th>
+<th>Proof level</th>
+<th>Status</th>
+<th>Evidence (PR / issue)</th>
+<th>Privacy boundary</th>
+<th>Next</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Live receipt-chain audit path / 13-of-13 proof</td>
+<td><strong>L5</strong> (single-node)</td>
+<td>implemented (live)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/pull/1985" target="_blank" rel="noopener">#1985</a>; rerun via <a href="https://github.com/InterCooperative-Network/icn/pull/1997" target="_blank" rel="noopener">#1997</a></td>
+<td>repo-safe evidence packet; raw transcript gitignored</td>
+<td>multi-node (<a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a>); CI <a href="https://github.com/InterCooperative-Network/icn/issues/1955" target="_blank" rel="noopener">#1955</a></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Durable effect dispatch evidence</td>
+<td><strong>L3</strong></td>
+<td>implemented (tested)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/pull/1990" target="_blank" rel="noopener">#1990</a>; <code>docs/spec/effect-dispatch-contract.md</code></td>
+<td>server-side institutional record; not a public surface</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/pull/1993" target="_blank" rel="noopener">#1993</a></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Dispatch-evidence recovery / backfill</td>
+<td><strong>L3</strong></td>
+<td>implemented (tested)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/pull/1993" target="_blank" rel="noopener">#1993</a>; related <a href="https://github.com/InterCooperative-Network/icn/pull/1986" target="_blank" rel="noopener">#1986</a></td>
+<td>as above</td>
+<td>—</td>
+</tr>
+<tr>
+<td>4</td>
+<td>Decision-hash ledger lookup / index</td>
+<td><strong>L3</strong></td>
+<td>implemented (tested)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/pull/1996" target="_blank" rel="noopener">#1996</a>; related <a href="https://github.com/InterCooperative-Network/icn/pull/1988" target="_blank" rel="noopener">#1988</a></td>
+<td>as above</td>
+<td>—</td>
+</tr>
+<tr>
+<td>5</td>
+<td>One-command local receipt-chain rehearsal</td>
+<td><strong>L4</strong></td>
+<td>implemented (local proof)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/pull/1997" target="_blank" rel="noopener">#1997</a>; <code>scripts/local_receipt_chain_13of13_rehearsal.sh</code></td>
+<td>repo-safe-by-construction evidence packet</td>
+<td>CI gating on <a href="https://github.com/InterCooperative-Network/icn/issues/1955" target="_blank" rel="noopener">#1955</a></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Pending-publish summary row contract</td>
+<td><strong>L2</strong></td>
+<td>implemented but partial (contract)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/pull/1998" target="_blank" rel="noopener">#1998</a>; <a href="/docs/contracts/pending-publish-summary">`pending-publish-summary.md`</a></td>
+<td>read-model only; no executable payload</td>
+<td>bind to a real publish surface (future)</td>
+</tr>
+<tr>
+<td>7</td>
+<td>Fixture-backed organizer rehearsal shell</td>
+<td><strong>L2</strong></td>
+<td>fixture-backed</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/pull/1999" target="_blank" rel="noopener">#1999</a>; <code>web/pilot-ui/fixtures/icn-organizer-demo/</code></td>
+<td>fixtures must be fictional; no private paths / Drive URLs</td>
+<td>wire shell → live path (<a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a>)</td>
+</tr>
+<tr>
+<td>8</td>
+<td><code>/me/action-cards</code> / standing-derived queue</td>
+<td><strong>L5</strong> live; <strong>L6</strong> partial (K3s)</td>
+<td>implemented but partial (3 of 5 paths)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1608" target="_blank" rel="noopener">#1608</a>, <a href="https://github.com/InterCooperative-Network/icn/issues/1646" target="_blank" rel="noopener">#1646</a>; see <a href="https://github.com/InterCooperative-Network/icn/blob/main/runtime-surface-map">`runtime-surface-map.md`</a></td>
+<td>member standing / identity data must be protected</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1646" target="_blank" rel="noopener">#1646</a> → <a href="https://github.com/InterCooperative-Network/icn/issues/1631" target="_blank" rel="noopener">#1631</a>, <a href="https://github.com/InterCooperative-Network/icn/issues/1634" target="_blank" rel="noopener">#1634</a></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Private-data disclosure boundary / scoped vault</td>
+<td><strong>L1</strong> (design)</td>
+<td>design-direction</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1792" target="_blank" rel="noopener">#1792</a>; <a href="/docs/spec/artifact-registry-and-scoped-vault">`artifact-registry-and-scoped-vault.md`</a></td>
+<td><strong>no runtime enforcement</strong>; privacy today is by exclusion</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1792" target="_blank" rel="noopener">#1792</a> / <a href="https://github.com/InterCooperative-Network/icn/issues/1798" target="_blank" rel="noopener">#1798</a> / <a href="https://github.com/InterCooperative-Network/icn/issues/1767" target="_blank" rel="noopener">#1767</a></td>
+</tr>
+<tr>
+<td>10</td>
+<td>NYCN organizer rehearsal milestone (overall)</td>
+<td>components at <strong>L2/L4/L5</strong>; <strong>L7 OPEN</strong></td>
+<td>implemented but partial</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a></td>
+<td>no live private data; disclosure boundary design-only</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a></td>
+</tr>
+</tbody></table>
+<h3>Per-capability detail</h3>
+<p>The table above is the scannable view. The prose below carries the honest claim-boundary fields (real now / fixture-only / public wording / known gaps) that do not fit a cell.</p>
+<p><strong>1. Live receipt-chain audit path / 13-of-13 proof — L5.</strong></p>
+<ul>
+<li><em>Real now:</em> a governed <code>proposal → vote → close → allocation</code> flow runs against a real <code>icnd</code> + gateway and <code>icnctl audit verify --token --json</code> reports a complete 13/13 receipt chain.</li>
+<li><em>Fixture-only / mocked:</em> none for the path itself — data is fictional, the gateway is real, ephemeral, loopback, and dev-gated.</li>
+<li><em>Public/demo wording:</em> &quot;live daemon/gateway proof of the 13/13 governed receipt chain on a local ephemeral node — proof of path, not proof of deployment readiness.&quot;</li>
+<li><em>Known gaps:</em> single-node loopback only (no multi-node / L6); CI run is gated by the disk flake in <a href="https://github.com/InterCooperative-Network/icn/issues/1955" target="_blank" rel="noopener">#1955</a>.</li>
+</ul>
+<p><strong>2. Durable effect dispatch evidence — L3.</strong> <em>Real now:</em> <code>ExecutionRecord.results</code> is persisted and an idempotent startup backfill reconstructs missing dispatch evidence. <em>Fixture-only:</em> none. <em>Public/demo wording:</em> &quot;dispatch evidence is durably persisted and recovered on startup.&quot; <em>Known gaps:</em> durability is proven by tests, not by a recorded live multi-restart drill.</p>
+<p><strong>3. Dispatch-evidence recovery / backfill — L3.</strong> <em>Real now:</em> the backfill scan uses cursor/seek pagination (not offset), removing the crash-window and O(n²) concerns. <em>Fixture-only:</em> none. <em>Public/demo wording:</em> &quot;recovery scan is bounded and crash-safe.&quot; <em>Known gaps:</em> recovery is unit/integration-proven, not exercised under a recorded fault-injection run.</p>
+<p><strong>4. Decision-hash ledger lookup / index — L3.</strong> <em>Real now:</em> ledger entries are indexed by <code>decision_hash</code>, fixing the crash-window and O(n²) lookup concerns. <em>Fixture-only:</em> none. <em>Public/demo wording:</em> &quot;decision-hash lookups are indexed.&quot; <em>Known gaps:</em> none material at this level.</p>
+<p><strong>5. One-command local receipt-chain rehearsal — L4.</strong> <em>Real now:</em> one operator command spins a fresh ephemeral node/gateway, asserts 13/13, emits a repo-safe evidence packet conforming to <code>urn:icn:contract:rehearsal-evidence-export:v1</code>, validates it, and prints what is real / dev-gated / fixture-only / NOT production. <em>Fixture-only:</em> fictional inputs; all outputs are gitignored. <em>Public/demo wording:</em> &quot;one-command local proof loop — not production, not a pilot, not live federation.&quot; <em>Known gaps:</em> requires a local build of <code>icnd</code>/<code>icnctl</code>; single node.</p>
+<p><strong>6. Pending-publish summary row contract — L2.</strong> <em>Real now:</em> a stable schema (<code>urn:icn:contract:pending-publish-summary:v1</code>, JSON Schema draft 2020-12) with a fictional example that validates via <code>docs/scripts/validate-preview-review.py --schema</code>; documented composition with <code>urn:icn:contract:preview-review:v1</code> (<a href="https://github.com/InterCooperative-Network/icn/pull/1745" target="_blank" rel="noopener">#1745</a>). <em>Fixture-only / mocked:</em> it is a <strong>read-model contract</strong> — it describes the rows an organizer was shown; it performs no mutation, implements no HTTP endpoint, and authorizes no formal pilot. <em>Public/demo wording:</em> &quot;schema/contract for the pending-publish review row — read-model only, no endpoint, no mutation, not a formal pilot authorization.&quot; <em>Known gaps:</em> no producing endpoint binds to it yet.</p>
+<p><strong>7. Fixture-backed organizer rehearsal shell — L2.</strong> <em>Real now:</em> a demo-mode shell renders committed fictional fixtures (<code>rehearsal-shell.manifest.json</code>), validated by <code>docs/scripts/validate-rehearsal-shell-fixtures.py</code>. <em>Fixture-only / mocked:</em> <strong>entirely</strong> — there is no live daemon behind the shell in demo mode. <em>Public/demo wording:</em> &quot;fixture-backed organizer rehearsal shell (demo mode) — a bounded rehearsal artifact; not live, not a formal pilot.&quot; <em>Known gaps:</em> not wired to the live gateway; not a partner rehearsal (L7) yet; the participation surface joining it to the live proof loop is the <a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a> milestone.</p>
+<p><strong>8. <code>/me/action-cards</code> / standing-derived participation queue — L5 (live), L6 partial.</strong> <em>Real now:</em> <code>GET /v1/gov/me/action-cards</code> emits proof-bearing receipt loops for three of five source paths (<code>proposal</code>/<code>vote</code>, <code>action_item</code>/<code>complete</code>, <code>meeting</code>/<code>attend</code>), with both a local HTTP proof loop and a homelab K3s smoke proof loop recorded (see <a href="https://github.com/InterCooperative-Network/icn/blob/main/current-truth-map">`current-truth-map.md`</a>). <em>Fixture-only / mocked:</em> the two remaining source paths (<code>signal_rule</code>, <code>obligation_lifecycle</code>) are RFC-gated under <a href="https://github.com/InterCooperative-Network/icn/issues/1646" target="_blank" rel="noopener">#1646</a> and not emitted. <em>Public/demo wording:</em> &quot;three of five currently emitted source paths, live — show three of five, not five of five.&quot; <em>Known gaps:</em> <a href="https://github.com/InterCooperative-Network/icn/issues/1631" target="_blank" rel="noopener">#1631</a>, <a href="https://github.com/InterCooperative-Network/icn/issues/1634" target="_blank" rel="noopener">#1634</a>, then <a href="https://github.com/InterCooperative-Network/icn/issues/1646" target="_blank" rel="noopener">#1646</a>.</p>
+<p><strong>9. Private-data disclosure boundary / scoped vault model — L1 (design).</strong> <em>Real now:</em> a design-level spec names the <code>ScopedVault</code> boundary and the forward-direction <code>DisclosurePolicy</code> / <code>PrivacyClass</code> / <code>PrivateObjectRef</code> / <code>AccessReceipt</code> / <code>ExportReceipt</code> / <code>RedactionMap</code> vocabulary; an <code>icn-privacy</code> crate exists. <em>Fixture-only / mocked:</em> disclosure enforcement is <strong>not implemented at runtime</strong>. Rehearsal privacy today is achieved by <strong>exclusion</strong> (repo-safe-by-construction packets, fictional fixtures), <strong>not</strong> by an enforced disclosure boundary. <em>Public/demo wording:</em> &quot;design-direction scoped-vault / disclosure model — NOT private-data handling; rehearsal privacy is by exclusion, not enforcement.&quot; <em>Known gaps:</em> wire-stable schema, encryption/key model, and runtime enforcement are all deferred (<a href="https://github.com/InterCooperative-Network/icn/issues/1792" target="_blank" rel="noopener">#1792</a>, <a href="https://github.com/InterCooperative-Network/icn/issues/1798" target="_blank" rel="noopener">#1798</a>, <a href="https://github.com/InterCooperative-Network/icn/issues/1767" target="_blank" rel="noopener">#1767</a>).</p>
+<p><strong>10. NYCN organizer rehearsal milestone (overall) — components L2/L4/L5; L7 OPEN.</strong> <em>Real now:</em> the kernel can prove (L5 receipt chain, L4 one-command rehearsal) and the rehearsal shell + contracts can rehearse (L2). <em>Fixture-only / mocked:</em> the integrated organizer-facing <strong>operable</strong> rehearsal — the participation surface joining the live proof loop to the rehearsal shell — does not exist yet. <em>Public/demo wording:</em> &quot;fixture-backed organizer rehearsal plus a local proof loop; the operable participation surface is the open milestone — not a formal pilot, not live federation, not production.&quot; <em>Known gaps:</em> the participation surface (<a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a>); disclosure enforcement (<a href="https://github.com/InterCooperative-Network/icn/issues/1792" target="_blank" rel="noopener">#1792</a>); the accessibility/privacy checklist below; the NYCN dogfood gossip-port preflight bug (<a href="https://github.com/InterCooperative-Network/icn/issues/1956" target="_blank" rel="noopener">#1956</a>); CI disk flake (<a href="https://github.com/InterCooperative-Network/icn/issues/1955" target="_blank" rel="noopener">#1955</a>).</p>
+<h2>Public / demo wording discipline</h2>
+<p>This section names the language that keeps claims inside the proof boundary. It is the proof-level lens on the project&#39;s existing red lines — for the full list (no crypto/token framing, regulatory vocabulary, no NYCN commitment claim, no live-federation claim), defer to <a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">`show-readiness-map.md`</a>.</p>
+<p><strong>Prefer</strong> (these stay inside the proof boundary):</p>
+<ul>
+<li>&quot;fixture-backed organizer rehearsal&quot;</li>
+<li>&quot;local proof loop&quot; / &quot;live daemon/gateway proof&quot;</li>
+<li>&quot;not production&quot; / &quot;not a formal pilot authorization&quot; / &quot;not private-data handling&quot;</li>
+<li>&quot;bounded rehearsal artifact&quot;</li>
+<li>&quot;proof of path, not proof of deployment readiness&quot;</li>
+</ul>
+<p><strong>Avoid</strong> (these claim past the evidence):</p>
+<ul>
+<li>&quot;production-ready&quot;, &quot;fully federated&quot;, &quot;live pilot&quot;, &quot;secure by default&quot;</li>
+<li>&quot;complete platform&quot;, &quot;partner deployed&quot;</li>
+<li>&quot;ready for organizers&quot; — unless the accessibility/privacy checklist below <strong>and</strong> the <a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a> acceptance conditions are both satisfied.</li>
+</ul>
+<h2>Accessibility and privacy readiness (gate for &quot;organizer-facing&quot;)</h2>
+<p>A capability does not reach <strong>L7 (partner / organizer rehearsal)</strong> on engineering proof alone. Anything presented as organizer-facing must also satisfy:</p>
+<ul>
+<li><strong>Plain-language labels</strong> — no internal jargon, URNs, or hashes as the primary label.</li>
+<li><strong>Screen-reader / non-visual compatibility</strong> — every state reachable and meaningful without sight.</li>
+<li><strong>Color-independent meaning</strong> — status never carried by color alone.</li>
+<li><strong>No raw private paths or Drive URLs</strong> in public fixtures — fictional data only.</li>
+<li><strong>Clear fixture-vs-live labeling</strong> — the viewer always knows whether they are looking at a fixture or a live result.</li>
+<li><strong>Visible non-claims</strong> — &quot;not production / not a formal pilot / not live federation&quot; stays on the surface, not buried in a footnote.</li>
+<li><strong>Visible receipt / evidence boundaries</strong> — what is proven vs described vs expected is legible.</li>
+</ul>
+<p>This checklist is why capability #7 (the fixture-backed shell) is L2, not L7: the shell exists, but the organizer-facing accessibility/privacy bar and the live participation surface are open under <a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a>. Disclosure enforcement that would make private organizer material safe to handle is design-only under <a href="https://github.com/InterCooperative-Network/icn/issues/1792" target="_blank" rel="noopener">#1792</a>; until it lands, organizer rehearsal stays on fictional fixtures. See <a href="/docs/design/ACCESSIBILITY_BASELINE">`docs/design/ACCESSIBILITY_BASELINE.md`</a> for the baseline this checklist draws on.</p>
+<h2>Non-claims</h2>
+<p>This map does not claim:</p>
+<ul>
+<li>production readiness for any capability;</li>
+<li>a formal NYCN pilot, partnership, or signed agreement;</li>
+<li>live federation between cooperatives;</li>
+<li>private-data handling readiness (the disclosure boundary is design-only);</li>
+<li>that the fixture-backed rehearsal shell runs against a live daemon;</li>
+<li>that <code>STATE.md</code> already records the <a href="https://github.com/InterCooperative-Network/icn/pull/1985" target="_blank" rel="noopener">#1985</a>→<a href="https://github.com/InterCooperative-Network/icn/pull/1999" target="_blank" rel="noopener">#1999</a> cycle.</li>
+</ul>
+<h2>When to update this map</h2>
+<ul>
+<li>A capability&#39;s strongest honest evidence changes (a new test, a live run, a recorded devnet proof) → bump its proof level.</li>
+<li>A new capability enters the organizer-rehearsal path → add a row plus a detail block.</li>
+<li>A <code>STATE.md</code> sync absorbs the <a href="https://github.com/InterCooperative-Network/icn/pull/1985" target="_blank" rel="noopener">#1985</a>→<a href="https://github.com/InterCooperative-Network/icn/pull/1999" target="_blank" rel="noopener">#1999</a> cycle → update the lag note above and reconcile.</li>
+<li>The accessibility/privacy checklist or <a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a> acceptance conditions change → revisit which capabilities may be called organizer-facing (L7).</li>
+</ul>
+<h2>Where to read deeper</h2>
+<table>
+<thead>
+<tr>
+<th>You want...</th>
+<th>Read</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>What is real now (per-PR pointer)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/current-truth-map">`current-truth-map.md`</a>, <a href="/docs/STATE">`docs/STATE.md`</a></td>
+</tr>
+<tr>
+<td>What is or isn&#39;t show-ready, red lines</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">`show-readiness-map.md`</a></td>
+</tr>
+<tr>
+<td>Subsystem coverage + status vocabulary</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/project-coverage-matrix">`project-coverage-matrix.md`</a></td>
+</tr>
+<tr>
+<td>Real runtime surfaces</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/runtime-surface-map">`runtime-surface-map.md`</a></td>
+</tr>
+<tr>
+<td>The phase model</td>
+<td><a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a></td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
