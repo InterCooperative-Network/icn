@@ -447,6 +447,14 @@ Current project planning and analysis:
 
 ### Strategy Documents (`strategy/`)
 
+Public introduction materials (June 2026, claims bounded by the evidence map):
+
+- [ICN_FOR_COOPERATIVE_MOVEMENT.md](strategy/ICN_FOR_COOPERATIVE_MOVEMENT.md) - Plain-English ICN introduction for cooperative developers, federation organizers, TA providers, and member-owners; honest tool comparisons, explicit non-claims
+- [ICN_FOR_EVERYONE.md](strategy/ICN_FOR_EVERYONE.md) - General-public introduction starting from "what is a cooperative"; receipts as evidence records, not crypto; explicit non-claims
+- [ICN_HANDBILL.md](strategy/ICN_HANDBILL.md) - One-page handbill with honest "where it actually stands" framing
+- [ICN_HARD_QUESTIONS.md](strategy/ICN_HARD_QUESTIONS.md) - Hard questions answered directly (bad-answer/honest-answer format): production use, fixture vs live vs design-only, capture, surveillance, private data, regulation, bus factor
+- [ICN_INTRODUCTION_EVIDENCE_MAP.md](strategy/ICN_INTRODUCTION_EVIDENCE_MAP.md) - Maps every introduction claim to verifiable merged artifacts and states what each does NOT prove
+
 Strategic direction and gap analysis (March 2026):
 
 - [ICN-Gap-Analysis-March-2026.md](strategy/ICN-Gap-Analysis-March-2026.md) - Subsystem-by-subsystem reality check
@@ -460,6 +468,7 @@ Strategic direction and gap analysis (March 2026):
 - [ICN-Scenarios.md](strategy/ICN-Scenarios.md) - Six working scenarios with API calls
 - [ICN-Evolution-Arc.md](strategy/ICN-Evolution-Arc.md) - Two-year project history
 - [ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md](strategy/ICN_THURSDAY_MEETING_BRIEF_2026-05-21.md) - Meeting-prep truth packet for the 2026-05-21 cooperative-developer / formation-platform / ICN conversation (controls project-state facts and non-claims)
+- [COOPERATIVE_CODEBASE_MEETING_BRIEF_2026-06-11.md](strategy/COOPERATIVE_CODEBASE_MEETING_BRIEF_2026-06-11.md) - Meeting brief for the 2026-06-11 Cooperative Codebase (forming Chicago tech co-op) call — learner-first posture, verified logistics, listening agenda, demo policy, pre-call checklist, capture grid; claims bounded by the hard-questions Q&A and evidence map
 - [NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md](strategy/NYCN_SUMMIT_REFERENCE_INSTITUTION_STRATEGY.md) - Project-shaping record: NYCN/Summit as ICN's first institutional laboratory (recurring democratic institution, not an event demo)
 - [ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md](strategy/ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md) - Short conceptual clarification: ICN is the substrate, NYCN/Summit is the first reference institution, institution packages are the reusable meaning layer in between. Four-layer table.
 - [COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md](strategy/COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md) - **Thursday primary** — learner-first, Launch-first prep packet (public research on Launch / comp.coop / The Worker Place, correct posture, first-five-minutes script, Launch-specific questions, quiet non-claims, walkthrough beats, capture grid)

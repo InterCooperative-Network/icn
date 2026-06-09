@@ -1827,6 +1827,36 @@ Formal technical specification for grants, regulatory review, and architectural 
 
 **For:** `grant-reviewers`, `architects`, `compliance` | **Updated:** 2026-03-15
 
+### 📝 **Living** [ICN: Infrastructure for the Cooperative Movement](/docs/strategy/ICN_FOR_COOPERATIVE_MOVEMENT.md)
+
+Plain-English ICN introduction for cooperative developers, federation organizers, TA providers, and member-owners. Honest comparisons to existing co-op tech, role-by-role fit, explicit non-claims. Pre-pilot framing throughout; claims bounded by ICN_INTRODUCTION_EVIDENCE_MAP.md.
+
+**For:** `public`, `stakeholders`, `organizers` | **Updated:** 2026-06-09
+
+### 📝 **Living** [ICN, in Plain English](/docs/strategy/ICN_FOR_EVERYONE.md)
+
+General-public ICN introduction starting from 'what is a cooperative'. No jargon wall. Explains receipts as evidence records (not crypto), institutional memory, and accountability. Explicit non-claims; pre-pilot framing throughout.
+
+**For:** `public` | **Updated:** 2026-06-09
+
+### 📝 **Living** [ICN one-page handbill](/docs/strategy/ICN_HANDBILL.md)
+
+One-page handbill: the problem, what ICN does, and where it actually stands (pre-pilot, not production-ready). Links to the evidence map and hard-questions Q&A.
+
+**For:** `public`, `organizers` | **Updated:** 2026-06-09
+
+### 📝 **Living** [ICN Hard Questions and Evidence-Bound Answers](/docs/strategy/ICN_HARD_QUESTIONS.md)
+
+Hard questions answered directly in bad-answer/honest-answer format: production use (no), what works now, fixture-backed vs live vs design-only, capture, surveillance, private data, regulation, blockchain (no), bus factor, smallest safe next step. Adapted from internal hardball rehearsal practice; generalized and depersonalized.
+
+**For:** `public`, `stakeholders`, `organizers`, `reviewers` | **Updated:** 2026-06-09
+
+### 📝 **Living** [ICN Introduction Evidence Map](/docs/strategy/ICN_INTRODUCTION_EVIDENCE_MAP.md)
+
+Maps every claim in the introduction materials to verifiable merged artifacts (icn#1985/#1997/#1998/#1999, nycn#78, icn-learn#3, icn-community-bridge#1) and states what each artifact does NOT prove. Anti-overclaim companion to the intro docs; defers to STATE.md and PHASE_PROGRESS.md for current truth.
+
+**For:** `public`, `stakeholders`, `organizers`, `reviewers` | **Updated:** 2026-06-09
+
 ### 📋 **Draft** [Licensing strategy matrix (autonomy review)](/docs/strategy/LICENSING_STRATEGY_MATRIX.md)
 
 Planning artifact only. Component-by-component licensing/autonomy matrix and option families (permissive / AGPL / CAL / policy-layer / hybrid) for a future maintainer/legal review. Not legal advice; not a relicensing decision; no metadata changes.
@@ -1868,9 +1898,9 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 304
+**Total documents:** 309
 
 **By status:**
 - Canonical: 40
 - Draft: 72
-- Living: 192
+- Living: 197
