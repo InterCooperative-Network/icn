@@ -47,7 +47,7 @@ for arg in "$@"; do
     --fresh)    : ;; # default behavior; accepted for an explicit one-command call
     --keep)     KEEP_RUNDIR=1 ;;
     --no-build) NOBUILD=1 ;;
-    -h|--help)  sed -n '2,30p' "$0"; exit 0 ;;
+    -h|--help)  awk 'NR==1{next} /^#/{print; next} {exit}' "$0"; exit 0 ;;
     *) echo "unknown argument: $arg (try --help)" >&2; exit 2 ;;
   esac
 done
