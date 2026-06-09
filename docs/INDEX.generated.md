@@ -1270,7 +1270,7 @@ Normative development control plane: discovery vs delivery, artifact routing, an
 
 Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh
 
-**For:** `contributors`, `agents` | **Updated:** 2026-05-07
+**For:** `contributors`, `agents` | **Updated:** 2026-06-09
 
 ### 📝 **Living** [ICN Golden Development Prompt](/docs/GOLDEN_PROMPT.md)
 
@@ -1602,6 +1602,12 @@ Protocol for recording every tracked file and directory across InterCooperative-
 
 **For:** `contributors`, `architects` | **Updated:** 2026-05-01
 
+### 📝 **Living** [Proof-Level Taxonomy and Capability Matrix](/docs/reference/project-index/proof-level-taxonomy-capability-matrix.md)
+
+Proof-level taxonomy (L0-L8) as shared claim-boundary vocabulary, plus a capability matrix for the current organizer-rehearsal path. Supports #1746 and narrows #1796. Orthogonal to the project-coverage-matrix status vocabulary. Defers to STATE.md and PHASE_PROGRESS.md for current truth.
+
+**For:** `all`, `team` | **Updated:** 2026-06-09
+
 ### 📋 **Draft** [ICN Repo Atlas](/docs/reference/project-index/repo-atlas.md)
 
 Draft interpretive atlas paired with the mechanical full-repo record. Names directory families, Rust-workspace families, and a classification vocabulary for stable atlas authoring across icn / nycn / icn-learn.
@@ -1862,9 +1868,9 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 303
+**Total documents:** 304
 
 **By status:**
 - Canonical: 40
 - Draft: 72
-- Living: 191
+- Living: 192
