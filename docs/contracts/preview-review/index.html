@@ -92,7 +92,7 @@ View source on GitHub →
 <p>Concretely:</p>
 <ul>
 <li>§3 step 3 (&quot;Preview parsed proposals&quot;) produces a packet with <code>preview_kind: meeting_notes_action_items</code> (or one of the other kinds).</li>
-<li>§3 step 6 (&quot;Preview before mutation&quot;) produces a packet with <code>preview_kind: pending_publish_summary</code>.</li>
+<li>§3 step 6 (&quot;Preview before mutation&quot;) produces a packet with <code>preview_kind: pending_publish_summary</code>. The <strong>row-level body</strong> of such a packet — the individual pending-publish rows (action items, decisions, attendance, obligations, allocations, settlements) the organizer reviews — is specified by the composed contract <code>urn:icn:contract:pending-publish-summary:v1</code> (<a href="https://github.com/InterCooperative-Network/icn/blob/main/pending-publish-summary">`pending-publish-summary.md`</a>). That contract does not replace this one; the producing system uses it to populate and summarize the rows behind this <code>pending_publish_summary</code> preview, producing the two as sibling packets linked by role/URN (not nested — this wrapper schema is <code>additionalProperties: false</code> and carries no field for an embedded body).</li>
 <li>§3 step 9 (&quot;Export evidence packet&quot;) consumes a packet with <code>preview_kind: evidence_packet_preview</code> before producing the upstream <code>urn:icn:contract:rehearsal-evidence-export:v1</code> artifact.</li>
 </ul>
 <p>The contract does not run any of those steps; it just describes the read-model the human review surface renders.</p>
@@ -239,6 +239,7 @@ View source on GitHub →
 </ul>
 <h2>See also</h2>
 <ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/pending-publish-summary">`./pending-publish-summary.md`</a> — composed row-level body contract (<code>urn:icn:contract:pending-publish-summary:v1</code>) for <code>preview_kind: pending_publish_summary</code>; specifies the individual pending-publish rows that back a <code>pending_publish_summary</code> preview (composed by role/URN, not nested)</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/rehearsal-evidence-export">`./rehearsal-evidence-export.md`</a> — repo-safe rehearsal evidence export contract; <code>evidence_packet_preview</code> previews are the human review boundary that precedes producing one of those packets</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/schema-id-audit">`./schema-id-audit.md`</a> — audit of every contract <code>$id</code> in the repo (this schema is now in §3 of that audit, recommendation: keep)</li>
 <li><a href="/docs/architecture/ARCHITECTURE_DUE_DILIGENCE">`../architecture/ARCHITECTURE_DUE_DILIGENCE.md`</a> — convenience-vs-authority and participation-access checklist (the upstream architecture-review reflex this contract is a deliberate application of)</li>

@@ -1,0 +1,365 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Pending-publish summary — contract notes | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>contracts</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>pending publish summary</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/contracts/pending-publish-summary.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Pending-publish summary — contract notes</h1>
+<h2>Files</h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/pending-publish-summary.schema.json">`pending-publish-summary.schema.json`</a></td>
+<td>JSON Schema (draft 2020-12) for one repo-safe pending-publish summary packet (a set of review rows).</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/pending-publish-summary.example.json">`pending-publish-summary.example.json`</a></td>
+<td>Fictional sample packet with action-item, decision, attendance, and allocation rows. Validates against the schema.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/scripts/validate-preview-review.py">`../scripts/validate-preview-review.py`</a></td>
+<td>Shared draft-2020-12 validator. It accepts <code>--schema</code>, so it validates this contract too: <code>python3 docs/scripts/validate-preview-review.py --schema docs/contracts/pending-publish-summary.schema.json docs/contracts/pending-publish-summary.example.json</code>.</td>
+</tr>
+</tbody></table>
+<h2>Why this contract exists after <code>preview-review</code></h2>
+<p><a href="https://github.com/InterCooperative-Network/icn/blob/main/preview-review.schema.json">`preview-review.schema.json`</a> (<code>urn:icn:contract:preview-review:v1</code>, landed in icn#1745) defines the <strong>review boundary</strong> — one preview, one <code>review_status</code>, one privacy posture, one <code>proposed_artifact</code>. It names <code>pending_publish_summary</code> as one of its <code>preview_kind</code> values but does <strong>not</strong> specify the shape of the individual rows inside such a summary.</p>
+<p>This contract fills exactly that gap: it is the <strong>row-level read-model</strong> an organizer reviews one item at a time before any documented next step — the data the rehearsal shell needs at the no-CLI workflow&#39;s §3 step 6 (&quot;Preview before mutation&quot;). (§3 step 3, &quot;Preview parsed proposals&quot;, is a <em>different</em> preview moment with its own <code>preview_kind: meeting_notes_action_items</code>, covered by <code>preview-review</code> directly — not by this contract.) Until this contract landed, each package invented its own row shape; this names the substrate-level row shape every package&#39;s pending-publish surface binds to.</p>
+<h2>How it composes with <code>preview-review</code></h2>
+<pre><code>urn:icn:contract:preview-review:v1            (the review boundary / wrapper)
+   preview_kind = &quot;pending_publish_summary&quot;
+        └── body specified by ─────────────►  urn:icn:contract:pending-publish-summary:v1
+                                                  preview_rows[]  (this contract)
+</code></pre>
+<ul>
+<li>The <strong>wrapper</strong> (<code>preview-review</code>) answers: <em>was this summary reviewed, by what generic role, under what privacy posture, before the next step?</em></li>
+<li>The <strong>body</strong> (this contract) answers: <em>what are the individual pending-publish rows the organizer is reviewing — their kind, plain summary, governing body, scope, provenance, status, and what each would create if approved?</em></li>
+</ul>
+<p>This contract <strong>does not replace</strong> <code>preview-review</code>. The schema records the composition in machine-readable form via the <code>x-icn-composes-with</code> companion field (<code>urn:icn:contract:preview-review:v1</code>). The relationship is <strong>by role/URN, not literal nesting</strong>: a producing system uses this contract to populate and summarize the rows behind a <code>preview_kind: pending_publish_summary</code> preview, producing the two as <strong>sibling packets</strong>. <code>preview-review.schema.json</code> is <code>additionalProperties: false</code> and defines no field that can carry this packet as an embedded object (its only free-text expansion is the string <code>proposed_artifact.detail</code>); the wrapper&#39;s <code>proposed_artifact</code> summarizes what these rows contain, while the rows themselves live in this contract&#39;s packet.</p>
+<h2>What this contract is — and is not</h2>
+<p>This is a <strong>read-only / read-model contract</strong>. It describes the rows an organizer was shown. It does <strong>not</strong>:</p>
+<ul>
+<li>mutate, publish, apply, create, or export anything;</li>
+<li>implement any HTTP endpoint or production API surface;</li>
+<li>authorize a formal NYCN pilot;</li>
+<li>permit private partner data in public git.</li>
+</ul>
+<p>Three fields make the read-only boundary explicit:</p>
+<ul>
+<li><strong><code>review_actions</code></strong> are <em>affordances</em> — the choices the organizer could make (<code>approve</code> / <code>reject</code> / <code>edit</code> / <code>request_info</code> / <code>defer</code>). They are not commands and not a record of actions taken. Rendering them performs nothing.</li>
+<li><strong><code>mutation_preview</code></strong> <em>describes</em> what a separate, named, documented endpoint would create later if the row were approved (<code>would_create</code> + a plain-language <code>summary</code>). It carries no executable payload (<code>additionalProperties: false</code>).</li>
+<li><strong><code>receipt_expected</code></strong> describes the expected receipt/evidence <em>category</em> (e.g. <code>governance_receipt</code>, <code>attendance_receipt</code>), never live receipt data.</li>
+</ul>
+<p>The per-row <code>status</code> value <code>approved_for_publish</code> records that a human review boundary was crossed <strong>for that row</strong>. It does <strong>not</strong> mean production deployment, formal pilot authorization, or any actual mutation. Mutation is performed by separate, named, documented endpoints; this contract only describes what a reviewer was shown and what they decided.</p>
+<h2>Identity — non-DNS contract identifier</h2>
+<p>The schema <code>$id</code> is a non-DNS URN:</p>
+<pre><code>urn:icn:contract:pending-publish-summary:v1
+</code></pre>
+<p>Same rationale as <a href="https://github.com/InterCooperative-Network/icn/blob/main/preview-review">`./preview-review.md`</a> and <a href="https://github.com/InterCooperative-Network/icn/blob/main/rehearsal-evidence-export">`./rehearsal-evidence-export.md`</a> (Identity sections) and <a href="/docs/architecture/ARCHITECTURE_DUE_DILIGENCE">`../architecture/ARCHITECTURE_DUE_DILIGENCE.md`</a>: contract identity for ICN must not depend on centralized DNS, ICANN registrars, registrar renewal, or capitalist hosting/payment structures. The companion field <code>x-icn-contract-name</code> (<code>icn.contract.pending_publish_summary.v1</code>) gives a human-readable handle; <code>x-icn-distribution-hints</code> lists repo-relative copies — <strong>distribution hints are not authority</strong>. Producers should pin to the URN, not a file path or DNS URL. The packet echoes the URN in its required <code>contract_id</code> field (a <code>const</code>).</p>
+<h2>How this fits the no-CLI organizer/member workflow</h2>
+<p>The no-CLI workflow at <a href="/docs/pilots/no-cli-organizer-member-rehearsal-workflow">`../pilots/no-cli-organizer-member-rehearsal-workflow.md`</a> describes the human path through a rehearsal. §3 step 6 (&quot;Preview before mutation&quot;) is the preview moment this contract serves (§3 step 3, &quot;Preview parsed proposals&quot;, is the separate <code>preview_kind: meeting_notes_action_items</code> moment). A <code>preview-review</code> packet with <code>preview_kind: pending_publish_summary</code> records the review boundary; the rows it summarizes conform to this contract. The contract runs none of those steps; it just names the read-model the human review surface renders.</p>
+<p>A surface that renders these rows is in scope for <a href="/docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE">`../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`</a> (§3.7 cognitive load, §3.11 receipts/provenance/evidence access, §3.12 governance/action access). Each row carries an <code>accessibility_hint</code> (ADR-0028 discipline, mirrored from action cards) so the gate has something concrete to check.</p>
+<h2>Relationship to action cards, Member standing, receipts, and provenance</h2>
+<ul>
+<li><strong>Action cards</strong> (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/institution-package/action-card.schema.json">`institution-package/action-card.schema.json`</a>) are per-member <em>derived views</em> of what a holder can do now. Pending-publish rows are <em>organizer-facing previews</em> of what would be created. They share vocabulary deliberately: <code>authority_basis</code>, <code>risk_level</code> (<code>low</code>/<code>normal</code>/<code>elevated</code>), <code>accessibility_hint</code>, and <code>scope</code>-style labels mirror the action-card axes so a shell can render both with one design language. Pending-publish <code>receipt_expected</code> is an object (<code>expected</code> + <code>category</code>) rather than the action-card boolean, because a preview describes an <em>expected category</em>, not a live outcome.</li>
+<li><strong>Member standing</strong> is the framing context (memberships, roles, scopes) above any action queue. This contract uses generic <code>governing_body_label</code> / <code>assignee_label</code> / <code>target_scope_label</code> strings, never DIDs — holder-label to DID binding is the separate private-overlay / DID activation flow (<a href="https://github.com/InterCooperative-Network/icn/issues/1730" target="_blank" rel="noopener">icn#1730</a>).</li>
+<li><strong>Receipts</strong> are described by category only (<code>receipt_expected</code>), never carried inline.</li>
+<li><strong>Provenance</strong> is <code>source_provenance_ref</code>: a category plus a safe reference label, optionally a related <code>contract_urn</code> (e.g. <code>urn:icn:contract:rehearsal-evidence-export:v1</code>). Never a private path or URL.</li>
+</ul>
+<h2>Stability</h2>
+<p>The schema sets <code>&quot;x-icn-status&quot;: &quot;rfc&quot;</code>. Treat the shape as <strong>versioned contract surface</strong>, not frozen public API. The version is encoded in the URN (<code>...:v1</code>); the next breaking shape requires a new URN (<code>...:v2</code>) and an explicit migration note per <a href="https://github.com/InterCooperative-Network/icn/blob/main/schema-id-audit">`schema-id-audit.md`</a> §5. Non-breaking additions (new optional fields, new enum members at the end of a closed taxonomy) may land at the same URN with a <code>schema_version</code> bump in the packet.</p>
+<h2>Field shape (at-a-glance)</h2>
+<p>The schema is the source of truth; this is a summary.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Closed taxonomy?</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>schema_version</code></td>
+<td>—</td>
+<td>Semver-style; bumped per shape change at this URN.</td>
+</tr>
+<tr>
+<td><code>contract_id</code></td>
+<td>const</td>
+<td>Must equal <code>urn:icn:contract:pending-publish-summary:v1</code>.</td>
+</tr>
+<tr>
+<td><code>generated_at</code></td>
+<td>—</td>
+<td>RFC 3339 timestamp.</td>
+</tr>
+<tr>
+<td><code>source_package</code></td>
+<td>partial</td>
+<td>Generic <code>label</code> + closed <code>category</code>. No partner nouns.</td>
+</tr>
+<tr>
+<td><code>source_material[]</code></td>
+<td>partial</td>
+<td><code>kind</code> closed (<code>committed-fixture</code>/<code>example-snippet</code>/<code>repo-safe-paste</code>); basename + summary free text. <strong>No raw external paths.</strong></td>
+</tr>
+<tr>
+<td><code>preview_rows[]</code></td>
+<td>—</td>
+<td>One or more rows (see below).</td>
+</tr>
+<tr>
+<td><code>privacy_review</code></td>
+<td>partial</td>
+<td>Generic role label + closed status enum.</td>
+</tr>
+<tr>
+<td><code>non_claims[]</code></td>
+<td>—</td>
+<td>Free text; the standing four (mutation / production / pilot-authorization / private-data) are <strong>machine-enforced</strong> via <code>contains</code> — a packet that drops one fails validation.</td>
+</tr>
+</tbody></table>
+<p>Each <code>preview_row</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Row field</th>
+<th>Closed taxonomy?</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code></td>
+<td>—</td>
+<td>Opaque, locally-unique; no private data encoded.</td>
+</tr>
+<tr>
+<td><code>kind</code></td>
+<td>yes</td>
+<td><code>action_item</code>/<code>decision</code>/<code>attendance</code>/<code>obligation</code>/<code>allocation</code>/<code>settlement</code>/<code>evidence_note</code>/<code>risk_note</code>. Economic-adjacent kinds are regulatory-safe vocabulary only.</td>
+</tr>
+<tr>
+<td><code>plain_summary</code></td>
+<td>—</td>
+<td>Plain language; regulatory-safe vocabulary for economic-adjacent rows.</td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>yes</td>
+<td><code>pending_review</code>/<code>approved_for_publish</code>/<code>rejected</code>/<code>needs_edit</code>/<code>needs_more_info</code>. <strong><code>approved_for_publish</code> is not a mutation.</strong></td>
+</tr>
+<tr>
+<td><code>target_scope_label</code></td>
+<td>—</td>
+<td>Generic label; not a DID.</td>
+</tr>
+<tr>
+<td><code>governing_body_label</code></td>
+<td>—</td>
+<td>Generic label; not a DID or roster.</td>
+</tr>
+<tr>
+<td><code>assignee_label</code></td>
+<td>—</td>
+<td>Optional generic label; <strong>never a DID</strong>.</td>
+</tr>
+<tr>
+<td><code>source_provenance_ref</code></td>
+<td>partial</td>
+<td><code>category</code> closed + safe <code>ref_label</code>; optional related <code>contract_urn</code>. <strong>No private paths.</strong></td>
+</tr>
+<tr>
+<td><code>authority_basis</code></td>
+<td>—</td>
+<td>Plain language (mirrors action-card).</td>
+</tr>
+<tr>
+<td><code>risk_level</code></td>
+<td>yes</td>
+<td><code>low</code>/<code>normal</code>/<code>elevated</code>.</td>
+</tr>
+<tr>
+<td><code>accessibility_hint</code></td>
+<td>—</td>
+<td>Required on every row (ADR-0028 discipline).</td>
+</tr>
+<tr>
+<td><code>review_actions[]</code></td>
+<td>yes</td>
+<td><code>approve</code>/<code>reject</code>/<code>edit</code>/<code>request_info</code>/<code>defer</code>. <strong>Affordances, not commands.</strong></td>
+</tr>
+<tr>
+<td><code>mutation_preview</code></td>
+<td>partial</td>
+<td><code>would_create</code> closed + plain <code>summary</code>. <strong>Description, not a command; no payload.</strong></td>
+</tr>
+<tr>
+<td><code>receipt_expected</code></td>
+<td>partial</td>
+<td><code>expected</code> bool + closed <code>category</code>, <strong>tied fail-closed</strong> (<code>category: none</code> iff <code>expected: false</code>). <strong>Expected category, not live data.</strong></td>
+</tr>
+<tr>
+<td><code>privacy_notes</code></td>
+<td>—</td>
+<td>Optional plain-language note; no private fields.</td>
+</tr>
+</tbody></table>
+<h2>What this schema MUST NOT carry</h2>
+<p>The schema declares <code>additionalProperties: false</code> at the root and every nested object, so unknown fields are rejected at validation time. The following content is <strong>forbidden</strong> by the schema&#39;s design and the project&#39;s privacy posture, regardless of whether a field could technically hold it:</p>
+<ul>
+<li>real personal names (unless explicitly fictional / example-only)</li>
+<li>real email addresses</li>
+<li>real phone numbers</li>
+<li>sponsor contact details</li>
+<li>accommodation or access needs tied to an identifiable person</li>
+<li>raw attendee or member rolls</li>
+<li>API tokens, secrets, signed URLs, or session credentials</li>
+<li>private Drive / Groups / Sheets paths or content</li>
+<li>private overlay contents</li>
+<li>live partner operational details</li>
+<li>any field that implies production deployment or formal pilot authorization</li>
+<li>DIDs of unconsented participants</li>
+<li>free-form mutation payloads (this is a read-model contract; mutation is performed by separate documented endpoints)</li>
+</ul>
+<p>This list is also captured in the schema&#39;s <code>x-icn-must-not-include</code> extension so machine consumers (linters, partner CI) can read it without parsing this prose.</p>
+<h2>Validation guidance for package repos</h2>
+<ol>
+<li>Validate every pending-publish summary that will live in a <strong>public repository</strong> against <code>pending-publish-summary.schema.json</code> before committing. Use the shared validator (<code>docs/scripts/validate-preview-review.py --schema docs/contracts/pending-publish-summary.schema.json &lt;packet&gt;</code>) or any draft-2020-12 JSON Schema validator. Pin to the URN.</li>
+<li>Do <strong>not</strong> add partner-specific nouns to this schema. Bind local meaning in package docs.</li>
+<li><strong>Partner-internal summaries may use the same schema shape but must not be committed to the ICN repository.</strong> Partner-internal data belongs in private overlays or partner-private storage, never in this tree.</li>
+<li>Prefer regulatory-safe vocabulary in human-language fields: <strong>obligation</strong>, <strong>allocation</strong>, <strong>settlement</strong>, <strong>unit</strong>, <strong>position</strong>, <strong>receipt</strong>, <strong>provenance</strong>, <strong>evidence</strong> — not payment / wallet / balance / currency framing for substrate flows.</li>
+<li>Keep the standing non-claims in every summary. Producers may <strong>add</strong> summary-specific non-claims; producers MUST NOT <strong>remove</strong> the standing four.</li>
+</ol>
+<h2>Producing a summary packet</h2>
+<p>A producing system (a parser, a fixture loader, a publish-staging tool) walks its inputs, identifies each proposed item, and packages one row per item:</p>
+<ol>
+<li>Set <code>contract_id</code> to the URN and <code>schema_version</code> to the shape version you authored against.</li>
+<li>Set <code>source_package.label</code>/<code>category</code> to generic values — never a partner name.</li>
+<li>Populate <code>source_material</code> by safe basename and category. No raw cloud-drive paths or private content.</li>
+<li>For each item, build a <code>preview_row</code>: pick the closed-enum <code>kind</code>, write a plain-language <code>plain_summary</code>, set <code>status</code> (usually <code>pending_review</code>), and set the generic <code>target_scope_label</code> / <code>governing_body_label</code> (and optional <code>assignee_label</code> — never a DID).</li>
+<li>Set <code>source_provenance_ref</code> to a category + safe <code>ref_label</code>. Set <code>authority_basis</code>, <code>risk_level</code>, and a per-row <code>accessibility_hint</code>.</li>
+<li>List the <code>review_actions</code> the organizer may take. Fill <code>mutation_preview</code> with what <em>would</em> be created (no payload) and <code>receipt_expected</code> with the expected category.</li>
+<li>Run the privacy check; set <code>privacy_review.status</code>. Add <code>privacy_notes</code> per row where helpful.</li>
+<li>Validate the packet against the schema before committing or rendering it in a public surface.</li>
+<li>Pair the packet with a <code>preview-review</code> packet whose <code>preview_kind</code> is <code>pending_publish_summary</code> — as sibling packets linked by role/URN, not nested (the wrapper carries no field for an embedded body).</li>
+</ol>
+<h2>Out of scope</h2>
+<ul>
+<li><strong>Mutation API</strong> for emitting these summaries or for applying approved rows. The contract is read-only.</li>
+<li><strong>The review boundary itself</strong> — that is <a href="https://github.com/InterCooperative-Network/icn/blob/main/preview-review">`preview-review.md`</a> (<code>urn:icn:contract:preview-review:v1</code>). This contract is only the row-level body.</li>
+<li><strong>Holder-label to DID binding</strong> — the private-overlay / DID activation flow (<a href="https://github.com/InterCooperative-Network/icn/issues/1730" target="_blank" rel="noopener">icn#1730</a>).</li>
+<li><strong>Partner overlay format.</strong> Partner-internal summaries live in private overlays, outside this schema.</li>
+<li><strong>UI rendering of these rows</strong> — organizer/member shell work tracked under <a href="https://github.com/InterCooperative-Network/icn/issues/1726" target="_blank" rel="noopener">icn#1726</a> / <a href="https://github.com/InterCooperative-Network/icn/issues/1727" target="_blank" rel="noopener">icn#1727</a>.</li>
+</ul>
+<h2>See also</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/preview-review">`./preview-review.md`</a> — the review-boundary wrapper this contract composes with; <code>preview_kind: pending_publish_summary</code> is the kind whose body this contract specifies</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/rehearsal-evidence-export">`./rehearsal-evidence-export.md`</a> — repo-safe rehearsal evidence export contract; <code>source_provenance_ref.contract_urn</code> may point at one of those packets</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/institution-package/action-card.schema.json">`./institution-package/action-card.schema.json`</a> — per-member action-card contract; shares the <code>authority_basis</code> / <code>risk_level</code> / <code>accessibility_hint</code> / <code>receipt_expected</code> vocabulary</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/schema-id-audit">`./schema-id-audit.md`</a> — audit of every contract <code>$id</code> in the repo (this schema is in §3, recommendation: keep)</li>
+<li><a href="/docs/architecture/ARCHITECTURE_DUE_DILIGENCE">`../architecture/ARCHITECTURE_DUE_DILIGENCE.md`</a> — convenience-vs-authority and participation-access checklist</li>
+<li><a href="/docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE">`../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`</a> — surface-side PR-time review gate that runs against any UI rendering these rows</li>
+<li><a href="/docs/pilots/no-cli-organizer-member-rehearsal-workflow">`../pilots/no-cli-organizer-member-rehearsal-workflow.md`</a> — no-CLI organizer / member rehearsal workflow; §3 step 6 (&quot;Preview before mutation&quot;) is the preview moment these rows populate</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/issues/1728" target="_blank" rel="noopener">icn#1728</a> — issue this contract&#39;s row-level read-model addresses</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/issues/1724" target="_blank" rel="noopener">icn#1724</a> — umbrella issue for the no-CLI organizer / member rehearsal UX</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/issues/1726" target="_blank" rel="noopener">icn#1726</a> / <a href="https://github.com/InterCooperative-Network/icn/issues/1727" target="_blank" rel="noopener">icn#1727</a> — open follow-ups: organizer rehearsal shell + fixture-backed demo mode (separate; this contract is the read-model they will render)</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/issues/1730" target="_blank" rel="noopener">icn#1730</a> — open follow-up: private-overlay / DID-binding activation flow (separate; the contract&#39;s <code>assignee label not DID</code> discipline references this work)</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

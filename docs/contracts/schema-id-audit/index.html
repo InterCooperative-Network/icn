@@ -85,6 +85,13 @@ View source on GitHub →
 <td>Landed already on the preferred non-DNS pattern (icn#1728). Same companion-field convention as the evidence schema (<code>x-icn-contract-name</code>, <code>x-icn-distribution-hints</code> as non-authoritative hints). Full rationale in <a href="https://github.com/InterCooperative-Network/icn/blob/main/preview-review">`./preview-review.md`</a> Identity section. Read-only review-boundary contract; explicitly not a mutation API.</td>
 </tr>
 <tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/pending-publish-summary.schema.json">`./pending-publish-summary.schema.json`</a></td>
+<td><code>urn:icn:contract:pending-publish-summary:v1</code></td>
+<td>non-DNS URN</td>
+<td><strong>keep</strong></td>
+<td>Authored on the preferred non-DNS pattern (icn#1728). Same companion-field convention (<code>x-icn-contract-name</code>, <code>x-icn-distribution-hints</code>) plus an <code>x-icn-composes-with</code> field pointing at <code>urn:icn:contract:preview-review:v1</code>. Full rationale in <a href="https://github.com/InterCooperative-Network/icn/blob/main/pending-publish-summary">`./pending-publish-summary.md`</a> Identity section. Read-only row-level read-model composed inside the preview-review boundary; explicitly not a mutation API.</td>
+</tr>
+<tr>
 <td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/institution-package/action-card.schema.json">`./institution-package/action-card.schema.json`</a></td>
 <td><code>https://intercooperative.network/contracts/institution-package/action-card.schema.json</code></td>
 <td>DNS-backed (HTTPS)</td>
@@ -114,6 +121,7 @@ View source on GitHub →
 <h2>4. Recommendations summary</h2>
 <ul>
 <li><strong>Keep</strong>: <code>rehearsal-evidence-export.schema.json</code> (already on the preferred pattern).</li>
+<li><strong>Keep</strong>: <code>preview-review.schema.json</code> and <code>pending-publish-summary.schema.json</code> (both on the preferred non-DNS pattern; the latter composes with the former via <code>x-icn-composes-with</code>).</li>
 <li><strong>Retain temporarily; review by 2026-06-30; migrate only after compatibility inventory</strong>: <code>institution-package/action-card.schema.json</code>. <strong>Do not migrate in the same PR as this audit.</strong> Open a separate PR scoped to that single schema&#39;s <code>$id</code> migration, gated on §5 below. If the 2026-06-30 review concludes that migration should not happen, document the decision in this audit and reset a new review date; do not let &quot;temporarily&quot; become &quot;indefinitely.&quot;</li>
 <li><strong>Add</strong>: none — every contract schema in scope has an <code>$id</code>.</li>
 <li><strong>No new schema</strong> should ship in <code>docs/contracts/</code> with a DNS-backed <code>$id</code>. The default for new contract schemas is <code>urn:icn:contract:&lt;short-name&gt;:v&lt;N&gt;</code>. Where a meaningful URN is impractical, a stable UUID URN (<code>urn:uuid:&lt;uuid&gt;</code>) is the bounded fallback.</li>
