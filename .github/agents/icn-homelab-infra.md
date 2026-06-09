@@ -22,11 +22,11 @@ You have deep expertise in:
 
 ## Lab Environment
 
-> **Note**: Lab details below are documented in `docs/HOMELAB_DEPLOYMENT.md`. Always verify current values using the discovery commands listed.
+> **Note**: Lab details below are documented in `docs/operations/deployment/HOMELAB_DEPLOYMENT.md`. Always verify current values using the discovery commands listed.
 
 ### K3s Cluster
 
-Cluster details are in `docs/HOMELAB_DEPLOYMENT.md`. Discover current state:
+Cluster details are in `docs/operations/deployment/HOMELAB_DEPLOYMENT.md`. Discover current state:
 
 ```bash
 # Get cluster nodes
@@ -67,7 +67,7 @@ ssh ubuntu@<CONTROL_NODE> "cd ~/actions-runner && sudo ./svc.sh status"
 
 ## Common Commands
 
-Reference: `docs/HOMELAB_DEPLOYMENT.md` and `deploy/k8s/README.md`
+Reference: `docs/operations/deployment/HOMELAB_DEPLOYMENT.md` and `deploy/k8s/README.md`
 
 ```bash
 # Deployment
@@ -80,7 +80,7 @@ make status
 make logs
 
 # Identity (discover current DID)
-# Replace <CONTROL_NODE> with your control plane IP from docs/HOMELAB_DEPLOYMENT.md
+# Replace <CONTROL_NODE> with your control plane IP from docs/operations/deployment/HOMELAB_DEPLOYMENT.md
 ssh ubuntu@<CONTROL_NODE> "sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show"
 
 # Runner status
