@@ -49,6 +49,7 @@ This directory is a **show-ready orientation layer** for the ICN repository. Its
 | [`ci-ops-deploy-map.md`](ci-ops-deploy-map.md) | CI workflows, deploy paths, K3s smoke runbooks — routing only. |
 | [`show-readiness-map.md`](show-readiness-map.md) | What can be shown now, what should not be shown as finished, the suggested demo narrative, and red lines. |
 | [`project-coverage-matrix.md`](project-coverage-matrix.md) | Coverage-style matrix: subsystem → anchors → drift and show risks. |
+| [`proof-level-taxonomy-capability-matrix.md`](proof-level-taxonomy-capability-matrix.md) | Proof-level taxonomy (L0–L8) as shared claim-boundary vocabulary, plus a capability matrix for the current organizer-rehearsal path. Supports #1746, narrows #1796. |
 | [`identity-crypto-map.md`](identity-crypto-map.md) | Identity, keys, DIDs, signing — where code and docs live. |
 | [`network-gossip-map.md`](network-gossip-map.md) | QUIC, gossip, discovery — runtime surfaces and overclaim guardrails. |
 | [`ccl-map.md`](ccl-map.md) | Cooperative Contract Language interpreter and governance wiring. |
