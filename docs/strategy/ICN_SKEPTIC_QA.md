@@ -20,7 +20,7 @@ Last Reviewed: 2026-06-09
 
 **Honest answer**:
 
-> "No. No cooperative is using ICN in production. Nothing about ICN is production-ready. The substrate has run on a small self-hosted development cluster, which proves it deploys and runs — it does not prove anyone depends on it, because no one does. If you ever hear someone claim a co-op is running on ICN, ask for the evidence; as of this document's review date, there isn't any, because it hasn't happened."
+> "No. No cooperative is using ICN in production. Nothing about ICN is production-ready. The substrate has run on a small self-hosted development cluster ([documented in-repo](../operations/deployment/HOMELAB_DEPLOYMENT.md); anchored in the [evidence map](ICN_INTRODUCTION_EVIDENCE_MAP.md)), which proves it deploys and runs — it does not prove anyone depends on it, because no one does. If you ever hear someone claim a co-op is running on ICN, ask for the evidence; as of this document's review date, there isn't any, because it hasn't happened."
 
 ---
 
@@ -48,7 +48,7 @@ Last Reviewed: 2026-06-09
 >
 > **Design-only**: production federation flows, member-facing applications, real-institution onboarding, private-data handling. These exist as specs, ADRs, and contracts — words and schemas, not running systems.
 >
-> ICN maintains a proof-level taxonomy precisely so these tiers don't get blurred in conversation. The rule is simple: state the level the evidence supports, and no higher."
+> ICN maintains a [proof-level taxonomy](../reference/project-index/proof-level-taxonomy-capability-matrix.md) precisely so these tiers don't get blurred in conversation. The rule is simple: state the level the evidence supports, and no higher."
 
 ---
 

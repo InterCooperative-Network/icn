@@ -46,10 +46,15 @@ The honest summary of the whole table: **ICN's strongest current evidence is loc
 - **Proves:** A facilitated walkthrough of the receipt-chain story **can run from recorded fixtures with no live infrastructure**, making demonstrations portable and removing live-system risk from facilitation settings.
 - **Does NOT prove:** Anything about live execution. Fixture mode is presentation-grade evidence by design; the live-execution evidence is #1985/#1997. Conflating the two modes is exactly the overclaim this evidence map exists to prevent.
 
-### [icn#2000](https://github.com/InterCooperative-Network/icn/pull/2000) — proof-level taxonomy and rehearsal capability matrix (in review as of 2026-06-09)
+### [icn#2000](https://github.com/InterCooperative-Network/icn/pull/2000) — proof-level taxonomy and rehearsal capability matrix (merged 2026-06-09)
 
-- **Proves (once merged):** ICN has a **shared claim-boundary vocabulary** (proof levels L0–L8, from design-only through production hardening) and a per-capability matrix, so contributors, facilitators, and reviewers cannot accidentally over- or under-claim. This is anti-overclaim infrastructure — it raises the honesty of claims, not the readiness of the system.
+- **Proves:** ICN has a **shared claim-boundary vocabulary** ([proof levels L0–L8](../reference/project-index/proof-level-taxonomy-capability-matrix.md), from design-only through production hardening) and a per-capability matrix, so contributors, facilitators, and reviewers cannot accidentally over- or under-claim. This is anti-overclaim infrastructure — it raises the honesty of claims, not the readiness of the system.
 - **Does NOT prove:** Any capability's readiness. A taxonomy describes evidence; it doesn't create it.
+
+### [Homelab deployment doc](../operations/deployment/HOMELAB_DEPLOYMENT.md) — self-hosted development-cluster deployment (in-repo operations doc)
+
+- **Proves:** The ICN daemon has been deployed to and run on a **small self-hosted K3s development cluster**. The deployment manifests landed in this repository in early December 2025 (`deploy/k8s`, first commits 2025-12-04/05), the deployment doc's pilot-testing status section is dated 2025-12-05, and the doc records a cluster rebuild on 2026-02-21.
+- **Does NOT prove:** Production use, continuous operation, multi-institution federation, or that any cooperative depends on this deployment. It is a development/demo environment operated by the maintainer.
 
 Supporting merged work behind the receipt-chain path, for completeness: [icn#1990](https://github.com/InterCooperative-Network/icn/pull/1990) (durable effect-dispatch evidence persistence), [icn#1993](https://github.com/InterCooperative-Network/icn/pull/1993) (bounded dispatch-evidence backfill), [icn#1996](https://github.com/InterCooperative-Network/icn/pull/1996) (decision-hash ledger index for scalable receipt-chain lookup). These harden the evidence path; they carry the same limits as #1985.
 
@@ -82,7 +87,8 @@ Supporting merged work behind the receipt-chain path, for completeness: [icn#199
 | "The demonstration is reproducible with one command" | icn#1997 | Live local proof (packaged) |
 | "A facilitated walkthrough can run without live infrastructure" | icn#1999 | Fixture-backed |
 | "Rehearsal surfaces share a validated summary contract" | icn#1998 | Schema/contract |
-| "ICN maintains a shared proof-level vocabulary against overclaim" | icn#2000 (in review as of 2026-06-09) | Documentation/process |
+| "ICN maintains a shared proof-level vocabulary against overclaim" | icn#2000 (merged 2026-06-09) | Documentation/process |
+| "The substrate has run on a small self-hosted development cluster (first deployed December 2025)" | [HOMELAB_DEPLOYMENT.md](../operations/deployment/HOMELAB_DEPLOYMENT.md) + `deploy/k8s` git history (first commits 2025-12-04/05) | Development deployment |
 | "The proof path can be driven externally from the NYCN repo" | nycn#78 | Live local proof, externally driven |
 | "An organizer learning path exists" | icn-learn#3 | Teaching scaffold |
 | "Event-data privacy boundaries are designed consent-first" | icn-community-bridge#1 | Design note |
