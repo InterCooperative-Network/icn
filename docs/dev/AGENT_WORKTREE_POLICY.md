@@ -1,7 +1,7 @@
 # Agent Worktree Policy (icn-dev operating model)
 
 **Status**: Active operating policy for agent sessions on the dev host
-**Scope**: Local repository operations. Complements [WORKTREES.md](WORKTREES.md), which documents the in-repo `../icn-wt/` worktree mechanics. This policy governs the host-level `~/icn-dev/` layout that agent sessions must use.
+**Scope**: Local repository operations. Complements [WORKTREES.md](WORKTREES.md), which documents git-worktree mechanics for the older repo-adjacent `../icn-wt/` layout. This policy governs the host-level `~/icn-dev/` layout that agent sessions must use.
 
 ## Why this exists
 
