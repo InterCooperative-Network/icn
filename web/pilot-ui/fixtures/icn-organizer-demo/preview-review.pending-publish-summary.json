@@ -1,0 +1,73 @@
+{
+  "schema_version": "0.1.0",
+  "preview_id": "preview-example-pending-publish-summary-2026-06-09-001",
+  "preview_kind": "pending_publish_summary",
+  "created_at": "2026-06-09T00:05:00Z",
+  "created_by_role": "facilitator",
+  "scope": "structure",
+  "source_material": [
+    {
+      "kind": "example-snippet",
+      "basename": "example-organizing-circle-notes.fixture.md",
+      "summary": "Fictional organizing-circle notes the pending-publish rows were summarized from. No real people or organization."
+    },
+    {
+      "kind": "example-snippet",
+      "basename": "example-allocation-draft.fixture.json",
+      "summary": "Fictional allocation draft referenced by the allocation row. No real units, positions, or partner data."
+    }
+  ],
+  "proposed_artifact": {
+    "kind": "publish_summary",
+    "title": "EXAMPLE — Four pending-publish rows staged for organizer review",
+    "summary": "A pending-publish summary of four fictional rows (one action item, one decision, one attendance record, one internal-unit allocation) presented to the reviewer before any documented next step.",
+    "detail": "This wrapper records the review boundary for a pending_publish_summary. The individual rows it summarizes live in the sibling packet urn:icn:contract:pending-publish-summary:v1 (docs/contracts/pending-publish-summary.example.json) and are composed by URN, not nested into this object — preview-review.schema.json is additionalProperties:false and defines no field that can carry the rows. Each row would, if approved, be created by a separate, named, documented endpoint; rendering this preview creates nothing. Holder-label to DID binding is a separate documented step under the private-overlay / DID activation flow (icn#1730)."
+  },
+  "review_status": "ready_for_review",
+  "review_requirements": [
+    "privacy_review",
+    "accessibility_review",
+    "repo_safety_review",
+    "scope_confirmation",
+    "no_mutation_check"
+  ],
+  "reviewer_actions": [
+    {
+      "action": "opened",
+      "by_role": "facilitator",
+      "recorded_at": "2026-06-09T00:05:00Z",
+      "notes": "Pending-publish summary assembled from the bundled fictional source material; presented to the reviewer for the first time."
+    }
+  ],
+  "privacy_review": {
+    "reviewer_role": "facilitator",
+    "status": "reviewed-clean",
+    "notes": "All rows summarized here are fictional; no real names, contacts, sponsors, attendee rolls, accommodation needs, tokens, DIDs, or partner Drive / Groups / Sheets paths were present at any point. The preview is checked into a public repository deliberately as a schema-conformance reference."
+  },
+  "repo_safety": {
+    "classification": "repo-safe",
+    "notes": "All source material is fictional and committed under the repo (or referenced by basename only); no partner-internal data is present. The preview is safe to render in any public surface."
+  },
+  "evidence_links": [
+    {
+      "kind": "public-doc",
+      "contract_urn": "urn:icn:contract:pending-publish-summary:v1",
+      "title": "Row-level body contract composed inside this pending_publish_summary review boundary (sibling packet, by URN — not nested here)."
+    },
+    {
+      "kind": "rehearsal-evidence-export",
+      "contract_urn": "urn:icn:contract:rehearsal-evidence-export:v1",
+      "title": "Upstream evidence-export contract a separate, documented next step would write to once approved."
+    }
+  ],
+  "non_claims": [
+    "This preview is a schema-conformance fixture, not a real review record.",
+    "Not a mutation; rendering this preview does not publish, apply, create, or export anything.",
+    "Not a production deployment.",
+    "Not a formally committed NYCN cooperative pilot authorization.",
+    "Not private-data handling; all material is fictional and repo-safe by construction.",
+    "Not a literal container for the pending-publish rows; the rows live in the sibling urn:icn:contract:pending-publish-summary:v1 packet and are composed by URN, never nested into this wrapper.",
+    "Not a payment, wallet, balance, or currency surface; allocation / settlement vocabulary in the composed rows refers to internal cooperative coordination primitives only, never money transmission or stored value.",
+    "Not a self-declared organizer-ready surface; the gate at docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md still runs against any UI that renders this preview."
+  ]
+}
