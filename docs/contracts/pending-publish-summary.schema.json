@@ -144,10 +144,16 @@
       }
     },
     "non_claims": {
-      "description": "Required free-text array enumerating the standing non-claims this summary preserves. At minimum: not a mutation, not production deployment, not formal pilot authorization, not private-data handling. Producers may add summary-specific non-claims; producers MUST NOT remove the standing four.",
+      "description": "Required free-text array enumerating the standing non-claims this summary preserves. The standing four are MACHINE-ENFORCED via the `contains` constraints below: a packet that drops any of them fails validation. Standing four: not a mutation, not production deployment, not formal pilot authorization, not private-data handling. Producers may add summary-specific non-claims; producers MUST NOT remove the standing four.",
       "type": "array",
       "minItems": 4,
-      "items": { "type": "string", "minLength": 1, "maxLength": 400 }
+      "items": { "type": "string", "minLength": 1, "maxLength": 400 },
+      "allOf": [
+        { "$comment": "standing non-claim: not a mutation", "contains": { "type": "string", "pattern": "[Mm]utation" } },
+        { "$comment": "standing non-claim: not production deployment", "contains": { "type": "string", "pattern": "[Pp]roduction" } },
+        { "$comment": "standing non-claim: not formal pilot authorization", "contains": { "type": "string", "pattern": "[Pp]ilot|[Aa]uthoriz" } },
+        { "$comment": "standing non-claim: not private-data handling", "contains": { "type": "string", "pattern": "[Pp]rivate|[Pp]rivacy" } }
+      ]
     }
   },
   "$defs": {
@@ -313,7 +319,7 @@
           }
         },
         "receipt_expected": {
-          "description": "Describes the receipt/evidence CATEGORY expected if the row's next step were taken. Never live receipt data. 'expected: false' with 'category: none' means no receipt is expected.",
+          "description": "Describes the receipt/evidence CATEGORY expected if the row's next step were taken. Never live receipt data. The fields are tied (fail-closed, enforced by if/then/else below): 'expected: false' requires 'category: none', and 'expected: true' forbids 'category: none'. Contradictory combinations are rejected at validation time.",
           "type": "object",
           "additionalProperties": false,
           "required": ["expected", "category"],
@@ -324,7 +330,7 @@
             },
             "category": {
               "type": "string",
-              "description": "Closed taxonomy of expected receipt categories. 'none' when no receipt is expected.",
+              "description": "Closed taxonomy of expected receipt categories. 'none' exactly when 'expected' is false (enforced).",
               "enum": [
                 "governance_receipt",
                 "attendance_receipt",
@@ -333,7 +339,10 @@
                 "none"
               ]
             }
-          }
+          },
+          "if": { "properties": { "expected": { "const": false } } },
+          "then": { "properties": { "category": { "const": "none" } } },
+          "else": { "properties": { "category": { "not": { "const": "none" } } } }
         },
         "privacy_notes": {
           "type": "string",

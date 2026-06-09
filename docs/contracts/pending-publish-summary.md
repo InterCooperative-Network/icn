@@ -91,7 +91,7 @@ The schema is the source of truth; this is a summary.
 | `source_material[]` | partial | `kind` closed (`committed-fixture`/`example-snippet`/`repo-safe-paste`); basename + summary free text. **No raw external paths.** |
 | `preview_rows[]` | — | One or more rows (see below). |
 | `privacy_review` | partial | Generic role label + closed status enum. |
-| `non_claims[]` | — | Free text; must include the standing four. |
+| `non_claims[]` | — | Free text; the standing four (mutation / production / pilot-authorization / private-data) are **machine-enforced** via `contains` — a packet that drops one fails validation. |
 
 Each `preview_row`:
 
@@ -110,7 +110,7 @@ Each `preview_row`:
 | `accessibility_hint` | — | Required on every row (ADR-0028 discipline). |
 | `review_actions[]` | yes | `approve`/`reject`/`edit`/`request_info`/`defer`. **Affordances, not commands.** |
 | `mutation_preview` | partial | `would_create` closed + plain `summary`. **Description, not a command; no payload.** |
-| `receipt_expected` | partial | `expected` bool + closed `category`. **Expected category, not live data.** |
+| `receipt_expected` | partial | `expected` bool + closed `category`, **tied fail-closed** (`category: none` iff `expected: false`). **Expected category, not live data.** |
 | `privacy_notes` | — | Optional plain-language note; no private fields. |
 
 ## What this schema MUST NOT carry
