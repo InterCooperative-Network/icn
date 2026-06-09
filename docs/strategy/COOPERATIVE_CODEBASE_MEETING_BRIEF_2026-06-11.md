@@ -8,7 +8,7 @@ Last Reviewed: 2026-06-09
 
 > **Posture: learner-first, peer-technologist.** They are forming a tech cooperative. Formation is not ICN's layer. The goal of this call is one identified seam and one rehearsal candidate, or a clean "not yet" — both are wins. Do not pitch.
 >
-> Facts and non-claims in this brief are controlled by the [skeptic Q&A](ICN_SKEPTIC_QA.md) and the [evidence map](ICN_INTRODUCTION_EVIDENCE_MAP.md) (landing via [#2002](https://github.com/InterCooperative-Network/icn/pull/2002)). If anything said on the call outruns those documents, it was an overclaim — correct it on the call.
+> Facts and non-claims in this brief are controlled by the [hard-questions Q&A](ICN_HARD_QUESTIONS.md) and the [evidence map](ICN_INTRODUCTION_EVIDENCE_MAP.md). If anything said on the call outruns those documents, it was an overclaim — correct it on the call.
 
 ---
 
@@ -17,7 +17,7 @@ Last Reviewed: 2026-06-09
 - **When:** Thursday, June 11, 2026, **3:30 PM Chicago / 4:30 PM Eastern**, 60 minutes.
 - **Who:** Aaron Junot (per Matt's notes; the scheduling emails identify only "Cooperative Codebase"), plus Matt. Other participant on the invite: the ICN gmail account.
 - **History:** booked via their Zeeg scheduler; rescheduled twice (Jun 1 → Jun 4 → Jun 11), the last at their request ("I have a conflict at the original time"). They have been flexible and apologetic about it — no signal of low interest, just calendar friction.
-- **Location: ⚠️ NOT in the final confirmation.** The earlier Jun 1 booking used a MayFirst Jitsi room (link in the May 31 email in matt.faherty@gmail.com). **Pre-call action: confirm the link with Aaron.** Do not assume the old room carries over.
+- **Location: ⚠️ NOT in the final confirmation.** The earlier Jun 1 booking used a MayFirst Jitsi room (link is in the May 31 location-change email in Matt's personal inbox; not reproduced here). **Pre-call action: confirm the link with Aaron.** Do not assume the old room carries over.
 - **Their prep-question field ("anything that will help prepare?") was left blank.** No agenda was set on either side. That makes the first five minutes ours to shape — gently.
 
 ## What we actually know about Cooperative Codebase (and what we don't)
@@ -38,7 +38,7 @@ Last Reviewed: 2026-06-09
 McKenzie was a co-op *developer* with a formation platform — the seam was Launch hands off into durable governance. Aaron is (apparently) a *founder*, and a technologist. Three things change:
 
 1. **He is living the formation problem right now.** The honest line from [ICN_FOR_COOPERATIVE_MOVEMENT.md](ICN_FOR_COOPERATIVE_MOVEMENT.md) applies to him directly: a co-op forming today should use formation resources and Loomio, not ICN. Say that early. It buys all the credibility the rest of the call runs on.
-2. **He can read the code.** Hard questions may be technical (why Rust, why not CRDTs/ActivityPub/X, what's actually implemented). The [skeptic Q&A](ICN_SKEPTIC_QA.md) tiers apply verbatim: live local proof vs fixture-backed vs design-only. State the tier; never blur.
+2. **He can read the code.** Hard questions may be technical (why Rust, why not CRDTs/ActivityPub/X, what's actually implemented). The [hard-questions Q&A](ICN_HARD_QUESTIONS.md) tiers apply verbatim: live local proof vs fixture-backed vs design-only. State the tier; never blur.
 3. **A tech co-op is a different kind of counterpart.** Four possible seams, in rough order of likelihood — hold all four loosely and let the call pick:
    - **Peer:** comparing notes on movement-tech; mutual orientation; nothing more. Fine outcome.
    - **Future user:** their co-op's own records (standing, decisions, member equity) on ICN someday, post-pilot.
@@ -66,7 +66,7 @@ Then stop talking and listen. Capture his vocabulary verbatim; use his words.
 
 The spine: **Standing → Authority → Decision → Obligation → Effect → Receipt → Evidence → Review.** Apps own meaning; the kernel enforces constraints without understanding them. Each co-op runs its own node. Receipts are evidence records, not currency.
 
-The current truth, stated plainly (full version in the [skeptic Q&A](ICN_SKEPTIC_QA.md), artifact-by-artifact limits in the [evidence map](ICN_INTRODUCTION_EVIDENCE_MAP.md)):
+The current truth, stated plainly (full version in the [hard-questions Q&A](ICN_HARD_QUESTIONS.md), artifact-by-artifact limits in the [evidence map](ICN_INTRODUCTION_EVIDENCE_MAP.md)):
 - **Live local proof:** the 13/13 receipt-chain audit runs against a real local daemon/gateway, reproducible with one command from a repo checkout.
 - **Fixture-backed:** the rehearsal shell runs without live infrastructure — presentation-grade by design.
 - **Design-only:** production federation, member-facing apps, private-data handling.
@@ -92,10 +92,10 @@ If a seam emerges: smallest safe next step is a two-hour sanitized tabletop (one
 ## Pre-call checklist (Wednesday)
 
 - [ ] Confirm the meeting link with Aaron (final confirmation has none; old MayFirst room may not carry over).
-- [ ] Merge [#2002](https://github.com/InterCooperative-Network/icn/pull/2002) so the skeptic Q&A and evidence map are linkable on `main`.
+- [x] #2002 merged — the hard-questions Q&A and evidence map are live on `main`.
 - [ ] Verify intercooperative.network key routes return 200 and claims carry maturity bands (ADR-0032/0033).
 - [ ] Dry-run the fixture-backed rehearsal shell once, even though the default is no demo.
-- [ ] Re-read the [skeptic Q&A](ICN_SKEPTIC_QA.md) once, out loud, the morning of.
+- [ ] Re-read the [hard-questions Q&A](ICN_HARD_QUESTIONS.md) once, out loud, the morning of.
 
 ## Capture grid (fill within 24h after the call)
 
@@ -114,4 +114,4 @@ Then update `memory` (people entry for Aaron is thin by design) and TASKS.md.
 
 ---
 
-*Related: [ICN_FOR_COOPERATIVE_MOVEMENT.md](ICN_FOR_COOPERATIVE_MOVEMENT.md) · [ICN_FOR_EVERYONE.md](ICN_FOR_EVERYONE.md) · [ICN_SKEPTIC_QA.md](ICN_SKEPTIC_QA.md) · [ICN_INTRODUCTION_EVIDENCE_MAP.md](ICN_INTRODUCTION_EVIDENCE_MAP.md) · prior-call pattern: [COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md](COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md)*
+*Related: [ICN_FOR_COOPERATIVE_MOVEMENT.md](ICN_FOR_COOPERATIVE_MOVEMENT.md) · [ICN_FOR_EVERYONE.md](ICN_FOR_EVERYONE.md) · [ICN_HARD_QUESTIONS.md](ICN_HARD_QUESTIONS.md) · [ICN_INTRODUCTION_EVIDENCE_MAP.md](ICN_INTRODUCTION_EVIDENCE_MAP.md) · prior-call pattern: [COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md](COOPERATIVE_FORMATION_PLATFORM_MEETING_PREP_2026-05-21.md)*
