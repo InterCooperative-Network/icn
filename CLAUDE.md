@@ -33,7 +33,7 @@ ICN implements a **constraint enforcement architecture** where Policy Oracles (a
 
 ## Live Deployment
 
-ICN daemon running on K3s cluster (deployed 2025-12-03). See **[docs/HOMELAB_DEPLOYMENT.md](docs/HOMELAB_DEPLOYMENT.md)** for:
+ICN daemon running on K3s cluster (deployed 2025-12-03). See **[docs/operations/deployment/HOMELAB_DEPLOYMENT.md](docs/operations/deployment/HOMELAB_DEPLOYMENT.md)** for:
 - Cluster details and node identity
 - Quick access commands
 - CI/CD pipeline and monitoring
@@ -499,7 +499,7 @@ See **[.github/ISSUE_POLICY.md](.github/ISSUE_POLICY.md)** for the complete issu
 - Partner (0.4-0.7): 100 msg/sec
 - Federated (0.7+): 200 msg/sec
 
-See [docs/production-hardening.md](docs/production-hardening.md) for complete details.
+See [docs/security/production-hardening.md](docs/security/production-hardening.md) for complete details.
 
 ## Notes
 
