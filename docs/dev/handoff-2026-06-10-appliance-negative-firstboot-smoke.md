@@ -133,7 +133,7 @@ Cloud-init reported `status: done` — SSH provisioning is independent of the IC
 - Production readiness: not claimed, unchanged.
 - The PGP trust-chain limitation on the Debian base image recorded by #1900: unchanged.
 
-## Operator assumptions
+## Unsafe Assumptions
 
 - The archived #1900 artifact image is the unit under test; its SHA256 was re-verified against its build manifest before use.
 - TCG (no KVM for the operator user) affects speed only, not gate semantics.

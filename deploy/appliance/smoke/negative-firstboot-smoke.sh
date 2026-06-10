@@ -118,8 +118,12 @@ while [ "$#" -gt 0 ]; do
     case "$1" in
         --dry-run)  MODE="dry-run" ; shift ;;
         --real)     MODE="real"    ; shift ;;
-        --scenario) SCENARIO="${2:-}" ; shift 2 ;;
-        --out)      OUT_DIR="${2:-}"  ; shift 2 ;;
+        --scenario)
+            [ "$#" -ge 2 ] || { err "--scenario requires a value" ; exit 2 ; }
+            SCENARIO="$2" ; shift 2 ;;
+        --out)
+            [ "$#" -ge 2 ] || { err "--out requires a value" ; exit 2 ; }
+            OUT_DIR="$2" ; shift 2 ;;
         --force)    FORCE=1 ; shift ;;
         --help|-h)  usage ;;
         *) err "unknown argument: $1" ; exit 2 ;;
@@ -392,6 +396,17 @@ run_in_vm() {
     ssh "${SSH_OPTS[@]}" "${SSH_USER}@127.0.0.1" "$@"
 }
 
+# Core evidence set, captured on BOTH fail-open paths (exit 10 and 11)
+# so an incorrect success is as auditable as a correct failure.
+capture_failopen_evidence() {
+    run_in_vm "sudo systemctl status icnd.service --no-pager" \
+        >"$OUT_DIR/icnd-status.txt" 2>&1 || true
+    run_in_vm "sudo journalctl -u icnd.service --no-pager -n 200" \
+        >"$OUT_DIR/icnd-journal.txt" 2>&1 || true
+    run_in_vm "sudo journalctl -b --no-pager | grep -iE 'dependency failed|firstboot' | tail -40" \
+        >"$OUT_DIR/depfail-journal.txt" 2>&1 || true
+}
+
 # ---------- assertion a: firstboot unit failed ----------
 log "Asserting icn-appliance-firstboot.service reaches 'failed' (bounded wait)..."
 FB_DEADLINE=$(( $(date +%s) + 180 ))
@@ -427,13 +442,15 @@ while [ "$(date +%s)" -lt "$OBS_DEADLINE" ]; do
     ICND_STATE="$(run_in_vm "systemctl is-active icnd 2>/dev/null" || true)"
     if [ "$ICND_STATE" = "active" ]; then
         err "FAIL-OPEN: icnd.service became ACTIVE despite failed firstboot."
-        run_in_vm "sudo journalctl -u icnd.service --no-pager -n 200" \
-            >"$OUT_DIR/icnd-journal.txt" 2>&1 || true
+        capture_failopen_evidence
         exit 10
     fi
     if run_in_vm "curl -sf --max-time 4 http://127.0.0.1:${HEALTH_PORT}/v1/health" \
         >/dev/null 2>&1; then
         err "FAIL-OPEN: /v1/health answered successfully despite failed firstboot."
+        capture_failopen_evidence
+        run_in_vm "curl -s --max-time 4 -i http://127.0.0.1:${HEALTH_PORT}/v1/health" \
+            >"$OUT_DIR/health-response.txt" 2>&1 || true
         exit 11
     fi
     sleep 5
