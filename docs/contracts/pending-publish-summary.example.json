@@ -1,0 +1,136 @@
+{
+  "schema_version": "0.1.0",
+  "contract_id": "urn:icn:contract:pending-publish-summary:v1",
+  "generated_at": "2026-06-09T00:00:00Z",
+  "source_package": {
+    "label": "Example institution package",
+    "category": "institution_package"
+  },
+  "source_material": [
+    {
+      "kind": "example-snippet",
+      "basename": "example-organizing-circle-notes.fixture.md",
+      "summary": "Fictional organizing-circle notes used to demonstrate the pending-publish row shape. No real people or organization."
+    },
+    {
+      "kind": "example-snippet",
+      "basename": "example-allocation-draft.fixture.json",
+      "summary": "Fictional allocation draft referenced by the allocation row. No real units, positions, or partner data."
+    }
+  ],
+  "preview_rows": [
+    {
+      "id": "row-example-action-item-001",
+      "kind": "action_item",
+      "plain_summary": "Example Working Group to draft a sample agenda for the next organizing cycle.",
+      "status": "pending_review",
+      "target_scope_label": "Example Working Group — next organizing cycle",
+      "governing_body_label": "Example Stewards Circle",
+      "assignee_label": "Example steward",
+      "source_provenance_ref": {
+        "category": "meeting_record",
+        "ref_label": "example-organizing-circle-notes.fixture.md"
+      },
+      "authority_basis": "assigned_action_item",
+      "risk_level": "low",
+      "accessibility_hint": "Plain-language action item; screen-reader friendly; no time pressure is encoded by this row.",
+      "review_actions": ["approve", "reject", "edit", "request_info"],
+      "mutation_preview": {
+        "would_create": "action_item_record",
+        "summary": "If approved, a separate documented endpoint would create one action-item record assigned to the Example steward label. No record is created by rendering this row."
+      },
+      "receipt_expected": {
+        "expected": true,
+        "category": "action_item_completion_receipt"
+      }
+    },
+    {
+      "id": "row-example-decision-001",
+      "kind": "decision",
+      "plain_summary": "Adopt the sample meeting cadence proposed by the Example Working Group.",
+      "status": "pending_review",
+      "target_scope_label": "Example Cooperative — meeting cadence",
+      "governing_body_label": "Example Stewards Circle",
+      "source_provenance_ref": {
+        "category": "governance_record",
+        "ref_label": "example-proposal-cadence.fixture.json"
+      },
+      "authority_basis": "domain_membership",
+      "risk_level": "normal",
+      "accessibility_hint": "Plain-language decision summary; the full proposal text is available before any vote is staged.",
+      "review_actions": ["approve", "reject", "edit", "request_info", "defer"],
+      "mutation_preview": {
+        "would_create": "governance_proposal",
+        "summary": "If approved, a separate documented endpoint would stage one governance proposal for the Example Stewards Circle to consider. No proposal is staged by rendering this row."
+      },
+      "receipt_expected": {
+        "expected": true,
+        "category": "governance_receipt"
+      }
+    },
+    {
+      "id": "row-example-attendance-001",
+      "kind": "attendance",
+      "plain_summary": "Record sample attendance for the Example Working Group's last session.",
+      "status": "needs_more_info",
+      "target_scope_label": "Example Working Group — session attendance",
+      "governing_body_label": "Example Working Group",
+      "source_provenance_ref": {
+        "category": "meeting_record",
+        "ref_label": "example-session-attendance.fixture.md"
+      },
+      "authority_basis": "meeting_attendee",
+      "risk_level": "low",
+      "accessibility_hint": "Plain-language attendance summary; only a generic count is shown, never a roster.",
+      "review_actions": ["approve", "reject", "request_info"],
+      "mutation_preview": {
+        "would_create": "attendance_record",
+        "summary": "If approved, a separate documented endpoint would create attendance records; no roster or member roll is included in this preview."
+      },
+      "receipt_expected": {
+        "expected": true,
+        "category": "attendance_receipt"
+      },
+      "privacy_notes": "No attendee roll is present in this row; only a generic count is summarized. Holder-label to DID binding is out of scope for this contract."
+    },
+    {
+      "id": "row-example-allocation-001",
+      "kind": "allocation",
+      "plain_summary": "Stage a sample allocation of shared internal unit capacity to the Example Working Group for the next cycle.",
+      "status": "pending_review",
+      "target_scope_label": "Example Cooperative — shared unit capacity",
+      "governing_body_label": "Example Stewards Circle",
+      "source_provenance_ref": {
+        "category": "governance_record",
+        "ref_label": "example-allocation-draft.fixture.json"
+      },
+      "authority_basis": "domain_membership",
+      "risk_level": "elevated",
+      "accessibility_hint": "Plain-language allocation summary; figures are internal cooperative units, explained in the row detail before any approval.",
+      "review_actions": ["approve", "reject", "edit", "request_info"],
+      "mutation_preview": {
+        "would_create": "allocation_record",
+        "summary": "If approved, a separate documented endpoint would record one allocation of shared internal unit capacity to the Example Working Group. No allocation is recorded by rendering this row."
+      },
+      "receipt_expected": {
+        "expected": true,
+        "category": "settlement_receipt"
+      }
+    }
+  ],
+  "privacy_review": {
+    "reviewer_role": "facilitator",
+    "status": "reviewed-clean",
+    "notes": "All rows are fictional; no real names, contacts, sponsors, attendee rolls, accommodation needs, tokens, DIDs, or partner Drive/Groups/Sheets paths are present at any point. This summary is checked into a public repository deliberately as a schema-conformance reference."
+  },
+  "non_claims": [
+    "This summary is a schema-conformance example, not a real review record.",
+    "Not a mutation; rendering these rows does not publish, apply, create, or export anything.",
+    "Not a production deployment.",
+    "Not a formally committed NYCN cooperative pilot authorization.",
+    "Not private-data handling; all rows are fictional and repo-safe by construction.",
+    "Not a payment, wallet, balance, or currency surface; allocation / obligation / settlement / unit / position vocabulary refers to internal cooperative coordination primitives, never money transmission or stored value.",
+    "Not a replacement for urn:icn:contract:preview-review:v1; this contract is the row-level body composed inside a preview_kind: pending_publish_summary review boundary.",
+    "Not a self-declared organizer-ready surface; the gate at docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md still runs against any UI that renders these rows."
+  ]
+}

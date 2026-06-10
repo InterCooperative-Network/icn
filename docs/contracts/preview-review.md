@@ -60,7 +60,7 @@ The no-CLI workflow at `docs/pilots/no-cli-organizer-member-rehearsal-workflow.m
 Concretely:
 
 - §3 step 3 ("Preview parsed proposals") produces a packet with `preview_kind: meeting_notes_action_items` (or one of the other kinds).
-- §3 step 6 ("Preview before mutation") produces a packet with `preview_kind: pending_publish_summary`.
+- §3 step 6 ("Preview before mutation") produces a packet with `preview_kind: pending_publish_summary`. The **row-level body** of such a packet — the individual pending-publish rows (action items, decisions, attendance, obligations, allocations, settlements) the organizer reviews — is specified by the composed contract `urn:icn:contract:pending-publish-summary:v1` ([`pending-publish-summary.md`](pending-publish-summary.md)). That contract does not replace this one; the producing system uses it to populate and summarize the rows behind this `pending_publish_summary` preview, producing the two as sibling packets linked by role/URN (not nested — this wrapper schema is `additionalProperties: false` and carries no field for an embedded body).
 - §3 step 9 ("Export evidence packet") consumes a packet with `preview_kind: evidence_packet_preview` before producing the upstream `urn:icn:contract:rehearsal-evidence-export:v1` artifact.
 
 The contract does not run any of those steps; it just describes the read-model the human review surface renders.
@@ -153,6 +153,7 @@ A producing system (a parser, a fixture loader, a publish-staging tool, an evide
 
 ## See also
 
+- [`./pending-publish-summary.md`](pending-publish-summary.md) — composed row-level body contract (`urn:icn:contract:pending-publish-summary:v1`) for `preview_kind: pending_publish_summary`; specifies the individual pending-publish rows that back a `pending_publish_summary` preview (composed by role/URN, not nested)
 - [`./rehearsal-evidence-export.md`](rehearsal-evidence-export.md) — repo-safe rehearsal evidence export contract; `evidence_packet_preview` previews are the human review boundary that precedes producing one of those packets
 - [`./schema-id-audit.md`](schema-id-audit.md) — audit of every contract `$id` in the repo (this schema is now in §3 of that audit, recommendation: keep)
 - [`../architecture/ARCHITECTURE_DUE_DILIGENCE.md`](../architecture/ARCHITECTURE_DUE_DILIGENCE.md) — convenience-vs-authority and participation-access checklist (the upstream architecture-review reflex this contract is a deliberate application of)
