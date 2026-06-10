@@ -11,6 +11,9 @@ on:
       - 'docs/scripts/doc_control_check.py'
       # gateway route source is code-truth for the API-doc canonical guard
       - 'icn/crates/icn-gateway/src/api/ledger.rs'
+      # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
+      # under docs/scripts + docs/contracts are already covered by docs/**
+      - 'web/pilot-ui/fixtures/**'
   pull_request:
     paths:
       - 'docs/**'
@@ -20,6 +23,9 @@ on:
       - 'docs/scripts/doc_control_check.py'
       # gateway route source is code-truth for the API-doc canonical guard
       - 'icn/crates/icn-gateway/src/api/ledger.rs'
+      # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
+      # under docs/scripts + docs/contracts are already covered by docs/**
+      - 'web/pilot-ui/fixtures/**'
   schedule:
     # Sunday at midnight UTC
     - cron: '0 0 * * 0'
@@ -167,9 +173,35 @@ jobs:
           echo "::warning::docs/INDEX.generated.md is out of date. Run: just index"
         continue-on-error: true
 
+  fixture_bundle:
+    name: Rehearsal Fixture Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install jsonschema
+
+      # Guards the Phase 2 rehearsal path: the committed fixture bundle for the
+      # fixture-backed rehearsal shell (#1726/#1727) must stay demo-only,
+      # network-disabled, schema-valid, and free of forbidden live/private
+      # references. The check is deterministic and offline (<1s); it validates
+      # the bundle, it does NOT implement icnd --demo-mode (#1727 stays open).
+      # Manual equivalent: python3 docs/scripts/validate-rehearsal-shell-fixtures.py
+      - name: Validate rehearsal-shell fixture bundle (offline, deterministic)
+        run: |
+          python3 docs/scripts/validate-rehearsal-shell-fixtures.py
+        continue-on-error: false
+
   summary:
     name: Documentation CI Summary
-    needs: [doc_control, lint, freshness, index]
+    needs: [doc_control, lint, freshness, index, fixture_bundle]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -181,6 +213,12 @@ jobs:
           fi
           if [ "${{ needs.lint.result }}" = "failure" ]; then
             echo "::error::Documentation lint failed"
+            exit 1
+          fi
+          # Fail closed: a cancelled or skipped fixture job must not pass the
+          # drift guard — anything but explicit success fails the summary.
+          if [ "${{ needs.fixture_bundle.result }}" != "success" ]; then
+            echo "::error::Rehearsal-shell fixture bundle validation did not succeed (result: ${{ needs.fixture_bundle.result }})"
             exit 1
           fi
           if [ "${{ needs.freshness.result }}" = "failure" ]; then

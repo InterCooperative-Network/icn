@@ -77,6 +77,11 @@ repo root:
 python3 docs/scripts/validate-rehearsal-shell-fixtures.py
 ```
 
+CI runs the same harness on every push/PR that touches this directory or
+`docs/**` (job "Rehearsal Fixture Bundle" in the Documentation Maintenance
+workflow, plus its weekly scheduled run), so the committed bundle cannot
+silently drift from the contracts.
+
 That harness asserts demo-mode / network-disabled, runs each packet
 through the existing `docs/scripts/validate-*.py` contract validators,
 checks the manifest's `non_claims`, and runs a deterministic forbidden
