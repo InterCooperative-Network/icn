@@ -6,6 +6,27 @@ Last Reviewed: 2026-06-10
 
 # ICN State (living doc)
 
+<!-- [sync edit] 2026-06-10 (appliance negative firstboot smoke verified — this PR):
+     Truth-sync for one narrow appliance slice. **Mixed truth class**: one new operator-run verification (real VM boot evidence) plus the script/docs that produced it. No Rust change, no contract URN, no ADR, no RFC, no ADR-0026 receipt class, no K3s/DNS/Forgejo/GitHub-settings mutation, no NYCN partner data.
+
+     What changed: the appliance proof matrix moves from "positive path verified (#1900); negative fail-closed path NOT verified" to "positive path verified (#1900, re-verified as baseline 2026-06-10); ONE negative fail-closed scenario verified (missing-firstboot-exec, operator-run 2026-06-10)". All other appliance failure modes remain unverified.
+
+     The slice:
+       - deploy/appliance/smoke/negative-firstboot-smoke.sh (new): deletes /usr/local/sbin/icn-appliance-firstboot (the ExecStart= of icn-appliance-firstboot.service) from a DISPOSABLE OVERLAY via virt-customize, boots the tampered overlay, and asserts fail-closed: firstboot unit `failed`, marker /var/lib/icn/.firstboot-complete absent, icnd never `active` during the observation window, /v1/health never answering. Any icnd activation or health answer exits non-zero as FAIL-OPEN. Source image never modified.
+       - deploy/appliance/smoke/README.md: documents the scenario, prerequisites (virt-customize; readable /boot/vmlinuz-* for libguestfs), and non-claims.
+       - docs/dev/handoff-2026-06-10-appliance-negative-firstboot-smoke.md: full operator evidence — host (icn-dev, Ubuntu 24.04.4, kernel 6.8.0-124-generic, QEMU 8.2.2 under TCG), image identity (the same #1900-built artifact, SHA256 re-verified against its manifest: e6888dd512d4...6f51), tamper hashes, command transcript, and journal excerpts.
+
+     Operator-run evidence (2026-06-10, host icn-dev, same artifact image #1900 built):
+       - Positive baseline re-run FIRST on the untampered image: PASS (SSH → marker → icnd active → /v1/health 200), so the negative run differs from a passing baseline by exactly one variable (the tamper).
+       - Negative run: firstboot failed with status=203/EXEC ("Unable to locate executable"); journal shows the gate's Requires= propagation verbatim — "Dependency failed for icnd.service" / "Job icnd.service/start failed with result 'dependency'"; marker ABSENT; icnd ActiveState=inactive SubState=dead throughout; health never answered. Exit 0 (fail-closed verified).
+       - Mechanism note recorded honestly: the boot-path block came from Requires= failure propagation; the ConditionPathExists= marker belt was not reached on the boot path (start job cancelled first) and is what would block a later manual start.
+
+     This sync explicitly does NOT claim: appliance fail-closed certification beyond the single verified scenario (tampered-but-present firstboot script, corrupted /etc/icn inputs, partial identity material, identity-init warn-and-continue path, disk-full, clock-skew all remain unverified); production readiness; signed/immutable/partner-distributable images; live federation; formal NYCN pilot; Phase 2 completion. Phase 2 status remains ⏳ (partner-bound); the #1703 human gate is unchanged.
+
+     Candidate-list delta vs the prior sync block: candidate (a) "appliance negative firstboot smoke" is now DONE (this PR). Candidates (b) Dependabot queue triage, (c) #1868 broad-fallback retirement criteria, (d) #1703 human gate, (e) issue hygiene #1704/#1727/#1728, (f) strategy-doc deep refresh carry forward unchanged. Next move is **not selected here**; optionality preserved.
+
+     Hard rule preserved: this sync does NOT change any contract field, mint a URN, add an ADR/RFC, widen gateway typed governance imports, migrate handlers, retire governance:write, touch K3s/DNS/Forgejo, handle private partner data, or claim Phase 2 completion / NYCN pilot / production readiness / live federation. One documented host-state change on icn-dev (chmod 0644 of the running kernel image for libguestfs, per the #1900 precedent) is recorded in the handoff. Phase model unchanged. -->
+
 <!-- [sync edit] 2026-06-10 (post #1903 → #2016 window, 91 commits, plus gap correction #1843 → #1874):
      Truth-sync recording two windows against `origin/main` HEAD `9012ba5c`. **Mixed truth class** — substantial real Rust runtime work plus docs/control-plane. No new contract URN, no new ADR, no new RFC, no new ADR-0026 receipt class, no K3s/DNS/Forgejo/GitHub-settings mutation, no NYCN partner data, no production-readiness claim, no live-federation claim, no formal NYCN pilot claim, no Phase 2 completion claim.
 
