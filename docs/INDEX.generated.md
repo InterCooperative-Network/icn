@@ -1738,7 +1738,7 @@ Comprehensive threat model covering attack vectors, adversary capabilities, and 
 
 Living snapshot of repo layout, decisions, constraints, and current engineering status
 
-**For:** `developers`, `agents` | **Updated:** 2026-05-22
+**For:** `developers`, `agents` | **Updated:** 2026-06-10
 
 
 ## Strategy
