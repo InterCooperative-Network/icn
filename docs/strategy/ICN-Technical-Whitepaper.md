@@ -204,7 +204,7 @@ DAOs and ICN both aim to provide verifiable collective governance. Both produce 
 
 As of March 2026:
 
-- **Codebase:** 37 Rust workspace crates (44 workspace members: 37 library crates + 3 binaries + 4 apps), ~414K LOC, 2,287 tests
+- **Codebase:** 37 Rust workspace crates (44 workspace members: 37 library crates + 3 binaries + 4 apps; count re-verified 2026-06-10 — the LOC and test figures on this line remain March 2026-era), ~414K LOC, 2,287 tests
 - **Binaries:** `icnd` (daemon), `icnctl` (CLI), `icn-console` (TUI)
 - **API:** 70+ REST endpoints via actix-web gateway, all with real handler logic, zero stubs
 - **SDKs:** TypeScript (npm), React Native (mobile)
