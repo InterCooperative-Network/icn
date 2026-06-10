@@ -38,6 +38,123 @@
 </script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>STATE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/STATE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN State (living doc)</h1>
+<!-- [sync edit] 2026-06-10 (post #1903 → #2016 window, 91 commits, plus gap correction #1843 → #1874):
+     Truth-sync recording two windows against `origin/main` HEAD `9012ba5c`. **Mixed truth class** — substantial real Rust runtime work plus docs/control-plane. No new contract URN, no new ADR, no new RFC, no new ADR-0026 receipt class, no K3s/DNS/Forgejo/GitHub-settings mutation, no NYCN partner data, no production-readiness claim, no live-federation claim, no formal NYCN pilot claim, no Phase 2 completion claim.
+
+     ── PART A — gap correction (2026-05-15 → 2026-05-17, 17 PRs, previously unrecorded) ──
+     The 2026-05-22 sync (#1902) verified an external review brief covering #1875 → #1901 and did not sweep the full git window; the following merges between the 2026-05-15 architecture-sprint sync (#1841/#1842) and #1875 were never recorded in STATE.md until now:
+       - #1843 schema(network): AntiEntropyProbe + StateDigest records (closed #1834).
+       - #1844 schema(network): DivergenceEvidence + RepairPlan records (closed #1835).
+       - #1845 test(devnet): receipt-index anti-entropy Slice A fixture (closed #1838).
+       - #1846 test(devnet): steward cockpit divergence-render Slice A fixture (closed #1840).
+       - #1847 fix(deps): lettre 0.11.19 → 0.11.22 (RUSTSEC-2026-0141).
+       - #1848 test(devnet): member shell read-only Slice A fixture (closed #1839). Fixture member identity + LocalDomain, four ActionCards, plain-language receipt summaries, opaque PrivateEvidence rendered as existence + scope + access path only (no body bytes), closed seven-string member sync vocabulary locked verbatim against the spec, ADR-0028 twelve-category accessibility checklist asserted on each rendered view; 21 fixture tests.
+       - #1850 schema(network): RepairReceipt record; #1851 test(devnet): Slice A repair fixtures retrofitted to consume it.
+       - #1853 schema(network): PeerSyncReport record; #1855 refactor(devnet): receipt-index fixture consumes it.
+       - #1857 schema(network): SyncDegradedStatus record (issue #1856); #1859 refactor(devnet): cockpit + member-shell fixtures consume it.
+       - #1861 schema(network): QuorumSyncCheck + FederationSyncWindow records.
+       - #1863 schema(network): RoutingProof + RedundancyProof records (issue #1862).
+       - #1874 test(devnet): RedundancyProof Slice B fixture.
+       - #1865 scaffold(deploy): Debian appliance / installable node image substrate (the scaffold the #1879/#1900 appliance docs reference).
+       - #1867 docs(design): consolidate design principles and Claude Design setup.
+     Effect of Part A on prior beliefs: all three Slice A fixture rehearsals (#1838 / #1839 / #1840) were CLOSED as completed by 2026-05-16 — fixture-backed deterministic proofs exist for receipt-index anti-entropy, member-shell read-only rendering, and steward-cockpit divergence rendering. The "first fixture rehearsal" candidate the 2026-05-22 sync block enumerated as open was already satisfied when that block was written.
+
+     ── PART B — main window (2026-05-23 → 2026-06-10, #1903 → #2016) ──
+
+     (1) governance:write decomposition EXECUTED with accepted-also fallback (#1868 steps 2–6) — **real Rust**:
+       - #1903 test: lock accepted-is-not-applied ReconciliationStatus invariants.
+       - #1905 authz(gateway): bind decomposed governance scope allowlist to canonical constants (step 2).
+       - #1918 migrate charter family to governance:charter:write (step 3); #1919 label direct charter activation as bootstrap path.
+       - #1922 migrate assign_role to governance:steward:write (step 4).
+       - #1923 migrate federation proposals; #1924 migrate meeting/activity/comment families.
+       - #1946 migrate proposal close scope; #1947 migrate HTTP proposal family.
+       - #1948 decompose cast-vote + meeting-create gateway scopes; #1949 decompose governance JSON-RPC scopes; #1950 reconcile vote-cast handler authorization; #1951 fix stale `gov:*` icnctl scope defaults to `governance:*`.
+       - #1984 cleanup(api): remove dead governance scope constants.
+       Verified result state at `9012ba5c`: 42 `require_any_scope` call sites in `icn/apps/governance/src/http/handlers.rs` across all seven families (charter 4, proposal 8, steward 1, federation 1, meeting 12, activity 8, comment 5), each pairing its class scope with broad `"governance:write"` as accepted-also fallback; ZERO bare broad-scope mutation gates remain. Broad `governance:write` is NOT retired — every site still accepts it during the migration; retirement criteria are a separate future decision.
+
+     (2) MandateGate + mandate-attested receipts (#1868 steps 5–6) — **real Rust**:
+       - #1925 docs(governance): MandateGate act-time resolver design; #1926 resolver primitives; #1927 MandateGate context guard (`icn/apps/governance/src/mandate_gate.rs`, wired in `configure.rs`, `manager.rs`, `icn-gateway/src/server.rs`); #1928 MandateGrantRef wire primitive.
+       - #1929 / #1930 / #1931 mandate attestation added to decision, action-item, and meeting-attendance receipts.
+       - #1934 / #1935 v2 meeting-attendance + action-item receipts; #1936 decision-receipt authority + grant-minting design; #1937 / #1938 v3 process-authorized decision receipts.
+       MandateGate landing does NOT mean the authority migration is complete: capability scopes still authorize every handler (with broad fallback), and mandate attestation enriches receipts rather than replacing scope checks.
+
+     (3) TrustThreshold fail-open closures — **real Rust**, P0 items from docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md:
+       - #1911 resolve TrustThreshold direct membership mutations; #1916 close TrustThreshold fail-open in check_domain_membership (closes #1913); #1917 follow-up assertion/docs cleanup.
+       - #1920 / #1921 cover the non-atomic put_mandate_with_grants orphan boundary (closes #1872).
+
+     (4) Receipt-chain audit completion + dispatch-evidence durability — **real Rust**:
+       - #1979 feat(cli): authenticate `icnctl audit verify` against secured gateways.
+       - #1985 fix(gateway): complete live receipt-chain audit path to 13/13 — `icnctl audit verify --token` reaches 13/13 against the live local daemon. The path includes a dev-gated kernel self-trust seed (`ICN_DEV_SELF_TRUST`; min_trust_for_entry stays 0.1 and enforced) — this is a LOCAL/dev-gated proof, not a partner deployment.
+       - #1986 recover incomplete cross-store closes; #1988 page decision ledger lookups; #1993 page dispatch evidence backfill scan; #1996 index ledger entries by decision_hash.
+       - #1990 feat(core): durably persist EffectDispatchEvidence across crash/restart using the dispatcher's ExecutionRecord as the durable write-ahead recovery handle (closes #1987; no DispatchEvidenceSink trait change, no effect re-execution).
+
+     (5) Demo / rehearsal layer — **real code, dev-gated**:
+       - #1980 local member-standing bootstrap; #1981 dev-gated standing bridge for live gateway demos.
+       - #1997 one-command local 13/13 receipt-chain rehearsal (`demo/scripts/local_receipt_chain_13of13_rehearsal.sh`).
+       - #1999 fixture-backed rehearsal shell demo mode (relates to open #1727).
+       - #1953 / #1954 nycn-dogfood keystone demo kit (work → obligation → receipt loop; receipts persisted, card asserted, receipt binding verified).
+       All demo-layer standing/trust shortcuts are explicitly dev-gated; none weakens audit, auth, trust, or ledger gates in production configuration, and none constitutes live federation.
+
+     (6) Vocabulary / meaning-firewall remediation (passport-keyring migration) — **mixed docs + SDK/UI code + CI**:
+       - #1957 docs/ci: reinforce meaning firewall around readiness and fintech vocabulary (adds `.github/scripts/readiness_overclaim_linter.py` alongside the compliance linter).
+       - #1958 align legacy payment/balance API doc surfaces with ICN semantic primitives; #1960 / #1961 TS SDK surface alignment + example typecheck.
+       - #1963 passport/keyring boundary definition; #1964–#1978 migration across UI copy, architecture docs, SDK (keyring aliases for legacy wallet-named APIs, keyring config option, storage-key canonicalization, identity-reset concurrency hardening, deprecation bridge replacement, operator-DID rename, CoopWallet example reframe, member allocation receipt language, node-mode terminology). This is custody-surface and vocabulary remediation — key custody (keyring) and identity (passport) are now named separately; no new custody feature is claimed.
+       - #1909 / #1910 React Native validation + deprecation-bridge fixes; #1976 React Native client lifecycle teardown.
+
+     (7) Contracts / spec / index — docs/control-plane:
+       - #1998 spec(contracts): pending-publish summary row contract (relates to open #1728).
+       - #2000 docs(project-index): proof-level taxonomy + rehearsal capability matrix; #2001 / #2007 INDEX.generated.md drift-mirror regenerations.
+       - #1952 docs(summit): workshop proposal claims aligned to verified runtime.
+
+     (8) Introduction / strategy materials — docs:
+       - #2002 honest ICN introduction + hard-question materials (ICN_FOR_COOPERATIVE_MOVEMENT.md, ICN_FOR_EVERYONE.md, ICN_HANDBILL.md, ICN_HARD_QUESTIONS.md, ICN_INTRODUCTION_EVIDENCE_MAP.md — the evidence map binds every introduction claim to merged artifacts and states what each does NOT prove).
+       - #2003 Cooperative Codebase meeting brief for the 2026-06-11 call; #2008 hard-questions naming alignment.
+
+     (9) Repo / agent hygiene — docs/process:
+       - #2009 agent worktree policy (docs/dev/AGENT_WORKTREE_POLICY.md) + AGENTS.md pointer; #2004 / #2005 / #2011 dead docs/dev-journal pointer fixes in CLAUDE.md and agent-instruction trees; #2010 homelab agent doc path fixes.
+
+     (10) Dependencies / CI / security — maintenance:
+       - #1894–#1898 ts-sdk Dependabot batch merged 2026-05-25 (flatted 3.4.2, minimatch 3.1.5, picomatch 2.3.2, fast-uri 3.1.2, dev-deps group) — the queue the 2026-05-22 sync left open is cleared.
+       - #1904 / #1994 / #2016 npm bumps (#2016 shell-quote 1.8.4, critical); #1908 react-native handlebars lockfile.
+       - #1983 chore(ci): ignore unmaintained pqcrypto-* advisories to unblock main — an explicit accepted-risk posture decision, not a fix; the advisories remain real.
+       - #1932 CI runner disk headroom guard + bounded Docker build cache (relates to open #1955).
+       - #1906 fix(compute): use public exports in cost doctest (relates to open #1704).
+       - #1982 website legacy cooperative URL redirects.
+
+     Issue-state record at sync write-time:
+       - #1868 OPEN — but materially advanced far beyond the 2026-05-22 record: steps 1–6 landed (#1881 constants; #1905 gateway allowlist; #1918/#1922/#1923/#1924/#1946/#1947 handler families; #1948/#1949 gateway+RPC; #1925–#1931 MandateGate; #1934–#1938 receipts v2/v3). Remaining: broad-fallback retirement decision and any leftover checklist items.
+       - CLOSED in/around this window: #1913 (by #1916), #1872 (by #1920/#1921), #1987 (by #1990), #1834 (by #1843), #1835 (by #1844), #1838 (by #1845), #1839 (by #1848), #1840 (by #1846).
+       - OPEN but possibly satisfied by landed work (verification + closure is a maintainer call, not claimed here): #1704 (vs #1906), #1727 (vs #1999), #1728 (vs #1998).
+       - Newly OPEN: #1955 (CI disk-space flake), #1956 (nycn-dogfood gossip-port preflight skips silently without `ss`).
+       - Unchanged OPEN gates: #1703 (NYCN organizer presentation → pilot formalization → first operator rehearsal), #1746, #1748, #1692 (licensing), #1742 ($id review by 2026-06-30), #1837, #1836.
+     Open PRs at sync write-time: #2018 / #1995 (npm dev-deps groups), #1940–#1945 (Rust deps — NOTE: #1944 rand 0.8.5 → 0.9.4 is a breaking major and #1942 ml-dsa 0.1.0-rc.4 → 0.1.1 touches the post-quantum surface; neither is a fast-track candidate), #1907 (icn.zone dev-portal scaffold, human-authored).
+
+     Cross-cycle disciplines preserved verbatim:
+       - No new ADR, no new RFC, no new contract URN, no new ADR-0026 receipt class (the v2/v3 receipt work versions existing governance receipt envelopes; the network schema records are devnet/fixture-level records, not ADR-0026 classes).
+       - The meaning firewall is not widened: scope constants stay kernel-side enforcement primitives; MandateGate lives in apps/governance; the gateway gained no typed governance imports.
+       - Settlement / position / obligation / allocation / unit / receipt / provenance / evidence — never payment / wallet / currency / balance / token / crypto / blockchain / timebank — for ICN-native flows. The passport/keyring migration (stack 6) actively remediates legacy wallet-named surfaces toward this discipline.
+       - Privacy is posture, not content. PrivateEvidence body bytes never reach any rendering layer (#1848 asserts this at fixture level).
+       - When cockpit shows degraded, member shell must show degraded too (#1859 wires both fixtures to the shared SyncDegradedStatus record).
+
+     Phase 2 status remains ⏳ (still partner-bound). Nothing in either window completes a phase, removes a partner-binding gate, activates NYCN, or implements live federation. The 13/13 receipt-chain proof, MandateGate, scope decomposition, fixture rehearsals, and introduction materials all strengthen Phase 2 machinery and presentation honesty; the human gate (#1703: organizer presentation → pilot formalization → first operator rehearsal) is unchanged.
+
+     This sync explicitly does NOT claim: Phase 2 completion; formal NYCN pilot; production readiness; live federation; an implemented Civic Shell, member shell, or steward cockpit (fixture-level proofs only); retirement of broad governance:write; a verified appliance fail-closed firstboot path (the #1900 negative-path gap is STILL open); signed/immutable/partner-distributable appliance images; resolved licensing (#1692); partner data handling.
+
+     Truth-class corrections recorded by this sync:
+       - The 2026-05-22 sync block's candidate enumeration listed "first fixture rehearsal (#1838/#1839/#1840)" among open candidates; all three were already closed by then (Part A above).
+       - docs/strategy/ICN-Technical-Whitepaper.md line 207 said "38 Rust workspace crates"; verified count from icn/Cargo.toml [workspace].members at 9012ba5c is 37 library crates (44 workspace members = 37 crates + 3 bins + 4 apps; icn-baseline-lock-guest remains excluded). Fixed in this PR. The same line's LOC/test figures date to the 2026-03-17 gap analysis and were NOT re-verified here.
+       - docs/status.toml total_crates ("44 workspace members") re-verified as still correct; no status.toml change needed this cycle.
+
+     Next pre-RFC architecture move is **not yet selected**; this sync preserves optionality. Named candidates (descriptive only, not selected here):
+       (a) Appliance negative firstboot smoke — exercise the fail-closed path #1900 left unverified; still the only named proof-matrix gap on the appliance.
+       (b) Dependabot queue triage — fast-track patch-level Rust bumps (#1940/#1941/#1943/#1945) and npm groups (#1995/#2018) after full workspace checks; hold #1944 (rand major) and #1942 (ml-dsa PQ surface) for dedicated review.
+       (c) #1868 endgame — define broad-fallback retirement criteria per the #1936 design (token-issuance migration first).
+       (d) #1703 human gate — organizer presentation → pilot formalization → first operator rehearsal (the 2026-06-11 Cooperative Codebase call is introduction-lane, not the NYCN organizer gate itself).
+       (e) Issue hygiene — verify and close #1704/#1727/#1728 against #1906/#1999/#1998 with evidence.
+       (f) Strategy-doc deep refresh — re-verify whitepaper LOC/test figures and ICN-Roadmap-Live.md currency (last bumped 2026-04-29).
+
+     Hard rule preserved: this sync edit does NOT change any contract field, does NOT mint a new contract URN, does NOT add an ADR, does NOT add an RFC, does NOT widen gateway typed governance imports, does NOT migrate or un-migrate any handler, does NOT retire `governance:write`, does NOT touch K3s / DNS / GitHub / Forgejo state, does NOT handle private partner / member / organizer data, does NOT claim Phase 2 completion, does NOT claim formal NYCN pilot, does NOT claim production readiness, does NOT claim live federation, does NOT verify the appliance fail-closed firstboot path. Phase model unchanged. -->
+
 <!-- [sync edit] 2026-05-22 (post #1875 → #1901 cycle: stale-count fix, governance:write decomposition design + class-level scope constants, governance production guard, appliance Debian-13 real smoke + verified host toolchain handoff, Civic Shell v0 spec, Claude Design protocol + truth-label appendix + icon candidate review + federation operator surface concept + member-shell action-card refinements, NYCN/Launch strategy reframes, SECURITY.md + issue templates + cross-repo map, three Dependabot dev-deps bumps):
      Truth-sync recording 21 PR merges plus one bare handoff commit (22 commits total) between 2026-05-17 and 2026-05-22 on `main`. **Mixed truth class** (this is not pure docs/control-plane): #1901 is real Rust runtime change in `icn/apps/governance/src/http/configure.rs` (new `GovernanceContextBuildMode` enum + `ICN_GOVERNANCE_BUILD_MODE` env var + fail-closed Production-mode validation + warn-only Bootstrap/Test); #1881 is real Rust change in `icn/crates/icn-rpc/src/auth.rs` (seven new class-level governance write-scope constants + `GOVERNANCE_CLASS_WRITE` slice + wire-string assertion tests). Everything else in this batch is docs/control-plane only. No new contract URN, no new ADR, no new RFC, no new ADR-0026 receipt class, no kernel/gateway/runtime API surface widening, no K3s/DNS/Forgejo mutation, no NYCN partner data, no production-readiness claim, no live-federation claim, no formal NYCN pilot claim, no Phase 2 completion claim.
 
