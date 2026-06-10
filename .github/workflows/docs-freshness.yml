@@ -215,8 +215,10 @@ jobs:
             echo "::error::Documentation lint failed"
             exit 1
           fi
-          if [ "${{ needs.fixture_bundle.result }}" = "failure" ]; then
-            echo "::error::Rehearsal-shell fixture bundle validation failed (fixture drift)"
+          # Fail closed: a cancelled or skipped fixture job must not pass the
+          # drift guard — anything but explicit success fails the summary.
+          if [ "${{ needs.fixture_bundle.result }}" != "success" ]; then
+            echo "::error::Rehearsal-shell fixture bundle validation did not succeed (result: ${{ needs.fixture_bundle.result }})"
             exit 1
           fi
           if [ "${{ needs.freshness.result }}" = "failure" ]; then
