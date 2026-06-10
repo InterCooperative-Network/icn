@@ -30,6 +30,12 @@ Single authoritative architecture covering all 8 primitives, kernel-app separati
 
 **For:** `developers`, `architects`, `grant-reviewers` | **Updated:** 2026-03-21
 
+### 🔒 **Canonical** [ICN Design Principles](/docs/DESIGN_PRINCIPLES.md)
+
+Canonical three-tier index of operational invariants, firewall contract, and frozen-core governance invariants. Pairs with the design system entry point as the kernel-side counterpart.
+
+**For:** `developers`, `architects`, `designers` | **Updated:** 2026-05-17
+
 ### 📝 **Living** [ADR-0001: Orchestration Plane Architecture (decision superseded by ADR-0017)](/docs/adr/ADR-0001-orchestration-plane-architecture.md)
 
 Original multi-repo orchestration-plane decision; physical layout DECISION superseded by ADR-0017, durable principle (explicit orchestration/state plane) retained. ADR remains as institutional memory at canonical path.
@@ -96,11 +102,23 @@ Reusable activation chain: package manifest -> private overlay -> bootstrap appl
 
 **For:** `architects`, `developers` | **Updated:** 2026-04-26
 
+### 📝 **Living** [Abuse-case hardening strategy](/docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md)
+
+Strategy / doctrine doc codifying ICN's institutional-failure-mode hardening layer: the substrate must not become an administrative panel with receipts. Ten one-line doctrine rules (receipts prove events not legitimacy; authority shortcuts must label themselves as shortcuts; unresolved standing is not standing in production; accepted is not applied; convenience paths must not become authority paths; bootstrap is not democracy; a capability token is not a mandate; a UI must not launder uncertainty into confidence; privacy posture is not private content; index absence is not record absence). Ten code-anchored abuse stories and matching hardening tracks: narrowing the broad governance:write scope, marking direct membership mutation and direct charter activation as bootstrap-only shortcuts with explicit administrative receipts, fail-closed resolver/checker policy in production, closed lifecycle vocabulary across API/shell/cockpit, per-effect idempotency, governance-parameter sanity bands, shell/cockpit fixture matrix, PrivateEvidence non-rendering regression, typed-receipt atomicity inventory. Strategy only — no runtime change, no new ADR, no new contract URN, no production-readiness claim. Companion to ARCHITECTURE_DUE_DILIGENCE.md and upstream of security/production-hardening.md.
+
+**For:** `architects`, `contributors` | **Updated:** 2026-05-16
+
 ### 📝 **Living** [Architectural Gaps & Remediation Plan](/docs/architecture/ARCHITECTURAL_GAPS_AND_FIXES.md)
 
 Analysis of architectural weaknesses and remediation strategies
 
 **For:** `architects` | **Updated:** 2026-03-10
+
+### 📝 **Living** [Architecture due diligence](/docs/architecture/ARCHITECTURE_DUE_DILIGENCE.md)
+
+Process / principle doc codifying two checklists authors and reviewers run when introducing or changing an architectural surface: (1) convenience-vs-authority (centralized convenience is fine; centralized authority is not — name dependencies and assign them to the correct layer), and (2) participation access (language, plain-language, vision, motor, cognitive, bandwidth, AT compatibility, accommodation privacy — designed-in, not bolted on). Triggered by the rehearsal evidence schema's non-DNS $id decision and grounded in docs/design-language/accessibility.md.
+
+**For:** `architects`, `contributors` | **Updated:** 2026-05-04
 
 ### 📝 **Living** [Canonical Encoding](/docs/architecture/CANONICAL_ENCODING.md)
 
@@ -156,6 +174,12 @@ State machine design for governance decision-making and enforcement
 
 **For:** `architects`, `developers` | **Updated:** 2026-03-12
 
+### 📋 **Draft** [ICN Integrated System Model](/docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md)
+
+Forward-direction integrating spine across substrate, governance, CCL contract layer, service hosting, governed workloads, storage as custody, backup and recovery doctrine, networking, member shell, and steward cockpit. Locates every subsystem inside one civic loop (identity → standing → authority → action card → authorized action → CCL/runtime evaluation → storage/compute/governance/economic transition → receipt → sync/federation → member shell + steward cockpit → challenge/repair). Preserves the meaning firewall, separates substrate from app from institution package from teaching surface, and marks forward-direction objects (InstitutionalDomain, DomainPolicy, GovernedServiceBinding, WorkloadManifest, RuntimeProvider, StorageSpec, BackupPolicy, ReplicationPolicy, RecoveryPolicy, ArchivePolicy, IntegrityPolicy) as forward-direction. Names CCL as the executable institutional rule layer inside governance; not sovereign. Names Cooperative OS as packaging direction, not current implementation scope. Advances #1793 — does not by itself close it.
+
+**For:** `developers`, `architects`, `contributors` | **Updated:** 2026-05-14
+
 ### 📝 **Living** [Identity and Membership Architecture](/docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md)
 
 Design of identity primitives, membership verification, and member lifecycle
@@ -204,6 +228,72 @@ Specification of kernel contract primitives
 
 **For:** `architects`, `developers` | **Updated:** 2026-03-10
 
+### 📋 **Draft** [Artifact Registry and Scoped Vault — boundary, v0 design](/docs/spec/artifact-registry-and-scoped-vault.md)
+
+Defines the design-level shape of ArtifactRegistry v0 (the institutional record of content-addressed artifacts and their metadata) and ScopedVault (the privacy-enforced container for restricted objects), and the boundary between them. ArtifactRegistry fields: artifact_id, content_hash, blob_location, mime_type, size, artifact_class, scope, created_by/at, access_policy_ref, retention_policy_ref (resolving to BackupPolicy / ArchivePolicy per #1816, where retention is a field — there is no separate RetentionPolicy object), provenance_refs, receipt_refs, version_ref, parent_refs, exportability. ScopedVault fields: vault_id, owning_scope, privacy_class (from the forward-direction #1792 taxonomy, kept explicitly distinct from the existing in-code PrivacyClass enums in icn-kernel-api/src/compute.rs and icn-boundary/src/types.rs), encryption_key_model_placeholder (deferred to #1767), access_policy, retention_policy, backup_export_policy, access_receipt_requirement, export_receipt_requirement, private_overlay_binding. Names ArtifactReceipt (existing Layer 2 receipt in icn-kernel-api/src/proofs.rs:30) as distinct from ArtifactRegistry (the new registry record). Reuses canonical types verbatim: Hash / Did / Signature / StorageClass / DataLocality (kernel-api), and StorageSpec / BackupPolicy / ReplicationPolicy / RecoveryPolicy / ArchivePolicy / IntegrityPolicy (per #1816). Cross-links #1792's forward-direction PrivacyClass / DisclosurePolicy / PrivateObjectRef / AccessReceipt / ExportReceipt / RedactionMap vocabulary; surfaces the existing-PrivacyClass-enum naming collision and defers reconciliation to the implementation tranche. Specifies a closed artifact_class taxonomy (Document per #1536, ComputeOutput per #1815, EvidencePacket per #1748, PrivateEvidence per #1792, Backup per #1816, SettlementRecord per #1634, Other) growable by ADR amendment. Maps six integration points and a 13-row failure/safety table. Identifies first safe implementation slice: ArtifactRegistry v0 schema + Document artifact-class + read-only steward-cockpit registry surface. Advances #1798 — does not by itself close it.
+
+**For:** `architects`, `developers`, `contributors` | **Updated:** 2026-05-14
+
+### 📋 **Draft** [CCL Policy Registry and Hook Contract](/docs/spec/ccl-policy-registry.md)
+
+Defines the CCL policy registry, policy-version model, adoption contract, evaluator-selection contract, evaluator-output → effect-plan contract, review/audit surfaces, and failure/safety rules. Bridges DomainPolicy (adopted CCL policy references) and the Stage 2/3 CCL hook points in the effect dispatch chain. Reuses existing types from icn-ccl (ContentHash, SemanticVersion, CclDocument, SchemaVersion, Capability) and icn-governance (GovernanceDecisionReceipt, GovernanceProof, Mandate, AuthorityGrant, EffectManifest). Specifies eight-step adoption contract, deterministic evaluator selection with fail-closed semantics for missing/conflicting/deprecated bindings, structured evaluator output (decision suggestion / reasons / effect plan / disclosure policy / receipt expectations / authority basis), audit surfaces (registry shows drafts and adopted versions; receipts carry policy_version_id provenance), and a complete failure/safety table. Extends ADR-0021 (CCL safety), ADR-0022 (schema bridge), and ADR-0023 (institutional process language) without redefining them. Advances #1817 — does not by itself close it. Defers wire-stable schema, evaluator execution envelope, adoption proposal lifecycle, federation mandate recognition, and other forward-direction items to named follow-ups.
+
+**For:** `architects`, `developers`, `contributors` | **Updated:** 2026-05-14
+
+### 📋 **Draft** [Compute Placement Policy](/docs/spec/compute-placement-policy.md)
+
+Defines the placement policy contract sitting between ADR-0030 (compute workload manifest and authority boundary) and ADR-0031 (commons compute admission and settlement policy): the policy decision a workload passes through before admission, execution, or rejection. Names seven closed placement classes (LocalOnly, DomainLocalPreferred, LocalDomainBound, FederationBound, CommonsEligible, ExternalCustodianRequired, RejectedByPolicy) using the corrected scope vocabulary from docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md §C3 (LocalDomain not Coop). Specifies the two-layer decision contract (eighteen candidate inputs; Layer 1 policy-oracle return value is PlacementDecision or PlacementRejected, with optional attached PlacementFallbackReceipt and surfaced ReviewRequiredActionCard; Layer 2 post-placement artifact is ExecutorAdmissionDecision), the placement hierarchy (local-first default), nine boundary rules, structured fallback behavior with PlacementFallbackReceipt as an evidence attachment on the parent PlacementDecision, four example domain policies, sixteen-row failure/safety table, operator/steward dashboard rendering, member-shell rendering, and the explicit receipt mapping (none of the placement artifacts is a new ADR-0026 receipt class; they are evidence-artifact identifiers traveling inside existing EffectDispatchEvidence envelopes per docs/spec/effect-dispatch-contract.md Stage 5). Fixes three vocabulary boundaries: scope (LocalDomain not Coop per #1825), execution vs capacity (execution budget is policy-facing; fuel_limit preserved as runtime field; capacity reserved for executor/node availability; resource envelope, allocation, settlement are spec-facing terms), and settlement vs payment (settlement / unit / position / obligation / allocation / receipt — not payment / currency / balance / wallet). Names the first safe proof-loop (read-only placement-decision rehearsal) and dry-run fallback exercise. Preserves legacy code identifiers (FuelLimit, payment_rate, payment_currency, DataLocality::CoopReplicated, icn-coop crate, coop_core paths, coop-scoped comments in icn-rpc) without endorsement; reconciliation tracked as named follow-ups. Advances #1801 — does not by itself close it. Defers wire-stable PlacementDecision schema, ExecutorAdmissionDecision schema, scheduler integration, fuel/payment legacy reconciliation, federation agreement adoption surface, and external custodian policy surface to named follow-ups.
+
+**For:** `architects`, `developers`, `contributors` | **Updated:** 2026-05-14
+
+### 📋 **Draft** [Effect Dispatch Contract](/docs/spec/effect-dispatch-contract.md)
+
+End-to-end behavior contract for turning an accepted governance decision into bounded effects with receipts. Names the five-stage chain (decision recording → mandate minting → effect plan → dispatch → application + evidence) and harmonizes existing types (GovernanceDecisionReceipt, GovernanceProof, GovernanceDecisionAttestation, Mandate, AuthorityGrant, EffectManifest, KernelEffect, EffectOutcome, InstitutionalEffectRecord, EffectDispatchEvidence) with ADRs 0014, 0019, 0025, 0026, 0027, 0029, 0030, 0031. Splits idempotency, partial-failure, challenge/reversal, CCL hook, privacy/redaction, action-card, and package-boundary rules into current contract vs forward schema work. Identifies #1748 process-transition receipts as the first safe runtime dogfood slice. Advances #1797 — does not by itself close it. Defers kernel-side mandate enforcement, federation mandate recognition, EffectRecord taxonomy implementation, stable idempotency-key schema, and other future-direction items to named follow-ups.
+
+**For:** `architects`, `developers`, `contributors` | **Updated:** 2026-05-14
+
+### 📋 **Draft** [Governed Service Binding, Workload Manifest, and Runtime Provider](/docs/spec/governed-service-binding.md)
+
+Defines GovernedServiceBinding (institutional record binding a workload to a domain), WorkloadManifest (declared shape of what a workload does), and RuntimeProvider (substrate-side executor interface) as the integrating envelope for hosted services, installable tools, compute jobs, CCL evaluators, and future container or microVM workloads. Generalizes existing types: ComputeTask (ADR-0030, implemented in icn-compute) is the compute-specific projection of WorkloadManifest; ToolManifest/ToolBinding (RFC-0017) is the tool-install projection; Executor (icn-compute) is the compute-specific RuntimeProvider; EvaluatorBinding (ccl-policy-registry.md) is a specialized GovernedServiceBinding for CCL evaluators. Names seven closed runtime classes (deterministic legitimacy compute, utility computation, container, microVM, accelerator, local device, external bridge), a ten-state lifecycle (declare → authorize → allocate → bind → run → observe → upgrade → suspend → remove → export), the five-stage hosted→governed→adapted→native maturity progression as binding-state requirements, eight boundary rules, and an eleven-row failure/safety table. Advances #1815 — does not by itself close it. Defers wire-stable schema, generic RuntimeProvider Rust trait, per-class provider specs, stage acceptance gates, BackupPolicy data model, and federation-side binding recognition to named follow-ups.
+
+**For:** `architects`, `developers`, `contributors` | **Updated:** 2026-05-14
+
+### 📋 **Draft** [ICN Civic Shell v0](/docs/spec/icn-civic-shell-v0.md)
+
+Defines the ICN Civic Shell as the v0 composition contract that ties together the public website (truth boundary per ADR-0032 and forward-direction ADR-0033), docs/spec/member-shell-v0.md (#1830), docs/spec/steward-cockpit-v0.md (#1831), docs/pilots/no-cli-organizer-member-rehearsal-workflow.md (#1724/#1726), docs/architecture/SERVICE_HOSTING_MODEL.md, docs/architecture/AUTH_BRIDGE_AND_DID_LOGIN.md, docs/architecture/PROTOCOL_SELECTION_FOR_MEMBER_SERVICES.md, docs/strategy/SOVEREIGN_FORGE.md, docs/ops/FORGEJO_DEPLOYMENT_PLAN.md, and docs/ops/SERVICE_GOVERNANCE_TEMPLATE.md into a single top-level public-plus-logged-in institutional operating shell. The first draft used the rejected `ICN Headquarters` metaphor; the v0 name is `ICN Civic Shell`. Composition only — the Civic Shell composes existing ICN surfaces and does not supersede the Member Shell, the Steward Cockpit, the public website, the service-hosting model, or the auth-bridge model. Names the public exterior (maturity-banded status / development updates / public roadmap / service-health posture / public forge window / docs and onboarding routes, anchored to ADR-0032 honesty-over-polish and ADR-0033 evidence-link discipline) and the logged-in interior (identity / active domain / active role / authority scope plus member dashboard, action cards, notifications, governance room, workroom, records / receipts room, forge room, operations control room, communications room, vault / privacy posture, settings / identity). Names the domain-and-route doctrine treating intercooperative.network as canonical public identity/truth and icn.zone as short operational/access/discovery without claiming any icn.zone route exists today, and frames ICN-PRIVATE / ICN-EDGE segmentation as current/planned operational context rather than ICN product doctrine. Names a ten-room model (Public Window, Lobby, Member Desk, Governance Room, Workroom, Records Room, Forge Room, Operations Control Room, Communications Room, Vault / Privacy Posture). Reaffirms the auth-bridge rule (OIDC authenticates sessions; ICN authorizes institutional power; receipts prove institutional transitions) and the hosted → governed → ICN-native progression for services. Anchors Civic Shell status labels to the proof-level taxonomy tracked in #1796. Preserves the closed regulatory-safe vocabulary (settlement / position / obligation / allocation / receipt / provenance). Explicit non-goals: no app implementation, no new endpoint, no auth implementation, no Keycloak / Forgejo / Matrix deployment, no n8n workflow build, no DNS / K3s / VLAN / network mutation, no public admin surfaces, no private data in repo, no Phase 2 completion claim, no formal NYCN pilot claim, no live-federation claim, no production-readiness claim, no replacement of existing member-shell or steward-cockpit specs. Advances the Civic Shell composition concept — does not close any sibling issue. Defers the authenticated shell route map, the public status / development updates content set, the member-dashboard / notification model, the forge-room GitHub-adapter / Forgejo-target adapter, the operations-control-room authority model, the project-index proof-level integration, the service-list / service-hosting reconciliation, and the communications-room Matrix / bridge / announcement boundary to named follow-ups (suggested only; not opened by this PR). network-ops was not read locally in this session; operational context is operator-provided summary only and does not make network-ops a public source of ICN truth.
+
+**For:** `architects`, `developers`, `contributors`, `operators` | **Updated:** 2026-05-21
+
+### 📋 **Draft** [InstitutionalDomain and DomainPolicy](/docs/spec/institutional-domain.md)
+
+Defines InstitutionalDomain as the governed operating jurisdiction and DomainPolicy as the persistent rule bundle a domain adopts. Specifies the design-level object outline for both, the boundary lines (domain is not a DNS name, node, federation, package, app, member account, storage bucket, CCL document, or tenant), placement in the civic loop, DomainPolicy evaluation rules (consulted at decision admission, mandate composition, effect plan generation, binding adoption; never in the kernel), the nine-stage domain lifecycle (declare → adopt charter/policy → initialize standing → bind routes/services/tools → operate → amend → federate → suspend/repair → export/exit/archive), and the relationship to the effect dispatch chain (#1797). Harmonizes with COOPERATIVE_DOMAIN_INFRASTRUCTURE.md (design-direction overview), DOMAIN_ROUTING_AND_DNS_BINDINGS.md, INSTITUTION_PACKAGE_BOUNDARY.md, KERNEL_APP_SEPARATION.md, and ADR-0014's constitutional object model. Identifies adjacent named-only concepts (DomainSession, DeviceIdentity/DeviceEnrollment, ServiceIdentity, Workspace, AgreementRegistry, ToolRegistry, DnsBinding) and defers their full specification to named follow-ups. Advances #1794 — does not by itself close it. No runtime, no schema, no wire format.
+
+**For:** `architects`, `developers`, `contributors` | **Updated:** 2026-05-14
+
+### 📋 **Draft** [Member Shell v0](/docs/spec/member-shell-v0.md)
+
+Defines the ICN member shell as the primary participation surface at v0: mobile-first, offline-tolerant, accessibility-first, plain-language-first. The shell is an app-side rendering surface that consumes ADR-0020 /me/standing, ADR-0027 ActionCard schema, ADR-0026 receipts, the closed seven-string sync vocabulary from docs/spec/network-anti-entropy-proof-loops.md (#1829), and the closed seven-string placement vocabulary from docs/spec/compute-placement-policy.md (#1826), without redefining any of them. Names five hard boundary lines (vs steward cockpit #1795, vs node operator civic-role surface #1613, vs public website, vs institution-package skin, vs backend/runtime), ten design principles, a ten-surface information architecture (Home/Today, My Standing, Current Scope, Action Cards, Decisions/Governance, Receipts, Records/Artifacts, Privacy/Access, Sync/Offline status, Help/Challenge/Review/Exit), the ActionCard rendering contract (per-field requirements + closed card states), the standing surface contract, the ten-step signing/confirmation flow with reversibility/privacy/sync warnings, the three-tier receipt rendering (plain summary → explanation → formal record under details), offline/low-bandwidth behavior including draft-intent vs sent-waiting-for-receipt vs confirmed labeling, privacy and ScopedVault member affordances (existence + scope + access path only, never body content), the twelve-category accessibility gate inherited from ADR-0028 / docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md, a closed v0 member-facing status vocabulary (sync states + execution-scope strings + action-lifecycle strings + privacy/disclosure strings + receipt-class plain-language labels), eighteen-row failure/safety table, and three fixture-first dogfood slices (read-only standing+ActionCard+receipt+sync-delayed; signing flow rehearsal; offline/degraded sync rehearsal). No new endpoints, no platform decision, no native-app implementation, no schema redefinition, no new receipt classes. Advances #1818 — does not by itself close it. Defers the live UI implementation, the platform decision (iOS/Android/PWA/web), the signal_rule and obligation_lifecycle source-path enablement, the multilingual rendering integration, and the Layer 4 ProvenanceQuery consumption to named follow-ups.
+
+**For:** `architects`, `developers`, `contributors` | **Updated:** 2026-05-15
+
+### 📋 **Draft** [Network Anti-Entropy Proof Loops](/docs/spec/network-anti-entropy-proof-loops.md)
+
+Defines the design-level proof-loop contract beneath compute placement (#1801), storage durability (#1816), artifact registry (#1798), receipt clearing, federation settlement finality (#1365), steward cockpit (#1795), and member shell (#1818). Names the eight-phase anti-entropy institutional evidence loop (schedule/trigger → probe → compare → classify → plan → apply → evidence → surface), thirteen forward-direction proof-artifact identifiers (AntiEntropyProbe, StateDigest, ReceiptDigest, ArtifactDigest, PeerSyncReport, DivergenceEvidence, RepairPlan, RepairReceipt, SyncDegradedStatus, QuorumSyncCheck, FederationSyncWindow, RoutingProof, RedundancyProof), nine state classes covered (governance state, receipts, artifact metadata, scoped vault refs, storage replicas, compute receipts, settlement records, federation membership, CCL policy versions), eighteen divergence classes, ten load-bearing boundary rules (no silent repair of governance-authoritative state; no repair beyond authority; no raw private content in gossip; no widening of locality / disclosure; no degraded-as-healthy rendering; no federation / commons placement without fresh QuorumSyncCheck within FederationSyncWindow; no settlement finality without anti-entropy proof; no member-facing lie; no production claim; no Coop-prefixed generic primitives), privacy and custody rules, steward cockpit surface vocabulary, member shell surface vocabulary (seven plain-language strings), eighteen-row failure/safety table, and three fixture-first proof-loop slices (read-only receipt-index rehearsal, RedundancyProof simulation, QuorumSyncCheck fixture). Anchors against existing primitives in icn-gossip (BloomFilter, VectorClock, PeerSyncManager, PartitionDetector, anti_entropy.rs module) and icn-core (AntiEntropyConfig, spawn_anti_entropy_task) without redefining them. No new ADR-0026 receipt classes introduced; proof artifacts travel inside existing Stage 5 EffectDispatchEvidence or Layer 2 ArtifactReceipt envelopes. Advances #1799 — does not by itself close it. Defers wire-stable schema, devnet fixture implementation, federation-side quorum window protocol, steward / member surface rendering specs, and private-object digest proof contract to named follow-ups.
+
+**For:** `architects`, `developers`, `contributors` | **Updated:** 2026-05-15
+
+### 📋 **Draft** [Steward Cockpit v0](/docs/spec/steward-cockpit-v0.md)
+
+Defines the ICN steward cockpit as the operator-facing civic-infrastructure surface for node and domain stewards at v0 — the operator/steward complement of docs/spec/member-shell-v0.md (#1830). Consumes verbatim the 9-field cockpit surface from docs/spec/network-anti-entropy-proof-loops.md (#1829) for the Network / Federation section, the 14-field operator/steward dashboard from docs/spec/compute-placement-policy.md (#1826) for the Compute / Commons section, and the storage durability policy objects from docs/spec/storage-durability-policies.md (#1823). Names six hard boundary lines (vs member shell #1830, vs node operator civic-role surface #1613, vs public website, vs institution-package skin, vs backend/runtime, vs surveillance/admin-control panel), ten v0 design principles (stewardship-not-domination, proof-before-confidence, degraded-is-visible, privacy-posture-not-private-content, receipts-explain-state, required-actions-explicit, authority-basis-visible, scope-visible, member-impact-summary-always-present, no-financial-framing), twelve cockpit information-architecture surfaces (Overview/Required Actions, Node Status, Domain Status, Network/Federation, Receipt Store, Storage/Artifacts/ScopedVault, Governance/Process, Compute/Commons, Participation Access, Privacy Posture, Backup/Export/Recovery, Warnings/Incidents/Repair), fourteen operator action-card scenarios with source class / authority pattern / expected outcome, per-surface rendering contracts that consume merged sibling specs without redefining them, a closed v0 operator-facing status vocabulary plus a verbatim member-impact summary mapping into the merged #1829 member-shell sync vocabulary, twenty-row failure/safety table including the load-bearing 'dashboard says healthy while member shell says degraded' v0 violation, and three fixture-first dogfood slices (read-only receipt-store + anti-entropy degraded/repair fixture; storage replica / backup overdue / restore-test receipt fixture; compute placement review-required fixture). No new endpoints, no frontend technology decision, no surveillance console, no private-data preview, no production-dashboard claim. Advances #1795 — does not by itself close it. Defers the live cockpit implementation, the frontend technology decision, the per-surface implementation specs, and the cross-link audit against icn-obs metric module renaming to named follow-ups.
+
+**For:** `architects`, `developers`, `contributors`, `operators` | **Updated:** 2026-05-15
+
+### 📋 **Draft** [Storage Durability Policies — Backup, Replication, Recovery, Archive, Integrity](/docs/spec/storage-durability-policies.md)
+
+Defines six forward-direction policy objects that bind storage classes to durability commitments: StorageSpec (binding between a workload/service/domain and storage), BackupPolicy (frequency, target, integrity, retention), ReplicationPolicy (replicas, placement, anti-entropy), RecoveryPolicy (restore objective class, drill cadence, restore authority), ArchivePolicy (long-term retention, immutability, access), and IntegrityPolicy (verification cadence, repair path). Reuses existing kernel-level types (StorageClass and DataLocality from icn/crates/icn-kernel-api/src/storage.rs) verbatim and acknowledges the drift between the 3-variant kernel enum and the 7-class spine-doc custody taxonomy (canonical store / service state / artifact-blob / volume-block / scoped vault / secret-key / cache-derived) — reconciliation deferred to a named follow-up. Names restore-test receipts as their own concept; mandates that backups, replicas, archives, and exports inherit source locality and disclosure constraints and MUST NOT broaden them. Specifies authority rules tying restore of authoritative state to ADR-0014 mandates and the effect dispatch chain (Stage 5 evidence). Provides a sixteen-row failure/safety table covering missing spec, locality boundary crossing, restore without authority, cache treated as canonical, secret material in ordinary backup, archive quiet deletion, etc. Advances #1816 — does not by itself close it. Defers wire-stable schema, restore-test receipt envelope, locality/privacy inheritance checks, archive verification contract, backup-provider interface, and anti-entropy integration to named follow-ups.
+
+**For:** `architects`, `developers`, `contributors` | **Updated:** 2026-05-14
+
 
 ## Design
 
@@ -219,6 +309,12 @@ Tactical prompt library for doctrine-aligned image generation and visual explora
 
 **For:** `architects`, `developers`, `designers` | **Updated:** 2026-04-22
 
+### 📋 **Draft** [ICN Visual Explainer Bible](/docs/design/ICN_VISUAL_EXPLAINER_BIBLE.md)
+
+Control-plane doctrine for every ICN visual explainer — source hierarchy, truth labels, vocabulary rules, accessibility floor, core explainer models, brief gate, generated-image workflow, production-source rule. Governs diagrams, infographics, generated images, and source assets across website, docs, decks, and product surfaces.
+
+**For:** `architects`, `developers`, `designers`, `stakeholders` | **Updated:** 2026-05-13
+
 ### 📋 **Draft** [ICN Visual System](/docs/design/ICN_VISUAL_SYSTEM.md)
 
 Stable visual doctrine for ICN across website, docs, product surfaces, onboarding, demo materials, and future institutional deployments
@@ -230,6 +326,30 @@ Stable visual doctrine for ICN across website, docs, product surfaces, onboardin
 Program for shipping one end-to-end cooperative use case for production 6-month validation
 
 **For:** `product`, `architects` | **Updated:** 2026-03-15
+
+### 📝 **Living** [Organizer / member accessibility gate](/docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md)
+
+PR-time review checklist for any organizer- or member-facing surface (rehearsal shells, action-card surfaces, preview/review surfaces, evidence-packet rendering, receipt/provenance review, member-facing governance flows). Twelve review categories with four-value gate outcomes (Pass / Pass with documented follow-ups / Blocked / N/A with reason); copy-paste PR checklist block. Operational layer beneath ADR-0028, design/ACCESSIBILITY_BASELINE.md, and design-language/accessibility.md; companion to architecture/ARCHITECTURE_DUE_DILIGENCE.md participation-access half. Not a CI gate; not a legal accessibility audit; not production-readiness.
+
+**For:** `architects`, `contributors`, `design` | **Updated:** 2026-05-05
+
+### 📋 **Draft** [ICN Visual Asset Register](/docs/design/assets/ASSET_REGISTER.md)
+
+Live register of planned and tracked visual assets for ICN. One row per asset (VE-NNN). Indexes briefs in docs/design/assets/briefs/. Initial rows cover the closure loop, scope model, decision-to-receipt, member shell concept, kernel/app separation, federation, commons/compute, action card anatomy, receipt anatomy, steward cockpit, regulatory-safe state, and what ICN is / is not.
+
+**For:** `architects`, `developers`, `designers`, `stakeholders` | **Updated:** 2026-05-13
+
+### 📋 **Draft** [ICN Visual Assets — Directory README](/docs/design/assets/README.md)
+
+Orientation for the visual-asset planning layer — where production assets live, where sketches live, asset lifecycle, and what does not go in this directory.
+
+**For:** `architects`, `developers`, `designers` | **Updated:** 2026-05-13
+
+### 📋 **Draft** [ICN Visual Review Checklist](/docs/design/assets/VISUAL_REVIEW_CHECKLIST.md)
+
+Pre-ship gate for every ICN visual explainer. Source grounding, truth label, vocabulary, accessibility floor, substrate honesty, kernel/app boundary, scope/package boundary, visual grammar, generated-image rules, production-source rule.
+
+**For:** `architects`, `developers`, `designers` | **Updated:** 2026-05-13
 
 ### 📝 **Living** [Capability-Based Feature Gating](/docs/design/capability-based-features.md)
 
@@ -1150,7 +1270,7 @@ Normative development control plane: discovery vs delivery, artifact routing, an
 
 Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh
 
-**For:** `contributors`, `agents` | **Updated:** 2026-03-26
+**For:** `contributors`, `agents` | **Updated:** 2026-06-09
 
 ### 📝 **Living** [ICN Golden Development Prompt](/docs/GOLDEN_PROMPT.md)
 
@@ -1208,9 +1328,33 @@ CI gates, ratchet phases, required checks, and failure index
 
 ### 📝 **Living** [Institution Package ActionCard Contract Notes](/docs/contracts/institution-package/README.md)
 
-Validation guidance for institution packages using action-card.schema.json; emitted vs RFC-gated source kinds; pointers to runtime models and issue icn#1713.
+Validation guidance for institution packages using action-card.schema.json; emitted vs RFC-gated source kinds; pointers to runtime models, ADR-0027, and issue icn#1713. JSON schema and fictional example live alongside; tiny validator at docs/scripts/validate-action-card.py. Schema $id retained temporarily per docs/contracts/schema-id-audit.md (review by 2026-06-30).
+
+**For:** `contributors`, `organizers` | **Updated:** 2026-05-07
+
+### 📝 **Living** [Pending-publish summary — contract notes](/docs/contracts/pending-publish-summary.md)
+
+Companion notes for the substrate-level row-level read-model contract for pending-publish summaries (urn:icn:contract:pending-publish-summary:v1). Composed body for preview-review.preview_kind = pending_publish_summary; does not replace urn:icn:contract:preview-review:v1. Defines the per-row shape (action item / decision / attendance / obligation / allocation / settlement / evidence note / risk note), review affordances, mutation_preview, expected receipt category, provenance reference, must-not-include list, and validation guidance. Read-only; not a mutation API. JSON schema and fictional example live alongside; validated via docs/scripts/validate-preview-review.py --schema.
+
+**For:** `contributors`, `architects`, `organizers` | **Updated:** 2026-06-09
+
+### 📝 **Living** [Preview / review — contract notes](/docs/contracts/preview-review.md)
+
+Companion notes for the substrate-level read-model contract for human-reviewable previews of pending publish, action items, evidence packets, and fixture demos (urn:icn:contract:preview-review:v1). Defines field shape, must-not-include list, validation guidance, stability, and how the contract fits the no-CLI organizer/member workflow + organizer/member accessibility gate. Closes the 'Generic preview/review API contract' follow-up in icn#1724 / no-CLI workflow §7. Read-only; not a mutation API. JSON schema and fictional example live alongside; tiny validator at docs/scripts/validate-preview-review.py.
+
+**For:** `contributors`, `architects` | **Updated:** 2026-05-05
+
+### 📝 **Living** [Rehearsal evidence export — contract notes](/docs/contracts/rehearsal-evidence-export.md)
+
+Companion notes for the substrate-level repo-safe rehearsal evidence export schema (urn:icn:contract:rehearsal-evidence-export:v1). Defines field shape, must-not-include list, validation guidance, stability, and the non-DNS contract-identity decision. JSON schema and fictional example live alongside; tiny validator at docs/scripts/validate-rehearsal-evidence.py.
 
 **For:** `contributors`, `organizers` | **Updated:** 2026-05-04
+
+### 📝 **Living** [Schema $id audit](/docs/contracts/schema-id-audit.md)
+
+Audit-only record of every JSON schema $id under docs/contracts/, classified DNS-backed vs non-DNS, with per-schema keep/migrate/investigate recommendations and migration safety rules. Performs no migration. First deliberate application of the architecture due-diligence checklist; deliverable for icn#1737.
+
+**For:** `architects`, `contributors` | **Updated:** 2026-05-05
 
 ### 📝 **Living** [Demo System Documentation](/docs/demo/README.md)
 
@@ -1350,6 +1494,12 @@ Approach for hosted cooperative pilot deployments
 
 **For:** `team` | **Updated:** 2026-03-10
 
+### 📝 **Living** [No-CLI organizer and member rehearsal workflow (generic ICN)](/docs/pilots/no-cli-organizer-member-rehearsal-workflow.md)
+
+Guided browser/mobile-first rehearsal story: standing, action cards, action items, receipts, provenance, repo-safe evidence; organizer vs steward vs member paths; preview-before-mutation; CLI as operator layer only; follow-ups for UI/API/evidence contracts including the landed fixture-backed demo-mode bridge slice. Partner companion doc lives in NYCN repo.
+
+**For:** `team`, `organizers` | **Updated:** 2026-06-09
+
 ### 📋 **Draft** [Agent Knowledge Architecture](/docs/planning/agent-knowledge-architecture.md)
 
 Design for AI agent knowledge bases and context management
@@ -1426,7 +1576,7 @@ Trust score threshold configuration guide
 
 Show-ready orientation layer — routes outside readers, contributors, and agents to the right canonical doc, source tree, or external URL. Defers to STATE.md and PHASE_PROGRESS.md for current truth.
 
-**For:** `all` | **Updated:** 2026-04-29
+**For:** `all` | **Updated:** 2026-05-11
 
 ### 📝 **Living** [CI / Ops / Deploy Map](/docs/reference/project-index/ci-ops-deploy-map.md)
 
@@ -1451,6 +1601,12 @@ How INDEX.md, registry.toml, DOCUMENT_REGISTRY.md, and doc_control_check.py rela
 Protocol for recording every tracked file and directory across InterCooperative-Network/icn (and adjacent repos) as a mechanical record plus an interpretive atlas. Defines outputs, generator, classification vocabulary, and privacy boundary.
 
 **For:** `contributors`, `architects` | **Updated:** 2026-05-01
+
+### 📝 **Living** [Proof-Level Taxonomy and Capability Matrix](/docs/reference/project-index/proof-level-taxonomy-capability-matrix.md)
+
+Proof-level taxonomy (L0-L8) as shared claim-boundary vocabulary, plus a capability matrix for the current organizer-rehearsal path. Supports #1746 and narrows #1796. Orthogonal to the project-coverage-matrix status vocabulary. Defers to STATE.md and PHASE_PROGRESS.md for current truth.
+
+**For:** `all`, `team` | **Updated:** 2026-06-09
 
 ### 📋 **Draft** [ICN Repo Atlas](/docs/reference/project-index/repo-atlas.md)
 
@@ -1582,7 +1738,7 @@ Comprehensive threat model covering attack vectors, adversary capabilities, and 
 
 Living snapshot of repo layout, decisions, constraints, and current engineering status
 
-**For:** `developers`, `agents` | **Updated:** 2026-05-02
+**For:** `developers`, `agents` | **Updated:** 2026-05-22
 
 
 ## Strategy
@@ -1671,6 +1827,36 @@ Formal technical specification for grants, regulatory review, and architectural 
 
 **For:** `grant-reviewers`, `architects`, `compliance` | **Updated:** 2026-03-15
 
+### 📝 **Living** [ICN: Infrastructure for the Cooperative Movement](/docs/strategy/ICN_FOR_COOPERATIVE_MOVEMENT.md)
+
+Plain-English ICN introduction for cooperative developers, federation organizers, TA providers, and member-owners. Honest comparisons to existing co-op tech, role-by-role fit, explicit non-claims. Pre-pilot framing throughout; claims bounded by ICN_INTRODUCTION_EVIDENCE_MAP.md.
+
+**For:** `public`, `stakeholders`, `organizers` | **Updated:** 2026-06-09
+
+### 📝 **Living** [ICN, in Plain English](/docs/strategy/ICN_FOR_EVERYONE.md)
+
+General-public ICN introduction starting from 'what is a cooperative'. No jargon wall. Explains receipts as evidence records (not crypto), institutional memory, and accountability. Explicit non-claims; pre-pilot framing throughout.
+
+**For:** `public` | **Updated:** 2026-06-09
+
+### 📝 **Living** [ICN one-page handbill](/docs/strategy/ICN_HANDBILL.md)
+
+One-page handbill: the problem, what ICN does, and where it actually stands (pre-pilot, not production-ready). Links to the evidence map and hard-questions Q&A.
+
+**For:** `public`, `organizers` | **Updated:** 2026-06-09
+
+### 📝 **Living** [ICN Hard Questions and Evidence-Bound Answers](/docs/strategy/ICN_HARD_QUESTIONS.md)
+
+Hard questions answered directly in bad-answer/honest-answer format: production use (no), what works now, fixture-backed vs live vs design-only, capture, surveillance, private data, regulation, blockchain (no), bus factor, smallest safe next step. Adapted from internal hardball rehearsal practice; generalized and depersonalized.
+
+**For:** `public`, `stakeholders`, `organizers`, `reviewers` | **Updated:** 2026-06-09
+
+### 📝 **Living** [ICN Introduction Evidence Map](/docs/strategy/ICN_INTRODUCTION_EVIDENCE_MAP.md)
+
+Maps every claim in the introduction materials to verifiable merged artifacts (icn#1985/#1997/#1998/#1999, nycn#78, icn-learn#3, icn-community-bridge#1) and states what each artifact does NOT prove. Anti-overclaim companion to the intro docs; defers to STATE.md and PHASE_PROGRESS.md for current truth.
+
+**For:** `public`, `stakeholders`, `organizers`, `reviewers` | **Updated:** 2026-06-09
+
 ### 📋 **Draft** [Licensing strategy matrix (autonomy review)](/docs/strategy/LICENSING_STRATEGY_MATRIX.md)
 
 Planning artifact only. Component-by-component licensing/autonomy matrix and option families (permissive / AGPL / CAL / policy-layer / hybrid) for a future maintainer/legal review. Not legal advice; not a relicensing decision; no metadata changes.
@@ -1712,9 +1898,9 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 284
+**Total documents:** 309
 
 **By status:**
-- Canonical: 39
-- Draft: 57
-- Living: 188
+- Canonical: 40
+- Draft: 72
+- Living: 197

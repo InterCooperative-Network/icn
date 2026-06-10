@@ -256,6 +256,8 @@ See `.github/agents/README.md` for the full list and usage instructions.
 
 When running multiple agents in parallel, each agent gets its own Git worktree with an isolated branch and working directory. See `docs/dev/WORKTREES.md` for full documentation.
 
+On the dev host, agent sessions follow the `~/icn-dev` bare-store/worktree operating model — see `docs/dev/AGENT_WORKTREE_POLICY.md` for worktree allocation, file locks, and the merge queue. The quick reference below covers the older repo-adjacent `../icn-wt/` workflow, not the `~/icn-dev` model.
+
 **Quick reference:**
 
 ```bash

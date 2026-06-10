@@ -33,7 +33,7 @@ ICN implements a **constraint enforcement architecture** where Policy Oracles (a
 
 ## Live Deployment
 
-ICN daemon running on K3s cluster (deployed 2025-12-03). See **[docs/HOMELAB_DEPLOYMENT.md](docs/HOMELAB_DEPLOYMENT.md)** for:
+ICN daemon running on K3s cluster (deployed 2025-12-03). See **[docs/operations/deployment/HOMELAB_DEPLOYMENT.md](docs/operations/deployment/HOMELAB_DEPLOYMENT.md)** for:
 - Cluster details and node identity
 - Quick access commands
 - CI/CD pipeline and monitoring
@@ -259,7 +259,7 @@ CCL (`icn-ccl`) is a domain-specific language for expressing agreements:
 
 ## Roadmap & Phase Tracking
 
-**Standard**: All development is tracked as sequential phases. No parallel tracks, no letter suffixes.
+**Standard**: All development is tracked as sequential phases. No parallel tracks, no letter suffixes. The active sequence is the Phase 0/1/2 model (begun 2026-03-18); the earlier Phase 1–18 numbering (and its planned 19–35 continuation) is retired — history in [docs/PHASE_HISTORY.md](docs/PHASE_HISTORY.md).
 
 ### Phase Format
 
@@ -286,33 +286,26 @@ Each phase in documentation must follow this format:
 
 ### Source of Truth
 
-- **Completed phases**: [docs/PHASE_HISTORY.md](docs/PHASE_HISTORY.md)
-- **Current & planned phases**: [docs/dev-journal/ROADMAP.md](docs/dev-journal/ROADMAP.md)
+- **Completed phases**: current model (Phases 0–1) in [docs/PHASE_PROGRESS.md](docs/PHASE_PROGRESS.md); pre-reset history (old numbering) in [docs/PHASE_HISTORY.md](docs/PHASE_HISTORY.md)
+- **Current & planned phases**: [docs/STATE.md](docs/STATE.md) and [docs/PHASE_PROGRESS.md](docs/PHASE_PROGRESS.md) (truth-synced, canonical); long-arc planning: [docs/strategy/ICN-Roadmap-Live.md](docs/strategy/ICN-Roadmap-Live.md)
 - **This file**: Quick reference only, not authoritative
 
 ### Current Status
 
-**Last Completed**: Phase 18 (Pre-Pilot Hardening) - 2025-11-27
-**Implementation**: ~75% complete (272K LOC, 2,287 tests)
-**Deployed**: K3s cluster since 2025-12-03
+Quick reference as of 2026-05-22 — [docs/PHASE_PROGRESS.md](docs/PHASE_PROGRESS.md) is the live, canonical version.
 
-**Remaining phases (19-35)**:
-- 19-20: Release Infrastructure + Testing Foundation
-- 21-22: Network Connectivity + Security Hardening
-- 23-26: Identity, SDK, Observability, Documentation
-- 27-29: Ledger/Economics, CCL/Governance, Code Quality
-- 30-33: Mobile, Infrastructure, Federation, CLI/UX
-- 34: Release Candidate
-- 35: Pilot Deployment
+**Current Phase**: Phase 2 — Pilot Launch (in progress, partner-bound). NYCN is the intended first cooperative partner — an active partnership track, not yet a formally committed pilot. Next gate: organizer presentation -> pilot formalization -> first operator rehearsal (per the NYCN rehearsal gate in the partner repo).
 
-See [docs/dev-journal/ROADMAP.md](docs/dev-journal/ROADMAP.md) for full details and issue mapping.
+**Completed**: Phase 0 — Close the Demo (2026-03-18); Phase 1 — The Charter Engine (2026-03-18).
+
+See [docs/PHASE_PROGRESS.md](docs/PHASE_PROGRESS.md) and [docs/STATE.md](docs/STATE.md) for current state and issue mapping, and [docs/strategy/ICN-Roadmap-Live.md](docs/strategy/ICN-Roadmap-Live.md) for the long-arc roadmap.
 
 ### Rules for Agents
 
 1. **Never invent new tracking systems** - use phases with sequential numbers
 2. **Never use "Track A/B/C"** - everything is sequential
-3. **Update PHASE_HISTORY.md** when completing a phase
-4. **Update ROADMAP.md** when planning changes
+3. **Record phase completion in docs/PHASE_PROGRESS.md and docs/STATE.md** (status flip + truth-sync edit) — docs/PHASE_HISTORY.md is pre-reset history only; do not add current-model phases to it
+4. **Update docs/STATE.md and docs/PHASE_PROGRESS.md** when phase state changes (they are canonical); update docs/strategy/ICN-Roadmap-Live.md when long-arc planning changes — never the strategy doc alone while canonical phase tracking goes stale
 5. **Keep this section as quick reference only** - detail goes in the dedicated docs
 
 ## Common Development Workflows
@@ -506,7 +499,7 @@ See **[.github/ISSUE_POLICY.md](.github/ISSUE_POLICY.md)** for the complete issu
 - Partner (0.4-0.7): 100 msg/sec
 - Federated (0.7+): 200 msg/sec
 
-See [docs/production-hardening.md](docs/production-hardening.md) for complete details.
+See [docs/security/production-hardening.md](docs/security/production-hardening.md) for complete details.
 
 ## Notes
 

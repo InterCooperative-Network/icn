@@ -381,6 +381,44 @@ pub trait Store: Send + Sync {
         Ok((paginated, total))
     }
 
+    /// Scan up to `limit` entries whose key is strictly greater than `after`
+    /// (or from the start of `prefix` when `after` is `None`), in ascending key
+    /// order.
+    ///
+    /// This is cursor/seek pagination: a caller pages the whole prefix by
+    /// passing the last returned key back as `after`. Unlike repeated
+    /// [`Store::scan_paginated`] (which recomputes a count and re-walks from the
+    /// start on every call — `O(n²/limit)` to traverse the prefix), resuming
+    /// from a key cursor traverses each entry once (`O(n)` total) while keeping
+    /// at most one page resident.
+    ///
+    /// # Arguments
+    /// * `prefix` - Key prefix to scan
+    /// * `after` - Exclusive lower-bound key; `None` starts at the prefix
+    /// * `limit` - Maximum number of entries to return
+    #[allow(clippy::type_complexity)]
+    fn scan_after(
+        &self,
+        prefix: &[u8],
+        after: Option<&[u8]>,
+        limit: usize,
+    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        // Default implementation materializes via scan() then filters — backends
+        // (e.g. Sled) should override with a true seek for streaming behavior.
+        // Relies on scan() yielding keys in ascending order, as the other
+        // paginated defaults already do.
+        let out = self
+            .scan(prefix)?
+            .into_iter()
+            .filter(|(k, _)| match after {
+                Some(a) => k.as_slice() > a,
+                None => true,
+            })
+            .take(limit)
+            .collect();
+        Ok(out)
+    }
+
     // Replica tracking operations (Phase 17)
     /// Get replica metadata for a content hash
     fn get_replica_metadata(&self, content_hash: &ContentHash) -> Result<Option<ReplicaMetadata>>;
@@ -824,6 +862,38 @@ impl Store for SledStore {
         }
 
         Ok((results, total))
+    }
+
+    fn scan_after(
+        &self,
+        prefix: &[u8],
+        after: Option<&[u8]>,
+        limit: usize,
+    ) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+        use std::ops::Bound;
+
+        // Seek directly to the cursor: strictly after the last key on resume,
+        // or at the prefix on the first page. Sled keys are ordered, so this
+        // visits each entry at most once across the whole paged traversal.
+        let lower = match after {
+            Some(a) => Bound::Excluded(a.to_vec()),
+            None => Bound::Included(prefix.to_vec()),
+        };
+
+        let mut results = Vec::with_capacity(limit);
+        for item in self.db.range((lower, Bound::<Vec<u8>>::Unbounded)) {
+            let (k, v) = item?;
+            // range() is unbounded above; stop as soon as we leave the prefix.
+            if !k.starts_with(prefix) {
+                break;
+            }
+            results.push((k.to_vec(), v.to_vec()));
+            if results.len() >= limit {
+                break;
+            }
+        }
+
+        Ok(results)
     }
 
     // Replica tracking implementation
@@ -1284,6 +1354,44 @@ mod tests {
         let (empty, total) = store.scan_paginated(b"items:", 20, 5)?;
         assert_eq!(total, 10);
         assert_eq!(empty.len(), 0);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_store_scan_after_cursor() -> Result<()> {
+        let store = SledStore::temporary()?;
+
+        for i in 0..10 {
+            store.put(format!("items:{i:02}").as_bytes(), b"data")?;
+        }
+        // A key outside the prefix must never leak into results.
+        store.put(b"other:00", b"x")?;
+
+        // First page from the start of the prefix.
+        let page1 = store.scan_after(b"items:", None, 4)?;
+        assert_eq!(page1.len(), 4);
+        assert_eq!(page1[0].0, b"items:00");
+        assert_eq!(page1[3].0, b"items:03");
+
+        // Resume strictly after the last key seen (cursor pagination).
+        let cursor = page1.last().unwrap().0.clone();
+        let page2 = store.scan_after(b"items:", Some(&cursor), 4)?;
+        assert_eq!(page2.len(), 4);
+        assert_eq!(
+            page2[0].0, b"items:04",
+            "resumes after the cursor, no repeat"
+        );
+
+        // Final partial page; stays within the prefix (never "other:00").
+        let cursor2 = page2.last().unwrap().0.clone();
+        let page3 = store.scan_after(b"items:", Some(&cursor2), 4)?;
+        assert_eq!(page3.len(), 2);
+        assert_eq!(page3[1].0, b"items:09");
+
+        // Past the end → empty (loop terminator).
+        let cursor3 = page3.last().unwrap().0.clone();
+        assert!(store.scan_after(b"items:", Some(&cursor3), 4)?.is_empty());
 
         Ok(())
     }

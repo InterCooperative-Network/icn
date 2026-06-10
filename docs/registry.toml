@@ -698,7 +698,7 @@ category = "reference"
 status = "living"
 title = "ICN Document Registry (human summary)"
 description = "Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh"
-last_updated = "2026-05-07"
+last_updated = "2026-06-09"
 owner = "matt"
 audiences = ["contributors", "agents"]
 truth_class = "descriptive"
@@ -707,7 +707,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["registry", "documentation-control"]
 recommended_action = "keep"
-last_reviewed = "2026-05-07"
+last_reviewed = "2026-06-09"
 
 [docs."docs/planning/documentation-namespace-resolution.md"]
 category = "strategy"
@@ -1443,6 +1443,86 @@ description = "Elevator pitch, one-pagers, and public communication messaging fr
 last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["stakeholders", "public"]
+
+[docs."docs/strategy/ICN_FOR_COOPERATIVE_MOVEMENT.md"]
+category = "strategy"
+status = "living"
+title = "ICN: Infrastructure for the Cooperative Movement"
+description = "Plain-English ICN introduction for cooperative developers, federation organizers, TA providers, and member-owners. Honest comparisons to existing co-op tech, role-by-role fit, explicit non-claims. Pre-pilot framing throughout; claims bounded by ICN_INTRODUCTION_EVIDENCE_MAP.md."
+last_updated = "2026-06-09"
+owner = "matt"
+audiences = ["public", "stakeholders", "organizers"]
+truth_class = "descriptive"
+role = "strategy"
+canonical = "no"
+freshness = "current"
+domain_tags = ["strategy", "introduction", "outreach", "cooperative-movement"]
+recommended_action = "keep"
+last_reviewed = "2026-06-09"
+
+[docs."docs/strategy/ICN_FOR_EVERYONE.md"]
+category = "strategy"
+status = "living"
+title = "ICN, in Plain English"
+description = "General-public ICN introduction starting from 'what is a cooperative'. No jargon wall. Explains receipts as evidence records (not crypto), institutional memory, and accountability. Explicit non-claims; pre-pilot framing throughout."
+last_updated = "2026-06-09"
+owner = "matt"
+audiences = ["public"]
+truth_class = "descriptive"
+role = "strategy"
+canonical = "no"
+freshness = "current"
+domain_tags = ["strategy", "introduction", "outreach", "public"]
+recommended_action = "keep"
+last_reviewed = "2026-06-09"
+
+[docs."docs/strategy/ICN_HANDBILL.md"]
+category = "strategy"
+status = "living"
+title = "ICN one-page handbill"
+description = "One-page handbill: the problem, what ICN does, and where it actually stands (pre-pilot, not production-ready). Links to the evidence map and hard-questions Q&A."
+last_updated = "2026-06-09"
+owner = "matt"
+audiences = ["public", "organizers"]
+truth_class = "descriptive"
+role = "strategy"
+canonical = "no"
+freshness = "current"
+domain_tags = ["strategy", "introduction", "outreach", "handbill"]
+recommended_action = "keep"
+last_reviewed = "2026-06-09"
+
+[docs."docs/strategy/ICN_HARD_QUESTIONS.md"]
+category = "strategy"
+status = "living"
+title = "ICN Hard Questions and Evidence-Bound Answers"
+description = "Hard questions answered directly in bad-answer/honest-answer format: production use (no), what works now, fixture-backed vs live vs design-only, capture, surveillance, private data, regulation, blockchain (no), bus factor, smallest safe next step. Adapted from internal hardball rehearsal practice; generalized and depersonalized."
+last_updated = "2026-06-09"
+owner = "matt"
+audiences = ["public", "stakeholders", "organizers", "reviewers"]
+truth_class = "descriptive"
+role = "strategy"
+canonical = "no"
+freshness = "current"
+domain_tags = ["strategy", "introduction", "hard-questions", "anti-overclaim"]
+recommended_action = "keep"
+last_reviewed = "2026-06-09"
+
+[docs."docs/strategy/ICN_INTRODUCTION_EVIDENCE_MAP.md"]
+category = "strategy"
+status = "living"
+title = "ICN Introduction Evidence Map"
+description = "Maps every claim in the introduction materials to verifiable merged artifacts (icn#1985/#1997/#1998/#1999, nycn#78, icn-learn#3, icn-community-bridge#1) and states what each artifact does NOT prove. Anti-overclaim companion to the intro docs; defers to STATE.md and PHASE_PROGRESS.md for current truth."
+last_updated = "2026-06-09"
+owner = "matt"
+audiences = ["public", "stakeholders", "organizers", "reviewers"]
+truth_class = "descriptive"
+role = "strategy"
+canonical = "no"
+freshness = "current"
+domain_tags = ["strategy", "introduction", "evidence", "anti-overclaim"]
+recommended_action = "keep"
+last_reviewed = "2026-06-09"
 
 [docs."docs/strategy/COOPERATIVE_DEVELOPER_DISCOVERY_BRIEF.md"]
 category = "strategy"
@@ -2408,6 +2488,22 @@ domain_tags = ["project-index", "navigation", "repo-atlas", "draft"]
 recommended_action = "keep"
 last_reviewed = "2026-05-01"
 
+[docs."docs/reference/project-index/proof-level-taxonomy-capability-matrix.md"]
+category = "reference"
+status = "living"
+title = "Proof-Level Taxonomy and Capability Matrix"
+description = "Proof-level taxonomy (L0-L8) as shared claim-boundary vocabulary, plus a capability matrix for the current organizer-rehearsal path. Supports #1746 and narrows #1796. Orthogonal to the project-coverage-matrix status vocabulary. Defers to STATE.md and PHASE_PROGRESS.md for current truth."
+last_updated = "2026-06-09"
+owner = "matt"
+audiences = ["all", "team"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "proof-level", "rehearsal", "show-readiness"]
+recommended_action = "keep"
+last_reviewed = "2026-06-09"
+
 [docs."docs/glossary.md"]
 category = "reference"
 status = "living"
@@ -3356,8 +3452,8 @@ audiences = ["team"]
 category = "reference"
 status = "living"
 title = "No-CLI organizer and member rehearsal workflow (generic ICN)"
-description = "Guided browser/mobile-first rehearsal story: standing, action cards, action items, receipts, provenance, repo-safe evidence; organizer vs steward vs member paths; preview-before-mutation; CLI as operator layer only; follow-ups for UI/API/evidence contracts. Partner companion doc lives in NYCN repo."
-last_updated = "2026-05-04"
+description = "Guided browser/mobile-first rehearsal story: standing, action cards, action items, receipts, provenance, repo-safe evidence; organizer vs steward vs member paths; preview-before-mutation; CLI as operator layer only; follow-ups for UI/API/evidence contracts including the landed fixture-backed demo-mode bridge slice. Partner companion doc lives in NYCN repo."
+last_updated = "2026-06-09"
 owner = "matt"
 audiences = ["team", "organizers"]
 truth_class = "descriptive"
@@ -3366,7 +3462,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["pilot", "nycn", "communications", "action-cards", "accessibility"]
 recommended_action = "keep"
-last_reviewed = "2026-05-04"
+last_reviewed = "2026-06-09"
 
 [docs."docs/contracts/institution-package/README.md"]
 category = "reference"
@@ -3431,6 +3527,22 @@ freshness = "current"
 domain_tags = ["contracts", "pilots", "review", "evidence", "accessibility"]
 recommended_action = "keep"
 last_reviewed = "2026-05-05"
+
+[docs."docs/contracts/pending-publish-summary.md"]
+category = "reference"
+status = "living"
+title = "Pending-publish summary — contract notes"
+description = "Companion notes for the substrate-level row-level read-model contract for pending-publish summaries (urn:icn:contract:pending-publish-summary:v1). Composed body for preview-review.preview_kind = pending_publish_summary; does not replace urn:icn:contract:preview-review:v1. Defines the per-row shape (action item / decision / attendance / obligation / allocation / settlement / evidence note / risk note), review affordances, mutation_preview, expected receipt category, provenance reference, must-not-include list, and validation guidance. Read-only; not a mutation API. JSON schema and fictional example live alongside; validated via docs/scripts/validate-preview-review.py --schema."
+last_updated = "2026-06-09"
+owner = "matt"
+audiences = ["contributors", "architects", "organizers"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["contracts", "pilots", "review", "evidence", "accessibility", "privacy"]
+recommended_action = "keep"
+last_reviewed = "2026-06-09"
 
 # ============================================================================
 # PLANNING AND STRATEGY (Additional)

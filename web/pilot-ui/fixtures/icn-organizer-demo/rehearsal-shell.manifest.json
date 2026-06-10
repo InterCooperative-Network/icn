@@ -1,0 +1,69 @@
+{
+  "fixture_id": "icn-organizer-rehearsal-shell-demo-v1",
+  "schema_version": "1.0.0",
+  "mode": "demo",
+  "network": "disabled",
+  "generated_from": "committed-fixtures",
+  "title": "ICN organizer/member rehearsal-shell fixture bundle (demo mode, no network)",
+  "description": "Deterministic, repo-safe read-model bundle the future no-CLI organizer/member rehearsal shell (icn#1726) can load by default — without any network access or live partner data. This manifest is the fixture-mode bridge slice for icn#1727; the full backend `--demo-mode` flag on icnd remains OPEN. Each read_model points at an already-committed, fictional packet and (where a schema exists) the validator that checks it.",
+  "read_models": [
+    {
+      "name": "member_standing",
+      "surface": "GET /v1/gov/me/standing (StandingResponse)",
+      "path": "web/pilot-ui/fixtures/icn-organizer-demo/standing.json",
+      "validate": "shape_only",
+      "structural_keys": ["did", "domains", "roles", "authority_scopes", "generated_at"],
+      "notes": "No committed substrate schema; field shapes are pinned by the pilot-ui e2e tests (tests/e2e/demo-fixture-preload.spec.js) against icn/apps/governance/src/http/models.rs."
+    },
+    {
+      "name": "member_action_cards",
+      "surface": "GET /v1/gov/me/action-cards (ActionCardsResponse wrapper)",
+      "path": "web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json",
+      "validate": "shape_only",
+      "structural_keys": ["did", "cards", "generated_at"],
+      "notes": "Wrapper { did, cards, generated_at }; each cards[i] matches docs/contracts/institution-package/action-card.schema.json (validated per-card by tests/e2e/standing-action-cards.spec.js, not by this slice)."
+    },
+    {
+      "name": "preview_review_pending_publish_summary",
+      "surface": "Review boundary (wrapper) the shell renders around the pending-publish rows",
+      "urn": "urn:icn:contract:preview-review:v1",
+      "preview_kind": "pending_publish_summary",
+      "path": "web/pilot-ui/fixtures/icn-organizer-demo/preview-review.pending-publish-summary.json",
+      "validate": "schema",
+      "validator": "docs/scripts/validate-preview-review.py",
+      "schema": "docs/contracts/preview-review.schema.json"
+    },
+    {
+      "name": "pending_publish_summary_rows",
+      "surface": "Row-level body the shell lists one item at a time (no-CLI workflow §3 step 6)",
+      "urn": "urn:icn:contract:pending-publish-summary:v1",
+      "composes_with": "preview_review_pending_publish_summary",
+      "composition": "sibling-by-urn — the rows are NOT nested into the preview-review wrapper",
+      "path": "docs/contracts/pending-publish-summary.example.json",
+      "validate": "schema",
+      "validator": "docs/scripts/validate-preview-review.py",
+      "schema": "docs/contracts/pending-publish-summary.schema.json"
+    },
+    {
+      "name": "rehearsal_evidence_export",
+      "surface": "Repo-safe evidence packet a separate documented step would export after review",
+      "urn": "urn:icn:contract:rehearsal-evidence-export:v1",
+      "path": "docs/contracts/rehearsal-evidence-export.example.json",
+      "validate": "schema",
+      "validator": "docs/scripts/validate-rehearsal-evidence.py",
+      "schema": "docs/contracts/rehearsal-evidence-export.schema.json"
+    }
+  ],
+  "url_allowlist_hosts": ["github.com", "raw.githubusercontent.com"],
+  "non_claims": [
+    "Demo fixture bundle only; not a production deployment.",
+    "No network by default; the validator performs no network access and this manifest declares network: disabled.",
+    "No mutation; loading or validating these packets publishes, applies, creates, or exports nothing.",
+    "No live Google Drive / Groups / Sheets / Calendar / mail sync, no federation, no K3s / DNS / Forgejo mutation.",
+    "No private organizer / member / sponsor / attendee data; every identifier is fictional (did:icn:example-*-not-live, demo.* labels).",
+    "Not a formally committed NYCN cooperative pilot authorization.",
+    "Not real holder-label to DID activation; that boundary is icn#1730 and is out of scope here.",
+    "Not a payment, wallet, balance, or currency surface; allocation / settlement vocabulary refers to internal cooperative coordination primitives only.",
+    "Does not implement the icn#1726 organizer shell UI, nor the full backend --demo-mode flag on icnd that icn#1727 ultimately tracks."
+  ]
+}

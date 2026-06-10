@@ -1,7 +1,7 @@
 ---
 Status: descriptive
 Canonical: no
-Last Reviewed: 2026-05-04
+Last Reviewed: 2026-06-09
 ---
 
 # No-CLI organizer and member rehearsal workflow (generic ICN)
@@ -86,7 +86,10 @@ Track as discrete work items (GitHub issues welcome; not all may exist yet):
 
 - **UI prototype** — Single guided shell (organizer mode) with the §3 screen list.
 - **Fixture-backed demo** — Deterministic fixture load with no network by default.
+  - **Bridge slice (landed):** a repo-safe read-model bundle the future shell can load by default lives at [`rehearsal-shell.manifest.json`](../../web/pilot-ui/fixtures/icn-organizer-demo/rehearsal-shell.manifest.json) (extending the existing `?mode=demo` fixture pack with the `preview-review` `preview_kind: pending_publish_summary` wrapper, the `pending-publish-summary` rows, and the `rehearsal-evidence-export` packet, alongside the existing `standing` / `action-cards` fixtures). It is validated **offline** by [`validate-rehearsal-shell-fixtures.py`](../scripts/validate-rehearsal-shell-fixtures.py), which asserts demo-mode / network-disabled, runs each packet through the existing contract validators, and runs a deterministic forbidden live/private-reference guard. The wrapper and rows are composed **by URN, not nested** (per [`pending-publish-summary.md`](../contracts/pending-publish-summary.md)).
+  - **Still open:** this slice is the docs/fixtures bridge only. The backend `--demo-mode` flag on icnd that [ICN#1727](https://github.com/InterCooperative-Network/icn/issues/1727) ultimately tracks remains **OPEN**; [ICN#1726](https://github.com/InterCooperative-Network/icn/issues/1726) (organizer shell that renders these packets) and [ICN#1730](https://github.com/InterCooperative-Network/icn/issues/1730) (private-overlay / DID activation boundary) remain separate follow-ups.
 - **Generic preview/review API contract** — Stable read models for “pending publish” summaries (package-agnostic shapes). Substrate contract: [`preview-review.schema.json`](../contracts/preview-review.schema.json) with companion notes at [`preview-review.md`](../contracts/preview-review.md). `$id` is the non-DNS URN `urn:icn:contract:preview-review:v1` ([ICN#1728](https://github.com/InterCooperative-Network/icn/issues/1728)).
+  - **Row-level pending-publish body** — The individual rows rendered inside a `preview_kind: pending_publish_summary` review boundary (action items, decisions, attendance, obligations, allocations, settlements). Composed substrate contract: [`pending-publish-summary.schema.json`](../contracts/pending-publish-summary.schema.json) with companion notes at [`pending-publish-summary.md`](../contracts/pending-publish-summary.md). `$id` is the non-DNS URN `urn:icn:contract:pending-publish-summary:v1` ([ICN#1728](https://github.com/InterCooperative-Network/icn/issues/1728)). Composes with — does not replace — `preview-review`.
 - **Evidence export contract** — Machine-readable **repo-safe** evidence summary schema shared with partners. Substrate contract: [`rehearsal-evidence-export.schema.json`](../contracts/rehearsal-evidence-export.schema.json) with companion notes at [`rehearsal-evidence-export.md`](../contracts/rehearsal-evidence-export.md). `$id` is the non-DNS URN `urn:icn:contract:rehearsal-evidence-export:v1` ([ICN#1729](https://github.com/InterCooperative-Network/icn/issues/1729)).
 - **Private-overlay / DID binding activation flow** — Generic substrate boundary documented at [`../spec/private-overlay-did-activation-flow.md`](../spec/private-overlay-did-activation-flow.md): public/private split, activation lifecycle, consent/authority rules, revocation/rotation/correction, threat-model notes, and evidence-receipt boundary ([ICN#1730](https://github.com/InterCooperative-Network/icn/issues/1730)). Partner-specific overlay policy lives in partner repositories (NYCN#57 is the downstream follow-up; not authored in ICN core).
 - **Accessibility review** — WCAG-oriented pass on any new shell before calling it organizer-ready.
@@ -95,6 +98,7 @@ Track as discrete work items (GitHub issues welcome; not all may exist yet):
 ## 8. See also
 
 - [runtime-surface-map.md](../reference/project-index/runtime-surface-map.md) — ICN runtime surfaces for organizers
+- [rehearsal-shell.manifest.json](../../web/pilot-ui/fixtures/icn-organizer-demo/rehearsal-shell.manifest.json) — fixture-backed demo-mode read-model bundle (no-network), validated by [validate-rehearsal-shell-fixtures.py](../scripts/validate-rehearsal-shell-fixtures.py)
 - [Institution package ActionCard notes](../contracts/institution-package/README.md)
 - [STATE.md](../STATE.md), [PHASE_PROGRESS.md](../PHASE_PROGRESS.md)
 - Partner-specific organizer materials and pilot rehearsal gate live in the partner NYCN repo.

@@ -112,3 +112,6 @@ icn-wt/
 
 # Session scratch artifacts
 .tmp/
+
+# Local rehearsal run artifacts (transcripts, verify.json, evidence packets)
+demo/output/
