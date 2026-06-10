@@ -1,11 +1,14 @@
 # Appliance Smoke (real local one-VM)
 
-> **Status: real local boot smoke.** `smoke-local.sh --real` boots the
-> appliance QCOW2 under QEMU user-mode networking, waits for SSH,
-> verifies firstboot ran, confirms `icnd` is active, and confirms
-> `/v1/health` returns 200 on port 8080 — all inside the disposable VM.
-> A PASS here means the local dev image works. It does NOT mean the
-> appliance is production, signed, or fit for partner federation.
+> **Status: real local boot smoke, positive + one negative scenario.**
+> `smoke-local.sh --real` boots the appliance QCOW2 under QEMU user-mode
+> networking, waits for SSH, verifies firstboot ran, confirms `icnd` is
+> active, and confirms `/v1/health` returns 200 on port 8080 — all
+> inside the disposable VM. `negative-firstboot-smoke.sh --real` proves
+> the opposite direction of the same gate: with required firstboot
+> material missing, `icnd` must NOT start and health must NOT answer.
+> A PASS on either means the local dev image behaves; it does NOT mean
+> the appliance is production, signed, or fit for partner federation.
 
 ## Future acceptance path
 
@@ -69,6 +72,61 @@ export ICN_APPLIANCE_CLOUD_INIT_SEED=/path/to/seed.iso
 # export ICN_APPLIANCE_SSH_PORT=22222
 bash deploy/appliance/smoke/smoke-local.sh --real
 ```
+
+## Negative fail-closed smoke
+
+`negative-firstboot-smoke.sh` completes the proof matrix the positive
+smoke leaves at positive-only. It exercises the appliance-only drop-in
+[`../systemd/icnd.service.d/10-firstboot-gate.conf`](../systemd/icnd.service.d/10-firstboot-gate.conf):
+
+- `Requires=icn-appliance-firstboot.service` — firstboot failure must
+  propagate and cancel icnd's start job.
+- `ConditionPathExists=/var/lib/icn/.firstboot-complete` — without the
+  marker, icnd must be skipped even if started manually.
+
+**Scenario (exactly one): `missing-firstboot-exec`.** The script
+creates a disposable qcow2 overlay of the image, deletes
+`/usr/local/sbin/icn-appliance-firstboot` (the firstboot unit's
+`ExecStart=`) from the overlay with `virt-customize`, boots the
+tampered overlay, and asserts fail-closed:
+
+1. `icn-appliance-firstboot.service` reaches `failed`.
+2. The marker `/var/lib/icn/.firstboot-complete` does not exist.
+3. `icnd` is never `active` during the observation window
+   (default 60s) — any `active` exits non-zero as **FAIL-OPEN**.
+4. `/v1/health` never answers during the window — any success exits
+   non-zero as **FAIL-OPEN**.
+
+The source image is never modified; the tamper exists only on the
+disposable overlay. Evidence (unit statuses, journals, hashes,
+verdict summary) is preserved in the `--out` directory.
+
+Dry-run (no tools required):
+
+```bash
+bash deploy/appliance/smoke/negative-firstboot-smoke.sh --dry-run
+```
+
+Real:
+
+```bash
+export ICN_APPLIANCE_IMAGE=/path/to/built/qcow2
+export ICN_APPLIANCE_SSH_KEY=/path/to/smoke-private-key
+export ICN_APPLIANCE_CLOUD_INIT_SEED=/path/to/seed.iso
+bash deploy/appliance/smoke/negative-firstboot-smoke.sh --real \
+  --out /path/to/evidence-dir
+# If /dev/kvm is not accessible, add --force to accept a slow TCG run.
+```
+
+Additional requirement over the positive smoke: `virt-customize`
+(libguestfs-tools). libguestfs needs a readable `/boot/vmlinuz-*` on
+the host; if it errors out as a non-root user, the operator can
+`chmod 0644` the running kernel image (the same host-state change the
+2026-05-21 positive smoke session recorded).
+
+**What a PASS does NOT mean:** one verified negative scenario does not
+certify every appliance failure mode, and does not make the appliance
+production-ready, signed, immutable, or partner-distributable.
 
 ### Known smoke gotchas
 
