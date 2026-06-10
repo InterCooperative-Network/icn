@@ -19,9 +19,13 @@ These instructions apply to documentation files in the `docs/` directory.
 docs/
 ├── ARCHITECTURE.md       # System design and component interactions
 ├── GETTING_STARTED.md    # New developer onboarding
-├── FAQ.md               # Common questions
+├── STATE.md             # Current project state (canonical)
+├── PHASE_PROGRESS.md    # Phase tracking (canonical)
 ├── PHASE_HISTORY.md     # Completed development phases
-├── dev-journal/         # Development session notes
+├── development/         # Development resources (sessions/ = session notes by month)
+├── dev/                 # Developer handoffs and working notes
+├── strategy/            # Roadmaps and strategy (ICN-Roadmap-Live.md)
+├── guides/              # User and developer guides (FAQ.md)
 ├── demo/                # Demo and testing documentation
 ├── security/            # Security audits and threat models
 └── [domain]/            # Domain-specific documentation

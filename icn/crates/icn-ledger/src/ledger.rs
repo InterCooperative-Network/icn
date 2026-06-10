@@ -245,6 +245,17 @@ pub(crate) const ARCHIVE_PREFIX: &str = "ledger:archive:";
 /// Format: ledger:witnesses:{entry_hash_hex}
 pub(crate) const WITNESS_PREFIX: &str = "ledger:witnesses:";
 
+/// Key prefix for the decision-hash secondary index.
+/// Format: `ledger:decision_idx:{decision_hash}` -> JSON `Vec<entry_hash_hex>`.
+/// Makes governance-authorized entries discoverable by `decision_hash` in
+/// O(matches) instead of an O(ledger) journal scan.
+pub(crate) const DECISION_INDEX_PREFIX: &str = "ledger:decision_idx:";
+
+/// Marker key recording that the decision-hash index has been built for this
+/// store. Gates the one-time migration backfill so a ledger that simply holds
+/// no governance entries is not rescanned on every startup.
+pub(crate) const DECISION_INDEX_BUILT_KEY: &str = "ledger:decision_idx_built";
+
 /// Record of an archived entry (from rollback operations)
 ///
 /// This struct is public because it's part of the `Ledger` API - callers may need
@@ -407,6 +418,10 @@ impl Ledger {
 
         // Index existing entries for fork detection
         ledger.rebuild_fork_index()?;
+
+        // Build the decision-hash secondary index (migrates pre-index ledgers;
+        // marker-gated so this runs at most once per store).
+        ledger.ensure_decision_index()?;
 
         Ok(ledger)
     }
@@ -1451,7 +1466,22 @@ impl Ledger {
             }
         }
 
-        // Serialize and store
+        // Secondary decision-hash index: make governance-authorized entries
+        // discoverable by `decision_hash` without scanning the journal.
+        //
+        // Written *before* the journal record on purpose. The decision lookup is
+        // now index-backed, so the safety invariant is "a journaled governance
+        // entry always has an index hint". Writing the hint first preserves that
+        // invariant across a crash in this write window: the only reachable
+        // inconsistency is a hint with no journal entry, which is harmless — the
+        // lookup re-reads the journal and skips it. (Writing it after the journal
+        // would instead allow a journaled-but-unindexed entry that the lookup
+        // could never find.) Non-governance entries are not indexed.
+        if let crate::types::ProvenanceRef::Governance { decision_hash, .. } = &entry.provenance {
+            self.index_entry_by_decision(decision_hash, &hash)?;
+        }
+
+        // Serialize and store the journal entry.
         let key = format!("{}{}", JOURNAL_PREFIX, hash.to_hex());
         let value = serde_json::to_vec(&entry)?;
         self.store.put(key.as_bytes(), &value)?;
@@ -2202,6 +2232,57 @@ impl Ledger {
     /// index was introduced. Only runs if the index is empty but entries exist.
     fn ensure_timestamp_index(&self) -> Result<()> {
         crate::ledger_impl::fork_ops::ensure_timestamp_index(self)
+    }
+
+    /// Build the decision-hash index for ledgers created before it existed
+    /// (one-time, marker-gated migration). See
+    /// [`crate::ledger_impl::fork_ops::ensure_decision_index`].
+    fn ensure_decision_index(&self) -> Result<()> {
+        crate::ledger_impl::fork_ops::ensure_decision_index(self)
+    }
+
+    /// Add an entry hash to the decision-hash secondary index (idempotent).
+    ///
+    /// Called from the entry-write path for governance-authorized entries so the
+    /// index stays consistent with the journal it mirrors. Re-indexing an
+    /// already-present hash is a no-op (idempotent re-append safe).
+    fn index_entry_by_decision(&self, decision_hash: &str, hash: &ContentHash) -> Result<()> {
+        // One key per (decision, entry): `ledger:decision_idx:{dh}:{hash}` with an
+        // empty value (the locator lives entirely in the key). This makes each
+        // append O(1) — no read-modify-write of a growing blob — so a decision
+        // authorizing many entries stays linear, and the put is idempotent.
+        let key = format!(
+            "{}{}:{}",
+            DECISION_INDEX_PREFIX,
+            decision_hash,
+            hash.to_hex()
+        );
+        self.store.put(key.as_bytes(), &[])?;
+        Ok(())
+    }
+
+    /// Get governance-authorized entries for a `decision_hash` via the secondary
+    /// index, paged in deterministic `(timestamp, hash)` order.
+    ///
+    /// Returns `(page, total)` where `total` is the count of *live* matching
+    /// entries — index rows that resolve to a present journal entry whose
+    /// provenance still carries this `decision_hash`. Rows pointing at entries
+    /// removed by archival/quarantine, or otherwise stale, are skipped: the
+    /// lookup re-verifies each entry against the journal, so it can never
+    /// surface a removed or mismatched entry. See
+    /// [`crate::ledger_impl::queries::get_entries_by_decision_hash`].
+    pub fn get_entries_by_decision_hash(
+        &self,
+        decision_hash: &str,
+        offset: usize,
+        limit: usize,
+    ) -> Result<(Vec<JournalEntry>, usize)> {
+        crate::ledger_impl::queries::get_entries_by_decision_hash(
+            self,
+            decision_hash,
+            offset,
+            limit,
+        )
     }
 
     /// Detect any forks in the ledger

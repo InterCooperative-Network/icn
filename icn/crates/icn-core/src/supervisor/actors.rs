@@ -57,6 +57,13 @@ pub struct GatewayActorHandles {
     /// execution records instead of re-opening the (exclusively locked) sled
     /// path and falling back to an empty temporary store.
     pub execution_query_store: Option<Arc<dyn icn_store::Store>>,
+    /// Best-effort execution-record retention cleanup, deferred to run *after*
+    /// the gateway's dispatch-evidence backfill (Issue #1987 follow-up). Pruning
+    /// terminal execution records before the backfill could delete a record
+    /// whose `EffectDispatchEvidence` was lost in the crash window before it can
+    /// be healed. Set only when a gateway will actually start; otherwise the
+    /// supervisor runs cleanup inline and leaves this `None`.
+    pub post_backfill_cleanup: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
 /// Core actor handles returned from initialization

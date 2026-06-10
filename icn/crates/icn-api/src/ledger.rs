@@ -93,23 +93,25 @@ impl LedgerService {
 
     /// Get ledger entries authorized by a decision hash.
     ///
-    /// Walks the entire journal in bounded offset pages (chronological order),
-    /// filtering by governance `decision_hash`, until `limit` matching entries
-    /// are collected (plus one extra to determine `has_more`) or the journal is
-    /// exhausted. Paging over the whole ledger — rather than scanning only a
-    /// fixed prefix from offset 0 — keeps the receipt-chain lookup correct for
-    /// ledgers holding more than one page of entries, where a recent decision's
-    /// entries would otherwise sit beyond the scan window and be missed.
+    /// Index-backed: resolves the governance `decision_hash` through the ledger's
+    /// `decision_hash -> entry` secondary index, so the lookup costs O(matches)
+    /// rather than scanning the whole journal (the scale follow-up to #1988,
+    /// which fixed correctness by paging the full journal). The index is
+    /// maintained on the ledger write path and re-verified against the journal on
+    /// read, so removed/archived entries never surface and the result matches the
+    /// old full-scan semantics exactly.
     ///
     /// The DTO surface stays stable while storage/query details remain internal.
+    /// Returns up to `limit` matching entries in deterministic chronological
+    /// order, with `has_more` set when further matches exist.
     pub async fn get_entries_by_decision(
         &self,
         decision_hash: &str,
         limit: usize,
     ) -> Result<DecisionEntriesPage, ApiError> {
-        // A zero-sized page has nothing to return; short-circuit without scanning.
-        // Gateway callers already clamp `limit` to >= 1; this guards the public
-        // method against a degenerate request triggering a full-ledger walk.
+        // A zero-sized page has nothing to return; short-circuit without touching
+        // the index. Gateway callers already clamp `limit` to >= 1; this guards
+        // the public method against a degenerate request.
         if limit == 0 {
             return Ok(DecisionEntriesPage {
                 entries: Vec::new(),
@@ -117,23 +119,17 @@ impl LedgerService {
             });
         }
 
-        // Number of journal entries fetched per page. Memory stays bounded to one
-        // page regardless of total ledger size.
-        const PAGE_SIZE: usize = 1000;
-
         let ledger = self.ledger.read().await;
 
-        let mut offset = 0usize;
-        let mut matched_count = 0usize;
-        let mut page_entries = Vec::new();
+        // `total` counts all live matches; the returned page holds the first
+        // `limit` of them, so `has_more` is exact.
+        let (entries, total) = ledger
+            .get_entries_by_decision_hash(decision_hash, 0, limit)
+            .map_err(|e| ApiError::LedgerError(e.to_string()))?;
 
-        loop {
-            let (entries, total) = ledger
-                .get_entries_paginated_asc(offset, PAGE_SIZE)
-                .map_err(|e| ApiError::LedgerError(e.to_string()))?;
-
-            for entry in entries {
-                // Extract governance provenance fields for filtering and view projection
+        let page_entries = entries
+            .into_iter()
+            .map(|entry| {
                 let (view_receipt_id, view_decision_hash) = match &entry.provenance {
                     ProvenanceRef::Governance {
                         receipt_id,
@@ -142,16 +138,7 @@ impl LedgerService {
                     _ => (None, None),
                 };
 
-                if view_decision_hash.as_deref() != Some(decision_hash) {
-                    continue;
-                }
-
-                matched_count += 1;
-                if page_entries.len() >= limit {
-                    continue;
-                }
-
-                page_entries.push(LedgerEntryView {
+                LedgerEntryView {
                     id: entry.id.map(|h| h.to_hex()).unwrap_or_default(),
                     timestamp: entry.timestamp,
                     author: entry.author.to_string(),
@@ -167,21 +154,13 @@ impl LedgerService {
                         .collect(),
                     decision_receipt_id: view_receipt_id,
                     decision_hash: view_decision_hash,
-                });
-            }
-
-            offset = offset.saturating_add(PAGE_SIZE);
-
-            // Stop once the journal is exhausted, or once enough matches exist to
-            // both fill the page and prove `has_more` (one past `limit`).
-            if offset >= total || matched_count > limit {
-                break;
-            }
-        }
+                }
+            })
+            .collect();
 
         Ok(DecisionEntriesPage {
             entries: page_entries,
-            has_more: matched_count > limit,
+            has_more: total > limit,
         })
     }
 }
@@ -273,5 +252,96 @@ mod tests {
             !page.has_more,
             "exactly one matching entry exists, so there is no further page"
         );
+    }
+
+    /// Helper: append a governance-authorized, self-balancing entry. The unique
+    /// `amount` keeps each entry's content hash distinct.
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
+    async fn append_gov(ledger: &mut Ledger, a: &Did, b: &Did, amount: i64, decision_hash: &str) {
+        let entry = JournalEntryBuilder::new(a.clone())
+            .debit(a.clone(), "hours".to_string(), amount)
+            .credit(b.clone(), "hours".to_string(), amount)
+            .with_governance_provenance(format!("receipt-{amount}"), decision_hash)
+            .build()
+            .unwrap();
+        ledger.append_entry(entry).await.unwrap();
+    }
+
+    /// Test B (DTO level): the page is bounded to `limit` and `has_more` is exact.
+    #[tokio::test]
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
+    async fn decision_lookup_bounds_page_and_reports_has_more() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
+        let mut ledger = Ledger::new(store).unwrap();
+        let a = KeyPair::generate().unwrap().did().clone();
+        let b = KeyPair::generate().unwrap().did().clone();
+        let dh = "dh-page";
+
+        for i in 0..5 {
+            append_gov(&mut ledger, &a, &b, i + 1, dh).await;
+        }
+        let service = LedgerService::new(Arc::new(RwLock::new(ledger)));
+
+        let page = service.get_entries_by_decision(dh, 2).await.unwrap();
+        assert_eq!(page.entries.len(), 2, "page is bounded to limit");
+        assert!(page.has_more, "5 matches exceed limit 2");
+
+        let full = service.get_entries_by_decision(dh, 10).await.unwrap();
+        assert_eq!(full.entries.len(), 5);
+        assert!(!full.has_more, "limit covers all matches");
+        assert!(full
+            .entries
+            .iter()
+            .all(|e| e.decision_hash.as_deref() == Some(dh)));
+    }
+
+    /// Test C: `limit == 0` returns an empty page and never reports more.
+    #[tokio::test]
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
+    async fn decision_lookup_limit_zero_returns_empty_page() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
+        let mut ledger = Ledger::new(store).unwrap();
+        let a = KeyPair::generate().unwrap().did().clone();
+        let b = KeyPair::generate().unwrap().did().clone();
+        append_gov(&mut ledger, &a, &b, 1, "dh-zero").await;
+        let service = LedgerService::new(Arc::new(RwLock::new(ledger)));
+
+        let page = service.get_entries_by_decision("dh-zero", 0).await.unwrap();
+        assert!(page.entries.is_empty());
+        assert!(!page.has_more);
+    }
+
+    /// Test D: non-governance entries and non-matching hashes never appear.
+    #[tokio::test]
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
+    async fn decision_lookup_excludes_non_matching_and_non_governance() {
+        let temp_dir = TempDir::new().unwrap();
+        let store = Arc::new(SledStore::open(temp_dir.path()).unwrap());
+        let mut ledger = Ledger::new(store).unwrap();
+        let a = KeyPair::generate().unwrap().did().clone();
+        let b = KeyPair::generate().unwrap().did().clone();
+
+        // A system (non-governance) entry, plus a governance entry under dh-A.
+        let sys = JournalEntryBuilder::new(a.clone())
+            .debit(a.clone(), "hours".to_string(), 1)
+            .credit(b.clone(), "hours".to_string(), 1)
+            .with_system_provenance("sys")
+            .build()
+            .unwrap();
+        ledger.append_entry(sys).await.unwrap();
+        append_gov(&mut ledger, &a, &b, 2, "dh-A").await;
+        let service = LedgerService::new(Arc::new(RwLock::new(ledger)));
+
+        // A different decision hash matches nothing (the system entry never leaks).
+        let other = service.get_entries_by_decision("dh-B", 10).await.unwrap();
+        assert!(other.entries.is_empty());
+        assert!(!other.has_more);
+
+        // dh-A returns exactly its one governance entry.
+        let a_page = service.get_entries_by_decision("dh-A", 10).await.unwrap();
+        assert_eq!(a_page.entries.len(), 1);
+        assert_eq!(a_page.entries[0].decision_hash.as_deref(), Some("dh-A"));
     }
 }

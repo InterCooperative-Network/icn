@@ -48,6 +48,45 @@ and the response struct definitions for `StandingResponse` /
 `icn/apps/governance/src/http/models.rs`. Schema field names are used
 verbatim — no invented fields.
 
+## Rehearsal-shell read-model bundle (manifest)
+
+[`rehearsal-shell.manifest.json`](rehearsal-shell.manifest.json) is the
+**fixture-mode bridge slice** for the future no-CLI organizer/member
+shell ([icn#1726](https://github.com/InterCooperative-Network/icn/issues/1726)):
+a single deterministic, no-network manifest the shell can load by
+default. It declares `mode: "demo"`, `network: "disabled"`, and points
+at committed read-model packets:
+
+| Read-model | Packet | Contract / schema |
+|---|---|---|
+| Member standing | [`standing.json`](standing.json) | shape-only (no committed schema; shape pinned by the e2e tests) |
+| Per-member action cards | [`action-cards.json`](action-cards.json) | shape-only wrapper; each card matches `action-card.schema.json` |
+| Pending-publish **review boundary** | [`preview-review.pending-publish-summary.json`](preview-review.pending-publish-summary.json) | `urn:icn:contract:preview-review:v1`, `preview_kind: pending_publish_summary` |
+| Pending-publish **rows** | [`pending-publish-summary.example.json`](../../../../docs/contracts/pending-publish-summary.example.json) | `urn:icn:contract:pending-publish-summary:v1` |
+| Rehearsal evidence export | [`rehearsal-evidence-export.example.json`](../../../../docs/contracts/rehearsal-evidence-export.example.json) | `urn:icn:contract:rehearsal-evidence-export:v1` |
+
+The pending-publish **review boundary** and **rows** are composed **by
+URN, not nested** — `preview-review` is `additionalProperties: false`
+and carries no field that can embed the rows (see
+[`pending-publish-summary.md`](../../../../docs/contracts/pending-publish-summary.md)).
+
+Validate the whole bundle **offline** (no network, no gateway), from the
+repo root:
+
+```bash
+python3 docs/scripts/validate-rehearsal-shell-fixtures.py
+```
+
+That harness asserts demo-mode / network-disabled, runs each packet
+through the existing `docs/scripts/validate-*.py` contract validators,
+checks the manifest's `non_claims`, and runs a deterministic forbidden
+live/private-reference guard. **It does not implement the backend
+`--demo-mode` flag on icnd; that remains OPEN at
+[#1727](https://github.com/InterCooperative-Network/icn/issues/1727).**
+Rendering any of these packets in a UI is still subject to the
+[`ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`](../../../../docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md)
+gate (a future #1726 concern; no UI ships in this slice).
+
 ## What this slice does NOT cover
 
 The following pilot-ui surfaces remain unaffected by this fixture

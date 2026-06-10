@@ -8,7 +8,7 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{info, warn};
+use tracing::{debug, info, warn};
 use tracing_actix_web::TracingLogger;
 use utoipa::OpenApi;
 use utoipa_swagger_ui::SwaggerUi;
@@ -151,6 +151,12 @@ pub struct GatewayServer {
     /// re-opening the (exclusively `sled`-locked) execution path — which would
     /// otherwise fall back to an empty temporary store (Gap C).
     execution_query_store: Option<Arc<dyn icn_store::Store>>,
+    /// Best-effort execution-record retention cleanup, supplied by the daemon
+    /// supervisor and invoked once, right AFTER the startup dispatch-evidence
+    /// backfill (Issue #1987 follow-up). Deferring cleanup until after the
+    /// backfill ensures pruning cannot delete a terminal execution record whose
+    /// evidence was lost in the crash window before the backfill heals it.
+    post_backfill_cleanup: Option<Arc<dyn Fn() + Send + Sync>>,
 }
 
 impl GatewayServer {
@@ -188,6 +194,7 @@ impl GatewayServer {
             settlement_engine: None,
             dispatch_evidence_sink_installer: None,
             execution_query_store: None,
+            post_backfill_cleanup: None,
         }
     }
 
@@ -237,6 +244,7 @@ impl GatewayServer {
             settlement_engine: None,
             dispatch_evidence_sink_installer: None,
             execution_query_store: None,
+            post_backfill_cleanup: None,
         }
     }
 
@@ -287,6 +295,7 @@ impl GatewayServer {
             settlement_engine: None,
             dispatch_evidence_sink_installer: None,
             execution_query_store: None,
+            post_backfill_cleanup: None,
         }
     }
 
@@ -550,6 +559,16 @@ impl GatewayServer {
         self
     }
 
+    /// Install a best-effort execution-record retention cleanup to run once,
+    /// right after the startup dispatch-evidence backfill (Issue #1987
+    /// follow-up). The daemon supervisor defers cleanup to here so pruning
+    /// cannot delete a terminal execution record whose evidence the backfill
+    /// still needs to heal.
+    pub fn with_post_backfill_cleanup(mut self, cleanup: Arc<dyn Fn() + Send + Sync>) -> Self {
+        self.post_backfill_cleanup = Some(cleanup);
+        self
+    }
+
     /// Run the gateway server
     pub async fn run(self) -> Result<()> {
         info!("Starting ICN Gateway on {}", self.bind_addr);
@@ -713,6 +732,54 @@ impl GatewayServer {
         if let Some(ref actor_handle) = self.governance_actor_handle {
             actor_handle.recover_incomplete_closes().await;
             info!("Replayed incomplete governance close-journal entries (post-sink recovery)");
+        }
+
+        // Issue #1987: backfill any EffectDispatchEvidence dropped in the async
+        // execution window. Runs AFTER the dispatch-evidence sink backend is
+        // installed (above) and the close-journal replay, using the same
+        // execution-record store the decision executor writes to. The sink's
+        // backfill path is idempotent (read-back dedup), so a clean restart
+        // re-scans and writes nothing, and replay never duplicates evidence.
+        if let (Some(execution_store), Some(sink)) = (
+            self.execution_query_store.as_ref(),
+            self.dispatch_evidence_sink_installer.as_ref(),
+        ) {
+            match crate::dispatch_evidence_backfill::backfill_pending_dispatch_evidence(
+                execution_store,
+                sink,
+            ) {
+                Ok(report) if report.redriven > 0 => {
+                    info!(
+                        scanned = report.scanned,
+                        redriven = report.redriven,
+                        skipped = report.skipped,
+                        unparsable = report.unparsable,
+                        "Backfilled dispatch evidence for recovered execution records (post-sink recovery)"
+                    );
+                }
+                Ok(report) => {
+                    debug!(
+                        scanned = report.scanned,
+                        "Dispatch-evidence backfill: no terminal records required healing"
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        error = %e,
+                        "Dispatch-evidence backfill scan failed (non-fatal; evidence may remain incomplete until next startup)"
+                    );
+                }
+            }
+        }
+
+        // Issue #1987 follow-up: run the deferred execution-record retention
+        // cleanup ONLY now — after the dispatch-evidence backfill above — so
+        // pruning cannot delete a terminal record whose evidence was lost in the
+        // crash window before the backfill had a chance to heal it. The daemon
+        // supervisor hands us this cleanup instead of running it at its own
+        // (pre-gateway) startup precisely for this ordering.
+        if let Some(cleanup) = self.post_backfill_cleanup.as_ref() {
+            cleanup();
         }
 
         // Execution record query store (read-only API surface).

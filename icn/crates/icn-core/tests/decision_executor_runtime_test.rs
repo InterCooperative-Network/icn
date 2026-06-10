@@ -301,6 +301,37 @@ fn content_hash_from_hex(hash_hex: &str) -> Result<ContentHash> {
 // Tests
 // ---------------------------------------------------------------------------
 
+/// Issue #1987: a terminal execution record persists the per-effect results,
+/// so a post-crash dispatch-evidence backfill can re-derive evidence from the
+/// durable `(effects, results)` pair without re-executing the effects.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_execute_persists_results_on_terminal_record() {
+    let tmp = TempDir::new().unwrap();
+    let (executor, exec_store) = make_executor_with_ledger(tmp.path());
+
+    let effects = spend_effect("hash-results-1");
+    let returned = executor
+        .execute(
+            effects,
+            "receipt-results-1",
+            "hash-results-1",
+            "proposal-results-1",
+        )
+        .await
+        .unwrap();
+    assert!(
+        !returned.is_empty(),
+        "spend should produce a per-effect result"
+    );
+
+    let record = exec_store.get("hash-results-1").unwrap().unwrap();
+    assert_eq!(record.status, ExecutionStatus::Confirmed);
+    assert_eq!(
+        record.results, returned,
+        "terminal record must persist the per-effect results for evidence backfill"
+    );
+}
+
 /// Test 1: A finalized decision auto-executes via the callback.
 ///
 /// This simulates what happens in the real runtime: the governance app
