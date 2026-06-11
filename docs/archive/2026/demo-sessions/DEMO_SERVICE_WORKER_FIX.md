@@ -24,7 +24,7 @@ localStorage.clear();
 localStorage.setItem('icn-gateway', 'http://localhost:8080');
 localStorage.setItem('icn-coop', 'rochester-tool-library');
 localStorage.setItem('icn-did', 'did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh');
-localStorage.setItem('icn-token', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkaWQ6aWNuOnpCRm5oSmhndlJqZ3VraFFta3E5ZGRCejV3aUV0MzJwdGtRa0JEald4NnVQaCIsImlhdCI6MTc2NjA5NTA3MiwiZXhwIjoxNzY2MDk4NjcyLCJjb29wX2lkIjoicm9jaGVzdGVyLXRvb2wtbGlicmFyeSIsInNjb3BlcyI6WyJsZWRnZXI6cmVhZCIsImxlZGdlcjp3cml0ZSIsImNvb3A6cmVhZCIsImdvdjpyZWFkIiwiZ292OndyaXRlIl19.DvDXir5YbuSa5hLcg6WsBt6dZBIr9K4Drcc5bZFA6TM');
+localStorage.setItem('icn-token', '<expired-dev-token-redacted>');
 localStorage.setItem('icn-token-expiry', '1766098672000');
 location.reload();
 ```
@@ -54,7 +54,7 @@ location.reload();
 The API is working fine! Test it yourself:
 
 ```bash
-TOKEN="eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkaWQ6aWNuOnpCRm5oSmhndlJqZ3VraFFta3E5ZGRCejV3aUV0MzJwdGtRa0JEald4NnVQaCIsImlhdCI6MTc2NjA5NTA3MiwiZXhwIjoxNzY2MDk4NjcyLCJjb29wX2lkIjoicm9jaGVzdGVyLXRvb2wtbGlicmFyeSIsInNjb3BlcyI6WyJsZWRnZXI6cmVhZCIsImxlZGdlcjp3cml0ZSIsImNvb3A6cmVhZCIsImdvdjpyZWFkIiwiZ292OndyaXRlIl19.DvDXir5YbuSa5hLcg6WsBt6dZBIr9K4Drcc5bZFA6TM"
+TOKEN="<expired-dev-token-redacted>"
 
 curl "http://localhost:8080/v1/coops/rochester-tool-library" \
   -H "Authorization: Bearer $TOKEN" | jq .
@@ -81,7 +81,7 @@ Both work perfectly! ✅
    localStorage.setItem('icn-gateway', 'http://localhost:8080');
    localStorage.setItem('icn-coop', 'rochester-tool-library');
    localStorage.setItem('icn-did', 'did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh');
-   localStorage.setItem('icn-token', 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkaWQ6aWNuOnpCRm5oSmhndlJqZ3VraFFta3E5ZGRCejV3aUV0MzJwdGtRa0JEald4NnVQaCIsImlhdCI6MTc2NjA5NTA3MiwiZXhwIjoxNzY2MDk4NjcyLCJjb29wX2lkIjoicm9jaGVzdGVyLXRvb2wtbGlicmFyeSIsInNjb3BlcyI6WyJsZWRnZXI6cmVhZCIsImxlZGdlcjp3cml0ZSIsImNvb3A6cmVhZCIsImdvdjpyZWFkIiwiZ292OndyaXRlIl19.DvDXir5YbuSa5hLcg6WsBt6dZBIr9K4Drcc5bZFA6TM');
+   localStorage.setItem('icn-token', '<expired-dev-token-redacted>');
    localStorage.setItem('icn-token-expiry', '1766098672000');
    location.reload();
    ```
