@@ -24,7 +24,7 @@ localStorage.clear();
 localStorage.setItem('icn-gateway', 'http://localhost:8080');
 localStorage.setItem('icn-coop', 'rochester-tool-library');
 localStorage.setItem('icn-did', 'did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh');
-localStorage.setItem('icn-token', '<expired-dev-token-redacted>');
+localStorage.setItem('icn-token', 'PASTE-DEV-TOKEN-HERE');
 localStorage.setItem('icn-token-expiry', '1766098672000');
 location.reload();
 ```
@@ -54,7 +54,7 @@ location.reload();
 The API is working fine! Test it yourself:
 
 ```bash
-TOKEN="<expired-dev-token-redacted>"
+TOKEN="PASTE-DEV-TOKEN-HERE"
 
 curl "http://localhost:8080/v1/coops/rochester-tool-library" \
   -H "Authorization: Bearer $TOKEN" | jq .
@@ -81,7 +81,7 @@ Both work perfectly! ✅
    localStorage.setItem('icn-gateway', 'http://localhost:8080');
    localStorage.setItem('icn-coop', 'rochester-tool-library');
    localStorage.setItem('icn-did', 'did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh');
-   localStorage.setItem('icn-token', '<expired-dev-token-redacted>');
+   localStorage.setItem('icn-token', 'PASTE-DEV-TOKEN-HERE');
    localStorage.setItem('icn-token-expiry', '1766098672000');
    location.reload();
    ```

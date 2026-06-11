@@ -57,7 +57,7 @@ If you can see the dashboard:
 
 **Token:**
 ```
-<expired-dev-token-redacted>
+PASTE-DEV-TOKEN-HERE
 ```
 
 **Expires:** 22:57 UTC (58 minutes from now)
@@ -76,7 +76,7 @@ localStorage.clear();
 localStorage.setItem('icn-gateway', 'http://localhost:8080');
 localStorage.setItem('icn-coop', 'rochester-tool-library');
 localStorage.setItem('icn-did', 'did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh');
-localStorage.setItem('icn-token', '<expired-dev-token-redacted>');
+localStorage.setItem('icn-token', 'PASTE-DEV-TOKEN-HERE');
 localStorage.setItem('icn-token-expiry', '1766098672000');
 
 // Reload page

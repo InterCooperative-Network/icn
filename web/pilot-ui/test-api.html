@@ -13,6 +13,10 @@
     
     async function testAPI() {
         const output = document.getElementById('output');
+        if (TOKEN === 'PASTE-DEV-TOKEN-HERE') {
+            output.textContent = 'No dev token set. Paste a real dev token into the TOKEN constant at the top of this file, then retry.\n';
+            return;
+        }
         output.textContent = 'Testing...\n';
         
         try {
