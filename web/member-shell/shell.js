@@ -666,7 +666,13 @@
     });
   }
 
+  // Monotonic load sequence: responses from an abandoned connect attempt
+  // must never render over a newer attempt's view (overlapping submits on
+  // a shared browser could otherwise mix two members' records).
+  var liveLoadSeq = 0;
+
   function loadLive() {
+    var seq = ++liveLoadSeq;
     setSyncChip(SYNC.VERIFYING, "neutral", "Asking the node for your standing…");
     byId("connect-status").textContent = "";
 
@@ -689,6 +695,7 @@
     renderReceipts();
 
     liveFetch("/v1/gov/me/standing").then(function (standing) {
+      if (seq !== liveLoadSeq) { return null; }  // a newer attempt owns the view
       if (prior.did && prior.did === standing.did) {
         state.receipts = prior.receipts;
       }
@@ -697,6 +704,7 @@
       renderStanding(standing);
       return liveFetch("/v1/gov/me/action-cards");
     }).then(function (cardsResponse) {
+      if (cardsResponse === null || seq !== liveLoadSeq) { return; }
       state.cards = cardsResponse;
       var anchor = Math.floor(Date.now() / 1000);
       renderCards(cardsResponse, state.standing, anchor);
@@ -706,6 +714,7 @@
         ". This view is a snapshot; refresh to re-check.");
       byId("connect-status").textContent = "Connected. Your standing and open actions are shown below.";
     }).catch(function (err) {
+      if (seq !== liveLoadSeq) { return; }  // stale failure must not clobber a newer attempt
       // Failure-table disposition (spec §"Failure and safety table"):
       // plain language first, no error code as primary surface, help path
       // always visible.
