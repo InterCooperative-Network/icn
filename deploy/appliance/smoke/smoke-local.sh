@@ -467,10 +467,10 @@ if [ "$DEMO" = 1 ]; then
     N_BEFORE="$(jq --arg id "$DEMO_ITEM" '[.cards[]? | select(.source_id==$id)] | length' <<<"$CARDS")"
     [ "$N_BEFORE" = "1" ] || { err "[demo] expected 1 open card for $DEMO_ITEM, found $N_BEFORE"; exit 13; }
 
-    log "[demo] 3/4 discharge (PUT status completed)..."
+    log "[demo] 3/4 discharge (PUT .../status {\"status\":\"completed\"} — the member-shell's documented call)..."
     curl -sf -m 10 -X PUT -H "$AUTH" -H 'Content-Type: application/json' \
         -d '{"status":"completed"}' \
-        "$GWH/v1/gov/domains/$DEMO_DOMAIN/action-items/$DEMO_ITEM" >/dev/null \
+        "$GWH/v1/gov/domains/$DEMO_DOMAIN/action-items/$DEMO_ITEM/status" >/dev/null \
         || { err "[demo] completion PUT failed"; exit 13; }
 
     log "[demo] 4/4 receipt (GET completion-receipt + binding check)..."

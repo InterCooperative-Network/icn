@@ -9,11 +9,13 @@
 #
 #   sudo icn-demo-verify <item-id> [domain]
 #       Re-fetches the completion receipt for that action item from THIS
-#       VM's gateway and checks the binding shape: a 32-byte BLAKE3
-#       record_hash over {item_id, domain_id, actor_did, transition,
-#       completed_at} (canonical hasher in icn-governance proof.rs).
-#       Proves: THIS actor discharged THIS obligation at THIS time on this
-#       node. Does not prove production, federation, or pilot adoption.
+#       VM's gateway and runs a CONSISTENCY CHECK: record_hash has the
+#       32-byte shape and the receipt fields (item_id, domain_id,
+#       transition, completed_at) match what was asked for. It does NOT
+#       re-derive the BLAKE3 record_hash — the canonical hasher lives in
+#       icn-governance proof.rs, and cryptographic verification of the
+#       chain is what `--chain` (icnctl audit verify) does.
+#       Does not prove production, federation, or pilot adoption.
 #
 #   sudo icn-demo-verify --chain
 #       Runs the bundled 13/13 governed receipt-chain rehearsal
@@ -98,7 +100,8 @@ then
   fatal "receipt failed the binding check (32-byte record_hash over item/domain/actor/transition/time)"
 fi
 
-log "PASS — receipt is well-formed and bound to this item/domain/transition."
-log "Proves: this actor discharged this obligation at this time, on this VM's node."
+log "PASS — receipt re-fetched; consistency check OK (32-byte record_hash shape +"
+log "field binding to this item/domain/transition). NOT a BLAKE3 re-derivation —"
+log "cryptographic verification is the --chain path (icnctl audit verify)."
 log "Does NOT prove: production deployment, federation, or pilot adoption."
 log "Deeper proof: sudo icn-demo-verify --chain   (13/13 governed receipt chain)"

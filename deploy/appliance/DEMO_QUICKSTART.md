@@ -11,9 +11,11 @@ One VM. One browser. The core ICN loop, honestly labeled:
 - Member standing, pending action cards, action discharge, and a
   cryptographic completion receipt — rendered in the member-shell
   reference client, served by the same VM.
-- Evidence you can re-verify: the receipt's 32-byte BLAKE3 `record_hash`
-  binding, and (optional, deeper) a 13/13 governed receipt-chain proof run
-  entirely inside the VM.
+- Evidence you can re-check: `icn-demo-verify <item-id>` re-fetches the
+  receipt and consistency-checks it (32-byte `record_hash` shape + field
+  binding — it does not re-derive the BLAKE3 hash), and (deeper,
+  cryptographic) `icn-demo-verify --chain` runs a 13/13 governed
+  receipt-chain proof entirely inside the VM via `icnctl audit verify`.
 
 ## What this does NOT demonstrate
 
@@ -107,17 +109,20 @@ session JWT (local VM only).
    domain, actor DID, transition, timestamp, and the 32-byte BLAKE3
    `record_hash` that binds them.
 5. **Verify evidence/audit** — in the VM:
-   `sudo icn-demo-verify <item-id>` re-fetches and checks the receipt
-   binding; `sudo icn-demo-verify --chain` runs the full 13/13 governed
-   receipt-chain rehearsal on a fresh ephemeral node and emits a
-   schema-validated evidence packet to `/var/lib/icn-demo/`.
+   `sudo icn-demo-verify <item-id>` re-fetches the receipt and
+   consistency-checks it (shape + field binding; not a BLAKE3
+   re-derivation); `sudo icn-demo-verify --chain` runs the full 13/13
+   governed receipt-chain rehearsal (`icnctl audit verify`) on a fresh
+   ephemeral node and emits a schema-validated evidence packet to
+   `/var/lib/icn-demo/`.
 
 ## Reset
 
 - Cheapest: power off and delete `overlay.qcow2`, recreate, reboot —
   whole-disk reset, nothing persists.
-- In-place: `ssh -p 2222 debian@127.0.0.1 sudo icn-demo-reset` (destroys
-  node state, re-runs firstboot, then `sudo icn-demo-seed` again).
+- In-place: `ssh -p 2222 debian@127.0.0.1 sudo icn-demo-reset` destroys
+  node state and re-runs firstboot. It does **not** reseed — run
+  `sudo icn-demo-seed` again afterwards for a fresh loop.
 
 ## Troubleshooting
 

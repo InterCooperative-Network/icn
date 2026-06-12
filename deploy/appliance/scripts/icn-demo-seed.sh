@@ -151,7 +151,9 @@ cat <<EOF
                 fictional institution data on a disposable dev VM.
 
  Demo loop: open the shell → standing → action card → complete → receipt.
- Evidence:  sudo icn-demo-verify   (receipt re-fetch + 13/13 chain proof)
- Reset:     sudo icn-demo-reset
+ Evidence:  sudo icn-demo-verify $ITEM_ID   (receipt re-fetch + consistency check,
+            after you complete the action)
+            sudo icn-demo-verify --chain    (full 13/13 governed chain proof)
+ Reset:     sudo icn-demo-reset             (then re-run icn-demo-seed)
 ==========================================================================
 EOF
