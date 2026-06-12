@@ -84,13 +84,15 @@ becomes a tracked obligation, shows up as an action card, gets
 discharged, and produces a hash-bound completion receipt.
 
 ```bash
-cd icn
+# from the repository root (the directory you cloned, e.g. `cd icn`)
+cargo build --release -p icnd -p icnctl --manifest-path icn/Cargo.toml   # skip if Path 1 already built these
 export ICN_PASSPHRASE=demo-anything   # protects a local throwaway keystore
 bash demo/nycn-dogfood/run.sh --fresh --record
 ```
 
-Same build requirement as Path 1 (shared workspace — build once, run
-both). `--record` renders an HTML transcript under
+The build line is a no-op if Path 1 already compiled the workspace —
+the script itself only checks for the binaries, it does not build them.
+`--record` renders an HTML transcript under
 `demo/nycn-dogfood/runs/<timestamp>/` you can replay for an audience.
 
 Two honest footnotes:
