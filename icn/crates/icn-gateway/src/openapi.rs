@@ -47,7 +47,11 @@ use crate::notification_store::{InAppNotification, Platform};
 
 // Member-shell surface (handlers live in the governance app crate, mounted
 // by this gateway under /v1/gov — see configure_governance in server.rs).
-use icn_governance::{ActionItemCompletionReceipt, ActionItemTransition};
+// Receipt types come via the app crate's re-export, not icn_governance
+// directly: the meaning-firewall ratchets pin this crate's direct
+// icn_governance references (see icn-core/src/meaning_firewall.rs).
+use icn_governance_actor::{ActionItemCompletionReceipt, ActionItemTransition};
+
 use icn_governance_actor::http::models::{
     ActionCard, ActionCardActionKind, ActionCardRiskLevel, ActionCardScope, ActionCardSourceKind,
     ActionCardsResponse, StandingDomainMembership, StandingResponse, StandingRoleAssignment,
@@ -56,6 +60,10 @@ use icn_governance_actor::http::models::{
 /// OpenAPI documentation for ICN Gateway
 #[derive(OpenApi)]
 #[openapi(
+    servers((
+        url = "/v1",
+        description = "Gateway API base path (all routes are mounted under /v1)"
+    )),
     paths(
         crate::api::federation::propose_clearing_adoption,
         // Member-shell surface (docs/dev/openapi-member-surface-gaps.md):
@@ -233,6 +241,15 @@ mod tests {
         assert!(
             security_schemes.contains_key("bearer_auth"),
             "bearer_auth security scheme must be registered"
+        );
+
+        // Paths are documented relative to the /v1 mount (Actix scope in
+        // server.rs); the server base keeps generated clients on the right
+        // URLs.
+        let servers = doc.servers.as_ref().expect("servers present");
+        assert!(
+            servers.iter().any(|s| s.url == "/v1"),
+            "server base url /v1 must be declared"
         );
     }
 }
