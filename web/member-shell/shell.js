@@ -326,8 +326,12 @@
     // states it can honestly know: reserved → inert; missing authority →
     // Closed — insufficient authority; otherwise Open. Mutation flow moves
     // a card to Sent/Confirmed below.
-    var actionable = auth.authorized || assignedCompletion;
+    // A card whose deadline is already behind the anchor is closed no matter
+    // what authority says (spec: "Closed — deadline passed").
+    var expired = typeof card.deadline === "number" && card.deadline < anchorSec;
+    var actionable = !expired && (auth.authorized || assignedCompletion);
     var status = reserved ? SOURCE_KIND_LABEL[card.source_kind]
+      : expired ? LIFECYCLE.CLOSED_DEADLINE
       : actionable ? LIFECYCLE.OPEN
       : LIFECYCLE.CLOSED_AUTHORITY;
     var chipTone = reserved ? "neutral" : actionable ? "ok" : "warn";
@@ -395,7 +399,7 @@
     // The one mutating action this v0 client implements (live mode only):
     // mark an assigned task complete, then fetch and render its completion
     // receipt. Everything else is read-only.
-    if (MODE === "live" && !reserved && assignedCompletion) {
+    if (MODE === "live" && !reserved && assignedCompletion && !expired) {
       li.appendChild(buildCompleteFlow(card, statusChip));
     }
     return li;
@@ -654,6 +658,12 @@
     byId("connect-status").textContent = "";
 
     liveFetch("/v1/gov/me/standing").then(function (standing) {
+      // Reconnecting as a different member must not carry the previous
+      // member's receipts into the new view (action history is theirs,
+      // not the shared browser's).
+      if (state.standing && state.standing.did !== standing.did) {
+        state.receipts = [];
+      }
       state.standing = standing;
       renderIdentity(standing);
       renderStanding(standing);
