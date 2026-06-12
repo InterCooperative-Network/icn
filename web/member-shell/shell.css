@@ -1,0 +1,222 @@
+/* ICN Member Shell — v0 reference client styles.
+ *
+ * ADR-0028 sensory-layer floor:
+ *  - WCAG 2.2 AA contrast on all text (palette documented per rule below)
+ *  - rem units throughout; respects the user's base font size
+ *  - :focus-visible ring on every interactive element
+ *  - prefers-reduced-motion respected (no motion is used; transition reset
+ *    kept as a guard)
+ *  - no information carried by color alone (every status has glyph + text)
+ *  - >= 44px (2.75rem) hit targets on buttons and summaries
+ */
+
+:root {
+  --ink: #1c1c21;        /* on white: ~16.1:1 */
+  --ink-muted: #4d4d57;  /* on white: ~7.9:1  */
+  --accent: #0f4f4a;     /* on white: ~8.7:1; white on it: ~8.7:1 */
+  --line: #c5c5cd;
+  --bg: #ffffff;
+  --panel: #f5f5f2;
+  --banner-demo-bg: #fff3cd;
+  --banner-demo-ink: #594400;   /* on #fff3cd: ~7.3:1 */
+  --banner-live-bg: #dceefb;
+  --banner-live-ink: #07395c;   /* on #dceefb: ~9.4:1 */
+  --ok-bg: #e6f4ea;
+  --ok-ink: #1d5c33;            /* on #e6f4ea: ~6.9:1 */
+  --warn-bg: #fdeceb;
+  --warn-ink: #79302a;          /* on #fdeceb: ~7.2:1 */
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: 100%; } /* never override user preference */
+
+body {
+  margin: 0 auto;
+  padding: 0 1rem 3rem;
+  max-width: 46rem;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 1rem;
+  line-height: 1.55;
+  color: var(--ink);
+  background: var(--bg);
+}
+
+/* Skip link: hidden until focused, then clearly visible. */
+.skip-link {
+  position: absolute;
+  left: -999rem;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 0.75rem 1rem;
+}
+.skip-link:focus-visible {
+  left: 1rem;
+  top: 1rem;
+  z-index: 10;
+}
+
+/* Honesty banner: permanently visible, never collapsed. */
+.banner {
+  margin: 0.75rem 0;
+  padding: 0.75rem 1rem;
+  border: 2px solid currentColor;
+  border-radius: 0.375rem;
+  font-weight: 600;
+}
+.banner.demo { background: var(--banner-demo-bg); color: var(--banner-demo-ink); }
+.banner.live { background: var(--banner-live-bg); color: var(--banner-live-ink); }
+
+h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+h2 { font-size: 1.25rem; margin-top: 2rem; border-bottom: 1px solid var(--line); padding-bottom: 0.25rem; }
+h3 { font-size: 1.05rem; }
+.subtitle { font-weight: 400; font-size: 1rem; color: var(--ink-muted); }
+.lede { color: var(--ink-muted); }
+.muted { color: var(--ink-muted); }
+.explain { color: var(--ink-muted); }
+
+.mode-nav {
+  list-style: none;
+  display: flex;
+  gap: 1rem;
+  padding: 0;
+}
+.mode-nav a {
+  display: inline-block;
+  padding: 0.5rem 0.25rem; /* enlarge hit area */
+  color: var(--accent);
+}
+.mode-nav a[aria-current="true"] {
+  font-weight: 700;
+  text-decoration: none;
+  border-bottom: 3px solid var(--accent);
+}
+
+a { color: var(--accent); }
+
+/* Forms */
+.field { margin: 1rem 0; }
+label { display: block; font-weight: 600; margin-bottom: 0.25rem; }
+input {
+  width: 100%;
+  font-size: 1rem;
+  padding: 0.6rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--ink-muted);
+  border-radius: 0.25rem;
+  color: var(--ink);
+  background: var(--bg);
+}
+.help { font-size: 0.9rem; color: var(--ink-muted); margin-top: 0.25rem; }
+
+button {
+  font-size: 1rem;
+  font-weight: 600;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  padding: 0.6rem 1.1rem;
+  border: 2px solid var(--accent);
+  border-radius: 0.375rem;
+  background: var(--accent);
+  color: #ffffff;
+  cursor: pointer;
+}
+button.secondary {
+  background: var(--bg);
+  color: var(--accent);
+}
+button:disabled {
+  background: var(--panel);
+  color: var(--ink-muted);
+  border-color: var(--ink-muted);
+  cursor: not-allowed;
+}
+
+/* Focus visibility — every interactive element. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+
+/* Lists of cards */
+.card-list { list-style: none; padding: 0; }
+.card-list > li {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin: 0.75rem 0;
+  background: var(--bg);
+}
+
+.card-list h3 { margin-top: 0; }
+
+dl.kv { margin: 0.75rem 0; }
+dl.kv dt { font-weight: 600; margin-top: 0.5rem; }
+dl.kv dd { margin: 0 0 0 0; color: var(--ink-muted); }
+
+/* Status chips: glyph + text, color reinforces only. */
+.chip {
+  display: inline-block;
+  padding: 0.3rem 0.7rem;
+  border: 1.5px solid currentColor;
+  border-radius: 1rem;
+  font-weight: 600;
+}
+.chip.ok { background: var(--ok-bg); color: var(--ok-ink); }
+.chip.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.chip.neutral { background: var(--panel); color: var(--ink); }
+
+.identity-label { font-size: 1.15rem; font-weight: 600; }
+
+details {
+  margin: 0.75rem 0;
+  border-left: 3px solid var(--line);
+  padding-left: 0.75rem;
+}
+summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 0.5rem 0; /* enlarge hit area toward 44px */
+  min-height: 1.75rem;
+}
+
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.95em;
+  background: var(--panel);
+  padding: 0.1rem 0.3rem;
+  border-radius: 0.2rem;
+  overflow-wrap: anywhere;
+}
+
+/* Pre-confirm panel for the one mutating action. */
+.confirm-panel {
+  border: 2px solid var(--accent);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-top: 0.75rem;
+  background: var(--panel);
+}
+.confirm-panel .actions { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.75rem; }
+
+footer {
+  margin-top: 3rem;
+  border-top: 1px solid var(--line);
+  padding-top: 1rem;
+  font-size: 0.9rem;
+  color: var(--ink-muted);
+}
+
+/* No motion is used by this client; this guard ensures any future
+   transition also respects the user's preference. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

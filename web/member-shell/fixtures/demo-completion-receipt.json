@@ -1,0 +1,13 @@
+{
+  "item_id": "demo-action-item-000",
+  "domain_id": "demo.coop.organizing",
+  "actor_did": "did:icn:example-organizer-demo-not-live",
+  "transition": "completed",
+  "completed_at": 1729900000,
+  "record_hash": [
+    17, 42, 8, 213, 96, 7, 154, 33,
+    201, 5, 88, 119, 64, 240, 11, 73,
+    156, 29, 222, 47, 101, 134, 90, 3,
+    68, 175, 52, 199, 26, 145, 83, 60
+  ]
+}
