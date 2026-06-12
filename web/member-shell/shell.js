@@ -484,6 +484,10 @@
     });
 
     confirmBtn.addEventListener("click", function () {
+      // Bind this flow to the connect attempt it started under. If a newer
+      // attempt (possibly another member) takes the view while the PUT or
+      // receipt GET is in flight, the callbacks must not render into it.
+      var flowSeq = liveLoadSeq;
       confirmBtn.disabled = true;
       cancelBtn.disabled = true;
       statusLine.textContent = LIFECYCLE.SENT;
@@ -495,6 +499,7 @@
         method: "PUT",
         body: JSON.stringify({ status: "completed" })
       }).then(function () {
+        if (flowSeq !== liveLoadSeq) { return null; }  // view changed hands; do not fetch under the new credential
         statusLine.textContent = LIFECYCLE.SENT + " — completion accepted, fetching the receipt.";
         // Past this point the completion is COMMITTED on the node. A failure
         // to read the receipt back must never be reported as "nothing was
@@ -503,6 +508,7 @@
                          "/action-items/" + encodeURIComponent(card.source_id) +
                          "/completion-receipt", { method: "GET" })
           .then(function (receipt) {
+            if (flowSeq !== liveLoadSeq) { return; }  // never render one member's receipt in another's view
             statusChip.textContent = "✓ " + LIFECYCLE.CONFIRMED;
             statusChip.className = "chip ok";
             statusLine.textContent = LIFECYCLE.CONFIRMED + ". " + SYNC.RECEIPT +
@@ -513,6 +519,7 @@
               new Date().toLocaleString() + ".");
           })
           .catch(function (err) {
+            if (flowSeq !== liveLoadSeq) { return; }
             // Receipt read failed AFTER the completion was accepted: keep the
             // committed state, do not re-enable Confirm, say exactly what is
             // and is not known.
@@ -527,6 +534,7 @@
       }).catch(function (err) {
         // The completion itself was refused — the gateway's answer, rendered
         // plainly, never a silent failure. Nothing was recorded.
+        if (flowSeq !== liveLoadSeq) { return; }
         statusLine.textContent = "Rejected with reason: " + err.message +
           " Nothing was recorded. You can try again or contact your steward.";
         statusChip.textContent = "⚠ " + LIFECYCLE.OPEN;
@@ -690,7 +698,9 @@
     state.cards = null;
     state.receipts = [];
     hide("identity-section");
+    hide("standing-section");
     clear(byId("domains-list"));
+    clear(byId("roles-list"));
     clear(byId("cards-list"));
     renderReceipts();
 
