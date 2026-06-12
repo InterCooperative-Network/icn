@@ -206,6 +206,27 @@ def authenticate(identity: Identity, scopes: list):
     ok(f"Authenticated {identity.name}  {C.DIM}({identity.did[:32]}...){C.RESET}")
 
 
+def bootstrap_standing(identity: Identity):
+    """DEV-ONLY: establish active Member standing in the demo jurisdiction.
+
+    The gateway enforces Commons standing on proposal submission and voting.
+    Real deployments confer standing through governed membership flows; this
+    local demo uses the dev-gated bootstrap bridge, which only exists when the
+    node runs with ICN_ENABLE_ADMIN_ENDPOINTS=true and a non-production
+    governance posture (the devnet compose sets both). Never available in
+    production configuration.
+    """
+    status, resp = api("POST", "/commons/dev/bootstrap-standing", {
+        "jurisdiction_id": DOMAIN_ID,
+    }, identity.token)
+    if status != 200:
+        fail(f"bootstrap-standing failed for {identity.name} — the node must "
+             f"run with ICN_ENABLE_ADMIN_ENDPOINTS=true and a non-production "
+             f"governance posture (e.g. ICN_GOVERNANCE_BUILD_MODE=test; set by "
+             f"deploy/devnet and the demo launcher scripts)", status, resp)
+    narrator(f"  {identity.name} now holds active Member standing in {DOMAIN_ID} (dev bootstrap).")
+
+
 # ── Main ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -279,6 +300,15 @@ def main():
         ok(f"Governance domain created: {DOMAIN_ID}")
     else:
         fail("Failed to create governance domain", status, resp)
+    bootstrap_standing(alice)
+
+    # Bob and Carol authenticate and establish standing BEFORE being added as
+    # members: the member-add path creates a holder record without a personhood
+    # anchor, and the dev bootstrap rejects holders that are missing anchors.
+    authenticate(bob, ["governance:read", "governance:write"])
+    bootstrap_standing(bob)
+    authenticate(carol, ["governance:read", "governance:write"])
+    bootstrap_standing(carol)
 
     step(5, "Add Bob to cooperative and governance domain")
     status, resp = api("POST", f"/coops/{COOP_ID}/members", {
