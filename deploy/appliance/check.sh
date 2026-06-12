@@ -80,8 +80,13 @@ fi
 # silently inert. -w is portable across GNU and BSD grep.
 section "forbidden vocabulary scan"
 FORBIDDEN_PATTERN='(payment|wallet|currency|balance|token|blockchain|crypto|timebank)'
+# Lines tagged `vocab-ok: <justification>` are explicit, reviewable
+# exceptions (same spirit as the sanitize gate's sanitize-ok marker). The
+# only sanctioned use today is the literal `icnctl auth token` CLI
+# subcommand name in the demo-profile scripts — a command name, not
+# economic vocabulary. Tag sparingly; every tag is visible in review.
 HITS="$(grep -rwniE "$FORBIDDEN_PATTERN" "$APPLIANCE_DIR" \
-    --exclude="check.sh" 2>/dev/null || true)"
+    --exclude="check.sh" 2>/dev/null | grep -v 'vocab-ok' || true)"
 if [ -z "$HITS" ]; then
     ok "no forbidden ICN-native vocabulary present"
 else

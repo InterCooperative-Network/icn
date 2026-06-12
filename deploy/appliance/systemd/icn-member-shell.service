@@ -1,0 +1,44 @@
+# DEMO PROFILE ONLY — installed by build-image.sh when
+# ICN_APPLIANCE_DEMO_PROFILE=1. Not part of the base appliance image and
+# never part of a production deployment.
+#
+# Serves the static member-shell reference client (web/member-shell/) and
+# the pilot-ui fixture pack from /usr/share/icn/static/web using python3's
+# stdlib HTTP server. This is a dev/demo serving path: no TLS, no caching,
+# no hardening beyond systemd sandboxing. The shell itself labels its modes
+# honestly (fixture vs live-local); this unit adds no claims.
+#
+# Port 8090 (0.0.0.0): inside a QEMU user-mode-network VM this is reachable
+# from the host only through an explicit hostfwd mapping. The gateway the
+# shell's live mode talks to stays JWT-authenticated.
+
+[Unit]
+Description=ICN member-shell static server (DEV/DEMO ONLY)
+Documentation=https://github.com/InterCooperative-Network/icn
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/usr/share/icn/static/web/member-shell/index.html
+
+[Service]
+Type=simple
+User=icn
+Group=icn
+WorkingDirectory=/usr/share/icn/static/web
+ExecStart=/usr/bin/python3 -m http.server 8090 --bind 0.0.0.0 --directory /usr/share/icn/static/web
+
+Restart=always
+RestartSec=5
+
+# Sandboxing: payload is read-only; the server needs no write access.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=icn-member-shell
+
+[Install]
+WantedBy=multi-user.target

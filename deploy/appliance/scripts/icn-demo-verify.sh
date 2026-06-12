@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# ============================================================================
+# icn-demo-verify — evidence/audit step of the appliance demo loop.
+# ----------------------------------------------------------------------------
+# DEMO PROFILE ONLY. Installed by build-image.sh when
+# ICN_APPLIANCE_DEMO_PROFILE=1. Run as root inside the appliance VM.
+#
+# Two evidence paths, both honest about what they prove:
+#
+#   sudo icn-demo-verify <item-id> [domain]
+#       Re-fetches the completion receipt for that action item from THIS
+#       VM's gateway and checks the binding shape: a 32-byte BLAKE3
+#       record_hash over {item_id, domain_id, actor_did, transition,
+#       completed_at} (canonical hasher in icn-governance proof.rs).
+#       Proves: THIS actor discharged THIS obligation at THIS time on this
+#       node. Does not prove production, federation, or pilot adoption.
+#
+#   sudo icn-demo-verify --chain
+#       Runs the bundled 13/13 governed receipt-chain rehearsal
+#       (scripts/local_receipt_chain_13of13_rehearsal.sh) against a FRESH
+#       ephemeral node on loopback :18080 inside this VM. Asserts
+#       `icnctl audit verify` reports a complete 13/13 receipt chain and
+#       emits a schema-validated, repo-safe evidence packet.
+#       Output: /var/lib/icn-demo/receipt-chain-13of13/
+# ============================================================================
+set -uo pipefail
+
+GW="${ICN_DEMO_GW:-http://127.0.0.1:8080}"
+DATA_DIR=/var/lib/icn
+ENV_FILE=/etc/icn/icnd.env
+REPO=/usr/share/icn/demo/repo
+COOP_ID="${ICN_DEMO_COOP_ID:-nycn}"
+
+log(){ echo "[demo-verify] $*"; }
+fatal(){ echo "[demo-verify] FATAL: $*" >&2; exit 1; }
+[ "$(id -u)" -eq 0 ] || fatal "run as root: sudo icn-demo-verify"
+
+if [ "${1:-}" = "--chain" ]; then
+  RUNNER="$REPO/scripts/local_receipt_chain_13of13_rehearsal.sh"
+  [ -f "$RUNNER" ] || fatal "bundled 13/13 rehearsal missing at $RUNNER"
+  OUT=/var/lib/icn-demo
+  mkdir -p "$OUT"
+  log "running the 13/13 governed receipt-chain rehearsal (fresh ephemeral node, loopback :18080)..."
+  log "this is the real proof path; it takes a few minutes on small VMs."
+  ICND=/usr/local/bin/icnd ICNCTL=/usr/local/bin/icnctl ICN_GW_PORT=18080 \
+    bash "$RUNNER" --fresh --no-build
+  rc=$?
+  if [ -d "$REPO/demo/output/receipt-chain-13of13" ]; then
+    rm -rf "$OUT/receipt-chain-13of13"
+    cp -r "$REPO/demo/output/receipt-chain-13of13" "$OUT/" 2>/dev/null || true
+    log "evidence copied to $OUT/receipt-chain-13of13/"
+  fi
+  exit "$rc"
+fi
+
+ITEM_ID="${1:-}"
+DOMAIN="${2:-nycn-federation-gov}"
+[ -n "$ITEM_ID" ] || fatal "usage: icn-demo-verify <item-id> [domain]   (or --chain)"
+[ -f "$ENV_FILE" ] || fatal "$ENV_FILE missing — has firstboot run?"
+command -v jq >/dev/null || fatal "jq missing"
+
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+SESSION_JWT="$(sudo -u icn ICN_KEYSTORE_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" ICN_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" /usr/local/bin/icnctl --data-dir "$DATA_DIR" auth token --gateway "$GW" --coop-id "$COOP_ID" -s "governance:read" 2>/dev/null | grep -oE 'eyJ[A-Za-z0-9_.-]+' | head -1)" # vocab-ok: icnctl CLI subcommand name
+[ -n "$SESSION_JWT" ] || fatal "could not mint a read JWT"
+
+receipt="$(curl -s -m 10 -H "Authorization: Bearer $SESSION_JWT" \
+  "$GW/v1/gov/domains/$DOMAIN/action-items/$ITEM_ID/completion-receipt")"
+echo "$receipt" | jq . 2>/dev/null || fatal "receipt fetch failed: $receipt"
+
+jq -e --arg id "$ITEM_ID" --arg dom "$DOMAIN" \
+  '(.record_hash | type == "array" and length == 32 and all(.[]; type == "number" and . >= 0 and . <= 255))
+   and .item_id == $id and .domain_id == $dom and .transition == "completed"
+   and (.completed_at | type == "number" and . > 0)' <<<"$receipt" >/dev/null \
+  || fatal "receipt failed the binding check (32-byte record_hash over item/domain/actor/transition/time)"
+
+log "PASS — receipt is well-formed and bound to this item/domain/transition."
+log "Proves: this actor discharged this obligation at this time, on this VM's node."
+log "Does NOT prove: production deployment, federation, or pilot adoption."
+log "Deeper proof: sudo icn-demo-verify --chain   (13/13 governed receipt chain)"
