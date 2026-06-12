@@ -221,8 +221,9 @@ def bootstrap_standing(identity: Identity):
     }, identity.token)
     if status != 200:
         fail(f"bootstrap-standing failed for {identity.name} — the node must "
-             f"run with ICN_ENABLE_ADMIN_ENDPOINTS=true and "
-             f"ICN_GOVERNANCE_BUILD_MODE=test (see deploy/devnet)", status, resp)
+             f"run with ICN_ENABLE_ADMIN_ENDPOINTS=true and a non-production "
+             f"governance posture (e.g. ICN_GOVERNANCE_BUILD_MODE=test; set by "
+             f"deploy/devnet and the demo launcher scripts)", status, resp)
     narrator(f"  {identity.name} now holds active Member standing in {DOMAIN_ID} (dev bootstrap).")
 
 
