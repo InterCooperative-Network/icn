@@ -118,6 +118,7 @@
   }
   function byId(id) { return document.getElementById(id); }
   function show(id) { byId(id).hidden = false; }
+  function hide(id) { byId(id).hidden = true; }
   function clear(node) { while (node.firstChild) { node.removeChild(node.firstChild); } }
 
   function kvRow(dl, term, value) {
@@ -669,12 +670,27 @@
     setSyncChip(SYNC.VERIFYING, "neutral", "Asking the node for your standing…");
     byId("connect-status").textContent = "";
 
+    // A new connect attempt invalidates whatever member view is on screen.
+    // The previous member's identity, standing, cards, and receipts must not
+    // remain visible during the load or after a FAILED load — on a shared
+    // browser that would expose their records under someone else's attempt.
+    // Same-member receipts are restored once the new standing confirms the
+    // DID matches.
+    var prior = {
+      did: state.standing && state.standing.did,
+      receipts: state.receipts
+    };
+    state.standing = null;
+    state.cards = null;
+    state.receipts = [];
+    hide("identity-section");
+    clear(byId("domains-list"));
+    clear(byId("cards-list"));
+    renderReceipts();
+
     liveFetch("/v1/gov/me/standing").then(function (standing) {
-      // Reconnecting as a different member must not carry the previous
-      // member's receipts into the new view (action history is theirs,
-      // not the shared browser's).
-      if (state.standing && state.standing.did !== standing.did) {
-        state.receipts = [];
+      if (prior.did && prior.did === standing.did) {
+        state.receipts = prior.receipts;
       }
       state.standing = standing;
       renderIdentity(standing);
