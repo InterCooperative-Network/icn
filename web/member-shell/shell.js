@@ -305,6 +305,12 @@
     var auth = authorityCheck(card, standing);
     var reserved = card.source_kind === "signal_rule" ||
       card.source_kind === "obligation_lifecycle";
+    // Assigned-task completion is authorized by the gateway at request time
+    // (token scope + creator/assignee + domain membership), not by the
+    // role-derived scopes flattened into /me/standing. Do not gate it on
+    // the client; the node's accept/reject answer is rendered honestly.
+    var assignedCompletion = card.source_kind === "action_item" &&
+      card.action_kind === "complete";
 
     li.appendChild(el("h3", { text: card.title || "(untitled card)" }));
 
@@ -320,11 +326,12 @@
     // states it can honestly know: reserved → inert; missing authority →
     // Closed — insufficient authority; otherwise Open. Mutation flow moves
     // a card to Sent/Confirmed below.
+    var actionable = auth.authorized || assignedCompletion;
     var status = reserved ? SOURCE_KIND_LABEL[card.source_kind]
-      : auth.authorized ? LIFECYCLE.OPEN
+      : actionable ? LIFECYCLE.OPEN
       : LIFECYCLE.CLOSED_AUTHORITY;
-    var chipTone = reserved ? "neutral" : auth.authorized ? "ok" : "warn";
-    var chipGlyph = reserved ? "● " : auth.authorized ? "✓ " : "⚠ ";
+    var chipTone = reserved ? "neutral" : actionable ? "ok" : "warn";
+    var chipGlyph = reserved ? "● " : actionable ? "✓ " : "⚠ ";
     var statusChip = el("span", { class: "chip " + chipTone, role: "status", text: chipGlyph + status });
     li.appendChild(el("p", {}, [statusChip]));
 
@@ -338,6 +345,11 @@
 
     if (auth.authorized) {
       kvRow(dl, "Authorization", "You are authorized for this.");
+    } else if (assignedCompletion) {
+      kvRow(dl, "Authorization",
+        "The node checks your authorization when you confirm. Assigned " +
+        "tasks are authorized by your assignment, which this view cannot " +
+        "evaluate from your standing alone.");
     } else {
       kvRow(dl, "Authorization",
         "This requires authority you do not currently hold: " +
@@ -383,9 +395,8 @@
     // The one mutating action this v0 client implements (live mode only):
     // mark an assigned task complete, then fetch and render its completion
     // receipt. Everything else is read-only.
-    if (MODE === "live" && !reserved &&
-        card.source_kind === "action_item" && card.action_kind === "complete") {
-      li.appendChild(buildCompleteFlow(card, auth, statusChip));
+    if (MODE === "live" && !reserved && assignedCompletion) {
+      li.appendChild(buildCompleteFlow(card, statusChip));
     }
     return li;
   }
@@ -399,7 +410,13 @@
   //   member — the gateway enforces this; we render its answer honestly.)
   // Then GET .../completion-receipt (scope governance:read).
   // ---------------------------------------------------------------------
-  function buildCompleteFlow(card, auth, statusChip) {
+  // Note: completion is never scope-gated client-side. /me/standing only
+  // flattens role-assignment scopes, so an ordinary assignee may not show
+  // the card's required_authority_scope even though the gateway will accept
+  // the request (token scope + creator/assignee + domain membership). The
+  // gateway authorizes the actual PUT; a refusal is rendered with its
+  // reason by the rejection path below.
+  function buildCompleteFlow(card, statusChip) {
     var holder = el("div");
 
     if (!card.domain_id) {
@@ -486,17 +503,6 @@
       });
     });
 
-    if (!auth.authorized) {
-      openBtn.disabled = true;
-      holder.appendChild(el("p", {
-        class: "muted",
-        text: "Action unavailable here: your standing does not list the " +
-          "required authority (" + auth.missing.map(scopePlain).join("; ") +
-          "). The node makes the final decision; this client will not send " +
-          "an action it can already see is not authorized."
-      }));
-    }
-
     holder.appendChild(openBtn);
     holder.appendChild(panel);
     return holder;
@@ -556,7 +562,12 @@
     kvRow(dl, "Actor", el("code", { text: String(receipt.actor_did || "") }));
     kvRow(dl, "Transition", String(receipt.transition || ""));
     kvRow(dl, "Completed at (unix seconds)", String(receipt.completed_at || ""));
-    kvRow(dl, "Record hash (blake3, canonical binding of the fields above)",
+    // Maturity-tier honesty: the demo fixture's hash is illustrative only —
+    // it is not a real blake3 binding and nothing is signed. Only live mode
+    // may claim the canonical binding.
+    kvRow(dl, MODE === "demo"
+        ? "Record hash (illustrative fixture value — not a real blake3 binding)"
+        : "Record hash (blake3, canonical binding of the fields above)",
       el("code", { text: hashToHex(receipt.record_hash) }));
     details.appendChild(dl);
     li.appendChild(details);
@@ -667,11 +678,19 @@
         return;
       }
       state.gateway = url.origin;
-      state.credential = byId("credential").value.trim();
-      if (!state.credential) {
+      var credentialInput = byId("credential");
+      var credential = credentialInput.value.trim();
+      // Accept a pasted full header value ("Bearer <value>") and normalize
+      // it to the bare credential.
+      credential = credential.replace(/^Bearer\s+/i, "").trim();
+      if (!credential) {
         byId("connect-status").textContent = "Paste an access credential first.";
         return;
       }
+      state.credential = credential;
+      // The credential now lives only in page memory; clear the DOM input
+      // so it is not left readable in the field.
+      credentialInput.value = "";
       loadLive();
     });
   }

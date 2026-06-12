@@ -78,6 +78,7 @@ h3 { font-size: 1.05rem; }
 .mode-nav {
   list-style: none;
   display: flex;
+  flex-wrap: wrap; /* mode links wrap on narrow viewports instead of overflowing */
   gap: 1rem;
   padding: 0;
 }
