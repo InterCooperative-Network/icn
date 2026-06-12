@@ -223,7 +223,7 @@ async fn test_expired_token_rejected() {
     let client_http = reqwest::Client::new();
 
     // Create a fake expired token (this won't actually be valid JWT)
-    let fake_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6aWNuOnRlc3QiLCJleHAiOjEsInNjb3BlcyI6WyJuZXR3b3JrOnJlYWQiXX0.invalid";
+    let fake_token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJkaWQ6aWNuOnRlc3QiLCJleHAiOjEsInNjb3BlcyI6WyJuZXR3b3JrOnJlYWQiXX0.invalid"; // synthetic fixture: fake claims (exp=1), invalid 5-byte signature, sanitize-ok
 
     let request = serde_json::json!({
         "jsonrpc": "2.0",
