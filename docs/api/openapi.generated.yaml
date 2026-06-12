@@ -31,6 +31,9 @@ info:
     name: MIT OR Apache-2.0
     url: https://opensource.org/licenses/MIT
   version: 0.1.0
+servers:
+- url: /v1
+  description: Gateway API base path (all routes are mounted under /v1)
 paths:
   /federation/clearing/{id}/propose-adoption:
     post:
