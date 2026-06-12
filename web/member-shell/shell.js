@@ -479,21 +479,37 @@
         body: JSON.stringify({ status: "completed" })
       }).then(function () {
         statusLine.textContent = LIFECYCLE.SENT + " — completion accepted, fetching the receipt.";
+        // Past this point the completion is COMMITTED on the node. A failure
+        // to read the receipt back must never be reported as "nothing was
+        // recorded" — that would be the shell lying about a recorded action.
         return liveFetch("/v1/gov/domains/" + encodeURIComponent(card.domain_id) +
                          "/action-items/" + encodeURIComponent(card.source_id) +
-                         "/completion-receipt", { method: "GET" });
-      }).then(function (receipt) {
-        statusChip.textContent = "✓ " + LIFECYCLE.CONFIRMED;
-        statusChip.className = "chip ok";
-        statusLine.textContent = LIFECYCLE.CONFIRMED + ". " + SYNC.RECEIPT +
-          " — see your Receipts below.";
-        addReceipt(receipt, "You marked a task complete.");
-        setSyncChip(SYNC.RECEIPT, "ok",
-          "Your latest action produced a receipt. Records were last refreshed at " +
-          new Date().toLocaleString() + ".");
+                         "/completion-receipt", { method: "GET" })
+          .then(function (receipt) {
+            statusChip.textContent = "✓ " + LIFECYCLE.CONFIRMED;
+            statusChip.className = "chip ok";
+            statusLine.textContent = LIFECYCLE.CONFIRMED + ". " + SYNC.RECEIPT +
+              " — see your Receipts below.";
+            addReceipt(receipt, "You marked a task complete.");
+            setSyncChip(SYNC.RECEIPT, "ok",
+              "Your latest action produced a receipt. Records were last refreshed at " +
+              new Date().toLocaleString() + ".");
+          })
+          .catch(function (err) {
+            // Receipt read failed AFTER the completion was accepted: keep the
+            // committed state, do not re-enable Confirm, say exactly what is
+            // and is not known.
+            statusChip.textContent = "● " + LIFECYCLE.SENT;
+            statusChip.className = "chip neutral";
+            statusLine.textContent = "Your completion was accepted and recorded. " +
+              "The receipt could not be retrieved right now (" + err.message + "). " +
+              "Do not redo the task — refresh your Receipts later or ask your steward.";
+            cancelBtn.textContent = "Close";
+            cancelBtn.disabled = false;
+          });
       }).catch(function (err) {
-        // "rejected with reason" — the gateway's answer, rendered plainly,
-        // never a silent failure.
+        // The completion itself was refused — the gateway's answer, rendered
+        // plainly, never a silent failure. Nothing was recorded.
         statusLine.textContent = "Rejected with reason: " + err.message +
           " Nothing was recorded. You can try again or contact your steward.";
         statusChip.textContent = "⚠ " + LIFECYCLE.OPEN;
