@@ -50,8 +50,8 @@ fatal(){ echo "[demo-seed] FATAL: $*" >&2; exit 1; }
 [ "$(id -u)" -eq 0 ] || fatal "run as root: sudo icn-demo-seed"
 [ -f "$ENV_FILE" ]   || fatal "$ENV_FILE missing — has icn-appliance-firstboot run?"
 [ -d "$PKG" ]        || fatal "demo institution package missing at $PKG (image built without ICN_APPLIANCE_DEMO_PROFILE=1?)"
-command -v curl >/dev/null || fatal "curl missing"
-command -v jq   >/dev/null || fatal "jq missing (demo profile installs it at image build)"
+command -v curl    >/dev/null || fatal "curl missing"
+command -v python3 >/dev/null || fatal "python3 missing"
 
 # Per-instance keystore passphrase, generated on this VM by firstboot.
 # shellcheck disable=SC1090
@@ -101,19 +101,30 @@ log "creating one open action item assigned to $DID ..."
 item_json="$(curl -s -m 10 -X POST -H "$AUTH" -H 'Content-Type: application/json' \
   -d "{\"title\":\"Confirm Summit 2026 venue booking\",\"description\":\"Demo obligation (fictional): confirm the venue contract for the 2026 Summit\",\"assignee\":\"$DID\",\"priority\":\"high\",\"meeting_context\":\"demo organizing team\"}" \
   "$GW/v1/gov/domains/$DOMAIN/action-items")"
-ITEM_ID="$(jq -r '.id // empty' <<<"$item_json" 2>/dev/null)"
+ITEM_ID="$(python3 -c 'import json,sys
+try:
+    print(json.load(sys.stdin).get("id", ""))
+except Exception:
+    print("")' <<<"$item_json")"
 [ -n "$ITEM_ID" ] || fatal "action item creation failed: $item_json"
 log "action item created: $ITEM_ID"
 
 cards_json="$(curl -s -m 10 -H "$AUTH" "$GW/v1/gov/me/action-cards")"
-card_n="$(jq --arg id "$ITEM_ID" '[.cards[]? | select(.source_id==$id)] | length' <<<"$cards_json" 2>/dev/null || echo 0)"
+card_n="$(python3 -c 'import json,sys
+try:
+    d = json.load(sys.stdin)
+    print(sum(1 for c in d.get("cards", []) if c.get("source_id") == sys.argv[1]))
+except Exception:
+    print(0)' "$ITEM_ID" <<<"$cards_json")"
 [ "$card_n" = "1" ] || fatal "expected 1 action card for $ITEM_ID, found ${card_n:-0}: $cards_json"
 log "action card visible via /v1/gov/me/action-cards."
 
 if [ "$JSON_OUT" = 1 ]; then
-  jq -n --arg did "$DID" --arg jwt "$SESSION_JWT" --arg item "$ITEM_ID" \
-        --arg domain "$DOMAIN" --arg gw "$GW" --arg standing "$standing_note" \
-        '{did:$did, jwt:$jwt, item_id:$item, domain:$domain, gateway:$gw, standing_note:$standing}'
+  python3 -c 'import json,sys
+print(json.dumps({"did": sys.argv[1], "jwt": sys.argv[2], "item_id": sys.argv[3],
+                  "domain": sys.argv[4], "gateway": sys.argv[5],
+                  "standing_note": sys.argv[6]}))' \
+    "$DID" "$SESSION_JWT" "$ITEM_ID" "$DOMAIN" "$GW" "$standing_note"
   exit 0
 fi
 

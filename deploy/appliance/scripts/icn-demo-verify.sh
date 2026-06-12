@@ -57,7 +57,7 @@ ITEM_ID="${1:-}"
 DOMAIN="${2:-nycn-federation-gov}"
 [ -n "$ITEM_ID" ] || fatal "usage: icn-demo-verify <item-id> [domain]   (or --chain)"
 [ -f "$ENV_FILE" ] || fatal "$ENV_FILE missing — has firstboot run?"
-command -v jq >/dev/null || fatal "jq missing"
+command -v python3 >/dev/null || fatal "python3 missing"
 
 # shellcheck disable=SC1090
 . "$ENV_FILE"
@@ -66,13 +66,31 @@ SESSION_JWT="$(sudo -u icn ICN_KEYSTORE_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" IC
 
 receipt="$(curl -s -m 10 -H "Authorization: Bearer $SESSION_JWT" \
   "$GW/v1/gov/domains/$DOMAIN/action-items/$ITEM_ID/completion-receipt")"
-echo "$receipt" | jq . 2>/dev/null || fatal "receipt fetch failed: $receipt"
+echo "$receipt" | python3 -m json.tool 2>/dev/null || fatal "receipt fetch failed: $receipt"
 
-jq -e --arg id "$ITEM_ID" --arg dom "$DOMAIN" \
-  '(.record_hash | type == "array" and length == 32 and all(.[]; type == "number" and . >= 0 and . <= 255))
-   and .item_id == $id and .domain_id == $dom and .transition == "completed"
-   and (.completed_at | type == "number" and . > 0)' <<<"$receipt" >/dev/null \
-  || fatal "receipt failed the binding check (32-byte record_hash over item/domain/actor/transition/time)"
+if ! RECEIPT_JSON="$receipt" python3 - "$ITEM_ID" "$DOMAIN" <<'PY'
+import json
+import os
+import sys
+
+r = json.loads(os.environ["RECEIPT_JSON"])
+item, dom = sys.argv[1], sys.argv[2]
+h = r.get("record_hash")
+ok = (
+    isinstance(h, list)
+    and len(h) == 32
+    and all(isinstance(b, int) and 0 <= b <= 255 for b in h)
+    and r.get("item_id") == item
+    and r.get("domain_id") == dom
+    and r.get("transition") == "completed"
+    and isinstance(r.get("completed_at"), (int, float))
+    and r.get("completed_at") > 0
+)
+sys.exit(0 if ok else 1)
+PY
+then
+  fatal "receipt failed the binding check (32-byte record_hash over item/domain/actor/transition/time)"
+fi
 
 log "PASS — receipt is well-formed and bound to this item/domain/transition."
 log "Proves: this actor discharged this obligation at this time, on this VM's node."

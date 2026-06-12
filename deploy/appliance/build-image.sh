@@ -130,7 +130,6 @@ cat <<'EOF_PLAN'
      commit, build timestamp, and an explicit non-production flag.
 
   When ICN_APPLIANCE_DEMO_PROFILE=1, step 5 additionally (DEV/DEMO only):
-       - apt install jq
        - copy web/member-shell + web/pilot-ui/fixtures -> /usr/share/icn/static/web/
        - copy institutions/ (NYCN fixture package)     -> /usr/share/icn/demo/institutions/
        - copy 13/13 rehearsal scripts + evidence validator + nycn-dogfood kit
@@ -387,7 +386,6 @@ if [ "$DEMO_PROFILE" = "1" ]; then
     fi
 
     VIRT_CUSTOMIZE_ARGS+=(
-        --install "jq"
         --mkdir /usr/share/icn/demo
         --copy-in "$DEMO_STAGE/static/web:/usr/share/icn/static"
         --copy-in "$DEMO_STAGE/demo/institutions:/usr/share/icn/demo"

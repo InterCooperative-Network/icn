@@ -1,0 +1,140 @@
+# ICN July Demo Image — Quickstart
+
+One VM. One browser. The core ICN loop, honestly labeled:
+
+**standing → action card → discharge → receipt → evidence/audit**
+
+## What this demonstrates
+
+- A real ICN node (`icnd`) booting on a disposable VM and serving its
+  JWT-authenticated HTTP gateway.
+- Member standing, pending action cards, action discharge, and a
+  cryptographic completion receipt — rendered in the member-shell
+  reference client, served by the same VM.
+- Evidence you can re-verify: the receipt's 32-byte BLAKE3 `record_hash`
+  binding, and (optional, deeper) a 13/13 governed receipt-chain proof run
+  entirely inside the VM.
+
+## What this does NOT demonstrate
+
+No production deployment. No pilot adoption. No federation or
+multi-organization anything. No real member data — the institution is a
+fictional fixture (NYCN package, in-tree). The image is unsigned and
+mutable. Dev gates are enabled and labeled. If someone tells you this VM
+is production infrastructure, they are wrong on purpose.
+
+## System requirements
+
+- Linux host with QEMU (`qemu-system-x86`, `qemu-utils`), `ssh`, `curl`,
+  `jq`, `cloud-image-utils` (only if you need to build a cloud-init seed).
+- ~4 GB free disk, 2 GB RAM for the VM (`-m 2048` recommended).
+- For building the image: Rust toolchain + `libguestfs-tools`, a staged
+  Debian cloud base image (glibc ≥ your build host's — see
+  "Host / image compatibility" in [README.md](README.md)).
+
+## Get or build the image
+
+There is no prebuilt download. Build from a public checkout:
+
+```bash
+git clone https://github.com/InterCooperative-Network/icn && cd icn
+export ICN_APPLIANCE_BASE_IMAGE=/path/to/debian-13-genericcloud-amd64.qcow2
+export ICN_APPLIANCE_OUTPUT_DIR=$HOME/icn-appliance-build
+export ICN_APPLIANCE_VERSION=0.0.2-demo
+export ICN_APPLIANCE_DEMO_PROFILE=1
+bash deploy/appliance/build-image.sh --real
+```
+
+Output: `$ICN_APPLIANCE_OUTPUT_DIR/icn-appliance-0.0.2-demo-amd64.qcow2`
+plus a manifest JSON with the image SHA256 and `demo_profile: true`.
+
+## Run it
+
+Prepare a one-off SSH key + cloud-init seed (see "Real local build + boot
+smoke" in [README.md](README.md)), then either:
+
+**Scripted (recommended first run):**
+
+```bash
+ICN_APPLIANCE_IMAGE=$HOME/icn-appliance-build/icn-appliance-0.0.2-demo-amd64.qcow2 \
+ICN_APPLIANCE_SSH_KEY=/path/to/smoke_ed25519 \
+ICN_APPLIANCE_CLOUD_INIT_SEED=/path/to/seed.iso \
+ICN_APPLIANCE_VM_MEMORY=2048 \
+bash deploy/appliance/smoke/smoke-local.sh --real --demo
+```
+
+That boots the VM on a disposable overlay, seeds the demo, drives the whole
+loop headlessly, and prints PASS/FAIL. It is the same path your browser
+will take.
+
+**Manual (for the browser demo):** boot QEMU yourself with the demo ports
+forwarded:
+
+```bash
+qemu-img create -f qcow2 -b "$IMAGE" -F qcow2 overlay.qcow2
+qemu-system-x86_64 -machine accel=kvm:tcg -m 2048 -smp 2 -display none \
+  -drive if=virtio,format=qcow2,file=overlay.qcow2 \
+  -drive if=virtio,format=raw,file=seed.iso,readonly=on \
+  -netdev user,id=net0,hostfwd=tcp:127.0.0.1:2222-:22,hostfwd=tcp:127.0.0.1:18080-:8080,hostfwd=tcp:127.0.0.1:18090-:8090 \
+  -device virtio-net-pci,netdev=net0 -nographic
+```
+
+Then seed it:
+
+```bash
+ssh -p 2222 debian@127.0.0.1 sudo icn-demo-seed
+```
+
+The seed prints the member-shell URLs, the open action item, and a dev
+session JWT (local VM only).
+
+## First URL to open
+
+> http://localhost:18090/member-shell/
+
+(Use `?mode=demo` for the self-labeled fixture mode that needs no JWT.)
+
+## The demo script (5 steps)
+
+1. **Inspect standing** — open the shell in live mode, paste the JWT from
+   `icn-demo-seed`. The standing pane shows the operator's domain
+   membership in the fictional NYCN institution.
+2. **Inspect the action card** — one open card: "Confirm Summit 2026 venue
+   booking" (`action_item / complete`, fictional).
+3. **Discharge the action** — complete it in the shell (live-mode
+   mutation: `PUT .../status {"status":"completed"}` under the hood).
+4. **View the receipt** — the shell fetches the completion receipt: item,
+   domain, actor DID, transition, timestamp, and the 32-byte BLAKE3
+   `record_hash` that binds them.
+5. **Verify evidence/audit** — in the VM:
+   `sudo icn-demo-verify <item-id>` re-fetches and checks the receipt
+   binding; `sudo icn-demo-verify --chain` runs the full 13/13 governed
+   receipt-chain rehearsal on a fresh ephemeral node and emits a
+   schema-validated evidence packet to `/var/lib/icn-demo/`.
+
+## Reset
+
+- Cheapest: power off and delete `overlay.qcow2`, recreate, reboot —
+  whole-disk reset, nothing persists.
+- In-place: `ssh -p 2222 debian@127.0.0.1 sudo icn-demo-reset` (destroys
+  node state, re-runs firstboot, then `sudo icn-demo-seed` again).
+
+## Troubleshooting
+
+| Symptom | Likely cause / fix |
+|---|---|
+| Shell says "Technical detail: Failed to fetch" in live mode | CORS or wrong gateway port. The demo drop-in allows origins `localhost:8090/18090` and `127.0.0.1:8090/18090`. Open the shell via one of those exactly; the gateway must be the hostfwd'd 18080 (or in-VM 8080). |
+| Port already in use on the host | Another process holds 2222/18080/18090. Change the hostfwd host-side numbers; if you change the shell port, the gateway CORS allowlist must contain that origin (edit `/etc/systemd/system/icnd.service.d/20-demo-profile.conf` in the VM, `systemctl daemon-reload && systemctl restart icnd`). |
+| `icn-demo-seed` fails: "$ENV_FILE missing" | Firstboot has not completed. `journalctl -u icn-appliance-firstboot`. The icnd unit is gated on firstboot success by design. |
+| Passphrase/identity errors from icnctl | The VM's keystore passphrase lives in `/etc/icn/icnd.env` (root, mode 600). The demo scripts read it themselves — run them with `sudo`, don't export your own. |
+| QEMU: KVM permission denied | Your user lacks /dev/kvm access; the launch line falls back to TCG (slow but works). `usermod -aG kvm $USER` for speed. |
+| Stale state after re-running the demo | Each `icn-demo-seed` adds a new open card. Old JWTs die with `icn-demo-reset` (new per-instance secret). When in doubt: overlay reset. |
+| 13/13 rehearsal slow | It builds nothing (uses installed binaries) but runs a full governed lifecycle; a few minutes at 2 GB RAM is normal. |
+
+## Honesty labels
+
+| Tier | Surfaces |
+|---|---|
+| **live-local** | node boot, `/v1/health`, standing, action cards, discharge, completion receipt, receipt binding check, 13/13 chain rehearsal — on this VM's own node |
+| **fixture-backed** | member-shell `?mode=demo` panes (self-labeled), NYCN institution package contents |
+| **design-only / absent** | production posture, signed/immutable image, federation, multi-org, pilots, attendance-receipt retrieval endpoint (known gap, `docs/dev/openapi-member-surface-gaps.md`) |
