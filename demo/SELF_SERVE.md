@@ -110,8 +110,9 @@ Boot a three-node devnet and run the governance demonstration suite
 against two independent nodes.
 
 ```bash
-cd icn/deploy/devnet && docker compose build   # one-time; long
-cd ../.. && bash demo/run-all.sh
+# from the repository root (the directory you cloned, e.g. `cd icn`)
+docker compose -f deploy/devnet/docker-compose.yml build   # one-time; long
+bash demo/run-all.sh
 ```
 
 Requirements: Docker + compose, python3 with the `cryptography`
