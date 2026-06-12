@@ -104,12 +104,21 @@ Then open:
 - Live: <http://localhost:8000/member-shell/> (gateway at
   `http://localhost:8080`)
 
-Live-mode note: the browser enforces CORS. The gateway must be started with
-a CORS mode that allows the shell's origin (see `configure_cors` in
-`icn/crates/icn-gateway/src/security.rs`), or the shell must be served from
-the same origin as the gateway. Otherwise the shell reports the failure in
-plain language ("Your standing is currently unavailable…") with the
-technical detail beneath.
+Live-mode note: the browser enforces CORS, and the shell's requests carry
+an `Authorization` header, which forces a CORS preflight. Start the node
+with the shell's page origin allowed:
+
+```bash
+ICN_CORS_ORIGINS="http://localhost:8000" icnd --config ... --gateway-enable ...
+```
+
+(`ICN_DEV_MODE` also switches to the dev CORS config; see `configure_cors`
+in `icn/crates/icn-gateway/src/security.rs`.) Without it the preflight is
+rejected and the shell reports "Technical detail: Failed to fetch" — that
+symptom means CORS, not a broken node. With the origin allowed, real
+gateway answers come through and render in plain language (verified
+end-to-end 2026-06-12: a rejected credential renders "The node answered
+401: Authentication failed…" with the degraded-sync chip).
 
 ## ADR-0028 accessibility checklist (honest)
 

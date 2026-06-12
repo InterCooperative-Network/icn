@@ -59,6 +59,9 @@
           Needs the <code>governance:read</code> scope to read your standing
           and action cards. Marking a task complete additionally needs
           <code>governance:meeting:write</code> or <code>governance:write</code>.
+          If connecting fails immediately with "Failed to fetch", the node
+          was not started with this page's address in
+          <code>ICN_CORS_ORIGINS</code> — see this directory's README.
         </p>
       </div>
       <button type="submit" id="connect-button">Connect and load my standing</button>
