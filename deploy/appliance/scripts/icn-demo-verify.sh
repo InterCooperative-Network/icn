@@ -40,6 +40,12 @@ if [ "${1:-}" = "--chain" ]; then
   [ -f "$RUNNER" ] || fatal "bundled 13/13 rehearsal missing at $RUNNER"
   OUT=/var/lib/icn-demo
   mkdir -p "$OUT"
+  # The rehearsal wrapper's binary gate only looks in $ROOT/icn/target/
+  # (its ICND/ICNCTL env overrides apply to the inner script, not the
+  # gate), so expose the installed binaries at the expected location.
+  mkdir -p "$REPO/icn/target/release"
+  ln -sf /usr/local/bin/icnd "$REPO/icn/target/release/icnd"
+  ln -sf /usr/local/bin/icnctl "$REPO/icn/target/release/icnctl"
   log "running the 13/13 governed receipt-chain rehearsal (fresh ephemeral node, loopback :18080)..."
   log "this is the real proof path; it takes a few minutes on small VMs."
   ICND=/usr/local/bin/icnd ICNCTL=/usr/local/bin/icnctl ICN_GW_PORT=18080 \
