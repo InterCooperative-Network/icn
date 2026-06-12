@@ -38,6 +38,142 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET /gov/domains/{domain_id}/action-items/{item_id}/completion-receipt
+         *     — Retrieve the latest [`ActionItemCompletionReceipt`] persisted for an
+         *     action item, if any.
+         * @description Closes the proof loop documented in `docs/dev/NYCN_K3S_PROOF_PATH.md`
+         *     and `docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md`: a holder shell that
+         *     completed an `action_item / complete` action card can read the
+         *     `ActionItemCompletionReceipt` back via HTTP, instead of relying on
+         *     in-process tests or on-disk Sled inspection.
+         *
+         *     Authorization mirrors the rest of the action-item read surface:
+         *     `governance:read` scope plus domain membership for the caller. The
+         *     receipt's bound `domain_id` is also asserted to match the path
+         *     parameter so a holder cannot probe across domain boundaries.
+         *
+         *     Returns:
+         *     - 200 with the receipt JSON when a completion receipt has been
+         *       persisted for the item under this domain.
+         *     - 404 when no receipt exists, when the item id does not match the
+         *       stored receipt's `domain_id`, or when the manager has no receipt
+         *       store wired (the receipt simply does not exist from the caller's
+         *       point of view).
+         */
+        get: operations["get_action_item_completion_receipt"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gov/me/action-cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET /gov/me/action-cards — Return pending action cards for the caller.
+         * @description Action cards are derived views — computed at request time from the caller's
+         *     `/me/standing` inputs plus open governance state. There is no mutation API;
+         *     the card carries a `source_id` and the holder acts on the underlying
+         *     object. See ADR-0027.
+         *
+         *     ## Sources currently emitted
+         *
+         *     - `proposal` / `vote` — Open proposals in domains where the caller has
+         *       voting standing and has not yet voted.
+         *     - `meeting` / `attend` — Meetings scheduled in the next 48 h where the
+         *       caller is on the attendee list.
+         *     - `action_item` / `complete` — Open action items assigned to the caller.
+         *
+         *     ## Sources reserved (not emitted today)
+         *
+         *     - `signal_rule` — pending icn#1631
+         *     - `obligation_lifecycle` — pending icn#1634
+         *
+         *     Per ADR-0027 the taxonomy is closed; new variants land alongside their
+         *     source-path implementation.
+         *
+         *     ## Self-only
+         *
+         *     There is no `did` query parameter. The caller's DID is always derived from
+         *     the authenticated claims; no card-set for a third party is reachable here.
+         */
+        get: operations["get_my_action_cards"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/gov/me/standing": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET /gov/me/standing — Return the authenticated caller's institutional standing.
+         * @description Composes existing governance state (domain membership + structure role
+         *     assignments) into one read model so member-facing UI does not have to
+         *     fan out to four endpoints.
+         *
+         *     ## What this returns
+         *
+         *     - The caller's DID (always — derived from the authenticated claims, not
+         *       from a query parameter).
+         *     - Each governance domain whose static member list contains the caller, or
+         *       whose membership is sourced from a trust threshold (status `"unverified"`
+         *       in that case — the trust graph is the source of truth, not this read
+         *       model).
+         *     - Each structure role assignment held by the caller, joined with cheap
+         *       structure metadata (name + parent entity) so the UI does not need a
+         *       second fetch per row.
+         *     - The deduplicated union of `authority_scope` across those role
+         *       assignments, as a convenience for UI.
+         *
+         *     ## Self-only
+         *
+         *     There is no `did` query parameter. The DID is always the caller's. A
+         *     caller cannot use this endpoint to inspect another DID's standing.
+         *
+         *     ## Optional filter
+         *
+         *     `?domain_id=<id>` narrows both `domains` and `roles` to assignments under
+         *     that domain. An unknown `domain_id` returns a valid empty standing rather
+         *     than a 404 — "no standing in that domain" is a meaningful answer.
+         *
+         *     ## Empty caller is not an error
+         *
+         *     A caller with no role assignments and no static membership receives a
+         *     200 with empty `domains`, `roles`, and `authority_scopes`. UI should
+         *     render an onboarding affordance, not an error.
+         */
+        get: operations["get_my_standing"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -65,6 +201,165 @@ export interface components {
                 [key: string]: number;
             };
         };
+        /**
+         * @description One pending action card for the authenticated caller.
+         *
+         *     Returned by `GET /v1/gov/me/action-cards`. Cards are **derived views** —
+         *     computed at request time from the caller's standing plus open governance
+         *     state — never stored entities. Two requests at the same moment from the
+         *     same DID return identical cards. See ADR-0027.
+         *
+         *     ## Boundary
+         *
+         *     All fields are generic. No institution-specific vocabulary. Institution
+         *     packages translate their local templates into these generic kinds; ICN
+         *     does not learn package-specific nouns from this surface.
+         */
+        ActionCard: {
+            /**
+             * @description Accessibility note for the rendering shell. Generic across institutions;
+             *     today the runtime emits the same baseline note for all cards.
+             */
+            accessibility_hint: string;
+            action_kind: components["schemas"]["ActionCardActionKind"];
+            /**
+             * @description Why the caller has the right to act here, in plain language. Examples:
+             *     `"role_assignment_in_domain"`, `"assigned_action_item"`,
+             *     `"meeting_attendee"`.
+             */
+            authority_basis: string;
+            /**
+             * Format: int64
+             * @description Optional Unix-seconds deadline. `None` means no time pressure encoded
+             *     by this card.
+             */
+            deadline?: number | null;
+            /** @description Governance domain this card lives under, when known. */
+            domain_id?: string | null;
+            /**
+             * @description Stable, deterministic id of the card. Runtime format:
+             *     `card-<source_kind_snake>-<source_id>-<action_kind_snake>` (for example
+             *     `card-proposal-<id>-vote`, `card-meeting-<id>-attend`,
+             *     `card-action_item-<id>-complete`) so the same underlying object yields
+             *     the same card id across requests.
+             */
+            id: string;
+            /**
+             * @description Whether successful completion of this action is expected to produce a
+             *     receipt (governance receipt, attendance receipt, action-item completion
+             *     receipt).
+             */
+            receipt_expected: boolean;
+            /**
+             * @description Authority-scope strings the kernel would expect for this action.
+             *     Generic; institution packages may use richer strings.
+             */
+            required_authority_scope: string[];
+            risk_level: components["schemas"]["ActionCardRiskLevel"];
+            scope: components["schemas"]["ActionCardScope"];
+            /** @description Underlying object id (proposal id, meeting id, action item id). */
+            source_id: string;
+            source_kind: components["schemas"]["ActionCardSourceKind"];
+            /**
+             * @description One-line plain-language summary of what this card is asking the
+             *     holder to do.
+             */
+            summary: string;
+            /** @description Short, plain-language title. Suitable for a list row. */
+            title: string;
+        };
+        /**
+         * @description What the holder is being asked to do. Closed taxonomy. New variants land
+         *     when their source path implementation lands.
+         * @enum {string}
+         */
+        ActionCardActionKind: "vote" | "attend" | "complete";
+        /**
+         * @description Coarse risk indicator surfaced to the holder. UI may sort or annotate but
+         *     must not hide cards. Exact semantics are policy concerns; this enum carries
+         *     a conservative three-level vocabulary.
+         * @enum {string}
+         */
+        ActionCardRiskLevel: "low" | "normal" | "elevated";
+        /**
+         * @description What the card targets. Maps to ICN's `entity / structure / individual`
+         *     constitutional axes; institution packages bind their local taxonomy to
+         *     these.
+         * @enum {string}
+         */
+        ActionCardScope: "entity" | "structure" | "individual";
+        /**
+         * @description Where a card is derived from. Closed taxonomy. Variants `SignalRule` and
+         *     `ObligationLifecycle` are reserved by issue #1646 for future implementation;
+         *     the runtime does not emit them today.
+         * @enum {string}
+         */
+        ActionCardSourceKind: "proposal" | "meeting" | "action_item" | "signal_rule" | "obligation_lifecycle";
+        /** @description Wrapper response for `GET /me/action-cards`. */
+        ActionCardsResponse: {
+            /** @description Pending cards for the caller, derived at request time. May be empty. */
+            cards: components["schemas"]["ActionCard"][];
+            /** @description The authenticated caller's DID. */
+            did: string;
+            /**
+             * Format: int64
+             * @description Unix-seconds when this card set was computed. Snapshot only — nothing
+             *     is cached server-side.
+             */
+            generated_at: number;
+        };
+        /**
+         * @description Cross-node deterministic completion receipt for a governance action
+         *     item.
+         *
+         *     Sits alongside [`GovernanceDecisionReceipt`] in ADR-0026 Layer 2: it
+         *     records the *fact* of a state transition the runtime can attest to,
+         *     keyed so a holder shell can locate it via the action card's `source_id`.
+         *
+         *     Equality is anchored to `record_hash`.
+         */
+        ActionItemCompletionReceipt: {
+            /**
+             * @description DID of the actor whose authorized completion call produced this
+             *     receipt (must be the action item's assignee or creator at call
+             *     time, per the handler's authorization check).
+             */
+            actor_did: string;
+            /**
+             * Format: int64
+             * @description Unix-seconds the transition was recorded (typically the
+             *     `updated_at` of the post-transition action item).
+             */
+            completed_at: number;
+            /** @description Governance domain the action item lives under. */
+            domain_id: string;
+            /**
+             * @description Action item id (string form of `ActionItemId`). This is the same
+             *     string the holder's `ActionCard.source_id` carries — it is the
+             *     link between the card and the receipt.
+             */
+            item_id: string;
+            /**
+             * @description blake3 canonical record hash binding the fields above (serialized
+             *     as a JSON array of 32 bytes).
+             */
+            record_hash: number[];
+            /**
+             * @description Transition this receipt records. Closed enum; see
+             *     [`ActionItemTransition`].
+             */
+            transition: components["schemas"]["ActionItemTransition"];
+        };
+        /**
+         * @description Closed taxonomy of state transitions that produce an
+         *     [`ActionItemCompletionReceipt`].
+         *
+         *     Today the only receipt-bearing transition is `Completed`. Variants are
+         *     added when a corresponding write path lands; the runtime never emits a
+         *     transition not listed here.
+         * @enum {string}
+         */
+        ActionItemTransition: "completed";
         /** @description Add a member to a cooperative */
         AddMemberRequest: {
             did: string;
@@ -651,6 +946,87 @@ export interface components {
             role?: string | null;
             signature: string;
         };
+        /** @description One governance-domain membership row in [`StandingResponse`]. */
+        StandingDomainMembership: {
+            domain_id: string;
+            domain_name: string;
+            /** @description `"static_list"` or `"trust_threshold"`. */
+            membership_source: string;
+            /**
+             * @description `"member"` if the caller is in the static member list,
+             *     `"unverified"` if membership comes from a trust-threshold source that
+             *     this read model does not evaluate (the caller may still be a member;
+             *     the trust graph is the source of truth).
+             */
+            status: string;
+        };
+        /**
+         * @description Caller-facing membership and authority read model.
+         *
+         *     Returned by `GET /v1/gov/me/standing`. Composes existing governance state
+         *     (domain memberships + structure role assignments) into one digestible
+         *     response so member-facing UI does not need to query four endpoints and
+         *     stitch them together.
+         *
+         *     ## What this is NOT
+         *
+         *     - This is **not** an authorization token. Scopes here are descriptive,
+         *       not bearer-issued. Authorization decisions still flow through the
+         *       `PolicyOracle`.
+         *     - This is **not** an action-card feed. Action-card generation builds on
+         *       top of this read model in a separate endpoint.
+         */
+        StandingResponse: {
+            /**
+             * @description Union of `authority_scope` strings across `roles`, deduplicated and
+             *     sorted. Convenience field for UI; equivalent to flattening `roles`.
+             */
+            authority_scopes: string[];
+            /** @description The authenticated caller's DID. */
+            did: string;
+            /**
+             * @description Optional human-readable label. Reserved for a future identity-registry
+             *     lookup; always `None` in this version.
+             */
+            display_label?: string | null;
+            /**
+             * @description Governance domains in which this caller has membership standing.
+             *     May be empty.
+             */
+            domains: components["schemas"]["StandingDomainMembership"][];
+            /**
+             * Format: int64
+             * @description Unix epoch seconds when this standing was computed. The response is a
+             *     snapshot; nothing is cached server-side.
+             */
+            generated_at: number;
+            /**
+             * @description Role assignments held by this caller across all structures.
+             *     May be empty.
+             */
+            roles: components["schemas"]["StandingRoleAssignment"][];
+        };
+        /**
+         * @description One role-assignment row in [`StandingResponse`]. Joins the underlying
+         *     [`icn_governance::RoleAssignment`] with cheap structure metadata
+         *     (name + parent entity) so UI does not have to fetch the structure.
+         */
+        StandingRoleAssignment: {
+            authority_scope: string[];
+            /** Format: int64 */
+            end_date?: number | null;
+            parent_entity_id?: string | null;
+            role: string;
+            role_assignment_id: string;
+            /** Format: int64 */
+            start_date: number;
+            structure_id: string;
+            /**
+             * @description `None` if the structure was deleted or is otherwise unreadable; the
+             *     role row is still surfaced so the caller can see something is off.
+             */
+            structure_name?: string | null;
+        };
         /** @description Steward detail response */
         StewardDetailResponse: {
             /** Format: int64 */
@@ -835,6 +1211,130 @@ export interface operations {
             };
             /** @description Internal server error */
             500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_action_item_completion_receipt: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Governance domain the action item lives under */
+                domain_id: string;
+                /** @description Action item id (UUID). This is the same string an `action_item`-sourced action card carries in `source_id` — it links the card to its receipt. Accepts any valid UUID form; canonicalized before lookup. */
+                item_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Latest completion receipt persisted for the action item under this domain. `record_hash` is the blake3 canonical record hash binding the receipt fields, serialized as a JSON array of 32 bytes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionItemCompletionReceipt"];
+                };
+            };
+            /** @description Malformed action item id (not a valid UUID) */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Missing or invalid bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token lacks the `governance:read` scope, or the caller is not a member of the domain */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description No completion receipt persisted for this item, the receipt is bound to a different domain (cross-domain existence is not leaked), or the domain does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_my_action_cards: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pending action cards for the caller, wrapped in `ActionCardsResponse` (`{did, cards, generated_at}`) — **not** a bare array. Cards are derived views computed at request time from the caller's standing plus open governance state; there is no mutation API on this surface — the holder acts on the underlying object named by `source_id` (ADR-0027). `cards` may be empty. Source/action/scope/risk fields use the closed enums `ActionCardSourceKind`, `ActionCardActionKind`, `ActionCardScope`, and `ActionCardRiskLevel`. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ActionCardsResponse"];
+                };
+            };
+            /** @description Missing or invalid bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token lacks the `governance:read` scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_my_standing: {
+        parameters: {
+            query?: {
+                /** @description Narrow `domains` and `roles` to one governance domain. An unknown `domain_id` returns a valid empty standing (200), not a 404 — "no standing in that domain" is a meaningful answer. */
+                domain_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's institutional standing. Self-only: the DID is always derived from the authenticated token; another DID's standing is not reachable here. A caller with no memberships and no role assignments receives 200 with empty `domains`, `roles`, and `authority_scopes` — empty standing is not an error. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StandingResponse"];
+                };
+            };
+            /** @description Missing or invalid bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token lacks the `governance:read` scope */
+            403: {
                 headers: {
                     [name: string]: unknown;
                 };
