@@ -45,10 +45,27 @@ use crate::api::steward::{
 use crate::identity_mgr::DeviceInfo;
 use crate::notification_store::{InAppNotification, Platform};
 
+// Member-shell surface (handlers live in the governance app crate, mounted
+// by this gateway under /v1/gov — see configure_governance in server.rs).
+use icn_governance::{ActionItemCompletionReceipt, ActionItemTransition};
+use icn_governance_actor::http::models::{
+    ActionCard, ActionCardActionKind, ActionCardRiskLevel, ActionCardScope, ActionCardSourceKind,
+    ActionCardsResponse, StandingDomainMembership, StandingResponse, StandingRoleAssignment,
+};
+
 /// OpenAPI documentation for ICN Gateway
 #[derive(OpenApi)]
 #[openapi(
-    paths(crate::api::federation::propose_clearing_adoption),
+    paths(
+        crate::api::federation::propose_clearing_adoption,
+        // Member-shell surface (docs/dev/openapi-member-surface-gaps.md):
+        // the routes a member-facing shell needs for the core loop
+        // standing → action card → discharge → receipt.
+        icn_governance_actor::http::handlers::get_my_standing,
+        icn_governance_actor::http::handlers::get_my_action_cards,
+        icn_governance_actor::http::handlers::get_action_item_completion_receipt,
+    ),
+    modifiers(&SecurityAddon),
     info(
         title = "ICN Gateway API",
         version = "0.1.0",
@@ -117,6 +134,11 @@ use crate::notification_store::{InAppNotification, Platform};
             ListNotificationsResponse, NotificationCountResponse, MarkReadResponse,
             // Federation
             ProposeAdoptionRequest, ProposeAdoptionResponse,
+            // Member-shell surface (standing, action cards, completion receipt)
+            StandingResponse, StandingDomainMembership, StandingRoleAssignment,
+            ActionCardsResponse, ActionCard, ActionCardSourceKind, ActionCardActionKind,
+            ActionCardScope, ActionCardRiskLevel,
+            ActionItemCompletionReceipt, ActionItemTransition,
             // Shared types
             DeviceInfo, Platform, InAppNotification,
         )
@@ -140,3 +162,77 @@ use crate::notification_store::{InAppNotification, Platform};
     )
 )]
 pub struct ApiDoc;
+
+/// Registers the `bearer_auth` JWT security scheme that annotated paths
+/// reference via `security(("bearer_auth" = []))`. Without this component
+/// those references point at an undeclared scheme.
+struct SecurityAddon;
+
+impl utoipa::Modify for SecurityAddon {
+    fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+        use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+        let components = openapi.components.get_or_insert_with(Default::default);
+        components.add_security_scheme(
+            "bearer_auth",
+            SecurityScheme::Http(
+                HttpBuilder::new()
+                    .scheme(HttpAuthScheme::Bearer)
+                    .bearer_format("JWT")
+                    .build(),
+            ),
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The member-shell surface must stay in the served OpenAPI document
+    /// (`/api-docs/openapi.json` is built from this same `ApiDoc` object —
+    /// see server.rs). Guards the annotation wiring across the gateway and
+    /// the governance app crate.
+    #[test]
+    fn member_shell_surface_is_documented() {
+        let doc = ApiDoc::openapi();
+        let paths = &doc.paths.paths;
+        for expected in [
+            "/gov/me/standing",
+            "/gov/me/action-cards",
+            "/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt",
+        ] {
+            assert!(
+                paths.contains_key(expected),
+                "missing documented path: {expected}"
+            );
+        }
+
+        let schemas = doc
+            .components
+            .as_ref()
+            .expect("components present")
+            .schemas
+            .clone();
+        for expected in [
+            "StandingResponse",
+            "ActionCardsResponse",
+            "ActionCard",
+            "ActionItemCompletionReceipt",
+        ] {
+            assert!(
+                schemas.contains_key(expected),
+                "missing registered schema: {expected}"
+            );
+        }
+
+        let security_schemes = &doc
+            .components
+            .as_ref()
+            .expect("components present")
+            .security_schemes;
+        assert!(
+            security_schemes.contains_key("bearer_auth"),
+            "bearer_auth security scheme must be registered"
+        );
+    }
+}

@@ -3000,6 +3000,37 @@ pub async fn add_action_item_note<E: GovernanceEventEmitter + Clone + 'static>(
 ///   stored receipt's `domain_id`, or when the manager has no receipt
 ///   store wired (the receipt simply does not exist from the caller's
 ///   point of view).
+#[utoipa::path(
+    get,
+    path = "/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt",
+    tag = "governance",
+    params(
+        ("domain_id" = String, Path,
+            description = "Governance domain the action item lives under"),
+        ("item_id" = String, Path,
+            description = "Action item id (UUID). This is the same string an \
+                `action_item`-sourced action card carries in `source_id` — it links \
+                the card to its receipt. Accepts any valid UUID form; canonicalized \
+                before lookup.")
+    ),
+    responses(
+        (status = 200,
+            description = "Latest completion receipt persisted for the action item \
+                under this domain. `record_hash` is the blake3 canonical record hash \
+                binding the receipt fields, serialized as a JSON array of 32 bytes.",
+            body = icn_governance::ActionItemCompletionReceipt),
+        (status = 400, description = "Malformed action item id (not a valid UUID)"),
+        (status = 401, description = "Missing or invalid bearer token"),
+        (status = 403,
+            description = "Token lacks the `governance:read` scope, or the caller is \
+                not a member of the domain"),
+        (status = 404,
+            description = "No completion receipt persisted for this item, the receipt \
+                is bound to a different domain (cross-domain existence is not leaked), \
+                or the domain does not exist")
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn get_action_item_completion_receipt<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,
     http_req: HttpRequest,
@@ -5213,6 +5244,29 @@ pub async fn get_my_scopes<E: GovernanceEventEmitter + Clone + 'static>(
 /// A caller with no role assignments and no static membership receives a
 /// 200 with empty `domains`, `roles`, and `authority_scopes`. UI should
 /// render an onboarding affordance, not an error.
+#[utoipa::path(
+    get,
+    path = "/gov/me/standing",
+    tag = "governance",
+    params(
+        ("domain_id" = Option<String>, Query,
+            description = "Narrow `domains` and `roles` to one governance domain. An \
+                unknown `domain_id` returns a valid empty standing (200), not a 404 — \
+                \"no standing in that domain\" is a meaningful answer.")
+    ),
+    responses(
+        (status = 200,
+            description = "The caller's institutional standing. Self-only: the DID is \
+                always derived from the authenticated token; another DID's standing is \
+                not reachable here. A caller with no memberships and no role assignments \
+                receives 200 with empty `domains`, `roles`, and `authority_scopes` — \
+                empty standing is not an error.",
+            body = StandingResponse),
+        (status = 401, description = "Missing or invalid bearer token"),
+        (status = 403, description = "Token lacks the `governance:read` scope")
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn get_my_standing<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,
     http_req: HttpRequest,
@@ -5375,6 +5429,26 @@ pub async fn get_my_work<E: GovernanceEventEmitter + Clone + 'static>(
 ///
 /// There is no `did` query parameter. The caller's DID is always derived from
 /// the authenticated claims; no card-set for a third party is reachable here.
+#[utoipa::path(
+    get,
+    path = "/gov/me/action-cards",
+    tag = "governance",
+    responses(
+        (status = 200,
+            description = "Pending action cards for the caller, wrapped in \
+                `ActionCardsResponse` (`{did, cards, generated_at}`) — **not** a bare \
+                array. Cards are derived views computed at request time from the \
+                caller's standing plus open governance state; there is no mutation API \
+                on this surface — the holder acts on the underlying object named by \
+                `source_id` (ADR-0027). `cards` may be empty. Source/action/scope/risk \
+                fields use the closed enums `ActionCardSourceKind`, \
+                `ActionCardActionKind`, `ActionCardScope`, and `ActionCardRiskLevel`.",
+            body = ActionCardsResponse),
+        (status = 401, description = "Missing or invalid bearer token"),
+        (status = 403, description = "Token lacks the `governance:read` scope")
+    ),
+    security(("bearer_auth" = []))
+)]
 pub async fn get_my_action_cards<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,
     http_req: HttpRequest,
