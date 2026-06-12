@@ -90,9 +90,12 @@ log "institution package applied."
 
 # Dev-gated standing bootstrap (best-effort; the action-item loop does not
 # strictly require it, but the shell's standing pane is richer with it).
+# The endpoint bootstraps the AUTHENTICATED caller's DID (claims.sub) in the
+# given jurisdiction — the body carries jurisdiction_id only, never a DID
+# (see icn-gateway api/commons dev_bootstrap_standing).
 standing_note="bootstrap-standing: ok"
 if ! curl -sf -m 5 -X POST -H "$AUTH" -H 'Content-Type: application/json' \
-      -d "{\"did\":\"$DID\"}" "$GW/v1/commons/dev/bootstrap-standing" >/dev/null 2>&1; then
+      -d "{\"jurisdiction_id\":\"$DOMAIN\"}" "$GW/v1/commons/dev/bootstrap-standing" >/dev/null 2>&1; then
   standing_note="bootstrap-standing: unavailable (dev gate off or endpoint shape changed) — standing pane may be sparse; action-item loop unaffected"
   log "WARN: $standing_note"
 fi

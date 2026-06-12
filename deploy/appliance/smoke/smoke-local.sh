@@ -452,7 +452,15 @@ if [ "$DEMO" = 1 ]; then
         err "[demo] seed output incomplete: $SEED_JSON"
         exit 12
     fi
-    log "[demo] seeded: item $DEMO_ITEM in $DEMO_DOMAIN for $DEMO_DID"
+    # Fail closed if the standing bootstrap silently degraded — the standing
+    # pane is step 1 of the demo, and the seed downgrades a failed bootstrap
+    # to a warning that a happy-path check would never see.
+    STANDING_NOTE="$(jq -r '.standing_note // empty' <<<"$SEED_JSON")"
+    if [ "$STANDING_NOTE" != "bootstrap-standing: ok" ]; then
+        err "[demo] standing bootstrap did not succeed: $STANDING_NOTE"
+        exit 12
+    fi
+    log "[demo] seeded: item $DEMO_ITEM in $DEMO_DOMAIN for $DEMO_DID (standing bootstrap ok)"
 
     GWH="http://127.0.0.1:${GW_FWD_PORT}"
     AUTH="Authorization: Bearer $DEMO_JWT"
