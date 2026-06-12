@@ -98,9 +98,12 @@ session JWT (local VM only).
 
 ## The demo script (5 steps)
 
-1. **Inspect standing** — open the shell in live mode, paste the JWT from
-   `icn-demo-seed`. The standing pane shows the operator's domain
-   membership in the fictional NYCN institution.
+1. **Inspect standing** — open the shell in live mode, set the **Gateway
+   address** field to `http://localhost:18080` (the forwarded gateway —
+   the shell's default of `:8080` points at an unforwarded host port in
+   this setup), and paste the JWT from `icn-demo-seed`. The standing pane
+   shows the operator's domain membership in the fictional NYCN
+   institution.
 2. **Inspect the action card** — one open card: "Confirm Summit 2026 venue
    booking" (`action_item / complete`, fictional).
 3. **Discharge the action** — complete it in the shell (live-mode

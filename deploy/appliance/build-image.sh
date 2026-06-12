@@ -398,6 +398,14 @@ if [ "$DEMO_PROFILE" = "1" ]; then
         --run-command "chmod +x /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-reset.sh"
         --run-command "ln -sf /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-seed && ln -sf /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-verify && ln -sf /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-reset"
         --run-command "systemctl enable icn-member-shell.service"
+        # The bundled 13/13 evidence validator (icn-demo-verify --chain)
+        # needs the python3 jsonschema package. Debian genericcloud images
+        # provide it transitively via cloud-init; assert it here so a base
+        # image without it fails the BUILD with a clear message instead of
+        # failing the advertised --chain path at demo time. (No apt install:
+        # the libguestfs appliance cannot rely on network/DNS — see the
+        # python3-not-jq note in the demo scripts.)
+        --run-command "python3 -c \"import jsonschema\" || { echo \"ERROR: demo profile requires python3-jsonschema in the base image (Debian genericcloud ships it via cloud-init); this base image lacks it\" >&2; exit 1; }"
     )
 fi
 
