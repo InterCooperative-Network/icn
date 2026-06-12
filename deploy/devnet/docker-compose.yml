@@ -16,6 +16,10 @@ services:
       - ICN_METRICS_PORT=9100
       - ICN_BOOTSTRAP_PEERS=
       - ICN_KEYSTORE_PASSPHRASE=devnet-insecure
+      # Dev-gated demo endpoints (POST /v1/commons/dev/bootstrap-standing).
+      # Local devnet only — these gates must never be set in production.
+      - ICN_ENABLE_ADMIN_ENDPOINTS=true
+      - ICN_GOVERNANCE_BUILD_MODE=test
       - ICN_GENESIS_FILE=/devnet/genesis.json
       - RUST_LOG=info,icn_core=debug,icn_gossip=debug,icn_net=debug
     ports:
@@ -51,6 +55,10 @@ services:
       - ICN_METRICS_PORT=9100
       - ICN_BOOTSTRAP_PEERS=icn://node-a:9000
       - ICN_KEYSTORE_PASSPHRASE=devnet-insecure
+      # Dev-gated demo endpoints (POST /v1/commons/dev/bootstrap-standing).
+      # Local devnet only — these gates must never be set in production.
+      - ICN_ENABLE_ADMIN_ENDPOINTS=true
+      - ICN_GOVERNANCE_BUILD_MODE=test
       - ICN_GENESIS_FILE=/devnet/genesis.json
       - RUST_LOG=info,icn_core=debug,icn_gossip=debug,icn_net=debug
     ports:
@@ -89,6 +97,10 @@ services:
       - ICN_METRICS_PORT=9100
       - ICN_BOOTSTRAP_PEERS=icn://node-a:9000,icn://node-b:9000
       - ICN_KEYSTORE_PASSPHRASE=devnet-insecure
+      # Dev-gated demo endpoints (POST /v1/commons/dev/bootstrap-standing).
+      # Local devnet only — these gates must never be set in production.
+      - ICN_ENABLE_ADMIN_ENDPOINTS=true
+      - ICN_GOVERNANCE_BUILD_MODE=test
       - ICN_GENESIS_FILE=/devnet/genesis.json
       - RUST_LOG=info,icn_core=debug,icn_gossip=debug,icn_net=debug
     ports:

@@ -1,329 +1,160 @@
-# A Federation in Motion — Self-Serve Quickstart
+# See ICN Run — Self-Serve Quickstart
 
-You don't need to know how ICN works to run this demo. Start here.
+You don't need to know how ICN works to run this. You need a laptop,
+and depending on the path you pick: nothing else, Docker, or a Rust
+toolchain. **Nothing here requires anyone's cluster, homelab, or
+private infrastructure.**
+
+Every path below is labeled with its honesty tier:
+
+- **live-local** — real ICN runtime (`icnd` + gateway) running on your
+  machine, producing real signed records you can audit.
+- **fixture-backed** — presentation surfaces rendering committed,
+  CI-drift-guarded fixture data. No backend. By design.
+- **design-only** — specified, not runnable. We say so rather than fake it.
+
+Things no path demonstrates, because they don't exist yet: production
+deployments, a live multi-organization federation, member-facing apps
+in real use, private-data handling. There is no pilot. See
+[`docs/strategy/ICN_HARD_QUESTIONS.md`](../docs/strategy/ICN_HARD_QUESTIONS.md)
+for the unvarnished status.
 
 ---
 
 ## What You're Looking At
 
-Four cooperative organizations, each running a live node:
+ICN is coordination infrastructure for cooperatives: it turns
+decisions and work into **legible obligations** and **verifiable
+receipts** on infrastructure the group controls. The loop every path
+below demonstrates, in part or in full:
 
-| Coop | Type | The question it answers |
-|------|------|------------------------|
-| **BrightWorks Cooperative** | Worker coop | Why did this member get this patronage allocation? |
-| **River City Tool Library** | Community coop | How does a shared-resource coop track member contributions? |
-| **Harbor Homes Cooperative** | Housing coop | Did the vote that authorized this $12,000 spend actually happen? |
-| **Finger Lakes CDN** | Intermediate org | Can a regional federation support member coops without owning them? |
+> work → obligation → action card → discharge → receipt → audit
 
-These are four separate ICN nodes, running on a four-node Kubernetes cluster. Each has its own governance, its own ledger, and its own identity. They coordinate without a central server.
-
-The demo shows four flows, each answering a different cooperative problem. You can run them in order or pick the one relevant to your audience.
+A receipt is an evidence record — it proves *this actor* discharged
+*this obligation* at *this time*. It is not currency, not a token, and
+not a payment. Nothing here is a financial product.
 
 ---
 
-## Prerequisites
+## Path 0 — Two minutes, zero build (fixture-backed)
 
-You need:
-- `kubectl` configured against the K3s cluster (`kubectl get pods -A` should show ICN pods)
-- `curl` and `python3` (standard on most Unix systems)
-- About 5 minutes per flow
-
-You do NOT need: Rust, cargo, npm, a local ICN build, or knowledge of how the protocol works.
-
----
-
-## Step 0 (first time only): Verify the cluster ratifies the scripts
-
-Before going live with a real audience, run the rehearsal probe from icn-dev (10.8.30.45):
+See the member-facing surfaces render: standing, action cards,
+plain-language receipts.
 
 ```bash
-ssh ubuntu@10.8.30.45
-cd /path/to/icn
-./demo/scripts/reseed-federation-demo.sh      # seed known state first
-./demo/scripts/rehearsal-probe.sh             # run the five-unknown probe
+git clone https://github.com/InterCooperative-Network/icn
+cd icn/web/pilot-ui
+python3 -m http.server 8000
+# open http://localhost:8000/?mode=demo
 ```
 
-Expected output ends with:
-```
-✓ CONFIRMED   5 / 5
-```
+In demo mode the standing and action-cards sections read committed
+fixture JSON (`web/pilot-ui/fixtures/icn-organizer-demo/`) instead of
+a gateway. The fixtures use fictional identities
+(`did:icn:example-*-not-live`) and are CI-checked against the real API
+schemas, so what you see is shaped exactly like live data — but it is
+**fixture-backed**: no node is running and nothing is signed.
 
-If any probe shows `MISMATCH`, read the note next to it — each one says exactly how to adapt the flow script. Run reseed again after probing to clean up probe proposals.
+## Path 1 — The proof, one command (live-local)
 
-You only need to do this once per cluster rebuild or ICN binary update.
-
----
-
-## Step 1: Reset to canonical state
-
-Always start here. This ensures the demo is in a known, clean state:
+The strongest single artifact ICN has: a governed proposal → vote →
+close → allocation driven over a real, JWT-secured local gateway,
+ending in a **13/13 receipt-chain audit** (`icnctl audit verify`).
 
 ```bash
-cd /path/to/icn
-./demo/scripts/reseed-federation-demo.sh
+git clone https://github.com/InterCooperative-Network/icn
+cd icn
+bash scripts/local_receipt_chain_13of13_rehearsal.sh
 ```
 
-Expected output ends with:
-```
-=== Reseed summary ===
-✓ Seeded: N
-· Skipped: M (already in place)
-✓ Failed: 0
-```
+Requirements: Rust toolchain (rustup), ~10 GB disk. The first run
+compiles the workspace — **20–60+ minutes depending on your machine**.
+The run ends with `RESULT: PASS` and writes a schema-valid evidence
+packet to `demo/output/receipt-chain-13of13/`.
 
-If you see `Failed: N > 0`, check that the cluster is healthy:
-```bash
-kubectl get pods -A | grep icn-
-```
+This is dev-gated and local: the script seeds standing/trust through
+explicitly dev-only switches that do not exist in production
+configuration. What it proves is the receipt chain and audit path, on
+hardware you control. Last verified from a clean checkout: 2026-06-11.
 
-All four ICN pods should show `1/1 Running`.
+## Path 2 — The story, one command (live-local)
 
----
-
-## Step 2: Run a flow
-
-Pick the flow that matches your audience:
+The cooperative-work narrative end to end: a piece of organizing work
+becomes a tracked obligation, shows up as an action card, gets
+discharged, and produces a hash-bound completion receipt.
 
 ```bash
-# Flow 1: Harbor Homes — governance and action traceability (~5 min)
-./demo/scripts/flow-1-governance.sh
-
-# Flow 2: BrightWorks — patronage and contribution legibility (~5 min)
-./demo/scripts/flow-2-patronage.sh
-
-# Flow 3: River City + BrightWorks — federation agreement (~7 min)
-./demo/scripts/flow-3-federation.sh
-
-# Flow 4: Finger Lakes CDN — audit view across all coops (~5 min, optional)
-./demo/scripts/flow-4-reporting.sh
+# from the repository root (the directory you cloned, e.g. `cd icn`)
+cargo build --release -p icnd -p icnctl --manifest-path icn/Cargo.toml   # skip if Path 1 already built these
+export ICN_PASSPHRASE=demo-anything   # protects a local throwaway keystore
+bash demo/nycn-dogfood/run.sh --fresh --record
 ```
 
-For the full demo, run them in order: 1, 2, 3, (optionally 4).
+The build line is a no-op if Path 1 already compiled the workspace —
+the script itself only checks for the binaries, it does not build them.
+`--record` renders an HTML transcript under
+`demo/nycn-dogfood/runs/<timestamp>/` you can replay for an audience.
 
----
+Two honest footnotes:
+- **If you already run ICN on this machine** (an `~/.icn/identity.age`
+  exists), the script binds to that operator identity and will fail
+  with a mismatched passphrase. Run hermetically:
+  `HOME=$(mktemp -d) ICN_PASSPHRASE=demo-anything bash demo/nycn-dogfood/run.sh --fresh --record`
+- The local node stays running after the script exits (the next
+  `--fresh` run reclaims it). That's deliberate — the node belongs to
+  the cooperative — but don't be surprised by the leftover process.
 
-## What the Output Means
+Last verified from a clean checkout: 2026-06-11.
 
-Each script uses colored output:
+## Path 3 — Three nodes on your laptop (live-local, Docker)
 
-- **White text**: Narrator line — what's happening, who's doing it
-- **Green ✓ lines**: Something succeeded
-- **Yellow · lines**: Notes and context for the presenter
-- **Yellow ⚠ lines**: Expected gaps or deployment constraints
-- **Red ✗ lines**: Something failed that needs attention
+Boot a three-node devnet and run the governance demonstration suite
+against two independent nodes.
 
-### The expected yellow notes
-
-Some endpoints return 403 or 404 in the current cluster. This is expected — not broken. The scripts narrate what the response would show in a fully configured deployment. Look for:
-
-```
-· Treasury API is not yet reachable in this deployment (scope 'treasury:read'
-· is not in ALLOWED_SCOPES — this is a deployment gap, not a design gap)
-```
-
-This means the treasury API works — but the auth scope that grants access to it hasn't been added to the demo token yet. The governance flows work fine without it.
-
-```
-· Proof endpoint returned 404 — signing key not configured in this pod
-```
-
-The governance proof endpoint (GovernanceReceipt) exists in the code. The pod's signing key isn't configured in this deployment. The governance record itself is still present and auditable.
-
----
-
-## What Each Flow Shows
-
-### Flow 1 — Governance Legitimacy (Harbor Homes)
-
-**The cooperator question:** "Did the thing we voted on actually happen, and can we prove it?"
-
-The script:
-1. Creates a governance domain for Harbor Homes' capital reserve
-2. Creates a proposal: authorize a $12,000 roof repair
-3. Opens it for voting
-4. Casts a vote
-5. Shows the vote tally
-6. Closes the proposal — result is final
-7. Attempts to retrieve a cryptographic governance proof
-8. Shows the full provenance: proposal → vote → decision → authorized action
-
-What you'll see at the end:
-```
-================================================================
- FLOW 1A COMPLETE
- Governance legitimacy and action traceability demonstrated.
-...
-```
-
-The proposal ID in the output is the permanent on-chain reference. Any Harbor Homes member can query it by ID.
-
-### Flow 2 — Patronage and Value (BrightWorks)
-
-**The cooperator question:** "Why did this member get this distribution?"
-
-The script:
-1. Introduces BrightWorks' Q1 figures (524 total labor hours, 3,840 credits to distribute)
-2. Finds the pre-seeded Q1 patronage proposal
-3. Shows the allocation table: each member's hours, formula, and resulting credits
-4. Opens the proposal for member ratification vote
-5. Casts the vote
-6. Closes the proposal
-7. Attempts a ledger settlement — posts credits with the governance decision ID as provenance
-8. Shows the member's ledger position
-
-The allocation formula is: `credits = (member_hours / 524) × 3,840`
-
-Every member can verify their allocation from the proposal — no trust in the treasurer required.
-
-### Flow 3 — Federation Coordination (River City + BrightWorks)
-
-**The cooperator question:** "How do independent co-ops work together without creating another bureaucracy?"
-
-The script:
-1. Connects to all three relevant nodes (River City, BrightWorks, Finger Lakes CDN)
-2. Shows current federation status from each node's perspective
-3. River City holds an internal governance vote: authorize equipment access
-4. BrightWorks holds an independent governance vote: authorize maintenance contribution
-5. Finger Lakes CDN registers both coops and issues vouches
-6. Creates a clearing agreement to track the value exchange
-7. Queries governance records from all three nodes simultaneously
-
-Key moment to watch: **Step 9** — three separate queries to three separate URLs, each returning the same agreement from a different perspective. No central server holds the authoritative record.
-
-### Flow 4 — Institutional Reporting (Finger Lakes CDN)
-
-**The institutional question:** "Can this produce trustworthy reporting without adding massive admin overhead?"
-
-The script:
-1. Authenticates against all four nodes
-2. Queries Harbor Homes' governance records for capital decisions
-3. Queries BrightWorks' governance records for patronage ratification
-4. Queries River City's governance records for federation agreements
-5. Queries BrightWorks' ledger history for allocation provenance
-6. Shows Finger Lakes CDN's federation-level view
-7. Assembles a grant report from the queried evidence
-
----
-
-## The Architecture in One Paragraph
-
-ICN is a P2P coordination substrate. Each cooperative runs its own node (`icnd` daemon). The nodes gossip with each other but each maintains its own authoritative state. There is no central database. Governance is actor-based: proposals go through GovernanceActor, which manages domains (governance contexts), proposals, votes, and tallies. Ledger balances are double-entry with a Merkle-DAG for provenance. The federation layer handles cross-coop trust and value clearing. The gateway (port 8080) is a REST API that the demo scripts call via `curl`. Auth is DID-based challenge-response, handled transparently by `icnctl` inside each pod.
-
----
-
-## Troubleshooting
-
-### "demo_wait_ready: timed out"
-
-A gateway didn't come up. Check pods:
 ```bash
-kubectl get pods -A | grep icn-
+# from the repository root (the directory you cloned, e.g. `cd icn`)
+docker compose -f deploy/devnet/docker-compose.yml build   # one-time; long
+bash demo/run-all.sh
 ```
 
-If a pod is `0/1 Running` or `CrashLoopBackOff`:
-```bash
-kubectl logs -n icn-coop-gamma $(kubectl get pod -n icn-coop-gamma -o name | head -1) --tail=20
-```
+Requirements: Docker + compose, python3 with the `cryptography`
+package. The image build compiles the workspace inside Docker —
+budget an hour on a small machine. Ends with a per-node pass/fail
+summary box.
 
-If the pod is fine but port 8080 isn't bound, the gateway patch may need reapplying. See `deploy/k8s/multi-node/gateway-patch.yaml`.
+Three independent nodes on one machine is **not** a federation of
+independent organizations — it demonstrates that nodes are
+self-contained, not that production federation exists (that remains
+design-only).
 
-### "Could not obtain token"
+## Presenter path — scripted flows on owned infrastructure
 
-`demo_get_token` runs `icnctl auth token` inside the pod. If that fails:
-```bash
-kubectl exec -n icn-coop-gamma \
-  $(kubectl get pod -n icn-coop-gamma -o name | head -1) \
-  -- icnctl auth token \
-  --coop-id harbor-homes-cooperative \
-  --scopes "governance:write,governance:read"
-```
+`demo/scripts/flow-1-governance.sh` through `flow-5-compute.sh` (plus
+`reseed-federation-demo.sh`, `rehearsal-probe.sh`, `present.sh`) are
+presenter-driven flows written for a multi-node deployment the
+presenter operates — they assume a seeded cluster and a reachable
+gateway, and some narrate known deployment gaps (403/404 with a
+yellow note) rather than hiding them. If you are not the presenter,
+Paths 0–3 are your versions of the same claims, minus the cluster.
 
-If `icnctl` is not found in the pod, the container image needs to be rebuilt with icnctl included.
+### Reading the output (all paths)
 
-### "Proposal creation failed"
-
-Most proposal failures are `422 Unprocessable Entity` — the domain ID doesn't exist yet. The domain is created by `reseed-federation-demo.sh`. Re-run reseed first.
-
-### "Reseed shows Failed: N"
-
-Each failure has an explanation printed above the summary. Common causes:
-- Pod not ready (wait 30s, try again)
-- Domain already exists and name-uniqueness check failed (usually harmless — see the `aside` lines)
-- Token fetch failed (check `kubectl exec` above)
-
-### "I ran the flow but nothing seems to have happened"
-
-The demo cluster uses in-memory state. If a pod restarted since the last reseed, all prior state (proposals, domains, coop records) was wiped. Run reseed again:
-```bash
-./demo/scripts/reseed-federation-demo.sh
-```
+- **White**: narrator — what's happening, who's doing it
+- **Green ✓**: succeeded, verified
+- **Yellow ·/⚠**: presenter context, or an expected, narrated gap
+- **Red ✗**: actually broken — a red line in a fresh checkout is a bug,
+  and a bug report is a welcome contribution
 
 ---
 
-## Resetting After a Demo
+## After the demo
 
-The demo is fully resettable:
-```bash
-./demo/scripts/reseed-federation-demo.sh
-```
+- What each claim is allowed to assert, with evidence links:
+  [`docs/strategy/ICN_INTRODUCTION_EVIDENCE_MAP.md`](../docs/strategy/ICN_INTRODUCTION_EVIDENCE_MAP.md)
+- The hard questions, answered without marketing:
+  [`docs/strategy/ICN_HARD_QUESTIONS.md`](../docs/strategy/ICN_HARD_QUESTIONS.md)
+- Current truth, per-PR: [`docs/STATE.md`](../docs/STATE.md)
 
-This:
-- Closes any stale open proposals (can't delete them, so closes them)
-- Re-creates the canonical coop records and governance domains
-- Re-seeds the Q1 patronage proposal for Flow 2
-- Leaves Harbor Homes and River City/BrightWorks clean for live flow runs
-
-It's safe to run multiple times. It's idempotent.
-
----
-
-## File Map
-
-```
-demo/
-├── scripts/
-│   ├── reseed-federation-demo.sh   # Reset to canonical state (run first)
-│   ├── lib-demo-ports.sh           # Shared port-forward + auth library
-│   ├── lib-demo-ports.sh.test      # Smoke tests for the library
-│   ├── rehearsal-probe.sh          # Pre-demo sanity probe (run BEFORE first live demo)
-│   ├── flow-1-governance.sh        # Harbor Homes roof repair (governance)
-│   ├── flow-2-patronage.sh         # BrightWorks Q1 patronage (value legibility)
-│   ├── flow-3-federation.sh        # River City + BrightWorks (federation)
-│   └── flow-4-reporting.sh         # Finger Lakes CDN audit view (optional)
-├── data/
-│   ├── brightworks-members.json    # BrightWorks member roster + labor hours
-│   ├── rivercity-members.json      # River City member roster + contribution hours
-│   ├── harborhomes-members.json    # Harbor Homes member roster + capital reserve
-│   ├── fingerlakes-members.json    # Finger Lakes CDN staff + member coops
-│   ├── federation-proposals.json   # Canonical proposal definitions for all flows
-│   └── federation-history.json     # Historical cross-coop transactions (narrative)
-└── docs/
-    ├── FEDERATION_RUNBOOK.md       # Full presenter runbook (speaking notes, fallback)
-    ├── SELF_SERVE.md               # This file
-    ├── api-map.md                  # Complete gateway API map
-    └── gateway-secrets.md          # JWT secret topology and regeneration
-```
-
----
-
-## What's Not Shown in This Demo
-
-**PR #1327 (ExecutionReceiptGate):** When this merges, Flow 1 upgrades from "governance and action are visible and linked" to "execution is cryptographically bound to the approved governance decision." The proof endpoint will return a signed GovernanceReceipt. Until then, the governance record is the audit trail.
-
-**Pilot UI:** The demo is terminal-first. There's a web UI at http://10.8.30.40:30030 that shows coops, proposals, and balances. It's useful as a visual anchor for non-technical audiences.
-
-**gRPC:** The nodes also expose a gRPC interface (ports 30651/30658/30649/30655). The demo uses the HTTP gateway exclusively.
-
-**Mobile SDK:** A React Native SDK exists. Not in scope for this demo.
-
----
-
-## For the Presenter
-
-The full speaking notes, duration variants (5 / 12 / 20 minutes), fallback protocol, and audience-specific framing are in:
-
-```
-demo/docs/FEDERATION_RUNBOOK.md
-```
-
-Read that before going live.
+If something above is overclaimed, file an issue saying exactly that.
+That's not politeness — the evidence-gated introduction discipline is
+the product working as intended.

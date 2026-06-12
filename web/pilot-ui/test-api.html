@@ -9,10 +9,14 @@
     <pre id="output"></pre>
 
     <script>
-    const TOKEN = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkaWQ6aWNuOnpCRm5oSmhndlJqZ3VraFFta3E5ZGRCejV3aUV0MzJwdGtRa0JEald4NnVQaCIsImlhdCI6MTc2NjA5NTU0MSwiZXhwIjoxNzY2MDk5MTQxLCJjb29wX2lkIjoicm9jaGVzdGVyLXRvb2wtbGlicmFyeSIsInNjb3BlcyI6WyJsZWRnZXI6cmVhZCIsImxlZGdlcjp3cml0ZSIsImNvb3A6cmVhZCIsImdvdjpyZWFkIiwiZ292OndyaXRlIl19.P1lN9Kx1Uf67I2dBggFn8Px1KEXNiiXjaTQxK7MkyCI';
+    const TOKEN = 'PASTE-DEV-TOKEN-HERE';
     
     async function testAPI() {
         const output = document.getElementById('output');
+        if (TOKEN === 'PASTE-DEV-TOKEN-HERE') {
+            output.textContent = 'No dev token set. Paste a real dev token into the TOKEN constant at the top of this file, then retry.\n';
+            return;
+        }
         output.textContent = 'Testing...\n';
         
         try {
