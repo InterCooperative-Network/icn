@@ -62,7 +62,7 @@ Use active documentation under <code>docs/</code> as authoritative.</p>
 localStorage.setItem(&#39;icn-gateway&#39;, &#39;http://localhost:8080&#39;);
 localStorage.setItem(&#39;icn-coop&#39;, &#39;rochester-tool-library&#39;);
 localStorage.setItem(&#39;icn-did&#39;, &#39;did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh&#39;);
-localStorage.setItem(&#39;icn-token&#39;, &#39;eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkaWQ6aWNuOnpCRm5oSmhndlJqZ3VraFFta3E5ZGRCejV3aUV0MzJwdGtRa0JEald4NnVQaCIsImlhdCI6MTc2NjA5NTA3MiwiZXhwIjoxNzY2MDk4NjcyLCJjb29wX2lkIjoicm9jaGVzdGVyLXRvb2wtbGlicmFyeSIsInNjb3BlcyI6WyJsZWRnZXI6cmVhZCIsImxlZGdlcjp3cml0ZSIsImNvb3A6cmVhZCIsImdvdjpyZWFkIiwiZ292OndyaXRlIl19.DvDXir5YbuSa5hLcg6WsBt6dZBIr9K4Drcc5bZFA6TM&#39;);
+localStorage.setItem(&#39;icn-token&#39;, &#39;PASTE-DEV-TOKEN-HERE&#39;);
 localStorage.setItem(&#39;icn-token-expiry&#39;, &#39;1766098672000&#39;);
 location.reload();
 </code></pre>
@@ -87,7 +87,7 @@ location.reload();
 <hr>
 <h2>Verify API Works</h2>
 <p>The API is working fine! Test it yourself:</p>
-<pre><code class="language-bash">TOKEN=&quot;eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkaWQ6aWNuOnpCRm5oSmhndlJqZ3VraFFta3E5ZGRCejV3aUV0MzJwdGtRa0JEald4NnVQaCIsImlhdCI6MTc2NjA5NTA3MiwiZXhwIjoxNzY2MDk4NjcyLCJjb29wX2lkIjoicm9jaGVzdGVyLXRvb2wtbGlicmFyeSIsInNjb3BlcyI6WyJsZWRnZXI6cmVhZCIsImxlZGdlcjp3cml0ZSIsImNvb3A6cmVhZCIsImdvdjpyZWFkIiwiZ292OndyaXRlIl19.DvDXir5YbuSa5hLcg6WsBt6dZBIr9K4Drcc5bZFA6TM&quot;
+<pre><code class="language-bash">TOKEN=&quot;PASTE-DEV-TOKEN-HERE&quot;
 
 curl &quot;http://localhost:8080/v1/coops/rochester-tool-library&quot; \
   -H &quot;Authorization: Bearer $TOKEN&quot; | jq .
@@ -112,7 +112,7 @@ curl &quot;http://localhost:8080/v1/ledger/rochester-tool-library/balance/did:ic
 <pre><code class="language-javascript">localStorage.setItem(&#39;icn-gateway&#39;, &#39;http://localhost:8080&#39;);
 localStorage.setItem(&#39;icn-coop&#39;, &#39;rochester-tool-library&#39;);
 localStorage.setItem(&#39;icn-did&#39;, &#39;did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh&#39;);
-localStorage.setItem(&#39;icn-token&#39;, &#39;eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkaWQ6aWNuOnpCRm5oSmhndlJqZ3VraFFta3E5ZGRCejV3aUV0MzJwdGtRa0JEald4NnVQaCIsImlhdCI6MTc2NjA5NTA3MiwiZXhwIjoxNzY2MDk4NjcyLCJjb29wX2lkIjoicm9jaGVzdGVyLXRvb2wtbGlicmFyeSIsInNjb3BlcyI6WyJsZWRnZXI6cmVhZCIsImxlZGdlcjp3cml0ZSIsImNvb3A6cmVhZCIsImdvdjpyZWFkIiwiZ292OndyaXRlIl19.DvDXir5YbuSa5hLcg6WsBt6dZBIr9K4Drcc5bZFA6TM&#39;);
+localStorage.setItem(&#39;icn-token&#39;, &#39;PASTE-DEV-TOKEN-HERE&#39;);
 localStorage.setItem(&#39;icn-token-expiry&#39;, &#39;1766098672000&#39;);
 location.reload();
 </code></pre>
