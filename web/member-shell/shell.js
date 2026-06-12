@@ -344,6 +344,18 @@
       ACTION_KIND_LABEL[card.action_kind] || ("Act (" + String(card.action_kind) + ")"));
     kvRow(dl, "Where this comes from",
       SOURCE_KIND_LABEL[card.source_kind] || String(card.source_kind));
+    // The member must see WHICH domain this card acts in before confirming,
+    // not just the constitutional axis (spec: "What scope am I acting in?").
+    // standing.domains carries the human-readable name for the card's domain.
+    var domainName = String(card.domain_id);
+    var domains = (standing && standing.domains) || [];
+    for (var di = 0; di < domains.length; di++) {
+      if (domains[di].domain_id === card.domain_id) {
+        domainName = (domains[di].domain_name || String(card.domain_id));
+        break;
+      }
+    }
+    kvRow(dl, "Where this applies", domainName);
     kvRow(dl, "Scope", SCOPE_LABEL[card.scope] || String(card.scope));
     kvRow(dl, "Why you can act here", card.authority_basis || "(no authority basis given)");
 
