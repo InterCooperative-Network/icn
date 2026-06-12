@@ -79,7 +79,7 @@ icn-ledger-app = { path = "../../../apps/ledger", features = ["utoipa"] }
 icn-store = { path = "../icn-store" }
 icn-rpc = { path = "../icn-rpc" }
 icn-obs = { path = "../icn-obs" }
-icn-governance = { path = "../icn-governance" }
+icn-governance = { path = "../icn-governance", features = ["utoipa"] }
 icn-governance-actor = { path = "../../apps/governance" }
 icn-http-kit = { path = "../icn-http-kit" }
 icn-compute = { path = "../icn-compute" }

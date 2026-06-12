@@ -81,10 +81,14 @@ pub use icn_kernel_api::governance::{
     TreasuryExecutor, TreasuryOperation, TreasuryOperationType,
 };
 
-// Re-export governance types needed by supervisor initialization.
-// This allows icn-core to import from icn_governance_actor instead of
-// icn_governance directly, reducing direct governance coupling.
-pub use icn_governance::{ForcedOutcome, MembershipResolver, ProposalId, StaticMembershipResolver};
+// Re-export governance types needed by supervisor initialization and by
+// the gateway's OpenAPI registration. This allows icn-core and icn-gateway
+// to import from icn_governance_actor instead of icn_governance directly,
+// reducing direct governance coupling (meaning-firewall ratchets).
+pub use icn_governance::{
+    ActionItemCompletionReceipt, ActionItemTransition, ForcedOutcome, MembershipResolver,
+    ProposalId, StaticMembershipResolver,
+};
 
 /// Create a ProposalExecutor instance.
 ///
