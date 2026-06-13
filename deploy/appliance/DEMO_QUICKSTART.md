@@ -164,11 +164,13 @@ manual `?mode=live` paste flow below is the advanced/debug path.)
   whole-disk reset, nothing persists.
 - In-place: `ssh -p 2222 debian@127.0.0.1 sudo icn-demo-reset` destroys
   node state and re-runs firstboot.
-- Reseed — **launcher (recommended live path):** rerun the one-command
-  launcher, or click **Start local demo** again; it seeds one fresh card with
-  no JWT to paste. **Manual / debug fallback:** `sudo icn-demo-seed` reseeds
-  directly but prints a local DEV credential — keep that credential out of
-  docs, screenshots, terminal transcripts, and PRs.
+- Reseed — **launcher (recommended live path):** reload the launcher (rerun the
+  one-command launcher, or refresh the launcher URL) and click **Start local
+  demo** — the Start button only shows on a fresh page load, so a reset alone
+  won't restore it on an already-open tab. It seeds one fresh card with no JWT
+  to paste. **Manual / debug fallback:** `sudo icn-demo-seed` reseeds directly
+  but prints a local DEV credential — keep that credential out of docs,
+  screenshots, terminal transcripts, and PRs.
 
 ## Troubleshooting
 
