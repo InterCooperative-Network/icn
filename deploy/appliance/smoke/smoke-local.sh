@@ -443,18 +443,24 @@ if [ "$DEMO" = 1 ]; then
     # gateway actually allows the shell origin for the configured forward
     # port, so a custom SHELL_FWD_PORT outside the image's CORS allowlist
     # cannot produce a DEMO PASS that a real browser would contradict.
-    log "[demo] CORS preflight for browser origin http://localhost:${SHELL_FWD_PORT}..."
-    CORS_HEADERS="$(curl -s -m 10 -X OPTIONS -D - -o /dev/null \
-        -H "Origin: http://localhost:${SHELL_FWD_PORT}" \
-        -H "Access-Control-Request-Method: GET" \
-        -H "Access-Control-Request-Headers: authorization" \
-        "http://127.0.0.1:${GW_FWD_PORT}/v1/gov/me/standing" 2>/dev/null)"
-    if ! grep -qiE "access-control-allow-origin: *(http://localhost:${SHELL_FWD_PORT}|\*)" <<<"$CORS_HEADERS"; then
-        err "[demo] gateway CORS does not allow http://localhost:${SHELL_FWD_PORT} — a real browser would fail here even though curl checks pass."
-        err "[demo] the demo image allowlists shell ports 8090/18090; use those, or extend ICN_CORS_ORIGINS in the image's icnd drop-in."
-        exit 11
-    fi
-    log "[demo] CORS preflight ok for http://localhost:${SHELL_FWD_PORT}."
+    # Assert BOTH loopback spellings for the configured port: the smoke
+    # prints 127.0.0.1 URLs while docs use localhost, and the browser sends
+    # whichever the operator typed. The demo drop-in allowlists both for
+    # the supported ports; a custom port must too.
+    for ORIGIN in "http://localhost:${SHELL_FWD_PORT}" "http://127.0.0.1:${SHELL_FWD_PORT}"; do
+        log "[demo] CORS preflight for browser origin ${ORIGIN}..."
+        CORS_HEADERS="$(curl -s -m 10 -X OPTIONS -D - -o /dev/null \
+            -H "Origin: ${ORIGIN}" \
+            -H "Access-Control-Request-Method: GET" \
+            -H "Access-Control-Request-Headers: authorization" \
+            "http://127.0.0.1:${GW_FWD_PORT}/v1/gov/me/standing" 2>/dev/null)"
+        if ! grep -qiE "access-control-allow-origin: *(${ORIGIN}|\*)" <<<"$CORS_HEADERS"; then
+            err "[demo] gateway CORS does not allow ${ORIGIN} — a real browser at that URL would fail even though curl checks pass."
+            err "[demo] the demo image allowlists both loopback spellings for shell ports 8090/18090; use those, or extend ICN_CORS_ORIGINS in the image's icnd drop-in."
+            exit 11
+        fi
+    done
+    log "[demo] CORS preflight ok for both loopback origins on port ${SHELL_FWD_PORT}."
 
     log "[demo] Seeding the demo loop in the VM (sudo icn-demo-seed --json)..."
     SEED_JSON="$(run_in_vm "sudo icn-demo-seed --json" 2>/dev/null)" || {
