@@ -333,14 +333,19 @@ that can <em>prove</em> it.</p>
 </tr>
 </thead>
 <tbody><tr>
+<td>Browser does not open</td>
+<td>No <code>xdg-open</code>/opener, or a headless workstation</td>
+<td>The launcher prints the shell URL — open it manually. Or run with <code>ICN_DEMO_NO_BROWSER=1</code> to set up the tunnels and just print the URL.</td>
+</tr>
+<tr>
 <td>Launcher exits &quot;host port already in use&quot;</td>
 <td>18080/18090/18091 busy on your workstation</td>
-<td>Free the port, or override <code>ICN_DEMO_GW_PORT</code> / <code>ICN_DEMO_SESSION_PORT</code> (shell stays 18090).</td>
+<td>Free the port, or override <code>ICN_DEMO_GW_PORT</code> / <code>ICN_DEMO_SESSION_PORT</code>. <strong>Shell port 18090 is fixed</strong> — if <em>it</em> is busy you must free it; there is no shell-port override (the launcher&#39;s port-conflict hint that names one is misleading).</td>
 </tr>
 <tr>
 <td>Launcher &quot;SSH tunnel exited before it came up&quot;</td>
-<td>Can&#39;t SSH the node / wrong key / wrong route</td>
-<td>Confirm you can <code>ssh &lt;user&gt;@&lt;node-ip&gt;</code> with your key, or set <code>ICN_DEMO_JUMP</code> to route through a host that can.</td>
+<td>Can&#39;t SSH the node, wrong/missing key, or wrong route</td>
+<td>Direct route: confirm <code>ssh &lt;user&gt;@&lt;node-ip&gt;</code> works and <code>ICN_DEMO_SSH_KEY</code> points at the demo key (the launcher exits early if the key file is missing). Jump route: set <code>ICN_DEMO_JUMP</code> <strong>and</strong> <code>ICN_DEMO_REMOTE_KEY</code> (the key path <em>on the jump host</em>).</td>
 </tr>
 <tr>
 <td>Tunnel up but member-shell never answers</td>
@@ -348,9 +353,19 @@ that can <em>prove</em> it.</p>
 <td>Wait for first boot; check <code>systemctl status icnd icn-demo-session</code> in the VM.</td>
 </tr>
 <tr>
-<td>&quot;Start local demo&quot; does nothing / standing never loads</td>
-<td>Session endpoint gated off, or dev gates not set</td>
-<td>Confirm the image is a <strong>demo-profile</strong> image; check <code>journalctl -u icn-demo-session</code>.</td>
+<td>&quot;Start local demo&quot; returns <strong>403</strong></td>
+<td>Read the JSON error — two distinct causes</td>
+<td><code>origin not allowed</code> = the page is not on an allowed shell origin. The launcher serves it at <code>http://localhost:18090</code>; the allow-list is exactly the two loopback spellings on the fixed shell port — <code>http://localhost:18090</code> and <code>http://127.0.0.1:18090</code> — so don&#39;t change the shell port. <code>demo session disabled (not a DEV/DEMO posture)</code> = dev gates off; confirm a <strong>demo-profile</strong> image and check <code>journalctl -u icn-demo-session</code> (it logs <code>refused: dev gates off</code>).</td>
+</tr>
+<tr>
+<td>&quot;Start local demo&quot; returns <strong>500</strong></td>
+<td>The seed failed inside the VM</td>
+<td><code>journalctl -u icn-demo-session</code>. The common case is <code>standing bootstrap degraded</code>; run <code>sudo icn-demo-reset &amp;&amp; sudo icn-demo-seed --json</code> and confirm <code>&quot;standing_note&quot;: &quot;bootstrap-standing: ok&quot;</code>.</td>
+</tr>
+<tr>
+<td>Session worked but gateway calls then fail</td>
+<td>Gateway forward/origin wrong (separate from the session endpoint)</td>
+<td>The session endpoint (18091) and the gateway (18080) are independent. Confirm <code>gateway→18080</code> is tunnelled and the page&#39;s gateway field reads <code>http://localhost:18080</code>; a non-18090 page origin also fails the gateway&#39;s own CORS.</td>
 </tr>
 <tr>
 <td>Authenticated calls fail CORS</td>
@@ -358,9 +373,29 @@ that can <em>prove</em> it.</p>
 <td>Use shell port <strong>18090</strong> (the gateway/session CORS allow-lists pin it). Don&#39;t change the shell port.</td>
 </tr>
 <tr>
+<td><code>icnd</code> won&#39;t start / sled lock held</td>
+<td>A previous <code>icnd</code> did not exit cleanly and still holds the sled DB lock</td>
+<td>In the VM: <code>systemctl restart icnd</code> (clears the stale process + lock). If it persists: <code>sudo icn-demo-reset</code> (destructive) or discard the QEMU overlay and reboot.</td>
+</tr>
+<tr>
+<td><code>icn-demo-verify &lt;item-id&gt;</code> can&#39;t fetch the receipt</td>
+<td>The action was not discharged yet, or wrong item/domain</td>
+<td>Complete the action card in the shell first — the receipt exists only after discharge. Use the <code>item_id</code> from <code>icn-demo-seed --json</code>; default domain is <code>nycn-federation-gov</code>.</td>
+</tr>
+<tr>
+<td>Stale demo data / extra cards</td>
+<td>Each <code>icn-demo-seed</code> adds another open card; old JWTs die on reset</td>
+<td><code>sudo icn-demo-reset &amp;&amp; sudo icn-demo-seed --json</code> for a clean single-card loop, or discard the overlay for a whole-disk reset.</td>
+</tr>
+<tr>
 <td>Cards don&#39;t refresh after discharge</td>
 <td>Expected — see <a href="#6-the-exact-click-path">§6 nuance</a></td>
 <td>The card flips to <strong>Confirmed</strong> in place; <code>/me/action-cards</code> is correctly empty.</td>
+</tr>
+<tr>
+<td>Live node unreachable — abandon the live demo</td>
+<td>Node down, can&#39;t tunnel, or out of time</td>
+<td>Fall back <strong>without</strong> a node: open <code>…/member-shell/?mode=demo</code> (self-labeled fixtures, no JWT, no node), or show the recorded screenshots (<a href="#13-screenshots">§13</a>). Say plainly it is the fixture/recorded fallback, not a live run.</td>
 </tr>
 </tbody></table>
 <hr>
