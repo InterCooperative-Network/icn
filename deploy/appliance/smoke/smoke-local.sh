@@ -438,6 +438,24 @@ if [ "$DEMO" = 1 ]; then
         || { err "[demo] fixture pack missing from the served payload"; exit 11; }
     log "[demo] member-shell + fixture pack served."
 
+    # curl does not enforce CORS, but the browser this smoke stands in for
+    # does (the shell's Authorization header forces a preflight). Assert the
+    # gateway actually allows the shell origin for the configured forward
+    # port, so a custom SHELL_FWD_PORT outside the image's CORS allowlist
+    # cannot produce a DEMO PASS that a real browser would contradict.
+    log "[demo] CORS preflight for browser origin http://localhost:${SHELL_FWD_PORT}..."
+    CORS_HEADERS="$(curl -s -m 10 -X OPTIONS -D - -o /dev/null \
+        -H "Origin: http://localhost:${SHELL_FWD_PORT}" \
+        -H "Access-Control-Request-Method: GET" \
+        -H "Access-Control-Request-Headers: authorization" \
+        "http://127.0.0.1:${GW_FWD_PORT}/v1/gov/me/standing" 2>/dev/null)"
+    if ! grep -qiE "access-control-allow-origin: *(http://localhost:${SHELL_FWD_PORT}|\*)" <<<"$CORS_HEADERS"; then
+        err "[demo] gateway CORS does not allow http://localhost:${SHELL_FWD_PORT} — a real browser would fail here even though curl checks pass."
+        err "[demo] the demo image allowlists shell ports 8090/18090; use those, or extend ICN_CORS_ORIGINS in the image's icnd drop-in."
+        exit 11
+    fi
+    log "[demo] CORS preflight ok for http://localhost:${SHELL_FWD_PORT}."
+
     log "[demo] Seeding the demo loop in the VM (sudo icn-demo-seed --json)..."
     SEED_JSON="$(run_in_vm "sudo icn-demo-seed --json" 2>/dev/null)" || {
         err "[demo] icn-demo-seed failed."
