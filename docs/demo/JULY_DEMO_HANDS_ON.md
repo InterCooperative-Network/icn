@@ -254,12 +254,22 @@ I actually looking at?"
 Run inside the node (SSH in, or use the hypervisor console):
 
 ```bash
-sudo icn-demo-reset          # destroys the demo's seeded state
-sudo icn-demo-seed --json    # reseeds a fresh member + open action card
+sudo icn-demo-reset          # clears this node's seeded demo state
 ```
 
-After reseed you should see `"standing_note": "bootstrap-standing: ok"` in the
-JSON. Reload the member-shell and the loop is fresh again.
+Reset only clears state — it proves nothing and does **not** reseed. Nothing
+shows in the shell until you reseed or relaunch:
+
+- **Launcher flow (recommended):** after reset, rerun the launcher — or, if the
+  page is still open, click **Start local demo** again. The session endpoint
+  seeds one fresh member + open action card for you, with no JWT to paste. Don't
+  also run `icn-demo-seed` by hand, or you'll get a duplicate card.
+- **Manual / debug flow:** `sudo icn-demo-seed --json` reseeds directly and
+  prints a **local DEV credential** for this disposable VM. Use it only for the
+  advanced paste/debug path. After reseed you should see
+  `"standing_note": "bootstrap-standing: ok"`; reload the shell. **Never paste
+  that credential into docs, screenshots, terminal transcripts, PRs, or any
+  public artifact** — it is local and disposable, but keep it off the record.
 
 > `icn-demo-reset` destroys the demo's seeded state on that node only. It does
 > not touch any other system.
