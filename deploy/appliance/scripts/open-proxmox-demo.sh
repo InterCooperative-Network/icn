@@ -36,16 +36,25 @@
 #   ICN_DEMO_JUMP         user@host of a jump host (jump route)
 #   ICN_DEMO_REMOTE_KEY   demo key path on the jump host
 #   ICN_DEMO_GW_PORT      host port -> gateway   (default 18080)
-#   ICN_DEMO_SHELL_PORT   host port -> shell     (default 18090)
 #   ICN_DEMO_SESSION_PORT host port -> session   (default 18091)
 #   ICN_DEMO_NO_BROWSER=1 set up tunnels + print the URL, do not open a browser
+# The shell host port is FIXED at 18090: it is the member-shell page Origin,
+# which the node's gateway (ICN_CORS_ORIGINS) and demo session endpoint both
+# pin. GW/SESSION are tunnel destinations (never an Origin), so they stay
+# overridable; the shell port is not.
 # ============================================================================
 set -uo pipefail
 
 VM_IP="${ICN_DEMO_VM_IP:?set ICN_DEMO_VM_IP to your running node instance IP (e.g. 192.0.2.50)}"
 SSH_USER="${ICN_DEMO_SSH_USER:-debian}"
 GW_PORT="${ICN_DEMO_GW_PORT:-18080}"
-SHELL_PORT="${ICN_DEMO_SHELL_PORT:-18090}"
+# FIXED, deliberately not overridable. The member-shell page Origin is
+# http://localhost:18090; the node's gateway (ICN_CORS_ORIGINS) and the demo
+# session endpoint both pin that origin. A custom shell port would pass the
+# session seed but fail every authenticated gateway fetch (CORS), so we do not
+# expose a shell-port knob. GW_PORT / SESSION_PORT are tunnel destinations, not
+# Origins, and remain overridable.
+SHELL_PORT=18090
 SESSION_PORT="${ICN_DEMO_SESSION_PORT:-18091}"
 JUMP="${ICN_DEMO_JUMP:-}"
 # Carry the chosen ports to the shell so it talks to the gateway + session

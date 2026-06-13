@@ -51,12 +51,14 @@ BIND_HOST = "127.0.0.1"
 BIND_PORT = int(os.environ.get("ICN_DEMO_SESSION_PORT", "8091"))
 SEED_CMD = ["/usr/local/sbin/icn-demo-seed", "--json"]
 
-# The demo shell is loaded over a loopback tunnel on the operator's machine.
-# Its host port is configurable — open-proxmox-demo.sh documents
-# ICN_DEMO_SHELL_PORT for conflict avoidance — so we cannot hard-code one port:
-# accept ANY http loopback origin (localhost / 127.0.0.1, any port) and refuse
-# everything else. Refusing all non-loopback origins is what stops a cross-site
-# page from triggering a reseed; the specific port is not the boundary.
+# The demo shell is served at 127.0.0.1:8090 in the VM and reached over the
+# operator's tunnel at localhost:18090 (a FIXED host port — the gateway's
+# ICN_CORS_ORIGINS allow-list pins that origin, so open-proxmox-demo.sh offers
+# no shell-port override). We still accept ANY http loopback origin here as
+# defense-in-depth: the CSRF boundary for this seed endpoint is loopback-vs-not,
+# and this set is a strict superset of the gateway's fixed {8090,18090} list, so
+# every origin the demo actually uses is accepted by both. Non-loopback origins
+# are refused.
 _LOOPBACK_ORIGIN = re.compile(r"^http://(localhost|127\.0\.0\.1):([0-9]{1,5})$")
 
 
