@@ -21,6 +21,17 @@
 #   ICN_APPLIANCE_IMAGE_FORMAT   qcow2 (default) | raw
 #   ICN_APPLIANCE_ARCH           amd64 (default)
 #   ICN_APPLIANCE_IMAGE_NAME     Override the output basename.
+#   ICN_APPLIANCE_DEMO_PROFILE   1 = additionally install the DEV/DEMO
+#                                profile: member-shell static payload +
+#                                serving unit (:8090), demo env drop-in for
+#                                icnd (0.0.0.0:8080 bind, dev gates, CORS),
+#                                in-image icn-demo-seed / icn-demo-verify /
+#                                icn-demo-reset, the NYCN fixture
+#                                institution package, and the bundled 13/13
+#                                receipt-chain rehearsal. Demo images are
+#                                labeled in the manifest (demo_profile:
+#                                true) and remain non-production dev
+#                                artifacts. Default 0 (base image only).
 #
 # Required tools for --real:
 #   qemu-img, virt-customize, virt-sysprep, sha256sum, cargo
@@ -75,6 +86,7 @@ REPO_ROOT="$(cd "$DEPLOY_DIR/.." && pwd)"
 
 ARCH="${ICN_APPLIANCE_ARCH:-amd64}"
 IMAGE_FORMAT="${ICN_APPLIANCE_IMAGE_FORMAT:-qcow2}"
+DEMO_PROFILE="${ICN_APPLIANCE_DEMO_PROFILE:-0}"
 
 log "Mode: $MODE"
 log "Repo root:        $REPO_ROOT"
@@ -85,6 +97,7 @@ log "Base image:       ${ICN_APPLIANCE_BASE_IMAGE:-<unset>}"
 log "Version:          ${ICN_APPLIANCE_VERSION:-<unset>}"
 log "Output dir:       ${ICN_APPLIANCE_OUTPUT_DIR:-<unset>}"
 log "Base SHA256:      ${ICN_APPLIANCE_BASE_SHA256:-<not set; will not verify>}"
+log "Demo profile:     $DEMO_PROFILE (1 = DEV/DEMO payload + units installed)"
 echo
 
 # ---------- dry-run plan (printed in both modes for transparency) ----------
@@ -115,6 +128,17 @@ cat <<'EOF_PLAN'
   8) Compute output SHA256.
   9) Emit a manifest JSON next to the image with version, hashes, git
      commit, build timestamp, and an explicit non-production flag.
+
+  When ICN_APPLIANCE_DEMO_PROFILE=1, step 5 additionally (DEV/DEMO only):
+       - copy web/member-shell + web/pilot-ui/fixtures -> /usr/share/icn/static/web/
+       - copy institutions/ (NYCN fixture package)     -> /usr/share/icn/demo/institutions/
+       - copy 13/13 rehearsal scripts + evidence validator + nycn-dogfood kit
+                                                        -> /usr/share/icn/demo/repo/
+       - copy icn-member-shell.service                  -> /etc/systemd/system/
+       - copy icnd.service.d/20-demo-profile.conf       -> /etc/systemd/system/icnd.service.d/
+       - copy icn-demo-{seed,verify,reset}.sh           -> /usr/local/sbin/
+       - systemctl enable icn-member-shell.service
+       - mark manifest demo_profile: true
 EOF_PLAN
 }
 
@@ -297,7 +321,99 @@ if [ -f "$HEALTH_CHECK_BIN" ]; then
     )
 fi
 
+# ---------- DEV/DEMO profile (ICN_APPLIANCE_DEMO_PROFILE=1) ----------
+# Everything in this block is demo-only payload and configuration. None of
+# it is installed on the base image, and the manifest records the choice
+# (demo_profile: true). See deploy/appliance/README.md "Demo profile".
+DEMO_STAGE=""
+if [ "$DEMO_PROFILE" = "1" ]; then
+    log "Demo profile requested: staging DEV/DEMO payload..."
+    DEMO_SEED_SCRIPT="$APPLIANCE_DIR/scripts/icn-demo-seed.sh"
+    DEMO_VERIFY_SCRIPT="$APPLIANCE_DIR/scripts/icn-demo-verify.sh"
+    DEMO_RESET_SCRIPT="$APPLIANCE_DIR/scripts/icn-demo-reset.sh"
+    MEMBER_SHELL_UNIT="$APPLIANCE_DIR/systemd/icn-member-shell.service"
+    DEMO_DROPIN="$APPLIANCE_DIR/systemd/icnd.service.d/20-demo-profile.conf"
+    for f in "$DEMO_SEED_SCRIPT" "$DEMO_VERIFY_SCRIPT" "$DEMO_RESET_SCRIPT" \
+             "$MEMBER_SHELL_UNIT" "$DEMO_DROPIN"; do
+        if [ ! -f "$f" ]; then
+            err "Demo profile source file missing: $f"
+            exit 7
+        fi
+    done
+    for d in "$REPO_ROOT/web/member-shell" "$REPO_ROOT/web/pilot-ui/fixtures" \
+             "$REPO_ROOT/institutions/nycn" "$REPO_ROOT/demo/nycn-dogfood"; do
+        if [ ! -d "$d" ]; then
+            err "Demo profile payload directory missing: $d"
+            exit 7
+        fi
+    done
+    for f in "$REPO_ROOT/scripts/local_receipt_chain_13of13_rehearsal.sh" \
+             "$REPO_ROOT/scripts/local_economic_receipt_chain_demo.sh" \
+             "$REPO_ROOT/docs/scripts/validate-rehearsal-evidence.py"; do
+        if [ ! -f "$f" ]; then
+            err "Demo profile payload file missing: $f"
+            exit 7
+        fi
+    done
+
+    # Stage a directory tree so virt-customize --copy-in can install whole
+    # directories with their relative layout preserved:
+    #   static/web/{member-shell, pilot-ui/fixtures}   (shell's relative
+    #       fixture fetch path "../pilot-ui/fixtures/..." must keep working)
+    #   demo/institutions/nycn                          (fixture institution)
+    #   demo/repo/{scripts, docs/scripts, docs/contracts, demo/nycn-dogfood}
+    #       (the 13/13 wrapper resolves ROOT as dirname($0)/.., so the
+    #        bundled copy must preserve the repo-relative layout)
+    DEMO_STAGE="$ICN_APPLIANCE_OUTPUT_DIR/.demo-stage.$$"
+    rm -rf "$DEMO_STAGE"
+    mkdir -p \
+        "$DEMO_STAGE/static/web/pilot-ui" \
+        "$DEMO_STAGE/demo/institutions" \
+        "$DEMO_STAGE/demo/repo/scripts" \
+        "$DEMO_STAGE/demo/repo/docs/scripts" \
+        "$DEMO_STAGE/demo/repo/demo"
+    cp -r "$REPO_ROOT/web/member-shell"            "$DEMO_STAGE/static/web/"
+    cp -r "$REPO_ROOT/web/pilot-ui/fixtures"       "$DEMO_STAGE/static/web/pilot-ui/"
+    cp -r "$REPO_ROOT/institutions/nycn"           "$DEMO_STAGE/demo/institutions/"
+    cp -r "$REPO_ROOT/demo/nycn-dogfood"           "$DEMO_STAGE/demo/repo/demo/"
+    cp "$REPO_ROOT/scripts/local_receipt_chain_13of13_rehearsal.sh" \
+       "$REPO_ROOT/scripts/local_economic_receipt_chain_demo.sh" \
+       "$DEMO_STAGE/demo/repo/scripts/"
+    cp "$REPO_ROOT/docs/scripts/validate-rehearsal-evidence.py" \
+       "$DEMO_STAGE/demo/repo/docs/scripts/"
+    if [ -d "$REPO_ROOT/docs/contracts" ]; then
+        cp -r "$REPO_ROOT/docs/contracts" "$DEMO_STAGE/demo/repo/docs/"
+    fi
+
+    VIRT_CUSTOMIZE_ARGS+=(
+        --mkdir /usr/share/icn/demo
+        --copy-in "$DEMO_STAGE/static/web:/usr/share/icn/static"
+        --copy-in "$DEMO_STAGE/demo/institutions:/usr/share/icn/demo"
+        --copy-in "$DEMO_STAGE/demo/repo:/usr/share/icn/demo"
+        --copy-in "$MEMBER_SHELL_UNIT:/etc/systemd/system"
+        --copy-in "$DEMO_DROPIN:/etc/systemd/system/icnd.service.d"
+        --copy-in "$DEMO_SEED_SCRIPT:/usr/local/sbin"
+        --copy-in "$DEMO_VERIFY_SCRIPT:/usr/local/sbin"
+        --copy-in "$DEMO_RESET_SCRIPT:/usr/local/sbin"
+        --run-command "chmod +x /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-reset.sh"
+        --run-command "ln -sf /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-seed && ln -sf /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-verify && ln -sf /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-reset"
+        --run-command "systemctl enable icn-member-shell.service"
+        # The bundled 13/13 evidence validator (icn-demo-verify --chain)
+        # needs the python3 jsonschema package. Debian genericcloud images
+        # provide it transitively via cloud-init; assert it here so a base
+        # image without it fails the BUILD with a clear message instead of
+        # failing the advertised --chain path at demo time. (No apt install:
+        # the libguestfs appliance cannot rely on network/DNS — see the
+        # python3-not-jq note in the demo scripts.)
+        --run-command "python3 -c \"import jsonschema\" || { echo \"ERROR: demo profile requires python3-jsonschema in the base image (Debian genericcloud ships it via cloud-init); this base image lacks it\" >&2; exit 1; }"
+    )
+fi
+
 virt-customize "${VIRT_CUSTOMIZE_ARGS[@]}"
+
+if [ -n "$DEMO_STAGE" ]; then
+    rm -rf "$DEMO_STAGE"
+fi
 
 # virt-sysprep to scrub instance-specific state. --operations chosen
 # narrowly so we don't accidentally wipe what we just installed.
@@ -332,10 +448,13 @@ cat > "$OUT_MANIFEST" <<EOF_MANIFEST
   "non_production": true,
   "signed": false,
   "immutable": false,
+  "demo_profile": $([ "$DEMO_PROFILE" = "1" ] && echo true || echo false),
   "notes": [
     "Local dev appliance image. NOT a signed release.",
     "Contains no embedded secrets; per-instance JWT and keystore passphrase",
-    "are generated by icn-appliance-firstboot.service on first boot."
+    "are generated by icn-appliance-firstboot.service on first boot.",
+    "demo_profile=true means DEV/DEMO units, dev gates, fixture institution,",
+    "and the member-shell payload are installed — never production posture."
   ]
 }
 EOF_MANIFEST

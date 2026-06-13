@@ -9,6 +9,21 @@
 #              user-mode networking, wait for SSH, verify icnd is alive,
 #              and confirm /v1/health on port 8080 from inside the VM.
 #
+# Demo-profile add-on (requires an image built with
+# ICN_APPLIANCE_DEMO_PROFILE=1):
+#   --demo     After the base checks pass, additionally:
+#                - forward the gateway and member-shell ports to the host
+#                  (hostfwd 127.0.0.1:GW_FWD->8080, 127.0.0.1:SHELL_FWD->8090)
+#                - verify the member-shell static server answers (host-side,
+#                  the stranger path)
+#                - run `sudo icn-demo-seed --json` in the VM
+#                - drive the member loop from the HOST through the forwarded
+#                  gateway: standing -> action card -> complete -> receipt,
+#                  with the receipt binding check (32-byte record_hash)
+#              A --demo pass means the demo loop works end-to-end against
+#              this image from a clean boot. It still does NOT mean
+#              production, pilot, or federation.
+#
 # Required for --real:
 #   ICN_APPLIANCE_IMAGE      Path to the QCOW2 produced by build-image.sh.
 #   ICN_APPLIANCE_SSH_KEY    Path to the smoke-only SSH private key. The
@@ -25,9 +40,13 @@
 #                                  cloud-localds (operator must replace
 #                                  the placeholder SSH key first; the
 #                                  script refuses the placeholder).
-#   ICN_APPLIANCE_VM_MEMORY      Default: 1024 (MiB).
+#   ICN_APPLIANCE_VM_MEMORY      Default: 1024 (MiB; consider 2048 with --demo).
 #   ICN_APPLIANCE_VM_CPUS        Default: 2.
 #   ICN_APPLIANCE_VM_TIMEOUT     Default: 300 (seconds; total smoke budget).
+#   ICN_APPLIANCE_GW_FWD_PORT    Default: 18080 (host port forwarded to the
+#                                VM gateway :8080; --demo only).
+#   ICN_APPLIANCE_SHELL_FWD_PORT Default: 18090 (host port forwarded to the
+#                                VM member-shell :8090; --demo only).
 #
 # Required tools for --real:
 #   qemu-system-x86_64, ssh, curl, sha256sum
@@ -57,10 +76,13 @@ usage() {
     exit 0
 }
 
+DEMO=0
+
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --dry-run) MODE="dry-run" ; shift ;;
         --real)    MODE="real"    ; shift ;;
+        --demo)    DEMO=1         ; shift ;;
         --help|-h) usage ;;
         *)
             err "unknown argument: $1"
@@ -77,8 +99,11 @@ HEALTH_PORT="${ICN_APPLIANCE_HEALTH_PORT:-8080}"
 VM_MEMORY="${ICN_APPLIANCE_VM_MEMORY:-1024}"
 VM_CPUS="${ICN_APPLIANCE_VM_CPUS:-2}"
 VM_TIMEOUT="${ICN_APPLIANCE_VM_TIMEOUT:-300}"
+GW_FWD_PORT="${ICN_APPLIANCE_GW_FWD_PORT:-18080}"
+SHELL_FWD_PORT="${ICN_APPLIANCE_SHELL_FWD_PORT:-18090}"
 
 log "Mode: $MODE"
+log "Demo add-on:      $DEMO"
 log "VM SSH:           ${SSH_USER}@127.0.0.1:${SSH_PORT}"
 log "Health port:      ${HEALTH_PORT} (checked inside VM via SSH; never 8000)"
 log "VM memory:        ${VM_MEMORY} MiB"
@@ -265,7 +290,15 @@ log "Creating disposable overlay $OVERLAY (backing format: $BACKING_FORMAT) ..."
 qemu-img create -f qcow2 -b "$ICN_APPLIANCE_IMAGE" -F "$BACKING_FORMAT" "$OVERLAY" >/dev/null
 
 # Launch QEMU under user-mode networking. We do NOT touch host networking.
-log "Launching QEMU (user-mode net, hostfwd ${SSH_PORT}->22)..."
+NETDEV="user,id=net0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22"
+if [ "$DEMO" = 1 ]; then
+    # Demo add-on: forward the gateway and member-shell so the loop can be
+    # driven from the host — the same path a stranger's browser takes.
+    NETDEV="${NETDEV},hostfwd=tcp:127.0.0.1:${GW_FWD_PORT}-:8080,hostfwd=tcp:127.0.0.1:${SHELL_FWD_PORT}-:8090"
+    log "Launching QEMU (user-mode net, hostfwd ${SSH_PORT}->22, ${GW_FWD_PORT}->8080, ${SHELL_FWD_PORT}->8090)..."
+else
+    log "Launching QEMU (user-mode net, hostfwd ${SSH_PORT}->22)..."
+fi
 qemu-system-x86_64 \
     -machine accel=kvm:tcg \
     -m "$VM_MEMORY" \
@@ -274,7 +307,7 @@ qemu-system-x86_64 \
     -serial file:"$WORK_DIR/serial.log" \
     -drive "if=virtio,format=qcow2,file=$OVERLAY" \
     -drive "if=virtio,format=raw,file=$SEED_ISO,readonly=on" \
-    -netdev "user,id=net0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22" \
+    -netdev "$NETDEV" \
     -device "virtio-net-pci,netdev=net0" \
     -nographic \
     >"$WORK_DIR/qemu.stdout" 2>"$WORK_DIR/qemu.stderr" &
@@ -381,6 +414,113 @@ if [ "$HEALTH_OK" -ne 1 ]; then
 fi
 log "/v1/health returned 200."
 
+# ---------- --demo add-on: drive the member loop from the host ----------
+if [ "$DEMO" = 1 ]; then
+    command -v jq >/dev/null 2>&1 || { err "--demo requires jq on the host"; exit 10; }
+
+    log "[demo] Verifying member-shell static server from the HOST (stranger path)..."
+    SHELL_DEADLINE=$(( $(date +%s) + 60 ))
+    SHELL_OK=0
+    while [ "$(date +%s)" -lt "$SHELL_DEADLINE" ]; do
+        if curl -sf -m 5 "http://127.0.0.1:${SHELL_FWD_PORT}/member-shell/index.html" >/dev/null 2>&1; then
+            SHELL_OK=1
+            break
+        fi
+        sleep 3
+    done
+    if [ "$SHELL_OK" -ne 1 ]; then
+        err "[demo] member-shell never answered on host port ${SHELL_FWD_PORT} (is the image built with ICN_APPLIANCE_DEMO_PROFILE=1?)"
+        run_in_vm "sudo systemctl status icn-member-shell.service --no-pager" || true
+        run_in_vm "sudo journalctl -u icn-member-shell.service --no-pager -n 50" || true
+        exit 11
+    fi
+    curl -sf -m 5 "http://127.0.0.1:${SHELL_FWD_PORT}/pilot-ui/fixtures/icn-organizer-demo/standing.json" >/dev/null 2>&1 \
+        || { err "[demo] fixture pack missing from the served payload"; exit 11; }
+    log "[demo] member-shell + fixture pack served."
+
+    # curl does not enforce CORS, but the browser this smoke stands in for
+    # does (the shell's Authorization header forces a preflight). Assert the
+    # gateway actually allows the shell origin for the configured forward
+    # port, so a custom SHELL_FWD_PORT outside the image's CORS allowlist
+    # cannot produce a DEMO PASS that a real browser would contradict.
+    # Assert BOTH loopback spellings for the configured port: the smoke
+    # prints 127.0.0.1 URLs while docs use localhost, and the browser sends
+    # whichever the operator typed. The demo drop-in allowlists both for
+    # the supported ports; a custom port must too.
+    for ORIGIN in "http://localhost:${SHELL_FWD_PORT}" "http://127.0.0.1:${SHELL_FWD_PORT}"; do
+        log "[demo] CORS preflight for browser origin ${ORIGIN}..."
+        CORS_HEADERS="$(curl -s -m 10 -X OPTIONS -D - -o /dev/null \
+            -H "Origin: ${ORIGIN}" \
+            -H "Access-Control-Request-Method: GET" \
+            -H "Access-Control-Request-Headers: authorization" \
+            "http://127.0.0.1:${GW_FWD_PORT}/v1/gov/me/standing" 2>/dev/null)"
+        if ! grep -qiE "access-control-allow-origin: *(${ORIGIN}|\*)" <<<"$CORS_HEADERS"; then
+            err "[demo] gateway CORS does not allow ${ORIGIN} — a real browser at that URL would fail even though curl checks pass."
+            err "[demo] the demo image allowlists both loopback spellings for shell ports 8090/18090; use those, or extend ICN_CORS_ORIGINS in the image's icnd drop-in."
+            exit 11
+        fi
+    done
+    log "[demo] CORS preflight ok for both loopback origins on port ${SHELL_FWD_PORT}."
+
+    log "[demo] Seeding the demo loop in the VM (sudo icn-demo-seed --json)..."
+    SEED_JSON="$(run_in_vm "sudo icn-demo-seed --json" 2>/dev/null)" || {
+        err "[demo] icn-demo-seed failed."
+        run_in_vm "sudo journalctl -u icnd.service --no-pager -n 100" || true
+        exit 12
+    }
+    DEMO_JWT="$(jq -r '.jwt // empty' <<<"$SEED_JSON")"
+    DEMO_ITEM="$(jq -r '.item_id // empty' <<<"$SEED_JSON")"
+    DEMO_DOMAIN="$(jq -r '.domain // empty' <<<"$SEED_JSON")"
+    DEMO_DID="$(jq -r '.did // empty' <<<"$SEED_JSON")"
+    if [ -z "$DEMO_JWT" ] || [ -z "$DEMO_ITEM" ] || [ -z "$DEMO_DOMAIN" ]; then
+        err "[demo] seed output incomplete: $SEED_JSON"
+        exit 12
+    fi
+    # Fail closed if the standing bootstrap silently degraded — the standing
+    # pane is step 1 of the demo, and the seed downgrades a failed bootstrap
+    # to a warning that a happy-path check would never see.
+    STANDING_NOTE="$(jq -r '.standing_note // empty' <<<"$SEED_JSON")"
+    if [ "$STANDING_NOTE" != "bootstrap-standing: ok" ]; then
+        err "[demo] standing bootstrap did not succeed: $STANDING_NOTE"
+        exit 12
+    fi
+    log "[demo] seeded: item $DEMO_ITEM in $DEMO_DOMAIN for $DEMO_DID (standing bootstrap ok)"
+
+    GWH="http://127.0.0.1:${GW_FWD_PORT}"
+    AUTH="Authorization: Bearer $DEMO_JWT"
+
+    log "[demo] 1/4 standing (host-side GET /v1/gov/me/standing)..."
+    curl -sf -m 10 -H "$AUTH" "$GWH/v1/gov/me/standing" | jq -e '.did' >/dev/null \
+        || { err "[demo] standing fetch failed"; exit 13; }
+
+    log "[demo] 2/4 action card visible (GET /v1/gov/me/action-cards)..."
+    CARDS="$(curl -sf -m 10 -H "$AUTH" "$GWH/v1/gov/me/action-cards")" \
+        || { err "[demo] action-cards fetch failed"; exit 13; }
+    N_BEFORE="$(jq --arg id "$DEMO_ITEM" '[.cards[]? | select(.source_id==$id)] | length' <<<"$CARDS")"
+    [ "$N_BEFORE" = "1" ] || { err "[demo] expected 1 open card for $DEMO_ITEM, found $N_BEFORE"; exit 13; }
+
+    log "[demo] 3/4 discharge (PUT .../status {\"status\":\"completed\"} — the member-shell's documented call)..."
+    curl -sf -m 10 -X PUT -H "$AUTH" -H 'Content-Type: application/json' \
+        -d '{"status":"completed"}' \
+        "$GWH/v1/gov/domains/$DEMO_DOMAIN/action-items/$DEMO_ITEM/status" >/dev/null \
+        || { err "[demo] completion PUT failed"; exit 13; }
+
+    log "[demo] 4/4 receipt (GET completion-receipt + binding check)..."
+    RECEIPT="$(curl -sf -m 10 -H "$AUTH" \
+        "$GWH/v1/gov/domains/$DEMO_DOMAIN/action-items/$DEMO_ITEM/completion-receipt")" \
+        || { err "[demo] receipt fetch failed"; exit 13; }
+    jq -e --arg id "$DEMO_ITEM" --arg dom "$DEMO_DOMAIN" --arg did "$DEMO_DID" \
+        '(.record_hash | type == "array" and length == 32 and all(.[]; type == "number" and . >= 0 and . <= 255))
+         and .item_id == $id and .domain_id == $dom and .actor_did == $did
+         and .transition == "completed"' <<<"$RECEIPT" >/dev/null \
+        || { err "[demo] receipt failed the binding check: $RECEIPT"; exit 13; }
+
+    N_AFTER="$(curl -sf -m 10 -H "$AUTH" "$GWH/v1/gov/me/action-cards" \
+        | jq --arg id "$DEMO_ITEM" '[.cards[]? | select(.source_id==$id)] | length')"
+    [ "$N_AFTER" = "0" ] || { err "[demo] card did not clear after completion"; exit 13; }
+    log "[demo] loop complete: standing -> card -> discharge -> receipt -> card cleared."
+fi
+
 cat <<EOF_PASS
 [appliance-smoke] PASS
   image:   $ICN_APPLIANCE_IMAGE
@@ -391,3 +531,17 @@ cat <<EOF_PASS
 NOTE: PASS means the local dev image boots and icnd is healthy. It does
 NOT mean the appliance is production, signed, or fit for partner federation.
 EOF_PASS
+
+if [ "$DEMO" = 1 ]; then
+    cat <<EOF_DEMO
+[appliance-smoke] DEMO PASS
+  shell:    http://127.0.0.1:${SHELL_FWD_PORT}/member-shell/ (host-forwarded)
+  gateway:  http://127.0.0.1:${GW_FWD_PORT} (host-forwarded, JWT-auth)
+  loop:     standing -> action card -> discharge -> receipt (verified host-side)
+
+NOTE: DEMO PASS means the member loop works end-to-end on this image from a
+clean boot, over the same forwarded ports a stranger's browser would use.
+Fictional fixture institution, dev gates, test posture — NOT production,
+NOT a pilot, NOT federation.
+EOF_DEMO
+fi
