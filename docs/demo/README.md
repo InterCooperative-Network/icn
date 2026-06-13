@@ -17,7 +17,7 @@
 | [JULY_DEMO_HANDS_ON.md](JULY_DEMO_HANDS_ON.md) | **Detailed presenter/operator flow** — click-by-click, "what to say" at each step, and the full failure-mode table. |
 | [JULY_DEMO_OPERATOR_CHECKLIST.md](JULY_DEMO_OPERATOR_CHECKLIST.md) | **Keep-open live-demo card** — preflight, launch command, expected states, and panic fixes. |
 | [JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md](JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md) | **Reviewer / evidence-hygiene handoff** — claim boundary by proof level, secret/evidence capture, known-gaps map, reviewer checklist. |
-| [../../deploy/appliance/DEMO_QUICKSTART.md](../../deploy/appliance/DEMO_QUICKSTART.md) | **Appliance build/run** — image build, the one-command launcher, and the manual fallback. |
+| [deploy/appliance/DEMO_QUICKSTART.md](../../deploy/appliance/DEMO_QUICKSTART.md) | **Appliance build/run** — image build, the one-command launcher, and the manual fallback. |
 
 > The sections below describe the older one-click tool-library / devnet demo,
 > not the July Candidate appliance.
