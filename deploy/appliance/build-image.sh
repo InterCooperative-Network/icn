@@ -134,10 +134,10 @@ cat <<'EOF_PLAN'
        - copy institutions/ (NYCN fixture package)     -> /usr/share/icn/demo/institutions/
        - copy 13/13 rehearsal scripts + evidence validator + nycn-dogfood kit
                                                         -> /usr/share/icn/demo/repo/
-       - copy icn-member-shell.service                  -> /etc/systemd/system/
+       - copy icn-member-shell.service + icn-demo-session.service -> /etc/systemd/system/
        - copy icnd.service.d/20-demo-profile.conf       -> /etc/systemd/system/icnd.service.d/
-       - copy icn-demo-{seed,verify,reset}.sh           -> /usr/local/sbin/
-       - systemctl enable icn-member-shell.service
+       - copy icn-demo-{seed,verify,reset}.sh + icn-demo-session.py -> /usr/local/sbin/
+       - systemctl enable icn-member-shell.service icn-demo-session.service
        - mark manifest demo_profile: true
 EOF_PLAN
 }
@@ -331,10 +331,12 @@ if [ "$DEMO_PROFILE" = "1" ]; then
     DEMO_SEED_SCRIPT="$APPLIANCE_DIR/scripts/icn-demo-seed.sh"
     DEMO_VERIFY_SCRIPT="$APPLIANCE_DIR/scripts/icn-demo-verify.sh"
     DEMO_RESET_SCRIPT="$APPLIANCE_DIR/scripts/icn-demo-reset.sh"
+    DEMO_SESSION_SCRIPT="$APPLIANCE_DIR/scripts/icn-demo-session.py"
     MEMBER_SHELL_UNIT="$APPLIANCE_DIR/systemd/icn-member-shell.service"
+    DEMO_SESSION_UNIT="$APPLIANCE_DIR/systemd/icn-demo-session.service"
     DEMO_DROPIN="$APPLIANCE_DIR/systemd/icnd.service.d/20-demo-profile.conf"
     for f in "$DEMO_SEED_SCRIPT" "$DEMO_VERIFY_SCRIPT" "$DEMO_RESET_SCRIPT" \
-             "$MEMBER_SHELL_UNIT" "$DEMO_DROPIN"; do
+             "$DEMO_SESSION_SCRIPT" "$MEMBER_SHELL_UNIT" "$DEMO_SESSION_UNIT" "$DEMO_DROPIN"; do
         if [ ! -f "$f" ]; then
             err "Demo profile source file missing: $f"
             exit 7
@@ -391,13 +393,16 @@ if [ "$DEMO_PROFILE" = "1" ]; then
         --copy-in "$DEMO_STAGE/demo/institutions:/usr/share/icn/demo"
         --copy-in "$DEMO_STAGE/demo/repo:/usr/share/icn/demo"
         --copy-in "$MEMBER_SHELL_UNIT:/etc/systemd/system"
+        --copy-in "$DEMO_SESSION_UNIT:/etc/systemd/system"
         --copy-in "$DEMO_DROPIN:/etc/systemd/system/icnd.service.d"
         --copy-in "$DEMO_SEED_SCRIPT:/usr/local/sbin"
         --copy-in "$DEMO_VERIFY_SCRIPT:/usr/local/sbin"
         --copy-in "$DEMO_RESET_SCRIPT:/usr/local/sbin"
-        --run-command "chmod +x /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-reset.sh"
+        --copy-in "$DEMO_SESSION_SCRIPT:/usr/local/sbin"
+        --run-command "chmod +x /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-session.py"
         --run-command "ln -sf /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-seed && ln -sf /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-verify && ln -sf /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-reset"
         --run-command "systemctl enable icn-member-shell.service"
+        --run-command "systemctl enable icn-demo-session.service"
         # The bundled 13/13 evidence validator (icn-demo-verify --chain)
         # needs the python3 jsonschema package. Debian genericcloud images
         # provide it transitively via cloud-init; assert it here so a base

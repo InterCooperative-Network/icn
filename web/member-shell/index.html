@@ -33,6 +33,23 @@
 
 <main id="main">
 
+  <!-- DEV/DEMO one-click start. Shown only when this page was opened by the
+       local demo launcher (?demo=launcher). Lets the operator start the demo
+       without typing a gateway address or pasting a credential. The launcher
+       forwards a loopback DEV/DEMO session endpoint to localhost:18091. -->
+  <section id="demo-launch-section" hidden aria-labelledby="demo-launch-h">
+    <h2 id="demo-launch-h">Start the local demo</h2>
+    <p>
+      This page was opened by the local DEV/DEMO launcher. Select Start to
+      begin a fresh local demo — your standing and a sample action card load
+      automatically. There is no address to type and no credential to paste.
+      The session is local to this dev node and nothing here is signed.
+    </p>
+    <button type="button" id="demo-launch-button">Start local demo</button>
+    <button type="button" id="demo-advanced-button" class="secondary">Connect manually instead</button>
+    <p id="demo-launch-status" role="status" aria-live="polite"></p>
+  </section>
+
   <!-- Live-mode connect panel. Hidden in demo mode. -->
   <section id="connect-section" hidden aria-labelledby="connect-h">
     <h2 id="connect-h">Connect to a local node</h2>

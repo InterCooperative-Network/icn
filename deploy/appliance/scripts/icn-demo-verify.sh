@@ -69,7 +69,11 @@ command -v python3 >/dev/null || fatal "python3 missing"
 
 # shellcheck disable=SC1090
 . "$ENV_FILE"
-SESSION_JWT="$(sudo -u icn ICN_KEYSTORE_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" ICN_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" /usr/local/bin/icnctl --data-dir "$DATA_DIR" auth token --gateway "$GW" --coop-id "$COOP_ID" -s "governance:read" 2>/dev/null | grep -oE 'eyJ[A-Za-z0-9_.-]+' | head -1)" # vocab-ok: icnctl CLI subcommand name
+# Drop to the icn user with runuser (this script runs as root), passing the
+# passphrase through exported env. NOT sudo: sudo logs its command + env to
+# the auth journal, leaking the keystore passphrase. See icn-demo-seed.sh
+# as_icn() for the rationale.
+SESSION_JWT="$(ICN_KEYSTORE_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" ICN_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" runuser -u icn --preserve-environment -- /usr/local/bin/icnctl --data-dir "$DATA_DIR" auth token --gateway "$GW" --coop-id "$COOP_ID" -s "governance:read" 2>/dev/null | grep -oE 'eyJ[A-Za-z0-9_.-]+' | head -1)" # vocab-ok: icnctl CLI subcommand name
 [ -n "$SESSION_JWT" ] || fatal "could not mint a read JWT"
 
 receipt="$(curl -s -m 10 -H "Authorization: Bearer $SESSION_JWT" \

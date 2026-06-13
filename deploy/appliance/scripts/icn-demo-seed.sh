@@ -59,8 +59,17 @@ command -v python3 >/dev/null || fatal "python3 missing"
 [ -n "${ICN_KEYSTORE_PASSPHRASE:-}" ] || fatal "ICN_KEYSTORE_PASSPHRASE not present in $ENV_FILE"
 
 as_icn(){
-  sudo -u icn ICN_KEYSTORE_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" \
-      ICN_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" "$@"
+  # Drop from root to the icn user with `runuser`, NOT `sudo`. sudo records
+  # both its command line AND its environment in the auth journal, so any form
+  # of `sudo … ICN_KEYSTORE_PASSPHRASE=… …` (command-line assignment OR
+  # --preserve-env) leaks the keystore passphrase into the journal. This
+  # script already runs as root, so it does not need sudo to gain privilege —
+  # runuser drops privilege without writing the command or env to any log.
+  # The passphrase is exported only for the runuser call and passed through
+  # with --preserve-environment.
+  ICN_KEYSTORE_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" \
+  ICN_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" \
+    runuser -u icn --preserve-environment -- "$@"
 }
 
 log "waiting for gateway health at $GW ..."
