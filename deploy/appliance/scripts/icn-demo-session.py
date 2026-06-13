@@ -27,13 +27,16 @@
 #     governance posture is non-Production (the same gates icn-demo-seed and
 #     the gateway's dev bootstrap require). Returns 403 otherwise.
 #   * Fixed command — no request data influences what is run; no injection.
-#   * CORS is allow-listed to the demo shell origins only.
+#   * CORS accepts only http loopback origins (localhost / 127.0.0.1, any
+#     port — the demo shell, however the operator tunnels it). Every
+#     non-loopback origin is refused, server-side, before any side effect.
 #   * NEVER logs the credential. Logs are redacted by construction.
 #
 # This is NOT a production auth surface. It exists only on demo-profile images.
 # ============================================================================
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
@@ -48,12 +51,28 @@ BIND_HOST = "127.0.0.1"
 BIND_PORT = int(os.environ.get("ICN_DEMO_SESSION_PORT", "8091"))
 SEED_CMD = ["/usr/local/sbin/icn-demo-seed", "--json"]
 
-# The demo shell is served on :8090 in the VM and tunnelled to :18090 on the
-# operator's machine. Allow exactly those loopback origins (both spellings).
-ALLOWED_ORIGINS = {
-    "http://localhost:18090", "http://127.0.0.1:18090",
-    "http://localhost:8090", "http://127.0.0.1:8090",
-}
+# The demo shell is loaded over a loopback tunnel on the operator's machine.
+# Its host port is configurable — open-proxmox-demo.sh documents
+# ICN_DEMO_SHELL_PORT for conflict avoidance — so we cannot hard-code one port:
+# accept ANY http loopback origin (localhost / 127.0.0.1, any port) and refuse
+# everything else. Refusing all non-loopback origins is what stops a cross-site
+# page from triggering a reseed; the specific port is not the boundary.
+_LOOPBACK_ORIGIN = re.compile(r"^http://(localhost|127\.0\.0\.1):([0-9]{1,5})$")
+
+
+def safe_origin(origin):
+    """If `origin` is an http loopback origin, return a SAFE echo value built
+    only from string literals + an int-parsed port — no request bytes reach the
+    response header, so a tainted Origin can never be reflected (defeats HTTP
+    response-splitting; CodeQL-clean). Returns None for any other origin."""
+    m = _LOOPBACK_ORIGIN.match(origin or "")
+    if not m:
+        return None
+    host, port = m.group(1), int(m.group(2))
+    if not (1 <= port <= 65535):
+        return None
+    host_literal = "localhost" if host == "localhost" else "127.0.0.1"
+    return "http://%s:%d" % (host_literal, port)
 
 
 def demo_gated():
@@ -72,16 +91,16 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "icn-demo-session/0"
 
     def _cors(self, origin):
-        # Emit only an exact, hard-coded allow-list member — never the raw
-        # request value — so a tainted Origin header can never be reflected
-        # into a response header (avoids HTTP response-splitting).
-        for allowed in ALLOWED_ORIGINS:
-            if allowed == origin:
-                self.send_header("Access-Control-Allow-Origin", allowed)
-                self.send_header("Vary", "Origin")
-                self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
-                self.send_header("Access-Control-Allow-Headers", "Content-Type")
-                return
+        # Echo only a server-reconstructed loopback origin (literals + an
+        # int-parsed port), never the raw request value — so a tainted Origin
+        # header can never be reflected into a response (avoids HTTP
+        # response-splitting). Non-loopback origins get no CORS headers.
+        safe = safe_origin(origin)
+        if safe is not None:
+            self.send_header("Access-Control-Allow-Origin", safe)
+            self.send_header("Vary", "Origin")
+            self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def do_OPTIONS(self):
         self.send_response(204)
@@ -96,10 +115,10 @@ class Handler(BaseHTTPRequestHandler):
         # SERVER-SIDE origin check, before any side effect. CORS response
         # headers only control whether the BROWSER reveals the response; they
         # do not stop a cross-site page from reaching this loopback port and
-        # triggering a reseed. Reject any non-allow-listed (or absent) Origin
-        # up front so only the demo shell can cause a reseed.
-        if origin not in ALLOWED_ORIGINS:
-            log("refused: origin not allow-listed")
+        # triggering a reseed. Reject any non-loopback (or absent) Origin up
+        # front so only a local demo shell can cause a reseed.
+        if safe_origin(origin) is None:
+            log("refused: origin not an allowed loopback origin")
             return self._json(403, {"error": "origin not allowed"}, origin)
         if not demo_gated():
             log("refused: dev gates off (ICN_ENABLE_ADMIN_ENDPOINTS / non-production)")
