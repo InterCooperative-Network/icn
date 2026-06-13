@@ -277,11 +277,26 @@ finished federation, but the first working piece.&quot;</li>
 <hr>
 <h2>8. How to reset the demo</h2>
 <p>Run inside the node (SSH in, or use the hypervisor console):</p>
-<pre><code class="language-bash">sudo icn-demo-reset          # destroys the demo&#39;s seeded state
-sudo icn-demo-seed --json    # reseeds a fresh member + open action card
+<pre><code class="language-bash">sudo icn-demo-reset          # clears this node&#39;s seeded demo state
 </code></pre>
-<p>After reseed you should see <code>&quot;standing_note&quot;: &quot;bootstrap-standing: ok&quot;</code> in the
-JSON. Reload the member-shell and the loop is fresh again.</p>
+<p>Reset only clears state — it proves nothing and does <strong>not</strong> reseed. Nothing
+shows in the shell until you reseed or relaunch:</p>
+<ul>
+<li><strong>Launcher flow (recommended):</strong> after reset, <strong>reload the launcher</strong> — rerun
+<code>open-proxmox-demo.sh</code>, or refresh the launcher URL in the browser — then click
+<strong>Start local demo</strong>. The <strong>Start</strong> button only appears on a fresh page load;
+it hides after the first session, so a reset alone won&#39;t bring it back on an
+already-open tab. The session endpoint then mints a fresh session and one
+open action card for you — it reuses the VM&#39;s existing operator identity, so
+no new member is created — with no JWT to paste. Don&#39;t also run
+<code>icn-demo-seed</code> by hand, or you&#39;ll get a duplicate card.</li>
+<li><strong>Manual / debug flow:</strong> <code>sudo icn-demo-seed --json</code> reseeds directly and
+prints a <strong>local DEV credential</strong> for this disposable VM. Use it only for the
+advanced paste/debug path. After reseed you should see
+<code>&quot;standing_note&quot;: &quot;bootstrap-standing: ok&quot;</code>; reload the shell. <strong>Never paste
+that credential into docs, screenshots, terminal transcripts, PRs, or any
+public artifact</strong> — it is local and disposable, but keep it off the record.</li>
+</ul>
 <blockquote>
 <p><code>icn-demo-reset</code> destroys the demo&#39;s seeded state on that node only. It does
 not touch any other system.</p>

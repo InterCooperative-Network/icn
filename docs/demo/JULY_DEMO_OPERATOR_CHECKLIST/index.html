@@ -88,9 +88,14 @@ card flips to <strong>Confirmed</strong> rather than disappearing. Consistent, n
 </blockquote>
 <hr>
 <h2>☐ Reset command (between runs) — inside the node</h2>
-<pre><code class="language-bash">sudo icn-demo-reset &amp;&amp; sudo icn-demo-seed --json
+<pre><code class="language-bash">sudo icn-demo-reset                 # clears state; reseed or relaunch after
 </code></pre>
-<p>Look for <code>&quot;standing_note&quot;: &quot;bootstrap-standing: ok&quot;</code>, then reload the shell.</p>
+<p>Reset proves nothing and does not reseed. Then <strong>launcher (recommended):</strong>
+reload the launcher URL, then click <strong>Start local demo</strong> — the button hides
+after the first session, so a reset alone won&#39;t restore it on an open tab
+(seeds one card, no paste). <strong>Manual/debug:</strong> <code>sudo icn-demo-seed --json</code>
+(prints a local DEV credential — don&#39;t paste it into public artifacts); look for
+<code>&quot;standing_note&quot;: &quot;bootstrap-standing: ok&quot;</code>. Reload the shell.</p>
 <hr>
 <h2>☐ Verification commands — inside the node</h2>
 <pre><code class="language-bash">sudo icn-demo-verify &lt;item-id&gt;     # single item consistency
@@ -129,8 +134,8 @@ sudo icn-demo-verify --chain       # full chain → expect 13/13 (the real proof
 <td>Shell must be on <strong>18090</strong>. Don&#39;t change it.</td>
 </tr>
 <tr>
-<td>Loop got messy</td>
-<td><code>sudo icn-demo-reset &amp;&amp; sudo icn-demo-seed --json</code>, reload.</td>
+<td>Loop got messy / extra cards</td>
+<td><code>sudo icn-demo-reset</code>, then <strong>reload the launcher URL</strong> and click <strong>Start local demo</strong> (the button hides after the first session, so reset alone won&#39;t restore it) — or <code>sudo icn-demo-seed --json</code> for the manual path.</td>
 </tr>
 </tbody></table>
 <hr>
