@@ -128,6 +128,12 @@ manual `?mode=live` paste flow below is the advanced/debug path.)
 
 ## The demo script (5 steps)
 
+> These five steps are the **manual fallback**. With the one-command launcher
+> above, standing and the action card load on a single **Start local demo**
+> click — no gateway typing and no JWT paste — so step 1's manual connect is
+> unnecessary. Drive the shell by hand with the steps below only when the
+> launcher is not usable.
+
 1. **Inspect standing** — open the shell in live mode, set the **Gateway
    address** field to `http://localhost:18080` (the forwarded gateway —
    the shell's default of `:8080` points at an unforwarded host port in
@@ -168,6 +174,10 @@ manual `?mode=live` paste flow below is the advanced/debug path.)
 | QEMU: KVM permission denied | Your user lacks /dev/kvm access; the launch line falls back to TCG (slow but works). `usermod -aG kvm $USER` for speed. |
 | Stale state after re-running the demo | Each `icn-demo-seed` adds a new open card. Old JWTs die with `icn-demo-reset` (new per-instance secret). When in doubt: overlay reset. |
 | 13/13 rehearsal slow | It builds nothing (uses installed binaries) but runs a full governed lifecycle; a few minutes at 2 GB RAM is normal. |
+| "Start local demo" returns **403** | Read the JSON error — two distinct causes. `origin not allowed` = the page is not on the fixed `:18090` origin (don't change the shell port). `demo session disabled (not a DEV/DEMO posture)` = dev gates off; confirm a demo-profile image and check `journalctl -u icn-demo-session`. |
+| Session worked but gateway calls then fail | The session endpoint (18091) and the gateway (18080) are separate. Confirm `gateway→18080` is tunnelled and the page's gateway field reads `http://localhost:18080`; a non-18090 page origin also fails the gateway's own CORS. |
+| `icnd` won't start / sled lock held | A previous `icnd` did not exit cleanly and still holds the sled DB lock. In the VM: `systemctl restart icnd` (clears the stale process + lock). If it persists: `sudo icn-demo-reset` (destructive) or overlay reset. |
+| Live node unreachable — abandon the live demo | Fall back without a node: open `…/member-shell/?mode=demo` (self-labeled fixtures, no JWT, no node), or show recorded screenshots. Say plainly it is the fixture/recorded fallback, not a live run. |
 
 ## Honesty labels
 
@@ -176,3 +186,8 @@ manual `?mode=live` paste flow below is the advanced/debug path.)
 | **live-local** | node boot, `/v1/health`, standing, action cards, discharge, completion receipt, receipt binding check, 13/13 chain rehearsal — on this VM's own node |
 | **fixture-backed** | member-shell `?mode=demo` panes (self-labeled), NYCN institution package contents |
 | **design-only / absent** | production posture, signed/immutable image, federation, multi-org, pilots, attendance-receipt retrieval endpoint (known gap, `docs/dev/openapi-member-surface-gaps.md`) |
+
+## See also
+
+- [`docs/demo/JULY_DEMO_HANDS_ON.md`](../../docs/demo/JULY_DEMO_HANDS_ON.md) — full click-by-click guide, presenter "what to say" script, and the complete failure-mode table.
+- [`docs/demo/JULY_DEMO_OPERATOR_CHECKLIST.md`](../../docs/demo/JULY_DEMO_OPERATOR_CHECKLIST.md) — the one-page checklist to keep open during a live run.

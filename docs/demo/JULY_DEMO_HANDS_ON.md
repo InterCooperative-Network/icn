@@ -321,12 +321,19 @@ that can *prove* it.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Launcher exits "host port already in use" | 18080/18090/18091 busy on your workstation | Free the port, or override `ICN_DEMO_GW_PORT` / `ICN_DEMO_SESSION_PORT` (shell stays 18090). |
-| Launcher "SSH tunnel exited before it came up" | Can't SSH the node / wrong key / wrong route | Confirm you can `ssh <user>@<node-ip>` with your key, or set `ICN_DEMO_JUMP` to route through a host that can. |
+| Browser does not open | No `xdg-open`/opener, or a headless workstation | The launcher prints the shell URL — open it manually. Or run with `ICN_DEMO_NO_BROWSER=1` to set up the tunnels and just print the URL. |
+| Launcher exits "host port already in use" | 18080/18090/18091 busy on your workstation | Free the port, or override `ICN_DEMO_GW_PORT` / `ICN_DEMO_SESSION_PORT`. **Shell port 18090 is fixed** — if *it* is busy you must free it; there is no shell-port override (the launcher's port-conflict hint that names one is misleading). |
+| Launcher "SSH tunnel exited before it came up" | Can't SSH the node, wrong/missing key, or wrong route | Direct route: confirm `ssh <user>@<node-ip>` works and `ICN_DEMO_SSH_KEY` points at the demo key (the launcher exits early if the key file is missing). Jump route: set `ICN_DEMO_JUMP` **and** `ICN_DEMO_REMOTE_KEY` (the key path *on the jump host*). |
 | Tunnel up but member-shell never answers | Node still booting, or demo profile not running | Wait for first boot; check `systemctl status icnd icn-demo-session` in the VM. |
-| "Start local demo" does nothing / standing never loads | Session endpoint gated off, or dev gates not set | Confirm the image is a **demo-profile** image; check `journalctl -u icn-demo-session`. |
+| "Start local demo" returns **403** | Read the JSON error — two distinct causes | `origin not allowed` = the page is not on the fixed `:18090` origin (don't change the shell port). `demo session disabled (not a DEV/DEMO posture)` = dev gates off; confirm a **demo-profile** image and check `journalctl -u icn-demo-session` (it logs `refused: dev gates off`). |
+| "Start local demo" returns **500** | The seed failed inside the VM | `journalctl -u icn-demo-session`. The common case is `standing bootstrap degraded`; run `sudo icn-demo-reset && sudo icn-demo-seed --json` and confirm `"standing_note": "bootstrap-standing: ok"`. |
+| Session worked but gateway calls then fail | Gateway forward/origin wrong (separate from the session endpoint) | The session endpoint (18091) and the gateway (18080) are independent. Confirm `gateway→18080` is tunnelled and the page's gateway field reads `http://localhost:18080`; a non-18090 page origin also fails the gateway's own CORS. |
 | Authenticated calls fail CORS | Shell served on a non-18090 origin | Use shell port **18090** (the gateway/session CORS allow-lists pin it). Don't change the shell port. |
+| `icnd` won't start / sled lock held | A previous `icnd` did not exit cleanly and still holds the sled DB lock | In the VM: `systemctl restart icnd` (clears the stale process + lock). If it persists: `sudo icn-demo-reset` (destructive) or discard the QEMU overlay and reboot. |
+| `icn-demo-verify <item-id>` can't fetch the receipt | The action was not discharged yet, or wrong item/domain | Complete the action card in the shell first — the receipt exists only after discharge. Use the `item_id` from `icn-demo-seed --json`; default domain is `nycn-federation-gov`. |
+| Stale demo data / extra cards | Each `icn-demo-seed` adds another open card; old JWTs die on reset | `sudo icn-demo-reset && sudo icn-demo-seed --json` for a clean single-card loop, or discard the overlay for a whole-disk reset. |
 | Cards don't refresh after discharge | Expected — see [§6 nuance](#6-the-exact-click-path) | The card flips to **Confirmed** in place; `/me/action-cards` is correctly empty. |
+| Live node unreachable — abandon the live demo | Node down, can't tunnel, or out of time | Fall back **without** a node: open `…/member-shell/?mode=demo` (self-labeled fixtures, no JWT, no node), or show the recorded screenshots ([§13](#13-screenshots)). Say plainly it is the fixture/recorded fallback, not a live run. |
 
 ---
 
