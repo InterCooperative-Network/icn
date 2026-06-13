@@ -2,7 +2,7 @@
 # ============================================================================
 # open-proxmox-demo.sh — one command to open the ICN member-shell DEV/DEMO.
 # ----------------------------------------------------------------------------
-# DEV/DEMO ONLY. Run this from your workstation (e.g. Zenith). It:
+# DEV/DEMO ONLY. Run this from your workstation (your laptop or dev box). It:
 #   1. opens SSH tunnels so the browser uses the sealed demo origins. The
 #      node's gateway/shell/session all bind 127.0.0.1 INSIDE the VM and are
 #      never exposed on the VLAN — they are reachable only through your tunnel:
