@@ -191,3 +191,4 @@ manual `?mode=live` paste flow below is the advanced/debug path.)
 
 - [`docs/demo/JULY_DEMO_HANDS_ON.md`](../../docs/demo/JULY_DEMO_HANDS_ON.md) — full click-by-click guide, presenter "what to say" script, and the complete failure-mode table.
 - [`docs/demo/JULY_DEMO_OPERATOR_CHECKLIST.md`](../../docs/demo/JULY_DEMO_OPERATOR_CHECKLIST.md) — the one-page checklist to keep open during a live run.
+- [`docs/demo/JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md`](../../docs/demo/JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md) — operator + reviewer handoff: candidate pin, claim boundary by proof level, evidence-capture checklist, and reviewer checklist.
