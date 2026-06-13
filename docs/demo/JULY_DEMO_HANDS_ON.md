@@ -264,9 +264,10 @@ shows in the shell until you reseed or relaunch:
   `open-proxmox-demo.sh`, or refresh the launcher URL in the browser — then click
   **Start local demo**. The **Start** button only appears on a fresh page load;
   it hides after the first session, so a reset alone won't bring it back on an
-  already-open tab. The session endpoint then seeds one fresh member + open
-  action card for you, with no JWT to paste. Don't also run `icn-demo-seed` by
-  hand, or you'll get a duplicate card.
+  already-open tab. The session endpoint then mints a fresh session and one
+  open action card for you — it reuses the VM's existing operator identity, so
+  no new member is created — with no JWT to paste. Don't also run
+  `icn-demo-seed` by hand, or you'll get a duplicate card.
 - **Manual / debug flow:** `sudo icn-demo-seed --json` reseeds directly and
   prints a **local DEV credential** for this disposable VM. Use it only for the
   advanced paste/debug path. After reseed you should see
