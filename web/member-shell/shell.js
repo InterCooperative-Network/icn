@@ -91,8 +91,17 @@
   // persisted). The flag is a UI hint only and carries no secret.
   var DEMO_LAUNCHER = MODE === "live" && params.get("demo") === "launcher";
   var DEMO_LOOPBACK = window.location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost";
-  var DEMO_GATEWAY = "http://" + DEMO_LOOPBACK + ":18080";
-  var DEMO_SESSION_URL = "http://" + DEMO_LOOPBACK + ":18091/v1/dev/demo/session";
+  // The launcher forwards the gateway and session endpoint to host ports and
+  // passes them as ?gw / ?session so operator port overrides
+  // (ICN_DEMO_GW_PORT / ICN_DEMO_SESSION_PORT) are honored. Digits only — a
+  // non-numeric value falls back to the default and can never inject into the
+  // URL we build.
+  function demoPort(name, fallback) {
+    var v = params.get(name);
+    return v && /^[0-9]{1,5}$/.test(v) ? v : fallback;
+  }
+  var DEMO_GATEWAY = "http://" + DEMO_LOOPBACK + ":" + demoPort("gw", "18080");
+  var DEMO_SESSION_URL = "http://" + DEMO_LOOPBACK + ":" + demoPort("session", "18091") + "/v1/dev/demo/session";
 
   var state = {
     gateway: null,     // live mode only; validated http(s) origin string

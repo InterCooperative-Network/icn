@@ -46,11 +46,17 @@ GW_PORT="${ICN_DEMO_GW_PORT:-18080}"
 SHELL_PORT="${ICN_DEMO_SHELL_PORT:-18090}"
 SESSION_PORT="${ICN_DEMO_SESSION_PORT:-18091}"
 JUMP="${ICN_DEMO_JUMP:-}"
-SHELL_URL="http://localhost:${SHELL_PORT}/member-shell/?mode=live&demo=launcher"
+# Carry the chosen ports to the shell so it talks to the gateway + session
+# endpoint on whatever ports this launcher actually forwarded (honoring the
+# ICN_DEMO_*_PORT overrides), not hard-coded defaults.
+SHELL_URL="http://localhost:${SHELL_PORT}/member-shell/?mode=live&demo=launcher&gw=${GW_PORT}&session=${SESSION_PORT}"
 GATEWAY_URL="http://localhost:${GW_PORT}"
 
 log()  { printf '[demo-open] %s\n' "$*"; }
 err()  { printf '[demo-open] ERROR: %s\n' "$*" >&2; }
+
+# curl is used for reachability AND the readiness wait — require it up front.
+command -v curl >/dev/null 2>&1 || { err "curl is required but not found on PATH."; exit 2; }
 
 # ---- preflight: required host ports free ----
 for p in "$GW_PORT" "$SHELL_PORT" "$SESSION_PORT"; do
@@ -63,15 +69,13 @@ done
 
 # ---- reachability ----
 log "Checking the running node instance gateway at ${VM_IP}:8080 ..."
-if command -v curl >/dev/null 2>&1; then
-  if ! curl -sf -m 6 "http://${VM_IP}:8080/v1/health" >/dev/null 2>&1; then
-    err "node instance gateway not reachable at http://${VM_IP}:8080/v1/health from here."
-    err "If you are off the node's network, run this from a host that can reach it, or use ICN_DEMO_JUMP."
-    [ -z "$JUMP" ] && exit 3
-    log "Continuing via jump host ${JUMP} (it will reach the node)."
-  else
-    log "Gateway healthy."
-  fi
+if ! curl -sf -m 6 "http://${VM_IP}:8080/v1/health" >/dev/null 2>&1; then
+  err "node instance gateway not reachable at http://${VM_IP}:8080/v1/health from here."
+  err "If you are off the node's network, run this from a host that can reach it, or use ICN_DEMO_JUMP."
+  [ -z "$JUMP" ] && exit 3
+  log "Continuing via jump host ${JUMP} (it will reach the node)."
+else
+  log "Gateway healthy."
 fi
 
 # ---- build the SSH tunnel command for the chosen route ----
@@ -83,7 +87,11 @@ if [ -n "$JUMP" ]; then
   # key and can reach the node), and forward those local binds back here.
   REMOTE_KEY="${ICN_DEMO_REMOTE_KEY:?set ICN_DEMO_REMOTE_KEY to the demo key path on the jump host}"
   log "Route: jump through ${JUMP} -> ${SSH_USER}@${VM_IP} (key on jump host)."
-  INNER="ssh -N ${FWD[*]} -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=accept-new -i ${REMOTE_KEY} ${SSH_USER}@${VM_IP}"
+  # Build the remote command with shell-escaping so a key path / user / IP
+  # containing spaces or metacharacters cannot break out of the inner command.
+  # The forward flags are numeric ports (safe); the path/user/host are %q-quoted.
+  printf -v INNER 'ssh -N %s -o ExitOnForwardFailure=yes -o StrictHostKeyChecking=accept-new -i %q %q@%q' \
+    "${FWD[*]}" "$REMOTE_KEY" "$SSH_USER" "$VM_IP"
   TUNNEL_CMD=( ssh "${COMMON[@]}"
     -L "${GW_PORT}:127.0.0.1:${GW_PORT}"
     -L "${SHELL_PORT}:127.0.0.1:${SHELL_PORT}"

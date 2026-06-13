@@ -36,7 +36,13 @@ import json
 import os
 import subprocess
 import sys
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+# Serialize seeding: ThreadingHTTPServer can dispatch concurrent POSTs, and
+# overlapping icn-demo-seed runs would race on node state. Only one seed runs
+# at a time; a second request blocks until the first releases.
+_SEED_LOCK = threading.Lock()
 
 BIND_HOST = "127.0.0.1"
 BIND_PORT = int(os.environ.get("ICN_DEMO_SESSION_PORT", "8091"))
@@ -66,11 +72,16 @@ class Handler(BaseHTTPRequestHandler):
     server_version = "icn-demo-session/0"
 
     def _cors(self, origin):
-        if origin in ALLOWED_ORIGINS:
-            self.send_header("Access-Control-Allow-Origin", origin)
-            self.send_header("Vary", "Origin")
-            self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
-            self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        # Emit only an exact, hard-coded allow-list member — never the raw
+        # request value — so a tainted Origin header can never be reflected
+        # into a response header (avoids HTTP response-splitting).
+        for allowed in ALLOWED_ORIGINS:
+            if allowed == origin:
+                self.send_header("Access-Control-Allow-Origin", allowed)
+                self.send_header("Vary", "Origin")
+                self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type")
+                return
 
     def do_OPTIONS(self):
         self.send_response(204)
@@ -82,38 +93,51 @@ class Handler(BaseHTTPRequestHandler):
         origin = self.headers.get("Origin", "")
         if self.path.rstrip("/") != "/v1/dev/demo/session":
             return self._json(404, {"error": "not found"}, origin)
+        # SERVER-SIDE origin check, before any side effect. CORS response
+        # headers only control whether the BROWSER reveals the response; they
+        # do not stop a cross-site page from reaching this loopback port and
+        # triggering a reseed. Reject any non-allow-listed (or absent) Origin
+        # up front so only the demo shell can cause a reseed.
+        if origin not in ALLOWED_ORIGINS:
+            log("refused: origin not allow-listed")
+            return self._json(403, {"error": "origin not allowed"}, origin)
         if not demo_gated():
             log("refused: dev gates off (ICN_ENABLE_ADMIN_ENDPOINTS / non-production)")
             return self._json(403, {"error": "demo session disabled (not a DEV/DEMO posture)"}, origin)
-        try:
-            out = subprocess.run(SEED_CMD, capture_output=True, text=True, timeout=120)
-        except Exception as e:  # noqa: BLE001 - report any spawn failure plainly
-            log("seed spawn failed: %s" % e)
-            return self._json(500, {"error": "seed failed to start"}, origin)
-        if out.returncode != 0:
-            # stderr may name the failure; it does not contain the credential.
-            log("seed exit %d: %s" % (out.returncode, (out.stderr or "").strip()[:200]))
-            return self._json(500, {"error": "seed failed"}, origin)
-        try:
-            session = json.loads(out.stdout)
-        except Exception:  # noqa: BLE001
-            log("seed produced non-JSON output")
-            return self._json(500, {"error": "seed output not JSON"}, origin)
-        note = session.get("standing_note", "")
-        if note != "bootstrap-standing: ok":
-            log("seed standing degraded: %s" % note)
-            return self._json(500, {"error": "standing bootstrap degraded", "standing_note": note}, origin)
-        log("session seeded ok (item %s) — credential returned to caller, not logged"
-            % session.get("item_id", "?"))
-        # Return the seed JSON verbatim (it carries the short-lived credential
-        # under "jwt"); the shell keeps it in page memory only.
-        return self._json(200, session, origin)
+        # Serialize: never run two seeds at once (see _SEED_LOCK).
+        with _SEED_LOCK:
+            try:
+                out = subprocess.run(SEED_CMD, capture_output=True, text=True, timeout=120)
+            except Exception as e:  # noqa: BLE001 - report any spawn failure plainly
+                log("seed spawn failed: %s" % e)
+                return self._json(500, {"error": "seed failed to start"}, origin)
+            if out.returncode != 0:
+                # stderr may name the failure; it does not contain the credential.
+                log("seed exit %d: %s" % (out.returncode, (out.stderr or "").strip()[:200]))
+                return self._json(500, {"error": "seed failed"}, origin)
+            try:
+                session = json.loads(out.stdout)
+            except Exception:  # noqa: BLE001
+                log("seed produced non-JSON output")
+                return self._json(500, {"error": "seed output not JSON"}, origin)
+            note = session.get("standing_note", "")
+            if note != "bootstrap-standing: ok":
+                log("seed standing degraded: %s" % note)
+                return self._json(500, {"error": "standing bootstrap degraded", "standing_note": note}, origin)
+            log("session seeded ok (item %s) — credential returned to caller, not logged"
+                % session.get("item_id", "?"))
+            # Return the seed JSON verbatim (it carries the short-lived
+            # credential under "jwt"); the shell keeps it in page memory only.
+            return self._json(200, session, origin)
 
     def _json(self, code, obj, origin):
         body = json.dumps(obj).encode("utf-8")
         self.send_response(code)
         self._cors(origin)
         self.send_header("Content-Type", "application/json")
+        # The body may carry the short-lived credential — never let any cache
+        # (browser or intermediary) retain it.
+        self.send_header("Cache-Control", "no-store")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)

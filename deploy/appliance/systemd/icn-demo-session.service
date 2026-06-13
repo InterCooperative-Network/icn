@@ -32,11 +32,24 @@ ExecStart=/usr/bin/python3 /usr/local/sbin/icn-demo-session.py
 Restart=on-failure
 RestartSec=5
 
-# Sandboxing: loopback-only network; no new privileges beyond the fixed
-# seed command it must run as root.
+# Sandboxing. Loopback-only network; the only thing this runs is the fixed
+# seed command. NOTE: unlike icn-member-shell.service (which runs as the
+# unprivileged `icn` user serving static files), this unit runs as root and
+# the seed it invokes drops to `icn` via `runuser` and writes node state under
+# /var/lib/icn. So NoNewPrivileges=true (would block the runuser privilege
+# transition) and ProtectSystem=strict (would make the state tree read-only)
+# are deliberately NOT set. The directives below harden everything that does
+# not interfere with that legitimate seed path.
 ProtectHome=true
 PrivateTmp=true
 ProtectControlGroups=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectClock=true
+ProtectHostname=true
+RestrictNamespaces=true
+RestrictRealtime=true
+LockPersonality=true
 RestrictAddressFamilies=AF_INET AF_UNIX
 
 StandardOutput=journal
