@@ -102,26 +102,35 @@ remotely).
 
 ## 4. Launch it locally (laptop / dev box)
 
-This path needs no SSH and no launcher script — you boot the image under QEMU
-with three port-forwards and open the browser. The shell host port **must** be
-`18090` (the node's gateway and session CORS allow-lists pin that origin).
+You boot the image under QEMU and reach it through forwards you control. The
+gateway and member-shell bind `0.0.0.0` inside the VM, so QEMU port-forwards
+reach them directly. The demo-session endpoint binds **loopback only** inside the
+VM (the same security posture as the remote path — it is only ever reached
+through a tunnel), so it needs a one-line SSH local-forward rather than a QEMU
+hostfwd (a hostfwd targets the guest NIC, not the guest's loopback). The shell
+host port **must** be `18090` (the node's gateway and session CORS allow-lists
+pin that origin).
 
 ```bash
-# Boot the demo image with the three loopback forwards and leave it running.
-# 18080 -> gateway(8080)   18090 -> member-shell(8090)   18091 -> session(8091)
+# 1) Boot the demo image. Forward SSH + gateway + member-shell; leave it running.
+#    2222 -> ssh(22)   18080 -> gateway(8080)   18090 -> member-shell(8090)
 qemu-system-x86_64 \
   -machine accel=kvm -cpu host -m 2048 -smp 2 \
   -drive file=/path/to/icn-appliance-<version>-amd64.qcow2,if=virtio \
   -drive file=/path/to/seed.iso,if=virtio,media=cdrom \
   -netdev user,id=n0,\
+hostfwd=tcp:127.0.0.1:2222-:22,\
 hostfwd=tcp:127.0.0.1:18080-:8080,\
-hostfwd=tcp:127.0.0.1:18090-:8090,\
-hostfwd=tcp:127.0.0.1:18091-:8091 \
+hostfwd=tcp:127.0.0.1:18090-:8090 \
   -device virtio-net-pci,netdev=n0 \
   -nographic
+
+# 2) Once the gateway answers, forward the loopback-only session endpoint over
+#    SSH (the demo key matches the cloud-init seed). Leave this running too.
+ssh -i /path/to/demo_key -p 2222 -N -L 18091:127.0.0.1:8091 debian@localhost
 ```
 
-Wait until the node finishes first boot (the gateway answers), then open:
+With both running, open:
 
 ```
 http://localhost:18090/member-shell/?mode=live&demo=launcher&gw=18080&session=18091
