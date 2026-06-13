@@ -36,7 +36,6 @@
 # ============================================================================
 import json
 import os
-import re
 import subprocess
 import sys
 import threading
@@ -52,29 +51,27 @@ BIND_PORT = int(os.environ.get("ICN_DEMO_SESSION_PORT", "8091"))
 SEED_CMD = ["/usr/local/sbin/icn-demo-seed", "--json"]
 
 # The demo shell is served at 127.0.0.1:8090 in the VM and reached over the
-# operator's tunnel at localhost:18090 (a FIXED host port — the gateway's
-# ICN_CORS_ORIGINS allow-list pins that origin, so open-proxmox-demo.sh offers
-# no shell-port override). We still accept ANY http loopback origin here as
-# defense-in-depth: the CSRF boundary for this seed endpoint is loopback-vs-not,
-# and this set is a strict superset of the gateway's fixed {8090,18090} list, so
-# every origin the demo actually uses is accepted by both. Non-loopback origins
-# are refused.
-_LOOPBACK_ORIGIN = re.compile(r"^http://(localhost|127\.0\.0\.1):([0-9]{1,5})$")
+# operator's tunnel at localhost:18090 (a FIXED host port — open-proxmox-demo.sh
+# offers no shell-port override). This endpoint mints a DEV/DEMO JWT, so it must
+# only answer the demo shell's own origins — NOT any loopback page (e.g. an
+# unrelated http://localhost:3000 dev server, which could otherwise obtain a
+# JWT). The allow-list below is therefore the exact, fixed set, identical to the
+# gateway's ICN_CORS_ORIGINS. Non-listed origins are refused.
+ALLOWED_ORIGINS = (
+    "http://localhost:8090", "http://127.0.0.1:8090",
+    "http://localhost:18090", "http://127.0.0.1:18090",
+)
 
 
 def safe_origin(origin):
-    """If `origin` is an http loopback origin, return a SAFE echo value built
-    only from string literals + an int-parsed port — no request bytes reach the
-    response header, so a tainted Origin can never be reflected (defeats HTTP
-    response-splitting; CodeQL-clean). Returns None for any other origin."""
-    m = _LOOPBACK_ORIGIN.match(origin or "")
-    if not m:
-        return None
-    host, port = m.group(1), int(m.group(2))
-    if not (1 <= port <= 65535):
-        return None
-    host_literal = "localhost" if host == "localhost" else "127.0.0.1"
-    return "http://%s:%d" % (host_literal, port)
+    """Return the matching allow-list member (an exact constant) if `origin` is a
+    demo shell origin, else None. Echoing only a hard-coded constant keeps the
+    response header free of any request bytes (no HTTP response-splitting;
+    CodeQL-clean), and the set matches the gateway's CORS allow-list exactly."""
+    for allowed in ALLOWED_ORIGINS:
+        if origin == allowed:
+            return allowed
+    return None
 
 
 def demo_gated():
