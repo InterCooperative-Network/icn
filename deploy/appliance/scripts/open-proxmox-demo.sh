@@ -3,11 +3,13 @@
 # open-proxmox-demo.sh — one command to open the ICN member-shell DEV/DEMO.
 # ----------------------------------------------------------------------------
 # DEV/DEMO ONLY. Run this from your workstation (e.g. Zenith). It:
-#   1. confirms the demo node instance is reachable,
-#   2. opens SSH tunnels so the browser uses the sealed demo origins:
+#   1. opens SSH tunnels so the browser uses the sealed demo origins. The
+#      node's gateway/shell/session all bind 127.0.0.1 INSIDE the VM and are
+#      never exposed on the VLAN — they are reachable only through your tunnel:
 #        localhost:18080 -> node instance gateway      127.0.0.1:8080
 #        localhost:18090 -> node instance member-shell 127.0.0.1:8090
 #        localhost:18091 -> node instance demo-session  127.0.0.1:8091
+#   2. waits for the member-shell to answer through the tunnel,
 #   3. opens your browser to the member-shell in live mode.
 # After the browser opens you do NOT touch the terminal again: click
 # "Start local demo" in the page — standing and an action card load with no
@@ -55,7 +57,7 @@ GATEWAY_URL="http://localhost:${GW_PORT}"
 log()  { printf '[demo-open] %s\n' "$*"; }
 err()  { printf '[demo-open] ERROR: %s\n' "$*" >&2; }
 
-# curl is used for reachability AND the readiness wait — require it up front.
+# curl is used for the post-tunnel readiness wait — require it up front.
 command -v curl >/dev/null 2>&1 || { err "curl is required but not found on PATH."; exit 2; }
 
 # ---- preflight: required host ports free ----
@@ -67,16 +69,13 @@ for p in "$GW_PORT" "$SHELL_PORT" "$SESSION_PORT"; do
   fi
 done
 
-# ---- reachability ----
-log "Checking the running node instance gateway at ${VM_IP}:8080 ..."
-if ! curl -sf -m 6 "http://${VM_IP}:8080/v1/health" >/dev/null 2>&1; then
-  err "node instance gateway not reachable at http://${VM_IP}:8080/v1/health from here."
-  err "If you are off the node's network, run this from a host that can reach it, or use ICN_DEMO_JUMP."
-  [ -z "$JUMP" ] && exit 3
-  log "Continuing via jump host ${JUMP} (it will reach the node)."
-else
-  log "Gateway healthy."
-fi
+# NOTE: no pre-tunnel reachability probe. The node's services bind 127.0.0.1
+# inside the VM, so a probe to ${VM_IP}:8080 from here would (correctly) fail
+# on a properly sealed node even when SSH works perfectly. The direct route
+# only requires SSH + the demo key, as documented; the jump route requires SSH
+# to the jump host. We validate end-to-end reachability AFTER the tunnel is up,
+# over the real path (curl localhost:${SHELL_PORT}), which is what actually
+# matters. SSH/connectivity failures surface there with an actionable message.
 
 # ---- build the SSH tunnel command for the chosen route ----
 FWD=( -L "${GW_PORT}:127.0.0.1:8080" -L "${SHELL_PORT}:127.0.0.1:8090" -L "${SESSION_PORT}:127.0.0.1:8091" )
@@ -116,11 +115,16 @@ trap cleanup EXIT INT TERM
 log "Establishing tunnel (pid $TUN_PID); waiting for the member-shell ..."
 ok=0
 for _ in $(seq 1 30); do
-  if ! kill -0 "$TUN_PID" 2>/dev/null; then err "tunnel exited early."; exit 5; fi
+  if ! kill -0 "$TUN_PID" 2>/dev/null; then
+    err "SSH tunnel exited before it came up. Check: can you 'ssh ${SSH_USER}@${VM_IP}'"
+    [ -n "$JUMP" ] && err "  via jump host ${JUMP}, with ICN_DEMO_REMOTE_KEY?" \
+                   || err "  with the key in ICN_DEMO_SSH_KEY? (or set ICN_DEMO_JUMP to route through a host that can)."
+    exit 5
+  fi
   if curl -sf -m 3 "http://localhost:${SHELL_PORT}/member-shell/index.html" >/dev/null 2>&1; then ok=1; break; fi
   sleep 1
 done
-[ "$ok" = 1 ] || { err "member-shell did not answer on localhost:${SHELL_PORT}."; exit 6; }
+[ "$ok" = 1 ] || { err "tunnel is up but the member-shell did not answer on localhost:${SHELL_PORT}. Is the node booted and the demo profile running (systemctl status icnd icn-demo-session)?"; exit 6; }
 log "Tunnel up. Shell reachable on localhost:${SHELL_PORT}."
 
 # ---- open the browser ----
