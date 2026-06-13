@@ -121,9 +121,11 @@ Run privately once before anyone is watching.
   (member-shell, **fixed**), `18091` (demo-session) are free on your workstation.
 - ☐ **Browser path ready.** A modern browser; the launcher opens the shell URL
   for you.
-- ☐ **Reset/reseed path known.** `sudo icn-demo-reset && sudo icn-demo-seed --json`
-  inside the node instance (look for `"standing_note": "bootstrap-standing: ok"`),
-  or whole-disk overlay reset.
+- ☐ **Reset/reseed path known.** Manual JWT flow: `sudo icn-demo-reset && sudo
+  icn-demo-seed --json` inside the node instance (look for `"standing_note":
+  "bootstrap-standing: ok"`). Launcher flow: `sudo icn-demo-reset` only —
+  clicking **Start local demo** re-seeds, so don't also seed by hand or you get
+  a duplicate card. Or whole-disk overlay reset.
 - ☐ **Verification commands known.** `sudo icn-demo-verify <item-id>` and
   `sudo icn-demo-verify --chain` (expect **13/13**).
 - ☐ **You can say the boundary in one breath:** *"core loop, real; demo data,
@@ -211,7 +213,7 @@ Quick orientation for the cases the brief calls out:
 |---|---|
 | Browser "Failed to fetch" in live mode | CORS / wrong gateway port — shell must be on **18090**; gateway is the forwarded **18080**. |
 | Wrong gateway port | Use the forwarded `18080`, not the shell's `:8080` default. |
-| Stale state after re-runs | `sudo icn-demo-reset && sudo icn-demo-seed --json`, reload; or whole-disk overlay reset. |
+| Stale state / extra action cards after re-runs | **Launcher flow:** `sudo icn-demo-reset` only, then reload and click **Start local demo** — the Start click re-seeds (one card). Do **not** also run `icn-demo-seed`, or the live demo shows a duplicate card (the session endpoint already seeds on each Start). **Manual JWT flow:** `sudo icn-demo-reset && sudo icn-demo-seed --json`, then paste the new JWT. Or whole-disk overlay reset. |
 | Need a clean reseed | `sudo icn-demo-seed --json` → expect `"standing_note": "bootstrap-standing: ok"`. |
 | Firstboot not complete | `icn-demo-seed` fails "$ENV_FILE missing"; `journalctl -u icn-appliance-firstboot`. The icnd unit is gated on firstboot by design. |
 | 13/13 proof slow | Normal — it builds nothing but runs a full governed lifecycle; a few minutes at 2 GB RAM. |
