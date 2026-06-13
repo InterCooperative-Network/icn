@@ -3,12 +3,17 @@
 # open-proxmox-demo.sh — one command to open the ICN member-shell DEV/DEMO.
 # ----------------------------------------------------------------------------
 # DEV/DEMO ONLY. Run this from your workstation (your laptop or dev box). It:
-#   1. opens SSH tunnels so the browser uses the sealed demo origins. The
-#      node's gateway/shell/session all bind 127.0.0.1 INSIDE the VM and are
-#      never exposed on the VLAN — they are reachable only through your tunnel:
-#        localhost:18080 -> node instance gateway      127.0.0.1:8080
-#        localhost:18090 -> node instance member-shell 127.0.0.1:8090
-#        localhost:18091 -> node instance demo-session  127.0.0.1:8091
+#   1. opens SSH tunnels so the browser uses the sealed demo origins and you
+#      reach the node through forwards you control:
+#        localhost:18080 -> node instance gateway      :8080  (binds 0.0.0.0)
+#        localhost:18090 -> node instance member-shell :8090  (binds 0.0.0.0)
+#        localhost:18091 -> node instance demo-session 127.0.0.1:8091 (loopback)
+#      Binding note: only the demo-session endpoint binds loopback. In the demo
+#      profile the gateway (--gateway-bind 0.0.0.0:8080) and member-shell
+#      (--bind 0.0.0.0) bind all interfaces, so on a BRIDGED Proxmox/cloud VM
+#      they are reachable on that VM's network — run the demo node on a trusted
+#      or isolated network. The tunnel works regardless; this is a DEV/DEMO
+#      image, not a hardened deployment.
 #   2. waits for the member-shell to answer through the tunnel,
 #   3. opens your browser to the member-shell in live mode.
 # After the browser opens you do NOT touch the terminal again: click
