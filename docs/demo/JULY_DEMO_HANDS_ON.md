@@ -93,10 +93,21 @@ artifact**. It is a local dev image.
 > the VM (your laptop's QEMU, a Proxmox box, a cloud instance). The demo is a
 > node instance, never a physical box and never production.
 
-The node's gateway, member-shell, and demo-session endpoint all bind
-**`127.0.0.1` inside the VM**. They are never exposed on your LAN. You reach them
-through port-forwards you control (QEMU hostfwd locally, or an SSH tunnel
-remotely).
+Binding, in the demo profile (be precise about this — it is a security point):
+
+- The **demo-session endpoint** (the one that mints the DEV/DEMO JWT) binds
+  **`127.0.0.1` only** inside the VM. It is never on the network — reachable
+  solely through a port-forward you control.
+- The **gateway** (`0.0.0.0:8080`) and **member-shell** (`0.0.0.0:8090`) bind all
+  interfaces. Under a local QEMU user-mode VM that is host-only (no LAN). But on
+  a **bridged Proxmox/cloud VM they are reachable on that VM's network** — so run
+  the demo node on a **trusted or isolated network** (e.g. an isolated VLAN), or
+  don't bridge it. The launcher reaches everything over the tunnel regardless;
+  the open binds are a dev-profile convenience, not a hardened posture. This is a
+  DEV/DEMO image, not a production deployment.
+
+The recommended path is the SSH tunnel ([§5](#5-launch-it-through-a-remote--proxmox-vm)),
+which works the same whether or not the gateway/shell are also on the LAN.
 
 ---
 
@@ -368,8 +379,9 @@ browser beats screenshots — use these as a fallback if the node isn't reachabl
 1. **(0:00–2:00) Frame it.** What ICN is ([§1](#1-what-this-demo-is)) and the
    honesty boundary ([§2](#2-what-this-demo-is-not)). "I'll show you what's real,
    and I'll be precise about what isn't."
-2. **(2:00–3:00) Launch.** Run the launcher (or have it open). Explain the node
-   binds loopback and you reach it through a tunnel you control.
+2. **(2:00–3:00) Launch.** Run the launcher (or have it open). Explain that the
+   JWT-minting session endpoint binds loopback and you reach the node through a
+   tunnel you control (see the binding note in [§3](#3-what-you-need-before-starting)).
 3. **(3:00–6:00) The loop.** Click through standing → card → discharge → receipt
    → confirmed, narrating with [§7](#7-what-to-say-at-each-stage).
 4. **(6:00–8:00) Evidence.** Expand the receipt; explain the record hash and what

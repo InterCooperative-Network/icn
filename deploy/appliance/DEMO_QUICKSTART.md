@@ -101,8 +101,11 @@ copy/paste, no gateway typing:
 ICN_DEMO_VM_IP=192.0.2.50 ICN_DEMO_SSH_KEY=/path/to/smoke_ed25519 \
   bash deploy/appliance/scripts/open-proxmox-demo.sh
 
-# or jump through a dev host that holds the key and can reach the node:
+# or jump through a dev host that holds the key and can reach the node
+# (ICN_DEMO_REMOTE_KEY is REQUIRED with ICN_DEMO_JUMP — it is the key path
+# ON the jump host):
 ICN_DEMO_VM_IP=192.0.2.50 ICN_DEMO_JUMP=user@dev-host \
+  ICN_DEMO_REMOTE_KEY=/path/to/smoke_ed25519 \
   bash deploy/appliance/scripts/open-proxmox-demo.sh
 ```
 
