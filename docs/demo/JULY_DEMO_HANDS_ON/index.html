@@ -1,0 +1,526 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN July Demo — Hands-On Guide | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>demo</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>JULY DEMO HANDS ON</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/demo/JULY_DEMO_HANDS_ON.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN July Demo — Hands-On Guide</h1>
+<blockquote>
+<p>A complete, click-by-click way through the ICN July Demo Candidate. Written so
+you can run it yourself, understand what you are looking at, and show it to
+another person without improvising.</p>
+</blockquote>
+<p>This is a <strong>DEV/DEMO</strong> walkthrough. Read <a href="#2-what-this-demo-is-not">§2 What this is not</a>
+and <a href="#16-what-this-proves">§16 What this proves</a> before you show it to anyone, so
+you describe it honestly.</p>
+<hr>
+<h2>Table of contents</h2>
+<ol>
+<li><a href="#1-what-this-demo-is">What this demo is</a></li>
+<li><a href="#2-what-this-demo-is-not">What this demo is not</a></li>
+<li><a href="#3-what-you-need-before-starting">What you need before starting</a></li>
+<li><a href="#4-launch-it-locally-laptop--dev-box">Launch it locally (laptop / dev box)</a></li>
+<li><a href="#5-launch-it-through-a-remote--proxmox-vm">Launch it through a remote / Proxmox VM</a></li>
+<li><a href="#6-the-exact-click-path">The exact click path</a></li>
+<li><a href="#7-what-to-say-at-each-stage">What to say at each stage</a></li>
+<li><a href="#8-how-to-reset-the-demo">How to reset the demo</a></li>
+<li><a href="#9-how-to-verify-receipts">How to verify receipts</a></li>
+<li><a href="#10-how-to-show-the-openapi-surface">How to show the OpenAPI surface</a></li>
+<li><a href="#11-how-to-explain-the-evidence--audit-trail">How to explain the evidence / audit trail</a></li>
+<li><a href="#12-common-failure-modes-and-fixes">Common failure modes and fixes</a></li>
+<li><a href="#13-screenshots">Screenshots</a></li>
+<li><a href="#14-the-5-minute-demo-script">The 5-minute demo script</a></li>
+<li><a href="#15-the-15-minute-demo-script">The 15-minute demo script</a></li>
+<li><a href="#16-what-this-proves">What this proves</a></li>
+<li><a href="#17-what-comes-next">What comes next</a></li>
+</ol>
+<hr>
+<h2>1. What this demo is</h2>
+<p>ICN (the Intercooperative Network) is infrastructure for cooperatives to
+coordinate <strong>without</strong> a central company in the middle. This demo is the first
+hands-on slice of that: a single ICN node, running as a self-contained
+appliance, driving one complete member loop end to end.</p>
+<p>The loop is small on purpose. One member, in one context, is shown the things
+they are allowed to act on, completes one of them, and the node produces a
+tamper-evident <strong>receipt</strong> that the action happened. You can then ask the node
+to prove that its record of events is internally consistent.</p>
+<p>In plain language, the demo shows a node that can answer four questions and
+prove its answers:</p>
+<ul>
+<li><strong>Who can act here?</strong> (member standing)</li>
+<li><strong>What can they do?</strong> (action cards)</li>
+<li><strong>Did they do it?</strong> (discharge + completion receipt)</li>
+<li><strong>Can you prove it happened and wasn&#39;t edited later?</strong> (receipt evidence +
+the audit chain)</li>
+</ul>
+<p>That is the seed of member-controlled infrastructure: a box a cooperative could
+eventually run themselves, instead of renting a seat in someone else&#39;s system.</p>
+<hr>
+<h2>2. What this demo is NOT</h2>
+<p>Be precise about this. The honesty boundary is the most important slide.</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Status</th>
+<th>What it means</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Live-local</strong></td>
+<td>✅ real, running here</td>
+<td>Node boot, <code>icnd</code>, the gateway, member standing, action cards, discharge, completion receipt, receipt↔evidence binding, seed/reset/reseed, the OpenAPI surface, and the 13/13 receipt-chain proof. These genuinely run on the node in front of you.</td>
+</tr>
+<tr>
+<td><strong>Fixture-backed</strong></td>
+<td>🟡 real software, demo data</td>
+<td>The NYCN institution package, the demo member/org identities, and the member-shell panes. The <em>mechanism</em> is real; the <em>people and org</em> are a scripted fixture, not a live membership roster.</td>
+</tr>
+<tr>
+<td><strong>Design-only / not yet proven</strong></td>
+<td>⛔ do not claim</td>
+<td>Federation, multi-organization behavior, production deployment, real pilot adoption, real member data, the mobile passport / keyring, QR node-claim, commons resource allocation, any wallet / token / payment behavior, and a signed release image. None of this is demonstrated here.</td>
+</tr>
+</tbody></table>
+<p>If someone asks &quot;is this live / in production / handling real money or real
+members?&quot; the answer is <strong>no</strong>. It is a development demonstration of the core
+loop. Say so plainly. The credibility of the project rests on not overclaiming.</p>
+<p>This image is <strong>unsigned</strong>, <strong>not immutable</strong>, and <strong>not a partner-distributable
+artifact</strong>. It is a local dev image.</p>
+<hr>
+<h2>3. What you need before starting</h2>
+<ul>
+<li>The demo appliance image (a <code>.qcow2</code> file) — see the project&#39;s appliance
+build docs, or reuse a verified candidate image.</li>
+<li>A way to run it: either <strong>QEMU/KVM locally</strong> (<a href="#4-launch-it-locally-laptop--dev-box">§4</a>)
+or a <strong>hypervisor</strong> (Proxmox/KVM/cloud) for the remote path (<a href="#5-launch-it-through-a-remote--proxmox-vm">§5</a>).</li>
+<li>A modern browser (Chrome/Chromium/Firefox).</li>
+<li>For the remote path only: SSH access to the running node and the demo SSH key.</li>
+<li>The launcher script lives in the repo at
+<code>deploy/appliance/scripts/open-proxmox-demo.sh</code>.</li>
+</ul>
+<blockquote>
+<p><strong>Terminology.</strong> The <em>appliance image</em> is a reproducible VM template. Booting
+it gives you a <em>running node instance</em>. The <em>hypervisor host</em> is whatever runs
+the VM (your laptop&#39;s QEMU, a Proxmox box, a cloud instance). The demo is a
+node instance, never a physical box and never production.</p>
+</blockquote>
+<p>Binding, in the demo profile (be precise about this — it is a security point):</p>
+<ul>
+<li>The <strong>demo-session endpoint</strong> (the one that mints the DEV/DEMO JWT) binds
+<strong><code>127.0.0.1</code> only</strong> inside the VM. It is never on the network — reachable
+solely through a port-forward you control.</li>
+<li>The <strong>gateway</strong> (<code>0.0.0.0:8080</code>) and <strong>member-shell</strong> (<code>0.0.0.0:8090</code>) bind all
+interfaces. Under a local QEMU user-mode VM that is host-only (no LAN). But on
+a <strong>bridged Proxmox/cloud VM they are reachable on that VM&#39;s network</strong> — so run
+the demo node on a <strong>trusted or isolated network</strong> (e.g. an isolated VLAN), or
+don&#39;t bridge it. The launcher reaches everything over the tunnel regardless;
+the open binds are a dev-profile convenience, not a hardened posture. This is a
+DEV/DEMO image, not a production deployment.</li>
+</ul>
+<p>The recommended path is the SSH tunnel (<a href="#5-launch-it-through-a-remote--proxmox-vm">§5</a>),
+which works the same whether or not the gateway/shell are also on the LAN.</p>
+<hr>
+<h2>4. Launch it locally (laptop / dev box)</h2>
+<p>You boot the image under QEMU and reach it through forwards you control. The
+gateway and member-shell bind <code>0.0.0.0</code> inside the VM, so QEMU port-forwards
+reach them directly. The demo-session endpoint binds <strong>loopback only</strong> inside the
+VM (the same security posture as the remote path — it is only ever reached
+through a tunnel), so it needs a one-line SSH local-forward rather than a QEMU
+hostfwd (a hostfwd targets the guest NIC, not the guest&#39;s loopback). The shell
+host port <strong>must</strong> be <code>18090</code> (the node&#39;s gateway and session CORS allow-lists
+pin that origin).</p>
+<pre><code class="language-bash"># 1) Boot the demo image. Forward SSH + gateway + member-shell; leave it running.
+#    2222 -&gt; ssh(22)   18080 -&gt; gateway(8080)   18090 -&gt; member-shell(8090)
+qemu-system-x86_64 \
+  -machine accel=kvm -cpu host -m 2048 -smp 2 \
+  -drive file=/path/to/icn-appliance-&lt;version&gt;-amd64.qcow2,if=virtio \
+  -drive file=/path/to/seed.iso,if=virtio,media=cdrom \
+  -netdev user,id=n0,\
+hostfwd=tcp:127.0.0.1:2222-:22,\
+hostfwd=tcp:127.0.0.1:18080-:8080,\
+hostfwd=tcp:127.0.0.1:18090-:8090 \
+  -device virtio-net-pci,netdev=n0 \
+  -nographic
+
+# 2) Once the gateway answers, forward the loopback-only session endpoint over
+#    SSH (the demo key matches the cloud-init seed). Leave this running too.
+ssh -i /path/to/demo_key -p 2222 -N -L 18091:127.0.0.1:8091 debian@localhost
+</code></pre>
+<p>With both running, open:</p>
+<pre><code>http://localhost:18090/member-shell/?mode=live&amp;demo=launcher&amp;gw=18080&amp;session=18091
+</code></pre>
+<p>Then follow <a href="#6-the-exact-click-path">§6 The exact click path</a>. Nothing to type,
+nothing to paste.</p>
+<blockquote>
+<p>The repo&#39;s <code>deploy/appliance/smoke/smoke-local.sh --real --demo</code> boots this
+same image the same way and drives the loop from the command line — it is the
+automated proof that the local-boot path works.</p>
+</blockquote>
+<hr>
+<h2>5. Launch it through a remote / Proxmox VM</h2>
+<p>Use this when the node runs on a hypervisor you reach over SSH. This is the
+<strong>one-command launcher</strong> path. The launcher opens the three tunnels and your
+browser; you never touch the terminal again after it opens.</p>
+<p>Set the connection via environment variables (no infra values are baked into the
+script):</p>
+<pre><code class="language-bash"># Direct route — your workstation can SSH the node and holds the demo key:
+ICN_DEMO_VM_IP=&lt;your-node-ip&gt; \
+ICN_DEMO_SSH_KEY=/path/to/demo_key \
+  bash deploy/appliance/scripts/open-proxmox-demo.sh
+
+# Jump route — the key lives on a dev host that can reach the node:
+ICN_DEMO_VM_IP=&lt;your-node-ip&gt; \
+ICN_DEMO_JUMP=user@dev-host \
+ICN_DEMO_REMOTE_KEY=/path/to/demo_key-on-jump-host \
+  bash deploy/appliance/scripts/open-proxmox-demo.sh
+</code></pre>
+<p>What it does, in order:</p>
+<ol>
+<li>Opens SSH tunnels: <code>localhost:18080→gateway</code>, <code>localhost:18090→member-shell</code>,
+<code>localhost:18091→demo-session</code>.</li>
+<li>Waits for the member-shell to actually answer through the tunnel.</li>
+<li>Opens your browser to the shell in launcher mode.</li>
+<li>Prints the URL and the gateway, then runs until you press <strong>Ctrl-C</strong>.</li>
+</ol>
+<p>Overridable env (all optional): <code>ICN_DEMO_SSH_USER</code> (default <code>debian</code>),
+<code>ICN_DEMO_GW_PORT</code> (18080), <code>ICN_DEMO_SESSION_PORT</code> (18091),
+<code>ICN_DEMO_NO_BROWSER=1</code> (set up tunnels, print the URL, don&#39;t open a browser).
+The <strong>shell port is fixed at 18090</strong> by design and is not overridable — it is the
+page origin the gateway CORS allow-list pins.</p>
+<hr>
+<h2>6. The exact click path</h2>
+<p>The browser opens to the member-shell in <strong>launcher mode</strong> (<code>?demo=launcher</code>).</p>
+<ol>
+<li>You see an honesty banner at the top and a <strong>&quot;Start local demo&quot;</strong> button. The
+gateway field is pre-filled (<code>http://localhost:18080</code>). The manual connect
+form is hidden.</li>
+<li>Click <strong>Start local demo</strong> — one click. The page asks the loopback session
+endpoint for a fresh DEV/DEMO session, holds the short-lived credential <strong>in
+page memory only</strong> (never written to disk, never in the URL), and loads the
+loop. No gateway typed, no JWT pasted.</li>
+<li><strong>Standing</strong> renders — the member&#39;s standing in the demo context (two
+domains).</li>
+<li><strong>Action card(s)</strong> appear — the things this member can act on.</li>
+<li>Click <strong>Mark complete</strong> on a card → a confirm step appears declaring the
+action and its reversibility.</li>
+<li>Click <strong>Confirm — mark complete</strong>.</li>
+<li><strong>Receipt</strong> renders, including the record hash.</li>
+<li>Expand the receipt to see the <strong>evidence</strong> detail (the record the network
+produced).</li>
+<li>The action card transitions to <strong>Confirmed</strong> in place.</li>
+</ol>
+<blockquote>
+<p><strong>Known nuance — say it out loud if asked.</strong> After discharge, the backend
+<code>/me/action-cards</code> correctly returns <strong>zero open cards</strong> (the obligation is
+complete). The card you see does <strong>not</strong> vanish from the screen; it flips to a
+<strong>Confirmed</strong> state in place so the audience can see the result. The
+on-screen &quot;Confirmed&quot; card and the empty open-cards list are consistent, not a
+bug.</p>
+</blockquote>
+<hr>
+<h2>7. What to say at each stage</h2>
+<p>Plain language, no jargon fog. A real person is next to you asking &quot;okay, what am
+I actually looking at?&quot;</p>
+<ul>
+<li><strong>Standing:</strong> &quot;The node knows who is allowed to act in this context, and what
+their standing is. Nobody had to ask a central server — the node holds this.&quot;</li>
+<li><strong>Action card:</strong> &quot;These are the prompts this member can act on — the work or
+the governance step in front of them. The node decides what to show based on
+who they are.&quot;</li>
+<li><strong>Discharge:</strong> &quot;The member completes the action. Notice it tells them what
+they&#39;re about to do and whether it can be undone before they confirm.&quot;</li>
+<li><strong>Receipt:</strong> &quot;The node produces a receipt — evidence the action happened, with
+a hash. This isn&#39;t a screenshot or a log line you could quietly edit; it&#39;s
+bound to the record.&quot;</li>
+<li><strong>Evidence / audit:</strong> &quot;And we can ask the node to prove its whole chain of
+records is internally consistent — that nothing was inserted or rewritten
+after the fact.&quot;</li>
+<li><strong>Appliance:</strong> &quot;The whole thing is one node a cooperative could eventually run
+themselves. This is the seed of member-controlled infrastructure — not a
+finished federation, but the first working piece.&quot;</li>
+</ul>
+<hr>
+<h2>8. How to reset the demo</h2>
+<p>Run inside the node (SSH in, or use the hypervisor console):</p>
+<pre><code class="language-bash">sudo icn-demo-reset          # destroys the demo&#39;s seeded state
+sudo icn-demo-seed --json    # reseeds a fresh member + open action card
+</code></pre>
+<p>After reseed you should see <code>&quot;standing_note&quot;: &quot;bootstrap-standing: ok&quot;</code> in the
+JSON. Reload the member-shell and the loop is fresh again.</p>
+<blockquote>
+<p><code>icn-demo-reset</code> destroys the demo&#39;s seeded state on that node only. It does
+not touch any other system.</p>
+</blockquote>
+<hr>
+<h2>9. How to verify receipts</h2>
+<p>Inside the node:</p>
+<pre><code class="language-bash"># Verify a single item&#39;s record is consistent:
+sudo icn-demo-verify &lt;item-id&gt;
+
+# Verify the full governed receipt chain (the cryptographic proof):
+sudo icn-demo-verify --chain
+</code></pre>
+<p><code>--chain</code> is the strong proof: it audit-verifies the full receipt chain and
+reports <strong>13/13</strong>. A per-item <code>verify</code> is a consistency check, not a BLAKE3
+re-derivation — <code>--chain</code> is the cryptographic path. Say it that way; don&#39;t
+inflate the per-item check.</p>
+<hr>
+<h2>10. How to show the OpenAPI surface</h2>
+<p>The gateway serves its member API surface as OpenAPI. Through the tunnel (or
+QEMU forward) on the gateway port:</p>
+<pre><code class="language-bash">curl -s http://localhost:18080/api-docs/openapi.json | head -c 400; echo
+</code></pre>
+<p>This is the machine-readable contract for the member surface that landed in
+#2027. It is what an app, an SDK, or a partner integration would build against.</p>
+<hr>
+<h2>11. How to explain the evidence / audit trail</h2>
+<p>The point of the receipt is not the receipt — it&#39;s that the record can be
+<strong>proven consistent later</strong>.</p>
+<ul>
+<li>Every meaningful action produces a record the node stores.</li>
+<li>The receipt binds to that record (the record hash you saw in the UI).</li>
+<li><code>icn-demo-verify --chain</code> walks the governed receipt chain and confirms every
+link is consistent — <strong>13/13</strong>. If someone had inserted, deleted, or rewritten
+a record after the fact, the chain check would not pass.</li>
+</ul>
+<p>Why a cooperative cares: it means the history of decisions and actions isn&#39;t
+&quot;trust the admin.&quot; It&#39;s verifiable by anyone who can run the check. That&#39;s the
+difference between a platform that <em>tells</em> you what happened and infrastructure
+that can <em>prove</em> it.</p>
+<hr>
+<h2>12. Common failure modes and fixes</h2>
+<table>
+<thead>
+<tr>
+<th>Symptom</th>
+<th>Likely cause</th>
+<th>Fix</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Launcher exits &quot;host port already in use&quot;</td>
+<td>18080/18090/18091 busy on your workstation</td>
+<td>Free the port, or override <code>ICN_DEMO_GW_PORT</code> / <code>ICN_DEMO_SESSION_PORT</code> (shell stays 18090).</td>
+</tr>
+<tr>
+<td>Launcher &quot;SSH tunnel exited before it came up&quot;</td>
+<td>Can&#39;t SSH the node / wrong key / wrong route</td>
+<td>Confirm you can <code>ssh &lt;user&gt;@&lt;node-ip&gt;</code> with your key, or set <code>ICN_DEMO_JUMP</code> to route through a host that can.</td>
+</tr>
+<tr>
+<td>Tunnel up but member-shell never answers</td>
+<td>Node still booting, or demo profile not running</td>
+<td>Wait for first boot; check <code>systemctl status icnd icn-demo-session</code> in the VM.</td>
+</tr>
+<tr>
+<td>&quot;Start local demo&quot; does nothing / standing never loads</td>
+<td>Session endpoint gated off, or dev gates not set</td>
+<td>Confirm the image is a <strong>demo-profile</strong> image; check <code>journalctl -u icn-demo-session</code>.</td>
+</tr>
+<tr>
+<td>Authenticated calls fail CORS</td>
+<td>Shell served on a non-18090 origin</td>
+<td>Use shell port <strong>18090</strong> (the gateway/session CORS allow-lists pin it). Don&#39;t change the shell port.</td>
+</tr>
+<tr>
+<td>Cards don&#39;t refresh after discharge</td>
+<td>Expected — see <a href="#6-the-exact-click-path">§6 nuance</a></td>
+<td>The card flips to <strong>Confirmed</strong> in place; <code>/me/action-cards</code> is correctly empty.</td>
+</tr>
+</tbody></table>
+<hr>
+<h2>13. Screenshots</h2>
+<p>A real-browser pass captures the six key states. To regenerate them, run the
+launcher (or local boot), then drive the click path with a browser-automation
+script and screenshot each step. The canonical six are:</p>
+<ol>
+<li><code>01-launcher-open</code> — launcher mode, &quot;Start local demo&quot; visible, gateway
+pre-filled</li>
+<li><code>02-standing-auto</code> — standing rendered after one click</li>
+<li><code>03-action-card</code> — open action card</li>
+<li><code>04-confirm</code> — the confirm-before-discharge step</li>
+<li><code>05-receipt</code> — receipt with record hash</li>
+<li><code>06-confirmed</code> — card in Confirmed state</li>
+</ol>
+<p>Keep screenshots free of any credential (scrub JWTs). For a live demo, the live
+browser beats screenshots — use these as a fallback if the node isn&#39;t reachable.</p>
+<hr>
+<h2>14. The 5-minute demo script</h2>
+<blockquote>
+<p>Goal: show the loop and the proof. No setup talk.</p>
+</blockquote>
+<ol>
+<li><strong>(0:00)</strong> &quot;This is one ICN node, running as a self-contained appliance.
+Watch it run one full member loop.&quot; — launcher already open.</li>
+<li><strong>(0:30)</strong> Click <strong>Start local demo</strong>. &quot;One click. No login to type, no token
+to paste.&quot; — standing renders.</li>
+<li><strong>(1:00)</strong> &quot;The node knows who can act here and what their standing is.&quot; Point
+at the two domains.</li>
+<li><strong>(1:30)</strong> &quot;Here&#39;s what this member can act on.&quot; Open the action card.</li>
+<li><strong>(2:30)</strong> Click <strong>Mark complete</strong> → confirm. &quot;It tells them what they&#39;re
+doing and whether it&#39;s reversible, then they confirm.&quot; → receipt.</li>
+<li><strong>(3:30)</strong> &quot;The node produced a receipt — evidence, with a hash, bound to the
+record.&quot; Expand evidence.</li>
+<li><strong>(4:00)</strong> Switch to a terminal: <code>sudo icn-demo-verify --chain</code> → <strong>13/13</strong>.
+&quot;And it can prove its whole record chain is consistent. Not &#39;trust me&#39; —
+verifiable.&quot;</li>
+<li><strong>(4:30)</strong> &quot;That&#39;s the seed of infrastructure a cooperative runs themselves.
+It&#39;s a demo of the core loop — not production, not a federation yet.&quot;</li>
+</ol>
+<hr>
+<h2>15. The 15-minute demo script</h2>
+<blockquote>
+<p>Goal: the loop, the proof, the honesty boundary, and the OpenAPI surface.</p>
+</blockquote>
+<ol>
+<li><strong>(0:00–2:00) Frame it.</strong> What ICN is (<a href="#1-what-this-demo-is">§1</a>) and the
+honesty boundary (<a href="#2-what-this-demo-is-not">§2</a>). &quot;I&#39;ll show you what&#39;s real,
+and I&#39;ll be precise about what isn&#39;t.&quot;</li>
+<li><strong>(2:00–3:00) Launch.</strong> Run the launcher (or have it open). Explain that the
+JWT-minting session endpoint binds loopback and you reach the node through a
+tunnel you control (see the binding note in <a href="#3-what-you-need-before-starting">§3</a>).</li>
+<li><strong>(3:00–6:00) The loop.</strong> Click through standing → card → discharge → receipt
+→ confirmed, narrating with <a href="#7-what-to-say-at-each-stage">§7</a>.</li>
+<li><strong>(6:00–8:00) Evidence.</strong> Expand the receipt; explain the record hash and what
+binding means (<a href="#11-how-to-explain-the-evidence--audit-trail">§11</a>).</li>
+<li><strong>(8:00–10:00) Proof.</strong> Terminal: <code>sudo icn-demo-verify --chain</code> → 13/13.
+Explain why a cooperative cares about verifiable history.</li>
+<li><strong>(10:00–11:30) Reset.</strong> <code>sudo icn-demo-reset &amp;&amp; sudo icn-demo-seed --json</code>,
+reload the shell — &quot;fresh loop, repeatable.&quot;</li>
+<li><strong>(11:30–13:00) The contract.</strong> Show <code>…/api-docs/openapi.json</code> — &quot;this is the
+surface an app or partner builds against.&quot;</li>
+<li><strong>(13:00–15:00) Boundaries + next.</strong> Walk <a href="#2-what-this-demo-is-not">§2</a> and
+<a href="#17-what-comes-next">§17</a>. &quot;This is the first working piece. Here&#39;s the road
+to a cooperative actually running one.&quot;</li>
+</ol>
+<hr>
+<h2>16. What this proves</h2>
+<ul>
+<li>A single ICN node boots as a self-contained appliance and runs the <strong>full
+member loop</strong> from a clean start: standing → action card → discharge →
+completion receipt → receipt/evidence binding.</li>
+<li>The loop is reachable from an ordinary browser with <strong>no credential typing or
+pasting</strong> — the credential is fetched by one click and held in page memory
+only.</li>
+<li>The node can <strong>prove its record chain is consistent (13/13)</strong> — verifiable, not
+asserted.</li>
+<li>The whole thing is <strong>reproducible</strong>: seed, reset, reseed, and a documented
+build + smoke path.</li>
+<li>The member API surface is published as <strong>OpenAPI</strong> for integrators.</li>
+</ul>
+<p>It does <strong>not</strong> prove federation, multi-org behavior, production readiness, real
+membership, funds, mobile passport/keyring, or a signed release. (<a href="#2-what-this-demo-is-not">§2</a>.)</p>
+<hr>
+<h2>17. What comes next</h2>
+<p>In rough order of what turns this seed into something a cooperative can lean on:</p>
+<ol>
+<li><strong>A baked, signed image</strong> — fold the launcher + session sidecar into a
+from-<code>main</code> candidate (currently branch-based), then move toward a signed,
+reproducible release artifact.</li>
+<li><strong>A second member and a two-party action</strong> — the loop today is one member;
+the next proof is two members interacting in one context.</li>
+<li><strong>A real org-claim ceremony</strong> — let a cooperative claim and configure their
+own node instance (the QR node-claim is design-only today).</li>
+<li><strong>Multi-org / federation</strong> — two nodes coordinating; the actual
+&quot;intercooperative&quot; step.</li>
+<li><strong>A real pilot</strong> — a cooperative (NYCN is the intended first partner) running
+a node against real, consented data, with the mobile passport for member
+identity.</li>
+</ol>
+<p>None of these are claimed as done. They&#39;re the map from &quot;the core loop works&quot; to
+&quot;members control the infrastructure.&quot;</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
