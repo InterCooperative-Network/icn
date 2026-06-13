@@ -1,0 +1,47 @@
+# DEMO PROFILE ONLY — installed by build-image.sh when
+# ICN_APPLIANCE_DEMO_PROFILE=1. Not on the base image, never production.
+#
+# Loopback DEV/DEMO session endpoint for the member-shell "Start local demo"
+# button (icn-demo-session.py): POST /v1/dev/demo/session runs icn-demo-seed
+# and returns a fresh DEV/DEMO session so the operator never copies/pastes a
+# JWT. Binds 127.0.0.1:8091 only — reachable solely through the operator's own
+# SSH tunnel (open-proxmox-demo.sh forwards it to localhost:18091). The script
+# is double dev-gated and refuses unless ICN_ENABLE_ADMIN_ENDPOINTS=true and a
+# non-production governance posture (it returns 403 otherwise).
+#
+# Runs as root because icn-demo-seed reads /etc/icn/icnd.env. The command is
+# fixed; no request data influences it. This adds no privilege the
+# tunnel-holding operator (SSH + sudo on this throwaway VM) does not already
+# have.
+
+[Unit]
+Description=ICN member-shell DEV/DEMO session endpoint (DEV/DEMO ONLY)
+Documentation=https://github.com/InterCooperative-Network/icn
+After=icnd.service
+Wants=icnd.service
+ConditionPathExists=/usr/local/sbin/icn-demo-session.py
+ConditionPathExists=/usr/local/sbin/icn-demo-seed
+
+[Service]
+Type=simple
+# Dev gates passed through so the endpoint's posture check matches icnd's.
+EnvironmentFile=-/etc/icn/icnd.env
+Environment=ICN_ENABLE_ADMIN_ENDPOINTS=true
+Environment=ICN_GOVERNANCE_BUILD_MODE=test
+ExecStart=/usr/bin/python3 /usr/local/sbin/icn-demo-session.py
+Restart=on-failure
+RestartSec=5
+
+# Sandboxing: loopback-only network; no new privileges beyond the fixed
+# seed command it must run as root.
+ProtectHome=true
+PrivateTmp=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_UNIX
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=icn-demo-session
+
+[Install]
+WantedBy=multi-user.target

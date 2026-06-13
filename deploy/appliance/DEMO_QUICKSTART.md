@@ -90,11 +90,38 @@ ssh -p 2222 debian@127.0.0.1 sudo icn-demo-seed
 The seed prints the member-shell URLs, the open action item, and a dev
 session JWT (local VM only).
 
-## First URL to open
+## One-command launcher (recommended for a live human demo)
+
+If a node instance is already running (e.g. a Proxmox VM at `192.0.2.50` — use your node's real IP),
+open the whole demo with one command from your workstation — no JWT
+copy/paste, no gateway typing:
+
+```bash
+# direct (this machine can SSH the node and has the demo key):
+ICN_DEMO_VM_IP=192.0.2.50 ICN_DEMO_SSH_KEY=/path/to/smoke_ed25519 \
+  bash deploy/appliance/scripts/open-proxmox-demo.sh
+
+# or jump through a dev host that holds the key and can reach the node:
+ICN_DEMO_VM_IP=192.0.2.50 ICN_DEMO_JUMP=user@dev-host \
+  bash deploy/appliance/scripts/open-proxmox-demo.sh
+```
+
+It opens the SSH tunnels (gateway→18080, shell→18090, demo-session→18091),
+then opens your browser to `…/member-shell/?mode=live&demo=launcher`. In the
+page, the gateway is pre-filled and a **Start local demo** button appears —
+select it once and your standing + a sample action card load automatically.
+Nothing is copied or pasted; the credential lives only in the page's memory.
+Press Ctrl-C in the terminal to close the tunnel when you're done.
+
+This needs a demo-profile image (the `icn-demo-session` endpoint ships with
+`ICN_APPLIANCE_DEMO_PROFILE=1`). Everything below is the manual fallback.
+
+## First URL to open (manual fallback)
 
 > http://localhost:18090/member-shell/
 
-(Use `?mode=demo` for the self-labeled fixture mode that needs no JWT.)
+(Use `?mode=demo` for the self-labeled fixture mode that needs no JWT. The
+manual `?mode=live` paste flow below is the advanced/debug path.)
 
 ## The demo script (5 steps)
 

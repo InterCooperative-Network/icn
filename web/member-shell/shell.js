@@ -81,6 +81,19 @@
   var params = new URLSearchParams(window.location.search);
   var MODE = params.get("mode") === "demo" ? "demo" : "live";
 
+  // DEV/DEMO one-click launcher context. The local launcher
+  // (deploy/appliance/scripts/open-proxmox-demo.sh) opens this page with
+  // ?demo=launcher and forwards two loopback ports: the gateway to :18080 and
+  // a DEV/DEMO session endpoint to :18091. When present, the shell shows a
+  // "Start local demo" button that obtains a fresh session in one click — no
+  // gateway typing, no credential paste, no credential in any URL. The
+  // credential is held in page memory exactly like the manual flow (never
+  // persisted). The flag is a UI hint only and carries no secret.
+  var DEMO_LAUNCHER = MODE === "live" && params.get("demo") === "launcher";
+  var DEMO_LOOPBACK = window.location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost";
+  var DEMO_GATEWAY = "http://" + DEMO_LOOPBACK + ":18080";
+  var DEMO_SESSION_URL = "http://" + DEMO_LOOPBACK + ":18091/v1/dev/demo/session";
+
   var state = {
     gateway: null,     // live mode only; validated http(s) origin string
     credential: null,  // live mode only; never persisted
@@ -789,11 +802,64 @@
       banner.textContent = "Live-local node — dev rehearsal, not production.";
       banner.className = "banner live";
       byId("nav-live").setAttribute("aria-current", "true");
+      wireConnectForm();
+      if (DEMO_LAUNCHER) {
+        // One-click DEV/DEMO start. Prefill the gateway for the launcher's
+        // tunnel so even the "connect manually instead" fallback needs no
+        // typing, then show the Start button.
+        byId("gateway-url").value = DEMO_GATEWAY;
+        show("demo-launch-section");
+        setSyncChip(SYNC.DELAYED, "neutral",
+          "Ready. Select Start local demo to load your standing.");
+        wireDemoLaunch();
+      } else {
+        show("connect-section");
+        setSyncChip(SYNC.DELAYED, "neutral",
+          "Not connected yet. Enter your local gateway address above.");
+      }
+    }
+  }
+
+  // DEV/DEMO one-click start: ask the launcher's loopback session endpoint for
+  // a fresh demo session, hold it in page memory (never persisted, never in a
+  // URL), then load standing + cards — the same render path as the manual
+  // flow. Falls back to the manual connect form on any failure.
+  function wireDemoLaunch() {
+    var btn = byId("demo-launch-button");
+    var adv = byId("demo-advanced-button");
+    var st = byId("demo-launch-status");
+    function toManual(msg) {
+      hide("demo-launch-section");
       show("connect-section");
       setSyncChip(SYNC.DELAYED, "neutral",
         "Not connected yet. Enter your local gateway address above.");
-      wireConnectForm();
+      if (msg) { byId("connect-status").textContent = msg; }
     }
+    btn.addEventListener("click", function () {
+      btn.disabled = true;
+      st.textContent = "Starting the local demo…";
+      // Simple cross-origin POST (no custom headers) — no preflight needed.
+      fetch(DEMO_SESSION_URL, { method: "POST" }).then(function (resp) {
+        if (!resp.ok) { throw new Error("HTTP " + resp.status); }
+        return resp.json();
+      }).then(function (session) {
+        var cred = session && session.jwt ? String(session.jwt) : "";
+        if (!cred) { throw new Error("no session credential returned"); }
+        // Use the launcher's tunnelled gateway, not the node-internal address
+        // the endpoint reports. Credential lives only in page memory.
+        state.gateway = DEMO_GATEWAY;
+        state.credential = cred;
+        hide("demo-launch-section");
+        show("connect-section");
+        loadLive();
+      }).catch(function (err) {
+        btn.disabled = false;
+        st.textContent =
+          "Could not start the local demo (" + err.message + "). " +
+          "Use Connect manually instead, or check the launcher tunnel.";
+      });
+    });
+    adv.addEventListener("click", function () { toManual(""); });
   }
 
   init();
