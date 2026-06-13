@@ -78,7 +78,7 @@ command -v curl >/dev/null 2>&1 || { err "curl is required but not found on PATH
 for p in "$GW_PORT" "$SHELL_PORT" "$SESSION_PORT"; do
   if (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; then
     exec 3>&- 3<&- 2>/dev/null || true
-    err "host port $p is already in use. Set ICN_DEMO_{GW,SHELL,SESSION}_PORT to free ports, or stop the process holding it."
+    err "host port $p is already in use. Override ICN_DEMO_GW_PORT (gateway) or ICN_DEMO_SESSION_PORT (demo-session) to a free tunnel port; the shell port 18090 is FIXED (the gateway + demo-session CORS allow-lists pin the shell origin), so if 18090 is the conflict, free that port instead of overriding it."
     exit 2
   fi
 done
