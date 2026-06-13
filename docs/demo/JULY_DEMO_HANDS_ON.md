@@ -254,12 +254,26 @@ I actually looking at?"
 Run inside the node (SSH in, or use the hypervisor console):
 
 ```bash
-sudo icn-demo-reset          # destroys the demo's seeded state
-sudo icn-demo-seed --json    # reseeds a fresh member + open action card
+sudo icn-demo-reset          # clears this node's seeded demo state
 ```
 
-After reseed you should see `"standing_note": "bootstrap-standing: ok"` in the
-JSON. Reload the member-shell and the loop is fresh again.
+Reset only clears state — it proves nothing and does **not** reseed. Nothing
+shows in the shell until you reseed or relaunch:
+
+- **Launcher flow (recommended):** after reset, **reload the launcher** — rerun
+  `open-proxmox-demo.sh`, or refresh the launcher URL in the browser — then click
+  **Start local demo**. The **Start** button only appears on a fresh page load;
+  it hides after the first session, so a reset alone won't bring it back on an
+  already-open tab. The session endpoint then mints a fresh session and one
+  open action card for you — it reuses the VM's existing operator identity, so
+  no new member is created — with no JWT to paste. Don't also run
+  `icn-demo-seed` by hand, or you'll get a duplicate card.
+- **Manual / debug flow:** `sudo icn-demo-seed --json` reseeds directly and
+  prints a **local DEV credential** for this disposable VM. Use it only for the
+  advanced paste/debug path. After reseed you should see
+  `"standing_note": "bootstrap-standing: ok"`; reload the shell. **Never paste
+  that credential into docs, screenshots, terminal transcripts, PRs, or any
+  public artifact** — it is local and disposable, but keep it off the record.
 
 > `icn-demo-reset` destroys the demo's seeded state on that node only. It does
 > not touch any other system.

@@ -61,9 +61,14 @@ http://localhost:18090/member-shell/?mode=live&demo=launcher&gw=18080&session=18
 ## ☐ Reset command (between runs) — inside the node
 
 ```bash
-sudo icn-demo-reset && sudo icn-demo-seed --json
+sudo icn-demo-reset                 # clears state; reseed or relaunch after
 ```
-Look for `"standing_note": "bootstrap-standing: ok"`, then reload the shell.
+Reset proves nothing and does not reseed. Then **launcher (recommended):**
+reload the launcher URL, then click **Start local demo** — the button hides
+after the first session, so a reset alone won't restore it on an open tab
+(seeds one card, no paste). **Manual/debug:** `sudo icn-demo-seed --json`
+(prints a local DEV credential — don't paste it into public artifacts); look for
+`"standing_note": "bootstrap-standing: ok"`. Reload the shell.
 
 ---
 
@@ -89,7 +94,7 @@ curl -s http://localhost:18080/api-docs/openapi.json | head -c 400; echo
 | Shell never answers | Wait for boot; in VM: `systemctl status icnd icn-demo-session`. |
 | Start-demo does nothing | Demo gates: in VM `journalctl -u icn-demo-session`; confirm demo-profile image. |
 | Auth calls fail CORS | Shell must be on **18090**. Don't change it. |
-| Loop got messy | `sudo icn-demo-reset && sudo icn-demo-seed --json`, reload. |
+| Loop got messy / extra cards | `sudo icn-demo-reset`, then **reload the launcher URL** and click **Start local demo** (the button hides after the first session, so reset alone won't restore it) — or `sudo icn-demo-seed --json` for the manual path. |
 
 ---
 
