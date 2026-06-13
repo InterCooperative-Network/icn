@@ -1,7 +1,9 @@
 # ICN July Demo — Operator Checklist
 
 > Keep this open during the demo. Full context:
-> [JULY_DEMO_HANDS_ON.md](JULY_DEMO_HANDS_ON.md).
+> [JULY_DEMO_HANDS_ON.md](JULY_DEMO_HANDS_ON.md). Candidate pin, evidence
+> capture, and reviewer handoff:
+> [JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md](JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md).
 > This is a **DEV/DEMO**. Not production, not a federation, not real members/funds.
 
 ---

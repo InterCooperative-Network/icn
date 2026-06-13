@@ -156,3 +156,4 @@ This map does not claim:
 | Subsystem coverage + status vocabulary | [`project-coverage-matrix.md`](project-coverage-matrix.md) |
 | Real runtime surfaces | [`runtime-surface-map.md`](runtime-surface-map.md) |
 | The phase model | [`docs/PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md) |
+| Run / narrate / hand off the Candidate 0.1 demo (Row 11 operator companion) | [`docs/demo/JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md`](../../demo/JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md) |
