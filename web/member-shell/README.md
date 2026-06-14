@@ -120,6 +120,87 @@ gateway answers come through and render in plain language (verified
 end-to-end 2026-06-12: a rejected credential renders "The node answered
 401: Authentication failed…" with the degraded-sync chip).
 
+## Internationalization (i18n) seam
+
+This client ships the **infrastructure** for language, not a set of
+translations (icn#2042). Adding a language is a catalog entry, not a code
+change.
+
+### How it works
+
+`i18n.js` (loaded before `shell.js`) exposes `window.ICNI18n`. Every
+member-facing string in `shell.js` and `index.html` is externalized into a
+catalog keyed by short semantic dotted keys (`sync.synced`, `lifecycle.sent`,
+`card.timePressure.none`, `connect.invalidUrl`, `receipt.whatThisProves`, …).
+`shell.js` renders by calling `ICNI18n.t(key, params)`; `index.html` carries
+`data-i18n="key"` on every static text node and
+`data-i18n-attr="placeholder:key;aria-label:key"` for attributes, which
+`shell.js` applies on boot. Rendering stays `textContent` /
+element-construction only — catalog strings can never inject markup.
+
+The closed member-facing vocabulary from `docs/spec/member-shell-v0.md`
+(`Synced`, `Sent — waiting for receipt`, `Confirmed`, …) lives in the `en`
+catalog **byte-identical** to the spec. Glyphs (`✓ ⚠ ● ○ ◐ ▲`), record-class
+names (`ActionItemCompletionReceipt`), raw enum values, DIDs, ids, and hashes
+are **not** translated — they stay in code / under "details".
+
+### Adding a language (no code change)
+
+1. Add one entry to `MESSAGES` in `i18n.js`:
+   `MESSAGES.fr = { "sync.synced": "Synchronisé", … }`. A **partial** catalog
+   is fine.
+2. Add one row to `LOCALES`: `fr: { name: "Français", dir: "ltr" }`.
+
+The language appears in the selector automatically. No `shell.js` change.
+
+### Per-key fallback + translation-pending behavior
+
+`t(key, params)` resolves: **active locale → `en` → the key itself** (never
+throws, never blanks). A key missing from a non-English catalog falls back to
+the English string per the spec's "translation pending" rule — the member sees
+real text, never an empty slot. The shipped `ar` locale has **no**
+translations on purpose: it demonstrates `dir="rtl"` mirroring plus the
+per-key English fallback for an as-yet-untranslated language.
+
+### Switching language
+
+- **URL:** append `?lang=<locale>` (e.g. `?lang=ar`).
+- **Selector:** a labelled `<select>` in the header (inside `<nav
+  aria-label="Language">`); changing it sets `?lang=` and reloads.
+- **Auto:** with no `?lang=`, the active locale is resolved from
+  `navigator.language` by prefix match, else `en`.
+
+`applyDocumentLocale()` sets `<html lang>` and `<html dir>` at runtime;
+`<html lang="en">` stays the static default in the markup.
+
+### RTL
+
+Layout uses CSS logical properties (`margin-inline`, `padding-inline`,
+`inset-inline`, `border-inline-start`, `text-align:start`) so `dir="rtl"`
+mirrors the page correctly. Try `?lang=ar`.
+
+### Pseudo-locale coverage test (`?lang=qps-ploc`)
+
+`?lang=qps-ploc` renders every externalized string through a transform that
+wraps it in `⟦…⟧` and accents vowels (`⟦Sýncéd⟧`). It derives from the `en`
+catalog, so coverage is exact: **any plain-English text left on screen under
+`?lang=qps-ploc` is a missed extraction.** Fixture/server data (display names,
+card titles, domain names) and raw technical identifiers (ids, enum strings,
+DIDs, hashes, class names) are intentionally *not* wrapped — they are data, not
+UI chrome. The document `lang` becomes `en-x-ploc` (a valid BCP-47 private-use
+tag) so the pseudo-locale keeps `html-lang-valid` passing.
+
+Verified end-to-end with axe-core (`wcag2a/2aa/21aa/22aa`) at three locales:
+`en` (0 violations, ltr), `qps-ploc` (0 violations, every chrome string
+flipped), `ar` (0 violations, `dir=rtl`, English fallback).
+
+### Non-goals
+
+No real translations ship in this v0 client (the infrastructure is the
+deliverable). No server-side locale negotiation. No per-locale number/date
+libraries beyond the locale-aware `toLocaleString()` already used for dates.
+See `docs/spec/member-shell-i18n-v0.md` for the seam's contract.
+
 ## ADR-0028 accessibility checklist (honest)
 
 Implemented in this v0 client:
@@ -152,8 +233,13 @@ NOT yet implemented (declared gaps, per ADR-0028's "partial floor
 compliance with the gap declared"):
 
 - [ ] Glossary endpoint integration (icn#1610 — endpoint does not exist yet)
-- [ ] Multi-language / translation tagging (icn#1740; all strings are
-      English; no "translation pending" path)
+- [x] Multi-language / translation tagging (icn#2042; icn#1740) —
+      **infrastructure present** (externalized string catalog + locale switch
+      via `?lang=` and a labelled selector + RTL via `dir` + per-key English
+      fallback / "translation pending" path + `?lang=qps-ploc` pseudo-locale
+      coverage test). **Translations pending:** no real non-English catalog
+      ships yet; the `ar` locale demonstrates RTL + fallback only. See the
+      "Internationalization (i18n) seam" section above.
 - [ ] Offline tolerance — no caching, no draft-intent queue, no service
       worker; this client requires the network it names
 - [ ] Screen-reader and switch-control testing — not performed; semantics
