@@ -14,6 +14,7 @@
 
 | Doc | Use it for |
 |-----|-----------|
+| [JULY_DEMO_CANDIDATE_0.1_RELEASE_PACKET.md](JULY_DEMO_CANDIDATE_0.1_RELEASE_PACKET.md) | **Read first — hand-off packet** (a candidate hand-off for review, *not* a shipped software release) — what it is/proves/doesn't, who it's for, how to run, how to review evidence, safe-to-share vs never-share, known gaps, next lanes. |
 | [JULY_DEMO_HANDS_ON.md](JULY_DEMO_HANDS_ON.md) | **Detailed presenter/operator flow** — click-by-click, "what to say" at each step, and the full failure-mode table. |
 | [JULY_DEMO_OPERATOR_CHECKLIST.md](JULY_DEMO_OPERATOR_CHECKLIST.md) | **Keep-open live-demo card** — preflight, launch command, expected states, and panic fixes. |
 | [JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md](JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md) | **Reviewer / evidence-hygiene handoff** — claim boundary by proof level, secret/evidence capture, known-gaps map, reviewer checklist. |
