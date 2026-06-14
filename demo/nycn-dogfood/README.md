@@ -52,6 +52,10 @@ This section is load-bearing. Be precise about it when showing the demo.
   (cd icn && cargo build --release -p icnd -p icnctl)
   ```
 - `curl`, `jq`, `python3` on PATH.
+- For the `--fresh` gossip-port preflight: `ss` (from `iproute2`) **or** `lsof`. The gateway port is
+  probed over `/dev/tcp`, but the gossip port is UDP/QUIC and needs one of these tools to detect a
+  stale listener. If neither is installed the run prints a clear warning and proceeds as if the
+  gossip port is free (install `iproute2`, or pass `--force-port-cleanup` to reclaim it regardless).
 - An operator keystore passphrase exported as `ICN_PASSPHRASE` (any value for a test identity).
 
 ## One-command run

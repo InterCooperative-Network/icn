@@ -44,6 +44,7 @@ esac; done
 die(){ echo "ERROR: $*" >&2; exit 1; }
 say(){ printf '\n== %s ==\n' "$*"; }
 note(){ printf '   %s\n' "$*"; }
+warn(){ printf 'WARNING: %s\n' "$*" >&2; }
 
 # ---- optional recording: re-exec once under tee, then render HTML ----
 if [ "$RECORD" = 1 ] && [ "${DOGFOOD_TEEING:-0}" != "1" ]; then
@@ -80,8 +81,28 @@ LAST_PID="$OUT_BASE/.last-icnd.pid"
 
 gw_health(){ curl -sf -m3 "$GW/v1/health" >/dev/null 2>&1; }
 port_listening(){ local p="${1:-$GW_PORT}"; (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null && { exec 3>&- 3<&-; return 0; }; return 1; }
-# Gossip is UDP (QUIC), so /dev/tcp cannot see it -- probe with ss by source port.
-udp_listening(){ local p="$1"; command -v ss >/dev/null 2>&1 || return 1; [ -n "$(ss -Huln "sport = :$p" 2>/dev/null)" ]; }
+# Gossip is UDP (QUIC), so /dev/tcp cannot see it. Probe with ss by source port,
+# falling back to lsof (which free_port already relies on) so the preflight still
+# runs without iproute2. If NEITHER probe tool exists, warn loudly and treat the
+# port as free -- do NOT skip silently, or a stale gossip listener on :$p goes
+# undetected and start_gw fails downstream with a confusing error (#1956).
+UDP_PROBE_WARNED=0
+udp_listening(){
+  local p="$1"
+  if command -v ss >/dev/null 2>&1; then
+    [ -n "$(ss -Huln "sport = :$p" 2>/dev/null)" ]; return
+  fi
+  if command -v lsof >/dev/null 2>&1; then
+    [ -n "$(lsof -nP -iUDP:"$p" 2>/dev/null)" ]; return
+  fi
+  if [ "$UDP_PROBE_WARNED" = 0 ]; then
+    warn "cannot probe UDP gossip port :$p -- neither 'ss' (iproute2) nor 'lsof' is installed."
+    warn "  a stale gossip listener on :$p will NOT be detected; proceeding as if free."
+    warn "  install iproute2 (e.g. 'sudo apt-get install iproute2'), or pass --force-port-cleanup."
+    UDP_PROBE_WARNED=1
+  fi
+  return 1
+}
 free_port(){
   local p="${1:-$GW_PORT}" proto="${2:-tcp}"
   if command -v fuser >/dev/null 2>&1; then fuser -k "${p}/${proto}" 2>/dev/null || true
