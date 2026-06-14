@@ -1,7 +1,7 @@
 ---
 Status: normative
 Canonical: yes
-Last Reviewed: 2026-03-26
+Last Reviewed: 2026-06-14
 ---
 
 # ICN Architecture Reference
@@ -58,7 +58,7 @@ The hard architectural boundary between kernel and apps. The kernel must never u
 
 **Five immutable invariants from KERNEL_APP_SEPARATION:**
 
-1. **Kernel crates must not import domain crates.** No `icn-ledger` in `icn-core`. No `icn-governance` in `icn-net`. A domain crate is anything that interprets semantics (governance, economics, trust policy). A kernel crate is anything that enforces mechanics (storage, networking, state machines). Compiler enforces this via `kernel_surface.toml`.
+1. **Kernel crates must not import domain crates.** No `icn-ledger` in `icn-core`. No `icn-governance` in `icn-net`. A domain crate is anything that interprets semantics (governance, economics, trust policy). A kernel crate is anything that enforces mechanics (storage, networking, state machines). This is enforced by **strict-mode ratchet tests** in `icn/crates/icn-core/src/meaning_firewall.rs` (run in CI, fail on regression), which pin the exact count of residual domain references per kernel crate; `kernel_surface.toml` is the human-readable per-crate inventory those ratchets track against. *(Verified against icn/crates/icn-core/src/meaning_firewall.rs and kernel_surface.toml, 2026-06-14.)*
 
 2. **Kernel only accepts pure data types.** `Vec<u8>`, `u64`, `bool`, `[u8; 32]`. No `TrustScore`, no `GovernanceProfile`, no semantic enums. The kernel cannot parse or pattern-match on app-specific structures because that would require understanding the app's meaning.
 
@@ -124,7 +124,7 @@ Every ICN node provides these eight primitives. Apps compose them into instituti
 
 **Sybil resistance via SDIS:** Steward network computes Verifiable Unique Identifiers (VUIs) using threshold PRF—no single steward knows the full VUI, only users with proof-of-personhood can enroll. Threshold guarantees honest steward majority can compute it; adversary majority cannot.
 
-**Crate:** `icn-identity` (88 modules), `icn-crypto`, `icn-crypto-pq`, `icn-zkp`, `icn-steward`
+**Crate:** `icn-identity`, `icn-crypto`, `icn-crypto-pq`, `icn-zkp`, `icn-steward`
 
 <!-- truth: descriptive -->
 
@@ -299,6 +299,7 @@ ICN identity is cryptographic, decentralized, and resistant to Sybil attacks thr
 - **Secondary keys:** Device keys (e.g., phone, laptop) tied to primary via explicit binding
 - **Key rotation:** Explicit, gossipped, history tracked on ledger
 - **Recovery:** Social recovery (steward-attested recovery keys) or explicit backup
+- **Keystore migration:** Auto-migration across formats v1 → v2 (TLS binding) → v2.1 (X25519 encryption keys) → v3 (DID Document + multi-device) → v4 (SDIS Anchor + KeyBundle with hybrid signatures). *(Verified against icn/crates/icn-identity/src/keystore.rs format docs, 2026-06-14.)*
 
 **Cryptographic suite:**
 - **Signing:** Ed25519 (512-bit signatures, ~2 million ops/sec on modern hardware)
@@ -322,7 +323,7 @@ ICN identity is cryptographic, decentralized, and resistant to Sybil attacks thr
 - Stewards provide: VUI computation, enrollment ceremonies, blind credential issuance, key recovery, revocation checking
 - No single steward knows who you are
 
-**Status: EXCEEDS SPEC** (operational). Crates: `icn-identity`, `icn-crypto`, `icn-crypto-pq`, `icn-zkp`, `icn-steward`
+**Status: EXCEEDS SPEC** (operational). Crates: `icn-identity`, `icn-crypto`, `icn-crypto-pq`, `icn-zkp`, `icn-steward`. *(§6 re-verified 2026-06-14: 3-of-5 steward threshold confirmed against icn/crates/icn-steward/src/gossip.rs and enrollment.rs (t-of-n PRF, default threshold 3); keystore migration chain confirmed against icn/crates/icn-identity/src/keystore.rs. The prior "88 modules" descriptor was unverifiable and removed.)*
 
 <!-- truth: descriptive -->
 
@@ -364,7 +365,7 @@ ICN trust is a directed, labeled, evidence-based graph. Each edge represents a r
 
 **Attack resistance:** Sybil attacks (create many fake accounts) are slowed by Sybil resistance in identity layer (SDIS). Bad-mouthing attacks (I accuse Alice of being untrustworthy) don't work because it's my subjective score, not Alice's score globally.
 
-**Status: CONFIRMED** (operational). Crate: `icn-trust`
+**Status: CONFIRMED** (operational). Crate: `icn-trust`. *(§7 verified accurate 2026-06-14: trust-class thresholds — Isolated <0.1, Known 0.1–0.4, Partner 0.4–0.7, Federated 0.7+ — checked against `TrustClass::from_score` in icn/crates/icn-trust/src/lib.rs; per-class rate limits 10/50/100/200 msg/s checked against icn/crates/icn-net/src/rate_limit.rs.)*
 
 <!-- truth: descriptive -->
 
@@ -406,7 +407,7 @@ ICN uses QUIC (UDP-based, multiplexed) with TLS 1.3 for encryption and authentic
 | Health | 8080 | HTTP | Health checks |
 | mDNS | 5353 | multicast | `_icn._udp.local.` (30s scan interval) |
 
-**Status: CONFIRMED** (operational). Crate: `icn-net`
+**Status: CONFIRMED** (operational). Crate: `icn-net`. *(§8 verified accurate 2026-06-14: default ports — 7777/UDP transport, 5601 RPC, 9100 metrics, 8080 health — checked against the defaults in icn/crates/icn-core/src/config/mod.rs; gateway health bind 8080 in icn/crates/icn-core/src/config/gateway.rs.)*
 
 <!-- truth: descriptive -->
 
@@ -442,7 +443,7 @@ Causal consistency trades total ordering for availability. Events at different p
 
 **Conflict resolution:** If two nodes receive entries in different order due to network timing, vector clocks reveal the causal order. Deterministic merge: re-apply events in causal order, same inputs always produce same output.
 
-**Status: OPERATIONAL** (proven in K3s deployment, 2+ months runtime). Crate: `icn-gossip`
+**Status: CONFIRMED** (operational). Crate: `icn-gossip`. *(§9 verified accurate 2026-06-14: vector clocks, Bloom-filter dedup, and anti-entropy each have dedicated modules in icn/crates/icn-gossip/src/ (vector_clock.rs, bloom.rs, anti_entropy.rs) with push/pull handlers; `namespace:purpose` topic convention confirmed in icn/crates/icn-gossip/src/types.rs and gossip.rs. NEEDS OPS RE-CONFIRMATION: the "2+ months K3s runtime" figure is an operational/deployment claim not verifiable from crate source — left to the status.toml network/deployment row, which is owned by ops.)*
 
 <!-- truth: descriptive -->
 
@@ -467,11 +468,11 @@ Users can trace any ledger entry back to the governance decision that authorized
 
 **Credit limits:** Per-participant, per-unit. Cooperative sets an overdraft limit (e.g., "-50 hours"). Account cannot go below that limit.
 
-**Demurrage (planned for Phase 25):** Time-decay on balances to encourage circulation. "Hold 100 hours for 1 year, automatically lose 2 hours to demurrage." Implemented as a governance-scheduled rebase of all positions.
+**Demurrage (planned, not yet implemented):** Time-decay on positions to encourage circulation. "Hold 100 hours for 1 year, automatically lose 2 hours to demurrage." Intended as a governance-scheduled rebase of all positions. *(Verified 2026-06-14: no `demurrage` or position-rebase implementation exists in icn/crates/icn-ledger/. The prior "Phase 25" tag used the retired Phase 1–18/19–35 numbering and was removed per the Phase 0/1/2 model.)*
 
 **Conflict resolution:** Concurrent debits to the same account. Both nodes receive debit A and debit B in different orders. Vector clocks reveal which came first. Nodes apply in causal order. If both were valid (no double-spend), both stick. If one exceeds the credit limit and the other comes first, second debit is rejected.
 
-**Status: CONFIRMED** (operational). Crate: `icn-ledger`
+**Status: CONFIRMED** (operational). Crate: `icn-ledger`. *(§10 verified accurate 2026-06-14: double-entry invariant "Σ debits == Σ credits per currency" and Merkle-DAG addressing confirmed in icn/crates/icn-ledger/src/lib.rs and types.rs; the receipt chain GovernanceDecisionReceipt → AllocationReceipt → SettlementIntent → JournalEntry confirmed in icn/crates/icn-ledger/src/allocations.rs. Only correction was the demurrage phase tag, above.)*
 
 <!-- truth: descriptive -->
 
@@ -505,9 +506,9 @@ The Cooperative Contract Language (CCL) is a domain-specific language for expres
 - **Fixed-point math:** Use scaled integers (e.g., 1_000_000 = 1 unit). No floating point (non-deterministic rounding)
 - **Canonical ordering:** Input sets are sorted before passing to contract (prevents non-determinism from iteration order)
 
-**WASM integration (optional):** Feature flag `--features wasm`. Enable wasmtime runtime. WASM modules are subject to the same fuel metering, determinism constraints, and capability gating as CCL. WASM offers more expressiveness (loops, recursion) but requires explicit fuel budgets and deterministic imports.
+**WASM integration (optional):** The wasmtime runtime is gated behind the `wasm` feature, which lives in the **`icn-compute`** crate (`wasm = ["wasmtime"]` in icn/crates/icn-compute/Cargo.toml), not in `icn-ccl` itself. WASM modules executed there are subject to the same fuel metering, determinism constraints, and capability gating as CCL. WASM offers more expressiveness (loops, recursion) but requires explicit fuel budgets and deterministic imports.
 
-**Status: WORKING BUT IMMATURE** (runtime executes, no pattern library yet). Crate: `icn-ccl`
+**Status: WORKING BUT IMMATURE** (runtime executes, no pattern library yet). Crate: `icn-ccl` (interpreter + fuel metering); WASM execution in `icn-compute`. *(§11 verified 2026-06-14: FuelConfig, capability-based security (ReadLedger/WriteLedger), deterministic bounded-expression evaluation, and the Interpreter confirmed in icn/crates/icn-ccl/src/ (lib.rs, runtime.rs, schema/mod.rs, fuel_estimator.rs). Correction: the wasmtime dependency and `wasm` feature were re-attributed from icn-ccl to icn-compute, where they actually live.)*
 
 <!-- truth: descriptive -->
 
@@ -564,7 +565,7 @@ constitutional_amendment_threshold = 75
 
 **Cryptographic decision proofs:** Every governance decision produces a signed proof (GovernanceProof). The proof commits the proposal, votes, threshold crossed, and decision timestamp. Proofs are append-only and gossipped.
 
-**Status: CONFIRMED** (operational — 547 tests, proven in demo flows). Crate: `icn-governance`
+**Status: CONFIRMED** (operational — proven in demo flows). Crate: `icn-governance`. *(§12 verified accurate 2026-06-14: the 9-state proposal lifecycle — Draft, Deliberation, Open, Accepted, Rejected, NoQuorum, Cancelled, Vetoed, ForceClosed — checked against `enum ProposalState` in icn/crates/icn-governance/src/proposal.rs, including the documented emergency-action transitions. The earlier "547 tests" figure is now stale and undercounts — a grep of `#[test]`/`#[tokio::test]` in icn-governance alone returns 600+ — so the exact count was dropped here rather than re-asserted; status.toml governance row carries the count and is flagged for an exact re-derivation.)*
 
 <!-- truth: descriptive -->
 
@@ -604,7 +605,7 @@ Federation ──→ Federation (nested federations)
 
 **Community types:** Geographic (city/region), Interest (hobby/profession), Solidarity (shared values). Types are configurable; these are defaults.
 
-**Status: CONFIRMED** (descriptive). Crates: `icn-entity`, `icn-coop`, `icn-community`
+**Status: CONFIRMED** (descriptive). Crates: `icn-entity`, `icn-coop`, `icn-community`. *(§13 verified accurate 2026-06-14: four entity types confirmed in `EntityType`/`EntityKind` (icn/crates/icn-entity/src/entity.rs); cooperative Formation → Active → Dissolution lifecycle confirmed in icn/crates/icn-coop/src/handle.rs; community types Geographic/Interest/Solidarity in icn/crates/icn-community/src/types.rs; deterministic treasury DID derivation via `derive_treasury_did`/`generate_treasury_did_deterministic` in icn/crates/icn-coop/src/.)*
 
 <!-- truth: descriptive -->
 
@@ -627,16 +628,18 @@ Federation enables multiple cooperatives to coordinate without surrendering auto
 
 **Federated DID resolution:** A DID like `did:icn:food-coop:z6MkhaXgBZDvotDkL5257faiztiGiC2QtKLGpbnnEGta2doK` includes a coop prefix. Federation nodes route DID resolution requests to the named coop.
 
-**Registry and attestations:** Federation gossips coop announcements (coop name, DID, trust context) and cryptographic attestations (federation member A attests to member B's identity).
+**Registry and attestations:** Federation gossips coop announcements (coop name, DID, trust context) and cryptographic attestations (federation member A attests to member B's identity). *(Verified 2026-06-14: `FederatedTrustAttestation` in icn/crates/icn-federation/src/attestation.rs.)*
 
-**Known gaps (honest):**
-- No three-epoch checkpointing (partition healing is eventual, not immediate)
-- No BFT (Byzantine fault tolerance assumes honest majority, not 1/3 adversary)
+**Bilateral clearing (added since the March 2026 snapshot):** Federation now has bilateral clearing agreements (`CrossCoopTransfer`, Phase F3) and a receipt-clearing path for cross-scope settlement (`ReceiptClearingManager` with batch clearing, Epic 4 / #941). This is genuine cross-coop settlement infrastructure — but it is **bilateral**, not multilateral netting. *(Verified against icn/crates/icn-federation/src/clearing.rs and receipt_clearing.rs.)*
+
+**Known gaps (honest, re-verified 2026-06-14 against icn/crates/icn-federation/src/):**
+- No multilateral netting algorithm — clearing is bilateral (`clearing.rs`), with no multi-party net-position solver
+- No dispute-resolution engine — agreements carry only an optional `dispute_resolution: Option<String>` *method label* (icn/crates/icn-federation/src/agreement/types.rs); disagreements still require human intervention
+- No three-epoch checkpointing / explicit partition-healing protocol (no `checkpoint`/`epoch` types in the crate; partition healing is eventual via gossip)
+- No BFT (Byzantine fault tolerance assumes honest majority, not 1/3 adversary — no `bft`/`byzantine` implementation in the crate)
 - No cross-federation async proof exchange (federation is single-cloud, not multi-federation)
-- No netting algorithm (settlement is bilateral, not multi-party netting)
-- No dispute resolution (disagreements require human intervention)
 
-**Status: PARTIALLY CONFIRMED** (basic federation works, advanced features incomplete). Crate: `icn-federation`
+**Status: PARTIALLY CONFIRMED** (registry, attestations, and bilateral clearing work; multilateral/BFT/dispute-resolution features incomplete). Crate: `icn-federation`. *(Note: the `federation:write` and `treasury:write` scopes that the March status snapshot flagged as "missing from K3s ALLOWED_SCOPES" are now present in icn/crates/icn-gateway/src/validation.rs::ALLOWED_SCOPES — see §status.toml correction.)*
 
 <!-- truth: descriptive -->
 
@@ -660,9 +663,9 @@ Distributed compute enables cooperatives to execute work (CCL contracts or WASM)
 
 **Proof verification:** Other nodes re-execute the contract independently. If output differs, the executor is penalized (reputation hit, possible expulsion). This creates incentive for honest execution without requiring a consensus mechanism.
 
-**Foundation status:** Runtime exists, contract examples work, no marketplace/bidding logic yet. Workers execute for free (or for reputation). Future phases will add compensation models (credit allocation, peer settlement).
+**Foundation status:** Runtime exists, contract examples work, no marketplace/bidding logic yet. A task cost model has landed since the March snapshot (`icn/crates/icn-compute/src/cost.rs`: fuel-limit × optional `payment_rate` → credit cost), so compute is no longer strictly "free" — but there is still no job marketplace, no bidding, and no workload-manifest schema. *(Verified 2026-06-14: no `marketplace`/`bidding`/`WorkloadManifest` constructs in icn/crates/icn-compute/src/; cost model confirmed in cost.rs; `ExecutionReceipt` in receipt.rs.)*
 
-**Status: FOUNDATION ONLY** (runtime exists, marketplace not built). Crate: `icn-compute`
+**Status: FOUNDATION ONLY** (runtime + cost model exist, marketplace/bidding/manifest-schema not built). Crate: `icn-compute`
 
 <!-- truth: operational -->
 
@@ -722,25 +725,27 @@ Configurable per cooperative. Trust graph change invalidates rate limit cache (r
 | Eclipse (isolate node from network) | Multiple peer connections, peer discovery diversity |
 | Double-spend (debit same account twice) | Double-entry invariant + consensus on entry order |
 
-**What's not here (correctly deferred):**
-- Onion routing / Tor-like multi-hop anonymity (Phase 21)
-- Traffic obfuscation / cover traffic (Phase 21)
-- Perfect forward secrecy (PFS) per session (can add with session ephemeral keys)
+**Privacy / anonymity status (re-verified 2026-06-14):**
+- **Onion routing — now implemented** (was previously listed here as deferred). `icn-privacy` ships a 540-line `OnionRouter` (layered encryption, circuits, `wrap_message`, `peel_layer`, metrics) in icn/crates/icn-privacy/src/onion_routing.rs, and it is **wired into the network actor**: `MessagePayload::Onion` is dispatched in icn/crates/icn-net/src/actor/connection.rs and relayed by `handle_onion`/`forward_onion` in icn/crates/icn-net/src/handlers/onion.rs. This is a crate-level multi-hop capability; it is not claimed as production-grade anonymity (no adversarial traffic-analysis audit). NEEDS SME review: end-to-end anonymity guarantees and threat model.
+- **Traffic obfuscation / cover traffic — still not built** (no cover-traffic implementation found in icn-net/icn-privacy).
+- **Perfect forward secrecy (PFS) per session** — not yet a standing guarantee (achievable with session ephemeral keys).
 
-**Status: CONFIRMED** (operational). Crates: `icn-net`, `icn-crypto`, `icn-security`
+*(Numbering note: the previous "Phase 21" tags on onion routing / traffic obfuscation used the retired Phase 1–18/19–35 scheme and have been removed per the Phase 0/1/2 model in CLAUDE.md / docs/PHASE_PROGRESS.md.)*
+
+**Status: CONFIRMED** (operational). Crates: `icn-net`, `icn-crypto`, `icn-security`, `icn-privacy`. *(§16 verified accurate 2026-06-14: three-layer model — QUIC/TLS transport, `SignedEnvelope` Ed25519 + replay sequence, ChaCha20-Poly1305 E2E — and the per-class rate limits 10/50/100/200 msg/s checked against icn/crates/icn-net/src/rate_limit.rs. Onion-routing claim corrected above.)*
 
 <!-- truth: descriptive -->
 
 ## 17. Crate Map
 
-**Workspace: 39 packages** — 32 crates in `icn/crates/`, 4 apps in `icn/apps/`, 3 binaries in `icn/bins/` (icnd, icnctl, icn-console).
+**Workspace: 44 packages** — 37 crates in `icn/crates/`, 4 apps in `icn/apps/`, 3 binaries in `icn/bins/` (icnd, icnctl, icn-console). *(Verified 2026-06-14 against `[workspace].members` in icn/Cargo.toml: 37 `crates/*` + 4 `apps/*` + 3 `bins/*` = 44. There are 38 crate directories on disk; `icn-baseline-lock-guest` is present but excluded from the workspace. The previous "39 packages / 32 crates" figure was stale.)*
 
 **Kernel crates** (domain-agnostic, enforce constraints):
 
 | Crate | Role | Infection Status |
 |---|---|---|
 | `icn-kernel-api` | Trait definitions (PolicyOracle, State, Compute, Comms) | Clean |
-| `icn-core` | Actor runtime, supervisor, shutdown | Infected (medium — 43 governance refs, 31 ledger refs) |
+| `icn-core` | Actor runtime, supervisor, shutdown | Infected (medium — **0** governance refs, **5** ledger refs, **32** ccl refs; pinned by meaning_firewall.rs ratchets) |
 | `icn-net` | QUIC/TLS transport, peer discovery | Infected (medium) |
 | `icn-gossip` | Pub/sub, vector clocks, anti-entropy | Infected (medium) |
 | `icn-store` | KV storage (Sled backend) | Clean |
@@ -756,8 +761,12 @@ Configurable per cooperative. Trust graph change invalidates rate limit cache (r
 | `icn-services` | Service registration and lifecycle | Needs Review |
 | `icn-crypto` | Core crypto (Ed25519, X25519) | Clean |
 | `icn-protocol` | Wire format, message types | Clean |
-| `icn-privacy` | Metadata protection, encrypted topics | Clean |
+| `icn-privacy` | Metadata protection, encrypted topics, onion routing | Clean |
 | `icn-security` | Security utilities, attack detection | Clean |
+| `icn-boundary` | Deterministic host/WASM-guest shared types (postcard, no floats) | Clean |
+| `icn-baseline-lock` | Executable single-node baseline-loop fixture (no networking) | Clean |
+
+*(Added 2026-06-14: `icn-boundary` and `icn-baseline-lock` are newer workspace crates not previously in this table; both have zero domain-crate dependencies — verified against their Cargo.toml `[dependencies]`.)*
 
 **Domain crates** (implement PolicyOracle, interpret domain semantics):
 
@@ -777,9 +786,20 @@ Configurable per cooperative. Trust graph change invalidates rate limit cache (r
 | `icn-community` | Communities (civic engine) | Confirmed (infected — medium) |
 | `icn-federation` | Cross-cooperative coordination | Partially Confirmed (infected — medium) |
 | `icn-naming` | Name resolution, service discovery | Confirmed (clean) |
+| `icn-commons` | Commons store / handle (capital-C Commons primitives) | Clean (by import) |
 | `icn-compute` | Trust-gated WASM execution | Foundation Only (needs review) |
 
-**Meaning Firewall audit (from kernel_surface.toml):** 9 of 29 kernel-touching crates are clean. 11 are infected (icn-core, icn-net, icn-gossip, icn-trust, icn-ledger, icn-governance, icn-coop, icn-community, icn-entity, icn-federation, icn-steward, icn-zkp, icn-rpc, icn-gateway — highest severity: icn-trust and icn-ledger). 9 need review. Extraction is incremental: GovernanceActor already moved to apps/governance (Feb 2026). Next targets: icn-trust (cascades infections), icn-ledger, continued governance extraction.
+*(Added 2026-06-14: `icn-commons` is a newer workspace crate — commons store/handle/inner — not previously in this table; zero domain-crate dependencies in its Cargo.toml.)*
+
+**Meaning Firewall audit (recomputed 2026-06-14 from the per-crate `[crates.*]` entries in kernel_surface.toml):** of the **28** crates inventoried, **13 are clean**, **14 are infected**, and **1 needs review** (`icn-compute`); plus **1 extracted app** (`icn-governance-actor`).
+
+- **Clean (13):** icn-api, icn-ccl, icn-crypto-pq, icn-encoding, icn-identity, icn-naming, icn-obs, icn-privacy, icn-security, icn-snapshot, icn-store, icn-testkit, icn-time.
+- **Infected (14):** icn-community, icn-coop, icn-core, icn-entity, icn-federation, icn-gateway, icn-gossip, icn-governance, icn-ledger, icn-net, icn-rpc, icn-steward, icn-trust, icn-zkp (highest severity: icn-trust and icn-ledger, which cascade).
+- **Needs review (1):** icn-compute.
+
+> **Important — stale upstream summary:** the `[metadata]` block at the top of kernel_surface.toml still reads `total_crates=29, clean=9, infected=11, needs_review=9` (dated 2026-02-20), which **does not match its own per-crate entries**. The numbers above are the honest recount from those entries. The `[metadata]` summary in kernel_surface.toml (and the derived `[meaning-firewall]` block in docs/status.toml) should be regenerated to match; that file is out of scope for this docs-only PR and is listed as a follow-up.
+
+Extraction is incremental: GovernanceActor already moved to apps/governance (Feb 2026), and icn-core's direct `icn_governance::` references are now **0** (pinned in meaning_firewall.rs). Next targets: icn-trust (cascades infections), icn-ledger, and completing the icn-core ledger/ccl extraction (5 ledger refs, 32 ccl refs remain).
 
 **Apps** (runtime-integrated in `icn/apps/`):
 - `apps/governance` — Governance execution (GovernanceActor, REST API)
@@ -852,21 +872,21 @@ This is the honest scorecard of what's complete, what's working, and what's know
 | Subsystem | Status | Evidence | Truth Class |
 |---|---|---|---|
 | **Identity** | EXCEEDS SPEC | SDIS + PQ crypto operational; DIDs live in production K3s | operational |
-| **Governance** | CONFIRMED | 547 tests pass; proposal lifecycle proven in demos | operational |
+| **Governance** | CONFIRMED | 9-state proposal lifecycle proven in demos (test count needs re-derivation — see status.toml note; 547 figure is stale) | operational |
 | **Economics (mutual credit)** | CONFIRMED | Ledger entries gossip, double-entry enforced, multi-unit works | operational |
 | **Federation** | PARTIALLY CONFIRMED | Registry works, bilateral settlement works; async proofs + netting unbuilt | operational |
 | **CCL** | WORKING BUT IMMATURE | Runtime executes, contracts run locally and gossip proofs; no pattern library | descriptive |
 | **Storage** | SIMPLIFIED | Merkle-DAG for ledger only; blobs/KV simplified since design phase | descriptive |
 | **Distributed compute** | FOUNDATION ONLY | Runtime works, fuel metering enforced, no marketplace/compensation yet | operational |
-| **Security** | CONFIRMED | TLS + signatures + replay protection live in production; onion routing deferred | operational |
+| **Security** | CONFIRMED | TLS + signatures + replay protection live; onion routing now implemented (icn-privacy + icn-net wiring), not deferred | operational |
 | **Network** | CONFIRMED | QUIC works, mDNS discovery live, NAT traversal (hole punch + relay) proven | operational |
 | **Entity model** | CONFIRMED | Recursive membership works, treasury derivation live | operational |
 
-**Infection status (kernel_surface.toml):** 9/29 kernel-touching crates are clean. 11 infected (highest priority: icn-trust and icn-ledger which cascade infections). 9 need review. GovernanceActor extraction to apps/ complete (Feb 2026); trust and ledger extractions next.
+**Infection status (recomputed 2026-06-14 from kernel_surface.toml per-crate entries — see §17):** of 28 inventoried crates, **13 clean / 14 infected / 1 needs-review**, plus 1 extracted app. Highest priority: icn-trust and icn-ledger (cascade infections). GovernanceActor extraction to apps/ complete (Feb 2026); icn-core governance refs now 0; trust and ledger extractions next. The stale `9/11/9` figure that was here came from the out-of-date kernel_surface.toml `[metadata]` summary, which does not match its own per-crate entries (follow-up: regenerate that summary + status.toml `[meaning-firewall]`).
 
-**Test coverage:** 2,287 tests across 32 crates + 4 apps. CI runs on every commit. K3s deployment has been running 2+ months with no data loss (no consensus failures because we don't do consensus — causal consistency only).
+**Test coverage:** NEEDS RE-DERIVATION. The previously asserted "2,287 tests across 32 crates" is stale: the workspace now has 37 crates + 4 apps + 3 binaries = 44 members (verified against icn/Cargo.toml), and a per-crate `#[test]`/`#[tokio::test]` grep of icn-governance alone exceeds 600. An exact, tool-derived total (`cargo test` summary) is owed before a precise number is re-asserted; the count was intentionally not date-stamped as verified here. CI runs on every commit.
 
-**Operational deployment:** K3s cluster at 10.8.30.40-42 (3 nodes). Sled data persisted, gossip syncing, governance decisions executing. Available at gateway :30080 (dev), pilot UI :30030.
+**Operational deployment (NEEDS OPS RE-CONFIRMATION):** runtime liveness/uptime/no-data-loss are operational claims not verifiable from source in this docs pass; see the ops-owned network/deployment rows in `docs/status.toml`. Cluster and ports unchanged from the prior revision.
 
 <!-- truth: operational -->
 
@@ -905,8 +925,8 @@ Deep-dive documents by category. Generated from `docs/registry.toml`.
 
 ---
 
-**Last updated:** 2026-03-21
+**Last updated:** 2026-06-14 (freshness re-verification for #2047 — see per-section "Verified against …" / "NEEDS … review" annotations above). Prior content edits: 2026-04-28 (#1672, MEMBER_STANDING + THE_COMMONS), which post-dated the previous 2026-03-21 review stamp.
 
-**Next review:** After Phase 21 (Privacy) and Phase 22 (Security Hardening) complete (est. 2026-06)
+**Next review:** scheduled per the docs/freshness.toml thresholds. *(The previous "After Phase 21 / Phase 22" target used the retired Phase 1–18/19–35 numbering; under the current Phase 0/1/2 model the project is in Phase 2 — Pilot Launch. Privacy/security-hardening work like onion routing has already landed, see §16.)*
 
 **Canonical reference:** This document is the hub. All links point to deep-dive docs; none are repeated here. If a section feels too shallow, the linked doc has the full detail.
