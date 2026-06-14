@@ -11,7 +11,7 @@
 ### Pre-Demo Checklist (2 minutes)
 
 ```bash
-# From repository root
+# Move to the repo root (works from any subdirectory in the checkout)
 cd "$(git rev-parse --show-toplevel)"
 
 # 1. Verify everything is ready
