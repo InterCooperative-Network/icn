@@ -85,9 +85,18 @@ screen-reader comprehension or human low-vision usability.
 Per `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` §5. Outcomes: **Pass** /
 **Pass w/ follow-ups** / **Blocked** / **N/A**.
 
-- [x] **3.1 Language access** — Pass. Plain-language copy; canonical terms (standing, action
-  card, receipt, provenance, DID) each paired with an inline explanation; no kernel jargon in
-  member copy. Follow-up (not blocking): multi-language tagging not implemented (#1740).
+- [x] **3.1 Language access** — Pass with documented follow-ups (**#1740**). Plain-language
+  English copy; canonical terms (standing, action card, receipt, provenance, DID) each paired
+  with an inline explanation; no kernel jargon in member copy. **But the surface is English-only
+  with strings hardcoded inline** — the closed status vocabulary is a JS object (the natural
+  shape of a message catalog), yet the rest of the copy is inline in `index.html`/`shell.js`,
+  and **there is no language-modularity infrastructure**: no message catalog the UI reads by
+  locale, no locale switch, only `<html lang="en">` (no `dir`/RTL handling), and no
+  translation-pending fallback. The gate's floor ("translation/localization readiness
+  *identified*") is met via #1740, but **modular-language infrastructure is genuinely owed** and
+  is treated here as a **first-class accessibility requirement, not a footnote** — language
+  access is access. (#1740 is currently framed for the *website* path; the member-shell i18n
+  seam needs its own tracking — see the finding below.)
 - [x] **3.2 Screen-reader / non-visual access** — Pass with documented follow-ups (**#2041**).
   Semantic HTML, landmarks, headings, `role="status"`/`aria-live` regions, list views,
   `aria-describedby`. **Real screen-reader testing not performed** — remains owed (tracked in
@@ -131,9 +140,11 @@ Per `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` §5. Outcomes: **Pass**
   reference client by design).
 
 **Surface readiness conclusion:** **member-facing reference-client floor cleared for automated +
-rendered-structural review; NOT yet organizer-ready / pilot-ready** until the owed human AT pass
-(3.2 / 3.9, and human 3.3 / 3.5) is completed. No category is hard-**Blocked**; four carry an
-explicit owed-follow-up that gates the "organizer-ready" label.
+rendered-structural review (in English); NOT yet organizer-ready / pilot-ready** until (a) the owed
+human AT pass (3.2 / 3.9, and human 3.3 / 3.5) is completed, and (b) **language-modularity
+infrastructure (3.1) exists** — the surface is English-only with no i18n seam, which gates
+readiness for any non-English cooperative. No category is hard-**Blocked**; five carry an explicit
+owed-follow-up that gates the "organizer-ready" label.
 
 ## 6. Findings
 
@@ -168,9 +179,25 @@ Recommendation: Keep the "nothing signed / fixture-backed" banner prominent (it 
   sealed live run for the discharge→receipt→13/13 proof rather than implying the fixture proves it.
 Blocking? no — verified okay (banner already present).
 ```
+```
+Finding: No language-modularity infrastructure — the member shell is English-only with strings
+  hardcoded inline. Language access is accessibility.
+Evidence: §5 gate 3.1; `<html lang="en">` only (no `dir`/RTL); the closed status vocabulary is a
+  JS object but the rest of the copy is inline in index.html/shell.js; no message catalog read by
+  locale, no locale switch, no translation-pending fallback.
+Impact: Non-English members cannot use the surface, and there is no seam to make it modular with
+  language. For non-English cooperatives this gates organizer-/pilot-readiness.
+Recommendation: Add the i18n *seam* (not translations yet): lift member-facing strings into a
+  message catalog keyed by locale (the status-vocabulary object is the starting shape), set
+  `lang`/`dir` per locale for RTL, add a translation-pending fallback. Track distinctly from the
+  website-framed #1740 (member-shell code is currently under task-member-shell's lock — coordinate).
+Blocking? no (DEV/DEMO English demo) / important follow-up (organizer-/pilot-ready, esp. for
+  non-English cooperatives)
+```
 
-Classification: 1 important-follow-up (screen-reader/AT, owed), 1 follow-up (human zoom/device),
-2 verified-okay. **No blockers** for DEV/DEMO review.
+Classification: 2 important-follow-ups (screen-reader/AT #2041; language-modularity infrastructure),
+1 follow-up (human zoom/device #2041), 2 verified-okay. **No blockers** for the DEV/DEMO English
+review; language-modularity and the human-AT pass both gate the organizer-/pilot-ready label.
 
 ## 7. Interface review — does the UI keep the distinctions honest?
 
@@ -192,8 +219,12 @@ repo per the evidence-log convention. This doc is the committed, shareable summa
 
 ## 9. Owed before "organizer-ready / pilot-ready"
 
-- Screen-reader smoke (≥1 of VoiceOver/NVDA/Orca) + ≥1 non-mouse input (3.2 / 3.9).
-- Human 200% browser-zoom + small-device pass (3.3 / 3.5 / 3.8).
+- Screen-reader smoke (≥1 of VoiceOver/NVDA/Orca) + ≥1 non-mouse input (3.2 / 3.9). [#2041]
+- Human 200% browser-zoom + small-device pass (3.3 / 3.5 / 3.8). [#2041]
 - External contrast-audit-tool confirmation of the documented ratios (3.3).
+- **Language-modularity infrastructure (3.1)** — the i18n *seam* for the member shell: a
+  locale-keyed message catalog (the status-vocabulary object is the starting shape), `lang`/`dir`
+  per locale for RTL, and a translation-pending fallback. Language access is accessibility; this
+  is owed, not optional. Track distinctly from the website-framed #1740.
 - (Declared, separate lanes, not this pass) glossary endpoint #1610, multi-language #1740,
   offline tolerance, privacy-preserving accommodation path, deadline-justice metadata.
