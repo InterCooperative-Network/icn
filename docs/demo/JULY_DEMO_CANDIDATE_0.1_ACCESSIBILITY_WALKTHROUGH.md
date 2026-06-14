@@ -235,6 +235,10 @@ regenerate them.
 
 ## 9. Owed before "organizer-ready / pilot-ready"
 
+> A reproducible human-tester packet for the owed items below — exact setup/launch commands,
+> per-category fill-in checklists, expected observations, and evidence/pass-fail templates — is in
+> [`JULY_DEMO_CANDIDATE_0.1_HUMAN_A11Y_VALIDATION.md`](JULY_DEMO_CANDIDATE_0.1_HUMAN_A11Y_VALIDATION.md). It is a template, not a completed pass.
+
 - Screen-reader smoke (≥1 of VoiceOver/NVDA/Orca) + ≥1 non-mouse input (3.2 / 3.9). [#2041]
 - Human 200% browser-zoom + small-device pass (3.3 / 3.5 / 3.8). [#2041]
 - External contrast-audit-tool confirmation of the documented ratios (3.3).
