@@ -45,8 +45,8 @@ View source on GitHub →
 <hr>
 <h2>Before You Begin</h2>
 <h3>Pre-Demo Checklist (2 minutes)</h3>
-<pre><code class="language-bash"># From repository root
-cd /home/ubuntu/projects/icn
+<pre><code class="language-bash"># Move to the repo root (works from any subdirectory in the checkout)
+cd &quot;$(git rev-parse --show-toplevel)&quot;
 
 # 1. Verify everything is ready
 ./demo/scripts/quick-test.sh
