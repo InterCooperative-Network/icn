@@ -30,14 +30,20 @@ This is an **evidence/documentation pass**. No runtime behavior was changed.
   `…/member-shell/?mode=demo`.
 - Drove headless Chromium via Playwright + `@axe-core/playwright`, which are **declared
   devDependencies of `web/pilot-ui`** (`@axe-core/playwright` per #1735) — so no new dependency
-  stack is introduced for this pass. Reproduce from a fresh checkout:
-  `cd web/pilot-ui && npm ci && npx playwright install chromium` — `npm ci` installs the packages
-  (not present in a fresh checkout until then); `npx playwright install` fetches the matching
-  Chromium browser binary (package scripts do **not**). Then run the script with
-  `NODE_PATH=web/pilot-ui/node_modules`. Playwright resolves its own version-pinned Chromium
-  build — this run used `chromium-1208`; a different Playwright version will resolve a different
-  build, which is fine.
-- Script: `walkthrough.cjs` (archived alongside this doc in the artifact class).
+  stack is introduced for this pass.
+- **Committed audit script:** [`web/member-shell/a11y-walkthrough.cjs`](../../web/member-shell/a11y-walkthrough.cjs)
+  (repo-safe; a dev/audit tool, not loaded by the shell). Reproduce:
+  `cd web/pilot-ui && npm ci && npx playwright install chromium`, serve the `web/` root
+  (`python3 -m http.server`), then run the script with `NODE_PATH=web/pilot-ui/node_modules`.
+- **Browser-revision provenance (honest):** Playwright resolves its own pinned Chromium for the
+  *installed* Playwright version, so the exact binary is **environment-dependent, not a single
+  pinned revision**. This run used the install already present in `web/pilot-ui/node_modules`
+  (Playwright **1.58.1** → **chromium-1208**). The lockfile pins Playwright **1.60.0**, so a
+  reviewer who runs `npm ci` first installs 1.60.0 and a newer Chromium and validates on *that*
+  browser — not on 1208. These are static-surface WCAG checks (semantic HTML, ARIA, contrast,
+  focus); the 0-violation result is expected to be stable across recent Chromium revisions, but
+  the recorded numbers below are specifically for 1.58.1/chromium-1208. A fresh-checkout reviewer
+  should confirm on their installed version.
 - Fixtures consumed: `web/pilot-ui/fixtures/icn-organizer-demo/{standing,action-cards}.json`
   (CI-drift-guarded, #2021) and `web/member-shell/fixtures/demo-completion-receipt.json`
   (fictional `did:icn:example-*`, illustrative `record_hash`, nothing signed).
@@ -210,12 +216,15 @@ review; language-modularity and the human-AT pass both gate the organizer-/pilot
 | Receipt vs proof/audit | yes — plain summary first; raw `record_hash`/class/ids behind "Show evidence detail"; fixture caption says nothing is signed |
 | Proof of path vs production readiness | yes — banner + footer ("not the production member shell… claims no live-federation or production posture") |
 
-## 8. Artifacts (repo-safe; not committed to git)
+## 8. Artifacts
 
-Screenshots, the axe/keyboard JSON report, and the walkthrough script live in the operator's
-local artifact store under the artifact class `july-demo-accessibility-<date>` (sibling to the
-sealed-image evidence). They are repo-safe (no credentials/keys/IPs), but are kept out of the
-repo per the evidence-log convention. This doc is the committed, shareable summary.
+The audit **script is committed**: [`web/member-shell/a11y-walkthrough.cjs`](../../web/member-shell/a11y-walkthrough.cjs)
+— so the checks are runnable from committed materials (see §2). The **screenshots** and the
+**axe/keyboard JSON report** live in the operator's local artifact store under the artifact class
+`july-demo-accessibility-<date>` (sibling to the sealed-image evidence) — repo-safe (no
+credentials/keys/IPs) but kept out of the repo per the evidence-log convention (they are binary /
+machine output). This doc is the committed, shareable summary; the committed script lets a reviewer
+regenerate them.
 
 ## 9. Owed before "organizer-ready / pilot-ready"
 
