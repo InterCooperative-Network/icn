@@ -12,7 +12,7 @@
 
 ```bash
 # From repository root
-cd /home/ubuntu/projects/icn
+cd "$(git rev-parse --show-toplevel)"
 
 # 1. Verify everything is ready
 ./demo/scripts/quick-test.sh
