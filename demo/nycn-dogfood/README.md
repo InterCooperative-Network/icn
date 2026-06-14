@@ -55,7 +55,8 @@ This section is load-bearing. Be precise about it when showing the demo.
 - For the `--fresh` gossip-port preflight: `ss` (from `iproute2`) **or** `lsof`. The gateway port is
   probed over `/dev/tcp`, but the gossip port is UDP/QUIC and needs one of these tools to detect a
   stale listener. If neither is installed the run prints a clear warning and proceeds as if the
-  gossip port is free (install `iproute2`, or pass `--force-port-cleanup` to reclaim it regardless).
+  gossip port is free; installing `iproute2` is the simplest fix. Passing `--force-port-cleanup`
+  makes the run attempt cleanup anyway, but the cleanup step itself needs `fuser` or `lsof`.
 - An operator keystore passphrase exported as `ICN_PASSPHRASE` (any value for a test identity).
 
 ## One-command run
