@@ -95,19 +95,18 @@ screen-reader comprehension or human low-vision usability.
 Per `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` §5. Outcomes: **Pass** /
 **Pass w/ follow-ups** / **Blocked** / **N/A**.
 
-- [x] **3.1 Language access** — Pass with documented follow-ups (**#2042**). Plain-language
-  English copy; canonical terms (standing, action card, receipt, provenance, DID) each paired
-  with an inline explanation; no kernel jargon in member copy. **But the surface is English-only
-  with strings hardcoded inline** — the closed status vocabulary is a JS object (the natural
-  shape of a message catalog), yet the rest of the copy is inline in `index.html`/`shell.js`,
-  and **there is no language-modularity infrastructure**: no message catalog the UI reads by
-  locale, no locale switch, only `<html lang="en">` (no `dir`/RTL handling), and no
-  translation-pending fallback. The gate's floor ("translation/localization readiness
-  *identified*") was met via #1740, but **modular-language infrastructure is genuinely owed** and
-  is treated here as a **first-class accessibility requirement, not a footnote** — language
-  access is access. Tracked concretely as **#2042** (the member-shell i18n seam), distinct from
-  the website-framed #1740. (An i18n seam implementing exactly this is up in **#2043**; once it
-  merges, this row moves to Pass and the finding below resolves.)
+- [x] **3.1 Language access** — Pass. Plain-language English copy; canonical terms (standing,
+  action card, receipt, provenance, DID) each paired with an inline explanation; no kernel jargon
+  in member copy. The **language-modularity infrastructure (i18n seam) is now implemented** —
+  landed in **#2043** (closes #2042): a locale-keyed message catalog the UI reads via `t()` with a
+  per-key English fallback, `?lang=` / `navigator.language` resolution, `<html lang>` + `dir` with
+  RTL, a translation-pending fallback, and a pseudo-locale coverage test. Adding a language is a
+  catalog entry, not a code change; axe is 0 at `en` / pseudo / `ar`; raw identifiers stay literal;
+  the `ar` RTL demo announces its English fallback as English (`lang=en`) honestly. **Still owed
+  (separate lanes, not blocking this DEV/DEMO English evidence pass):** real translations and a
+  human language-quality pass for each shipped locale — the seam ships only `en` + a pseudo-locale
+  + an RTL fallback demo, no real translations yet; the broader website multilingual path is #1740.
+  Language access is access — the seam is the infrastructure floor; translations are the next lane.
 - [x] **3.2 Screen-reader / non-visual access** — Pass with documented follow-ups (**#2041**).
   Semantic HTML, landmarks, headings, `role="status"`/`aria-live` regions, list views,
   `aria-describedby`. **Real screen-reader testing not performed** — remains owed (tracked in
@@ -151,11 +150,12 @@ Per `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` §5. Outcomes: **Pass**
   reference client by design).
 
 **Surface readiness conclusion:** **member-facing reference-client floor cleared for automated +
-rendered-structural review (in English); NOT yet organizer-ready / pilot-ready** until (a) the owed
-human AT pass (3.2 / 3.9, and human 3.3 / 3.5) is completed, and (b) **language-modularity
-infrastructure (3.1) exists** — the surface is English-only with no i18n seam, which gates
-readiness for any non-English cooperative. No category is hard-**Blocked**; five carry an explicit
-owed-follow-up that gates the "organizer-ready" label.
+rendered-structural review; the language-modularity infrastructure (3.1) is now implemented
+(#2043, merged); NOT yet organizer-ready / pilot-ready** until (a) the owed human AT pass
+(3.2 / 3.9, and human 3.3 / 3.5) is completed, and (b) **real translations + a human language-quality
+pass** ship for the target locales (the i18n seam exists but ships only `en` + a pseudo-locale +
+an RTL fallback demo). No category is hard-**Blocked**; the human-AT items (#2041) and the
+translations/human-language lane remain owed-follow-ups that gate the "organizer-ready" label.
 
 ## 6. Findings
 
@@ -191,24 +191,26 @@ Recommendation: Keep the "nothing signed / fixture-backed" banner prominent (it 
 Blocking? no — verified okay (banner already present).
 ```
 ```
-Finding: No language-modularity infrastructure — the member shell is English-only with strings
-  hardcoded inline. Language access is accessibility.
-Evidence: §5 gate 3.1; `<html lang="en">` only (no `dir`/RTL); the closed status vocabulary is a
-  JS object but the rest of the copy is inline in index.html/shell.js; no message catalog read by
-  locale, no locale switch, no translation-pending fallback.
-Impact: Non-English members cannot use the surface, and there is no seam to make it modular with
-  language. For non-English cooperatives this gates organizer-/pilot-readiness.
-Recommendation: Add the i18n *seam* (not translations yet): lift member-facing strings into a
-  message catalog keyed by locale (the status-vocabulary object is the starting shape), set
-  `lang`/`dir` per locale for RTL, add a translation-pending fallback. Tracked concretely as
-  **#2042** (distinct from the website-framed #1740); implemented in **#2043** (open).
-Blocking? no (DEV/DEMO English demo) / important follow-up (organizer-/pilot-ready, esp. for
-  non-English cooperatives)
+Finding: Language-modularity infrastructure — RESOLVED by #2043 (merged). Language access is
+  accessibility, and the member shell now has an i18n seam.
+Evidence: §5 gate 3.1; #2043 added a locale-keyed message catalog read via `t()` with per-key
+  English fallback, `?lang=`/`navigator.language` resolution, `<html lang>`/`dir` + RTL, a
+  translation-pending fallback, and a pseudo-locale coverage test; axe 0 at en/pseudo/ar.
+Impact: The surface can now be made modular with language — adding a language is a catalog entry,
+  not a code change. **Still owed (separate lane):** real translations + a human language-quality
+  pass per shipped locale (the seam ships only `en` + a pseudo-locale + an RTL fallback demo);
+  the broader website multilingual path is #1740.
+Recommendation: Open/queue a translations lane (real per-locale catalogs + human language QA) when
+  a target locale is chosen; the seam (#2043) is the infrastructure floor.
+Blocking? no (DEV/DEMO English demo; seam implemented) / important follow-up: real translations +
+  human-language QA before organizer-/pilot-ready for non-English cooperatives
 ```
 
-Classification: 2 important-follow-ups (screen-reader/AT #2041; language-modularity infrastructure),
-1 follow-up (human zoom/device #2041), 2 verified-okay. **No blockers** for the DEV/DEMO English
-review; language-modularity and the human-AT pass both gate the organizer-/pilot-ready label.
+Classification: 1 important-follow-up (screen-reader/AT #2041), 1 follow-up (human zoom/device
+#2041), 1 resolved (language-modularity infrastructure — i18n seam landed in #2043; real
+translations + human-language QA remain a separate lane), 2 verified-okay. **No blockers** for the
+DEV/DEMO English review; the human-AT pass (#2041) and the translations/human-language lane gate
+the organizer-/pilot-ready label.
 
 ## 7. Interface review — does the UI keep the distinctions honest?
 
@@ -236,10 +238,10 @@ regenerate them.
 - Screen-reader smoke (≥1 of VoiceOver/NVDA/Orca) + ≥1 non-mouse input (3.2 / 3.9). [#2041]
 - Human 200% browser-zoom + small-device pass (3.3 / 3.5 / 3.8). [#2041]
 - External contrast-audit-tool confirmation of the documented ratios (3.3).
-- **Language-modularity infrastructure (3.1)** — the i18n *seam* for the member shell: a
-  locale-keyed message catalog (the status-vocabulary object is the starting shape), `lang`/`dir`
-  per locale for RTL, and a translation-pending fallback. Language access is accessibility; this
-  is owed, not optional. Tracked as **#2042** (member-shell i18n seam; implemented in #2043),
-  distinct from the website-framed #1740.
+- **Language-modularity infrastructure (3.1) — DONE** (i18n seam landed in **#2043**, closes #2042):
+  locale-keyed catalog, `t()` + per-key English fallback, `?lang=`/`navigator.language`, `lang`/`dir`
+  + RTL, translation-pending fallback, pseudo-locale coverage. **Still owed:** real translations +
+  a human language-quality pass per shipped locale (the seam ships only `en` + a pseudo-locale + an
+  RTL fallback demo); the broader website multilingual path is #1740.
 - (Declared, separate lanes, not this pass) glossary endpoint #1610, multi-language #1740,
   offline tolerance, privacy-preserving accommodation path, deadline-justice metadata.
