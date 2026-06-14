@@ -139,8 +139,9 @@ fallback is Arabic.)*
 
 ## 6. Automated evidence reproduced for this packet (at `2b148e72`)
 
-- **6A axe / keyboard / structure:** see §1 table — reproduced via
-  `NODE_PATH=<…>/web/pilot-ui/node_modules node web/member-shell/a11y-walkthrough.cjs http://127.0.0.1:8099 ./out`.
+- **6A axe / keyboard / structure:** see §1 table — reproduced via the walkthrough doc's exact
+  command (after `( cd web/pilot-ui && npm ci && npx playwright install chromium )` per its Method section):
+  `NODE_PATH=web/pilot-ui/node_modules node web/member-shell/a11y-walkthrough.cjs http://127.0.0.1:8099 ./out`.
   axe 0 violations / 27 passes; 16 focusable reached, all outlined; landmarks + skip link + single `h1`.
 - **6C contrast math:** independent WCAG relative-luminance recomputation of the seven `shell.css`
   tokens yields all ratios ≥ AA (range 7.0–17.0:1). Recomputed values are **≥** the documented
