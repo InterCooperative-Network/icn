@@ -1,0 +1,364 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>July Demo Candidate 0.1 — human accessibility validation packet | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>demo</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>JULY DEMO CANDIDATE 0.1 HUMAN A11Y VALIDATION</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/demo/JULY_DEMO_CANDIDATE_0.1_HUMAN_A11Y_VALIDATION.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>July Demo Candidate 0.1 — human accessibility validation packet</h1>
+<p><strong>Status: NOT a completed human pass.</strong> This is a reproducible packet/template for a human
+tester to run the assistive-technology validation owed by <a href="https://github.com/InterCooperative-Network/icn/issues/2041" target="_blank" rel="noopener">#2041</a>. No human / screen-reader /
+switch-device testing has been performed by filling out this doc — the fields below are empty
+on purpose. Filling them in (with repo-safe evidence) is the work <a href="https://github.com/InterCooperative-Network/icn/issues/2041" target="_blank" rel="noopener">#2041</a> tracks.</p>
+<p>Target surface: the member-shell v0 reference client (<code>web/member-shell/</code>), the human surface
+of July Demo Candidate 0.1. DEV/DEMO member surface only — <strong>not</strong> a production or pilot
+accessibility certification.</p>
+<p>Commit this packet was prepared against: <code>origin/main</code> <code>2b148e72</code>.</p>
+<h2>1. What is already proven (automated) vs what this packet owes (human)</h2>
+<p>The <strong>automated / rendered-structural floor is cleared</strong> and recorded in
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/JULY_DEMO_CANDIDATE_0.1_ACCESSIBILITY_WALKTHROUGH">`JULY_DEMO_CANDIDATE_0.1_ACCESSIBILITY_WALKTHROUGH.md`</a>
+(PR #2039). Reproduced for this packet at <code>2b148e72</code> (fixture mode, headless Chromium via the
+committed <code>web/member-shell/a11y-walkthrough.cjs</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Automated check</th>
+<th>Result at <code>2b148e72</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>axe-core (<code>wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa</code>)</td>
+<td><strong>0 violations</strong>, 27 passes</td>
+</tr>
+<tr>
+<td>Keyboard: focusable elements reached by Tab, all with a visible focus outline</td>
+<td>16 reached, all outlined</td>
+</tr>
+<tr>
+<td>Landmarks / skip link / single <code>h1</code></td>
+<td><code>header, nav, main, footer</code>; skip link present; one <code>h1</code></td>
+</tr>
+<tr>
+<td>Credential in <code>?mode=demo</code> URL</td>
+<td>none (<code>url_has_no_credential = true</code>)</td>
+</tr>
+<tr>
+<td>Honesty banner perceivable in DOM</td>
+<td><code>Fixture-backed demo — no live node, nothing signed.</code></td>
+</tr>
+<tr>
+<td>Mobile 360px horizontal scroll / reduced-motion render</td>
+<td>none / standing still visible</td>
+</tr>
+<tr>
+<td>i18n seam (<code>en</code>, <code>qps-ploc</code>, <code>ar</code>): locale resolve + <code>lang</code>/<code>dir</code> applied + fallback</td>
+<td>smoke PASS (see §6E)</td>
+</tr>
+<tr>
+<td>WCAG contrast <strong>math</strong> on <code>shell.css</code> tokens (arithmetic only)</td>
+<td>all 7 tokens ≥ AA, 7.0–17.0:1 (see §6C)</td>
+</tr>
+</tbody></table>
+<p><strong>Automation verifies structure, not perception.</strong> It cannot confirm that a real screen-reader
+<em>conveys</em> the flow understandably, that a switch user can <em>complete</em> the task, that focus is
+<em>findable</em> by a human, or that the <em>rendered</em> surface looks right at 200% zoom / in RTL. Those
+are the four owed <code>ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> categories this packet is for:</p>
+<ul>
+<li><strong>3.2</strong> Screen-reader / non-visual access</li>
+<li><strong>3.3</strong> Low-vision access (human 200% zoom + external contrast-tool confirmation)</li>
+<li><strong>3.5</strong> Keyboard / switch / non-pointer access (keyboard + visible focus already automated; switch owed)</li>
+<li><strong>3.9</strong> Assistive-technology compatibility (≥1 screen reader + ≥1 non-mouse input; record which AT)</li>
+</ul>
+<h2>2. Environment to record (fill in before testing)</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Date</td>
+<td></td>
+</tr>
+<tr>
+<td>OS + version</td>
+<td></td>
+</tr>
+<tr>
+<td>Browser + version</td>
+<td></td>
+</tr>
+<tr>
+<td>Screen reader + version (≥1 of VoiceOver / NVDA / Orca)</td>
+<td></td>
+</tr>
+<tr>
+<td>Non-mouse input exercised (keyboard / switch software / voice)</td>
+<td></td>
+</tr>
+<tr>
+<td>Viewport size / zoom level(s)</td>
+<td></td>
+</tr>
+<tr>
+<td>Commit SHA tested</td>
+<td></td>
+</tr>
+<tr>
+<td>External contrast tool used (for 3.3)</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>3. Setup + launch (exact, fixture mode, no live node)</h2>
+<pre><code class="language-bash"># from the repo root ( cd &quot;$(git rev-parse --show-toplevel)&quot; )
+( cd web &amp;&amp; python3 -m http.server 8099 --bind 127.0.0.1 &amp; )   # serve the web/ root
+# then open in your browser:
+#   http://127.0.0.1:8099/member-shell/?mode=demo            (fixture mode, no JWT)
+#   http://127.0.0.1:8099/member-shell/?mode=demo&amp;lang=qps-ploc
+#   http://127.0.0.1:8099/member-shell/?mode=demo&amp;lang=ar
+</code></pre>
+<p>Fixture mode renders the participation spine as read views (standing → action cards →
+completion receipt → plain-language evidence) with no live mutation and nothing signed. The
+live <code>seed → discharge → verify</code> loop is a separate sealed run (operator evidence outside the
+repo) — do not re-run or re-claim it here. To reproduce the automated floor, see the Method
+section of the walkthrough doc.</p>
+<h2>4. Owed-category checklists (mark each item, record observation)</h2>
+<p>Use: <strong>Pass</strong> / <strong>Pass with documented follow-up #&lt;issue&gt;</strong> / <strong>Blocked</strong> / <strong>N/A (reason)</strong>.</p>
+<h3>A. Keyboard-only navigation (3.5)</h3>
+<p><em>(Automation already confirmed: 16 focusable reached, all with a visible outline, no axe focus
+violation. A human still confirms order/comprehension/no-trap.)</em></p>
+<ul>
+<li><input disabled="" type="checkbox"> Every interactive control (mode nav, language selector, Start-local-demo if shown, each
+&quot;Show technical detail / Show evidence detail&quot; disclosure, every link) is reachable by Tab. → ___</li>
+<li><input disabled="" type="checkbox"> Tab order matches reading order / is understandable. → ___</li>
+<li><input disabled="" type="checkbox"> Focus is visibly findable on every stop (not a thin gray underline). → ___</li>
+<li><input disabled="" type="checkbox"> No keyboard trap: the &quot;Show technical/evidence detail&quot; sections are native <code>&lt;details&gt;</code> disclosures — they toggle with Enter/Space and you can Tab past them, which is <strong>not</strong> a trap. Native disclosures are <strong>not</strong> expected to close on <code>Esc</code>; reserve any <code>Esc</code>-to-close check for a real modal/popover (none ship in this surface today). → ___</li>
+<li><input disabled="" type="checkbox"> Action-card / receipt / evidence controls are reachable and operable by keyboard. → ___</li>
+</ul>
+<h3>B. Screen-reader smoke (3.2 / 3.9) — AT used: ____________</h3>
+<ul>
+<li><input disabled="" type="checkbox"> Document title and page structure (landmarks, headings) are announced understandably. → ___</li>
+<li><input disabled="" type="checkbox"> The standing / action-cards / receipt / evidence panes are each announced as distinct, named regions. → ___</li>
+<li><input disabled="" type="checkbox"> The permanent honesty banner (&quot;Fixture-backed demo — no live node, nothing signed.&quot;) is perceivable, not visually-only. → ___</li>
+<li><input disabled="" type="checkbox"> The language selector is announced and operable. → ___</li>
+<li><input disabled="" type="checkbox"> Fixture/demo status is not hidden from AT. → ___</li>
+<li><input disabled="" type="checkbox"> Dynamic changes (e.g. opening a disclosure, &quot;Start local demo&quot;) are announced or at least not silently confusing. → ___</li>
+<li><input disabled="" type="checkbox"> Raw identifiers (DIDs, <code>record_hash</code>, class names) are not read as if they were prose/translatable. → ___</li>
+</ul>
+<h3>C. Low-vision / 200% zoom + contrast (3.3)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> At 200% browser zoom: no essential content clipped, controls remain usable, no loss of function. → ___</li>
+<li><input disabled="" type="checkbox"> At a narrow viewport (≈320–360px): clean reflow, no horizontal scroll for primary content. → ___</li>
+<li><input disabled="" type="checkbox"> Focus outline remains visible at zoom. → ___</li>
+<li><input disabled="" type="checkbox"> <strong>External contrast tool</strong> confirms the rendered text meets the documented <code>shell.css</code> ratios below. <em>(The ratios are arithmetically ≥ AA — see §6C — but a tool must confirm the rendered surface uses these tokens at these sizes.)</em> → ___</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Foreground on background</th>
+<th>Documented (<code>shell.css</code>)</th>
+<th>Recomputed (WCAG)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--ink</code></td>
+<td><code>#1c1c21</code> on <code>#ffffff</code></td>
+<td>~16.1:1</td>
+<td>17.0:1</td>
+</tr>
+<tr>
+<td><code>--ink-muted</code></td>
+<td><code>#4d4d57</code> on <code>#ffffff</code></td>
+<td>~7.9:1</td>
+<td>8.4:1</td>
+</tr>
+<tr>
+<td><code>--accent</code></td>
+<td><code>#0f4f4a</code> on <code>#ffffff</code></td>
+<td>~8.7:1</td>
+<td>9.4:1</td>
+</tr>
+<tr>
+<td><code>--banner-demo-ink</code></td>
+<td><code>#594400</code> on <code>#fff3cd</code></td>
+<td>~7.3:1</td>
+<td>8.4:1</td>
+</tr>
+<tr>
+<td><code>--banner-live-ink</code></td>
+<td><code>#07395c</code> on <code>#dceefb</code></td>
+<td>~9.4:1</td>
+<td>10.1:1</td>
+</tr>
+<tr>
+<td><code>--ok-ink</code></td>
+<td><code>#1d5c33</code> on <code>#e6f4ea</code></td>
+<td>~6.9:1</td>
+<td>7.0:1</td>
+</tr>
+<tr>
+<td><code>--warn-ink</code></td>
+<td><code>#79302a</code> on <code>#fdeceb</code></td>
+<td>~7.2:1</td>
+<td>8.1:1</td>
+</tr>
+</tbody></table>
+<h3>D. Switch / non-pointer access (3.5 / 3.9) — input used: ____________</h3>
+<ul>
+<li><input disabled="" type="checkbox"> With switch-control software (or another non-keyboard, non-mouse input), all interactive controls are reachable and operable. → ___</li>
+<li><input disabled="" type="checkbox"> No hover-only controls; touch hit targets are ≥ ~44×44 CSS px where touch is expected. → ___</li>
+</ul>
+<h3>E. Language-selector usability (i18n seam) — honesty-bounded</h3>
+<p><em>(The seam is infrastructure, not translation. <code>en</code> is the only real catalog; <code>qps-ploc</code> is a
+pseudo-locale coverage test; <code>ar</code> ships an intentionally empty catalog that demonstrates RTL
+while falling back to English — its document <code>lang</code> stays <code>en</code> so AT is not told the English
+fallback is Arabic.)</em></p>
+<ul>
+<li><input disabled="" type="checkbox"> The language selector is discoverable and operable (mouse, keyboard, and AT). → ___</li>
+<li><input disabled="" type="checkbox"> <code>?lang=qps-ploc</code>: member-facing strings are visibly pseudo-localized (<code>⟦…⟧</code>, accented). Any plain-English string left under the pseudo-locale is a missed extraction — note it. → ___</li>
+<li><input disabled="" type="checkbox"> <code>?lang=ar</code>: layout mirrors to RTL (<code>dir=rtl</code>) without breaking the demo surface; text remains English fallback (expected — <code>ar</code> is a layout demo, not a translation); <code>lang</code> stays <code>en</code>. → ___</li>
+<li><input disabled="" type="checkbox"> Switching locales does not strand focus or hide the honesty banner. → ___</li>
+</ul>
+<h3>F. Reduced motion (supportive)</h3>
+<ul>
+<li><input disabled="" type="checkbox"> With <code>prefers-reduced-motion</code> set, the surface remains usable and content stays visible. → ___</li>
+</ul>
+<h2>5. Evidence-recording rules (repo-safe)</h2>
+<ul>
+<li>Capture screenshots / a short screen-reader transcript per category. Keep binaries in your
+<strong>local artifact store, not committed</strong> (mirror the walkthrough doc&#39;s artifact convention);
+reference them by path/hash in this doc.</li>
+<li><strong>Never</strong> capture or paste a JWT, token, key, passphrase, private IP/hostname, or any
+credential. Fixture mode has no credential in the URL; live mode does — do not use live mode
+for evidence here.</li>
+<li>Record the exact AT name+version and input method per category (3.9 requires naming the AT).</li>
+</ul>
+<h2>6. Automated evidence reproduced for this packet (at <code>2b148e72</code>)</h2>
+<ul>
+<li><strong>6A axe / keyboard / structure:</strong> see §1 table — reproduced via the walkthrough doc&#39;s exact
+command (after <code>( cd web/pilot-ui &amp;&amp; npm ci &amp;&amp; npx playwright install chromium )</code> per its Method section):
+<code>NODE_PATH=web/pilot-ui/node_modules node web/member-shell/a11y-walkthrough.cjs http://127.0.0.1:8099 ./out</code>.
+axe 0 violations / 27 passes; 16 focusable reached, all outlined; landmarks + skip link + single <code>h1</code>.</li>
+<li><strong>6C contrast math:</strong> independent WCAG relative-luminance recomputation of the seven <code>shell.css</code>
+tokens yields all ratios ≥ AA (range 7.0–17.0:1). Recomputed values are <strong>≥</strong> the documented
+values (the <code>shell.css</code> comments are conservative; deltas ≤ ~1.1, all still ≥ 4.5:1) — a minor
+doc-accuracy nit, not a contrast failure. <strong>This verifies the token math only; it does not
+verify the rendered surface or human perception — 3.3 still owes a human + external-tool pass.</strong></li>
+<li><strong>6E i18n smoke:</strong> loading <code>web/member-shell/i18n.js</code> for <code>?lang=en|qps-ploc|ar</code> resolves the
+locale, applies <code>lang</code>/<code>dir</code> (<code>ar</code>→<code>dir=rtl</code>, <code>lang=en</code> fallback override; <code>qps-ploc</code>→<code>lang=en-x-ploc</code>),
+and returns English for <code>en</code>, pseudo-text for <code>qps-ploc</code>, English fallback for <code>ar</code>. PASS.</li>
+</ul>
+<h2>7. After the human pass is complete</h2>
+<ol>
+<li>Fill in §2 and every checklist item in §4 with a verdict + observation + evidence reference.</li>
+<li>In <a href="https://github.com/InterCooperative-Network/icn/blob/main/JULY_DEMO_CANDIDATE_0.1_ACCESSIBILITY_WALKTHROUGH">`JULY_DEMO_CANDIDATE_0.1_ACCESSIBILITY_WALKTHROUGH.md`</a>
+§5, flip gate rows 3.2 / 3.3 / 3.5 / 3.9 from &quot;Pass with documented follow-ups #2041&quot; to
+<strong>Pass</strong> (or Blocked, with the real reason), and update §9 &quot;owed&quot; and the surface-readiness
+conclusion to match what was actually observed.</li>
+<li>Update <a href="https://github.com/InterCooperative-Network/icn/issues/2041" target="_blank" rel="noopener">#2041</a> with the result and close it <strong>only</strong> if the gate categories genuinely pass.</li>
+</ol>
+<h2>8. What must NOT be claimed until this packet is actually completed by a human</h2>
+<ul>
+<li>Automated axe/browser evidence exists; <strong>human AT validation is separate and, as of this commit, still owed.</strong></li>
+<li>Language-modularity <strong>infrastructure</strong> exists; <strong>real translations are not complete</strong>; the
+pseudo-locale is <strong>not</strong> a translation; the <code>ar</code> RTL path is a <strong>layout demo with English
+fallback</strong>, not Arabic-language completion.</li>
+<li>This is still <strong>local / dev / demo / single-actor</strong>. Not production. Not pilot-ready. Not
+organizer-ready until the gate categories pass. Not live federation. Not NYCN-approved/adopted.
+Not partner-ready. Not private-data ready. Not a two-member flow. Not production signed receipts.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
