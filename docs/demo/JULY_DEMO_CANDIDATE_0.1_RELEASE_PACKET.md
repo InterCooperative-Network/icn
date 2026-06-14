@@ -1,5 +1,10 @@
-# ICN July Demo Candidate 0.1 — Release / Hand-off Packet
+# ICN July Demo Candidate 0.1 — Hand-off Packet
 
+> **"Release packet" = a candidate hand-off package for review, NOT a shipped or
+> tagged software release.** No release dry-run has been run (see §3 and §9). The
+> filename keeps the `RELEASE_PACKET` label only because that is how the demo index
+> routes to it.
+>
 > **DEV/DEMO. Local. Single-node. Single-actor. Fictional data.** Read this first,
 > then the linked run-path and evidence docs. You should be able to understand,
 > operate, review, and share July Demo Candidate 0.1 from this packet alone —
@@ -70,7 +75,11 @@ production or pilot claim.
 
 ## 5. How do I run it?
 
-Pick the path that matches what you have. All are local; none requires a partner or the internet.
+Pick the path that matches what you have. **Distinguish two phases:** *building/staging* the
+appliance image is **not** offline — the quickstart starts with a `git clone`, and
+`build-image.sh --real` runs `virt-customize --update --install`, which fetches Debian packages
+over the network (`deploy/appliance/build-image.sh`). *Operating* an already-built/staged image
+(boot, launcher, member loop, verify) is **local**. None of the paths requires a partner.
 
 | Path | Doc |
 |---|---|
