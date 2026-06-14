@@ -34,8 +34,15 @@ const { mkdirSync, writeFileSync } = require('node:fs');
     const ctx = await browser.newContext({ viewport: { width: 1280, height: 1024 } });
     const page = await ctx.newPage();
     await page.goto(URL, { waitUntil: 'networkidle' });
-    await page.waitForSelector('#standing-section:not([hidden])', { timeout: 8000 })
-      .catch(() => report.notes.push('standing-section did not un-hide in 8s'));
+    // Fail closed: if the primary fixture-backed shell never renders (wrong
+    // serve root, broken fixtures), do NOT write a report that could be mistaken
+    // for a regenerated pass — throw so the harness exits non-zero.
+    const rendered = await page.waitForSelector('#standing-section:not([hidden])', { timeout: 8000 })
+      .then(() => true).catch(() => false);
+    if (!rendered) {
+      throw new Error('member-shell standing pane never rendered at ' + URL +
+        ' — wrong serve root (serve the web/ directory) or broken fixtures. Failing closed; no report written.');
+    }
 
     log('url_has_no_credential', !/token=|jwt=|credential=|bearer/i.test(page.url()));
     log('honesty_banner', ((await page.textContent('#honesty-banner').catch(() => '')) || '').trim());

@@ -32,9 +32,13 @@ This is an **evidence/documentation pass**. No runtime behavior was changed.
   devDependencies of `web/pilot-ui`** (`@axe-core/playwright` per #1735) — so no new dependency
   stack is introduced for this pass.
 - **Committed audit script:** [`web/member-shell/a11y-walkthrough.cjs`](../../web/member-shell/a11y-walkthrough.cjs)
-  (repo-safe; a dev/audit tool, not loaded by the shell). Reproduce:
-  `cd web/pilot-ui && npm ci && npx playwright install chromium`, serve the `web/` root
-  (`python3 -m http.server`), then run the script with `NODE_PATH=web/pilot-ui/node_modules`.
+  (repo-safe; a dev/audit tool, not loaded by the shell). Reproduce (the serve port and the
+  script's base-URL argument must match — the script defaults to `:8099`):
+  ```
+  ( cd web/pilot-ui && npm ci && npx playwright install chromium )
+  ( cd web && python3 -m http.server 8099 --bind 127.0.0.1 & )     # serve the web/ root on :8099
+  NODE_PATH=web/pilot-ui/node_modules node web/member-shell/a11y-walkthrough.cjs http://127.0.0.1:8099 ./out
+  ```
 - **Browser-revision provenance (honest):** Playwright resolves its own pinned Chromium for the
   *installed* Playwright version, so the exact binary is **environment-dependent, not a single
   pinned revision**. This run used the install already present in `web/pilot-ui/node_modules`
