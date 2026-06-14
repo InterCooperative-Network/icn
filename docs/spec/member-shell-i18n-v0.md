@@ -63,7 +63,8 @@ MESSAGES = {
     "sync.synced": "Synced",
     "lifecycle.sent": "Sent — waiting for receipt",
     "card.timePressure.none": "No time pressure.",
-    "card.rel.closesIn": "closes in about {n} {unit}",
+    "time.closesIn": "closes in about {n} {unit}",
+    "time.deadlinePassed": "deadline passed about {n} {unit} ago",
     "live.nodeAnswered": "The node answered {status}: {reason}"
     // … one complete English catalog …
   }

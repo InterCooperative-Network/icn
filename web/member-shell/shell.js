@@ -28,7 +28,17 @@
   // t(). The catalog holds the text; this file holds only keys and logic.
   // t() never throws and never returns blank — at worst it returns the key.
   // ---------------------------------------------------------------------
-  var I18N = window.ICNI18n;
+  // Degrade gracefully if i18n.js failed to load (wrong serve root, cache, or
+  // partial deploy): a no-op shim so the shell still renders (showing keys)
+  // instead of throwing before any content appears.
+  var I18N = window.ICNI18n || {
+    t: function (key) { return key; },
+    locale: "en",
+    resolveLocale: function () { return "en"; },
+    applyDocumentLocale: function () {},
+    availableLocales: function () { return ["en"]; },
+    localeMeta: function () { return { name: "English", dir: "ltr" }; }
+  };
   function t(key, params) { return I18N.t(key, params); }
 
   // ---------------------------------------------------------------------
@@ -807,6 +817,17 @@
     document.title = t("doc.title");
     applyStaticI18n();
     wireLanguageSelector(locale);
+
+    // Keep the chosen language sticky across Demo/Live mode switches: if the
+    // user set ?lang= explicitly, carry it on the mode-nav links (which are
+    // otherwise hardcoded to ?mode=...). Navigator-default locale leaves the
+    // links clean.
+    var langParam = params.get("lang");
+    if (langParam) {
+      var lp = encodeURIComponent(langParam);
+      byId("nav-demo").setAttribute("href", "?mode=demo&lang=" + lp);
+      byId("nav-live").setAttribute("href", "?mode=live&lang=" + lp);
+    }
 
     var banner = byId("honesty-banner");
     if (MODE === "demo") {

@@ -131,7 +131,7 @@ change.
 `i18n.js` (loaded before `shell.js`) exposes `window.ICNI18n`. Every
 member-facing string in `shell.js` and `index.html` is externalized into a
 catalog keyed by short semantic dotted keys (`sync.synced`, `lifecycle.sent`,
-`card.timePressure.none`, `connect.invalidUrl`, `receipt.whatThisProves`, …).
+`card.timePressure.none`, `live.invalidUrl`, `receipt.whatThisProves`, …).
 `shell.js` renders by calling `ICNI18n.t(key, params)`; `index.html` carries
 `data-i18n="key"` on every static text node and
 `data-i18n-attr="placeholder:key;aria-label:key"` for attributes, which

@@ -286,7 +286,14 @@
     // attribute emits the valid private-use form `en-x-ploc` (via htmlLang) to
     // keep the HTML lang valid for assistive tech and axe `html-lang-valid`.
     "qps-ploc": { name: "Pseudo-locale (i18n coverage test)", dir: "ltr", pseudo: true, htmlLang: "en-x-ploc" },
-    ar: { name: "العربية (translations pending — RTL demo)", dir: "rtl" }
+    // `ar` demonstrates the dir=rtl switch + the translation-pending fallback.
+    // Its catalog is intentionally empty, so member text falls back to English.
+    // The document `lang` therefore stays `en` (htmlLang override) so screen
+    // readers and browser translation handle the actually-displayed English as
+    // English, not as Arabic — RTL layout is shown via `dir` without
+    // mislabeling the fallback prose. When real `ar` strings are added to
+    // MESSAGES.ar, drop the htmlLang override so `lang` becomes `ar`.
+    ar: { name: "العربية (translations pending — RTL demo)", dir: "rtl", htmlLang: "en" }
   };
 
   // Empty (no translations) catalogs for locales declared in LOCALES but not
