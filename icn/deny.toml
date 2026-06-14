@@ -65,8 +65,9 @@ ignore = [
 
     # proc-macro-error2 is unmaintained, pulled in transitively via
     # i18n-embed-fl ← age ← icn-identity (Age-encrypted keystore). This is an
-    # "unmaintained" advisory, not an exploitable vulnerability. No upstream fix
-    # exists yet: i18n-embed-fl 0.10 and age 0.11.3 both still depend on
+    # "unmaintained" advisory, not an exploitable vulnerability. Current Cargo.lock
+    # pins i18n-embed-fl 0.9.4 / age 0.11.2; upgrading does not help because the
+    # latest releases (i18n-embed-fl 0.10.0 / age 0.11.3) still depend on
     # proc-macro-error2. Revisit when `age` drops the dependency.
     "RUSTSEC-2026-0173",  # proc-macro-error2 unmaintained (transitive via i18n-embed-fl ← age)
 ]
