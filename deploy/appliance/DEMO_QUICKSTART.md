@@ -36,6 +36,14 @@ is production infrastructure, they are wrong on purpose.
 
 ## Get or build the image
 
+> **Network: build-time vs operate-time.** *Building or staging* this image is
+> **not** offline — the steps below start with a `git clone` and
+> `build-image.sh --real` runs `virt-customize --update --install`, which fetches
+> Debian packages and dependencies over the network. *Operating* an
+> already-staged local image (boot, launcher, member loop, verify, reset) is
+> **local / offline-ish** and needs no partner. This remains a DEV/DEMO appliance
+> profile — not production, and not partner-distributable infrastructure.
+
 There is no prebuilt download. Build from a public checkout:
 
 ```bash
