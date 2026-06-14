@@ -108,6 +108,33 @@ const { mkdirSync, writeFileSync } = require('node:fs');
     await rmPage.screenshot({ path: `${OUT}/04-reduced-motion.png`, fullPage: true });
 
     writeFileSync(`${OUT}/walkthrough-report.json`, JSON.stringify(report, null, 2));
+
+    // Fail closed on a regression: a regenerated run must NOT exit 0 / print
+    // REPORT_WRITTEN if the accessibility checks this evidence claims are not
+    // satisfied. The report JSON is written first (for diagnosis), then we throw
+    // — which the outer catch turns into a non-zero exit — so the documented
+    // reproduction command can never be mistaken for a fresh pass after the
+    // member-shell markup regresses.
+    const failures = [];
+    if (report.axe.violation_count > 0) {
+      failures.push(`axe: ${report.axe.violation_count} WCAG violation(s) [${report.axe.violations.map((v) => v.id).join(', ')}]`);
+    }
+    if (report.keyboard.all_have_visible_outline !== true) {
+      failures.push('keyboard: not every focusable showed a visible focus outline');
+    }
+    if (report.steps.standing_visible !== true) {
+      failures.push('standing pane not visible');
+    }
+    if (report.steps.mobile_no_horizontal_scroll !== true) {
+      failures.push('mobile (360px): horizontal scroll present');
+    }
+    if (report.steps.reduced_motion_standing_visible !== true) {
+      failures.push('reduced-motion: standing pane not visible');
+    }
+    if (failures.length) {
+      throw new Error('accessibility checks FAILED — ' + failures.join('; ') +
+        '. Report written to ' + OUT + '/walkthrough-report.json for diagnosis. Failing closed (not a pass).');
+    }
     console.log('REPORT_WRITTEN');
   } finally {
     await browser.close();
