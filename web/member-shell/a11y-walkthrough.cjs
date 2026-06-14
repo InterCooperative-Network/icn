@@ -16,6 +16,7 @@
  *
  * Usage: node a11y-walkthrough.cjs <baseUrl> <outDir>   (default mode=demo / ?lang=en)
  */
+const { chromium } = require('playwright');
 const { AxeBuilder } = require('@axe-core/playwright');
 const { mkdirSync, writeFileSync } = require('node:fs');
 

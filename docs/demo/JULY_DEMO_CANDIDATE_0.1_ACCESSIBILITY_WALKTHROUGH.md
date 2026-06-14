@@ -91,7 +91,7 @@ screen-reader comprehension or human low-vision usability.
 Per `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` §5. Outcomes: **Pass** /
 **Pass w/ follow-ups** / **Blocked** / **N/A**.
 
-- [x] **3.1 Language access** — Pass with documented follow-ups (**#1740**). Plain-language
+- [x] **3.1 Language access** — Pass with documented follow-ups (**#2042**). Plain-language
   English copy; canonical terms (standing, action card, receipt, provenance, DID) each paired
   with an inline explanation; no kernel jargon in member copy. **But the surface is English-only
   with strings hardcoded inline** — the closed status vocabulary is a JS object (the natural
@@ -99,10 +99,11 @@ Per `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` §5. Outcomes: **Pass**
   and **there is no language-modularity infrastructure**: no message catalog the UI reads by
   locale, no locale switch, only `<html lang="en">` (no `dir`/RTL handling), and no
   translation-pending fallback. The gate's floor ("translation/localization readiness
-  *identified*") is met via #1740, but **modular-language infrastructure is genuinely owed** and
+  *identified*") was met via #1740, but **modular-language infrastructure is genuinely owed** and
   is treated here as a **first-class accessibility requirement, not a footnote** — language
-  access is access. (#1740 is currently framed for the *website* path; the member-shell i18n
-  seam needs its own tracking — see the finding below.)
+  access is access. Tracked concretely as **#2042** (the member-shell i18n seam), distinct from
+  the website-framed #1740. (An i18n seam implementing exactly this is up in **#2043**; once it
+  merges, this row moves to Pass and the finding below resolves.)
 - [x] **3.2 Screen-reader / non-visual access** — Pass with documented follow-ups (**#2041**).
   Semantic HTML, landmarks, headings, `role="status"`/`aria-live` regions, list views,
   `aria-describedby`. **Real screen-reader testing not performed** — remains owed (tracked in
@@ -195,8 +196,8 @@ Impact: Non-English members cannot use the surface, and there is no seam to make
   language. For non-English cooperatives this gates organizer-/pilot-readiness.
 Recommendation: Add the i18n *seam* (not translations yet): lift member-facing strings into a
   message catalog keyed by locale (the status-vocabulary object is the starting shape), set
-  `lang`/`dir` per locale for RTL, add a translation-pending fallback. Track distinctly from the
-  website-framed #1740 (member-shell code is currently under task-member-shell's lock — coordinate).
+  `lang`/`dir` per locale for RTL, add a translation-pending fallback. Tracked concretely as
+  **#2042** (distinct from the website-framed #1740); implemented in **#2043** (open).
 Blocking? no (DEV/DEMO English demo) / important follow-up (organizer-/pilot-ready, esp. for
   non-English cooperatives)
 ```
@@ -234,6 +235,7 @@ regenerate them.
 - **Language-modularity infrastructure (3.1)** — the i18n *seam* for the member shell: a
   locale-keyed message catalog (the status-vocabulary object is the starting shape), `lang`/`dir`
   per locale for RTL, and a translation-pending fallback. Language access is accessibility; this
-  is owed, not optional. Track distinctly from the website-framed #1740.
+  is owed, not optional. Tracked as **#2042** (member-shell i18n seam; implemented in #2043),
+  distinct from the website-framed #1740.
 - (Declared, separate lanes, not this pass) glossary endpoint #1610, multi-language #1740,
   offline tolerance, privacy-preserving accommodation path, deadline-justice metadata.
