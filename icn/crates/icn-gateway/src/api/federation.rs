@@ -97,6 +97,60 @@ pub struct FederationStatusResponse {
     pub clearing_agreements: usize,
 }
 
+/// A single node in the federation topology graph: one cooperative.
+///
+/// Derived from the same coops source `list_coops` uses. This is a relationship
+/// node, not a live network peer — presence here means the cooperative is known
+/// to the registry, NOT that it is currently connected or reachable.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TopologyNode {
+    /// Unique identifier for the cooperative.
+    pub coop_id: String,
+    /// Human-readable cooperative name.
+    pub name: String,
+}
+
+/// A single directed edge in the federation topology graph.
+///
+/// `kind` is either `"vouch"` (a trust vouch, same source `get_vouches` uses) or
+/// `"agreement"` (a federation/coordination clearing agreement, same source
+/// `list_agreements` uses). Edges describe relationships only — they carry **no**
+/// clearing positions, balances, or settlement data (that is intentionally out of
+/// scope; a future economic-view endpoint will cover it).
+#[derive(Debug, Serialize, ToSchema)]
+pub struct TopologyEdge {
+    /// Source of the relationship.
+    ///
+    /// For a vouch this is the voucher (a DID string, as `get_vouches` returns).
+    /// For an agreement this is `coop_a`.
+    pub from: String,
+    /// Target of the relationship.
+    ///
+    /// For a vouch this is the vouched-for `coop_id`. For an agreement this is `coop_b`.
+    pub to: String,
+    /// Relationship kind: `"vouch"` or `"agreement"`.
+    pub kind: String,
+    /// For `"agreement"` edges, the clearing-agreement ID (provenance only, no amounts).
+    /// Absent for `"vouch"` edges.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agreement_id: Option<String>,
+}
+
+/// A narrow relationship graph of the federation: which cooperatives exist and
+/// how they are related by vouches and coordination agreements.
+///
+/// This is **not** a live network-connectivity view (it says nothing about which
+/// peers are currently online or reachable) and **not** a clearing/economic view
+/// (it carries no balances, positions, or settlement amounts). It is purely a
+/// relationship graph derived from existing vouch and agreement records.
+#[derive(Debug, Serialize, ToSchema)]
+pub struct FederationTopologyResponse {
+    /// The cooperatives known to the federation registry.
+    pub nodes: Vec<TopologyNode>,
+    /// Vouch and agreement relationships between cooperatives.
+    pub edges: Vec<TopologyEdge>,
+}
+
 // ============================================================================
 // Status Endpoint
 // ============================================================================
@@ -403,6 +457,127 @@ pub async fn vouch_for_coop(
         "target_coop_id": target_coop_id,
         "trust_score": req.trust_score
     })))
+}
+
+// ============================================================================
+// Topology Endpoint
+// ============================================================================
+
+/// GET /federation/topology - Read-only federation relationship graph
+///
+/// Returns a narrow `{nodes, edges}` graph of the federation:
+/// - `nodes` are the cooperatives known to the registry (same source as `list_coops`).
+/// - `edges` are relationships between cooperatives:
+///   - `"vouch"` edges from each voucher to the vouched-for coop (same source as `get_vouches`),
+///   - `"agreement"` edges between the two parties of each clearing agreement
+///     (same source as `list_agreements`).
+///
+/// **Honesty / scope.** This is a *relationship graph derived from existing vouch and
+/// agreement records* — it is NOT a live network-connectivity view (it says nothing about
+/// which peers are currently online or reachable) and NOT a clearing/economic view. It
+/// carries **no** clearing positions, balances, or settlement amounts; those are intentionally
+/// out of scope and reserved for a separate future economic-view endpoint. Agreement edges
+/// carry only the agreement ID for provenance, never amounts.
+///
+/// Prefers the supervisor-owned `FederationService` (governance-originated state). In
+/// standalone mode it falls back to the gateway-local `FederationManager`. The two paths
+/// are separate stores (ADR 0012) and this endpoint reflects exactly one.
+///
+/// An empty federation (no coops, no edges) returns `{"nodes":[],"edges":[]}` cleanly — it
+/// is not an error. In standalone mode an uninitialized registry is also treated as empty.
+#[get("/topology")]
+pub async fn get_topology(
+    http_req: HttpRequest,
+    fed_mgr: web::Data<Arc<FederationManager>>,
+    federation_service: web::Data<Arc<Option<Arc<dyn FederationService>>>>,
+) -> Result<HttpResponse> {
+    require_scope(&http_req, "federation:read")?;
+
+    // Prefer supervisor-owned service (governance-registered state).
+    if let Some(ref service) = ***federation_service {
+        let coops = service
+            .list_cooperatives()
+            .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+
+        let mut edges: Vec<TopologyEdge> = Vec::new();
+
+        // Vouch edges: voucher DID -> vouched-for coop, one per coop in the registry.
+        for coop in &coops {
+            let vouchers = service
+                .get_vouches_for(&coop.coop_id)
+                .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+            for voucher in vouchers {
+                edges.push(TopologyEdge {
+                    from: voucher,
+                    to: coop.coop_id.clone(),
+                    kind: "vouch".to_string(),
+                    agreement_id: None,
+                });
+            }
+        }
+
+        // Agreement edges: coop_a -> coop_b. Relationship only — no clearing positions.
+        let agreements = service
+            .list_agreements()
+            .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+        for a in agreements {
+            edges.push(TopologyEdge {
+                from: a.coop_a,
+                to: a.coop_b,
+                kind: "agreement".to_string(),
+                agreement_id: Some(a.agreement_id),
+            });
+        }
+
+        let nodes: Vec<TopologyNode> = coops
+            .into_iter()
+            .map(|c| TopologyNode {
+                coop_id: c.coop_id,
+                name: c.name,
+            })
+            .collect();
+
+        return Ok(HttpResponse::Ok().json(FederationTopologyResponse { nodes, edges }));
+    }
+
+    // Standalone fallback: gateway-local FederationManager.
+    // An uninitialized registry surfaces as an error from these calls; treat that as an
+    // empty federation so the empty graph returns cleanly rather than 4xx/5xx.
+    let coops = fed_mgr.list_cooperatives().await.unwrap_or_default();
+
+    let mut edges: Vec<TopologyEdge> = Vec::new();
+
+    for coop in &coops {
+        let vouchers = fed_mgr.get_vouches(&coop.coop_id).await.unwrap_or_default();
+        for voucher in vouchers {
+            edges.push(TopologyEdge {
+                from: voucher,
+                to: coop.coop_id.clone(),
+                kind: "vouch".to_string(),
+                agreement_id: None,
+            });
+        }
+    }
+
+    let agreements = fed_mgr.list_agreements().await.unwrap_or_default();
+    for a in agreements {
+        edges.push(TopologyEdge {
+            from: a.coop_a,
+            to: a.coop_b,
+            kind: "agreement".to_string(),
+            agreement_id: Some(a.agreement_id),
+        });
+    }
+
+    let nodes: Vec<TopologyNode> = coops
+        .into_iter()
+        .map(|c| TopologyNode {
+            coop_id: c.coop_id,
+            name: c.name,
+        })
+        .collect();
+
+    Ok(HttpResponse::Ok().json(FederationTopologyResponse { nodes, edges }))
 }
 
 // ============================================================================
@@ -2047,6 +2222,210 @@ mod tests {
             "Direct-management store must be unchanged after propose-adoption"
         );
         assert_eq!(after[0].agreement_id, "agr-dm-001");
+    }
+
+    // ── topology tests (D5: read-only relationship graph) ─────────────────────
+
+    /// The topology route must be wired (not 404). Without auth claims it should
+    /// reach the handler and fail on require_scope, NOT return 404.
+    #[actix_web::test]
+    async fn test_topology_route_matches() {
+        let fed_mgr = Arc::new(FederationManager::new());
+        let no_service: Arc<Option<Arc<dyn FederationService>>> = Arc::new(None);
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(no_service))
+                .service(web::scope("/v1/federation").service(get_topology)),
+        )
+        .await;
+
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/topology")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_ne!(
+            resp.status().as_u16(),
+            404,
+            "Federation topology route should match (got 404 = route not found)"
+        );
+    }
+
+    /// Service path: topology returns the `{nodes, edges}` shape, sourcing nodes from
+    /// list_cooperatives, vouch edges from get_vouches_for, and agreement edges from
+    /// list_agreements — and carries NO clearing/position data.
+    #[actix_web::test]
+    async fn test_topology_shape_prefers_federation_service() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let service_data = stub_service_data();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(service_data))
+                .service(web::scope("/v1/federation").service(get_topology)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/topology")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+
+        // Shape: top-level object with nodes + edges arrays.
+        let nodes = body["nodes"].as_array().expect("nodes must be an array");
+        let edges = body["edges"].as_array().expect("edges must be an array");
+
+        // One node from the stub's list_cooperatives.
+        assert_eq!(nodes.len(), 1, "expected exactly the stub coop node");
+        assert_eq!(nodes[0]["coop_id"], "governance-coop");
+        assert_eq!(nodes[0]["name"], "Governance Cooperative");
+
+        // Edges: one vouch (voucher -> governance-coop) + one agreement (coop_a -> coop_b).
+        assert_eq!(
+            edges.len(),
+            2,
+            "expected one vouch edge and one agreement edge"
+        );
+
+        let vouch = edges
+            .iter()
+            .find(|e| e["kind"] == "vouch")
+            .expect("must have a vouch edge");
+        assert_eq!(vouch["from"], "did:icn:voucher-gov");
+        assert_eq!(vouch["to"], "governance-coop");
+        assert!(
+            vouch.get("agreement_id").is_none() || vouch["agreement_id"].is_null(),
+            "vouch edges must not carry an agreement_id"
+        );
+
+        let agreement = edges
+            .iter()
+            .find(|e| e["kind"] == "agreement")
+            .expect("must have an agreement edge");
+        assert_eq!(agreement["from"], "coop-alpha");
+        assert_eq!(agreement["to"], "coop-beta");
+        assert_eq!(agreement["agreement_id"], "agr-gov-001");
+
+        // Honesty guard: no clearing/position/settlement data must leak into the graph.
+        for e in edges {
+            for forbidden in [
+                "max_imbalance",
+                "net_position",
+                "party_a_owes",
+                "party_b_owes",
+                "pending_count",
+                "settlement_interval",
+                "exchange_rates",
+            ] {
+                assert!(
+                    e.get(forbidden).is_none(),
+                    "edge must not expose clearing field `{forbidden}`"
+                );
+            }
+        }
+    }
+
+    /// Empty/uninitialized standalone federation returns a clean empty graph, not an error.
+    #[actix_web::test]
+    async fn test_topology_empty_graph_returns_cleanly() {
+        use actix_web::HttpMessage;
+
+        // Uninitialized FederationManager (no registry), no service injected.
+        let fed_mgr = Arc::new(FederationManager::new());
+        let no_service: Arc<Option<Arc<dyn FederationService>>> = Arc::new(None);
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(no_service))
+                .service(web::scope("/v1/federation").service(get_topology)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/topology")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(
+            resp.status().as_u16(),
+            200,
+            "empty/uninitialized federation must return 200, not an error"
+        );
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(
+            body["nodes"].as_array().expect("nodes array").len(),
+            0,
+            "empty federation must have no nodes"
+        );
+        assert_eq!(
+            body["edges"].as_array().expect("edges array").len(),
+            0,
+            "empty federation must have no edges"
+        );
+    }
+
+    /// Verify that get_topology falls back to FederationManager when no service is present
+    /// (route still matches and serves rather than routing-failing).
+    #[actix_web::test]
+    async fn test_topology_falls_back_to_fed_mgr_when_no_service() {
+        use actix_web::HttpMessage;
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let no_service: Arc<Option<Arc<dyn FederationService>>> = Arc::new(None);
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(no_service))
+                .service(web::scope("/v1/federation").service(get_topology)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/topology")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        // Fallback path serves cleanly (uninitialized → empty graph), and the route matched.
+        assert_ne!(
+            resp.status().as_u16(),
+            404,
+            "route must match even without FederationService (fell through to fed_mgr path)"
+        );
     }
 
     /// Verify that empty scopes placed AFTER named scopes don't steal routes.
