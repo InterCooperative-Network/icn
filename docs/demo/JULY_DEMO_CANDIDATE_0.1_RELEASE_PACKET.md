@@ -49,6 +49,12 @@ they can act on, *completes/discharges* it, gets a *completion receipt*, and can
 - The member surface clears the **automated** accessibility floor (axe-core WCAG A+AA: 0
   violations) and the rendered-structural floor (keyboard reachable with visible focus,
   landmarks, no-credential-in-URL) — see the accessibility evidence below.
+- The member surface is **modular with language** — an i18n seam (the infrastructure, not the
+  translations) landed in #2043: a locale-keyed message catalog read via `t()` with English
+  fallback, `?lang=` / `navigator.language` resolution, `<html lang>`/`dir` + RTL, a
+  translation-pending fallback, and a pseudo-locale coverage test. Adding a language is a catalog
+  entry, not a code change. It ships only `en` + a pseudo-locale + an RTL fallback demo; **real
+  translations and a human language-quality pass are not done** (see Known gaps).
 
 ## 3. What does it NOT prove?
 
@@ -139,7 +145,10 @@ signed.)
 
 - **Human accessibility is partial.** Automated axe + rendered-structural floor passed; the
   **screen-reader / assistive-technology** pass and **human low-vision / browser-zoom** pass are
-  **not** done — recorded as owed in the accessibility evidence doc.
+  **not** done — recorded as owed in the accessibility evidence doc (tracked by #2041).
+- **Language: infrastructure only, no translations.** The i18n seam exists (#2043), but the shell
+  ships only `en` + a pseudo-locale + an RTL fallback demo — **real translations and a human
+  language-quality pass per locale are not done**; the broader website multilingual path is #1740.
 - **Release dry-run not run.** No release packaging/dry-run has been performed.
 - No production security posture.
 - No formal NYCN pilot; no NYCN activation.
@@ -158,6 +167,8 @@ Only the responsible next steps — not a roadmap:
   pass first).
 - **Rendered-browser walkthrough follow-ups** (live-mode rendered pass once a local gateway is
   available; the fixture-mode pass is done).
+- **Real translations + human language-quality pass** for a chosen target locale, on top of the
+  i18n seam (#2043) — the seam is the floor; translations are the next lane.
 - **Release dry-run / artifact packaging** — only when actually performed, and named as such.
 - **Two-member action flow** — only **after** this release packet is stable (out of scope now).
 - **Private-disclosure / scoped-vault runtime** — a separate future lane.
