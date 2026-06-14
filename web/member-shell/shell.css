@@ -8,6 +8,11 @@
  *    kept as a guard)
  *  - no information carried by color alone (every status has glyph + text)
  *  - >= 44px (2.75rem) hit targets on buttons and summaries
+ *
+ * i18n / RTL (icn#2042): layout uses CSS logical properties
+ * (margin-inline / padding-inline / inset-inline / text-align:start) so that
+ * setting `dir="rtl"` on <html> mirrors the layout correctly. No physical
+ * left/right is used for member-facing layout.
  */
 
 :root {
@@ -42,16 +47,17 @@ body {
   background: var(--bg);
 }
 
-/* Skip link: hidden until focused, then clearly visible. */
+/* Skip link: hidden until focused, then clearly visible. Logical inset so it
+   anchors to the start edge in both LTR and RTL. */
 .skip-link {
   position: absolute;
-  left: -999rem;
+  inset-inline-start: -999rem;
   background: var(--ink);
   color: var(--bg);
   padding: 0.75rem 1rem;
 }
 .skip-link:focus-visible {
-  left: 1rem;
+  inset-inline-start: 1rem;
   top: 1rem;
   z-index: 10;
 }
@@ -94,6 +100,34 @@ h3 { font-size: 1.05rem; }
 }
 
 a { color: var(--accent); }
+
+/* Language selector: labelled, keyboard-accessible, start-aligned so it
+   mirrors with dir=rtl. The control meets the 44px hit-target floor. */
+.language-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.75rem 0;
+}
+.language-nav label {
+  display: inline-block;
+  margin-bottom: 0;
+  font-weight: 600;
+}
+.language-nav select {
+  font-size: 1rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--ink-muted);
+  border-radius: 0.25rem;
+  color: var(--ink);
+  background: var(--bg);
+}
+.language-nav select:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
 
 /* Forms */
 .field { margin: 1rem 0; }
@@ -156,7 +190,7 @@ summary:focus-visible {
 
 dl.kv { margin: 0.75rem 0; }
 dl.kv dt { font-weight: 600; margin-top: 0.5rem; }
-dl.kv dd { margin: 0 0 0 0; color: var(--ink-muted); }
+dl.kv dd { margin: 0; color: var(--ink-muted); }
 
 /* Status chips: glyph + text, color reinforces only. */
 .chip {
@@ -174,8 +208,8 @@ dl.kv dd { margin: 0 0 0 0; color: var(--ink-muted); }
 
 details {
   margin: 0.75rem 0;
-  border-left: 3px solid var(--line);
-  padding-left: 0.75rem;
+  border-inline-start: 3px solid var(--line);
+  padding-inline-start: 0.75rem;
 }
 summary {
   cursor: pointer;

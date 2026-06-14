@@ -23,56 +23,78 @@
   "use strict";
 
   // ---------------------------------------------------------------------
+  // i18n seam (icn#2042). Every member-facing string is externalized into
+  // the ICNI18n catalog (i18n.js, loaded before this file) and resolved via
+  // t(). The catalog holds the text; this file holds only keys and logic.
+  // t() never throws and never returns blank — at worst it returns the key.
+  // ---------------------------------------------------------------------
+  // Degrade gracefully if i18n.js failed to load (wrong serve root, cache, or
+  // partial deploy): a no-op shim so the shell still renders (showing keys)
+  // instead of throwing before any content appears.
+  var I18N = window.ICNI18n || {
+    t: function (key) { return key; },
+    locale: "en",
+    resolveLocale: function () { return "en"; },
+    applyDocumentLocale: function () {},
+    availableLocales: function () { return ["en"]; },
+    localeMeta: function () { return { name: "English", dir: "ltr" }; }
+  };
+  function t(key, params) { return I18N.t(key, params); }
+
+  // ---------------------------------------------------------------------
   // Closed member-facing vocabulary (docs/spec/member-shell-v0.md
-  // §"Member-facing status vocabulary"). Strings are verbatim; inventing
-  // new ones is a v0 violation.
+  // §"Member-facing status vocabulary"). The English values are verbatim in
+  // the `en` catalog; inventing new ones is a v0 violation. These maps are
+  // key maps — their displayed text comes from the catalog via t().
   // ---------------------------------------------------------------------
   var SYNC = {
-    SYNCED: "Synced",
-    DELAYED: "Sync delayed",
-    VERIFYING: "Some records are being verified",
-    PAUSED: "Action paused until records sync",
-    RECEIPT: "Receipt available",
-    REVIEW: "Review required",
-    DEGRADED: "Sync delayed / degraded"
+    SYNCED: "sync.synced",
+    DELAYED: "sync.delayed",
+    VERIFYING: "sync.verifying",
+    PAUSED: "sync.paused",
+    RECEIPT: "sync.receipt",
+    REVIEW: "sync.review",
+    DEGRADED: "sync.degraded"
   };
 
   var LIFECYCLE = {
-    OPEN: "Open",
-    OPEN_PAUSED: "Open but paused",
-    SENT: "Sent — waiting for receipt",
-    CONFIRMED: "Confirmed",
-    DECLINED: "Declined",
-    CLOSED_DEADLINE: "Closed — deadline passed",
-    CLOSED_SUPERSEDED: "Closed — superseded",
-    CLOSED_AUTHORITY: "Closed — insufficient authority"
+    OPEN: "lifecycle.open",
+    OPEN_PAUSED: "lifecycle.openPaused",
+    SENT: "lifecycle.sent",
+    CONFIRMED: "lifecycle.confirmed",
+    DECLINED: "lifecycle.declined",
+    CLOSED_DEADLINE: "lifecycle.closedDeadline",
+    CLOSED_SUPERSEDED: "lifecycle.closedSuperseded",
+    CLOSED_AUTHORITY: "lifecycle.closedAuthority"
   };
 
   // Plain-language maps for the closed ADR-0027 enums. The raw enum value
   // is never the primary surface (spec §"ActionCard rendering contract").
+  // Values are catalog keys; displayed text comes from t().
   var ACTION_KIND_LABEL = {
-    vote: "Cast a vote",
-    attend: "Confirm attendance",
-    complete: "Mark a task complete"
+    vote: "action.vote",
+    attend: "action.attend",
+    complete: "action.complete"
   };
   var SOURCE_KIND_LABEL = {
-    proposal: "A proposal in your domain",
-    meeting: "A scheduled meeting",
-    action_item: "A task assigned to you",
+    proposal: "source.proposal",
+    meeting: "source.meeting",
+    action_item: "source.actionItem",
     // Reserved source paths (icn#1631 / icn#1634): render as inert
     // "available soon" placeholders, never as live cards.
-    signal_rule: "Available soon (not yet enabled)",
-    obligation_lifecycle: "Available soon (not yet enabled)"
+    signal_rule: "source.availableSoon",
+    obligation_lifecycle: "source.availableSoon"
   };
   var SCOPE_LABEL = {
-    entity: "Affects your whole organization",
-    structure: "Affects one body within your organization (a committee or working group)",
-    individual: "Affects only you"
+    entity: "scope.entity",
+    structure: "scope.structure",
+    individual: "scope.individual"
   };
+  // Glyphs (○ ◐ ▲) stay in code, never translated. Text comes from t().
   var RISK_LABEL = {
-    low: { glyph: "○", text: "Low impact" },        // ○
-    normal: { glyph: "◐", text: "Normal impact" },  // ◐
-    elevated: { glyph: "▲", text: "Take extra care" } // ▲
+    low: { glyph: "○", text: "risk.low" },        // ○
+    normal: { glyph: "◐", text: "risk.normal" },  // ◐
+    elevated: { glyph: "▲", text: "risk.elevated" } // ▲
   };
 
   // ---------------------------------------------------------------------
@@ -158,7 +180,7 @@
   // Formatting helpers
   // ---------------------------------------------------------------------
   function fmtAbs(unixSeconds) {
-    if (typeof unixSeconds !== "number") { return "(no timestamp)"; }
+    if (typeof unixSeconds !== "number") { return t("time.noTimestamp"); }
     return new Date(unixSeconds * 1000).toLocaleString();
   }
 
@@ -169,12 +191,12 @@
     var delta = targetSec - anchorSec;
     var abs = Math.abs(delta);
     var unit, n;
-    if (abs >= 86400) { n = Math.round(abs / 86400); unit = n === 1 ? "day" : "days"; }
-    else if (abs >= 3600) { n = Math.round(abs / 3600); unit = n === 1 ? "hour" : "hours"; }
-    else { n = Math.max(1, Math.round(abs / 60)); unit = n === 1 ? "minute" : "minutes"; }
+    if (abs >= 86400) { n = Math.round(abs / 86400); unit = t(n === 1 ? "time.day" : "time.days"); }
+    else if (abs >= 3600) { n = Math.round(abs / 3600); unit = t(n === 1 ? "time.hour" : "time.hours"); }
+    else { n = Math.max(1, Math.round(abs / 60)); unit = t(n === 1 ? "time.minute" : "time.minutes"); }
     return delta >= 0
-      ? "closes in about " + n + " " + unit
-      : "deadline passed about " + n + " " + unit + " ago";
+      ? t("time.closesIn", { n: n, unit: unit })
+      : t("time.deadlinePassed", { n: n, unit: unit });
   }
 
   function hashToHex(recordHash) {
@@ -185,9 +207,11 @@
       }).join("");
     }
     if (typeof recordHash === "string") { return recordHash; }
-    return "(unavailable)";
+    return t("hash.unavailable");
   }
 
+  // text is already-resolved display text (callers pass t(...) results or
+  // composed strings). The glyph stays in code; tone drives the chip class.
   function setSyncChip(text, tone, detail) {
     var chip = byId("sync-chip");
     var glyph = tone === "ok" ? "✓ " : tone === "warn" ? "⚠ " : "● ";
@@ -200,43 +224,38 @@
   // Identity + standing rendering (ADR-0020 read model)
   // ---------------------------------------------------------------------
   function renderIdentity(standing) {
-    var label = standing.display_label || "(no display name configured)";
+    var label = standing.display_label || t("identity.noDisplayName");
     byId("identity-label").textContent = label;
-    byId("identity-did").textContent = standing.did || "(unknown)";
+    byId("identity-did").textContent = standing.did || t("identity.unknownDid");
     show("identity-section");
   }
 
   function membershipPlain(domain) {
     if (domain.status === "member") {
-      return "You are a member of this domain (you are on its member list).";
+      return t("membership.member");
     }
     if (domain.status === "unverified") {
-      return "Your membership here comes from a participation-trust source " +
-        "and is shown as unverified in this view. That does not mean you " +
-        "are not a member — it means this view does not evaluate it.";
+      return t("membership.unverified");
     }
-    return "Membership status: " + String(domain.status);
+    return t("membership.other", { status: String(domain.status) });
   }
 
   function renderStanding(standing) {
     var domainsList = byId("domains-list");
     clear(domainsList);
     if (!standing.domains || standing.domains.length === 0) {
-      domainsList.appendChild(el("li", {
-        text: "No memberships are recorded for you yet. If you expect to " +
-          "see one, please contact your steward."
-      }));
+      domainsList.appendChild(el("li", { text: t("standing.noMemberships") }));
     } else {
       standing.domains.forEach(function (d) {
         var li = el("li");
         li.appendChild(el("h3", { text: d.domain_name || d.domain_id }));
         li.appendChild(el("p", { text: membershipPlain(d) }));
         var details = el("details");
-        details.appendChild(el("summary", { text: "Show technical detail" }));
+        details.appendChild(el("summary", { text: t("standing.showTechnical") }));
         var dl = el("dl", { class: "kv" });
-        kvRow(dl, "Domain id", d.domain_id || "");
-        kvRow(dl, "Membership source", d.membership_source || "");
-        kvRow(dl, "Status", d.status || "");
+        kvRow(dl, t("standing.kv.domainId"), d.domain_id || "");
+        kvRow(dl, t("standing.kv.membershipSource"), d.membership_source || "");
+        kvRow(dl, t("standing.kv.status"), d.status || "");
         details.appendChild(dl);
         li.appendChild(details);
         domainsList.appendChild(li);
@@ -246,31 +265,35 @@
     var rolesList = byId("roles-list");
     clear(rolesList);
     if (!standing.roles || standing.roles.length === 0) {
-      rolesList.appendChild(el("li", { text: "You hold no recorded roles right now." }));
+      rolesList.appendChild(el("li", { text: t("standing.noRoles") }));
     } else {
       standing.roles.forEach(function (r) {
         var li = el("li");
-        var structureName = r.structure_name || ("structure " + r.structure_id +
-          " (its name is currently unavailable — something may be off; you can ask your steward)");
-        li.appendChild(el("h3", { text: capitalize(r.role) + " — " + structureName }));
+        var structureName = r.structure_name ||
+          t("standing.structureNameUnavailable", { id: r.structure_id });
+        li.appendChild(el("h3", {
+          text: t("standing.roleHeading", { role: capitalize(r.role), structure: structureName })
+        }));
         li.appendChild(el("p", {
-          text: "This role authorizes you to act in these areas: " +
-            (r.authority_scope && r.authority_scope.length
+          text: t("standing.roleAuthorizes", {
+            scopes: (r.authority_scope && r.authority_scope.length
               ? r.authority_scope.map(scopePlain).join("; ")
-              : "(none recorded)") + "."
+              : t("standing.roleNoScopes"))
+          })
         }));
         li.appendChild(el("p", {
           class: "muted",
-          text: "Held since " + fmtAbs(r.start_date) +
-            (r.end_date ? ("; ends " + fmtAbs(r.end_date)) : "")
+          text: r.end_date
+            ? t("standing.heldSinceEnds", { start: fmtAbs(r.start_date), end: fmtAbs(r.end_date) })
+            : t("standing.heldSince", { start: fmtAbs(r.start_date) })
         }));
         var details = el("details");
-        details.appendChild(el("summary", { text: "Show technical detail" }));
+        details.appendChild(el("summary", { text: t("standing.showTechnical") }));
         var dl = el("dl", { class: "kv" });
-        kvRow(dl, "Role assignment id", r.role_assignment_id || "");
-        kvRow(dl, "Structure id", r.structure_id || "");
-        kvRow(dl, "Parent entity", r.parent_entity_id || "(none)");
-        kvRow(dl, "Authority scope strings", (r.authority_scope || []).join(", "));
+        kvRow(dl, t("standing.kv.roleAssignmentId"), r.role_assignment_id || "");
+        kvRow(dl, t("standing.kv.structureId"), r.structure_id || "");
+        kvRow(dl, t("standing.kv.parentEntity"), r.parent_entity_id || t("standing.kv.parentEntityNone"));
+        kvRow(dl, t("standing.kv.authorityScopeStrings"), (r.authority_scope || []).join(", "));
         details.appendChild(dl);
         li.appendChild(details);
         rolesList.appendChild(li);
@@ -306,9 +329,9 @@
     var cards = (cardsResponse && cardsResponse.cards) || [];
     if (cards.length === 0) {
       var li = el("li");
-      li.appendChild(el("p", { text: "Nothing needs your attention right now." }));
+      li.appendChild(el("p", { text: t("cards.none") }));
       if (MODE === "live") {
-        var again = el("button", { class: "secondary", text: "Check again" });
+        var again = el("button", { class: "secondary", text: t("cards.checkAgain") });
         again.addEventListener("click", function () { loadLive(); });
         li.appendChild(again);
       }
@@ -335,12 +358,12 @@
     var assignedCompletion = card.source_kind === "action_item" &&
       card.action_kind === "complete";
 
-    li.appendChild(el("h3", { text: card.title || "(untitled card)" }));
+    li.appendChild(el("h3", { text: card.title || t("card.untitled") }));
 
     // accessibility_hint renders as plain-language preamble BEFORE any
     // decision controls (ADR-0028 / spec rendering table).
     if (card.accessibility_hint) {
-      li.appendChild(el("p", { class: "muted", text: "Before you decide: " + card.accessibility_hint }));
+      li.appendChild(el("p", { class: "muted", text: t("card.beforeYouDecide", { hint: card.accessibility_hint }) }));
     }
 
     li.appendChild(el("p", { text: card.summary || "" }));
@@ -353,20 +376,25 @@
     // what authority says (spec: "Closed — deadline passed").
     var expired = typeof card.deadline === "number" && card.deadline < anchorSec;
     var actionable = !expired && (auth.authorized || assignedCompletion);
-    var status = reserved ? SOURCE_KIND_LABEL[card.source_kind]
+    var statusKey = reserved ? SOURCE_KIND_LABEL[card.source_kind]
       : expired ? LIFECYCLE.CLOSED_DEADLINE
       : actionable ? LIFECYCLE.OPEN
       : LIFECYCLE.CLOSED_AUTHORITY;
+    var status = t(statusKey);
     var chipTone = reserved ? "neutral" : actionable ? "ok" : "warn";
     var chipGlyph = reserved ? "● " : actionable ? "✓ " : "⚠ ";
     var statusChip = el("span", { class: "chip " + chipTone, role: "status", text: chipGlyph + status });
     li.appendChild(el("p", {}, [statusChip]));
 
     var dl = el("dl", { class: "kv" });
-    kvRow(dl, "What you are being asked to do",
-      ACTION_KIND_LABEL[card.action_kind] || ("Act (" + String(card.action_kind) + ")"));
-    kvRow(dl, "Where this comes from",
-      SOURCE_KIND_LABEL[card.source_kind] || String(card.source_kind));
+    kvRow(dl, t("card.kv.askedToDo"),
+      ACTION_KIND_LABEL[card.action_kind]
+        ? t(ACTION_KIND_LABEL[card.action_kind])
+        : t("card.action.fallback", { action: String(card.action_kind) }));
+    kvRow(dl, t("card.kv.whereFrom"),
+      SOURCE_KIND_LABEL[card.source_kind]
+        ? t(SOURCE_KIND_LABEL[card.source_kind])
+        : String(card.source_kind));
     // The member must see WHICH domain this card acts in before confirming,
     // not just the constitutional axis (spec: "What scope am I acting in?").
     // standing.domains carries the human-readable name for the card's domain.
@@ -378,55 +406,54 @@
         break;
       }
     }
-    kvRow(dl, "Where this applies", domainName);
-    kvRow(dl, "Scope", SCOPE_LABEL[card.scope] || String(card.scope));
-    kvRow(dl, "Why you can act here", card.authority_basis || "(no authority basis given)");
+    kvRow(dl, t("card.kv.whereApplies"), domainName);
+    kvRow(dl, t("card.kv.scope"),
+      SCOPE_LABEL[card.scope] ? t(SCOPE_LABEL[card.scope]) : String(card.scope));
+    kvRow(dl, t("card.kv.whyYouCanAct"), card.authority_basis || t("card.noAuthorityBasis"));
 
     if (auth.authorized) {
-      kvRow(dl, "Authorization", "You are authorized for this.");
+      kvRow(dl, t("card.kv.authorization"), t("card.auth.authorized"));
     } else if (assignedCompletion) {
-      kvRow(dl, "Authorization",
-        "The node checks your authorization when you confirm. Assigned " +
-        "tasks are authorized by your assignment, which this view cannot " +
-        "evaluate from your standing alone.");
+      kvRow(dl, t("card.kv.authorization"), t("card.auth.assignedCompletion"));
     } else {
-      kvRow(dl, "Authorization",
-        "This requires authority you do not currently hold: " +
-        auth.missing.map(scopePlain).join("; ") + ".");
+      kvRow(dl, t("card.kv.authorization"),
+        t("card.auth.insufficient", { missing: auth.missing.map(scopePlain).join("; ") }));
     }
 
     if (typeof card.deadline === "number") {
       var rel = fmtRel(card.deadline, anchorSec);
       var dd = el("span", { text: rel + " " });
       var det = el("details");
-      det.appendChild(el("summary", { text: "Exact time" }));
-      det.appendChild(el("p", { text: fmtAbs(card.deadline) + " (your local time)" }));
+      det.appendChild(el("summary", { text: t("card.exactTime") }));
+      det.appendChild(el("p", { text: t("card.localTime", { time: fmtAbs(card.deadline) }) }));
       var wrap = el("span");
       wrap.appendChild(dd);
       wrap.appendChild(det);
-      kvRow(dl, "Time pressure", wrap);
+      kvRow(dl, t("card.kv.timePressure"), wrap);
     } else {
       // Spec: absent deadline renders as "no time pressure", not "no deadline".
-      kvRow(dl, "Time pressure", "No time pressure.");
+      kvRow(dl, t("card.kv.timePressure"), t("card.timePressure.none"));
     }
 
-    var risk = RISK_LABEL[card.risk_level] || { glyph: "●", text: String(card.risk_level) };
-    kvRow(dl, "Care level", risk.glyph + " " + risk.text);
+    var risk = RISK_LABEL[card.risk_level]
+      ? { glyph: RISK_LABEL[card.risk_level].glyph, text: t(RISK_LABEL[card.risk_level].text) }
+      : { glyph: "●", text: String(card.risk_level) };
+    kvRow(dl, t("card.kv.careLevel"), risk.glyph + " " + risk.text);
 
-    kvRow(dl, "What happens if you act",
+    kvRow(dl, t("card.kv.whatHappens"),
       card.receipt_expected
-        ? "Acting will produce a receipt — a permanent record you can review in your Receipts."
-        : "Acting is not expected to produce a receipt.");
+        ? t("card.whatHappens.receipt")
+        : t("card.whatHappens.noReceipt"));
     li.appendChild(dl);
 
     // Technical identifiers live under "details", never as primary surface.
     var details = el("details");
-    details.appendChild(el("summary", { text: "Show technical detail" }));
+    details.appendChild(el("summary", { text: t("card.showTechnical") }));
     var tdl = el("dl", { class: "kv" });
-    kvRow(tdl, "Card id", card.id || "");
-    kvRow(tdl, "Underlying record id", card.source_id || "");
-    kvRow(tdl, "Domain id", card.domain_id || "(not carried on this card)");
-    kvRow(tdl, "Raw kind / action / scope / risk",
+    kvRow(tdl, t("card.kv.cardId"), card.id || "");
+    kvRow(tdl, t("card.kv.underlyingRecordId"), card.source_id || "");
+    kvRow(tdl, t("card.kv.domainId"), card.domain_id || t("card.domainIdNotCarried"));
+    kvRow(tdl, t("card.kv.rawKind"),
       [card.source_kind, card.action_kind, card.scope, card.risk_level].join(" / "));
     details.appendChild(tdl);
     li.appendChild(details);
@@ -461,35 +488,32 @@
     if (!card.domain_id) {
       holder.appendChild(el("p", {
         class: "muted",
-        text: "This card does not carry a domain reference, so this client " +
-          "cannot address the completion endpoint for it."
+        text: t("complete.noDomainRef")
       }));
       return holder;
     }
 
-    var openBtn = el("button", { text: "Mark complete…" });
+    var openBtn = el("button", { text: t("complete.openButton") });
     var panel = el("div", { class: "confirm-panel", hidden: "hidden" });
 
     // Pre-confirm summary (spec §"Signing / confirmation flow"): authority
     // basis, scope, consequence, receipt expected, reversibility honesty.
-    panel.appendChild(el("h4", { text: "Before you confirm" }));
+    panel.appendChild(el("h4", { text: t("complete.beforeConfirm") }));
     var pdl = el("dl", { class: "kv" });
-    kvRow(pdl, "What will change",
-      "This task will be recorded as completed, in your name.");
-    kvRow(pdl, "Why you may do this", card.authority_basis || "(no authority basis given)");
-    kvRow(pdl, "Scope", SCOPE_LABEL[card.scope] || String(card.scope));
-    kvRow(pdl, "Receipt", card.receipt_expected
-      ? "A completion receipt will be produced and shown in your Receipts."
-      : "No receipt is expected for this action.");
-    kvRow(pdl, "Can this be undone?",
-      "The completion record is permanent once accepted. This client " +
-      "offers no undo; if you complete it in error, contact your steward.");
+    kvRow(pdl, t("complete.kv.whatChanges"), t("complete.whatChanges.body"));
+    kvRow(pdl, t("complete.kv.whyYouMay"), card.authority_basis || t("card.noAuthorityBasis"));
+    kvRow(pdl, t("complete.kv.scope"),
+      SCOPE_LABEL[card.scope] ? t(SCOPE_LABEL[card.scope]) : String(card.scope));
+    kvRow(pdl, t("complete.kv.receipt"), card.receipt_expected
+      ? t("complete.receipt.expected")
+      : t("complete.receipt.notExpected"));
+    kvRow(pdl, t("complete.kv.canUndo"), t("complete.canUndo.body"));
     panel.appendChild(pdl);
 
     var statusLine = el("p", { role: "status", "aria-live": "polite" });
 
-    var confirmBtn = el("button", { text: "Confirm — mark complete" });
-    var cancelBtn = el("button", { class: "secondary", text: "Cancel" });
+    var confirmBtn = el("button", { text: t("complete.confirmButton") });
+    var cancelBtn = el("button", { class: "secondary", text: t("complete.cancelButton") });
     var actions = el("div", { class: "actions" }, [confirmBtn, cancelBtn]);
     panel.appendChild(actions);
     panel.appendChild(statusLine);
@@ -512,8 +536,8 @@
       var flowSeq = liveLoadSeq;
       confirmBtn.disabled = true;
       cancelBtn.disabled = true;
-      statusLine.textContent = LIFECYCLE.SENT;
-      statusChip.textContent = "● " + LIFECYCLE.SENT;
+      statusLine.textContent = t(LIFECYCLE.SENT);
+      statusChip.textContent = "● " + t(LIFECYCLE.SENT);
       statusChip.className = "chip neutral";
 
       liveFetch("/v1/gov/domains/" + encodeURIComponent(card.domain_id) +
@@ -522,7 +546,7 @@
         body: JSON.stringify({ status: "completed" })
       }).then(function () {
         if (flowSeq !== liveLoadSeq) { return null; }  // view changed hands; do not fetch under the new credential
-        statusLine.textContent = LIFECYCLE.SENT + " — completion accepted, fetching the receipt.";
+        statusLine.textContent = t("complete.sentFetching", { sent: t(LIFECYCLE.SENT) });
         // Past this point the completion is COMMITTED on the node. A failure
         // to read the receipt back must never be reported as "nothing was
         // recorded" — that would be the shell lying about a recorded action.
@@ -531,35 +555,32 @@
                          "/completion-receipt", { method: "GET" })
           .then(function (receipt) {
             if (flowSeq !== liveLoadSeq) { return; }  // never render one member's receipt in another's view
-            statusChip.textContent = "✓ " + LIFECYCLE.CONFIRMED;
+            statusChip.textContent = "✓ " + t(LIFECYCLE.CONFIRMED);
             statusChip.className = "chip ok";
-            statusLine.textContent = LIFECYCLE.CONFIRMED + ". " + SYNC.RECEIPT +
-              " — see your Receipts below.";
-            addReceipt(receipt, "You marked a task complete.");
-            setSyncChip(SYNC.RECEIPT, "ok",
-              "Your latest action produced a receipt. Records were last refreshed at " +
-              new Date().toLocaleString() + ".");
+            statusLine.textContent = t("complete.confirmedSeeReceipts", {
+              confirmed: t(LIFECYCLE.CONFIRMED), receipt: t(SYNC.RECEIPT)
+            });
+            addReceipt(receipt, t("complete.receiptContext"));
+            setSyncChip(t(SYNC.RECEIPT), "ok",
+              t("complete.syncDetail", { time: new Date().toLocaleString() }));
           })
           .catch(function (err) {
             if (flowSeq !== liveLoadSeq) { return; }
             // Receipt read failed AFTER the completion was accepted: keep the
             // committed state, do not re-enable Confirm, say exactly what is
             // and is not known.
-            statusChip.textContent = "● " + LIFECYCLE.SENT;
+            statusChip.textContent = "● " + t(LIFECYCLE.SENT);
             statusChip.className = "chip neutral";
-            statusLine.textContent = "Your completion was accepted and recorded. " +
-              "The receipt could not be retrieved right now (" + err.message + "). " +
-              "Do not redo the task — refresh your Receipts later or ask your steward.";
-            cancelBtn.textContent = "Close";
+            statusLine.textContent = t("complete.receiptReadFailed", { error: err.message });
+            cancelBtn.textContent = t("complete.closeButton");
             cancelBtn.disabled = false;
           });
       }).catch(function (err) {
         // The completion itself was refused — the gateway's answer, rendered
         // plainly, never a silent failure. Nothing was recorded.
         if (flowSeq !== liveLoadSeq) { return; }
-        statusLine.textContent = "Rejected with reason: " + err.message +
-          " Nothing was recorded. You can try again or contact your steward.";
-        statusChip.textContent = "⚠ " + LIFECYCLE.OPEN;
+        statusLine.textContent = t("complete.rejected", { error: err.message });
+        statusChip.textContent = "⚠ " + t(LIFECYCLE.OPEN);
         statusChip.className = "chip warn";
         confirmBtn.disabled = false;
         cancelBtn.disabled = false;
@@ -583,10 +604,7 @@
     var list = byId("receipts-list");
     clear(list);
     if (state.receipts.length === 0) {
-      list.appendChild(el("li", {
-        text: "No receipts to show yet. When you complete an action that " +
-          "produces a receipt, it appears here."
-      }));
+      list.appendChild(el("li", { text: t("receipts.none") }));
     } else {
       state.receipts.forEach(function (entry) {
         list.appendChild(renderCompletionReceipt(entry.receipt, entry.plainContext));
@@ -600,37 +618,36 @@
   function renderCompletionReceipt(receipt, plainContext) {
     var li = el("li");
     var isSelf = state.standing && receipt.actor_did === state.standing.did;
-    var who = isSelf ? "You" : "Another member (identifier under evidence detail)";
+    var who = isSelf ? t("receipt.who.self") : t("receipt.who.other");
 
-    li.appendChild(el("h3", { text: "Action completed" }));
+    li.appendChild(el("h3", { text: t("receipt.actionCompleted") }));
     li.appendChild(el("p", {}, [
-      el("span", { class: "chip ok", text: "✓ " + SYNC.RECEIPT })
+      el("span", { class: "chip ok", text: "✓ " + t(SYNC.RECEIPT) })
     ]));
     li.appendChild(el("p", {
-      text: who + " marked a task as complete on " + fmtAbs(receipt.completed_at) + "."
+      text: t("receipt.markedComplete", { who: who, when: fmtAbs(receipt.completed_at) })
     }));
     li.appendChild(el("p", {
       class: "muted",
-      text: "What this proves: who acted (the actor recorded below), which " +
-        "obligation it satisfied (the task identified below), and when. " +
-        (plainContext || "")
+      text: t("receipt.whatThisProves", { context: (plainContext || "") })
     }));
 
     var details = el("details");
-    details.appendChild(el("summary", { text: "Show evidence detail" }));
+    details.appendChild(el("summary", { text: t("receipt.showEvidence") }));
     var dl = el("dl", { class: "kv" });
-    kvRow(dl, "Record class", "ActionItemCompletionReceipt");
-    kvRow(dl, "Task (action item) id", String(receipt.item_id || ""));
-    kvRow(dl, "Domain id", String(receipt.domain_id || ""));
-    kvRow(dl, "Actor", el("code", { text: String(receipt.actor_did || "") }));
-    kvRow(dl, "Transition", String(receipt.transition || ""));
-    kvRow(dl, "Completed at (unix seconds)", String(receipt.completed_at || ""));
+    // "ActionItemCompletionReceipt" is a record class name — not translated.
+    kvRow(dl, t("receipt.kv.recordClass"), "ActionItemCompletionReceipt");
+    kvRow(dl, t("receipt.kv.taskId"), String(receipt.item_id || ""));
+    kvRow(dl, t("receipt.kv.domainId"), String(receipt.domain_id || ""));
+    kvRow(dl, t("receipt.kv.actor"), el("code", { text: String(receipt.actor_did || "") }));
+    kvRow(dl, t("receipt.kv.transition"), String(receipt.transition || ""));
+    kvRow(dl, t("receipt.kv.completedAt"), String(receipt.completed_at || ""));
     // Maturity-tier honesty: the demo fixture's hash is illustrative only —
     // it is not a real blake3 binding and nothing is signed. Only live mode
     // may claim the canonical binding.
     kvRow(dl, MODE === "demo"
-        ? "Record hash (illustrative fixture value — not a real blake3 binding)"
-        : "Record hash (blake3, canonical binding of the fields above)",
+        ? t("receipt.kv.recordHashDemo")
+        : t("receipt.kv.recordHashLive"),
       el("code", { text: hashToHex(receipt.record_hash) }));
     details.appendChild(dl);
     li.appendChild(details);
@@ -641,7 +658,7 @@
   // Demo mode: fixture-backed, nothing signed, no live node.
   // ---------------------------------------------------------------------
   function loadDemo() {
-    setSyncChip(SYNC.VERIFYING, "neutral", "Loading the committed fixture snapshot…");
+    setSyncChip(t(SYNC.VERIFYING), "neutral", t("demo.loadingFixture"));
     Promise.all([
       fetchJson(FIXTURES.standing),
       fetchJson(FIXTURES.cards),
@@ -654,18 +671,13 @@
       renderIdentity(state.standing);
       renderStanding(state.standing);
       renderCards(state.cards, state.standing, anchor);
-      addReceipt(results[2],
-        "This is a fictional demonstration receipt for a previously " +
-        "completed task; it is not tied to any card above.");
+      addReceipt(results[2], t("demo.receiptContext"));
 
-      setSyncChip(SYNC.SYNCED, "ok",
-        "Fixture snapshot generated at " + fmtAbs(anchor) +
-        ". Deadlines above are read relative to that snapshot moment, " +
-        "because fixture data does not move with the clock.");
+      setSyncChip(t(SYNC.SYNCED), "ok",
+        t("demo.syncedDetail", { when: fmtAbs(anchor) }));
     }).catch(function (err) {
-      setSyncChip(SYNC.DEGRADED, "warn",
-        "The fixture files could not be loaded (" + err.message + "). " +
-        "Make sure the page is served from the web/ directory — see the README.");
+      setSyncChip(t(SYNC.DEGRADED), "warn",
+        t("demo.loadFailed", { error: err.message }));
     });
   }
 
@@ -689,7 +701,7 @@
           var reason;
           try { reason = JSON.parse(bodyText).error || bodyText; }
           catch (e) { reason = bodyText || ("HTTP " + resp.status); }
-          throw new Error("The node answered " + resp.status + ": " + String(reason).slice(0, 300));
+          throw new Error(t("live.nodeAnswered", { status: resp.status, reason: String(reason).slice(0, 300) }));
         });
       }
       return resp.json();
@@ -703,7 +715,7 @@
 
   function loadLive() {
     var seq = ++liveLoadSeq;
-    setSyncChip(SYNC.VERIFYING, "neutral", "Asking the node for your standing…");
+    setSyncChip(t(SYNC.VERIFYING), "neutral", t("live.askingStanding"));
     byId("connect-status").textContent = "";
 
     // A new connect attempt invalidates whatever member view is on screen.
@@ -741,20 +753,16 @@
       var anchor = Math.floor(Date.now() / 1000);
       renderCards(cardsResponse, state.standing, anchor);
       renderReceipts();
-      setSyncChip(SYNC.SYNCED, "ok",
-        "Records last refreshed at " + new Date().toLocaleString() +
-        ". This view is a snapshot; refresh to re-check.");
-      byId("connect-status").textContent = "Connected. Your standing and open actions are shown below.";
+      setSyncChip(t(SYNC.SYNCED), "ok",
+        t("live.syncedDetail", { time: new Date().toLocaleString() }));
+      byId("connect-status").textContent = t("live.connected");
     }).catch(function (err) {
       if (seq !== liveLoadSeq) { return; }  // stale failure must not clobber a newer attempt
       // Failure-table disposition (spec §"Failure and safety table"):
       // plain language first, no error code as primary surface, help path
       // always visible.
-      setSyncChip(SYNC.DEGRADED, "warn",
-        "Your standing is currently unavailable. We'll keep trying. " +
-        "If this persists, please contact your steward.");
-      byId("connect-status").textContent =
-        "Could not load your records. Technical detail: " + err.message;
+      setSyncChip(t(SYNC.DEGRADED), "warn", t("live.standingUnavailable"));
+      byId("connect-status").textContent = t("live.couldNotLoad", { error: err.message });
     });
   }
 
@@ -765,11 +773,11 @@
       try {
         url = new URL(byId("gateway-url").value);
       } catch (e) {
-        byId("connect-status").textContent = "That gateway address is not a valid URL.";
+        byId("connect-status").textContent = t("live.invalidUrl");
         return;
       }
       if (url.protocol !== "http:" && url.protocol !== "https:") {
-        byId("connect-status").textContent = "The gateway address must start with http:// or https://.";
+        byId("connect-status").textContent = t("live.urlScheme");
         return;
       }
       state.gateway = url.origin;
@@ -779,7 +787,7 @@
       // it to the bare credential.
       credential = credential.replace(/^Bearer\s+/i, "").trim();
       if (!credential) {
-        byId("connect-status").textContent = "Paste an access credential first.";
+        byId("connect-status").textContent = t("live.pasteCredential");
         return;
       }
       state.credential = credential;
@@ -801,14 +809,34 @@
   // Boot
   // ---------------------------------------------------------------------
   function init() {
+    // i18n boot: set <html lang>/<dir>, the document title, all static
+    // data-i18n nodes and data-i18n-attr attributes, and the language
+    // selector — before the mode-specific render path runs.
+    var locale = I18N.locale;
+    I18N.applyDocumentLocale(locale);
+    document.title = t("doc.title");
+    applyStaticI18n();
+    wireLanguageSelector(locale);
+
+    // Keep the chosen language sticky across Demo/Live mode switches: if the
+    // user set ?lang= explicitly, carry it on the mode-nav links (which are
+    // otherwise hardcoded to ?mode=...). Navigator-default locale leaves the
+    // links clean.
+    var langParam = params.get("lang");
+    if (langParam) {
+      var lp = encodeURIComponent(langParam);
+      byId("nav-demo").setAttribute("href", "?mode=demo&lang=" + lp);
+      byId("nav-live").setAttribute("href", "?mode=live&lang=" + lp);
+    }
+
     var banner = byId("honesty-banner");
     if (MODE === "demo") {
-      banner.textContent = "Fixture-backed demo — no live node, nothing signed.";
+      banner.textContent = t("banner.demo");
       banner.className = "banner demo";
       byId("nav-demo").setAttribute("aria-current", "true");
       loadDemo();
     } else {
-      banner.textContent = "Live-local node — dev rehearsal, not production.";
+      banner.textContent = t("banner.live");
       banner.className = "banner live";
       byId("nav-live").setAttribute("aria-current", "true");
       wireConnectForm();
@@ -818,15 +846,53 @@
         // typing, then show the Start button.
         byId("gateway-url").value = DEMO_GATEWAY;
         show("demo-launch-section");
-        setSyncChip(SYNC.DELAYED, "neutral",
-          "Ready. Select Start local demo to load your standing.");
+        setSyncChip(t(SYNC.DELAYED), "neutral", t("launcher.ready"));
         wireDemoLaunch();
       } else {
         show("connect-section");
-        setSyncChip(SYNC.DELAYED, "neutral",
-          "Not connected yet. Enter your local gateway address above.");
+        setSyncChip(t(SYNC.DELAYED), "neutral", t("launcher.notConnected"));
       }
     }
+  }
+
+  // Apply the catalog to every static node carrying data-i18n (textContent)
+  // and data-i18n-attr ("attr:key;attr:key" → setAttribute). Element
+  // construction / textContent only — no innerHTML, so catalog strings can
+  // never inject markup.
+  function applyStaticI18n() {
+    var textNodes = document.querySelectorAll("[data-i18n]");
+    Array.prototype.forEach.call(textNodes, function (node) {
+      node.textContent = t(node.getAttribute("data-i18n"));
+    });
+    var attrNodes = document.querySelectorAll("[data-i18n-attr]");
+    Array.prototype.forEach.call(attrNodes, function (node) {
+      node.getAttribute("data-i18n-attr").split(";").forEach(function (pair) {
+        var parts = pair.split(":");
+        if (parts.length === 2) {
+          var attr = parts[0].trim();
+          var key = parts[1].trim();
+          if (attr && key) { node.setAttribute(attr, t(key)); }
+        }
+      });
+    });
+  }
+
+  // Populate the language selector and, on change, set ?lang= and reload.
+  // Reload is the simplest robust re-render path (no partial DOM rebuild).
+  function wireLanguageSelector(activeLocale) {
+    var select = byId("language-select");
+    if (!select) { return; }
+    I18N.availableLocales().forEach(function (loc) {
+      var meta = I18N.localeMeta(loc) || { name: loc };
+      var opt = el("option", { value: loc, text: meta.name });
+      if (loc === activeLocale) { opt.setAttribute("selected", "selected"); }
+      select.appendChild(opt);
+    });
+    select.addEventListener("change", function () {
+      var params = new URLSearchParams(window.location.search);
+      params.set("lang", select.value);
+      window.location.search = params.toString();
+    });
   }
 
   // DEV/DEMO one-click start: ask the launcher's loopback session endpoint for
@@ -840,13 +906,12 @@
     function toManual(msg) {
       hide("demo-launch-section");
       show("connect-section");
-      setSyncChip(SYNC.DELAYED, "neutral",
-        "Not connected yet. Enter your local gateway address above.");
+      setSyncChip(t(SYNC.DELAYED), "neutral", t("launcher.notConnected"));
       if (msg) { byId("connect-status").textContent = msg; }
     }
     btn.addEventListener("click", function () {
       btn.disabled = true;
-      st.textContent = "Starting the local demo…";
+      st.textContent = t("launcher.starting");
       // Simple cross-origin POST (no custom headers) — no preflight needed.
       fetch(DEMO_SESSION_URL, { method: "POST" }).then(function (resp) {
         if (!resp.ok) { throw new Error("HTTP " + resp.status); }
@@ -863,9 +928,7 @@
         loadLive();
       }).catch(function (err) {
         btn.disabled = false;
-        st.textContent =
-          "Could not start the local demo (" + err.message + "). " +
-          "Use Connect manually instead, or check the launcher tunnel.";
+        st.textContent = t("launcher.startFailed", { error: err.message });
       });
     });
     adv.addEventListener("click", function () { toManual(""); });
