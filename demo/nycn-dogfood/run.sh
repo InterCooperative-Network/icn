@@ -121,7 +121,13 @@ free_port(){
   local p="${1:-$GW_PORT}" proto="${2:-tcp}"
   if command -v fuser >/dev/null 2>&1; then fuser -k "${p}/${proto}" 2>/dev/null || true
   elif command -v lsof >/dev/null 2>&1; then
-    if [ "$proto" = udp ]; then lsof -tiUDP:"$p" 2>/dev/null | xargs -r kill 2>/dev/null || true
+    if [ "$proto" = udp ]; then
+      # lsof -i selects by ANY matching endpoint; filter to PIDs with a LOCAL bind
+      # to :$p (split NAME on "->", test the local side) so --force-port-cleanup
+      # never kills a client merely connected to a remote :$p -- mirrors udp_listening.
+      lsof -nP -iUDP:"$p" 2>/dev/null \
+        | awk -v sfx=":$p" 'NR>1 { split($NF,a,"->"); if (a[1] ~ sfx "$") print $2 }' \
+        | sort -u | xargs -r kill 2>/dev/null || true
     else lsof -tiTCP:"$p" -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null || true; fi
   else die "cannot free :$p/$proto (no fuser/lsof); free it manually"; fi
   sleep 1
