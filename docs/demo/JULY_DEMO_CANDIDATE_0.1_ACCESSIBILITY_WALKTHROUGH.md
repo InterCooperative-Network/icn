@@ -30,10 +30,13 @@ This is an **evidence/documentation pass**. No runtime behavior was changed.
   `…/member-shell/?mode=demo`.
 - Drove headless Chromium via Playwright + `@axe-core/playwright`, which are **declared
   devDependencies of `web/pilot-ui`** (`@axe-core/playwright` per #1735) — so no new dependency
-  stack is introduced for this pass. Reproduce by installing pilot-ui's dev deps once
-  (`cd web/pilot-ui && npm ci`), then running the script with
-  `NODE_PATH=web/pilot-ui/node_modules` (they are not present in a fresh checkout until
-  installed). Cached Chromium `chromium-1208`.
+  stack is introduced for this pass. Reproduce from a fresh checkout:
+  `cd web/pilot-ui && npm ci && npx playwright install chromium` — `npm ci` installs the packages
+  (not present in a fresh checkout until then); `npx playwright install` fetches the matching
+  Chromium browser binary (package scripts do **not**). Then run the script with
+  `NODE_PATH=web/pilot-ui/node_modules`. Playwright resolves its own version-pinned Chromium
+  build — this run used `chromium-1208`; a different Playwright version will resolve a different
+  build, which is fine.
 - Script: `walkthrough.cjs` (archived alongside this doc in the artifact class).
 - Fixtures consumed: `web/pilot-ui/fixtures/icn-organizer-demo/{standing,action-cards}.json`
   (CI-drift-guarded, #2021) and `web/member-shell/fixtures/demo-completion-receipt.json`
@@ -85,20 +88,20 @@ Per `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` §5. Outcomes: **Pass**
 - [x] **3.1 Language access** — Pass. Plain-language copy; canonical terms (standing, action
   card, receipt, provenance, DID) each paired with an inline explanation; no kernel jargon in
   member copy. Follow-up (not blocking): multi-language tagging not implemented (#1740).
-- [x] **3.2 Screen-reader / non-visual access** — Pass with documented follow-ups. Semantic
-  HTML, landmarks, headings, `role="status"`/`aria-live` regions, list views, `aria-describedby`.
-  **Real screen-reader testing not performed** — remains owed (the client declares this gap;
-  open a follow-up issue before calling this surface organizer-ready).
-- [x] **3.3 Low-vision access** — Pass with documented follow-ups. 200% CSS zoom rendered
-  without layout break (screenshot); rem units throughout; contrast ratios documented per token
-  in `shell.css`. **Human low-vision + external contrast-audit-tool verification not performed** —
-  owed.
+- [x] **3.2 Screen-reader / non-visual access** — Pass with documented follow-ups (**#2041**).
+  Semantic HTML, landmarks, headings, `role="status"`/`aria-live` regions, list views,
+  `aria-describedby`. **Real screen-reader testing not performed** — remains owed (tracked in
+  **#2041**; the client also declares this gap) before calling this surface organizer-ready.
+- [x] **3.3 Low-vision access** — Pass with documented follow-ups (**#2041**). 200% CSS zoom
+  rendered without layout break (screenshot); rem units throughout; contrast ratios documented
+  per token in `shell.css`. **Human low-vision + external contrast-audit-tool verification not
+  performed** — owed (tracked in **#2041**).
 - [x] **3.4 Color-independent meaning** — Pass. Status carries glyph + text label (risk level
   is "glyph + label, never color alone" per spec/README); axe found no color-contrast violations.
-- [x] **3.5 Keyboard / switch / non-pointer access** — Pass with documented follow-ups.
+- [x] **3.5 Keyboard / switch / non-pointer access** — Pass with documented follow-ups (**#2041**).
   15 focusables reached by Tab, all with a visible focus outline; skip link present; no
   hover-only controls in markup; buttons/inputs sized ≥44px (2.75rem) per `shell.css`. **Switch-
-  control software not exercised** — owed.
+  control software not exercised** — owed (tracked in **#2041**).
 - [ ] **3.6 Captions, transcripts, non-audio access** — N/A with reason: the reference client
   ships no audio/video/narration media.
 - [x] **3.7 Cognitive load and step complexity** — Pass. Single column, fixed section order,
@@ -109,10 +112,10 @@ Per `docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` §5. Outcomes: **Pass**
 - [x] **3.8 Low-bandwidth / low-device access** — Pass. Dependency-free static HTML/CSS/vanilla
   JS; no framework, build, animation, or autoplay. Follow-up (not blocking): no offline
   tolerance / cache / draft queue (declared gap).
-- [ ] **3.9 Assistive-technology compatibility** — Pass with documented follow-ups. Real HTML
-  elements over `div[role]`; standard inputs. **AT exercised: none** (headless environment, no
-  screen reader / switch). This single line keeps the surface from being called "organizer-ready"
-  until an AT pass is done — owed.
+- [ ] **3.9 Assistive-technology compatibility** — Pass with documented follow-ups (**#2041**).
+  Real HTML elements over `div[role]`; standard inputs. **AT exercised: none** (headless
+  environment, no screen reader / switch). This single line keeps the surface from being called
+  "organizer-ready" until an AT pass is done — owed (tracked in **#2041**).
 - [ ] **3.10 Privacy-preserving accommodation path** — N/A with reason: no accommodation profile
   exists in this reference client; no disability/medical/accommodation data is collected, rendered,
   or committed. (A real deployment must add this; tracked as a declared gap, not a regression.)
@@ -140,14 +143,14 @@ Evidence: §1, gate 3.2 / 3.9; environment is headless with no VoiceOver/NVDA/Or
   own README declares this gap.
 Impact: Cannot honestly call the member surface "organizer-ready" or "pilot-ready" without it.
 Recommendation: One human (or AT-equipped) pass with at least one screen reader + one non-mouse
-  input; open a follow-up issue and attach results.
+  input; tracked in #2041 — attach results there.
 Blocking? no (for DEV/DEMO review) / yes (for organizer-ready / pilot-ready labeling)
 ```
 ```
 Finding: Human low-vision / 200% browser-zoom / low-end-device verification not performed.
 Evidence: §4 used CSS zoom + narrow viewport as automated proxies; no human confirmation.
 Impact: Automated zoom proxy can miss real reflow/comprehension problems.
-Recommendation: Human 200% browser-zoom + small-device pass; fold into the same follow-up.
+Recommendation: Human 200% browser-zoom + small-device pass; fold into #2041.
 Blocking? no (DEV/DEMO) / important follow-up (organizer-ready)
 ```
 ```
