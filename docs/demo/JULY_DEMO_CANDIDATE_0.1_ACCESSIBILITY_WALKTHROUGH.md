@@ -13,7 +13,7 @@ This is an **evidence/documentation pass**. No runtime behavior was changed.
 | Path | Status |
 |---|---|
 | Rendered-browser walkthrough of member-shell **fixture mode** (`?mode=demo`) | **RUN** (headless Chromium, this pass) |
-| Automated WCAG scan (axe-core, WCAG 2.0/2.1/2.2 A+AA) | **RUN** (this pass) |
+| Automated WCAG scan (axe-core; tags `wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa` — WCAG 2.0/2.1 A & AA plus 2.2 AA) | **RUN** (this pass) |
 | Keyboard-navigation + visible-focus trace | **RUN** (this pass) |
 | 200% zoom (CSS), narrow/mobile reflow, reduced-motion render | **RUN** (this pass) |
 | **Live** member-shell against a running gateway (discharge mutation) | **NOT run here** — no live appliance/gateway in this environment. The live `seed → discharge → verify → reset/reseed` + 13/13 receipt-chain loop was run and **sealed separately on 2026-06-13** (operator evidence: `~/artifacts/icn/demo-image-20260612/EVIDENCE-MAP.md`). This pass does not re-run or re-claim it. |
@@ -28,9 +28,12 @@ This is an **evidence/documentation pass**. No runtime behavior was changed.
 
 - Served the repo's `web/` directory statically (`python3 -m http.server`), opened
   `…/member-shell/?mode=demo`.
-- Drove headless Chromium via Playwright + `@axe-core/playwright` **already installed under
-  `web/pilot-ui/node_modules`** (pilot-ui depends on `@axe-core/playwright` per #1735) — no
-  new dependency stack was added. Cached Chromium `chromium-1208`.
+- Drove headless Chromium via Playwright + `@axe-core/playwright`, which are **declared
+  devDependencies of `web/pilot-ui`** (`@axe-core/playwright` per #1735) — so no new dependency
+  stack is introduced for this pass. Reproduce by installing pilot-ui's dev deps once
+  (`cd web/pilot-ui && npm ci`), then running the script with
+  `NODE_PATH=web/pilot-ui/node_modules` (they are not present in a fresh checkout until
+  installed). Cached Chromium `chromium-1208`.
 - Script: `walkthrough.cjs` (archived alongside this doc in the artifact class).
 - Fixtures consumed: `web/pilot-ui/fixtures/icn-organizer-demo/{standing,action-cards}.json`
   (CI-drift-guarded, #2021) and `web/member-shell/fixtures/demo-completion-receipt.json`
