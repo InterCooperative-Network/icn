@@ -81,7 +81,7 @@ violation. A human still confirms order/comprehension/no-trap.)*
   "Show technical detail / Show evidence detail" disclosure, every link) is reachable by Tab. → ___
 - [ ] Tab order matches reading order / is understandable. → ___
 - [ ] Focus is visibly findable on every stop (not a thin gray underline). → ___
-- [ ] No keyboard trap; `Esc` exits any disclosure/popover; you can Tab back out. → ___
+- [ ] No keyboard trap: the "Show technical/evidence detail" sections are native `<details>` disclosures — they toggle with Enter/Space and you can Tab past them, which is **not** a trap. Native disclosures are **not** expected to close on `Esc`; reserve any `Esc`-to-close check for a real modal/popover (none ship in this surface today). → ___
 - [ ] Action-card / receipt / evidence controls are reachable and operable by keyboard. → ___
 
 ### B. Screen-reader smoke (3.2 / 3.9) — AT used: ____________
