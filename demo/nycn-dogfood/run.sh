@@ -44,6 +44,7 @@ esac; done
 die(){ echo "ERROR: $*" >&2; exit 1; }
 say(){ printf '\n== %s ==\n' "$*"; }
 note(){ printf '   %s\n' "$*"; }
+warn(){ printf 'WARNING: %s\n' "$*" >&2; }
 
 # ---- optional recording: re-exec once under tee, then render HTML ----
 if [ "$RECORD" = 1 ] && [ "${DOGFOOD_TEEING:-0}" != "1" ]; then
@@ -80,13 +81,53 @@ LAST_PID="$OUT_BASE/.last-icnd.pid"
 
 gw_health(){ curl -sf -m3 "$GW/v1/health" >/dev/null 2>&1; }
 port_listening(){ local p="${1:-$GW_PORT}"; (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null && { exec 3>&- 3<&-; return 0; }; return 1; }
-# Gossip is UDP (QUIC), so /dev/tcp cannot see it -- probe with ss by source port.
-udp_listening(){ local p="$1"; command -v ss >/dev/null 2>&1 || return 1; [ -n "$(ss -Huln "sport = :$p" 2>/dev/null)" ]; }
+# Gossip is UDP (QUIC), so /dev/tcp cannot see it. Probe with ss by source port,
+# falling back to lsof so the preflight still runs without iproute2. The lsof
+# fallback matches only sockets whose LOCAL endpoint is :$p (a bound listener) --
+# not a connection whose REMOTE peer happens to be :$p, which would otherwise
+# read as a false collision. If NEITHER probe tool exists, warn loudly instead of
+# skipping silently (#1956): without --force-port-cleanup, treat the port as free
+# and proceed; with it, report busy so the caller runs free_port (which itself
+# needs fuser/lsof and dies clearly if absent).
+UDP_PROBE_WARNED=0
+udp_listening(){
+  local p="$1"
+  if command -v ss >/dev/null 2>&1; then
+    [ -n "$(ss -Huln "sport = :$p" 2>/dev/null)" ]; return
+  fi
+  if command -v lsof >/dev/null 2>&1; then
+    # lsof NAME is "local[->remote]"; only a local bind to :$p is a real collision.
+    lsof -nP -iUDP:"$p" 2>/dev/null | awk -v sfx=":$p" '
+      NR>1 { split($NF, a, "->"); if (a[1] ~ sfx "$") found=1 }
+      END  { exit !found }
+    '
+    return
+  fi
+  if [ "$UDP_PROBE_WARNED" = 0 ]; then
+    warn "cannot probe UDP gossip port :$p -- neither 'ss' (iproute2) nor 'lsof' is installed."
+    if [ "${FORCE_PORT:-0}" = 1 ]; then
+      warn "  --force-port-cleanup is set: attempting cleanup anyway (needs 'fuser' or 'lsof')."
+    else
+      warn "  a stale gossip listener on :$p will NOT be detected; proceeding as if free."
+      warn "  install iproute2 (e.g. 'sudo apt-get install iproute2'), or re-run with"
+      warn "  --force-port-cleanup to reclaim it (cleanup needs 'fuser' or 'lsof')."
+    fi
+    UDP_PROBE_WARNED=1
+  fi
+  # Operator explicitly asked to reclaim -> report busy so the caller runs free_port.
+  [ "${FORCE_PORT:-0}" = 1 ]
+}
 free_port(){
   local p="${1:-$GW_PORT}" proto="${2:-tcp}"
   if command -v fuser >/dev/null 2>&1; then fuser -k "${p}/${proto}" 2>/dev/null || true
   elif command -v lsof >/dev/null 2>&1; then
-    if [ "$proto" = udp ]; then lsof -tiUDP:"$p" 2>/dev/null | xargs -r kill 2>/dev/null || true
+    if [ "$proto" = udp ]; then
+      # lsof -i selects by ANY matching endpoint; filter to PIDs with a LOCAL bind
+      # to :$p (split NAME on "->", test the local side) so --force-port-cleanup
+      # never kills a client merely connected to a remote :$p -- mirrors udp_listening.
+      lsof -nP -iUDP:"$p" 2>/dev/null \
+        | awk -v sfx=":$p" 'NR>1 { split($NF,a,"->"); if (a[1] ~ sfx "$") print $2 }' \
+        | sort -u | xargs -r kill 2>/dev/null || true
     else lsof -tiTCP:"$p" -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null || true; fi
   else die "cannot free :$p/$proto (no fuser/lsof); free it manually"; fi
   sleep 1
