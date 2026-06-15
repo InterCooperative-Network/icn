@@ -516,6 +516,14 @@ pub async fn create_meeting(
         ));
     }
 
+    // #1868: bind the mutation to the token's cooperative. The class scopes
+    // (`governance:meeting:write`) are requestable per coop, so the scope gate
+    // alone does not establish that the caller may write under the body-supplied
+    // `coop_id`. Without this, a meeting-scoped token for coop A could create a
+    // meeting record under coop B. CRITICAL: Prevent cross-coop attacks.
+    // Mirrors the guard added to `index_decision_endpoint` in #2052.
+    require_coop_access(&http_req, &req.coop_id)?;
+
     // Generate meeting ID
     let now = icn_time::current_timestamp_secs();
     let meeting_id = format!(
@@ -1068,6 +1076,88 @@ mod tests {
         assert_eq!(
             create_status("governance:charter:write").await,
             StatusCode::FORBIDDEN
+        );
+    }
+
+    /// #1868: a validly-scoped token must not create a meeting under a coop other
+    /// than its own. The class scopes are requestable per coop, so the route binds
+    /// the body-supplied `coop_id` to the token's coop via `require_coop_access`.
+    /// A same-coop create succeeds (201) and creates the meeting; a cross-coop
+    /// create is rejected (403) without mutating the registry. The registry-state
+    /// assertions below (not just the HTTP status) prove the "without mutating"
+    /// claim. Mirrors `index_decision_rejects_cross_coop_write`.
+    #[actix_web::test]
+    async fn create_meeting_rejects_cross_coop_write() {
+        // Returns the response status alongside a handle to the same registry the
+        // app mutates, so the caller can assert on its contents afterward. The
+        // `Arc` is cloned before being moved into the app, so both views point at
+        // one shared `DecisionRegistry`. The handler extracts
+        // `web::Data<Arc<DecisionRegistry>>`, so the app data must be
+        // `web::Data::new(Arc<..>)` (which yields `Data<Arc<..>>`), not
+        // `web::Data::from(Arc<..>)` (which would yield the mismatched
+        // `Data<DecisionRegistry>` and make extraction fail with 500).
+        async fn create_status(
+            token_coop: &str,
+            body_coop: &str,
+        ) -> (actix_web::http::StatusCode, Arc<DecisionRegistry>) {
+            let registry = Arc::new(DecisionRegistry::new());
+            let app = actix_test::init_service(
+                App::new()
+                    .app_data(web::Data::new(registry.clone()))
+                    .service(web::scope("/registry").configure(configure)),
+            )
+            .await;
+            let claims = TokenClaims {
+                sub: "did:icn:test-user".to_string(),
+                iat: 1_000_000_000,
+                exp: 9_999_999_999,
+                coop_id: token_coop.to_string(),
+                // Validly scoped: passes the scope gate so the coop binding is the
+                // only thing under test.
+                scopes: vec!["governance:meeting:write".to_string()],
+            };
+            let req = actix_test::TestRequest::post()
+                .uri("/registry/meetings")
+                .set_json(serde_json::json!({
+                    "coopId": body_coop,
+                    "title": "Cross-coop test meeting",
+                    "startsAt": 1_800_000_000u64
+                }))
+                .to_request();
+            req.extensions_mut().insert(claims);
+            let status = actix_test::call_service(&app, req).await.status();
+            (status, registry)
+        }
+
+        use actix_web::http::StatusCode;
+        // Same coop: the write is bound to the token's coop and succeeds, and the
+        // meeting is actually persisted under that coop.
+        let (same_coop_status, same_coop_registry) =
+            create_status("did:icn:coopA", "did:icn:coopA").await;
+        assert_eq!(same_coop_status, StatusCode::CREATED);
+        assert_eq!(
+            same_coop_registry.list_meetings("did:icn:coopA").len(),
+            1,
+            "same-coop create should persist exactly one meeting under coopA"
+        );
+
+        // Cross coop: a coopA token cannot create a meeting under coopB, and the
+        // rejection must leave the registry unmutated (no meeting under coopB, and
+        // none leaked under the token's own coopA either).
+        let (cross_coop_status, cross_coop_registry) =
+            create_status("did:icn:coopA", "did:icn:coopB").await;
+        assert_eq!(cross_coop_status, StatusCode::FORBIDDEN);
+        assert!(
+            cross_coop_registry
+                .list_meetings("did:icn:coopB")
+                .is_empty(),
+            "cross-coop reject must not create a meeting under coopB"
+        );
+        assert!(
+            cross_coop_registry
+                .list_meetings("did:icn:coopA")
+                .is_empty(),
+            "cross-coop reject must not create a meeting under coopA either"
         );
     }
 
