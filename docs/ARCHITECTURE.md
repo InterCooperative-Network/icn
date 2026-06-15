@@ -786,10 +786,10 @@ Configurable per cooperative. Trust graph change invalidates rate limit cache (r
 | `icn-community` | Communities (civic engine) | Confirmed (infected — medium) |
 | `icn-federation` | Cross-cooperative coordination | Partially Confirmed (infected — medium) |
 | `icn-naming` | Name resolution, service discovery | Confirmed (clean) |
-| `icn-commons` | Commons store / handle (capital-C Commons primitives) | Clean (by import) |
+| `icn-commons` | Commons store / handle (capital-C Commons primitives) | Infected (needs review) — direct `icn-governance` (domain) dep |
 | `icn-compute` | Trust-gated WASM execution | Foundation Only (needs review) |
 
-*(Added 2026-06-14: `icn-commons` is a newer workspace crate — commons store/handle/inner — not previously in this table; zero domain-crate dependencies in its Cargo.toml.)*
+*(Added 2026-06-14; corrected 2026-06-15: `icn-commons` is a newer workspace crate — commons store/handle/inner — not previously in this table. **It is NOT clean by import:** `icn/crates/icn-commons/Cargo.toml` `[dependencies]` declares a direct `icn-governance = { path = "../icn-governance" }` dep, and `icn-governance` is an infected/domain crate (see Domain crates above and `kernel_surface.toml`). The crate also pulls `icn-identity`, `icn-obs`, `icn-time` (all clean), but the `icn-governance` edge alone makes the earlier "zero domain-crate dependencies" claim false — hence Infected (needs review). Note: `icn-commons` is **not** part of the `kernel_surface.toml` 28-crate inventory, so it is not counted in the Meaning Firewall recount below; the 13/14/1 totals are unchanged by this correction.)*
 
 **Meaning Firewall audit (recomputed 2026-06-14 from the per-crate `[crates.*]` entries in kernel_surface.toml):** of the **28** crates inventoried, **13 are clean**, **14 are infected**, and **1 needs review** (`icn-compute`); plus **1 extracted app** (`icn-governance-actor`).
 

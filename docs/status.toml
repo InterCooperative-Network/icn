@@ -210,11 +210,16 @@ evidence = [
   "Topic-based gossip with anti-entropy + Bloom filter dedup",
   "SignedEnvelope + EncryptedEnvelope formats",
   "DID bootstrap format",
-  "K3s deployment running 2+ months",
+  "K3s deployment running 2+ months (NEEDS OPS RE-CONFIRMATION — runtime claim NOT verified this pass; not covered by last_verified)",
 ]
 last_verified = "2026-06-14"
 verified_by = "freshness-2047"
-review_note = "Re-verified #2047 (code-level): gossip primitives (vector_clock/bloom/anti_entropy) and default ports confirmed in src. NEEDS OPS RE-CONFIRMATION: 'K3s running 2+ months' is a runtime/deployment claim not source-verifiable; NAT-traversal hardening gap retained."
+# last_verified covers ONLY the code-level facts re-verified at source this pass
+# (gossip primitives, envelope formats, default ports). The K3s runtime claim is
+# explicitly carved out of the fresh timestamp — it is NOT source-verifiable and
+# was NOT re-confirmed by ops in #2047. It is tagged inline as NEEDS OPS RE-CONFIRMATION
+# so it does not ride the fresh date. (See PR #2051 review thread, comment 3410749048.)
+review_note = "Re-verified #2047 (code-level only): gossip primitives (vector_clock/bloom/anti_entropy), envelope formats, and default ports confirmed in src — this is what last_verified=2026-06-14 attests to. NOT covered by the fresh date: 'K3s running 2+ months' is a runtime/deployment claim, not source-verifiable, NOT re-confirmed by ops this pass (tagged NEEDS OPS RE-CONFIRMATION inline in evidence). NAT-traversal hardening gap retained."
 crates = ["icn-net", "icn-gossip"]
 gaps = [
   "NAT traversal needs hardening for production internet use",

@@ -91,12 +91,12 @@ notes = "Computation algorithm and trust classes are stable."
 title = "Network & Transport"
 last_updated = "2026-06-14"
 last_verified_by = "freshness-2047"
-review_note = "Verified accurate: default ports 7777/5601/9100/8080 vs icn-core/src/config/mod.rs and gateway.rs."
+review_note = "Verified accurate (code-level only): default ports 7777/5601/9100/8080 vs icn-core/src/config/mod.rs and gateway.rs. The 'K3s deployment' runtime claim is NOT source-verifiable and was NOT re-confirmed this pass — see status.toml subsystems.network (NEEDS OPS RE-CONFIRMATION); do not read this section's freshness as attesting the runtime deployment."
 staleness_threshold_days = 60
 truth_class = "operational"
 depends_on = ["icn/crates/icn-net/src/**"]
 evidence_type = "demo"
-notes = "QUIC stack proven in K3s deployment."
+notes = "QUIC stack present in src and ports verified; the 'proven in K3s deployment' runtime claim NEEDS OPS RE-CONFIRMATION (not verified this pass)."
 
 [sections."09-gossip-synchronization"]
 title = "Gossip & Synchronization"
