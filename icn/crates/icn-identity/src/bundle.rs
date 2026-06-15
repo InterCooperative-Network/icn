@@ -827,7 +827,8 @@ impl IdentityBundle {
 
     /// Generate a new X25519 keypair for encryption
     fn generate_x25519_keypair() -> (Zeroizing<Vec<u8>>, [u8; 32]) {
-        use rand::rngs::OsRng;
+        // rand_core 0.6 OsRng: x25519-dalek 2.x pins rand_core 0.6
+        use rand_core::OsRng;
 
         let secret = StaticSecret::random_from_rng(OsRng);
         let public = PublicKey::from(&secret);

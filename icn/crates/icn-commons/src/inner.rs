@@ -89,7 +89,7 @@ impl CommonsInner {
         // Generate genesis random
         let mut genesis = [0u8; 32];
         use rand::RngCore;
-        rand::thread_rng().fill_bytes(&mut genesis);
+        rand::rng().fill_bytes(&mut genesis);
 
         // Create the underlying SDIS Anchor
         let pathway = if let Some(did) = steward_did {

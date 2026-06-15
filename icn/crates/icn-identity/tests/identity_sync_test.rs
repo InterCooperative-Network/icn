@@ -227,7 +227,7 @@ fn test_cache_rejects_older_versions() {
     let did = keypair.did().clone();
     let source_did = KeyPair::generate().unwrap().did().clone();
 
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
     use x25519_dalek::{PublicKey, StaticSecret};
 
     let x25519_secret = StaticSecret::random_from_rng(OsRng);

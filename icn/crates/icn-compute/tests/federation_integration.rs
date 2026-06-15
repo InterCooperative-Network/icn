@@ -258,7 +258,7 @@ fn test_local_preference_weight() {
 #[test]
 fn test_federated_executor_attestation_signing() {
     use ed25519_dalek::SigningKey;
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
 
     let now_secs = icn_time::current_timestamp_millis() / 1000;
 

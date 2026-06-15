@@ -291,7 +291,8 @@ impl NeighborSets {
     ///
     /// Returns random selection without replacement up to `count` peers.
     pub fn sample(&self, scope: Scope, count: usize) -> Vec<PeerId> {
-        use rand::seq::SliceRandom;
+        // rand 0.9: `choose_multiple` moved from SliceRandom to IndexedRandom
+        use rand::seq::IndexedRandom;
 
         let peers: Vec<PeerId> = match scope {
             Scope::LocalCluster => self.local_cluster.iter().cloned().collect(),
@@ -311,7 +312,7 @@ impl NeighborSets {
             }
         };
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         peers
             .choose_multiple(&mut rng, count.min(peers.len()))
             .cloned()

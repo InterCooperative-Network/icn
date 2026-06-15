@@ -62,7 +62,7 @@ chrono = "0.4"
 
 # Cryptography
 hex = "0.4"
-rand = "0.8"
+rand = "0.9"
 ed25519-dalek = "2"
 base64 = "0.22"
 sha2 = "0.10"
@@ -116,6 +116,8 @@ lettre = { version = "0.11", default-features = false, features = ["tokio1-rustl
 futures = "0.3"
 reqwest = { workspace = true }
 tempfile = "3"
+# rand_core 0.6 OsRng for ed25519-dalek 2.x interop in tests (dalek pins rand_core 0.6)
+rand_core = { version = "0.6", features = ["getrandom"] }
 criterion = { version = "0.5", features = ["async_tokio"] }
 prometheus = "0.14"
 actix-http = "3"

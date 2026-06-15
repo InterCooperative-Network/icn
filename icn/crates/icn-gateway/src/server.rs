@@ -2087,6 +2087,7 @@ impl GatewayServer {
                         .service(
                             web::scope("/federation")
                                 .service(api::federation::get_status)
+                                .service(api::federation::get_topology)
                                 .service(api::federation::init_federation)
                                 .service(api::federation::list_coops)
                                 .service(api::federation::get_coop)

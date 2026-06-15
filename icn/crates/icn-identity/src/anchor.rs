@@ -136,7 +136,7 @@ impl Anchor {
     /// for initial network bootstrap or testing scenarios.
     pub fn genesis(reason: &str) -> Self {
         let mut id = [0u8; 32];
-        rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut id);
+        rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut id);
 
         Self {
             id,

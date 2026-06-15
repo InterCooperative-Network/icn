@@ -46,7 +46,8 @@
 //! - Shamir, Adi. "How to share a secret." Communications of the ACM 22.11 (1979): 612-613.
 //! - SLIP-0039: Shamir's Secret-Sharing for Mnemonic Codes
 
-use rand::RngCore;
+// rand_core 0.6 RngCore/OsRng: infallible OS entropy (rand 0.9's OsRng is fallible-only)
+use rand_core::RngCore;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
 use crate::{CryptoError, Result};
@@ -303,7 +304,7 @@ impl ShamirSecretSharing {
         let mut shares: Vec<ShamirShare> = (1..=total)
             .map(|idx| ShamirShare::new(idx, [0u8; 32]))
             .collect();
-        let mut rng = rand::rngs::OsRng;
+        let mut rng = rand_core::OsRng;
 
         // For each byte of the secret, generate ONE polynomial and evaluate at each share index
         for (byte_idx, &secret_byte) in secret.iter().enumerate() {

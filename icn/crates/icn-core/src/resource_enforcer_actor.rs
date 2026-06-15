@@ -251,7 +251,7 @@ impl ResourceAccessEnforcerActor {
             let jitter_secs = {
                 let max_jitter = config.check_interval_seconds / 10;
                 if max_jitter > 0 {
-                    rand::thread_rng().gen_range(0..max_jitter)
+                    rand::rng().random_range(0..max_jitter)
                 } else {
                     0
                 }
