@@ -1719,7 +1719,8 @@ mod tests {
     fn test_pq_binding_proof_non_hybrid_keypair_returns_none() {
         // Create a legacy (classical-only) keypair using from_bytes
         use ed25519_dalek::SigningKey;
-        use rand::rngs::OsRng;
+        // rand_core 0.6 OsRng: ed25519-dalek 2.x pins rand_core 0.6
+        use rand_core::OsRng;
 
         let signing_key = SigningKey::generate(&mut OsRng);
         let secret_bytes: [u8; 32] = signing_key.to_bytes();

@@ -51,7 +51,7 @@
 //! # use icn_gateway::auth::AuthManager;
 //! # use std::sync::Arc;
 //! # use ed25519_dalek::SigningKey;
-//! # use rand::rngs::OsRng;
+//! # use rand_core::OsRng;
 //! let auth = AuthManager::new(b"secret".to_vec());
 //!
 //! // Hardware-backed key (private key in HSM/TPM)
@@ -273,8 +273,8 @@ impl AuthManager {
     /// Generate cryptographically random nonce (32 bytes, hex-encoded)
     fn generate_nonce(&self) -> ChallengeNonce {
         use rand::Rng;
-        let mut rng = rand::thread_rng();
-        let nonce_bytes: [u8; 32] = rng.gen();
+        let mut rng = rand::rng();
+        let nonce_bytes: [u8; 32] = rng.random();
         hex::encode(nonce_bytes)
     }
 
@@ -422,7 +422,8 @@ mod tests {
     fn test_verify_challenge_success_with_hardware_backed_bundle() {
         use ed25519_dalek::SigningKey;
         use icn_identity::{DidKey, IdentityBundle, SoftwareSigner};
-        use rand::rngs::OsRng;
+        // rand_core 0.6 OsRng: ed25519-dalek 2.x pins rand_core 0.6
+        use rand_core::OsRng;
         use std::sync::Arc;
 
         let auth = AuthManager::new(b"test_secret".to_vec());

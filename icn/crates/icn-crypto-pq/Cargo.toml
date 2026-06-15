@@ -30,7 +30,9 @@ hkdf = "0.12"
 hmac = "0.12"
 
 # Randomness
-rand = "0.8"
+rand = "0.9"
+# rand_core 0.6 OsRng for ed25519-dalek / x25519-dalek 2.x interop (they pin rand_core 0.6)
+rand_core = { version = "0.6", features = ["getrandom"] }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }

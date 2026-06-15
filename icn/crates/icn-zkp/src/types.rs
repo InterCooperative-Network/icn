@@ -124,7 +124,7 @@ impl ProofContext {
     pub fn new(verifier_did: Option<Did>) -> Self {
         use rand::RngCore;
         let mut nonce = [0u8; 16];
-        rand::thread_rng().fill_bytes(&mut nonce);
+        rand::rng().fill_bytes(&mut nonce);
 
         Self {
             verifier_did,

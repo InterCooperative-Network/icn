@@ -146,7 +146,7 @@ fn test_find_matches_across_many_topics() {
 fn make_test_node() -> (icn_identity::Did, StaticSecret, PublicKey) {
     let keypair = KeyPair::generate().unwrap();
     let did = keypair.did().clone();
-    let secret = StaticSecret::random_from_rng(rand::thread_rng());
+    let secret = StaticSecret::random_from_rng(rand_core::OsRng);
     let public = PublicKey::from(&secret);
     (did, secret, public)
 }

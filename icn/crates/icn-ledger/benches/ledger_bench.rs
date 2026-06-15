@@ -82,7 +82,7 @@ fn bench_entry_serialization(c: &mut Criterion) {
 
 fn bench_signature_verification(c: &mut Criterion) {
     use ed25519_dalek::{Signature, Signer, SigningKey, Verifier, VerifyingKey};
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
 
     let mut group = c.benchmark_group("ledger_crypto");
 

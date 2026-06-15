@@ -32,7 +32,7 @@ impl CitizenshipProofPublic {
     /// Create new public inputs
     pub fn new(country_code: [u8; 2], minimum_status: StatusType, issuer_pk: [u8; 32]) -> Self {
         let mut nonce = [0u8; 16];
-        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce);
+        rand::RngCore::fill_bytes(&mut rand::rng(), &mut nonce);
         Self {
             country_code,
             minimum_status,

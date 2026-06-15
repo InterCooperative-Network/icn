@@ -83,7 +83,7 @@ impl TopicEncryptor {
     pub fn encrypt(&self, topic: &str) -> Result<EncryptedTopic> {
         // Generate random nonce (96 bits for ChaCha20-Poly1305)
         let mut nonce_bytes = [0u8; 12];
-        rand::thread_rng().fill_bytes(&mut nonce_bytes);
+        rand::rng().fill_bytes(&mut nonce_bytes);
         let nonce = Nonce::from(nonce_bytes);
 
         // Encrypt topic name

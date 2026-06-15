@@ -25,7 +25,7 @@ struct TestDevice {
 
 impl TestDevice {
     fn new(id: impl Into<String>, label: impl Into<String>) -> Self {
-        use rand::rngs::OsRng;
+        use rand_core::OsRng;
 
         let keypair = KeyPair::generate().unwrap();
         let x25519_secret = x25519_dalek::StaticSecret::random_from_rng(OsRng);

@@ -274,7 +274,7 @@ async fn relay_loop(
 pub fn build_send_indication(peer_addr: SocketAddr, data: &[u8]) -> Result<Vec<u8>> {
     // Generate random transaction ID
     let mut transaction_id = [0u8; 12];
-    rand::thread_rng().fill_bytes(&mut transaction_id);
+    rand::rng().fill_bytes(&mut transaction_id);
 
     // Estimate capacity: 20 header + xor-peer-address attr (8 v4 / 20 v6) + data attr
     let xor_attr_val_len = if peer_addr.is_ipv6() { 20 } else { 8 };
@@ -406,7 +406,7 @@ mod tests {
         const DATA_INDICATION: u16 = 0x0017;
 
         let mut transaction_id = [0u8; 12];
-        rand::thread_rng().fill_bytes(&mut transaction_id);
+        rand::rng().fill_bytes(&mut transaction_id);
 
         let mut msg = Vec::with_capacity(20 + 12 + 4 + payload.len() + 4);
 

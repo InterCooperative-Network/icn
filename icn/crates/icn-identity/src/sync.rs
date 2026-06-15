@@ -415,7 +415,8 @@ mod tests {
         let did = keypair.did().clone();
 
         // Generate X25519 keys for DID Document
-        use rand::rngs::OsRng;
+        // rand_core 0.6 OsRng: x25519-dalek 2.x pins rand_core 0.6
+        use rand_core::OsRng;
         use x25519_dalek::{PublicKey, StaticSecret};
         let x25519_secret = StaticSecret::random_from_rng(OsRng);
         let x25519_public = PublicKey::from(&x25519_secret);
@@ -447,7 +448,8 @@ mod tests {
         let did = keypair.did().clone();
         let source_did = KeyPair::generate().unwrap().did().clone();
 
-        use rand::rngs::OsRng;
+        // rand_core 0.6 OsRng: x25519-dalek 2.x pins rand_core 0.6
+        use rand_core::OsRng;
         use x25519_dalek::{PublicKey, StaticSecret};
         let x25519_secret = StaticSecret::random_from_rng(OsRng);
         let x25519_public = PublicKey::from(&x25519_secret);
@@ -496,7 +498,8 @@ mod tests {
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
 
-        use rand::rngs::OsRng;
+        // rand_core 0.6 OsRng: x25519-dalek 2.x pins rand_core 0.6
+        use rand_core::OsRng;
         use x25519_dalek::{PublicKey, StaticSecret};
         let x25519_secret = StaticSecret::random_from_rng(OsRng);
         let x25519_public = PublicKey::from(&x25519_secret);

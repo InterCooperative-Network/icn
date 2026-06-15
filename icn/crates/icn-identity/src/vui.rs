@@ -140,8 +140,8 @@ impl VuiRequest {
     pub fn new(id_data_hash: IdDataHash) -> Self {
         let mut ephemeral_public = [0u8; 32];
         let mut nonce = [0u8; 16];
-        rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut ephemeral_public);
-        rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut nonce);
+        rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut ephemeral_public);
+        rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut nonce);
 
         Self {
             id_data_hash,

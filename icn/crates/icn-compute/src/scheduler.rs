@@ -1417,7 +1417,7 @@ impl PlacementPolicy for DefaultPlacementPolicy {
 
         // Factor 9: Random jitter (weight 0.10)
         use rand::Rng;
-        let jitter = rand::thread_rng().gen::<f64>() * 0.10;
+        let jitter = rand::rng().random::<f64>() * 0.10;
         score += jitter;
 
         // Cap final score at 1.0

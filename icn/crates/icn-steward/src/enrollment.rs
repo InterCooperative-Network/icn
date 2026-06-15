@@ -95,7 +95,7 @@ impl EnrollmentRequest {
     /// Create a new enrollment request
     pub fn new(id_data_hash: &[u8; 32], pathway_hash: [u8; 8]) -> Self {
         let mut commitment_salt = [0u8; 16];
-        rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut commitment_salt);
+        rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut commitment_salt);
 
         let vui_commitment = Self::compute_commitment(id_data_hash, &commitment_salt);
 

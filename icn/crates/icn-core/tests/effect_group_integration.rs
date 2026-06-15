@@ -49,7 +49,7 @@ async fn test_treasury_create_budget_provenance_chain() -> Result<()> {
     use icn_kernel_api::governance::{DecisionReceiptId, TreasuryExecutor};
     use icn_ledger::Ledger;
     use icn_store::SledStore;
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
     use tokio::sync::RwLock;
 
     let _ = tracing_subscriber::fmt()
@@ -146,7 +146,7 @@ async fn test_membership_add_member_provenance_chain() -> Result<()> {
     use icn_kernel_api::governance::DecisionReceiptId;
     use icn_kernel_api::MembershipService;
     use icn_store::SledStore;
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
 
     let _ = tracing_subscriber::fmt()
         .with_env_filter("info")
@@ -244,7 +244,7 @@ async fn test_membership_freeze_member_provenance_chain() -> Result<()> {
     use icn_kernel_api::governance::DecisionReceiptId;
     use icn_kernel_api::{AddMemberRequest, MembershipService};
     use icn_store::SledStore;
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
 
     let _ = tracing_subscriber::fmt()
         .with_env_filter("info")
@@ -336,7 +336,7 @@ async fn test_membership_unfreeze_member_provenance_chain() -> Result<()> {
     use icn_kernel_api::governance::DecisionReceiptId;
     use icn_kernel_api::{AddMemberRequest, FreezeMemberRequest, MembershipService};
     use icn_store::SledStore;
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
 
     let _ = tracing_subscriber::fmt()
         .with_env_filter("info")
@@ -536,7 +536,7 @@ async fn test_federation_join_provenance_chain() -> Result<()> {
     };
     use icn_kernel_api::FederationService;
     use icn_store::SledStore;
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
 
     let _ = tracing_subscriber::fmt()
         .with_env_filter("info")
@@ -631,7 +631,7 @@ async fn test_federation_vouch_executor_path() -> Result<()> {
         DecisionReceiptId, FederationExecutor, FederationOperation, FederationOperationType,
     };
     use icn_store::SledStore;
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
 
     let _ = tracing_subscriber::fmt()
         .with_env_filter("info")

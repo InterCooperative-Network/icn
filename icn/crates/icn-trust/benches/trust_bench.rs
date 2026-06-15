@@ -41,13 +41,13 @@ fn create_test_graph(size: usize) -> (TrustGraph, Vec<Did>, TempDir) {
     // Create DIDs using valid Ed25519 keys from deterministic seeds
     let dids: Vec<Did> = (0..size).map(|i| did_from_seed(i as u32)).collect();
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Add edges from own_did to ~10% of nodes (direct trust)
     let direct_count = std::cmp::max(1, size / 10);
     for _i in 0..direct_count {
-        let target_idx = rng.gen_range(1..size);
-        let score = TrustScore::unchecked(0.3 + rng.gen::<f64>() * 0.7); // 0.3 to 1.0
+        let target_idx = rng.random_range(1..size);
+        let score = TrustScore::unchecked(0.3 + rng.random::<f64>() * 0.7); // 0.3 to 1.0
         let edge = TrustEdge::new(dids[0].clone(), dids[target_idx].clone(), score);
         graph.add_edge(edge).unwrap();
     }
@@ -55,10 +55,10 @@ fn create_test_graph(size: usize) -> (TrustGraph, Vec<Did>, TempDir) {
     // Add random edges between other nodes (transitive paths)
     let edge_count = size * 5; // ~5 edges per node
     for _ in 0..edge_count {
-        let source_idx = rng.gen_range(1..size);
-        let target_idx = rng.gen_range(1..size);
+        let source_idx = rng.random_range(1..size);
+        let target_idx = rng.random_range(1..size);
         if source_idx != target_idx {
-            let score = TrustScore::unchecked(0.3 + rng.gen::<f64>() * 0.7);
+            let score = TrustScore::unchecked(0.3 + rng.random::<f64>() * 0.7);
             let edge = TrustEdge::new(dids[source_idx].clone(), dids[target_idx].clone(), score);
             let _ = graph.add_edge(edge); // Ignore errors for duplicates
         }
@@ -82,11 +82,11 @@ fn bench_trust_computation(c: &mut Criterion) {
             network_size,
             |b, &network_size| {
                 let (graph, dids, _temp_dir) = create_test_graph(network_size);
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
 
                 b.iter(|| {
                     // Query a random DID
-                    let target_idx = rng.gen_range(1..network_size);
+                    let target_idx = rng.random_range(1..network_size);
                     graph.compute_trust_score(black_box(&dids[target_idx]))
                 });
             },
@@ -138,10 +138,10 @@ fn bench_threshold_queries(c: &mut Criterion) {
             network_size,
             |b, &network_size| {
                 let (graph, dids, _temp_dir) = create_test_graph(network_size);
-                let mut rng = rand::thread_rng();
+                let mut rng = rand::rng();
 
                 b.iter(|| {
-                    let target_idx = rng.gen_range(1..network_size);
+                    let target_idx = rng.random_range(1..network_size);
                     graph.compute_trust_score_with_threshold(
                         black_box(&dids[target_idx]),
                         Some(0.3), // Stop when we find trust >= 0.3

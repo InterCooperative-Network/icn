@@ -754,14 +754,14 @@ pub async fn complete_enrollment(
 /// Generate secure recovery codes
 fn generate_recovery_codes(count: usize) -> Vec<String> {
     use rand::Rng;
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let chars: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // Exclude confusing chars (0, 1, I, O)
 
     (0..count)
         .map(|_| {
             (0..8)
                 .map(|_| {
-                    let idx = rng.gen_range(0..chars.len());
+                    let idx = rng.random_range(0..chars.len());
                     chars[idx] as char
                 })
                 .collect::<String>()
@@ -775,8 +775,8 @@ fn generate_recovery_codes(count: usize) -> Vec<String> {
 
 fn generate_verification_code() -> String {
     use rand::Rng;
-    let mut rng = rand::thread_rng();
-    format!("VERIFY-{:04}", rng.gen_range(1000..=9999))
+    let mut rng = rand::rng();
+    format!("VERIFY-{:04}", rng.random_range(1000..=9999))
 }
 
 fn format_timestamp(ts: u64) -> String {

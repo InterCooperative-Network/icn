@@ -5032,7 +5032,8 @@ fn handle_device_command(cmd: DeviceCommands, data_dir: &Path) -> Result<()> {
             let keypair = KeyPair::generate()?;
 
             // Generate X25519 encryption key
-            use rand::rngs::OsRng;
+            // rand_core 0.6 OsRng: x25519-dalek 2.x pins rand_core 0.6
+            use rand_core::OsRng;
             use x25519_dalek::{PublicKey, StaticSecret};
 
             let x25519_secret = StaticSecret::random_from_rng(OsRng);
