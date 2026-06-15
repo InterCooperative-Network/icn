@@ -23,7 +23,7 @@ use std::sync::{Arc, RwLock};
 
 use crate::api::receipts::GovernanceReceiptResponse;
 use crate::error::{GatewayError, Result};
-use crate::middleware::{get_claims, require_any_scope, require_scope};
+use crate::middleware::{get_claims, require_any_scope, require_coop_access, require_scope};
 use crate::receipt_store::ReceiptStore;
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus};
 use icn_kernel_api::receipts::CanonicalReceipt;
@@ -593,7 +593,18 @@ pub async fn index_decision_endpoint(
     registry: web::Data<Arc<DecisionRegistry>>,
     req: web::Json<IndexDecisionRequest>,
 ) -> Result<HttpResponse> {
-    require_scope(&http_req, "governance:write")?;
+    // #1868: narrow the residual decision-index route to the proposal class scope,
+    // with the broad `governance:write` retained as an accepted-also fallback. A
+    // decision record is the outcome of the proposal lifecycle
+    // (`create_proposal`/`cast_vote`/`close_proposal`), so it belongs to the
+    // `governance:proposal:write` class per the §6 mapping in
+    // docs/design/governance/governance-write-decomposition.md (§3.1 names this
+    // exact route → `governance:proposal:write`). This completes the gateway
+    // (non-app) governance:write decomposition.
+    require_any_scope(
+        &http_req,
+        &["governance:proposal:write", "governance:write"],
+    )?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -611,6 +622,13 @@ pub async fn index_decision_endpoint(
             "coop_id must be a valid DID".to_string(),
         ));
     }
+
+    // #1868: bind the mutation to the token's cooperative. The class scopes
+    // (`governance:proposal:write`) are requestable per coop, so the scope gate
+    // alone does not establish that the caller may write under the body-supplied
+    // `coop_id`. Without this, a proposal-scoped token for coop A could index a
+    // decision record under coop B. CRITICAL: Prevent cross-coop attacks.
+    require_coop_access(&http_req, &req.coop_id)?;
 
     // Generate IDs
     let now = icn_time::current_timestamp_secs();
@@ -1049,6 +1067,107 @@ mod tests {
         );
         assert_eq!(
             create_status("governance:charter:write").await,
+            StatusCode::FORBIDDEN
+        );
+    }
+
+    /// #1868: the residual decision-index route now gates on
+    /// `["governance:proposal:write", "governance:write"]` (a decision is the
+    /// outcome of the proposal lifecycle). Acceptance is asserted as "not
+    /// 401/403"; the broad fallback is still accepted; other scopes are 403 at
+    /// the gate. This is the last non-app gateway surface on bare
+    /// `governance:write`.
+    #[actix_web::test]
+    async fn index_decision_scope_gate_accepts_proposal_and_broad_rejects_others() {
+        async fn index_status(scope: &str) -> actix_web::http::StatusCode {
+            let registry = Arc::new(DecisionRegistry::new());
+            let app = actix_test::init_service(
+                App::new()
+                    .app_data(web::Data::new(registry))
+                    .service(web::scope("/registry").configure(configure)),
+            )
+            .await;
+            let claims = TokenClaims {
+                sub: "did:icn:test-user".to_string(),
+                iat: 1_000_000_000,
+                exp: 9_999_999_999,
+                coop_id: "did:icn:test123".to_string(),
+                scopes: vec![scope.to_string()],
+            };
+            let req = actix_test::TestRequest::post()
+                .uri("/registry/decisions")
+                .set_json(serde_json::json!({
+                    "coopId": "did:icn:test123",
+                    "title": "Scope test decision"
+                }))
+                .to_request();
+            req.extensions_mut().insert(claims);
+            actix_test::call_service(&app, req).await.status()
+        }
+
+        use actix_web::http::StatusCode;
+        // The class scope is accepted on the route.
+        let narrow = index_status("governance:proposal:write").await;
+        assert_ne!(narrow, StatusCode::UNAUTHORIZED);
+        assert_ne!(narrow, StatusCode::FORBIDDEN);
+
+        // The broad fallback still works.
+        let broad = index_status("governance:write").await;
+        assert_ne!(broad, StatusCode::UNAUTHORIZED);
+        assert_ne!(broad, StatusCode::FORBIDDEN);
+
+        // Unrelated scopes are rejected at the gate.
+        assert_eq!(index_status("governance:read").await, StatusCode::FORBIDDEN);
+        assert_eq!(
+            index_status("governance:meeting:write").await,
+            StatusCode::FORBIDDEN
+        );
+    }
+
+    /// #1868: a validly-scoped token must not index a decision under a coop other
+    /// than its own. The class scopes are requestable per coop, so the route binds
+    /// the body-supplied `coop_id` to the token's coop via `require_coop_access`.
+    /// A same-coop write succeeds (201); a cross-coop write is rejected (403)
+    /// without mutating the registry.
+    #[actix_web::test]
+    async fn index_decision_rejects_cross_coop_write() {
+        async fn index_status(token_coop: &str, body_coop: &str) -> actix_web::http::StatusCode {
+            let registry = Arc::new(DecisionRegistry::new());
+            let app = actix_test::init_service(
+                App::new()
+                    .app_data(web::Data::new(registry))
+                    .service(web::scope("/registry").configure(configure)),
+            )
+            .await;
+            let claims = TokenClaims {
+                sub: "did:icn:test-user".to_string(),
+                iat: 1_000_000_000,
+                exp: 9_999_999_999,
+                coop_id: token_coop.to_string(),
+                // Validly scoped: passes the scope gate so the coop binding is the
+                // only thing under test.
+                scopes: vec!["governance:proposal:write".to_string()],
+            };
+            let req = actix_test::TestRequest::post()
+                .uri("/registry/decisions")
+                .set_json(serde_json::json!({
+                    "coopId": body_coop,
+                    "title": "Cross-coop test decision"
+                }))
+                .to_request();
+            req.extensions_mut().insert(claims);
+            actix_test::call_service(&app, req).await.status()
+        }
+
+        use actix_web::http::StatusCode;
+        // Same coop: the write is bound to the token's coop and succeeds.
+        assert_eq!(
+            index_status("did:icn:coopA", "did:icn:coopA").await,
+            StatusCode::CREATED
+        );
+        // Cross coop: a coopA token cannot write a decision under coopB.
+        assert_eq!(
+            index_status("did:icn:coopA", "did:icn:coopB").await,
             StatusCode::FORBIDDEN
         );
     }

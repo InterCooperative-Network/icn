@@ -260,7 +260,7 @@ init_identity_block() {
     log "Generating per-instance JWT secret + keystore passphrase (NOT embedded in image)."
     if [ "$DRY_RUN" -eq 1 ]; then
         printf '[firstboot] (dry-run) would generate JWT + keystore passphrase, write %s mode 600.\n' "$ICND_ENV_FILE"
-        printf '[firstboot] (dry-run) would run: ICN_KEYSTORE_PASSPHRASE=... sudo -u %s icnd --init --data-dir %s --init-gateway-port %s --init-gossip-port %s\n' \
+        printf '[firstboot] (dry-run) would run: ICN_KEYSTORE_PASSPHRASE=<REDACTED> runuser -u %s --preserve-environment -- icnd --init --data-dir %s --init-gateway-port %s --init-gossip-port %s\n' \
             "$ICN_USER" "$ICN_DATA_DIR" "$ICN_FIRSTBOOT_INIT_GATEWAY_PORT" "$ICN_FIRSTBOOT_INIT_GOSSIP_PORT"
         return 0
     fi
@@ -297,9 +297,15 @@ init_identity_block() {
     # drift from the runtime bind and from appliance.env's documented ports.
     # The runtime --gateway-bind flag in deploy/icnd.service still wins for
     # the bind address; this just keeps the on-disk config honest.
+    # Drop to the icn user with `runuser`, NOT `sudo -u`. sudo logs the full
+    # command (including ICN_KEYSTORE_PASSPHRASE=<value>) to the auth journal;
+    # runuser does not. firstboot already runs as root, so no outer sudo is
+    # needed (an outer sudo would re-strip the env before runuser). The
+    # passphrase is passed via the environment with --preserve-environment.
+    # Same hardening as icn-demo-{seed,verify}.
     log "Initializing icnd identity (icnd --init) as $ICN_USER..."
     if ICN_KEYSTORE_PASSPHRASE="$pass" \
-        sudo -u "$ICN_USER" -E env "ICN_KEYSTORE_PASSPHRASE=$pass" \
+        runuser -u "$ICN_USER" --preserve-environment -- \
         icnd --init \
             --data-dir "$ICN_DATA_DIR" \
             --init-gateway-port "$ICN_FIRSTBOOT_INIT_GATEWAY_PORT" \
@@ -307,7 +313,7 @@ init_identity_block() {
         log "icnd --init succeeded."
     else
         warn "icnd --init failed. icnd.service may not start until identity is initialized."
-        warn "Inspect: sudo -u $ICN_USER icnd --init --data-dir $ICN_DATA_DIR"
+        warn "Inspect: runuser -u $ICN_USER -- icnd --init --data-dir $ICN_DATA_DIR"
         return 1
     fi
 }

@@ -184,7 +184,7 @@ HTTP gateways are accessed via `kubectl port-forward` (scripts call `demo_ports_
 ### Before Demo Day (run once per day)
 
 ```bash
-cd /home/ubuntu/projects/icn
+cd "$(git rev-parse --show-toplevel)"
 
 # Reseed all federation state — seeds identity, trust, proposals, compute trust
 bash demo/scripts/reseed-federation-demo.sh

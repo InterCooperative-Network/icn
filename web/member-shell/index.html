@@ -3,11 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<!-- Title is the static default; shell.js sets it from the i18n catalog
+     (doc.title) once the active locale is resolved. -->
 <title>ICN Member Shell — v0 reference client</title>
 <link rel="stylesheet" href="shell.css">
 </head>
 <body>
-<a class="skip-link" href="#main">Skip to main content</a>
+<a class="skip-link" href="#main" data-i18n="skip.toMain">Skip to main content</a>
 
 <header>
   <!-- Honesty banner: permanently visible, names the active maturity tier.
@@ -16,27 +18,52 @@
     Loading&hellip;
   </div>
 
-  <h1>ICN Member Shell <span class="subtitle">v0 reference client</span></h1>
-  <p class="lede">
+  <h1><span data-i18n="header.title">ICN Member Shell</span> <span class="subtitle" data-i18n="header.subtitle">v0 reference client</span></h1>
+  <p class="lede" data-i18n="header.lede">
     Your view of your own participation: who you are here, what you are
     authorized to do, what needs your attention, and the receipts that prove
     what happened.
   </p>
 
-  <nav aria-label="Mode">
+  <nav data-i18n-attr="aria-label:nav.mode.label" aria-label="Mode">
     <ul class="mode-nav">
-      <li><a id="nav-demo" href="?mode=demo">Demo mode (fixture data)</a></li>
-      <li><a id="nav-live" href="?mode=live">Live mode (local node)</a></li>
+      <li><a id="nav-demo" href="?mode=demo" data-i18n="nav.mode.demo">Demo mode (fixture data)</a></li>
+      <li><a id="nav-live" href="?mode=live" data-i18n="nav.mode.live">Live mode (local node)</a></li>
     </ul>
+  </nav>
+
+  <!-- Language selector. Labelled, keyboard-accessible. shell.js populates
+       the options from ICNI18n.availableLocales() and, on change, sets
+       ?lang= and reloads (simplest, robust). -->
+  <nav class="language-nav" data-i18n-attr="aria-label:nav.language.label" aria-label="Language">
+    <label for="language-select" data-i18n="nav.language.label">Language</label>
+    <select id="language-select" data-i18n-attr="aria-label:nav.language.choose" aria-label="Choose language"></select>
   </nav>
 </header>
 
 <main id="main">
 
+  <!-- DEV/DEMO one-click start. Shown only when this page was opened by the
+       local demo launcher (?demo=launcher). Lets the operator start the demo
+       without typing a gateway address or pasting a credential. The launcher
+       forwards a loopback DEV/DEMO session endpoint to localhost:18091. -->
+  <section id="demo-launch-section" hidden aria-labelledby="demo-launch-h">
+    <h2 id="demo-launch-h" data-i18n="demoLaunch.heading">Start the local demo</h2>
+    <p data-i18n="demoLaunch.body">
+      This page was opened by the local DEV/DEMO launcher. Select Start to
+      begin a fresh local demo — your standing and a sample action card load
+      automatically. There is no address to type and no credential to paste.
+      The session is local to this dev node and nothing here is signed.
+    </p>
+    <button type="button" id="demo-launch-button" data-i18n="demoLaunch.start">Start local demo</button>
+    <button type="button" id="demo-advanced-button" class="secondary" data-i18n="demoLaunch.manual">Connect manually instead</button>
+    <p id="demo-launch-status" role="status" aria-live="polite"></p>
+  </section>
+
   <!-- Live-mode connect panel. Hidden in demo mode. -->
   <section id="connect-section" hidden aria-labelledby="connect-h">
-    <h2 id="connect-h">Connect to a local node</h2>
-    <p>
+    <h2 id="connect-h" data-i18n="connect.heading">Connect to a local node</h2>
+    <p data-i18n="connect.body">
       Enter the address of a locally running ICN gateway and paste an access
       credential (the signed authorization string issued by the gateway's
       sign-in flow). Your credential is kept only on this page while it is
@@ -45,26 +72,25 @@
     </p>
     <form id="connect-form">
       <div class="field">
-        <label for="gateway-url">Gateway address</label>
+        <label for="gateway-url" data-i18n="connect.gatewayLabel">Gateway address</label>
         <input type="url" id="gateway-url" name="gateway-url"
                value="http://localhost:8080" required
                spellcheck="false" autocomplete="off">
       </div>
       <div class="field">
-        <label for="credential">Access credential</label>
+        <label for="credential" data-i18n="connect.credentialLabel">Access credential</label>
         <input type="password" id="credential" name="credential" required
                autocomplete="off" placeholder="Paste credential"
+               data-i18n-attr="placeholder:connect.credentialPlaceholder"
                aria-describedby="credential-help">
         <p id="credential-help" class="help">
-          Needs the <code>governance:read</code> scope to read your standing
-          and action cards. Marking a task complete additionally needs
-          <code>governance:meeting:write</code> or <code>governance:write</code>.
+          <span data-i18n="connect.credentialHelp.before">Needs the </span><code>governance:read</code><span data-i18n="connect.credentialHelp.middle"> scope to read your standing
+          and action cards. Marking a task complete additionally needs </span><code>governance:meeting:write</code><span data-i18n="connect.credentialHelp.or"> or </span><code>governance:write</code><span data-i18n="connect.credentialHelp.after">.
           If connecting fails immediately with "Failed to fetch", the node
-          was not started with this page's address in
-          <code>ICN_CORS_ORIGINS</code> — see this directory's README.
+          was not started with this page's address in </span><code>ICN_CORS_ORIGINS</code><span data-i18n="connect.credentialHelp.end"> — see this directory's README.</span>
         </p>
       </div>
-      <button type="submit" id="connect-button">Connect and load my standing</button>
+      <button type="submit" id="connect-button" data-i18n="connect.submit">Connect and load my standing</button>
     </form>
     <p id="connect-status" role="status" aria-live="polite"></p>
   </section>
@@ -72,7 +98,7 @@
   <!-- Sync / records status. Uses ONLY the closed member-facing vocabulary
        from docs/spec/member-shell-v0.md ("Member-facing status vocabulary"). -->
   <section id="sync-section" aria-labelledby="sync-h">
-    <h2 id="sync-h">Records status</h2>
+    <h2 id="sync-h" data-i18n="sync.heading">Records status</h2>
     <p>
       <span id="sync-chip" class="chip" role="status" aria-live="polite"></span>
     </p>
@@ -81,13 +107,13 @@
 
   <!-- Who am I -->
   <section id="identity-section" hidden aria-labelledby="identity-h">
-    <h2 id="identity-h">Who am I here</h2>
+    <h2 id="identity-h" data-i18n="identity.heading">Who am I here</h2>
     <p id="identity-label" class="identity-label"></p>
     <details>
-      <summary>Show technical identifier</summary>
+      <summary data-i18n="identity.showTechnical">Show technical identifier</summary>
       <p>
-        Your network identity (a <dfn>DID</dfn> &mdash; decentralized
-        identifier, the address your participation records are tied to):
+        <span data-i18n="identity.didIntro">Your network identity (a </span><dfn data-i18n="identity.didDfn">DID</dfn><span data-i18n="identity.didIntroAfter"> &mdash; decentralized
+        identifier, the address your participation records are tied to):</span>
       </p>
       <p><code id="identity-did"></code></p>
     </details>
@@ -95,22 +121,22 @@
 
   <!-- Standing -->
   <section id="standing-section" hidden aria-labelledby="standing-h">
-    <h2 id="standing-h">My standing</h2>
-    <p class="explain">
+    <h2 id="standing-h" data-i18n="standing.heading">My standing</h2>
+    <p class="explain" data-i18n="standing.explain">
       Standing is what this institution currently recognizes about you:
       where you are a member, which roles you hold, and what those roles
       authorize you to do.
     </p>
-    <h3>Memberships</h3>
+    <h3 data-i18n="standing.memberships">Memberships</h3>
     <ul id="domains-list" class="card-list"></ul>
-    <h3>Roles and authority</h3>
+    <h3 data-i18n="standing.rolesAndAuthority">Roles and authority</h3>
     <ul id="roles-list" class="card-list"></ul>
   </section>
 
   <!-- Action cards -->
   <section id="cards-section" hidden aria-labelledby="cards-h">
-    <h2 id="cards-h">Things you can act on</h2>
-    <p class="explain">
+    <h2 id="cards-h" data-i18n="cards.heading">Things you can act on</h2>
+    <p class="explain" data-i18n="cards.explain">
       Each card below is something open to you right now, with what it is,
       why you are allowed to act, and what will happen if you do.
     </p>
@@ -119,8 +145,8 @@
 
   <!-- Receipts -->
   <section id="receipts-section" hidden aria-labelledby="receipts-h">
-    <h2 id="receipts-h">Receipts</h2>
-    <p class="explain">
+    <h2 id="receipts-h" data-i18n="receipts.heading">Receipts</h2>
+    <p class="explain" data-i18n="receipts.explain">
       A receipt is the record that proves something happened: who acted,
       what obligation it satisfied, and when. The plain-language summary
       comes first; the formal evidence is available under
@@ -131,8 +157,8 @@
 
   <!-- Help path: the spec requires a visible way to ask for help. -->
   <section id="help-section" aria-labelledby="help-h">
-    <h2 id="help-h">Need help?</h2>
-    <p>
+    <h2 id="help-h" data-i18n="help.heading">Need help?</h2>
+    <p data-i18n="help.body">
       If something here looks wrong &mdash; a missing membership, a card you
       cannot act on, a record you want reviewed &mdash; contact your steward.
       In this reference client the steward contact path is not wired; a real
@@ -144,15 +170,17 @@
 
 <footer>
   <p>
-    This is a <strong>reference client</strong> proving the
-    <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/member-shell-v0.md">member-shell-v0
-    rendering contract</a> is implementable. It is not the production member
+    <span data-i18n="footer.intro">This is a </span><strong data-i18n="footer.referenceClient">reference client</strong><span data-i18n="footer.middle"> proving the
+    </span><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/member-shell-v0.md" data-i18n="footer.linkText">member-shell-v0
+    rendering contract</a><span data-i18n="footer.after"> is implementable. It is not the production member
     shell, makes no platform decision, has no offline support, and claims no
     live-federation or production posture. See the README in this directory
-    for the honest maturity and accessibility checklist.
+    for the honest maturity and accessibility checklist.</span>
   </p>
 </footer>
 
+<!-- i18n seam loads BEFORE shell.js so window.ICNI18n is available at boot. -->
+<script src="i18n.js"></script>
 <script src="shell.js"></script>
 </body>
 </html>
