@@ -15,7 +15,7 @@ use utoipa::ToSchema;
 
 use crate::error::{GatewayError, Result};
 use crate::ledger_mgr::LedgerManager;
-use crate::middleware::{get_claims, require_scope};
+use crate::middleware::{get_claims, require_coop_access, require_scope};
 
 /// Request to create recurring settlement
 #[derive(Debug, Deserialize, ToSchema)]
@@ -48,6 +48,10 @@ pub async fn create_recurring_settlement(
     req: web::Json<CreateRecurringSettlementRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "settlements:write")?;
+    // Bind the body-supplied coop_id to the caller's token coop. `settlements:write`
+    // is requestable per coop, so without this a token for coop A could schedule a
+    // recurring settlement under coop B. CRITICAL: prevent cross-coop write.
+    require_coop_access(&http_req, &req.coop_id)?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -413,4 +417,81 @@ pub fn start_scheduler(
             }
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::auth::TokenClaims;
+    use actix_web::http::StatusCode;
+    use actix_web::{test as actix_test, App, HttpMessage};
+
+    fn write_claims(coop: &str, sub: &str) -> TokenClaims {
+        TokenClaims {
+            sub: sub.to_string(),
+            iat: 1_000_000_000,
+            exp: 9_999_999_999,
+            coop_id: coop.to_string(),
+            scopes: vec!["settlements:write".to_string()],
+        }
+    }
+
+    /// `settlements:write` is requestable per coop, so `create_recurring_settlement`
+    /// binds the body coop_id to the token's coop. Same-coop create succeeds (201)
+    /// and persists exactly one settlement; cross-coop is rejected (403) and stores
+    /// nothing. Store-state assertions prove "no mutation on reject".
+    #[actix_web::test]
+    async fn create_recurring_settlement_rejects_cross_coop_write() {
+        async fn run(
+            token_coop: &str,
+            body_coop: &str,
+            sub: &str,
+        ) -> (StatusCode, RecurringPaymentStore) {
+            let db = sled::Config::new().temporary(true).open().unwrap();
+            let store = RecurringPaymentStore::new(db.clone());
+            let probe = RecurringPaymentStore::new(db);
+            let app = actix_test::init_service(
+                App::new()
+                    .app_data(web::Data::new(store))
+                    .service(create_recurring_settlement),
+            )
+            .await;
+            let req = actix_test::TestRequest::post()
+                .uri("/settlements/recurring")
+                .set_json(serde_json::json!({
+                    "coop_id": body_coop,
+                    "from_account": "acct-from",
+                    "to_account": "acct-to",
+                    "amount": 100,
+                    "unit": "hours",
+                    "frequency": "daily"
+                }))
+                .to_request();
+            req.extensions_mut().insert(write_claims(token_coop, sub));
+            let status = actix_test::call_service(&app, req).await.status();
+            (status, probe)
+        }
+
+        // The success path parses claims.sub into a Did, so use a real DID subject.
+        let sub = icn_identity::KeyPair::generate().unwrap().did().to_string();
+
+        // Assert on persisted state via `list()` (full primary-key scan) rather than
+        // `list_by_owner()`: the latter splits the index key on ':' expecting 3 parts
+        // and so cannot match DID owners (which themselves contain ':'). That's a
+        // pre-existing store-layer limitation, out of scope for this authz fix.
+        let (same, same_store) = run("coopA", "coopA", &sub).await;
+        assert_eq!(same, StatusCode::CREATED);
+        assert_eq!(
+            same_store.list().unwrap().len(),
+            1,
+            "same-coop create should persist exactly one recurring settlement"
+        );
+
+        let (cross, cross_store) = run("coopA", "coopB", &sub).await;
+        assert_eq!(cross, StatusCode::FORBIDDEN);
+        assert!(
+            cross_store.list().unwrap().is_empty(),
+            "cross-coop reject must not create a recurring settlement"
+        );
+    }
 }

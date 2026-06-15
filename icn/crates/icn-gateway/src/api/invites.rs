@@ -9,7 +9,7 @@ use crate::auth::AuthManager;
 use crate::commons_mgr::CommonsManager;
 use crate::error::Result;
 use crate::invite::InviteManager;
-use crate::middleware::{get_claims, require_scope};
+use crate::middleware::{get_claims, require_coop_access, require_scope};
 use crate::models::{
     CreateInviteRequest, InviteInfo, InviteListResponse, InviteResponse, JoinRequest, JoinResponse,
 };
@@ -43,6 +43,10 @@ pub async fn create_invite(
 
     // Validate inputs
     validation::validate_coop_id(&req.coop_id)?;
+    // Bind the body-supplied coop_id to the caller's token coop. `coop:admin` is
+    // requestable per coop, so without this a coop A admin could mint invites
+    // (which grant membership) for coop B. CRITICAL: prevent cross-coop write.
+    require_coop_access(&http_req, &req.coop_id)?;
     validation::validate_role(&req.role)?;
 
     // Default to 7 days if not specified
@@ -108,6 +112,10 @@ pub async fn list_invites(
     })?;
 
     validation::validate_coop_id(coop_id)?;
+    // Invite codes are membership-granting bearer secrets; binding the queried
+    // coop_id to the caller's token coop stops a coop A reader from listing (and
+    // then redeeming) coop B's invites. CRITICAL: prevent cross-coop exposure.
+    require_coop_access(&http_req, coop_id)?;
 
     // List invites
     let invites = invite_mgr.list_invites(coop_id).await.map_err(|e| {
@@ -184,4 +192,98 @@ pub async fn join_via_invite(
         role: invite.role,
         private_key: String::new(), // Client generates their own keypair
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::auth::TokenClaims;
+    use crate::commons_mgr::CommonsManager;
+    use crate::invite::InviteManager;
+    use actix_web::http::StatusCode;
+    use actix_web::{test as actix_test, App, HttpMessage};
+
+    fn admin_claims(coop: &str, sub: &str) -> TokenClaims {
+        TokenClaims {
+            sub: sub.to_string(),
+            iat: 1_000_000_000,
+            exp: 9_999_999_999,
+            coop_id: coop.to_string(),
+            scopes: vec!["coop:admin".to_string(), "coop:read".to_string()],
+        }
+    }
+
+    /// `coop:admin` is requestable per coop, so `create_invite` binds the body
+    /// coop_id to the token's coop. A same-coop admin mints an invite (201) that is
+    /// then listed; a cross-coop admin is rejected (403) and creates nothing under
+    /// the target coop. Invites grant membership, so this is a privilege-escalation
+    /// boundary. (coop_ids avoid ':' to satisfy validate_coop_id.)
+    #[actix_web::test]
+    async fn create_invite_rejects_cross_coop_write() {
+        async fn run(
+            token_coop: &str,
+            body_coop: &str,
+            sub: &str,
+        ) -> (StatusCode, Arc<InviteManager>) {
+            let invite_mgr = Arc::new(InviteManager::new());
+            let commons_mgr = Arc::new(CommonsManager::new());
+            let app = actix_test::init_service(
+                App::new()
+                    .app_data(web::Data::new(invite_mgr.clone()))
+                    .app_data(web::Data::new(commons_mgr))
+                    .service(web::scope("/invites").service(create_invite)),
+            )
+            .await;
+            let req = actix_test::TestRequest::post()
+                .uri("/invites")
+                .set_json(serde_json::json!({ "coop_id": body_coop, "role": "member" }))
+                .to_request();
+            req.extensions_mut().insert(admin_claims(token_coop, sub));
+            let status = actix_test::call_service(&app, req).await.status();
+            (status, invite_mgr)
+        }
+
+        // The success path parses claims.sub into a Did, so use a real DID subject.
+        let sub = icn_identity::KeyPair::generate().unwrap().did().to_string();
+
+        let (same, same_mgr) = run("coopA", "coopA", &sub).await;
+        assert_eq!(same, StatusCode::CREATED);
+        assert_eq!(
+            same_mgr.list_invites("coopA").await.unwrap().len(),
+            1,
+            "same-coop admin should create exactly one invite"
+        );
+
+        let (cross, cross_mgr) = run("coopA", "coopB", &sub).await;
+        assert_eq!(cross, StatusCode::FORBIDDEN);
+        assert!(
+            cross_mgr.list_invites("coopB").await.unwrap().is_empty(),
+            "cross-coop reject must not create an invite under coopB"
+        );
+    }
+
+    /// Invite codes are membership-granting bearer secrets; `list_invites` binds the
+    /// queried coop_id to the token's coop so a coopA reader cannot enumerate (and
+    /// then redeem) coopB's invites. Same-coop read succeeds (200); cross-coop is 403.
+    #[actix_web::test]
+    async fn list_invites_rejects_cross_coop_read() {
+        async fn run(token_coop: &str, query_coop: &str) -> StatusCode {
+            let invite_mgr = Arc::new(InviteManager::new());
+            let app = actix_test::init_service(
+                App::new()
+                    .app_data(web::Data::new(invite_mgr))
+                    .service(web::scope("/invites").service(list_invites)),
+            )
+            .await;
+            let req = actix_test::TestRequest::get()
+                .uri(&format!("/invites?coop_id={query_coop}"))
+                .to_request();
+            req.extensions_mut()
+                .insert(admin_claims(token_coop, "did:icn:reader"));
+            actix_test::call_service(&app, req).await.status()
+        }
+
+        assert_eq!(run("coopA", "coopA").await, StatusCode::OK);
+        assert_eq!(run("coopA", "coopB").await, StatusCode::FORBIDDEN);
+    }
 }

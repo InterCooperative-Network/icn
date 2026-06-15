@@ -13,7 +13,7 @@ use utoipa::ToSchema;
 
 use crate::error::{GatewayError, Result};
 use crate::ledger_mgr::LedgerManager;
-use crate::middleware::{get_claims, require_scope};
+use crate::middleware::{get_claims, require_coop_access, require_scope};
 
 /// Request to create escrow
 #[derive(Debug, Deserialize, ToSchema)]
@@ -43,6 +43,10 @@ pub async fn create_escrow(
     req: web::Json<CreateEscrowRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "settlements:write")?;
+    // Bind the body-supplied coop_id to the caller's token coop. `settlements:write`
+    // is requestable per coop, so without this a token for coop A could create an
+    // escrow under coop B. CRITICAL: prevent cross-coop write.
+    require_coop_access(&http_req, &req.coop_id)?;
 
     let claims = get_claims(&http_req)
         .ok_or_else(|| GatewayError::AuthenticationFailed("No claims found".to_string()))?;
@@ -167,6 +171,11 @@ pub async fn release_escrow(
         .get(&escrow_id)
         .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Escrow not found: {escrow_id}")))?;
+
+    // The escrow belongs to a specific coop; only a caller bound to that coop may
+    // approve/release it (and trigger a settlement on that coop's ledger).
+    // CRITICAL: prevent cross-coop release.
+    require_coop_access(&http_req, &escrow.coop_id)?;
 
     // Check status
     if escrow.status != EscrowStatus::Pending && escrow.status != EscrowStatus::Locked {
@@ -362,4 +371,140 @@ pub fn configure(cfg: &mut web::ServiceConfig) {
         .service(get_escrow)
         .service(release_escrow)
         .service(refund_escrow);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::auth::TokenClaims;
+    use actix_web::http::StatusCode;
+    use actix_web::{test as actix_test, App, HttpMessage};
+
+    fn write_claims(coop: &str, sub: &str) -> TokenClaims {
+        TokenClaims {
+            sub: sub.to_string(),
+            iat: 1_000_000_000,
+            exp: 9_999_999_999,
+            coop_id: coop.to_string(),
+            // Validly scoped, so the coop binding is the only thing under test.
+            scopes: vec!["settlements:write".to_string()],
+        }
+    }
+
+    fn fresh_db() -> sled::Db {
+        sled::Config::new().temporary(true).open().unwrap()
+    }
+
+    /// `settlements:write` is requestable per coop, so `create_escrow` binds the
+    /// body-supplied coop_id to the token's coop. A same-coop create succeeds (201)
+    /// and persists exactly one escrow; a cross-coop create is rejected (403) and
+    /// leaves the store empty. The store-state assertions (not just the HTTP status)
+    /// prove "no mutation on reject". Mirrors `create_meeting_rejects_cross_coop_write`.
+    #[actix_web::test]
+    async fn create_escrow_rejects_cross_coop_write() {
+        async fn run(token_coop: &str, body_coop: &str, sub: &str) -> (StatusCode, EscrowStore) {
+            // Two store handles over one temp db so we can assert on what the app wrote.
+            let db = fresh_db();
+            let store = EscrowStore::new(db.clone());
+            let probe = EscrowStore::new(db);
+            let app = actix_test::init_service(
+                App::new()
+                    .app_data(web::Data::new(store))
+                    .service(create_escrow),
+            )
+            .await;
+            let req = actix_test::TestRequest::post()
+                .uri("/escrow")
+                .set_json(serde_json::json!({
+                    "coop_id": body_coop,
+                    "from_account": "acct-from",
+                    "to_account": "acct-to",
+                    "amount": 100,
+                    "unit": "hours",
+                    "description": "test escrow",
+                    "conditions": []
+                }))
+                .to_request();
+            req.extensions_mut().insert(write_claims(token_coop, sub));
+            let status = actix_test::call_service(&app, req).await.status();
+            (status, probe)
+        }
+
+        // The success path parses claims.sub into a Did, so use a real DID subject.
+        let sub = icn_identity::KeyPair::generate().unwrap().did().to_string();
+
+        let (same, same_store) = run("coopA", "coopA", &sub).await;
+        assert_eq!(same, StatusCode::CREATED);
+        assert_eq!(
+            same_store.list_by_user(&sub).unwrap().len(),
+            1,
+            "same-coop create should persist exactly one escrow"
+        );
+
+        let (cross, cross_store) = run("coopA", "coopB", &sub).await;
+        assert_eq!(cross, StatusCode::FORBIDDEN);
+        assert!(
+            cross_store.list_by_user(&sub).unwrap().is_empty(),
+            "cross-coop reject must not create an escrow"
+        );
+    }
+
+    /// An escrow belongs to a specific coop; `release_escrow` binds the caller to
+    /// that coop. A coopA token cannot approve/release a coopB escrow: the request
+    /// is rejected (403) and the stored escrow is left untouched (still Pending, no
+    /// approvals recorded) — proving the cross-coop call never reached the mutation.
+    #[actix_web::test]
+    async fn release_escrow_rejects_cross_coop_release() {
+        let db = fresh_db();
+        let store = EscrowStore::new(db.clone());
+        let probe = EscrowStore::new(db);
+
+        // Seed a pending escrow owned by coopB.
+        store
+            .insert(Escrow {
+                id: "esc-1".to_string(),
+                coop_id: "coopB".to_string(),
+                creator: "did:icn:creator".to_string(),
+                from_account: "acct-from".to_string(),
+                to_account: "acct-to".to_string(),
+                amount: 100,
+                currency: "hours".to_string(),
+                status: EscrowStatus::Pending,
+                conditions: vec![],
+                approvals: vec![],
+                expires_at: None,
+                description: "seeded".to_string(),
+                created_at: 1,
+                updated_at: 1,
+            })
+            .unwrap();
+
+        let app = actix_test::init_service(
+            App::new()
+                .app_data(web::Data::new(store))
+                .app_data(web::Data::new(Arc::new(LedgerManager::new())))
+                .service(release_escrow),
+        )
+        .await;
+
+        let sub = icn_identity::KeyPair::generate().unwrap().did().to_string();
+        let req = actix_test::TestRequest::post()
+            .uri("/escrow/esc-1/release")
+            .set_json(serde_json::json!({ "proof": null }))
+            .to_request();
+        req.extensions_mut().insert(write_claims("coopA", &sub));
+        let status = actix_test::call_service(&app, req).await.status();
+
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        let after = probe.get("esc-1").unwrap().expect("escrow still present");
+        assert_eq!(
+            after.status,
+            EscrowStatus::Pending,
+            "cross-coop release must not change escrow status"
+        );
+        assert!(
+            after.approvals.is_empty(),
+            "cross-coop release must not record an approval"
+        );
+    }
 }
