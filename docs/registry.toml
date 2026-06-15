@@ -627,7 +627,7 @@ canonical = "yes"
 freshness = "current"
 domain_tags = ["architecture", "kernel"]
 recommended_action = "keep"
-last_reviewed = "2026-03-26"
+last_reviewed = "2026-06-14"
 
 [docs."docs/DESIGN_PRINCIPLES.md"]
 category = "architecture"

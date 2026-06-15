@@ -22,8 +22,9 @@ evidence = [
   "Age-encrypted keystore with auto-migration (v1-v4)",
   "Social key recovery via steward attestations",
 ]
-last_verified = "2026-03-17"
-verified_by = "gap-analysis"
+last_verified = "2026-06-14"
+verified_by = "freshness-2047"
+review_note = "Re-verified #2047: 3-of-5 steward threshold (icn-steward gossip.rs/enrollment.rs) and keystore migration v1->v4 (icn-identity keystore.rs). 'SDIS complete through Phase S6' and enrollment-flow gap retained from gap-analysis (not independently re-traced this pass)."
 crates = ["icn-identity", "icn-crypto-pq", "icn-steward", "icn-zkp"]
 gaps = ["Enrollment flow (icn-enrollment) planned but not built"]
 
@@ -33,16 +34,17 @@ status = "confirmed"
 truth_class = "operational"
 evidence_type = "demo"
 evidence = [
-  "547 tests passing in governance module",
-  "Full proposal lifecycle proven: Draft -> Deliberation -> Open -> Accepted/Rejected/NoQuorum/Cancelled/Vetoed/ForceClosed",
+  "Test count NEEDS RE-DERIVATION: prior '547 tests' is stale (icn-governance #[test]/#[tokio::test] grep now 600+); run cargo test for an exact figure before re-asserting",
+  "Full 9-state proposal lifecycle verified vs enum ProposalState in icn-governance/src/proposal.rs: Draft -> Deliberation -> Open -> Accepted/Rejected/NoQuorum/Cancelled/Vetoed/ForceClosed",
   "Liquid democracy delegation (scope + expiry aware)",
   "Cryptographic decision proofs (Ed25519 hashes + voter attestations)",
   "20+ REST API endpoints",
   "Charter system (TOML format per coop/community)",
-  "14-call governance demo flow verified on K3s",
+  "14-call governance demo flow verified on K3s (NEEDS OPS RE-CONFIRMATION — runtime claim)",
 ]
-last_verified = "2026-03-17"
-verified_by = "gap-analysis"
+last_verified = "2026-06-14"
+verified_by = "freshness-2047"
+review_note = "Re-verified #2047: 9-state lifecycle confirmed against source. Test count flagged stale (not re-asserted with a precise number). Demo/K3s claims left to ops re-confirmation."
 crates = ["icn-governance", "apps/governance"]
 gaps = [
   "3 of 7 voting models deferred (Futarchy, Sociocracy circles, Sortition)",
@@ -65,8 +67,9 @@ evidence = [
   "Budget management + escrow system",
   "Python Mesa simulation validating mutual credit parameters",
 ]
-last_verified = "2026-03-17"
-verified_by = "gap-analysis"
+last_verified = "2026-06-14"
+verified_by = "freshness-2047"
+review_note = "Re-verified #2047: double-entry invariant + Merkle-DAG + receipt chain (AllocationReceipt->SettlementIntent->JournalEntry) confirmed in icn-ledger src. Gaps (#1308 CCL formula, #1303 terminology rename) retained from gap-analysis — issue states not independently re-confirmed closed this pass."
 crates = ["icn-ledger", "apps/ledger"]
 gaps = [
   "Commons credit formula hardcoded in Rust, not in CCL (#1308)",
@@ -86,17 +89,21 @@ evidence = [
   "Demo federation (4 personas: BrightWorks, River City Tool Library, Harbor Homes, Finger Lakes CDN)",
   "Federation joining/leaving proposal types",
 ]
-last_verified = "2026-03-17"
-verified_by = "gap-analysis"
+last_verified = "2026-06-14"
+verified_by = "freshness-2047"
 crates = ["icn-federation"]
+# Re-verified 2026-06-14 (#2047) against icn/crates/icn-federation/src/.
+# UPDATE: bilateral clearing now exists (clearing.rs CrossCoopTransfer Phase F3,
+#   receipt_clearing.rs Epic 4 #941) — genuine cross-coop settlement, but bilateral not multilateral.
+# RESOLVED: federation:write and treasury:write are now in icn-gateway ALLOWED_SCOPES
+#   (icn/crates/icn-gateway/src/validation.rs); the K3s env ALLOWED_SCOPES list is a deploy concern.
 gaps = [
-  "Three-epoch checkpoint system NOT BUILT",
-  "Partition healing NOT BUILT",
-  "Byzantine fault tolerance NOT IMPLEMENTED",
+  "Three-epoch checkpoint system NOT BUILT (no checkpoint/epoch types in crate)",
+  "Partition healing NOT BUILT (eventual via gossip only)",
+  "Byzantine fault tolerance NOT IMPLEMENTED (no bft/byzantine impl in crate)",
   "Cross-federation async proof exchange NOT SPECIFIED",
-  "Netting algorithm NOT BUILT",
-  "Inter-org dispute resolution NOT BUILT",
-  "treasury:write and federation:write scopes missing from K3s ALLOWED_SCOPES",
+  "Multilateral netting algorithm NOT BUILT (clearing is bilateral)",
+  "Inter-org dispute-resolution engine NOT BUILT (agreements carry only an Option<String> method label)",
 ]
 
 [subsystems.ccl]
@@ -111,8 +118,9 @@ evidence = [
   "WASM execution via wasmtime (optional feature flag)",
   "Fuzz testing target",
 ]
-last_verified = "2026-03-17"
-verified_by = "gap-analysis"
+last_verified = "2026-06-14"
+verified_by = "freshness-2047"
+review_note = "Re-verified #2047: interpreter + FuelConfig + deterministic bounded expressions + capability-based security confirmed in icn-ccl src. Note: WASM/wasmtime lives in icn-compute (wasm feature), not icn-ccl — corrected in ARCHITECTURE.md §11."
 crates = ["icn-ccl"]
 gaps = [
   "No pre-built contract library for common cooperative patterns",
@@ -132,8 +140,9 @@ evidence = [
   "NFS-backed persistent volumes on K3s",
   "Tamper-evident, independently verifiable",
 ]
-last_verified = "2026-03-17"
-verified_by = "gap-analysis"
+last_verified = "2026-06-14"
+verified_by = "freshness-2047"
+review_note = "Re-verified #2047: three-tier (Hot/Warm/Cold) storage still NOT implemented in icn-store src (no Hot/Warm/Cold tier types). Gap claims hold."
 crates = ["icn-store", "icn-snapshot"]
 gaps = [
   "Three-tier storage (Hot/Warm/Cold) not implemented",
@@ -153,8 +162,9 @@ evidence = [
   "Gossip-based task distribution",
   "ExecutionReceiptGate merged",
 ]
-last_verified = "2026-03-17"
-verified_by = "gap-analysis"
+last_verified = "2026-06-14"
+verified_by = "freshness-2047"
+review_note = "Re-verified #2047: still foundation-only — no marketplace/bidding/WorkloadManifest in icn-compute src. UPDATE: task cost model now exists (icn-compute/src/cost.rs: fuel x payment_rate -> credit cost), so compute is no longer strictly free."
 crates = ["icn-compute"]
 gaps = [
   "Workload manifest schema NOT BUILT",
@@ -176,12 +186,16 @@ evidence = [
   "Bloom filter deduplication",
   "Trust graph: 3D (Social, Economic, Technical)",
 ]
-last_verified = "2026-03-17"
-verified_by = "gap-analysis"
+last_verified = "2026-06-14"
+verified_by = "freshness-2047"
 crates = ["icn-net", "icn-crypto", "icn-security", "icn-privacy"]
+# Re-verified 2026-06-14 (#2047). Onion routing is now IMPLEMENTED and wired:
+#   icn/crates/icn-privacy/src/onion_routing.rs (OnionRouter, layered encryption, circuits, 540 LOC)
+#   + icn/crates/icn-net/src/handlers/onion.rs (peel/forward) + connection.rs dispatch.
+#   Retired "Phase 20" numbering removed (Phase 0/1/2 model is canonical).
 gaps = [
-  "Onion routing NOT BUILT (Phase 20)",
-  "Traffic obfuscation NOT BUILT (Phase 20)",
+  "Onion routing IMPLEMENTED at crate level (icn-privacy + icn-net) but anonymity threat model NEEDS SME REVIEW (not audited for traffic analysis)",
+  "Traffic obfuscation / cover traffic NOT BUILT",
   "Active attack detection STUB (icn-security minimal)",
 ]
 
@@ -196,10 +210,16 @@ evidence = [
   "Topic-based gossip with anti-entropy + Bloom filter dedup",
   "SignedEnvelope + EncryptedEnvelope formats",
   "DID bootstrap format",
-  "K3s deployment running 2+ months",
+  "K3s deployment running 2+ months (NEEDS OPS RE-CONFIRMATION — runtime claim NOT verified this pass; not covered by last_verified)",
 ]
-last_verified = "2026-03-17"
-verified_by = "gap-analysis"
+last_verified = "2026-06-14"
+verified_by = "freshness-2047"
+# last_verified covers ONLY the code-level facts re-verified at source this pass
+# (gossip primitives, envelope formats, default ports). The K3s runtime claim is
+# explicitly carved out of the fresh timestamp — it is NOT source-verifiable and
+# was NOT re-confirmed by ops in #2047. It is tagged inline as NEEDS OPS RE-CONFIRMATION
+# so it does not ride the fresh date. (See PR #2051 review thread, comment 3410749048.)
+review_note = "Re-verified #2047 (code-level only): gossip primitives (vector_clock/bloom/anti_entropy), envelope formats, and default ports confirmed in src — this is what last_verified=2026-06-14 attests to. NOT covered by the fresh date: 'K3s running 2+ months' is a runtime/deployment claim, not source-verifiable, NOT re-confirmed by ops this pass (tagged NEEDS OPS RE-CONFIRMATION inline in evidence). NAT-traversal hardening gap retained."
 crates = ["icn-net", "icn-gossip"]
 gaps = [
   "NAT traversal needs hardening for production internet use",
@@ -219,27 +239,42 @@ evidence = [
   "Naming service with bounded alias resolution",
   "Deterministic treasury DID derivation",
 ]
-last_verified = "2026-03-17"
-verified_by = "gap-analysis"
+last_verified = "2026-06-14"
+verified_by = "freshness-2047"
+review_note = "Re-verified #2047: EntityType/EntityKind, coop Formation->Active->Dissolution, CommunityType Geographic/Interest/Solidarity, deterministic treasury DID derivation all confirmed in src. No gaps recorded; holds."
 crates = ["icn-entity", "icn-coop", "icn-community"]
 gaps = []
 
 # Meaning Firewall is tracked separately as a cross-cutting concern
 [meaning-firewall]
-total_crates = 29
-clean = 9
-infected = 11
-needs_review = 9
+# Recomputed 2026-06-14 (#2047) from the per-crate [crates.*] entries in kernel_surface.toml.
+# The old summary (total_crates=29, clean=9, infected=11, needs_review=9) was copied from the
+# stale kernel_surface.toml [metadata] block (dated 2026-02-20), which does NOT match its own
+# per-crate entries. These numbers are the honest recount from those entries.
+inventoried_crates = 28
+clean = 13
+infected = 14
+needs_review = 1
+extracted_apps = 1   # icn-governance-actor
 source = "kernel_surface.toml"
-last_verified = "2026-03-17"
-notes = "11 infected crates. Highest priority: icn-trust (cascades infections), icn-ledger (most heavily infected). GovernanceActor extracted to apps/governance Feb 2026. 6-phase extraction plan in progress."
+last_verified = "2026-06-14"
+verified_by = "freshness-2047"
+upstream_inconsistency = "kernel_surface.toml [metadata] summary (9/11/9) is stale and contradicts its per-crate entries; regenerate it from the entries. That file is out of scope for the docs-only #2047 PR and is listed as a follow-up."
+notes = "14 infected crates. Highest priority: icn-trust (cascades infections), icn-ledger (most heavily infected). GovernanceActor extracted to apps/governance Feb 2026; icn-core direct icn_governance:: refs now 0 (pinned in meaning_firewall.rs). 6-phase extraction plan in progress."
 
 # Aggregate stats
 [summary]
 total_subsystems = 10
-total_tests = 2287
-total_crates = "37 crates + 4 apps + 3 binaries = 44 workspace members"
-loc_approx = "414K"
-deployment = "K3s cluster 10.8.30.40-42 (3 nodes), running since Dec 2025"
+# total_tests: NOT re-derived this pass. The "2287" figure is from the March gap analysis and
+# is stale (workspace grew; icn-governance alone now greps to 600+ test attrs). Run `cargo test`
+# for an authoritative total before re-asserting a precise number.
+total_tests_note = "stale (2287, 2026-03-17) — needs cargo-test re-derivation"
+total_crates = "37 crates + 4 apps + 3 binaries = 44 workspace members"   # verified 2026-06-14 vs icn/Cargo.toml [workspace].members
+loc_approx = "414K"   # not re-measured this pass
+deployment = "3-node K3s cluster, running since Dec 2025 — NEEDS OPS RE-CONFIRMATION (runtime claim; node addresses documented in deployment guides/runbooks)"
+# last_full_verification deliberately NOT bumped to today: this #2047 pass re-verified the
+# per-subsystem rows and the meaning-firewall recount against source, but did NOT run a full
+# cargo-test/LOC/deployment sweep. The 2026-03-17 gap analysis remains the last *full* verification.
 last_full_verification = "2026-03-17"
-verification_source = "docs/strategy/ICN-Gap-Analysis-March-2026.md"
+last_partial_verification = "2026-06-14"   # #2047 source-level re-verification of subsystem rows + meaning-firewall recount
+verification_source = "docs/strategy/ICN-Gap-Analysis-March-2026.md; #2047 source re-verification 2026-06-14"
