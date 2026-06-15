@@ -26,7 +26,10 @@ use crate::api::devices::{
     ApiListDevicesResponse, ApiRegisterDeviceRequest, ApiRegisterDeviceResponse,
     ApiRevokeDeviceRequest,
 };
-use crate::api::federation::{ProposeAdoptionRequest, ProposeAdoptionResponse};
+use crate::api::federation::{
+    FederationTopologyResponse, ProposeAdoptionRequest, ProposeAdoptionResponse, TopologyEdge,
+    TopologyNode,
+};
 use crate::api::governance_dashboard::{
     ActivityEvent, AmendmentsBreakdown, AppealsBreakdown, GovernanceDashboard,
 };
@@ -65,6 +68,7 @@ use icn_governance_actor::http::models::{
         description = "Gateway API base path (all routes are mounted under /v1)"
     )),
     paths(
+        crate::api::federation::get_topology,
         crate::api::federation::propose_clearing_adoption,
         // Member-shell surface (docs/dev/openapi-member-surface-gaps.md):
         // the routes a member-facing shell needs for the core loop
@@ -142,6 +146,7 @@ use icn_governance_actor::http::models::{
             ListNotificationsResponse, NotificationCountResponse, MarkReadResponse,
             // Federation
             ProposeAdoptionRequest, ProposeAdoptionResponse,
+            FederationTopologyResponse, TopologyNode, TopologyEdge,
             // Member-shell surface (standing, action cards, completion receipt)
             StandingResponse, StandingDomainMembership, StandingRoleAssignment,
             ActionCardsResponse, ActionCard, ActionCardSourceKind, ActionCardActionKind,
@@ -251,5 +256,32 @@ mod tests {
             servers.iter().any(|s| s.url == "/v1"),
             "server base url /v1 must be declared"
         );
+    }
+
+    /// The federation topology route is served by the gateway (server.rs wires
+    /// `api::federation::get_topology`), so it must also appear in the generated
+    /// OpenAPI document along with its response schemas. Otherwise clients using
+    /// `/api-docs/openapi.json` or generated SDK types cannot discover or type it.
+    #[test]
+    fn federation_topology_is_documented() {
+        let doc = ApiDoc::openapi();
+
+        assert!(
+            doc.paths.paths.contains_key("/federation/topology"),
+            "missing documented path: /federation/topology"
+        );
+
+        let schemas = doc
+            .components
+            .as_ref()
+            .expect("components present")
+            .schemas
+            .clone();
+        for expected in ["FederationTopologyResponse", "TopologyNode", "TopologyEdge"] {
+            assert!(
+                schemas.contains_key(expected),
+                "missing registered schema: {expected}"
+            );
+        }
     }
 }
