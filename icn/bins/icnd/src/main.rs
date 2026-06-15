@@ -484,10 +484,15 @@ const INSECURE_DEV_JWT_SECRET: &str =
 ///
 /// `--insecure-gateway-no-jwt` is a **local-dev-only escape hatch**, not a
 /// general no-auth mode. It is permitted ONLY when the gateway binds to a
-/// loopback address (`127.0.0.0/8`, `::1`, or `localhost`). For any other bind
-/// (e.g. `0.0.0.0`, `[::]`, or a concrete externally-reachable address) this
-/// returns an error and the daemon must refuse to start — failing closed rather
-/// than silently exposing an unauthenticated gateway on a reachable interface.
+/// loopback `IP:PORT` the gateway can actually serve — a valid `SocketAddr`
+/// whose IP is in `127.0.0.0/8` or is `::1` (e.g. `127.0.0.1:8080`,
+/// `[::1]:8080`). Hostnames such as `localhost` are NOT accepted, because the
+/// gateway parses the bind as a `SocketAddr`. For any other bind (e.g.
+/// `0.0.0.0`, `[::]`, a concrete externally-reachable address, or any
+/// unparseable/host-form input) this returns an error and the daemon must
+/// refuse to start — failing closed rather than silently exposing an
+/// unauthenticated gateway on a reachable interface (or claiming a "loopback"
+/// bind the gateway cannot actually start on).
 ///
 /// The check is purely a function of the bind host, so it is exercised directly
 /// by unit tests below.
@@ -497,47 +502,46 @@ fn insecure_jwt_allowed(bind_addr: &str) -> Result<()> {
     } else {
         anyhow::bail!(
             "Refusing to start: --insecure-gateway-no-jwt is only permitted on a loopback \
-             gateway bind (127.0.0.1, ::1, or localhost), but gateway.bind_addr is '{bind_addr}'. \
-             Insecure no-JWT mode is a local-dev-only escape hatch, NOT a general no-auth mode. \
-             Either bind the gateway to loopback (e.g. --gateway-bind 127.0.0.1:8080) or remove \
+             gateway bind (a valid IP:PORT in 127.0.0.0/8, e.g. 127.0.0.1:8080, or [::1]:PORT), \
+             but gateway.bind_addr is '{bind_addr}'. The gateway parses the bind as a SocketAddr, \
+             so hostnames such as 'localhost' are not accepted. Insecure no-JWT mode is a \
+             local-dev-only escape hatch, NOT a general no-auth mode. Either bind the gateway to a \
+             loopback IP literal (e.g. --gateway-bind 127.0.0.1:8080) or remove \
              --insecure-gateway-no-jwt and configure a JWT secret (ICN_GATEWAY_JWT_SECRET / \
              --gateway-jwt-secret)."
         )
     }
 }
 
-/// Return `true` if the gateway bind address points at a loopback host.
+/// Return `true` if the gateway bind address is a loopback bind the gateway
+/// can actually bind to.
 ///
-/// Accepts the same `"IP:PORT"` / `"[IPv6]:PORT"` / `"host:PORT"` forms the
-/// gateway config uses. The host is judged loopback if it parses to a loopback
-/// `IpAddr` (covers all of `127.0.0.0/8` and `::1`) or is the literal
-/// `localhost`. Anything that does not clearly resolve to loopback — including
-/// unparseable input — is treated as non-loopback (fail closed).
+/// The gateway spawn path parses the bind address with
+/// `bind_addr.parse::<SocketAddr>()` (see `icn-core/src/supervisor/init_gateway.rs`),
+/// so the ONLY accepted forms are a syntactically valid `IP:PORT` —
+/// `127.0.0.1:8080` for IPv4 or `[::1]:8080` for IPv6 — with a valid `u16`
+/// port. Hostnames (including `localhost`), unbracketed IPv6, missing/invalid
+/// ports, and any other input are NOT resolved by the gateway and would never
+/// bind.
+///
+/// To keep this guard in lockstep with what the gateway can serve, the check is
+/// deliberately conservative: it returns `true` only when the input parses as a
+/// `SocketAddr` whose IP is loopback (covers all of `127.0.0.0/8` and `::1`).
+/// Anything else — including `localhost:*`, bare hostnames, malformed ports, and
+/// unparseable input — is treated as non-loopback (**fail closed**). This
+/// guarantees the insecure no-JWT mode can never be enabled on a bind the
+/// gateway would later expose on a reachable interface, and never reports a
+/// "loopback" bind the gateway cannot actually start on.
 fn is_loopback_bind(bind_addr: &str) -> bool {
-    use std::net::{IpAddr, SocketAddr};
+    use std::net::SocketAddr;
 
-    // Preferred path: a fully-formed socket address (handles "[::1]:8080",
-    // "127.0.0.1:8080", etc.) gives us the IP directly.
-    if let Ok(sock) = bind_addr.parse::<SocketAddr>() {
-        return sock.ip().is_loopback();
-    }
-
-    // Fall back to extracting the host portion for the `host:port` /
-    // `localhost:port` forms that are not valid SocketAddrs.
-    let host = match bind_addr.rsplit_once(':') {
-        // Bracketed IPv6 literal without a successful SocketAddr parse above:
-        // strip the brackets and re-check as a bare IP.
-        Some((h, _)) if h.starts_with('[') && h.ends_with(']') => &h[1..h.len() - 1],
-        Some((h, _)) => h,
-        None => bind_addr,
-    };
-
-    if host.eq_ignore_ascii_case("localhost") {
-        return true;
-    }
-
-    host.parse::<IpAddr>()
-        .map(|ip| ip.is_loopback())
+    // A fully-formed socket address (e.g. "127.0.0.1:8080", "[::1]:8080") is
+    // the only form the gateway can bind. Parse it the same way the gateway
+    // does and require the resulting IP to be loopback. Everything else fails
+    // closed.
+    bind_addr
+        .parse::<SocketAddr>()
+        .map(|sock| sock.ip().is_loopback())
         .unwrap_or(false)
 }
 
@@ -905,13 +909,17 @@ mod insecure_gateway_jwt_tests {
 
     #[test]
     fn insecure_allowed_on_loopback_binds() {
+        // Only bind strings that are valid `IP:PORT` SocketAddrs with a loopback
+        // IP — i.e. exactly the forms the gateway can actually bind (it parses
+        // `bind_addr` as a `SocketAddr`). Hostnames like `localhost` are
+        // deliberately excluded here; see `loopback_excludes_hostname_and_invalid`.
         for addr in [
             "127.0.0.1:8080",
             "127.0.0.1:0",
-            "127.5.6.7:8080", // anywhere in 127.0.0.0/8 is loopback
-            "[::1]:8080",
-            "localhost:8080",
-            "LOCALHOST:8080", // case-insensitive
+            "127.5.6.7:8080",         // anywhere in 127.0.0.0/8 is loopback
+            "127.0.0.1:65535",        // max valid port
+            "[::1]:8080",             // bracketed IPv6 loopback
+            "[0:0:0:0:0:0:0:1]:8080", // fully-expanded IPv6 loopback literal
         ] {
             assert!(
                 is_loopback_bind(addr),
@@ -920,6 +928,37 @@ mod insecure_gateway_jwt_tests {
             assert!(
                 insecure_jwt_allowed(addr).is_ok(),
                 "insecure mode should be permitted on loopback bind '{addr}'"
+            );
+        }
+    }
+
+    /// The guard must fail closed on anything the gateway cannot bind as a
+    /// loopback `SocketAddr`: hostnames (incl. `localhost`, which the gateway
+    /// does NOT resolve), missing/invalid ports, unbracketed IPv6, and bare IPs.
+    /// These are the cases that previously looked like "loopback" but would make
+    /// the daemon claim insecure-mode-on-loopback while the gateway silently
+    /// failed to start.
+    #[test]
+    fn loopback_excludes_hostname_and_invalid() {
+        for addr in [
+            "localhost:8080",          // hostname — gateway parses SocketAddr, won't resolve
+            "LOCALHOST:8080",          // hostname (case) — still not a SocketAddr
+            "localhost",               // hostname, no port
+            "127.0.0.1",               // loopback IP but NO port — not a SocketAddr
+            "[::1]",                   // IPv6 loopback, no port — not a SocketAddr
+            "::1:8080",                // unbracketed IPv6 — not a valid SocketAddr
+            "127.0.0.1:bad",           // invalid (non-numeric) port
+            "127.0.0.1:99999",         // port out of u16 range
+            "127.0.0.1:",              // empty port
+            "loopback.localhost:8080", // hostname that merely contains "localhost"
+        ] {
+            assert!(
+                !is_loopback_bind(addr),
+                "expected '{addr}' to FAIL closed (non-loopback): only valid loopback IP:PORT is allowed"
+            );
+            assert!(
+                insecure_jwt_allowed(addr).is_err(),
+                "insecure mode must be refused on '{addr}' (gateway cannot bind it)"
             );
         }
     }
@@ -947,15 +986,17 @@ mod insecure_gateway_jwt_tests {
     #[test]
     fn insecure_rejected_on_non_loopback_binds() {
         for addr in [
-            "0.0.0.0:8080",      // all IPv4 interfaces
-            "[::]:8080",         // all IPv6 interfaces
-            "192.168.1.10:8080", // private LAN address
-            "10.0.0.5:8080",     // another private (non-loopback) address
-            "203.0.113.5:8080",  // public IP (TEST-NET-3)
-            "[2001:db8::1]:8080",
-            "example.com:8080", // non-localhost hostname
-            "not-an-address",   // unparseable => fail closed
-            "",                 // empty => fail closed
+            "0.0.0.0:8080",       // all IPv4 interfaces
+            "[::]:8080",          // all IPv6 interfaces
+            "192.168.1.10:8080",  // private LAN address
+            "203.0.113.5:8080",   // public IP (TEST-NET-3)
+            "[2001:db8::1]:8080", // documentation IPv6 (non-loopback)
+            "example.com:8080",   // non-localhost hostname
+            "localhost:8080",     // hostname — gateway can't resolve; must fail closed
+            "127.0.0.1",          // loopback IP but missing port => not a SocketAddr
+            "127.0.0.1:bad",      // loopback IP, invalid port => fail closed
+            "not-an-address",     // unparseable => fail closed
+            "",                   // empty => fail closed
         ] {
             assert!(
                 !is_loopback_bind(addr),
