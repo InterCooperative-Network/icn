@@ -343,7 +343,7 @@ ICN_PASSPHRASE=dev ICN_GATEWAY_JWT_SECRET=dev-secret-must-be-at-least-32-bytes \
 
 **Gotchas:**
 - Gateway is **off by default**. Pass `--gateway-enable` to bind port 8080.
-- Gateway requires `ICN_GATEWAY_JWT_SECRET` (minimum 32 bytes for HS256). The `--insecure-gateway-no-jwt` flag does **not** work — `main.rs` clears the placeholder before `init_gateway.rs` reads it, so the gateway silently refuses to start.
+- Gateway requires `ICN_GATEWAY_JWT_SECRET` (minimum 32 bytes for HS256). For a quick local smoke run you can instead pass `--insecure-gateway-no-jwt`: this is a **local-dev-only escape hatch**, NOT a general no-auth mode. It only activates when the gateway is enabled and no JWT secret is configured, and it **fails closed** — the daemon refuses to start if the gateway bind address is not loopback (`127.0.0.1` / `::1` / `localhost`). On loopback it logs a loud warning and starts with a well-known insecure dev secret so the challenge/verify flow still works (anyone can mint tokens against it — never use it on a reachable interface). To bind a non-loopback gateway, configure a real `ICN_GATEWAY_JWT_SECRET` instead.
 - Metrics always bind port 9100. Health: `GET http://localhost:8080/v1/health` (no auth).
 - The daemon also accepts `ICN_KEYSTORE_PASSPHRASE` (checked before `ICN_PASSPHRASE`).
 
