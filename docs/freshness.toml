@@ -127,7 +127,7 @@ notes = "Receipt chain is active development (AllocationReceipt wiring)."
 title = "Contract Execution (CCL)"
 last_updated = "2026-06-14"
 last_verified_by = "freshness-2047"
-review_note = "Verified: FuelConfig, capability-based security, deterministic bounded expressions, Interpreter (icn-ccl). Correction: wasmtime/`wasm` feature re-attributed from icn-ccl to icn-compute (where the dep actually lives)."
+review_note = "Verified: FuelConfig, capability-based security, deterministic bounded expressions, Interpreter (icn-ccl). Corrections: (1) wasmtime/`wasm` feature re-attributed from icn-ccl to icn-compute (where the dep actually lives); (2) WASM path marked experimental — it is NOT held to CCL's fuel/determinism guarantees: icn-compute/src/wasm_executor.rs uses Engine::default() (no wasmtime fuel metering, comment 'fuel metering can be enabled later') + coarse per-call counter, and a wall-clock SystemTime::now() timestamp host import (non-deterministic)."
 staleness_threshold_days = 45
 truth_class = "descriptive"
 depends_on = ["icn/crates/icn-ccl/src/**"]
@@ -146,7 +146,7 @@ depends_on = [
   "icn/apps/governance/src/**",
 ]
 evidence_type = "demo"
-notes = "Most actively verified subsystem. 547 tests, demo flow proven."
+notes = "Most actively verified subsystem; demo flow proven. Exact test count NEEDS RE-DERIVATION (prior '547 tests' is stale — see review_note and status.toml governance row); run cargo test for an exact figure before re-asserting."
 
 [sections."13-entity-model"]
 title = "Entity Model"
