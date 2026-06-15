@@ -24,7 +24,7 @@ impl MembershipProofPublic {
     /// Create new public inputs for any membership
     pub fn new(org_did: Did) -> Self {
         let mut nonce = [0u8; 16];
-        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce);
+        rand::RngCore::fill_bytes(&mut rand::rng(), &mut nonce);
 
         Self {
             org_did,

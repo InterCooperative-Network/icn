@@ -224,7 +224,7 @@ impl TurnClient {
 
         // Generate transaction ID
         let mut transaction_id = [0u8; 12];
-        rand::thread_rng().fill_bytes(&mut transaction_id);
+        rand::rng().fill_bytes(&mut transaction_id);
 
         // Build Allocate request
         let request = self.build_allocate_request(&transaction_id)?;
@@ -279,7 +279,7 @@ impl TurnClient {
 
         // Generate transaction ID
         let mut transaction_id = [0u8; 12];
-        rand::thread_rng().fill_bytes(&mut transaction_id);
+        rand::rng().fill_bytes(&mut transaction_id);
 
         // Build Refresh request
         let request = self.build_refresh_request(&transaction_id)?;
@@ -339,7 +339,7 @@ impl TurnClient {
 
         // Generate transaction ID
         let mut transaction_id = [0u8; 12];
-        rand::thread_rng().fill_bytes(&mut transaction_id);
+        rand::rng().fill_bytes(&mut transaction_id);
 
         // Build CreatePermission request
         let request = self.build_permission_request(&transaction_id, peer_addr)?;
@@ -439,7 +439,7 @@ impl TurnClient {
         // Generate a transaction ID for XOR encoding (not used for response matching
         // since indications have no response)
         let mut transaction_id = [0u8; 12];
-        rand::thread_rng().fill_bytes(&mut transaction_id);
+        rand::rng().fill_bytes(&mut transaction_id);
 
         // Build SEND-INDICATION message
         let indication = self.build_send_indication(&transaction_id, peer_addr, data)?;

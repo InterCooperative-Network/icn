@@ -69,6 +69,8 @@ icn-trust.workspace = true
 icn-membership-app = { path = "../../apps/membership" }
 portpicker.workspace = true
 reqwest.workspace = true
+# rand_core 0.6 OsRng for ed25519-dalek 2.x interop in tests (dalek pins rand_core 0.6)
+rand_core = { workspace = true }
 # Enable test-util for time mocking in integration tests
 tokio = { version = "1.49", features = ["test-util"] }
 

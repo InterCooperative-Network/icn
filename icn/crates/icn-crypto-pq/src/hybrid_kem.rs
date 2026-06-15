@@ -148,7 +148,7 @@ impl HybridKemKeypair {
     /// Generate a new hybrid KEM keypair
     pub fn generate() -> Result<Self> {
         // Generate X25519 keypair
-        let classical_secret = StaticSecret::random_from_rng(rand::rngs::OsRng);
+        let classical_secret = StaticSecret::random_from_rng(rand_core::OsRng);
         let classical_public = X25519PublicKey::from(&classical_secret);
 
         // Generate ML-KEM keypair
@@ -183,7 +183,7 @@ impl HybridKemKeypair {
         context: &[u8],
     ) -> Result<([u8; 32], HybridKemCiphertext)> {
         // X25519: ephemeral ECDH
-        let ephemeral_secret = EphemeralSecret::random_from_rng(rand::rngs::OsRng);
+        let ephemeral_secret = EphemeralSecret::random_from_rng(rand_core::OsRng);
         let ephemeral_public = X25519PublicKey::from(&ephemeral_secret);
         let classical_shared = ephemeral_secret.diffie_hellman(&recipient_pk.classical_key());
 

@@ -65,7 +65,7 @@ impl RevocationRecord {
         // Generate revocation ID from components + random nonce for uniqueness
         let mut nonce = [0u8; 16];
         use rand::RngCore;
-        rand::thread_rng().fill_bytes(&mut nonce);
+        rand::rng().fill_bytes(&mut nonce);
 
         let mut hasher = Sha256::new();
         hasher.update(b"revocation:");

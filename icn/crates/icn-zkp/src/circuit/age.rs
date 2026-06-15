@@ -31,7 +31,7 @@ impl AgeProofPublic {
     pub fn new(threshold: u8, issuer_pk: [u8; 32]) -> Self {
         use rand::RngCore;
         let mut nonce = [0u8; 16];
-        rand::thread_rng().fill_bytes(&mut nonce);
+        rand::rng().fill_bytes(&mut nonce);
 
         // Calculate current date as days since epoch
         let now = std::time::SystemTime::now()
@@ -78,7 +78,7 @@ impl AgeProofPrivate {
     /// Create new private inputs
     pub fn new(birthdate_days: u32, issuer_signature: Vec<u8>) -> Self {
         let mut blinding = [0u8; 32];
-        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut blinding);
+        rand::RngCore::fill_bytes(&mut rand::rng(), &mut blinding);
         Self {
             birthdate_days,
             issuer_signature,

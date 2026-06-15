@@ -109,7 +109,7 @@ impl TrafficObfuscator {
         }
 
         let delay_ms =
-            rand::thread_rng().gen_range(self.config.min_delay_ms..=self.config.max_delay_ms);
+            rand::rng().random_range(self.config.min_delay_ms..=self.config.max_delay_ms);
 
         Duration::from_millis(delay_ms)
     }
@@ -138,7 +138,7 @@ impl TrafficObfuscator {
 
         let padding_len = self.config.padded_size - message.len();
         let padding: Vec<u8> = (0..padding_len)
-            .map(|_| rand::thread_rng().gen::<u8>())
+            .map(|_| rand::rng().random::<u8>())
             .collect();
 
         icn_obs::metrics::privacy::messages_padded_inc();
@@ -173,7 +173,7 @@ impl TrafficObfuscator {
     /// from real messages.
     pub fn generate_cover_traffic(&self) -> Vec<u8> {
         let size = self.config.padded_size;
-        let cover_message: Vec<u8> = (0..size).map(|_| rand::thread_rng().gen::<u8>()).collect();
+        let cover_message: Vec<u8> = (0..size).map(|_| rand::rng().random::<u8>()).collect();
 
         icn_obs::metrics::privacy::cover_traffic_sent_inc();
 
@@ -197,7 +197,7 @@ impl TrafficObfuscator {
         let probability = probability.min(1.0);
 
         // Random chance based on probability
-        rand::thread_rng().gen::<f64>() < probability
+        rand::rng().random::<f64>() < probability
     }
 
     /// Get the configured padded message size

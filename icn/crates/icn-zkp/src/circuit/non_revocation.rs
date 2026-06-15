@@ -92,7 +92,7 @@ impl NonRevocationPublic {
         accumulator_type: AccumulatorType,
     ) -> Self {
         let mut nonce = [0u8; 16];
-        rand::RngCore::fill_bytes(&mut rand::thread_rng(), &mut nonce);
+        rand::RngCore::fill_bytes(&mut rand::rng(), &mut nonce);
         Self {
             accumulator_value,
             accumulator_epoch,

@@ -31,6 +31,8 @@ sha2 = "0.10"
 hex = "0.4"
 base64 = "0.22"
 rand.workspace = true
+# rand_core 0.6 OsRng for x25519-dalek 2.x interop (dalek pins rand_core 0.6)
+rand_core = { workspace = true }
 x25519-dalek.workspace = true
 tar = "0.4"
 walkdir = "2.4"

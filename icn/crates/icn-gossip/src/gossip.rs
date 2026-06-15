@@ -1425,10 +1425,10 @@ pub fn start_digest_emitter(
         );
 
         loop {
-            // Calculate next interval with jitter (thread_rng is recreated each iteration to avoid Send issues)
+            // Calculate next interval with jitter (rng() is recreated each iteration to avoid Send issues)
             let jitter = if jitter_ms > 0 {
                 use rand::Rng;
-                rand::thread_rng().gen_range(0..jitter_ms)
+                rand::rng().random_range(0..jitter_ms)
             } else {
                 0
             };

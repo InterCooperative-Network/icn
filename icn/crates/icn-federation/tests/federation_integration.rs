@@ -17,7 +17,7 @@ use icn_federation::{
 };
 use icn_identity::{Did, KeyPair};
 use icn_store::{SledStore, Store};
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use std::sync::Arc;
 use wiremock::matchers::{method, path_regex};
 use wiremock::{Mock, MockServer, ResponseTemplate};

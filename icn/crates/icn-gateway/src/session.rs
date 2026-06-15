@@ -9,7 +9,7 @@
 
 use anyhow::Result;
 use icn_identity::Did;
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -232,8 +232,8 @@ impl SessionManager {
 
     /// Generate a cryptographically random session ID (32 bytes, hex-encoded)
     fn generate_session_id() -> String {
-        let mut rng = thread_rng();
-        let bytes: [u8; 32] = rng.gen();
+        let mut rng = rng();
+        let bytes: [u8; 32] = rng.random();
         hex::encode(bytes)
     }
 }
