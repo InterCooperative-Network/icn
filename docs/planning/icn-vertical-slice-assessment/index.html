@@ -488,7 +488,7 @@ View source on GitHub →
 <li>Use <code>Authorization: Bearer &lt;token&gt;</code> on all protected endpoints</li>
 </ol>
 <p><strong>Scopes relevant to demo:</strong> <code>governance:read</code>, <code>governance:write</code>, <code>coop:read</code>, <code>coop:write</code>, <code>federation:read</code>, <code>federation:write</code>, <code>federation:admin</code></p>
-<p><strong>Dev shortcut:</strong> <code>icnd --gateway-enable --insecure-gateway-no-jwt</code> — unclear if this fully disables auth or just removes the JWT secret requirement. Needs testing.</p>
+<p><strong>Dev shortcut (local-dev only):</strong> <code>icnd --gateway-enable --insecure-gateway-no-jwt</code> lets the gateway start without provisioning a JWT secret. It is a local-dev-only escape hatch, not a general no-auth mode: it <strong>fails closed</strong>, refusing to start unless the gateway binds to a loopback IP literal (<code>--gateway-bind 127.0.0.1:8080</code> or <code>[::1]:8080</code>). The bind address is parsed as a <code>SocketAddr</code>, so hostnames such as <code>localhost</code> are not accepted. On a valid loopback bind it logs a loud warning and starts with a well-known insecure dev secret (the challenge/verify flow still works). Use a real <code>ICN_GATEWAY_JWT_SECRET</code> for any non-loopback bind.</p>
 <p><strong>DID generation:</strong> <code>icn-identity</code> crate provides <code>KeyPair::generate()</code> → DID, and <code>IdentityBundle::generate()</code> → full signing bundle. This is Ed25519-based.</p>
 <hr>
 <h2>4. Governance Primitives (Deep Dive)</h2>
