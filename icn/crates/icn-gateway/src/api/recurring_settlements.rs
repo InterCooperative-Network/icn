@@ -48,9 +48,10 @@ pub async fn create_recurring_settlement(
     req: web::Json<CreateRecurringSettlementRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "settlements:write")?;
-    // Bind the body-supplied coop_id to the caller's token coop. `settlements:write`
-    // is requestable per coop, so without this a token for coop A could schedule a
-    // recurring settlement under coop B. CRITICAL: prevent cross-coop write.
+    // Flat coop-namespace guard (NOT entity/community/federation hierarchy — see
+    // #2061): bind the body-supplied coop_id to the caller's token namespace.
+    // `settlements:write` is requestable per namespace, so without this a token for
+    // coop A could schedule a recurring settlement under coop B. Prevent a cross-namespace write.
     require_coop_access(&http_req, &req.coop_id)?;
 
     let claims = get_claims(&http_req)

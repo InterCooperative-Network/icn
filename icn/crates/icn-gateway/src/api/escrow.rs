@@ -43,9 +43,10 @@ pub async fn create_escrow(
     req: web::Json<CreateEscrowRequest>,
 ) -> Result<HttpResponse> {
     require_scope(&http_req, "settlements:write")?;
-    // Bind the body-supplied coop_id to the caller's token coop. `settlements:write`
-    // is requestable per coop, so without this a token for coop A could create an
-    // escrow under coop B. CRITICAL: prevent cross-coop write.
+    // Flat coop-namespace guard (NOT entity/community/federation hierarchy — that is
+    // tracked in #2061): bind the body-supplied coop_id to the caller's token
+    // namespace. `settlements:write` is requestable per namespace, so without this a
+    // token for coop A could create an escrow under coop B. Prevent a cross-namespace write.
     require_coop_access(&http_req, &req.coop_id)?;
 
     let claims = get_claims(&http_req)
@@ -172,9 +173,9 @@ pub async fn release_escrow(
         .map_err(|e| GatewayError::InternalError(format!("Store error: {e}")))?
         .ok_or_else(|| GatewayError::NotFound(format!("Escrow not found: {escrow_id}")))?;
 
-    // The escrow belongs to a specific coop; only a caller bound to that coop may
-    // approve/release it (and trigger a settlement on that coop's ledger).
-    // CRITICAL: prevent cross-coop release.
+    // The escrow lives in a specific coop namespace; only a caller bound to that
+    // namespace may approve/release it (and trigger a settlement on its ledger).
+    // Flat coop-namespace guard, not entity hierarchy (#2061). Prevent a cross-namespace release.
     require_coop_access(&http_req, &escrow.coop_id)?;
 
     // Check status

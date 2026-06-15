@@ -43,9 +43,10 @@ pub async fn create_invite(
 
     // Validate inputs
     validation::validate_coop_id(&req.coop_id)?;
-    // Bind the body-supplied coop_id to the caller's token coop. `coop:admin` is
-    // requestable per coop, so without this a coop A admin could mint invites
-    // (which grant membership) for coop B. CRITICAL: prevent cross-coop write.
+    // Flat coop-namespace guard (NOT entity/community/federation hierarchy — see
+    // #2061): bind the body-supplied coop_id to the caller's token namespace.
+    // `coop:admin` is requestable per namespace, so without this a coop A admin could
+    // mint invites (which grant membership) for coop B. Prevent a cross-namespace write.
     require_coop_access(&http_req, &req.coop_id)?;
     validation::validate_role(&req.role)?;
 
@@ -113,8 +114,9 @@ pub async fn list_invites(
 
     validation::validate_coop_id(coop_id)?;
     // Invite codes are membership-granting bearer secrets; binding the queried
-    // coop_id to the caller's token coop stops a coop A reader from listing (and
-    // then redeeming) coop B's invites. CRITICAL: prevent cross-coop exposure.
+    // coop_id to the caller's token namespace stops a coop A reader from listing (and
+    // then redeeming) coop B's invites. Flat coop-namespace guard, not entity
+    // hierarchy (#2061). Prevent cross-namespace exposure.
     require_coop_access(&http_req, coop_id)?;
 
     // List invites
