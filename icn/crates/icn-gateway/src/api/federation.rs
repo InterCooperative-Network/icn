@@ -119,16 +119,21 @@ pub struct TopologyNode {
 /// scope; a future economic-view endpoint will cover it).
 #[derive(Debug, Serialize, ToSchema)]
 pub struct TopologyEdge {
-    /// Source of the relationship.
+    /// Source of the relationship — always a **node ID** (cooperative ID), never a DID.
     ///
-    /// For a vouch this is the voucher's **cooperative ID** (e.g. `coop-alpha`) — the value
-    /// stored as `voucher_coop_id` and returned by `get_vouches`/`get_vouches_for`. It is NOT
-    /// a DID; edge sources are coop IDs consistently across both vouch and agreement edges.
-    /// For an agreement this is `coop_a`.
+    /// For a vouch this is the voucher's cooperative ID (e.g. `coop-alpha`) — the value stored as
+    /// `voucher_coop_id` and returned by `get_vouches`/`get_vouches_for`.
+    ///
+    /// For an agreement this is the source party resolved to its node ID. Agreement records store
+    /// the party DID in `coop_a` on the governance backend, so endpoints are resolved through the
+    /// registry's `public_did -> coop_id` map before being emitted; this guarantees the value
+    /// matches a `TopologyNode.coop_id`. (If a party is not a registered node, the raw stored
+    /// identifier is emitted as a best effort.)
     pub from: String,
-    /// Target of the relationship.
+    /// Target of the relationship — always a **node ID** (cooperative ID), never a DID.
     ///
-    /// For a vouch this is the vouched-for `coop_id`. For an agreement this is `coop_b`.
+    /// For a vouch this is the vouched-for `coop_id`. For an agreement this is the destination
+    /// party resolved to its node ID (same `public_did -> coop_id` resolution as `from`).
     pub to: String,
     /// Relationship kind: `"vouch"` or `"agreement"`.
     pub kind: String,
@@ -485,6 +490,35 @@ fn empty_if_uninitialized<T: Default>(result: Result<T>) -> Result<T> {
     }
 }
 
+/// Resolve a clearing-agreement endpoint to a topology **node ID** (cooperative ID).
+///
+/// Agreement records do not store endpoints uniformly across the two backends:
+/// - The supervisor `FederationService` path stores the party **DID** in
+///   `ClearingAgreementView.coop_a`/`coop_b` (see `establish_clearing` in
+///   `icn-core/src/services/federation_service.rs`, which passes `coop_a_did`/`coop_b_did`
+///   into the coop-ID slots of `BilateralClearingAgreement::new`).
+/// - The gateway-local direct-management path stores the cooperative **ID** in those fields.
+///
+/// Topology nodes, however, are always keyed by `CooperativeView.coop_id`. If we emitted the
+/// raw `coop_a`/`coop_b` for governance-originated agreements, the edge endpoints would be DIDs
+/// that match no node, leaving graph clients unable to resolve those relationships.
+///
+/// Both backends *do* reliably populate the dedicated `*_did` fields with the party DID. We
+/// therefore resolve each endpoint by looking its DID up in a `public_did -> coop_id` map built
+/// from the same coops that became nodes. On a hit we emit the node ID; on a miss we fall back to
+/// the raw stored value (already a coop ID in the direct-management path, and the best available
+/// identifier for a party that is not a registered node in the governance path).
+fn resolve_endpoint_to_coop_id<'a>(
+    did_to_coop_id: &std::collections::HashMap<&str, &'a str>,
+    endpoint_did: &str,
+    raw_endpoint: &'a str,
+) -> &'a str {
+    did_to_coop_id
+        .get(endpoint_did)
+        .copied()
+        .unwrap_or(raw_endpoint)
+}
+
 /// GET /federation/topology - Read-only federation relationship graph
 ///
 /// Returns a narrow `{nodes, edges}` graph of the federation:
@@ -495,7 +529,10 @@ fn empty_if_uninitialized<T: Default>(result: Result<T>) -> Result<T> {
 ///   - `"agreement"` edges between the two parties of each clearing agreement
 ///     (same source as `list_agreements`).
 ///
-/// Edge sources (`from`) are cooperative IDs consistently for both kinds; they are never DIDs.
+/// Both edge endpoints (`from` and `to`) are **node IDs** (cooperative IDs) consistently for both
+/// kinds; they are never DIDs. Agreement records store party DIDs in `coop_a`/`coop_b` on the
+/// governance backend, so each endpoint is resolved through the registry's `public_did -> coop_id`
+/// map before being emitted — guaranteeing every edge endpoint matches a node in `nodes`.
 ///
 /// **Honesty / scope.** This is a *relationship graph derived from existing vouch and
 /// agreement records* — it is NOT a live network-connectivity view (it says nothing about
@@ -536,9 +573,18 @@ pub async fn get_topology(
             .list_cooperatives()
             .map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
+        // Map party DID -> node (coop) ID so agreement edges resolve to node IDs. The
+        // governance backend stores party DIDs in agreement `coop_a`/`coop_b`, while nodes are
+        // keyed by coop ID; without this remap those edges would dangle. See
+        // `resolve_endpoint_to_coop_id`.
+        let did_to_coop_id: std::collections::HashMap<&str, &str> = coops
+            .iter()
+            .map(|c| (c.public_did.as_str(), c.coop_id.as_str()))
+            .collect();
+
         let mut edges: Vec<TopologyEdge> = Vec::new();
 
-        // Vouch edges: voucher DID -> vouched-for coop, one per coop in the registry.
+        // Vouch edges: voucher coop ID -> vouched-for coop, one per coop in the registry.
         for coop in &coops {
             let vouchers = service
                 .get_vouches_for(&coop.coop_id)
@@ -553,14 +599,17 @@ pub async fn get_topology(
             }
         }
 
-        // Agreement edges: coop_a -> coop_b. Relationship only — no clearing positions.
+        // Agreement edges: coop_a -> coop_b, resolved to node IDs. Relationship only — no
+        // clearing positions.
         let agreements = service
             .list_agreements()
             .map_err(|e| GatewayError::InternalError(e.to_string()))?;
         for a in agreements {
+            let from = resolve_endpoint_to_coop_id(&did_to_coop_id, &a.coop_a_did, &a.coop_a);
+            let to = resolve_endpoint_to_coop_id(&did_to_coop_id, &a.coop_b_did, &a.coop_b);
             edges.push(TopologyEdge {
-                from: a.coop_a,
-                to: a.coop_b,
+                from: from.to_string(),
+                to: to.to_string(),
                 kind: "agreement".to_string(),
                 agreement_id: Some(a.agreement_id),
             });
@@ -591,6 +640,20 @@ pub async fn get_topology(
     // matches that exact convention — it does not invent a new one.
     let coops = empty_if_uninitialized(fed_mgr.list_cooperatives().await)?;
 
+    // Same node-ID resolution as the service path. In the direct-management backend
+    // `coop_a`/`coop_b` are already coop IDs, so the DID lookup typically resolves to the same
+    // value (or falls back to it); applying the remap keeps both backends behaviorally identical
+    // and future-proofs the fallback if its storage shape ever shifts toward DIDs. The DID
+    // strings are materialized first so the borrowed `&str` map can reference them.
+    let did_coop_pairs: Vec<(String, &str)> = coops
+        .iter()
+        .map(|c| (c.public_did.to_string(), c.coop_id.as_str()))
+        .collect();
+    let did_to_coop_id: std::collections::HashMap<&str, &str> = did_coop_pairs
+        .iter()
+        .map(|(did, coop_id)| (did.as_str(), *coop_id))
+        .collect();
+
     let mut edges: Vec<TopologyEdge> = Vec::new();
 
     for coop in &coops {
@@ -607,9 +670,13 @@ pub async fn get_topology(
 
     let agreements = empty_if_uninitialized(fed_mgr.list_agreements().await)?;
     for a in agreements {
+        let coop_a_did = a.coop_a_did.to_string();
+        let coop_b_did = a.coop_b_did.to_string();
+        let from = resolve_endpoint_to_coop_id(&did_to_coop_id, &coop_a_did, &a.coop_a);
+        let to = resolve_endpoint_to_coop_id(&did_to_coop_id, &coop_b_did, &a.coop_b);
         edges.push(TopologyEdge {
-            from: a.coop_a,
-            to: a.coop_b,
+            from: from.to_string(),
+            to: to.to_string(),
             kind: "agreement".to_string(),
             agreement_id: Some(a.agreement_id),
         });
@@ -2425,6 +2492,191 @@ mod tests {
                 );
             }
         }
+    }
+
+    /// Regression for the round-2 review finding: when the governance `FederationService`
+    /// stores party **DIDs** in agreement `coop_a`/`coop_b` (as `establish_clearing` does —
+    /// it passes `coop_a_did`/`coop_b_did` into the coop-ID slots of
+    /// `BilateralClearingAgreement::new`), the topology must resolve those DIDs back to the
+    /// corresponding node (coop) IDs so agreement edges connect real nodes rather than dangling.
+    #[actix_web::test]
+    async fn test_topology_resolves_agreement_did_endpoints_to_node_ids() {
+        use actix_web::HttpMessage;
+        use icn_kernel_api::{
+            ClearingAgreementView, ClearingPositionView, CooperativeView,
+            FederationClearingRequest, FederationClearingResult, FederationClearingSettleRequest,
+            FederationClearingSettleResult, FederationJoinRequest, FederationJoinResult,
+            FederationLeaveRequest, FederationLeaveResult, FederationRevokeVouchRequest,
+            FederationRevokeVouchResult, FederationService, FederationTerminateClearingRequest,
+            FederationTerminateClearingResult, FederationVouchRequest, FederationVouchResult,
+        };
+
+        // Stub that mimics the real governance backend: nodes are keyed by coop_id, but the
+        // agreement stores party DIDs in coop_a/coop_b (matching the registered coops' public_did).
+        struct DidAgreementStub;
+        impl FederationService for DidAgreementStub {
+            fn join_federation(
+                &self,
+                _: FederationJoinRequest,
+            ) -> anyhow::Result<FederationJoinResult> {
+                unimplemented!()
+            }
+            fn leave_federation(
+                &self,
+                _: FederationLeaveRequest,
+            ) -> anyhow::Result<FederationLeaveResult> {
+                unimplemented!()
+            }
+            fn vouch_for_cooperative(
+                &self,
+                _: FederationVouchRequest,
+            ) -> anyhow::Result<FederationVouchResult> {
+                unimplemented!()
+            }
+            fn establish_clearing(
+                &self,
+                _: FederationClearingRequest,
+            ) -> anyhow::Result<FederationClearingResult> {
+                unimplemented!()
+            }
+            fn settle_clearing(
+                &self,
+                _: FederationClearingSettleRequest,
+            ) -> anyhow::Result<FederationClearingSettleResult> {
+                unimplemented!()
+            }
+            fn terminate_clearing(
+                &self,
+                _: FederationTerminateClearingRequest,
+            ) -> anyhow::Result<FederationTerminateClearingResult> {
+                unimplemented!()
+            }
+            fn revoke_vouch(
+                &self,
+                _: FederationRevokeVouchRequest,
+            ) -> anyhow::Result<FederationRevokeVouchResult> {
+                unimplemented!()
+            }
+            fn get_clearing_position(&self, _: &str) -> anyhow::Result<ClearingPositionView> {
+                unimplemented!()
+            }
+            fn is_registered(&self, _: &str) -> bool {
+                false
+            }
+            fn get_registration_provenance(&self, _: &str) -> Option<(String, String)> {
+                None
+            }
+            fn list_cooperatives(&self) -> anyhow::Result<Vec<CooperativeView>> {
+                Ok(vec![
+                    CooperativeView {
+                        coop_id: "coop-gov".to_string(),
+                        name: "Gov Coop".to_string(),
+                        public_did: "did:icn:gov".to_string(),
+                        gateway_endpoints: vec![],
+                        capabilities: vec![],
+                        last_seen: 0,
+                        origin: "governance".to_string(),
+                    },
+                    CooperativeView {
+                        coop_id: "coop-farm".to_string(),
+                        name: "Farm Coop".to_string(),
+                        public_did: "did:icn:farm".to_string(),
+                        gateway_endpoints: vec![],
+                        capabilities: vec![],
+                        last_seen: 0,
+                        origin: "governance".to_string(),
+                    },
+                ])
+            }
+            fn get_cooperative(&self, _: &str) -> anyhow::Result<Option<CooperativeView>> {
+                Ok(None)
+            }
+            fn get_vouches_for(&self, _: &str) -> anyhow::Result<Vec<String>> {
+                Ok(vec![])
+            }
+            fn list_agreements(&self) -> anyhow::Result<Vec<ClearingAgreementView>> {
+                // Governance backend stores the party DID in coop_a/coop_b (NOT a coop ID).
+                Ok(vec![ClearingAgreementView {
+                    agreement_id: "agr-gov-xyz".to_string(),
+                    coop_a: "did:icn:gov".to_string(),
+                    coop_a_did: "did:icn:gov".to_string(),
+                    coop_b: "did:icn:farm".to_string(),
+                    coop_b_did: "did:icn:farm".to_string(),
+                    settlement_interval: "weekly".to_string(),
+                    max_imbalance: 1000,
+                    created_at: 0,
+                    exchange_rates: std::collections::HashMap::new(),
+                    origin: "governance".to_string(),
+                    source_agreement_id: None,
+                }])
+            }
+            fn get_agreement(&self, _: &str) -> anyhow::Result<Option<ClearingAgreementView>> {
+                Ok(None)
+            }
+        }
+
+        let fed_mgr = Arc::new(FederationManager::new());
+        let service_data: Arc<Option<Arc<dyn FederationService>>> = Arc::new(Some(Arc::new(
+            DidAgreementStub,
+        )
+            as Arc<dyn FederationService>));
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(fed_mgr.clone()))
+                .app_data(web::Data::new(service_data))
+                .service(web::scope("/v1/federation").service(get_topology)),
+        )
+        .await;
+
+        let claims = crate::auth::TokenClaims {
+            sub: "did:icn:test".to_string(),
+            iat: 1_000_000_000,
+            coop_id: "test-coop".to_string(),
+            scopes: vec!["federation:read".to_string()],
+            exp: 9_999_999_999,
+        };
+        let req = test::TestRequest::get()
+            .uri("/v1/federation/topology")
+            .to_request();
+        req.extensions_mut().insert(claims);
+
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status().as_u16(), 200);
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        let nodes = body["nodes"].as_array().expect("nodes array");
+        let node_ids: std::collections::HashSet<&str> = nodes
+            .iter()
+            .map(|n| n["coop_id"].as_str().unwrap())
+            .collect();
+        assert_eq!(node_ids, ["coop-gov", "coop-farm"].into_iter().collect());
+
+        let agreement = body["edges"]
+            .as_array()
+            .expect("edges array")
+            .iter()
+            .find(|e| e["kind"] == "agreement")
+            .expect("must have an agreement edge");
+
+        // The DID-keyed agreement endpoints must be resolved to node (coop) IDs, not left as DIDs.
+        assert_eq!(
+            agreement["from"], "coop-gov",
+            "agreement `from` DID must resolve to its node ID"
+        );
+        assert_eq!(
+            agreement["to"], "coop-farm",
+            "agreement `to` DID must resolve to its node ID"
+        );
+        // And both endpoints must actually be nodes in the graph (no dangling edges).
+        assert!(
+            node_ids.contains(agreement["from"].as_str().unwrap()),
+            "agreement `from` must match a node"
+        );
+        assert!(
+            node_ids.contains(agreement["to"].as_str().unwrap()),
+            "agreement `to` must match a node"
+        );
     }
 
     /// Empty/uninitialized standalone federation returns a clean empty graph, not an error.
