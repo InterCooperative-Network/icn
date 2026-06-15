@@ -1082,15 +1082,28 @@ mod tests {
     /// #1868: a validly-scoped token must not create a meeting under a coop other
     /// than its own. The class scopes are requestable per coop, so the route binds
     /// the body-supplied `coop_id` to the token's coop via `require_coop_access`.
-    /// A same-coop create succeeds (201); a cross-coop create is rejected (403)
-    /// without mutating the registry. Mirrors `index_decision_rejects_cross_coop_write`.
+    /// A same-coop create succeeds (201) and creates the meeting; a cross-coop
+    /// create is rejected (403) without mutating the registry. The registry-state
+    /// assertions below (not just the HTTP status) prove the "without mutating"
+    /// claim. Mirrors `index_decision_rejects_cross_coop_write`.
     #[actix_web::test]
     async fn create_meeting_rejects_cross_coop_write() {
-        async fn create_status(token_coop: &str, body_coop: &str) -> actix_web::http::StatusCode {
+        // Returns the response status alongside a handle to the same registry the
+        // app mutates, so the caller can assert on its contents afterward. The
+        // `Arc` is cloned before being moved into the app, so both views point at
+        // one shared `DecisionRegistry`. The handler extracts
+        // `web::Data<Arc<DecisionRegistry>>`, so the app data must be
+        // `web::Data::new(Arc<..>)` (which yields `Data<Arc<..>>`), not
+        // `web::Data::from(Arc<..>)` (which would yield the mismatched
+        // `Data<DecisionRegistry>` and make extraction fail with 500).
+        async fn create_status(
+            token_coop: &str,
+            body_coop: &str,
+        ) -> (actix_web::http::StatusCode, Arc<DecisionRegistry>) {
             let registry = Arc::new(DecisionRegistry::new());
             let app = actix_test::init_service(
                 App::new()
-                    .app_data(web::Data::new(registry))
+                    .app_data(web::Data::new(registry.clone()))
                     .service(web::scope("/registry").configure(configure)),
             )
             .await;
@@ -1112,19 +1125,39 @@ mod tests {
                 }))
                 .to_request();
             req.extensions_mut().insert(claims);
-            actix_test::call_service(&app, req).await.status()
+            let status = actix_test::call_service(&app, req).await.status();
+            (status, registry)
         }
 
         use actix_web::http::StatusCode;
-        // Same coop: the write is bound to the token's coop and succeeds.
+        // Same coop: the write is bound to the token's coop and succeeds, and the
+        // meeting is actually persisted under that coop.
+        let (same_coop_status, same_coop_registry) =
+            create_status("did:icn:coopA", "did:icn:coopA").await;
+        assert_eq!(same_coop_status, StatusCode::CREATED);
         assert_eq!(
-            create_status("did:icn:coopA", "did:icn:coopA").await,
-            StatusCode::CREATED
+            same_coop_registry.list_meetings("did:icn:coopA").len(),
+            1,
+            "same-coop create should persist exactly one meeting under coopA"
         );
-        // Cross coop: a coopA token cannot create a meeting under coopB.
-        assert_eq!(
-            create_status("did:icn:coopA", "did:icn:coopB").await,
-            StatusCode::FORBIDDEN
+
+        // Cross coop: a coopA token cannot create a meeting under coopB, and the
+        // rejection must leave the registry unmutated (no meeting under coopB, and
+        // none leaked under the token's own coopA either).
+        let (cross_coop_status, cross_coop_registry) =
+            create_status("did:icn:coopA", "did:icn:coopB").await;
+        assert_eq!(cross_coop_status, StatusCode::FORBIDDEN);
+        assert!(
+            cross_coop_registry
+                .list_meetings("did:icn:coopB")
+                .is_empty(),
+            "cross-coop reject must not create a meeting under coopB"
+        );
+        assert!(
+            cross_coop_registry
+                .list_meetings("did:icn:coopA")
+                .is_empty(),
+            "cross-coop reject must not create a meeting under coopA either"
         );
     }
 
