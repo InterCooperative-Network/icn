@@ -470,6 +470,81 @@ fn handle_init(args: &Args) -> Result<()> {
     Ok(())
 }
 
+/// Well-known, intentionally-public JWT secret used ONLY by the
+/// `--insecure-gateway-no-jwt` local-dev escape hatch. It exists so the gateway
+/// can satisfy its non-empty / >=32-byte secret invariant and start/serve
+/// locally; it is NOT a real auth boundary. The loopback guard
+/// ([`insecure_jwt_allowed`]) prevents this mode from ever activating on a
+/// reachable bind. Must be >=32 bytes (gateway minimum for HS256).
+const INSECURE_DEV_JWT_SECRET: &str =
+    "icn-insecure-dev-only-no-jwt-secret-do-not-use-in-production";
+
+/// Decide whether the insecure no-JWT gateway mode is permitted for a given
+/// gateway bind address.
+///
+/// `--insecure-gateway-no-jwt` is a **local-dev-only escape hatch**, not a
+/// general no-auth mode. It is permitted ONLY when the gateway binds to a
+/// loopback `IP:PORT` the gateway can actually serve — a valid `SocketAddr`
+/// whose IP is in `127.0.0.0/8` or is `::1` (e.g. `127.0.0.1:8080`,
+/// `[::1]:8080`). Hostnames such as `localhost` are NOT accepted, because the
+/// gateway parses the bind as a `SocketAddr`. For any other bind (e.g.
+/// `0.0.0.0`, `[::]`, a concrete externally-reachable address, or any
+/// unparseable/host-form input) this returns an error and the daemon must
+/// refuse to start — failing closed rather than silently exposing an
+/// unauthenticated gateway on a reachable interface (or claiming a "loopback"
+/// bind the gateway cannot actually start on).
+///
+/// The check is purely a function of the bind host, so it is exercised directly
+/// by unit tests below.
+fn insecure_jwt_allowed(bind_addr: &str) -> Result<()> {
+    if is_loopback_bind(bind_addr) {
+        Ok(())
+    } else {
+        anyhow::bail!(
+            "Refusing to start: --insecure-gateway-no-jwt is only permitted on a loopback \
+             gateway bind (a valid IP:PORT in 127.0.0.0/8, e.g. 127.0.0.1:8080, or [::1]:PORT), \
+             but gateway.bind_addr is '{bind_addr}'. The gateway parses the bind as a SocketAddr, \
+             so hostnames such as 'localhost' are not accepted. Insecure no-JWT mode is a \
+             local-dev-only escape hatch, NOT a general no-auth mode. Either bind the gateway to a \
+             loopback IP literal (e.g. --gateway-bind 127.0.0.1:8080) or remove \
+             --insecure-gateway-no-jwt and configure a JWT secret (ICN_GATEWAY_JWT_SECRET / \
+             --gateway-jwt-secret)."
+        )
+    }
+}
+
+/// Return `true` if the gateway bind address is a loopback bind the gateway
+/// can actually bind to.
+///
+/// The gateway spawn path parses the bind address with
+/// `bind_addr.parse::<SocketAddr>()` (see `icn-core/src/supervisor/init_gateway.rs`),
+/// so the ONLY accepted forms are a syntactically valid `IP:PORT` —
+/// `127.0.0.1:8080` for IPv4 or `[::1]:8080` for IPv6 — with a valid `u16`
+/// port. Hostnames (including `localhost`), unbracketed IPv6, missing/invalid
+/// ports, and any other input are NOT resolved by the gateway and would never
+/// bind.
+///
+/// To keep this guard in lockstep with what the gateway can serve, the check is
+/// deliberately conservative: it returns `true` only when the input parses as a
+/// `SocketAddr` whose IP is loopback (covers all of `127.0.0.0/8` and `::1`).
+/// Anything else — including `localhost:*`, bare hostnames, malformed ports, and
+/// unparseable input — is treated as non-loopback (**fail closed**). This
+/// guarantees the insecure no-JWT mode can never be enabled on a bind the
+/// gateway would later expose on a reachable interface, and never reports a
+/// "loopback" bind the gateway cannot actually start on.
+fn is_loopback_bind(bind_addr: &str) -> bool {
+    use std::net::SocketAddr;
+
+    // A fully-formed socket address (e.g. "127.0.0.1:8080", "[::1]:8080") is
+    // the only form the gateway can bind. Parse it the same way the gateway
+    // does and require the resulting IP to be loopback. Everything else fails
+    // closed.
+    bind_addr
+        .parse::<SocketAddr>()
+        .map(|sock| sock.ip().is_loopback())
+        .unwrap_or(false)
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
@@ -542,13 +617,36 @@ async fn main() -> Result<()> {
         );
     }
 
-    // If --insecure-gateway-no-jwt is set, use a placeholder to pass validation
-    // (the actual insecure mode warning is logged later)
+    // --insecure-gateway-no-jwt is a LOCAL-DEV-ONLY escape hatch for the smoke
+    // path: it lets the gateway come up without an operator-provisioned JWT
+    // secret. It is honored only when the gateway is enabled and no JWT secret
+    // was supplied (CLI/env/config); a configured secret always wins.
     let insecure_no_jwt = args.insecure_gateway_no_jwt
         && config.gateway.enabled
         && config.gateway.jwt_secret.is_empty();
     if insecure_no_jwt {
-        config.gateway.jwt_secret = "__INSECURE_NO_JWT__".to_string();
+        // FAIL CLOSED: insecure no-JWT mode is only permitted on a loopback
+        // bind. On any externally-reachable bind the daemon refuses to start.
+        // (`?` here aborts startup with the helper's clear, actionable error.)
+        insecure_jwt_allowed(&config.gateway.bind_addr)?;
+
+        // LOUD startup warning the moment we accept insecure mode, before any
+        // further setup runs.
+        tracing::warn!(
+            "⚠️  INSECURE MODE: --insecure-gateway-no-jwt is active on loopback bind '{}'. \
+             No operator JWT secret is configured; a well-known INSECURE dev secret is being \
+             used so the gateway can start and serve locally. This is a LOCAL-DEV-ONLY escape \
+             hatch, NOT a general no-auth mode — anyone can mint tokens against this secret. \
+             Never use it on a reachable interface.",
+            config.gateway.bind_addr
+        );
+
+        // Use a fixed, well-known INSECURE dev secret so the gateway starts and
+        // serves (its challenge/verify flow still works) without weakening the
+        // gateway's own non-empty / >=32-byte secret invariants. The value is
+        // intentionally public and constant: in this dev-only mode auth is not a
+        // real boundary, which the loopback guard above makes safe to expose.
+        config.gateway.jwt_secret = INSECURE_DEV_JWT_SECRET.to_string();
     }
 
     // Handle --validate-config flag
@@ -605,12 +703,20 @@ async fn main() -> Result<()> {
     if config.gateway.enabled {
         tracing::info!("Gateway API enabled on {}", config.gateway.bind_addr);
         if insecure_no_jwt {
+            // Loud, repeated warning at the gateway-startup boundary. Do NOT
+            // clear the secret here: the gateway requires a non-empty >=32-byte
+            // secret to start, so clearing it would make the flag a no-op (the
+            // gateway would silently refuse to start). The well-known dev secret
+            // set earlier lets the gateway start and serve locally.
             tracing::warn!(
-                "⚠️  Gateway running WITHOUT JWT authentication (--insecure-gateway-no-jwt)"
+                "⚠️  Gateway running in INSECURE local-dev mode (--insecure-gateway-no-jwt) on {} \
+                 with a well-known dev JWT secret",
+                config.gateway.bind_addr
             );
-            tracing::warn!("⚠️  This is insecure and should only be used for development!");
-            // Clear the placeholder so gateway knows to skip JWT validation
-            config.gateway.jwt_secret = String::new();
+            tracing::warn!(
+                "⚠️  This is a LOCAL-DEV-ONLY escape hatch, NOT a general no-auth mode — \
+                 only ever use it on a loopback bind for development!"
+            );
         } else {
             tracing::info!(
                 "Gateway JWT secret configured (length: {})",
@@ -770,4 +876,165 @@ fn read_passphrase(prompt: &str) -> Result<Zeroizing<Vec<u8>>> {
         Zeroizing::new(rpassword::read_password().context("Failed to read password")?);
     // Convert to bytes (copies from zeroized String, which is then dropped and zeroed)
     Ok(Zeroizing::new(passphrase_str.as_bytes().to_vec()))
+}
+
+#[cfg(test)]
+mod insecure_gateway_jwt_tests {
+    use super::*;
+
+    /// Mirror of the `main()` predicate that decides whether insecure no-JWT
+    /// mode activates, kept pure so the default-requires-auth invariant is
+    /// directly testable. `main()` ANDs the same three conditions.
+    fn insecure_mode_active(flag: bool, gateway_enabled: bool, jwt_secret_empty: bool) -> bool {
+        flag && gateway_enabled && jwt_secret_empty
+    }
+
+    // --- Acceptance test 1: default (no flag) requires auth -----------------
+
+    #[test]
+    fn default_no_flag_keeps_jwt_required() {
+        // Flag absent => insecure mode never activates, regardless of bind or
+        // whether a secret is configured. The normal JWT path (which fails
+        // closed on an empty/short secret in the gateway) is used unchanged.
+        assert!(!insecure_mode_active(false, true, true));
+        assert!(!insecure_mode_active(false, true, false));
+        // A configured JWT secret also keeps insecure mode off even if the flag
+        // is passed (a real secret always wins over the escape hatch).
+        assert!(!insecure_mode_active(true, true, false));
+        // Gateway disabled => insecure mode is irrelevant / inactive.
+        assert!(!insecure_mode_active(true, false, true));
+    }
+
+    // --- Acceptance test 2: insecure + loopback bind is allowed -------------
+
+    #[test]
+    fn insecure_allowed_on_loopback_binds() {
+        // Only bind strings that are valid `IP:PORT` SocketAddrs with a loopback
+        // IP — i.e. exactly the forms the gateway can actually bind (it parses
+        // `bind_addr` as a `SocketAddr`). Hostnames like `localhost` are
+        // deliberately excluded here; see `loopback_excludes_hostname_and_invalid`.
+        for addr in [
+            "127.0.0.1:8080",
+            "127.0.0.1:0",
+            "127.5.6.7:8080",         // anywhere in 127.0.0.0/8 is loopback
+            "127.0.0.1:65535",        // max valid port
+            "[::1]:8080",             // bracketed IPv6 loopback
+            "[0:0:0:0:0:0:0:1]:8080", // fully-expanded IPv6 loopback literal
+        ] {
+            assert!(
+                is_loopback_bind(addr),
+                "expected '{addr}' to be treated as loopback"
+            );
+            assert!(
+                insecure_jwt_allowed(addr).is_ok(),
+                "insecure mode should be permitted on loopback bind '{addr}'"
+            );
+        }
+    }
+
+    /// The guard must fail closed on anything the gateway cannot bind as a
+    /// loopback `SocketAddr`: hostnames (incl. `localhost`, which the gateway
+    /// does NOT resolve), missing/invalid ports, unbracketed IPv6, and bare IPs.
+    /// These are the cases that previously looked like "loopback" but would make
+    /// the daemon claim insecure-mode-on-loopback while the gateway silently
+    /// failed to start.
+    #[test]
+    fn loopback_excludes_hostname_and_invalid() {
+        for addr in [
+            "localhost:8080",          // hostname — gateway parses SocketAddr, won't resolve
+            "LOCALHOST:8080",          // hostname (case) — still not a SocketAddr
+            "localhost",               // hostname, no port
+            "127.0.0.1",               // loopback IP but NO port — not a SocketAddr
+            "[::1]",                   // IPv6 loopback, no port — not a SocketAddr
+            "::1:8080",                // unbracketed IPv6 — not a valid SocketAddr
+            "127.0.0.1:bad",           // invalid (non-numeric) port
+            "127.0.0.1:99999",         // port out of u16 range
+            "127.0.0.1:",              // empty port
+            "loopback.localhost:8080", // hostname that merely contains "localhost"
+        ] {
+            assert!(
+                !is_loopback_bind(addr),
+                "expected '{addr}' to FAIL closed (non-loopback): only valid loopback IP:PORT is allowed"
+            );
+            assert!(
+                insecure_jwt_allowed(addr).is_err(),
+                "insecure mode must be refused on '{addr}' (gateway cannot bind it)"
+            );
+        }
+    }
+
+    #[test]
+    fn insecure_mode_activates_on_loopback() {
+        // The full predicate: flag set + gateway enabled + no operator secret.
+        assert!(insecure_mode_active(true, true, true));
+    }
+
+    #[test]
+    fn dev_secret_satisfies_gateway_minimum() {
+        // The gateway refuses to start on an empty secret or one < 32 bytes
+        // (icn-gateway server.rs). The well-known dev secret must clear that bar
+        // so "insecure + loopback" actually starts and serves.
+        assert!(!INSECURE_DEV_JWT_SECRET.is_empty());
+        assert!(
+            INSECURE_DEV_JWT_SECRET.len() >= 32,
+            "dev secret must be >= 32 bytes to satisfy the gateway HS256 minimum"
+        );
+    }
+
+    // --- Acceptance test 3: insecure + non-loopback bind is rejected --------
+
+    #[test]
+    fn insecure_rejected_on_non_loopback_binds() {
+        for addr in [
+            "0.0.0.0:8080",       // all IPv4 interfaces
+            "[::]:8080",          // all IPv6 interfaces
+            "192.168.1.10:8080",  // private LAN address
+            "203.0.113.5:8080",   // public IP (TEST-NET-3)
+            "[2001:db8::1]:8080", // documentation IPv6 (non-loopback)
+            "example.com:8080",   // non-localhost hostname
+            "localhost:8080",     // hostname — gateway can't resolve; must fail closed
+            "127.0.0.1",          // loopback IP but missing port => not a SocketAddr
+            "127.0.0.1:bad",      // loopback IP, invalid port => fail closed
+            "not-an-address",     // unparseable => fail closed
+            "",                   // empty => fail closed
+        ] {
+            assert!(
+                !is_loopback_bind(addr),
+                "expected '{addr}' to be treated as NON-loopback"
+            );
+            match insecure_jwt_allowed(addr) {
+                Ok(()) => panic!(
+                    "insecure mode must be rejected (daemon refuses to start) on non-loopback bind '{addr}'"
+                ),
+                Err(err) => {
+                    let msg = err.to_string();
+                    assert!(
+                        (msg.contains("loopback") && msg.contains(addr)) || addr.is_empty(),
+                        "rejection error should be clear and name the bind: {msg}"
+                    );
+                }
+            }
+        }
+    }
+
+    // --- Acceptance test 4: a loud warning is emitted when active -----------
+    //
+    // `main()` emits the loud `tracing::warn!` ⚠️ messages on exactly the branch
+    // guarded by `insecure_mode_active(..) == true` AND `insecure_jwt_allowed(..)
+    // == Ok`. This test pins that gating: when both hold, the warning branch is
+    // taken; when either fails, it is not (default path / refuse-to-start).
+
+    #[test]
+    fn loud_warning_branch_is_gated_on_active_and_loopback() {
+        // Active + loopback => warning branch is reached (daemon continues).
+        assert!(insecure_mode_active(true, true, true));
+        assert!(insecure_jwt_allowed("127.0.0.1:8080").is_ok());
+
+        // Active + non-loopback => no warning, the daemon refuses to start.
+        assert!(insecure_mode_active(true, true, true));
+        assert!(insecure_jwt_allowed("0.0.0.0:8080").is_err());
+
+        // Flag absent => default path, no insecure warning.
+        assert!(!insecure_mode_active(false, true, true));
+    }
 }

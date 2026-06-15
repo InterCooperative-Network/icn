@@ -38,6 +38,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/federation/topology": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * GET /federation/topology - Read-only federation relationship graph
+         * @description Returns a narrow `{nodes, edges}` graph of the federation:
+         *     - `nodes` are the cooperatives known to the registry (same source as `list_coops`).
+         *     - `edges` are relationships between cooperatives:
+         *       - `"vouch"` edges from each voucher's **coop ID** to the vouched-for coop (same source as
+         *         `get_vouches` — the stored `voucher_coop_id`, a coop ID, not a DID),
+         *       - `"agreement"` edges between the two parties of each clearing agreement
+         *         (same source as `list_agreements`).
+         *
+         *     Both edge endpoints (`from` and `to`) are **node IDs** (cooperative IDs) consistently for both
+         *     kinds; they are never DIDs. Agreement records store party DIDs in `coop_a`/`coop_b` on the
+         *     governance backend, so each endpoint is resolved through the registry's `public_did -> coop_id`
+         *     map before being emitted — guaranteeing every edge endpoint matches a node in `nodes`.
+         *
+         *     **Honesty / scope.** This is a *relationship graph derived from existing vouch and
+         *     agreement records* — it is NOT a live network-connectivity view (it says nothing about
+         *     which peers are currently online or reachable) and NOT a clearing/economic view. It
+         *     carries **no** clearing positions, balances, or settlement amounts; those are intentionally
+         *     out of scope and reserved for a separate future economic-view endpoint. Agreement edges
+         *     carry only the agreement ID for provenance, never amounts.
+         *
+         *     Prefers the supervisor-owned `FederationService` (governance-originated state). In
+         *     standalone mode it falls back to the gateway-local `FederationManager`. The two paths
+         *     are separate stores (ADR 0012) and this endpoint reflects exactly one.
+         *
+         *     An empty federation (no coops, no edges) returns `{"nodes":[],"edges":[]}` cleanly — it
+         *     is not an error. In standalone mode an uninitialized registry is also treated as empty.
+         *     Real (non-"not initialized") failures from the underlying store propagate as 500.
+         */
+        get: operations["get_topology"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt": {
         parameters: {
             query?: never;
@@ -585,6 +631,21 @@ export interface components {
              */
             additional_days: number;
         };
+        /**
+         * @description A narrow relationship graph of the federation: which cooperatives exist and
+         *     how they are related by vouches and coordination agreements.
+         *
+         *     This is **not** a live network-connectivity view (it says nothing about which
+         *     peers are currently online or reachable) and **not** a clearing/economic view
+         *     (it carries no balances, positions, or settlement amounts). It is purely a
+         *     relationship graph derived from existing vouch and agreement records.
+         */
+        FederationTopologyResponse: {
+            /** @description Vouch and agreement relationships between cooperatives. */
+            edges: components["schemas"]["TopologyEdge"][];
+            /** @description The cooperatives known to the federation registry. */
+            nodes: components["schemas"]["TopologyNode"][];
+        };
         /** @description Detailed founder response */
         FounderDetailResponse: {
             did: string;
@@ -1105,6 +1166,57 @@ export interface components {
             expires_in: number;
             token: string;
         };
+        /**
+         * @description A single directed edge in the federation topology graph.
+         *
+         *     `kind` is either `"vouch"` (a trust vouch, same source `get_vouches` uses) or
+         *     `"agreement"` (a federation/coordination clearing agreement, same source
+         *     `list_agreements` uses). Edges describe relationships only — they carry **no**
+         *     clearing positions, balances, or settlement data (that is intentionally out of
+         *     scope; a future economic-view endpoint will cover it).
+         */
+        TopologyEdge: {
+            /**
+             * @description For `"agreement"` edges, the clearing-agreement ID (provenance only, no amounts).
+             *     Absent for `"vouch"` edges.
+             */
+            agreement_id?: string | null;
+            /**
+             * @description Source of the relationship — always a **node ID** (cooperative ID), never a DID.
+             *
+             *     For a vouch this is the voucher's cooperative ID (e.g. `coop-alpha`) — the value stored as
+             *     `voucher_coop_id` and returned by `get_vouches`/`get_vouches_for`.
+             *
+             *     For an agreement this is the source party resolved to its node ID. Agreement records store
+             *     the party DID in `coop_a` on the governance backend, so endpoints are resolved through the
+             *     registry's `public_did -> coop_id` map before being emitted; this guarantees the value
+             *     matches a `TopologyNode.coop_id`. (If a party is not a registered node, the raw stored
+             *     identifier is emitted as a best effort.)
+             */
+            from: string;
+            /** @description Relationship kind: `"vouch"` or `"agreement"`. */
+            kind: string;
+            /**
+             * @description Target of the relationship — always a **node ID** (cooperative ID), never a DID.
+             *
+             *     For a vouch this is the vouched-for `coop_id`. For an agreement this is the destination
+             *     party resolved to its node ID (same `public_did -> coop_id` resolution as `from`).
+             */
+            to: string;
+        };
+        /**
+         * @description A single node in the federation topology graph: one cooperative.
+         *
+         *     Derived from the same coops source `list_coops` uses. This is a relationship
+         *     node, not a live network peer — presence here means the cooperative is known
+         *     to the registry, NOT that it is currently connected or reachable.
+         */
+        TopologyNode: {
+            /** @description Unique identifier for the cooperative. */
+            coop_id: string;
+            /** @description Human-readable cooperative name. */
+            name: string;
+        };
         /** @description Transaction history entry */
         TransactionHistoryEntry: {
             accounts: components["schemas"]["AccountDeltaResponse"][];
@@ -1210,6 +1322,40 @@ export interface operations {
                 content?: never;
             };
             /** @description Internal server error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_topology: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Federation relationship graph (nodes + vouch/agreement edges) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FederationTopologyResponse"];
+                };
+            };
+            /** @description Unauthorized (missing or invalid federation:read scope) */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Internal server error (real store/internal failure, never an empty graph) */
             500: {
                 headers: {
                     [name: string]: unknown;

@@ -130,7 +130,7 @@ DID-based challenge-response, produces JWT tokens.
 
 **Scopes relevant to demo:** `governance:read`, `governance:write`, `coop:read`, `coop:write`, `federation:read`, `federation:write`, `federation:admin`
 
-**Dev shortcut:** `icnd --gateway-enable --insecure-gateway-no-jwt` — unclear if this fully disables auth or just removes the JWT secret requirement. Needs testing.
+**Dev shortcut (local-dev only):** `icnd --gateway-enable --insecure-gateway-no-jwt` lets the gateway start without provisioning a JWT secret. It is a local-dev-only escape hatch, not a general no-auth mode: it **fails closed**, refusing to start unless the gateway binds to a loopback IP literal (`--gateway-bind 127.0.0.1:8080` or `[::1]:8080`). The bind address is parsed as a `SocketAddr`, so hostnames such as `localhost` are not accepted. On a valid loopback bind it logs a loud warning and starts with a well-known insecure dev secret (the challenge/verify flow still works). Use a real `ICN_GATEWAY_JWT_SECRET` for any non-loopback bind.
 
 **DID generation:** `icn-identity` crate provides `KeyPair::generate()` → DID, and `IdentityBundle::generate()` → full signing bundle. This is Ed25519-based.
 
