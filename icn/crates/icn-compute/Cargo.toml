@@ -38,7 +38,7 @@ thiserror = "2.0"
 
 # Utilities
 hex = "0.4"
-rand = "0.8"
+rand = "0.9"
 chrono = "0.4"
 num_cpus = "1.16"
 

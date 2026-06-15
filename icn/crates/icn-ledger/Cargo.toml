@@ -29,7 +29,7 @@ ed25519-dalek.workspace = true
 [dev-dependencies]
 tempfile = "3.24"
 criterion = "0.5"
-rand = "0.8"
+rand = "0.9"
 icn-governance = { path = "../icn-governance" }
 icn-trust = { path = "../icn-trust" }
 metrics-util = { version = "0.19", features = ["debugging"] }
