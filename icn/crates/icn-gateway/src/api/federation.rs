@@ -121,7 +121,9 @@ pub struct TopologyNode {
 pub struct TopologyEdge {
     /// Source of the relationship.
     ///
-    /// For a vouch this is the voucher (a DID string, as `get_vouches` returns).
+    /// For a vouch this is the voucher's **cooperative ID** (e.g. `coop-alpha`) — the value
+    /// stored as `voucher_coop_id` and returned by `get_vouches`/`get_vouches_for`. It is NOT
+    /// a DID; edge sources are coop IDs consistently across both vouch and agreement edges.
     /// For an agreement this is `coop_a`.
     pub from: String,
     /// Target of the relationship.
@@ -463,14 +465,37 @@ pub async fn vouch_for_coop(
 // Topology Endpoint
 // ============================================================================
 
+/// Collapse the gateway-local `FederationManager`'s "not initialized" signal into an empty
+/// value, while propagating every other error unchanged.
+///
+/// `FederationManager` read methods return `GatewayError::BadRequest("Federation not initialized")`
+/// when the registry/clearing store has not been initialized yet (a legitimate empty state for a
+/// standalone gateway), and `GatewayError::InternalError` for genuine store/internal failures.
+///
+/// The topology endpoint wants an uninitialized standalone gateway to read as an empty graph (200),
+/// but must NOT mask real failures as "empty" — doing so would hide outages from operators and
+/// clients. This helper encodes exactly that distinction without inventing a new error convention:
+/// only the `BadRequest` not-initialized signal becomes `Default` (empty); all other errors bubble.
+fn empty_if_uninitialized<T: Default>(result: Result<T>) -> Result<T> {
+    match result {
+        Ok(value) => Ok(value),
+        // The only `BadRequest` these read paths emit is the "Federation not initialized" guard.
+        Err(GatewayError::BadRequest(_)) => Ok(T::default()),
+        Err(other) => Err(other),
+    }
+}
+
 /// GET /federation/topology - Read-only federation relationship graph
 ///
 /// Returns a narrow `{nodes, edges}` graph of the federation:
 /// - `nodes` are the cooperatives known to the registry (same source as `list_coops`).
 /// - `edges` are relationships between cooperatives:
-///   - `"vouch"` edges from each voucher to the vouched-for coop (same source as `get_vouches`),
+///   - `"vouch"` edges from each voucher's **coop ID** to the vouched-for coop (same source as
+///     `get_vouches` — the stored `voucher_coop_id`, a coop ID, not a DID),
 ///   - `"agreement"` edges between the two parties of each clearing agreement
 ///     (same source as `list_agreements`).
+///
+/// Edge sources (`from`) are cooperative IDs consistently for both kinds; they are never DIDs.
 ///
 /// **Honesty / scope.** This is a *relationship graph derived from existing vouch and
 /// agreement records* — it is NOT a live network-connectivity view (it says nothing about
@@ -485,6 +510,18 @@ pub async fn vouch_for_coop(
 ///
 /// An empty federation (no coops, no edges) returns `{"nodes":[],"edges":[]}` cleanly — it
 /// is not an error. In standalone mode an uninitialized registry is also treated as empty.
+/// Real (non-"not initialized") failures from the underlying store propagate as 500.
+#[utoipa::path(
+    get,
+    path = "/federation/topology",
+    tag = "federation",
+    responses(
+        (status = 200, description = "Federation relationship graph (nodes + vouch/agreement edges)", body = FederationTopologyResponse),
+        (status = 401, description = "Unauthorized (missing or invalid federation:read scope)"),
+        (status = 500, description = "Internal server error (real store/internal failure, never an empty graph)")
+    ),
+    security(("bearer_auth" = []))
+)]
 #[get("/topology")]
 pub async fn get_topology(
     http_req: HttpRequest,
@@ -541,14 +578,23 @@ pub async fn get_topology(
     }
 
     // Standalone fallback: gateway-local FederationManager.
-    // An uninitialized registry surfaces as an error from these calls; treat that as an
-    // empty federation so the empty graph returns cleanly rather than 4xx/5xx.
-    let coops = fed_mgr.list_cooperatives().await.unwrap_or_default();
+    //
+    // An *uninitialized* registry is a legitimate "empty federation" — surface it as an
+    // empty graph (200), not an error. But a *real* failure (e.g. an internal store error)
+    // must NOT be silently flattened into an empty graph: that would hide outages and
+    // mislead clients into believing the federation has no members. We therefore convert
+    // only the "not initialized" signal to empty and propagate every other error.
+    //
+    // FederationManager distinguishes these the same way every sibling read does: the
+    // not-initialized guard returns `GatewayError::BadRequest("Federation not initialized")`,
+    // while underlying store failures return `GatewayError::InternalError`. `empty_if_uninitialized`
+    // matches that exact convention — it does not invent a new one.
+    let coops = empty_if_uninitialized(fed_mgr.list_cooperatives().await)?;
 
     let mut edges: Vec<TopologyEdge> = Vec::new();
 
     for coop in &coops {
-        let vouchers = fed_mgr.get_vouches(&coop.coop_id).await.unwrap_or_default();
+        let vouchers = empty_if_uninitialized(fed_mgr.get_vouches(&coop.coop_id).await)?;
         for voucher in vouchers {
             edges.push(TopologyEdge {
                 from: voucher,
@@ -559,7 +605,7 @@ pub async fn get_topology(
         }
     }
 
-    let agreements = fed_mgr.list_agreements().await.unwrap_or_default();
+    let agreements = empty_if_uninitialized(fed_mgr.list_agreements().await)?;
     for a in agreements {
         edges.push(TopologyEdge {
             from: a.coop_a,
@@ -1322,7 +1368,8 @@ mod tests {
                 }
             }
             fn get_vouches_for(&self, _coop_id: &str) -> anyhow::Result<Vec<String>> {
-                Ok(vec!["did:icn:voucher-stub".to_string()])
+                // Vouch edge sources are coop IDs (stored voucher_coop_id), not DIDs.
+                Ok(vec!["voucher-coop-stub".to_string()])
             }
             fn list_agreements(&self) -> anyhow::Result<Vec<ClearingAgreementView>> {
                 Ok(vec![])
@@ -1507,7 +1554,8 @@ mod tests {
                 }
             }
             fn get_vouches_for(&self, _: &str) -> anyhow::Result<Vec<String>> {
-                Ok(vec!["did:icn:voucher-gov".to_string()])
+                // Vouch edge sources are coop IDs (stored voucher_coop_id), not DIDs.
+                Ok(vec!["voucher-coop-gov".to_string()])
             }
             fn list_agreements(&self) -> anyhow::Result<Vec<ClearingAgreementView>> {
                 Ok(vec![ClearingAgreementView {
@@ -1712,7 +1760,7 @@ mod tests {
         assert_eq!(resp.status().as_u16(), 200);
         let body: serde_json::Value = test::read_body_json(resp).await;
         assert_eq!(
-            body["vouches"][0], "did:icn:voucher-gov",
+            body["vouches"][0], "voucher-coop-gov",
             "must come from FederationService (governance path)"
         );
     }
@@ -2226,8 +2274,43 @@ mod tests {
 
     // ── topology tests (D5: read-only relationship graph) ─────────────────────
 
-    /// The topology route must be wired (not 404). Without auth claims it should
-    /// reach the handler and fail on require_scope, NOT return 404.
+    /// `empty_if_uninitialized` must collapse ONLY the "not initialized" signal to an empty
+    /// value and propagate every other error. This is the contract that keeps the standalone
+    /// topology fallback from masking real store/internal failures as an empty graph.
+    // NB: `use actix_web::test` (above) shadows the bare `#[test]` attribute with actix's
+    // async-test macro, so a synchronous unit test must name the std attribute explicitly.
+    #[::core::prelude::v1::test]
+    fn test_empty_if_uninitialized_distinguishes_empty_from_real_error() {
+        // Ok values pass through unchanged.
+        let ok: Result<Vec<u8>> = Ok(vec![1, 2, 3]);
+        assert_eq!(empty_if_uninitialized(ok).unwrap(), vec![1, 2, 3]);
+
+        // The "not initialized" BadRequest signal becomes the default (empty) value.
+        let not_init: Result<Vec<u8>> = Err(GatewayError::BadRequest(
+            "Federation not initialized".to_string(),
+        ));
+        assert!(
+            empty_if_uninitialized(not_init).unwrap().is_empty(),
+            "not-initialized must collapse to an empty value"
+        );
+
+        // A genuine internal/store failure must propagate, NOT flatten to empty.
+        let internal: Result<Vec<u8>> = Err(GatewayError::InternalError(
+            "sled store read failed".to_string(),
+        ));
+        let propagated = empty_if_uninitialized(internal);
+        assert!(
+            matches!(propagated, Err(GatewayError::InternalError(_))),
+            "real internal errors must propagate, not be swallowed into an empty graph"
+        );
+    }
+
+    /// The topology route must be wired AND must enforce auth. Without auth claims the
+    /// request should reach the handler and fail inside `require_scope`, which returns
+    /// `AuthenticationFailed` (HTTP 401) when no claims are present — not a 404 (route
+    /// missing) and not a 5xx (handler ran past the auth gate). Asserting the exact 401
+    /// proves the request reached the handler's scope check rather than passing on an
+    /// unrelated error.
     #[actix_web::test]
     async fn test_topology_route_matches() {
         let fed_mgr = Arc::new(FederationManager::new());
@@ -2245,10 +2328,12 @@ mod tests {
             .uri("/v1/federation/topology")
             .to_request();
         let resp = test::call_service(&app, req).await;
-        assert_ne!(
+        assert_eq!(
             resp.status().as_u16(),
-            404,
-            "Federation topology route should match (got 404 = route not found)"
+            401,
+            "no-claims request must reach the handler and be rejected by require_scope \
+             with 401 (got {} — 404 = route not wired, other = auth gate bypassed)",
+            resp.status().as_u16()
         );
     }
 
@@ -2307,7 +2392,8 @@ mod tests {
             .iter()
             .find(|e| e["kind"] == "vouch")
             .expect("must have a vouch edge");
-        assert_eq!(vouch["from"], "did:icn:voucher-gov");
+        // Edge source is the voucher's coop ID (stored voucher_coop_id), not a DID.
+        assert_eq!(vouch["from"], "voucher-coop-gov");
         assert_eq!(vouch["to"], "governance-coop");
         assert!(
             vouch.get("agreement_id").is_none() || vouch["agreement_id"].is_null(),
@@ -2390,8 +2476,12 @@ mod tests {
         );
     }
 
-    /// Verify that get_topology falls back to FederationManager when no service is present
-    /// (route still matches and serves rather than routing-failing).
+    /// Verify that get_topology actually *serves from* the FederationManager fallback path
+    /// when no service is present. With valid claims and an uninitialized manager, the
+    /// fallback must return 200 with an empty `{nodes:[],edges:[]}` graph — not merely
+    /// "not 404". Asserting the 200 + empty shape proves the request flowed through the
+    /// standalone fallback (uninitialized → empty) rather than erroring or short-circuiting,
+    /// and guards against future regressions that would turn the fallback into a 4xx/5xx.
     #[actix_web::test]
     async fn test_topology_falls_back_to_fed_mgr_when_no_service() {
         use actix_web::HttpMessage;
@@ -2420,11 +2510,26 @@ mod tests {
         req.extensions_mut().insert(claims);
 
         let resp = test::call_service(&app, req).await;
-        // Fallback path serves cleanly (uninitialized → empty graph), and the route matched.
-        assert_ne!(
+        // Fallback path must serve from the gateway-local FederationManager: uninitialized
+        // registry → clean empty graph with a 200, proving the fallback actually ran.
+        assert_eq!(
             resp.status().as_u16(),
-            404,
-            "route must match even without FederationService (fell through to fed_mgr path)"
+            200,
+            "fallback path must serve a 200 empty graph from FederationManager when no service \
+             is injected (got {})",
+            resp.status().as_u16()
+        );
+
+        let body: serde_json::Value = test::read_body_json(resp).await;
+        assert_eq!(
+            body["nodes"].as_array().expect("nodes array").len(),
+            0,
+            "uninitialized fallback must serve zero nodes"
+        );
+        assert_eq!(
+            body["edges"].as_array().expect("edges array").len(),
+            0,
+            "uninitialized fallback must serve zero edges"
         );
     }
 
