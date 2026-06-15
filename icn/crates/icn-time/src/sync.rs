@@ -357,7 +357,7 @@ pub async fn start_clock_sync_task(mut sync: ClockSync, interval: Duration) {
     }
 }
 
-// Use system random for nonce generation
+// Use the thread-local RNG (rand::rng()) for nonce generation
 mod rand {
     pub fn random<T>() -> T
     where
