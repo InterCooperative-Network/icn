@@ -12,22 +12,22 @@ utoipa = ["dep:utoipa"]
 
 [dependencies]
 # Kernel API for PolicyOracle trait and types
-icn-kernel-api = { path = "../../icn/crates/icn-kernel-api" }
+icn-kernel-api = { path = "../../crates/icn-kernel-api" }
 
 # Internal ledger implementation (not exposed to kernel)
-icn-ledger = { path = "../../icn/crates/icn-ledger" }
+icn-ledger = { path = "../../crates/icn-ledger" }
 
 # Identity types (for Did conversion)
-icn-identity = { path = "../../icn/crates/icn-identity" }
+icn-identity = { path = "../../crates/icn-identity" }
 
 # Storage
-icn-store = { path = "../../icn/crates/icn-store" }
+icn-store = { path = "../../crates/icn-store" }
 
 # Contract execution (for ContractRuntime, ContractActor, CharterValidator)
-icn-ccl = { path = "../../icn/crates/icn-ccl" }
+icn-ccl = { path = "../../crates/icn-ccl" }
 
 # Observability (for treasury validation metrics)
-icn-obs = { path = "../../icn/crates/icn-obs" }
+icn-obs = { path = "../../crates/icn-obs" }
 
 # Sync primitives (for PolicyOracle sync requirement)
 parking_lot = "0.12"
@@ -42,7 +42,7 @@ uuid = { version = "1", features = ["v4", "serde"] }
 sled = "0.34"
 
 # Time utilities (for budgets, escrow, recurring payments)
-icn-time = { path = "../../icn/crates/icn-time" }
+icn-time = { path = "../../crates/icn-time" }
 
 # Error handling
 anyhow = "1.0"
