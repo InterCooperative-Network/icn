@@ -26,7 +26,7 @@
 //! ```
 
 use hkdf::Hkdf;
-use ml_dsa::{KeyGen, MlDsa65, Seed};
+use ml_dsa::{Keypair, MlDsa65, Seed, SigningKey};
 use pqcrypto_mldsa::mldsa65::{
     detached_sign, keypair, verify_detached_signature, DetachedSignature, PublicKey, SecretKey,
 };
@@ -165,15 +165,17 @@ impl MlDsaKeypair {
 
         let seed = Seed::from(rng_seed);
 
-        // Generate keypair using the pure-Rust ml-dsa crate
-        let kp = MlDsa65::from_seed(&seed);
+        // Generate the signing key deterministically with the pure-Rust ml-dsa crate.
+        // ml-dsa 0.1.1 removed the `KeyGen` trait and `MlDsa65::from_seed`; keygen now
+        // lives on `SigningKey::<P>::from_seed`, and the expanded signing key is reached
+        // via `expanded_key()` rather than directly on the signing key.
+        let signing_key = SigningKey::<MlDsa65>::from_seed(&seed);
+        let verifying_key = signing_key.verifying_key();
 
-        // Extract key bytes using encode() methods
-        let signing_key = kp.signing_key();
-        let verifying_key = kp.verifying_key();
-
+        // Extract FIPS 204 byte encodings compatible with the pqcrypto sign/verify path:
+        // expanded signing key (4032 bytes) and verifying key (1952 bytes).
         #[allow(deprecated)]
-        let sk_encoded = signing_key.to_expanded();
+        let sk_encoded = signing_key.expanded_key().to_expanded();
         let pk_encoded = verifying_key.encode();
 
         Ok(Self {

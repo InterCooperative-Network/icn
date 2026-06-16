@@ -18,7 +18,7 @@ pqcrypto-mlkem = "0.1"       # ML-KEM (FIPS 203) - Module-Lattice Key Encapsulat
 pqcrypto-traits = "0.3"
 
 # Pure Rust ML-DSA for deterministic key generation (accepts custom RNG)
-ml-dsa = "0.1.0-rc.4"
+ml-dsa = "0.1.1"
 
 # Threshold cryptography
 # vsss-rs = "4.0"            # Verifiable secret sharing (add when needed)
