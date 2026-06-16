@@ -47,5 +47,5 @@ The summit is a NYCN activity and program domain, not a platform primitive. ICN 
 ## Current Status
 
 - Canonical platform boundary remains [`docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md`](../../docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md)
-- Repo-grounded NYCN architecture remains in [`docs/strategy/NYCN-Repo-Architecture-Spec.md`](../../docs/strategy/NYCN-Repo-Architecture-Spec.md)
+- Conceptual ICN/NYCN package-boundary clarification is in [`docs/strategy/ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md`](../../docs/strategy/ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md)
 - This package is the operational home for institution-owned artifacts going forward
