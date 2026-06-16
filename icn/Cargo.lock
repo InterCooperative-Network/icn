@@ -3352,11 +3352,16 @@ name = "icn-governance-app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ed25519-dalek",
  "icn-governance",
  "icn-identity",
  "icn-kernel-api",
  "icn-store",
  "parking_lot 0.12.5",
+ "rand 0.8.5",
+ "sled",
+ "tempfile",
+ "tokio",
  "tracing",
 ]
 
