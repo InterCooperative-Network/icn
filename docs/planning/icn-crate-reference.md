@@ -391,7 +391,7 @@ Handles: coop lifecycle, member applications, charter management, treasury manag
 --gateway-enable         Enable REST/WebSocket Gateway API
 --gateway-bind <addr>    Gateway bind address
 --gateway-jwt-secret     JWT signing key
---insecure-gateway-no-jwt  Dev only, skip JWT
+--insecure-gateway-no-jwt  Local-dev only; loopback bind only (fails closed otherwise)
 --validate-config        CI/CD config validation
 --tracing               OpenTelemetry distributed tracing
 ```

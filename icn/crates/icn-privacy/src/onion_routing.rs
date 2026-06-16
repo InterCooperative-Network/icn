@@ -288,7 +288,7 @@ impl OnionRouter {
     /// Generates ephemeral keypair, derives shared secret via ECDH, then encrypts.
     fn encrypt_layer(&self, plaintext: &[u8], recipient_pubkey: &PublicKey) -> Result<OnionLayer> {
         // Generate ephemeral keypair for this layer
-        let ephemeral_secret = StaticSecret::random_from_rng(rand::thread_rng());
+        let ephemeral_secret = StaticSecret::random_from_rng(rand_core::OsRng);
         let ephemeral_pubkey = PublicKey::from(&ephemeral_secret);
 
         // Derive shared secret via ECDH
@@ -299,7 +299,7 @@ impl OnionRouter {
 
         // Generate random nonce
         let mut nonce_bytes = [0u8; 12];
-        rand::thread_rng().fill_bytes(&mut nonce_bytes);
+        rand::rng().fill_bytes(&mut nonce_bytes);
         let nonce = Nonce::from(nonce_bytes);
 
         // Encrypt
@@ -400,7 +400,7 @@ mod tests {
     fn make_test_did() -> (Did, StaticSecret, PublicKey) {
         let keypair = KeyPair::generate().unwrap();
         let did = keypair.did().clone();
-        let secret = StaticSecret::random_from_rng(rand::thread_rng());
+        let secret = StaticSecret::random_from_rng(rand_core::OsRng);
         let pubkey = PublicKey::from(&secret);
         (did, secret, pubkey)
     }

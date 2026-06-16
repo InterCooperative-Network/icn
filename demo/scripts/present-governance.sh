@@ -64,6 +64,11 @@ if ss -tlnp 2>/dev/null | grep -q ":${PORT} " || \
   exit 1
 fi
 
+# Dev-gated demo endpoints (POST /v1/commons/dev/bootstrap-standing) used by
+# demo-governance.py. Local demo node only — never set these in production.
+export ICN_ENABLE_ADMIN_ENDPOINTS=true
+export ICN_GOVERNANCE_BUILD_MODE=test
+
 # 1. Build (skip if binary is fresh)
 ICND="$ICN_ROOT/target/debug/icnd"
 if [ -f "$ICND" ] && [ "$ICND" -nt "$ICN_ROOT/Cargo.lock" ]; then

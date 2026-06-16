@@ -20,7 +20,7 @@
 
 use anyhow::Result;
 use ed25519_dalek::SigningKey;
-use rand::rngs::OsRng;
+use rand_core::OsRng;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::info;

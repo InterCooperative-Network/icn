@@ -14,10 +14,12 @@
 - **Keystore**: `~/.icn/identity.age` (empty passphrase)
 - **Cooperative**: `test-coop` (created, user is Steward)
 
-### Active Token (valid ~1 hour from 01:30 UTC)
+### Token (intentionally redacted — generate a fresh one)
 ```
-eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkaWQ6aWNuOno4cDZoa0hhRkZNMmFNaldmaHNrc3ZVeDNBV3Q3WlZGaGpUc3hMbjkzTWFSUiIsImlhdCI6MTc2NTY3NTg0NiwiZXhwIjoxNzY1Njc5NDQ2LCJjb29wX2lkIjoidGVzdC1jb29wIiwic2NvcGVzIjpbImNvb3A6cmVhZCIsImNvb3A6d3JpdGUiLCJjb29wOmFkbWluIiwibGVkZ2VyOnJlYWQiLCJsZWRnZXI6d3JpdGUiLCJnb3Y6cmVhZCIsImdvdjp3cml0ZSJdfQ.q2vwo2ncX1PfEizO0ZPnZ5xAKQeV3ajkQZOzuYq7_ko
+<expired-dev-token-redacted>
 ```
+
+The original token was removed during sanitization and had a ~1 hour lifetime anyway. Generate a replacement with the "Get New Token" command below.
 
 **Scopes**: coop:read, coop:write, coop:admin, ledger:read, ledger:write, gov:read, gov:write
 

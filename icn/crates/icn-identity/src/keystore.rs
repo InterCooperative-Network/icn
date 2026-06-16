@@ -1130,7 +1130,8 @@ impl KeyStore for AgeKeyStore {
                 warn!("⚠️  Generating X25519 encryption keys");
 
                 // Generate X25519 keys
-                use rand::rngs::OsRng;
+                // rand_core 0.6 OsRng: x25519-dalek 2.x pins rand_core 0.6
+                use rand_core::OsRng;
                 use x25519_dalek::{PublicKey, StaticSecret};
 
                 let secret_key = StaticSecret::random_from_rng(OsRng);

@@ -54,6 +54,8 @@ icn-testkit.workspace = true
 tokio = { workspace = true, features = ["test-util", "rt-multi-thread", "macros"] }
 tempfile = "3.24"
 rand.workspace = true
+# rand_core 0.6 OsRng for ed25519-dalek 2.x interop in tests (dalek pins rand_core 0.6)
+rand_core = { workspace = true }
 wiremock = "0.6"
 
 [lints]

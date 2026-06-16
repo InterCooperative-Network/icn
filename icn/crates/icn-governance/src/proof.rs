@@ -1164,6 +1164,7 @@ fn outcome_ordinal(outcome: ProofOutcome) -> u8 {
 /// added when a corresponding write path lands; the runtime never emits a
 /// transition not listed here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 #[serde(rename_all = "snake_case")]
 pub enum ActionItemTransition {
     /// The action item moved into `ActionItemStatus::Completed`. The
@@ -1181,6 +1182,7 @@ pub enum ActionItemTransition {
 ///
 /// Equality is anchored to `record_hash`.
 #[derive(Clone, Debug, Serialize, Deserialize)]
+#[cfg_attr(feature = "utoipa", derive(utoipa::ToSchema))]
 pub struct ActionItemCompletionReceipt {
     /// Action item id (string form of `ActionItemId`). This is the same
     /// string the holder's `ActionCard.source_id` carries — it is the
@@ -1198,7 +1200,9 @@ pub struct ActionItemCompletionReceipt {
     /// Unix-seconds the transition was recorded (typically the
     /// `updated_at` of the post-transition action item).
     pub completed_at: u64,
-    /// blake3 canonical record hash binding the fields above.
+    /// blake3 canonical record hash binding the fields above (serialized
+    /// as a JSON array of 32 bytes).
+    #[cfg_attr(feature = "utoipa", schema(value_type = Vec<u8>, max_items = 32, min_items = 32))]
     pub record_hash: Hash,
 }
 

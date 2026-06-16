@@ -808,8 +808,8 @@ impl<S: Store + 'static> RpcAuthManager<S> {
     /// Generate cryptographically random nonce
     fn generate_nonce(&self) -> String {
         use rand::Rng;
-        let mut rng = rand::thread_rng();
-        let nonce_bytes: [u8; 32] = rng.gen();
+        let mut rng = rand::rng();
+        let nonce_bytes: [u8; 32] = rng.random();
         hex::encode(nonce_bytes)
     }
 

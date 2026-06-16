@@ -318,6 +318,56 @@ To rotate: remove `/var/lib/icn/.firstboot-complete` AND the keystore
 file `/var/lib/icn/identity.age` (plus `config.toml` / `genesis.json` in
 the same directory), then reboot or rerun firstboot.
 
+## Demo profile (DEV/DEMO image variant)
+
+`ICN_APPLIANCE_DEMO_PROFILE=1` at build time produces a **demo image**: the
+base appliance plus everything needed to run the member loop
+**standing -> action card -> discharge -> receipt -> evidence** against the
+VM's own node, from a stranger's browser on the host.
+
+What it adds (and the base image does NOT have):
+
+| Piece | Where | What it is |
+|---|---|---|
+| member-shell + pilot-ui fixtures | `/usr/share/icn/static/web/` | static reference client (#2026), fixture + live-local modes |
+| `icn-member-shell.service` | `:8090` | python3 stdlib static server, dev-only |
+| `20-demo-profile.conf` drop-in | `icnd.service.d/` | gateway bind `0.0.0.0:8080` (hostfwd reachability), dev gates (`ICN_ENABLE_ADMIN_ENDPOINTS`, `ICN_GOVERNANCE_BUILD_MODE=test`), `ICN_CORS_ORIGINS` for the shell |
+| `icn-demo-seed` | `/usr/local/sbin/` | seeds NYCN fixture institution + one open action item; prints the dev session JWT + URLs |
+| `icn-demo-verify` | `/usr/local/sbin/` | receipt binding check; `--chain` runs the bundled 13/13 governed receipt-chain rehearsal on an ephemeral in-VM node |
+| `icn-demo-reset` | `/usr/local/sbin/` | destructive reset: wipe node state, re-run firstboot, reseed |
+| NYCN package + dogfood kit + 13/13 scripts | `/usr/share/icn/demo/` | fixture institution and bundled evidence tooling |
+
+Build and smoke it:
+
+```bash
+export ICN_APPLIANCE_BASE_IMAGE=/path/to/debian-13-genericcloud-amd64.qcow2
+export ICN_APPLIANCE_OUTPUT_DIR=$HOME/icn-appliance-build
+export ICN_APPLIANCE_VERSION=0.0.2-demo
+export ICN_APPLIANCE_DEMO_PROFILE=1
+bash deploy/appliance/build-image.sh --real
+
+ICN_APPLIANCE_IMAGE=$ICN_APPLIANCE_OUTPUT_DIR/icn-appliance-0.0.2-demo-amd64.qcow2 \
+ICN_APPLIANCE_SSH_KEY=... ICN_APPLIANCE_CLOUD_INIT_SEED=... \
+bash deploy/appliance/smoke/smoke-local.sh --real --demo
+```
+
+`--demo` forwards the gateway (host `18080`) and shell (host `18090`), seeds
+the loop in-VM, then drives **standing -> card -> complete -> receipt** from
+the host through the forwarded ports — the same path a stranger's browser
+takes — and checks the receipt's 32-byte `record_hash` binding.
+
+Honesty labels for the demo image:
+
+- **Live-local:** node boot, health, standing/action-card/receipt endpoints,
+  action-item discharge, completion receipt, 13/13 receipt-chain rehearsal
+  (`icn-demo-verify --chain`). All on the VM's own node.
+- **Fixture-backed:** the shell's `?mode=demo` surfaces (self-labeled), the
+  NYCN institution package (fictional data).
+- **Not present / not claimed:** production posture, signed image, pilot
+  adoption, federation, multi-org deployment, real member data. The dev
+  gates in the drop-in are the same labeled non-production gates the local
+  devnet uses — never enable them outside a disposable demo VM.
+
 ## Security posture (dev-image, not production)
 
 - **No secrets are committed in this directory or embedded in the image.**

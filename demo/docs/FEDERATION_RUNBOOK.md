@@ -263,7 +263,7 @@ kubectl exec -n icn-coop-gamma <pod> -- ss -tlnp | grep 8080
 
 If 8080 is not bound: the gateway patch may have rolled back. Re-apply:
 ```bash
-cd /home/ubuntu/projects/icn
+cd "$(git rev-parse --show-toplevel)"
 kubectl patch deployment icn-gamma -n icn-coop-gamma --type=strategic --patch '{
   "spec":{"template":{"spec":{"containers":[{
     "name":"icnd",

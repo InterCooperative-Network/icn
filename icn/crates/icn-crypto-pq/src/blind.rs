@@ -43,7 +43,7 @@ impl BlindingFactor {
     /// Generate a random blinding factor
     pub fn generate() -> Self {
         let mut value = [0u8; 32];
-        rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut value);
+        rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut value);
         Self { value }
     }
 
@@ -270,7 +270,7 @@ mod tests {
     use super::*;
 
     fn generate_keypair() -> (SigningKey, VerifyingKey) {
-        let signing_key = SigningKey::generate(&mut rand::rngs::OsRng);
+        let signing_key = SigningKey::generate(&mut rand_core::OsRng);
         let verifying_key = signing_key.verifying_key();
         (signing_key, verifying_key)
     }
@@ -400,7 +400,7 @@ mod tests {
 
         // Create token
         let mut token_id = [0u8; 32];
-        rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut token_id);
+        rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut token_id);
 
         let mut issuer_id = [0u8; 32];
         issuer_id.copy_from_slice(verifying_key.as_bytes());

@@ -584,8 +584,8 @@ impl ChallengeScheduler {
         let tree = ContentChunkTree::new(content.clone(), self.config.chunk_size);
         let expected_merkle_root = tree.root();
 
-        // Random byte offset (using gen_range to avoid modulo bias)
-        let byte_offset = rand::thread_rng().gen_range(0..content_size);
+        // Random byte offset (using random_range to avoid modulo bias)
+        let byte_offset = rand::rng().random_range(0..content_size);
         // Compute byte length: min of configured sample size and remaining content
         let byte_length = self
             .config
@@ -607,7 +607,7 @@ impl ChallengeScheduler {
         let blocks_to_challenge = self.config.blocks_per_challenge.min(num_chunks);
         let chunk_indices: Vec<u32> = {
             use rand::seq::index::sample;
-            let mut rng = rand::thread_rng();
+            let mut rng = rand::rng();
             sample(&mut rng, num_chunks as usize, blocks_to_challenge as usize)
                 .into_iter()
                 .map(|i| i as u32)

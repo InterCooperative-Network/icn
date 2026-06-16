@@ -11,8 +11,8 @@
 ### Pre-Demo Checklist (2 minutes)
 
 ```bash
-# From repository root
-cd /home/ubuntu/projects/icn
+# Move to the repo root (works from any subdirectory in the checkout)
+cd "$(git rev-parse --show-toplevel)"
 
 # 1. Verify everything is ready
 ./demo/scripts/quick-test.sh

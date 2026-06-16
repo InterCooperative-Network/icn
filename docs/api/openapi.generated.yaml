@@ -31,6 +31,9 @@ info:
     name: MIT OR Apache-2.0
     url: https://opensource.org/licenses/MIT
   version: 0.1.0
+servers:
+- url: /v1
+  description: Gateway API base path (all routes are mounted under /v1)
 paths:
   /federation/clearing/{id}/propose-adoption:
     post:
@@ -80,6 +83,217 @@ paths:
           description: Source agreement not found in direct-management registry
         '500':
           description: Internal server error
+      security:
+      - bearer_auth: []
+  /federation/topology:
+    get:
+      tags:
+      - federation
+      summary: GET /federation/topology - Read-only federation relationship graph
+      description: |-
+        Returns a narrow `{nodes, edges}` graph of the federation:
+        - `nodes` are the cooperatives known to the registry (same source as `list_coops`).
+        - `edges` are relationships between cooperatives:
+          - `"vouch"` edges from each voucher's **coop ID** to the vouched-for coop (same source as
+            `get_vouches` — the stored `voucher_coop_id`, a coop ID, not a DID),
+          - `"agreement"` edges between the two parties of each clearing agreement
+            (same source as `list_agreements`).
+
+        Both edge endpoints (`from` and `to`) are **node IDs** (cooperative IDs) consistently for both
+        kinds; they are never DIDs. Agreement records store party DIDs in `coop_a`/`coop_b` on the
+        governance backend, so each endpoint is resolved through the registry's `public_did -> coop_id`
+        map before being emitted — guaranteeing every edge endpoint matches a node in `nodes`.
+
+        **Honesty / scope.** This is a *relationship graph derived from existing vouch and
+        agreement records* — it is NOT a live network-connectivity view (it says nothing about
+        which peers are currently online or reachable) and NOT a clearing/economic view. It
+        carries **no** clearing positions, balances, or settlement amounts; those are intentionally
+        out of scope and reserved for a separate future economic-view endpoint. Agreement edges
+        carry only the agreement ID for provenance, never amounts.
+
+        Prefers the supervisor-owned `FederationService` (governance-originated state). In
+        standalone mode it falls back to the gateway-local `FederationManager`. The two paths
+        are separate stores (ADR 0012) and this endpoint reflects exactly one.
+
+        An empty federation (no coops, no edges) returns `{"nodes":[],"edges":[]}` cleanly — it
+        is not an error. In standalone mode an uninitialized registry is also treated as empty.
+        Real (non-"not initialized") failures from the underlying store propagate as 500.
+      operationId: get_topology
+      responses:
+        '200':
+          description: Federation relationship graph (nodes + vouch/agreement edges)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FederationTopologyResponse'
+        '401':
+          description: Unauthorized (missing or invalid federation:read scope)
+        '500':
+          description: Internal server error (real store/internal failure, never an empty graph)
+      security:
+      - bearer_auth: []
+  /gov/domains/{domain_id}/action-items/{item_id}/completion-receipt:
+    get:
+      tags:
+      - governance
+      summary: |-
+        GET /gov/domains/{domain_id}/action-items/{item_id}/completion-receipt
+        — Retrieve the latest [`ActionItemCompletionReceipt`] persisted for an
+        action item, if any.
+      description: |-
+        Closes the proof loop documented in `docs/dev/NYCN_K3S_PROOF_PATH.md`
+        and `docs/dev/NYCN_ACTION_ITEM_RECEIPT_PATH.md`: a holder shell that
+        completed an `action_item / complete` action card can read the
+        `ActionItemCompletionReceipt` back via HTTP, instead of relying on
+        in-process tests or on-disk Sled inspection.
+
+        Authorization mirrors the rest of the action-item read surface:
+        `governance:read` scope plus domain membership for the caller. The
+        receipt's bound `domain_id` is also asserted to match the path
+        parameter so a holder cannot probe across domain boundaries.
+
+        Returns:
+        - 200 with the receipt JSON when a completion receipt has been
+          persisted for the item under this domain.
+        - 404 when no receipt exists, when the item id does not match the
+          stored receipt's `domain_id`, or when the manager has no receipt
+          store wired (the receipt simply does not exist from the caller's
+          point of view).
+      operationId: get_action_item_completion_receipt
+      parameters:
+      - name: domain_id
+        in: path
+        description: Governance domain the action item lives under
+        required: true
+        schema:
+          type: string
+      - name: item_id
+        in: path
+        description: Action item id (UUID). This is the same string an `action_item`-sourced action card carries in `source_id` — it links the card to its receipt. Accepts any valid UUID form; canonicalized before lookup.
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Latest completion receipt persisted for the action item under this domain. `record_hash` is the blake3 canonical record hash binding the receipt fields, serialized as a JSON array of 32 bytes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionItemCompletionReceipt'
+        '400':
+          description: Malformed action item id (not a valid UUID)
+        '401':
+          description: Missing or invalid bearer token
+        '403':
+          description: Token lacks the `governance:read` scope, or the caller is not a member of the domain
+        '404':
+          description: No completion receipt persisted for this item, the receipt is bound to a different domain (cross-domain existence is not leaked), or the domain does not exist
+      security:
+      - bearer_auth: []
+  /gov/me/action-cards:
+    get:
+      tags:
+      - governance
+      summary: GET /gov/me/action-cards — Return pending action cards for the caller.
+      description: |-
+        Action cards are derived views — computed at request time from the caller's
+        `/me/standing` inputs plus open governance state. There is no mutation API;
+        the card carries a `source_id` and the holder acts on the underlying
+        object. See ADR-0027.
+
+        ## Sources currently emitted
+
+        - `proposal` / `vote` — Open proposals in domains where the caller has
+          voting standing and has not yet voted.
+        - `meeting` / `attend` — Meetings scheduled in the next 48 h where the
+          caller is on the attendee list.
+        - `action_item` / `complete` — Open action items assigned to the caller.
+
+        ## Sources reserved (not emitted today)
+
+        - `signal_rule` — pending icn#1631
+        - `obligation_lifecycle` — pending icn#1634
+
+        Per ADR-0027 the taxonomy is closed; new variants land alongside their
+        source-path implementation.
+
+        ## Self-only
+
+        There is no `did` query parameter. The caller's DID is always derived from
+        the authenticated claims; no card-set for a third party is reachable here.
+      operationId: get_my_action_cards
+      responses:
+        '200':
+          description: Pending action cards for the caller, wrapped in `ActionCardsResponse` (`{did, cards, generated_at}`) — **not** a bare array. Cards are derived views computed at request time from the caller's standing plus open governance state; there is no mutation API on this surface — the holder acts on the underlying object named by `source_id` (ADR-0027). `cards` may be empty. Source/action/scope/risk fields use the closed enums `ActionCardSourceKind`, `ActionCardActionKind`, `ActionCardScope`, and `ActionCardRiskLevel`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionCardsResponse'
+        '401':
+          description: Missing or invalid bearer token
+        '403':
+          description: Token lacks the `governance:read` scope
+      security:
+      - bearer_auth: []
+  /gov/me/standing:
+    get:
+      tags:
+      - governance
+      summary: GET /gov/me/standing — Return the authenticated caller's institutional standing.
+      description: |-
+        Composes existing governance state (domain membership + structure role
+        assignments) into one read model so member-facing UI does not have to
+        fan out to four endpoints.
+
+        ## What this returns
+
+        - The caller's DID (always — derived from the authenticated claims, not
+          from a query parameter).
+        - Each governance domain whose static member list contains the caller, or
+          whose membership is sourced from a trust threshold (status `"unverified"`
+          in that case — the trust graph is the source of truth, not this read
+          model).
+        - Each structure role assignment held by the caller, joined with cheap
+          structure metadata (name + parent entity) so the UI does not need a
+          second fetch per row.
+        - The deduplicated union of `authority_scope` across those role
+          assignments, as a convenience for UI.
+
+        ## Self-only
+
+        There is no `did` query parameter. The DID is always the caller's. A
+        caller cannot use this endpoint to inspect another DID's standing.
+
+        ## Optional filter
+
+        `?domain_id=<id>` narrows both `domains` and `roles` to assignments under
+        that domain. An unknown `domain_id` returns a valid empty standing rather
+        than a 404 — "no standing in that domain" is a meaningful answer.
+
+        ## Empty caller is not an error
+
+        A caller with no role assignments and no static membership receives a
+        200 with empty `domains`, `roles`, and `authority_scopes`. UI should
+        render an onboarding affordance, not an error.
+      operationId: get_my_standing
+      parameters:
+      - name: domain_id
+        in: query
+        description: Narrow `domains` and `roles` to one governance domain. An unknown `domain_id` returns a valid empty standing (200), not a 404 — "no standing in that domain" is a meaningful answer.
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: 'The caller''s institutional standing. Self-only: the DID is always derived from the authenticated token; another DID''s standing is not reachable here. A caller with no memberships and no role assignments receives 200 with empty `domains`, `roles`, and `authority_scopes` — empty standing is not an error.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandingResponse'
+        '401':
+          description: Missing or invalid bearer token
+        '403':
+          description: Token lacks the `governance:read` scope
       security:
       - bearer_auth: []
 components:
@@ -133,6 +347,232 @@ components:
             format: int64
           propertyNames:
             type: string
+    ActionCard:
+      type: object
+      description: |-
+        One pending action card for the authenticated caller.
+
+        Returned by `GET /v1/gov/me/action-cards`. Cards are **derived views** —
+        computed at request time from the caller's standing plus open governance
+        state — never stored entities. Two requests at the same moment from the
+        same DID return identical cards. See ADR-0027.
+
+        ## Boundary
+
+        All fields are generic. No institution-specific vocabulary. Institution
+        packages translate their local templates into these generic kinds; ICN
+        does not learn package-specific nouns from this surface.
+      required:
+      - id
+      - source_kind
+      - action_kind
+      - scope
+      - title
+      - summary
+      - authority_basis
+      - required_authority_scope
+      - risk_level
+      - accessibility_hint
+      - receipt_expected
+      - source_id
+      properties:
+        accessibility_hint:
+          type: string
+          description: |-
+            Accessibility note for the rendering shell. Generic across institutions;
+            today the runtime emits the same baseline note for all cards.
+        action_kind:
+          $ref: '#/components/schemas/ActionCardActionKind'
+        authority_basis:
+          type: string
+          description: |-
+            Why the caller has the right to act here, in plain language. Examples:
+            `"role_assignment_in_domain"`, `"assigned_action_item"`,
+            `"meeting_attendee"`.
+        deadline:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          description: |-
+            Optional Unix-seconds deadline. `None` means no time pressure encoded
+            by this card.
+          minimum: 0
+        domain_id:
+          type:
+          - string
+          - 'null'
+          description: Governance domain this card lives under, when known.
+        id:
+          type: string
+          description: |-
+            Stable, deterministic id of the card. Runtime format:
+            `card-<source_kind_snake>-<source_id>-<action_kind_snake>` (for example
+            `card-proposal-<id>-vote`, `card-meeting-<id>-attend`,
+            `card-action_item-<id>-complete`) so the same underlying object yields
+            the same card id across requests.
+        receipt_expected:
+          type: boolean
+          description: |-
+            Whether successful completion of this action is expected to produce a
+            receipt (governance receipt, attendance receipt, action-item completion
+            receipt).
+        required_authority_scope:
+          type: array
+          items:
+            type: string
+          description: |-
+            Authority-scope strings the kernel would expect for this action.
+            Generic; institution packages may use richer strings.
+        risk_level:
+          $ref: '#/components/schemas/ActionCardRiskLevel'
+        scope:
+          $ref: '#/components/schemas/ActionCardScope'
+        source_id:
+          type: string
+          description: Underlying object id (proposal id, meeting id, action item id).
+        source_kind:
+          $ref: '#/components/schemas/ActionCardSourceKind'
+        summary:
+          type: string
+          description: |-
+            One-line plain-language summary of what this card is asking the
+            holder to do.
+        title:
+          type: string
+          description: Short, plain-language title. Suitable for a list row.
+    ActionCardActionKind:
+      type: string
+      description: |-
+        What the holder is being asked to do. Closed taxonomy. New variants land
+        when their source path implementation lands.
+      enum:
+      - vote
+      - attend
+      - complete
+    ActionCardRiskLevel:
+      type: string
+      description: |-
+        Coarse risk indicator surfaced to the holder. UI may sort or annotate but
+        must not hide cards. Exact semantics are policy concerns; this enum carries
+        a conservative three-level vocabulary.
+      enum:
+      - low
+      - normal
+      - elevated
+    ActionCardScope:
+      type: string
+      description: |-
+        What the card targets. Maps to ICN's `entity / structure / individual`
+        constitutional axes; institution packages bind their local taxonomy to
+        these.
+      enum:
+      - entity
+      - structure
+      - individual
+    ActionCardSourceKind:
+      type: string
+      description: |-
+        Where a card is derived from. Closed taxonomy. Variants `SignalRule` and
+        `ObligationLifecycle` are reserved by issue #1646 for future implementation;
+        the runtime does not emit them today.
+      enum:
+      - proposal
+      - meeting
+      - action_item
+      - signal_rule
+      - obligation_lifecycle
+    ActionCardsResponse:
+      type: object
+      description: Wrapper response for `GET /me/action-cards`.
+      required:
+      - did
+      - cards
+      - generated_at
+      properties:
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/ActionCard'
+          description: Pending cards for the caller, derived at request time. May be empty.
+        did:
+          type: string
+          description: The authenticated caller's DID.
+        generated_at:
+          type: integer
+          format: int64
+          description: |-
+            Unix-seconds when this card set was computed. Snapshot only — nothing
+            is cached server-side.
+          minimum: 0
+    ActionItemCompletionReceipt:
+      type: object
+      description: |-
+        Cross-node deterministic completion receipt for a governance action
+        item.
+
+        Sits alongside [`GovernanceDecisionReceipt`] in ADR-0026 Layer 2: it
+        records the *fact* of a state transition the runtime can attest to,
+        keyed so a holder shell can locate it via the action card's `source_id`.
+
+        Equality is anchored to `record_hash`.
+      required:
+      - item_id
+      - domain_id
+      - actor_did
+      - transition
+      - completed_at
+      - record_hash
+      properties:
+        actor_did:
+          type: string
+          description: |-
+            DID of the actor whose authorized completion call produced this
+            receipt (must be the action item's assignee or creator at call
+            time, per the handler's authorization check).
+        completed_at:
+          type: integer
+          format: int64
+          description: |-
+            Unix-seconds the transition was recorded (typically the
+            `updated_at` of the post-transition action item).
+          minimum: 0
+        domain_id:
+          type: string
+          description: Governance domain the action item lives under.
+        item_id:
+          type: string
+          description: |-
+            Action item id (string form of `ActionItemId`). This is the same
+            string the holder's `ActionCard.source_id` carries — it is the
+            link between the card and the receipt.
+        record_hash:
+          type: array
+          items:
+            type: integer
+            format: int32
+            minimum: 0
+          description: |-
+            blake3 canonical record hash binding the fields above (serialized
+            as a JSON array of 32 bytes).
+          maxItems: 32
+          minItems: 32
+        transition:
+          $ref: '#/components/schemas/ActionItemTransition'
+          description: |-
+            Transition this receipt records. Closed enum; see
+            [`ActionItemTransition`].
+    ActionItemTransition:
+      type: string
+      description: |-
+        Closed taxonomy of state transitions that produce an
+        [`ActionItemCompletionReceipt`].
+
+        Today the only receipt-bearing transition is `Completed`. Variants are
+        added when a corresponding write path lands; the runtime never emits a
+        transition not listed here.
+      enum:
+      - completed
     AddMemberRequest:
       type: object
       description: Add a member to a cooperative
@@ -675,6 +1115,30 @@ components:
           format: int64
           description: Additional days to extend
           minimum: 0
+    FederationTopologyResponse:
+      type: object
+      description: |-
+        A narrow relationship graph of the federation: which cooperatives exist and
+        how they are related by vouches and coordination agreements.
+
+        This is **not** a live network-connectivity view (it says nothing about which
+        peers are currently online or reachable) and **not** a clearing/economic view
+        (it carries no balances, positions, or settlement amounts). It is purely a
+        relationship graph derived from existing vouch and agreement records.
+      required:
+      - nodes
+      - edges
+      properties:
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopologyEdge'
+          description: Vouch and agreement relationships between cooperatives.
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/TopologyNode'
+          description: The cooperatives known to the federation registry.
     FounderDetailResponse:
       type: object
       description: Detailed founder response
@@ -1480,6 +1944,135 @@ components:
           - 'null'
         signature:
           type: string
+    StandingDomainMembership:
+      type: object
+      description: One governance-domain membership row in [`StandingResponse`].
+      required:
+      - domain_id
+      - domain_name
+      - membership_source
+      - status
+      properties:
+        domain_id:
+          type: string
+        domain_name:
+          type: string
+        membership_source:
+          type: string
+          description: '`"static_list"` or `"trust_threshold"`.'
+        status:
+          type: string
+          description: |-
+            `"member"` if the caller is in the static member list,
+            `"unverified"` if membership comes from a trust-threshold source that
+            this read model does not evaluate (the caller may still be a member;
+            the trust graph is the source of truth).
+    StandingResponse:
+      type: object
+      description: |-
+        Caller-facing membership and authority read model.
+
+        Returned by `GET /v1/gov/me/standing`. Composes existing governance state
+        (domain memberships + structure role assignments) into one digestible
+        response so member-facing UI does not need to query four endpoints and
+        stitch them together.
+
+        ## What this is NOT
+
+        - This is **not** an authorization token. Scopes here are descriptive,
+          not bearer-issued. Authorization decisions still flow through the
+          `PolicyOracle`.
+        - This is **not** an action-card feed. Action-card generation builds on
+          top of this read model in a separate endpoint.
+      required:
+      - did
+      - domains
+      - roles
+      - authority_scopes
+      - generated_at
+      properties:
+        authority_scopes:
+          type: array
+          items:
+            type: string
+          description: |-
+            Union of `authority_scope` strings across `roles`, deduplicated and
+            sorted. Convenience field for UI; equivalent to flattening `roles`.
+        did:
+          type: string
+          description: The authenticated caller's DID.
+        display_label:
+          type:
+          - string
+          - 'null'
+          description: |-
+            Optional human-readable label. Reserved for a future identity-registry
+            lookup; always `None` in this version.
+        domains:
+          type: array
+          items:
+            $ref: '#/components/schemas/StandingDomainMembership'
+          description: |-
+            Governance domains in which this caller has membership standing.
+            May be empty.
+        generated_at:
+          type: integer
+          format: int64
+          description: |-
+            Unix epoch seconds when this standing was computed. The response is a
+            snapshot; nothing is cached server-side.
+          minimum: 0
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/StandingRoleAssignment'
+          description: |-
+            Role assignments held by this caller across all structures.
+            May be empty.
+    StandingRoleAssignment:
+      type: object
+      description: |-
+        One role-assignment row in [`StandingResponse`]. Joins the underlying
+        [`icn_governance::RoleAssignment`] with cheap structure metadata
+        (name + parent entity) so UI does not have to fetch the structure.
+      required:
+      - role_assignment_id
+      - structure_id
+      - role
+      - authority_scope
+      - start_date
+      properties:
+        authority_scope:
+          type: array
+          items:
+            type: string
+        end_date:
+          type:
+          - integer
+          - 'null'
+          format: int64
+          minimum: 0
+        parent_entity_id:
+          type:
+          - string
+          - 'null'
+        role:
+          type: string
+        role_assignment_id:
+          type: string
+        start_date:
+          type: integer
+          format: int64
+          minimum: 0
+        structure_id:
+          type: string
+        structure_name:
+          type:
+          - string
+          - 'null'
+          description: |-
+            `None` if the structure was deleted or is otherwise unreadable; the
+            role row is still surfaced so the caller can see something is off.
     StewardDetailResponse:
       type: object
       description: Steward detail response
@@ -1662,6 +2255,69 @@ components:
           minimum: 0
         token:
           type: string
+    TopologyEdge:
+      type: object
+      description: |-
+        A single directed edge in the federation topology graph.
+
+        `kind` is either `"vouch"` (a trust vouch, same source `get_vouches` uses) or
+        `"agreement"` (a federation/coordination clearing agreement, same source
+        `list_agreements` uses). Edges describe relationships only — they carry **no**
+        clearing positions, balances, or settlement data (that is intentionally out of
+        scope; a future economic-view endpoint will cover it).
+      required:
+      - from
+      - to
+      - kind
+      properties:
+        agreement_id:
+          type:
+          - string
+          - 'null'
+          description: |-
+            For `"agreement"` edges, the clearing-agreement ID (provenance only, no amounts).
+            Absent for `"vouch"` edges.
+        from:
+          type: string
+          description: |-
+            Source of the relationship — always a **node ID** (cooperative ID), never a DID.
+
+            For a vouch this is the voucher's cooperative ID (e.g. `coop-alpha`) — the value stored as
+            `voucher_coop_id` and returned by `get_vouches`/`get_vouches_for`.
+
+            For an agreement this is the source party resolved to its node ID. Agreement records store
+            the party DID in `coop_a` on the governance backend, so endpoints are resolved through the
+            registry's `public_did -> coop_id` map before being emitted; this guarantees the value
+            matches a `TopologyNode.coop_id`. (If a party is not a registered node, the raw stored
+            identifier is emitted as a best effort.)
+        kind:
+          type: string
+          description: 'Relationship kind: `"vouch"` or `"agreement"`.'
+        to:
+          type: string
+          description: |-
+            Target of the relationship — always a **node ID** (cooperative ID), never a DID.
+
+            For a vouch this is the vouched-for `coop_id`. For an agreement this is the destination
+            party resolved to its node ID (same `public_did -> coop_id` resolution as `from`).
+    TopologyNode:
+      type: object
+      description: |-
+        A single node in the federation topology graph: one cooperative.
+
+        Derived from the same coops source `list_coops` uses. This is a relationship
+        node, not a live network peer — presence here means the cooperative is known
+        to the registry, NOT that it is currently connected or reachable.
+      required:
+      - coop_id
+      - name
+      properties:
+        coop_id:
+          type: string
+          description: Unique identifier for the cooperative.
+        name:
+          type: string
+          description: Human-readable cooperative name.
     TransactionHistoryEntry:
       type: object
       description: Transaction history entry
@@ -1789,6 +2445,11 @@ components:
       - for
       - against
       - abstain
+  securitySchemes:
+    bearer_auth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
 tags:
 - name: health
   description: Health check and readiness endpoints

@@ -1,6 +1,28 @@
 # ICN Demo: Start Here
 
-**Last Updated**: 2026-02-11
+**Last Updated**: 2026-06-13
+
+---
+
+## July Demo Candidate 0.1 (current single-actor proof loop)
+
+> **DEV/DEMO only — local, single-node, single-actor, fictional institution
+> data.** Not production, not federation, not a formal pilot, no real member or
+> funds data. It demonstrates the cooperative-participation spine — standing →
+> action card → discharge → receipt → evidence/audit — as **proof of path, not
+> deployment readiness.**
+
+| Doc | Use it for |
+|-----|-----------|
+| [JULY_DEMO_CANDIDATE_0.1_RELEASE_PACKET.md](JULY_DEMO_CANDIDATE_0.1_RELEASE_PACKET.md) | **Read first — hand-off packet** (a candidate hand-off for review, *not* a shipped software release) — what it is/proves/doesn't, who it's for, how to run, how to review evidence, safe-to-share vs never-share, known gaps, next lanes. |
+| [JULY_DEMO_HANDS_ON.md](JULY_DEMO_HANDS_ON.md) | **Detailed presenter/operator flow** — click-by-click, "what to say" at each step, and the full failure-mode table. |
+| [JULY_DEMO_OPERATOR_CHECKLIST.md](JULY_DEMO_OPERATOR_CHECKLIST.md) | **Keep-open live-demo card** — preflight, launch command, expected states, and panic fixes. |
+| [JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md](JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md) | **Reviewer / evidence-hygiene handoff** — claim boundary by proof level, secret/evidence capture, known-gaps map, reviewer checklist. |
+| [deploy/appliance/DEMO_QUICKSTART.md](../../deploy/appliance/DEMO_QUICKSTART.md) | **Appliance build/run** — image build, the one-command launcher, and the manual fallback. |
+| [JULY_DEMO_CANDIDATE_0.1_ACCESSIBILITY_WALKTHROUGH.md](JULY_DEMO_CANDIDATE_0.1_ACCESSIBILITY_WALKTHROUGH.md) | **Accessibility + rendered-browser evidence** — the 12-category organizer/member gate outcome, automated axe + keyboard results, what a reviewer can verify, and the human screen-reader/zoom pass still owed. |
+
+> The sections below describe the older one-click tool-library / devnet demo,
+> not the July Candidate appliance.
 
 ---
 
