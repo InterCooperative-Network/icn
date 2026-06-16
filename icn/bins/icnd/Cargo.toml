@@ -46,7 +46,7 @@ serde_json.workspace = true
 icn-trust-app = { path = "../../../apps/trust" }
 icn-governance-app = { path = "../../../apps/governance" }
 icn-governance-actor = { path = "../../apps/governance" }
-icn-ledger-app = { path = "../../../apps/ledger" }
+icn-ledger-app = { path = "../../apps/ledger-app" }
 icn-charter-app = { path = "../../apps/charter" }
 
 # Needed for parameter store construction in daemon

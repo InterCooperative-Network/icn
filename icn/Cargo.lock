@@ -3481,6 +3481,7 @@ name = "icn-ledger-app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ed25519-dalek",
  "icn-ccl",
  "icn-identity",
  "icn-kernel-api",
@@ -3490,9 +3491,11 @@ dependencies = [
  "icn-time",
  "metrics",
  "parking_lot 0.12.5",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "sled",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
