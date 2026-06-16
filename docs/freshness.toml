@@ -27,8 +27,9 @@ notes = "Regulatory positioning. Changes only if regulatory landscape shifts."
 
 [sections."03-meaning-firewall"]
 title = "The Meaning Firewall"
-last_updated = "2026-03-21"
-last_verified_by = "matt"
+last_updated = "2026-06-14"
+last_verified_by = "freshness-2047"
+review_note = "Enforcement mechanism corrected (meaning_firewall.rs ratchets, not 'compiler'); infection tally recomputed from kernel_surface.toml per-crate entries (13 clean / 14 infected / 1 needs-review / 1 extracted) in §17/§19. Checked against icn/crates/icn-core/src/meaning_firewall.rs."
 staleness_threshold_days = 60
 truth_class = "normative"
 depends_on = [
@@ -61,8 +62,9 @@ notes = "Seven invariants. Changes only if regulatory strategy changes."
 
 [sections."06-identity-cryptography"]
 title = "Identity & Cryptography"
-last_updated = "2026-03-21"
-last_verified_by = "matt"
+last_updated = "2026-06-14"
+last_verified_by = "freshness-2047"
+review_note = "3-of-5 steward threshold verified (icn-steward gossip.rs/enrollment.rs); keystore migration chain v1->v2->v2.1->v3->v4 verified (icn-identity keystore.rs); unverifiable '88 modules' descriptor removed."
 staleness_threshold_days = 45
 truth_class = "descriptive"
 depends_on = [
@@ -76,8 +78,9 @@ notes = "Active development area (SDIS phases). Check when new phases complete."
 
 [sections."07-trust-graph"]
 title = "Trust Graph"
-last_updated = "2026-03-21"
-last_verified_by = "matt"
+last_updated = "2026-06-14"
+last_verified_by = "freshness-2047"
+review_note = "Verified accurate: trust-class thresholds vs TrustClass::from_score (icn-trust/src/lib.rs); rate limits 10/50/100/200 msg/s vs icn-net/src/rate_limit.rs."
 staleness_threshold_days = 60
 truth_class = "descriptive"
 depends_on = ["icn/crates/icn-trust/src/**"]
@@ -86,18 +89,20 @@ notes = "Computation algorithm and trust classes are stable."
 
 [sections."08-network-transport"]
 title = "Network & Transport"
-last_updated = "2026-03-21"
-last_verified_by = "matt"
+last_updated = "2026-06-14"
+last_verified_by = "freshness-2047"
+review_note = "Verified accurate (code-level only): default ports 7777/5601/9100/8080 vs icn-core/src/config/mod.rs and gateway.rs. The 'K3s deployment' runtime claim is NOT source-verifiable and was NOT re-confirmed this pass — see status.toml subsystems.network (NEEDS OPS RE-CONFIRMATION); do not read this section's freshness as attesting the runtime deployment."
 staleness_threshold_days = 60
 truth_class = "operational"
 depends_on = ["icn/crates/icn-net/src/**"]
 evidence_type = "demo"
-notes = "QUIC stack proven in K3s deployment."
+notes = "QUIC stack present in src and ports verified; the 'proven in K3s deployment' runtime claim NEEDS OPS RE-CONFIRMATION (not verified this pass)."
 
 [sections."09-gossip-synchronization"]
 title = "Gossip & Synchronization"
-last_updated = "2026-03-21"
-last_verified_by = "matt"
+last_updated = "2026-06-14"
+last_verified_by = "freshness-2047"
+review_note = "Verified accurate: vector_clock.rs/bloom.rs/anti_entropy.rs + push/pull handlers + namespace:purpose topics in icn-gossip. '2+ months K3s runtime' downgraded to NEEDS OPS RE-CONFIRMATION (not source-verifiable)."
 staleness_threshold_days = 60
 truth_class = "descriptive"
 depends_on = ["icn/crates/icn-gossip/src/**"]
@@ -106,8 +111,9 @@ notes = "Gossip protocol stable since Phase 7."
 
 [sections."10-state-ledger"]
 title = "State & Ledger"
-last_updated = "2026-03-21"
-last_verified_by = "matt"
+last_updated = "2026-06-14"
+last_verified_by = "freshness-2047"
+review_note = "Verified accurate: double-entry invariant + Merkle-DAG (icn-ledger lib.rs/types.rs); receipt chain GovernanceDecisionReceipt->AllocationReceipt->SettlementIntent->JournalEntry (icn-ledger/src/allocations.rs). Demurrage 'Phase 25' tag (retired numbering) corrected to 'planned, not implemented'."
 staleness_threshold_days = 45
 truth_class = "descriptive"
 depends_on = [
@@ -119,8 +125,9 @@ notes = "Receipt chain is active development (AllocationReceipt wiring)."
 
 [sections."11-contract-execution"]
 title = "Contract Execution (CCL)"
-last_updated = "2026-03-21"
-last_verified_by = "matt"
+last_updated = "2026-06-14"
+last_verified_by = "freshness-2047"
+review_note = "Verified: FuelConfig, capability-based security, deterministic bounded expressions, Interpreter (icn-ccl). Corrections: (1) wasmtime/`wasm` feature re-attributed from icn-ccl to icn-compute (where the dep actually lives); (2) WASM path marked experimental — it is NOT held to CCL's fuel/determinism guarantees: icn-compute/src/wasm_executor.rs uses Engine::default() (no wasmtime fuel metering, comment 'fuel metering can be enabled later') + coarse per-call counter, and a wall-clock SystemTime::now() timestamp host import (non-deterministic)."
 staleness_threshold_days = 45
 truth_class = "descriptive"
 depends_on = ["icn/crates/icn-ccl/src/**"]
@@ -129,8 +136,9 @@ notes = "CCL runtime stable but ecosystem immature."
 
 [sections."12-governance"]
 title = "Governance"
-last_updated = "2026-03-21"
-last_verified_by = "matt"
+last_updated = "2026-06-14"
+last_verified_by = "freshness-2047"
+review_note = "Verified accurate: 9-state proposal lifecycle (incl. ForceClosed) vs enum ProposalState in icn-governance/src/proposal.rs. '547 tests' figure dropped as stale (icn-governance #[test] grep now 600+); exact count flagged for re-derivation."
 staleness_threshold_days = 30
 truth_class = "operational"
 depends_on = [
@@ -138,12 +146,13 @@ depends_on = [
   "icn/apps/governance/src/**",
 ]
 evidence_type = "demo"
-notes = "Most actively verified subsystem. 547 tests, demo flow proven."
+notes = "Most actively verified subsystem; demo flow proven. Exact test count NEEDS RE-DERIVATION (prior '547 tests' is stale — see review_note and status.toml governance row); run cargo test for an exact figure before re-asserting."
 
 [sections."13-entity-model"]
 title = "Entity Model"
-last_updated = "2026-03-21"
-last_verified_by = "matt"
+last_updated = "2026-06-14"
+last_verified_by = "freshness-2047"
+review_note = "Verified accurate: EntityType/EntityKind (icn-entity), coop Formation->Active->Dissolution (icn-coop/handle.rs), CommunityType Geographic/Interest/Solidarity (icn-community/types.rs), deterministic treasury DID derivation (icn-coop)."
 staleness_threshold_days = 60
 truth_class = "descriptive"
 depends_on = [
@@ -156,8 +165,9 @@ notes = "Entity model fully implements spec. Stable."
 
 [sections."14-federation"]
 title = "Federation"
-last_updated = "2026-03-21"
-last_verified_by = "matt"
+last_updated = "2026-06-14"
+last_verified_by = "freshness-2047"
+review_note = "Updated: bilateral clearing now exists (clearing.rs CrossCoopTransfer, receipt_clearing.rs Epic 4 #941). Gaps re-verified: no multilateral netting, no dispute engine (only Option<String> label), no BFT/checkpointing. federation:write/treasury:write scopes now present in gateway ALLOWED_SCOPES."
 staleness_threshold_days = 30
 truth_class = "descriptive"
 depends_on = ["icn/crates/icn-federation/src/**"]
@@ -166,8 +176,9 @@ notes = "Known gaps (BFT, netting, dispute resolution). Review when any federati
 
 [sections."15-distributed-compute"]
 title = "Distributed Compute"
-last_updated = "2026-03-21"
-last_verified_by = "matt"
+last_updated = "2026-06-14"
+last_verified_by = "freshness-2047"
+review_note = "Verified: still foundation-only — no marketplace/bidding/WorkloadManifest in icn-compute. Updated: cost model now exists (cost.rs, fuel x payment_rate -> credit cost), so 'workers execute for free' qualified."
 staleness_threshold_days = 60
 truth_class = "descriptive"
 depends_on = ["icn/crates/icn-compute/src/**"]
@@ -176,8 +187,9 @@ notes = "Foundation only. Low change velocity expected until Phase 2 Track E."
 
 [sections."16-security"]
 title = "Security"
-last_updated = "2026-03-21"
-last_verified_by = "matt"
+last_updated = "2026-06-14"
+last_verified_by = "freshness-2047"
+review_note = "Major correction: onion routing now IMPLEMENTED (icn-privacy/src/onion_routing.rs 540 LOC, wired via icn-net handlers/onion.rs + connection.rs dispatch), not 'deferred'. Retired 'Phase 21/22' numbering removed. Three-layer model + rate limits re-verified. NEEDS SME review: onion anonymity threat model."
 staleness_threshold_days = 60
 truth_class = "operational"
 depends_on = [

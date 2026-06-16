@@ -1140,7 +1140,7 @@ async fn test_ledger_entry_carries_decision_provenance() -> Result<()> {
     use icn_kernel_api::authz::AllowAllOracle;
     use icn_kernel_api::services::{LedgerService, TreasuryEntryRequest, TreasuryOperationType};
     use icn_ledger::Ledger;
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
 
     // Setup: create a ledger and LedgerServiceImpl
     let store = Arc::new(SledStore::temporary().unwrap());
@@ -1262,7 +1262,7 @@ async fn test_decision_to_ledger_provenance_end_to_end() -> Result<()> {
         DecisionReceiptId, TreasuryExecutor, TreasuryOperation, TreasuryOperationType,
     };
     use icn_ledger::Ledger;
-    use rand::rngs::OsRng;
+    use rand_core::OsRng;
 
     let _ = tracing_subscriber::fmt()
         .with_env_filter("info")

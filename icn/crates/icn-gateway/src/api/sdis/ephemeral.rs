@@ -136,7 +136,7 @@ impl EphemeralProof {
 
         // Generate ephemeral signing key
         let mut ephemeral_seed = [0u8; 32];
-        rand::thread_rng().fill_bytes(&mut ephemeral_seed);
+        rand::rng().fill_bytes(&mut ephemeral_seed);
         let ephemeral_signing = SigningKey::from_bytes(&ephemeral_seed);
         let ephemeral_pk = ephemeral_signing.verifying_key();
 
@@ -146,7 +146,7 @@ impl EphemeralProof {
 
         // Generate nonce
         let mut nonce = [0u8; 16];
-        rand::thread_rng().fill_bytes(&mut nonce);
+        rand::rng().fill_bytes(&mut nonce);
 
         // Get anchor hash and truncate
         let anchor_id = keybundle.anchor.id_bytes();

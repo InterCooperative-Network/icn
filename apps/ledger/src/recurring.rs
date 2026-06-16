@@ -139,16 +139,19 @@ impl RecurringPaymentStore {
 
     /// List payments by owner
     pub fn list_by_owner(&self, owner: &str) -> Result<Vec<RecurringPayment>> {
-        let prefix = format!("idx_owner:{owner}");
+        // Key format is `idx_owner:{owner}:{id}`. Recover the id by stripping the
+        // full `idx_owner:{owner}:` prefix rather than splitting on ':'. Owners are
+        // DIDs (`did:icn:<base58>`) which themselves contain ':', so a naive
+        // `split(':')` over-segments the key and the owner never matches. The
+        // trailing colon also pins the owner segment exactly (no `alice`/`alice2`
+        // prefix collision). Mirrors `EscrowStore::list_by_user`.
+        let prefix = format!("idx_owner:{owner}:");
         let mut payments = Vec::new();
 
         for item in self.db.scan_prefix(prefix.as_bytes()) {
             let (key, _) = item?;
             let key_str = std::str::from_utf8(&key)?;
-            // Format: idx_owner:{owner}:{id}
-            let parts: Vec<&str> = key_str.split(':').collect();
-            if parts.len() == 3 {
-                let id = parts[2];
+            if let Some(id) = key_str.strip_prefix(&prefix) {
                 if let Some(payment) = self.get(id)? {
                     payments.push(payment);
                 }
@@ -270,6 +273,39 @@ mod tests {
 
         let bob_payments = store.list_by_owner("bob")?;
         assert_eq!(bob_payments.len(), 1);
+
+        Ok(())
+    }
+
+    #[test]
+    fn list_by_owner_matches_did_owners_with_colons() -> Result<()> {
+        // Regression: owners are DIDs (`did:icn:<base58>`) which contain ':'. The
+        // index key is `idx_owner:{owner}:{id}`; the previous `split(':')` +
+        // `len() == 3` parser never matched DID owners, so `list_by_owner` — and the
+        // live `GET /settlements/recurring` (lists by `claims.sub`) — returned empty
+        // for every real user. A literal DID-shaped owner reproduces the failure;
+        // the bug is purely about ':' in the key, not DID cryptography.
+        let db = temp_db();
+        let store = RecurringPaymentStore::new(db);
+
+        let owner = "did:icn:z6MkpTHR8VNsBxYAGF1cooperativeOwnerExample";
+        let payment = RecurringPayment {
+            id: "pay-1".to_string(),
+            owner: owner.to_string(),
+            ..Default::default()
+        };
+        store.insert(payment)?;
+
+        let listed = store.list_by_owner(owner)?;
+        assert_eq!(
+            listed.len(),
+            1,
+            "list_by_owner must return payments for DID owners (':' in index key)"
+        );
+        assert_eq!(listed[0].id, "pay-1");
+
+        // A different DID owner must not match (no prefix collision / cross-owner leak).
+        assert!(store.list_by_owner("did:icn:someoneElse")?.is_empty());
 
         Ok(())
     }

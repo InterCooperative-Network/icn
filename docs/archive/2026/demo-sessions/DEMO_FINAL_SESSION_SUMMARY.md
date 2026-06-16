@@ -252,9 +252,9 @@ The remaining 5% is purely a Windows/browser connectivity issue, not an ICN prob
 **DID:** did:icn:zBFnhJhgvRjgukhQmkq9ddBz5wiEt32ptkQkBDjWx6uPh  
 **Passphrase:** demo123
 
-**Fresh Token (expires 23:05 UTC):**
+**Token (redacted — expired; generate a fresh one rather than copying from this archive):**
 ```
-eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJkaWQ6aWNuOnpCRm5oSmhndlJqZ3VraFFta3E5ZGRCejV3aUV0MzJwdGtRa0JEald4NnVQaCIsImlhdCI6MTc2NjA5NTU0MSwiZXhwIjoxNzY2MDk5MTQxLCJjb29wX2lkIjoicm9jaGVzdGVyLXRvb2wtbGlicmFyeSIsInNjb3BlcyI6WyJsZWRnZXI6cmVhZCIsImxlZGdlcjp3cml0ZSIsImNvb3A6cmVhZCIsImdvdjpyZWFkIiwiZ292OndyaXRlIl19.P1lN9Kx1Uf67I2dBggFn8Px1KEXNiiXjaTQxK7MkyCI
+<expired-dev-token-redacted>
 ```
 
 ---

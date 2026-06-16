@@ -11,7 +11,9 @@ publish = false
 icn-kernel-api = { path = "../../crates/icn-kernel-api" }
 
 # Governance domain types (proposals, votes, domains, etc.)
-icn-governance = { path = "../../crates/icn-governance" }
+# utoipa feature: ToSchema on ActionItemCompletionReceipt for the OpenAPI
+# annotation on get_action_item_completion_receipt.
+icn-governance = { path = "../../crates/icn-governance", features = ["utoipa"] }
 
 # CCL schema (charter YAML parsing/validation at the HTTP boundary)
 icn-ccl = { path = "../../crates/icn-ccl" }

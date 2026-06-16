@@ -182,7 +182,8 @@ mod tests {
     use super::*;
     use ed25519_dalek::SigningKey;
     use icn_identity::KeyPair;
-    use rand::rngs::OsRng;
+    // rand_core 0.6 OsRng: ed25519-dalek 2.x pins rand_core 0.6
+    use rand_core::OsRng;
 
     fn test_did() -> Did {
         KeyPair::generate().unwrap().did().clone()

@@ -210,7 +210,7 @@ impl HybridKeypair {
     /// Generate a new hybrid keypair
     pub fn generate() -> Result<Self> {
         // Generate Ed25519 keypair
-        let classical_signing = SigningKey::generate(&mut rand::rngs::OsRng);
+        let classical_signing = SigningKey::generate(&mut rand_core::OsRng);
 
         // Generate ML-DSA keypair
         let pq_keypair = MlDsaKeypair::generate()?;

@@ -4,7 +4,7 @@
 
 use anyhow::Result;
 use icn_identity::Did;
-use rand::{thread_rng, Rng};
+use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::RwLock;
@@ -159,11 +159,11 @@ impl InviteManager {
     /// Generate a random invite code (12 characters, alphanumeric)
     fn generate_code() -> String {
         const CHARSET: &[u8] = b"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
-        let mut rng = thread_rng();
+        let mut rng = rng();
 
         (0..12)
             .map(|_| {
-                let idx = rng.gen_range(0..CHARSET.len());
+                let idx = rng.random_range(0..CHARSET.len());
                 CHARSET[idx] as char
             })
             .collect()

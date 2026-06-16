@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# ============================================================================
+# icn-demo-seed — seed the appliance DEMO PROFILE with a runnable member loop.
+# ----------------------------------------------------------------------------
+# DEMO PROFILE ONLY. Installed by build-image.sh when
+# ICN_APPLIANCE_DEMO_PROFILE=1. Run as root inside the appliance VM:
+#
+#     sudo icn-demo-seed [--json]
+#
+# What it does (all against THIS VM's own gateway on 127.0.0.1:8080):
+#   1. Waits for the gateway to be healthy.
+#   2. Resolves the node operator DID and mints a dev session JWT
+#      (signed with this VM's per-instance JWT secret).
+#   3. Applies the in-tree NYCN institution package (fictional fixture
+#      institution — same package the nycn-dogfood rehearsal kit uses).
+#   4. Dev-gated standing bootstrap for the operator DID (so the shell's
+#      standing pane has something honest to show). Best-effort: if the
+#      dev gate is unavailable the seed continues and says so.
+#   5. Creates ONE open action item assigned to the operator DID — this is
+#      the action card the operator discharges in the member-shell.
+#   6. Prints the demo JWT + URLs + honesty labels (or JSON with --json).
+#
+# What it does NOT do:
+#   - No production claims. Fictional institution, test posture, local VM.
+#   - No external network access. Everything is loopback inside the VM.
+#   - The printed JWT is a LOCAL DEV credential for this disposable VM
+#     only. It is not a secret worth protecting beyond the VM's lifetime,
+#     but it is also never printed to the journal by the units — only by
+#     this command, in your terminal, on request.
+#
+# Idempotency: re-running re-applies the institution package (a no-op when
+# already applied) and creates an additional open action item. For a clean
+# slate use icn-demo-reset.
+# ============================================================================
+set -uo pipefail
+
+GW="${ICN_DEMO_GW:-http://127.0.0.1:8080}"
+DATA_DIR=/var/lib/icn
+ENV_FILE=/etc/icn/icnd.env
+PKG=/usr/share/icn/demo/institutions/nycn
+COOP_ID="${ICN_DEMO_COOP_ID:-nycn}"
+DOMAIN="${ICN_DEMO_DOMAIN:-nycn-federation-gov}"
+SCOPES="governance:read,governance:write,coop:read,coop:write,coop:admin"
+JSON_OUT=0
+[ "${1:-}" = "--json" ] && JSON_OUT=1
+
+log(){ [ "$JSON_OUT" = 1 ] || echo "[demo-seed] $*"; }
+fatal(){ echo "[demo-seed] FATAL: $*" >&2; exit 1; }
+
+[ "$(id -u)" -eq 0 ] || fatal "run as root: sudo icn-demo-seed"
+[ -f "$ENV_FILE" ]   || fatal "$ENV_FILE missing — has icn-appliance-firstboot run?"
+[ -d "$PKG" ]        || fatal "demo institution package missing at $PKG (image built without ICN_APPLIANCE_DEMO_PROFILE=1?)"
+command -v curl    >/dev/null || fatal "curl missing"
+command -v python3 >/dev/null || fatal "python3 missing"
+
+# Per-instance keystore passphrase, generated on this VM by firstboot.
+# shellcheck disable=SC1090
+. "$ENV_FILE"
+[ -n "${ICN_KEYSTORE_PASSPHRASE:-}" ] || fatal "ICN_KEYSTORE_PASSPHRASE not present in $ENV_FILE"
+
+as_icn(){
+  # Drop from root to the icn user with `runuser`, NOT `sudo`. sudo records
+  # both its command line AND its environment in the auth journal, so any form
+  # of `sudo … ICN_KEYSTORE_PASSPHRASE=… …` (command-line assignment OR
+  # --preserve-env) leaks the keystore passphrase into the journal. This
+  # script already runs as root, so it does not need sudo to gain privilege —
+  # runuser drops privilege without writing the command or env to any log.
+  # The passphrase is exported only for the runuser call and passed through
+  # with --preserve-environment.
+  ICN_KEYSTORE_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" \
+  ICN_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" \
+    runuser -u icn --preserve-environment -- "$@"
+}
+
+log "waiting for gateway health at $GW ..."
+for i in $(seq 1 30); do
+  curl -sf -m 3 "$GW/v1/health" >/dev/null 2>&1 && break
+  [ "$i" = 30 ] && fatal "gateway never became healthy at $GW (journalctl -u icnd)"
+  sleep 2
+done
+log "gateway healthy."
+
+id_out="$(as_icn /usr/local/bin/icnctl --data-dir "$DATA_DIR" id show 2>/dev/null || true)"
+DID="$(grep -oE 'did:icn:[A-Za-z0-9]+' <<<"$id_out" | head -1)"
+[ -n "$DID" ] || fatal "could not resolve node operator DID (icnctl --data-dir $DATA_DIR id show)"
+log "operator DID: $DID"
+
+jwt_out="$(as_icn /usr/local/bin/icnctl --data-dir "$DATA_DIR" auth token --gateway "$GW" --coop-id "$COOP_ID" -s "$SCOPES" 2>/dev/null || true)" # vocab-ok: icnctl CLI subcommand name
+SESSION_JWT="$(grep -oE 'eyJ[A-Za-z0-9_.-]+' <<<"$jwt_out" | head -1)"
+[ -n "$SESSION_JWT" ] || fatal "session JWT mint failed (icnctl auth subcommand)"
+AUTH="Authorization: Bearer $SESSION_JWT"
+log "dev session JWT minted (printed at the end — local VM only)."
+
+log "applying NYCN institution package (fictional fixture institution)..."
+as_icn /usr/local/bin/icnctl --data-dir "$DATA_DIR" institution bootstrap apply \
+  -g "$GW" -c "$COOP_ID" --package "$PKG" >/tmp/icn-demo-seed-bootstrap.log 2>&1 \
+  || fatal "institution bootstrap apply failed (see /tmp/icn-demo-seed-bootstrap.log)"
+log "institution package applied."
+
+# Dev-gated standing bootstrap (best-effort; the action-item loop does not
+# strictly require it, but the shell's standing pane is richer with it).
+# The endpoint bootstraps the AUTHENTICATED caller's DID (claims.sub) in the
+# given jurisdiction — the body carries jurisdiction_id only, never a DID
+# (see icn-gateway api/commons dev_bootstrap_standing).
+standing_note="bootstrap-standing: ok"
+if ! curl -sf -m 5 -X POST -H "$AUTH" -H 'Content-Type: application/json' \
+      -d "{\"jurisdiction_id\":\"$DOMAIN\"}" "$GW/v1/commons/dev/bootstrap-standing" >/dev/null 2>&1; then
+  standing_note="bootstrap-standing: unavailable (dev gate off or endpoint shape changed) — standing pane may be sparse; action-item loop unaffected"
+  log "WARN: $standing_note"
+fi
+
+log "creating one open action item assigned to $DID ..."
+item_json="$(curl -s -m 10 -X POST -H "$AUTH" -H 'Content-Type: application/json' \
+  -d "{\"title\":\"Confirm Summit 2026 venue booking\",\"description\":\"Demo obligation (fictional): confirm the venue contract for the 2026 Summit\",\"assignee\":\"$DID\",\"priority\":\"high\",\"meeting_context\":\"demo organizing team\"}" \
+  "$GW/v1/gov/domains/$DOMAIN/action-items")"
+ITEM_ID="$(python3 -c 'import json,sys
+try:
+    print(json.load(sys.stdin).get("id", ""))
+except Exception:
+    print("")' <<<"$item_json")"
+[ -n "$ITEM_ID" ] || fatal "action item creation failed: $item_json"
+log "action item created: $ITEM_ID"
+
+cards_json="$(curl -s -m 10 -H "$AUTH" "$GW/v1/gov/me/action-cards")"
+card_n="$(python3 -c 'import json,sys
+try:
+    d = json.load(sys.stdin)
+    print(sum(1 for c in d.get("cards", []) if c.get("source_id") == sys.argv[1]))
+except Exception:
+    print(0)' "$ITEM_ID" <<<"$cards_json")"
+[ "$card_n" = "1" ] || fatal "expected 1 action card for $ITEM_ID, found ${card_n:-0}: $cards_json"
+log "action card visible via /v1/gov/me/action-cards."
+
+if [ "$JSON_OUT" = 1 ]; then
+  python3 -c 'import json,sys
+print(json.dumps({"did": sys.argv[1], "jwt": sys.argv[2], "item_id": sys.argv[3],
+                  "domain": sys.argv[4], "gateway": sys.argv[5],
+                  "standing_note": sys.argv[6]}))' \
+    "$DID" "$SESSION_JWT" "$ITEM_ID" "$DOMAIN" "$GW" "$standing_note"
+  exit 0
+fi
+
+cat <<EOF
+
+============================ ICN DEMO SEEDED =============================
+ Gateway (in-VM):    $GW   (host: whatever you hostfwd'd 8080 to)
+ Member shell:       http://localhost:8090/member-shell/        (live-local)
+                     http://localhost:8090/member-shell/?mode=demo (fixtures)
+                     (replace 8090 with your hostfwd port if different)
+ Operator DID:       $DID
+ Domain:             $DOMAIN
+ Open action item:   $ITEM_ID
+ $standing_note
+
+ Dev session JWT (LOCAL VM ONLY — paste into the shell's live mode):
+ $SESSION_JWT
+
+ Honesty labels:
+   live-local : node, gateway, standing/action-card/receipt endpoints,
+                action-item completion, completion receipt — all on THIS VM.
+   fixture    : ?mode=demo surfaces (self-labeled in the shell).
+   NOT real   : no production, no pilot, no federation, no real members —
+                fictional institution data on a disposable dev VM.
+
+ Demo loop: open the shell → standing → action card → complete → receipt.
+ Evidence:  sudo icn-demo-verify $ITEM_ID   (receipt re-fetch + consistency check,
+            after you complete the action)
+            sudo icn-demo-verify --chain    (full 13/13 governed chain proof)
+ Reset:     sudo icn-demo-reset             (then re-run icn-demo-seed)
+==========================================================================
+EOF

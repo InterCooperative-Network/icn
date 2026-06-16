@@ -116,7 +116,8 @@ impl KeyBundle {
         let hybrid_keypair = HybridKeypair::generate()
             .map_err(|e| anyhow::anyhow!("Failed to generate hybrid keypair: {e}"))?;
 
-        let x25519_secret = X25519Secret::random_from_rng(rand::rngs::OsRng);
+        // rand_core 0.6 OsRng: x25519-dalek 2.x pins rand_core 0.6
+        let x25519_secret = X25519Secret::random_from_rng(rand_core::OsRng);
         let x25519_public = X25519PublicKey::from(&x25519_secret);
 
         Ok(Self {

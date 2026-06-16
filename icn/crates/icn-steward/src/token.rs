@@ -192,7 +192,7 @@ impl TokenRequest {
     /// Create a new token request
     pub fn new(blinded_message: Vec<u8>, vui_commitment: [u8; 32], pathway_hash: [u8; 8]) -> Self {
         let mut nonce = [0u8; 16];
-        rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut nonce);
+        rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut nonce);
 
         let now = icn_time::current_timestamp_secs();
 

@@ -155,7 +155,7 @@ impl AdditiveSecretSharing {
         // Generate n-1 random shares
         for i in 1..n {
             let mut share_value = [0u8; 32];
-            rand::RngCore::fill_bytes(&mut rand::rngs::OsRng, &mut share_value);
+            rand_core::RngCore::fill_bytes(&mut rand_core::OsRng, &mut share_value);
 
             // XOR into running sum
             for (j, byte) in share_value.iter().enumerate() {

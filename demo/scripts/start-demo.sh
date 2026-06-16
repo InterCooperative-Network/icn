@@ -18,6 +18,11 @@ echo "  Workspace: $ICN_ROOT"
 echo "  Data dir:  $DATA_DIR"
 echo ""
 
+# Dev-gated demo endpoints (POST /v1/commons/dev/bootstrap-standing) used by
+# demo-governance.py. Local demo node only — never set these in production.
+export ICN_ENABLE_ADMIN_ENDPOINTS=true
+export ICN_GOVERNANCE_BUILD_MODE=test
+
 # 1. Build
 echo "[1/4] Building icnd..."
 cd "$ICN_ROOT"
