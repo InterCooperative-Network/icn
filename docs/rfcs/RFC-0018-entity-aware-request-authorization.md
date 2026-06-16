@@ -1,7 +1,7 @@
 ---
 id: "0018"
 title: "Entity-Aware Request Authorization (EntityId + membership/hierarchy/delegation, migrate off flat coop_id guards)"
-status: "draft"
+status: "active"
 created: "2026-06-16"
 updated: "2026-06-16"
 authors: ["Matt Faherty"]
@@ -16,8 +16,9 @@ superseded_by: []
 
 ## Status
 
-`draft` — first authored version, opened for review. This RFC **explores** the design and
-specifies a migration path; it is **not** a decision and **not** an implementation commitment.
+`active` — open for review and comments (per the RFC lifecycle in `docs/rfcs/README.md`,
+`active` = open for review; `draft` = not yet ready for broad review). This RFC **explores** the
+design and specifies a migration path; it is **not** a decision and **not** an implementation commitment.
 Per the RFC/ADR split, the decision is recorded later in a follow-up ADR, and implementation
 lands under issues with code/test evidence. **Accepted RFC does not mean implemented.**
 
@@ -66,12 +67,12 @@ any endpoint is converted — "architecture, not a sweep."
 
 | Layer | Mechanism | Identifier | Location |
 |---|---|---|---|
-| Flat coop namespace | `require_coop_access` = `claims.coop_id == coop_id` (string equality) | `coop_id` — flat slug, `[A-Za-z0-9_-]`, ≤64, **no colons** | `icn-gateway/src/middleware.rs:138`; `validate_coop_id` in `validation.rs:189` |
-| Scopes / capabilities | `require_scope` / `require_any_scope` / `has_scope` (exact match, no wildcards); `ALLOWED_SCOPES` incl. the `governance:*` class split for #1868 | scope strings (`ledger:write`, `governance:proposal:write`, …) | `middleware.rs:72-134`; `validation.rs:49-99` |
-| Entity / role (**already live**) | `require_entity_write_access(entity_mgr, entity_id, caller_id)` → `get_members` → gate on `Founder \| BoardMember` | `EntityId` = `entity:icn:<type>:<slug>` | `icn-gateway/src/api/entity.rs:260-294` |
-| Commons / jurisdiction | `require_office_in_jurisdiction` / `require_membership_in_jurisdiction` | `JurisdictionId` (commons holder) | `icn-gateway/src/authority.rs:22-100` |
+| Flat coop namespace | `require_coop_access` = `claims.coop_id == coop_id` (string equality) | `coop_id` — flat slug, `[A-Za-z0-9_-]`, ≤64, **no colons** | `icn/crates/icn-gateway/src/middleware.rs:138`; `validate_coop_id` in `icn/crates/icn-gateway/src/validation.rs:189` |
+| Scopes / capabilities | `require_scope` / `require_any_scope` / `has_scope` (exact match, no wildcards); `ALLOWED_SCOPES` incl. the `governance:*` class split for #1868 | scope strings (`ledger:write`, `governance:proposal:write`, …) | `icn/crates/icn-gateway/src/middleware.rs:72-134`; `icn/crates/icn-gateway/src/validation.rs:49-99` |
+| Entity / role (**already live**) | `require_entity_write_access(entity_mgr, entity_id, caller_id)` → `get_members` → gate on `Founder \| BoardMember` | `EntityId` = `entity:icn:<type>:<slug>` | `icn/crates/icn-gateway/src/api/entity.rs:260-294` |
+| Commons / jurisdiction | `require_office_in_jurisdiction` / `require_membership_in_jurisdiction` | `JurisdictionId` (commons holder) | `icn/crates/icn-gateway/src/authority.rs:22-100` |
 
-The token (`TokenClaims`, `icn-gateway/src/auth.rs:109-116`) is
+The token (`TokenClaims`, `icn/crates/icn-gateway/src/auth.rs:109-116`) is
 `{ sub (DID), iat, exp, coop_id (flat slug), scopes[] }`. **There is no `EntityId` or
 entity-type claim today.** The authz subject is therefore split: a DID (`sub`) *and* a flat coop
 slug (`coop_id`), with no typed entity binding.
@@ -80,17 +81,17 @@ slug (`coop_id`), with no typed entity binding.
 
 `icn-entity` provides the material an entity-aware primitive needs:
 
-- `EntityType { Individual, Cooperative, Community, Federation, Unknown }` (`entity.rs:262`).
+- `EntityType { Individual, Cooperative, Community, Federation, Unknown }` (`icn/crates/icn-entity/src/entity.rs:262`).
 - `EntityId` = `entity:icn:<type>:<slug>`, with `EntityId::from_did` for individuals
-  (`entity.rs:24-55`).
-- `RelationType { MemberOf, FederatedWith, ParentOf }` + `EntityRelationship` (`entity.rs:523`).
+  (`icn/crates/icn-entity/src/entity.rs:24-55`).
+- `RelationType { MemberOf, FederatedWith, ParentOf }` + `EntityRelationship` (`icn/crates/icn-entity/src/entity.rs:523`).
 - `MembershipRole { Founder, BoardMember, FederatedMember, AssociateMember, … }` and
   `MembershipCapability { Vote, Propose, TreasuryAccess, Invite, ManageSubEntities, Sign, … }`
-  (`membership.rs:290-400, 643-670`).
+  (`icn/crates/icn-entity/src/membership.rs:290-400, 643-670`).
 - An `EntityRegistry` membership graph: `get_members(parent)`, `get_memberships_of(member)`,
-  `list_children(parent)`, `get_parent(entity)`, `get_relationships_from/to` (`registry.rs:25-136`).
+  `list_children(parent)`, `get_parent(entity)`, `get_relationships_from/to` (`icn/crates/icn-entity/src/registry.rs:25-136`).
 
-**The proven seed pattern.** `require_entity_write_access` (`api/entity.rs:260-294`) is
+**The proven seed pattern.** `require_entity_write_access` (`icn/crates/icn-gateway/src/api/entity.rs:260-294`) is
 `require_entity_access` in embryo: it resolves the caller `claims.sub → Did →
 EntityId::from_did → caller_id`, loads `get_members(entity_id)`, and gates the action on the
 caller's `MembershipRole`. Generalizing this — over arbitrary target entities, the membership
@@ -100,9 +101,9 @@ graph (incl. hierarchy/delegation), and a per-action capability — is the heart
 
 - **Authority (governance):** `AuthorityClass { Representation, Execution, Attestation }`,
   `TypedScope { domain, proposal_class, action_kind, amount_ceiling, time_window }`,
-  `AuthorityGrant`, `DecisionProvenance` (`icn-governance/src/authority.rs`). Grantors are
+  `AuthorityGrant`, `DecisionProvenance` (`icn/crates/icn-governance/src/authority.rs`). Grantors are
   cooperatives/communities/federations — never the platform.
-- **Kernel:** `PolicyOracle` / `PolicyDecision` / `ConstraintSet` (`icn-kernel-api/src/authz.rs`)
+- **Kernel:** `PolicyOracle` / `PolicyDecision` / `ConstraintSet` (`icn/crates/icn-kernel-api/src/authz.rs`)
   — the meaning-firewall enforcement seam.
 
 These three (entity membership, typed authority, kernel policy oracle) exist independently. **No
@@ -111,13 +112,13 @@ this RFC scopes.
 
 ### Flat `require_coop_access` call sites (~30) and classification
 
-Enumerated across `icn-gateway/src/api/`:
+Enumerated across `icn/crates/icn-gateway/src/api/`:
 
 | Family | Sites | Classification |
 |---|---|---|
-| ledger | 6 (`get_position`, `create_settlement`, `get_history`, `get_entries_by_decision`, `create_cross_settlement`, `get_cross_settlement_quote`) | **all 6 same-entity.** Note: `create_cross_settlement` (`ledger.rs:558`) + `get_cross_settlement_quote` (`ledger.rs:666`) are the `/{coop_id}/settle/convert` **cross-UNIT FX** endpoints (`from_unit ≠ to_unit`, e.g. hours→USD) operating **within a single coop** — they pass the same path `coop_id` to `create_cross_payment`/`get_cross_payment_quote`. They are **not** cross-coop, despite the "cross" in the name. |
-| treasury | 10 (status, position, nonce, budgets×2, audit, deposit, spend-propose, rules, budget-create) | same-entity today; **carries `entity_id` in its response model already** (`treasury.rs:85-106`), authorizes flat (`treasury.rs:300`) → **first reference conversion** |
-| coops | 6 (get, update_settings, delete, add_member, remove_member, update_member_role) | same-entity; membership mutations overlap with the entity-model role checks already in `api/entity.rs` |
+| ledger | 6 (`get_position`, `create_settlement`, `get_history`, `get_entries_by_decision`, `create_cross_settlement`, `get_cross_settlement_quote`) | **all 6 same-entity.** Note: `create_cross_settlement` (`icn/crates/icn-gateway/src/api/ledger.rs:558`) + `get_cross_settlement_quote` (`icn/crates/icn-gateway/src/api/ledger.rs:666`) are the `/{coop_id}/settle/convert` **cross-UNIT FX** endpoints (`from_unit ≠ to_unit`, e.g. hours→USD) operating **within a single coop** — they pass the same path `coop_id` to `create_cross_payment`/`get_cross_payment_quote`. They are **not** cross-coop, despite the "cross" in the name. |
+| treasury | 10 (status, position, nonce, budgets×2, audit, deposit, spend-propose, rules, budget-create) | same-entity today; **carries `entity_id` in its response model already** (`icn/crates/icn-gateway/src/api/treasury.rs:85-106`), authorizes flat (`icn/crates/icn-gateway/src/api/treasury.rs:300`) → **first reference conversion** |
+| coops | 6 (get, update_settings, delete, add_member, remove_member, update_member_role) | same-entity; membership mutations overlap with the entity-model role checks already in `icn/crates/icn-gateway/src/api/entity.rs` |
 | escrow | 2 (`create_escrow` `&req.coop_id`, `release_escrow` `&escrow.coop_id`) | same-entity (hardened in #2058) |
 | invites | 2 (`create_invite`, `list_invites`) | same-entity (hardened in #2058) |
 | recurring | 1 (`create_recurring_settlement`) | same-entity (hardened in #2058) |
@@ -176,7 +177,7 @@ individual *and* the coop the token authorizes for — see Identifier reconcilia
   "a federation may aggregate member treasuries" are **institution policy**, expressed in the
   governance app / CCL charters / institution packages — **never** baked into ICN core or the
   kernel. (This is the standing meaning-firewall invariant: AGENTS.md "ICN invariants";
-  `docs/architecture/KERNEL_APP_SEPARATION.md`; `THE_COMMONS.md` "not one social doctrine in the
+  `docs/architecture/KERNEL_APP_SEPARATION.md`; `docs/architecture/THE_COMMONS.md` "not one social doctrine in the
   kernel".) **No NYCN-specific rule enters ICN core via this work.**
 
 ### Relationship to existing layers
@@ -184,7 +185,7 @@ individual *and* the coop the token authorizes for — see Identifier reconcilia
 - **Scopes/#1868** answer "does the token carry the capability for this action class?"
   `require_entity_access` answers "may this caller act on *this entity* for this action?" The two
   compose: scope-gate first (coarse), then entity-gate (fine), mirroring the existing two-layer
-  pattern in `api/entity.rs` (scope `entity:write` + role check).
+  pattern in `icn/crates/icn-gateway/src/api/entity.rs` (scope `entity:write` + role check).
 - **Authority/`TypedScope`** is how *delegated* authority (federation acting on a member) is
   expressed; since no flat-guarded site is cross-coop today, delegation first matters for
   **net-new** federation/community routes, not for converting any existing endpoint.
@@ -199,9 +200,9 @@ proposes:
 1. **Canonical authz target = `EntityId`.** It is typed (carries `EntityType`) and already the
    currency of the membership graph. A flat `coop_id` maps to `entity:icn:cooperative:<slug>` —
    **but this mapping is not a free string transform, and is not lossless/reversible in general.**
-   The two namespaces differ: `validate_coop_id` (`validation.rs:189-213`) accepts Unicode
+   The two namespaces differ: `validate_coop_id` (`icn/crates/icn-gateway/src/validation.rs:189-213`) accepts Unicode
    alphanumerics, **uppercase**, **underscores**, and length **1–64**, whereas an `EntityId` slug
-   (`entity.rs:84-135`) requires **lowercase-ASCII** alphanumerics + hyphens only, length **4–64**,
+   (`icn/crates/icn-entity/src/entity.rs:84-135`) requires **lowercase-ASCII** alphanumerics + hyphens only, length **4–64**,
    must **start with a letter**, and forbids **consecutive hyphens**. So currently-valid coops like
    `coop_A`, `abc` (len 3), `café`, or `1coop` have **no** valid slug, and naive normalization can
    **collide** (`coop_A` and `coop-a` → `coop-a`). The migration must therefore define an explicit
