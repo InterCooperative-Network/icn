@@ -43,7 +43,7 @@ hex = "0.4"
 serde_json.workspace = true
 
 # App crates (domain logic - lives outside kernel)
-icn-trust-app = { path = "../../../apps/trust" }
+icn-trust-app = { path = "../../apps/trust-app" }
 icn-governance-app = { path = "../../apps/governance-app" }
 icn-governance-actor = { path = "../../apps/governance" }
 icn-ledger-app = { path = "../../apps/ledger-app" }

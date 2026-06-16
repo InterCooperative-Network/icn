@@ -3847,15 +3847,20 @@ name = "icn-trust-app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "criterion",
+ "ed25519-dalek",
  "icn-identity",
  "icn-kernel-api",
  "icn-obs",
  "icn-security",
  "icn-store",
+ "icn-time",
  "icn-trust",
  "parking_lot 0.12.5",
+ "rand 0.8.5",
  "serde_json",
  "sha2",
+ "tempfile",
  "tokio",
  "tracing",
 ]
