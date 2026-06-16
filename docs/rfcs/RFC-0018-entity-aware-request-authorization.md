@@ -168,6 +168,20 @@ DID binding. The general case then **widens** the degenerate one: a caller indiv
 authority over it, is also allowed. (This means the authz subject is two-part — the caller
 individual *and* the coop the token authorizes for — see Identifier reconciliation below.)
 
+**Critical caveat — the `coop_id` claim is currently self-asserted.** Token issuance binds only
+DID *ownership*: `verify_challenge` checks the challenge signature + TTL, then `issue_token`
+(`icn/crates/icn-gateway/src/auth.rs`) stores the requester-supplied `coop_id` directly into
+`TokenClaims` with **no membership/agency check** (only `validate_coop_id` *format* validation at
+`/auth/verify`, `icn/crates/icn-gateway/src/api/auth.rs`). So today's flat `require_coop_access` —
+and therefore the degenerate "authorized-coop projection == target" case — trusts a coop claim the
+gateway never verified: a holder of *any* DID can request a token for `food-coop` and satisfy the
+check. **The degenerate case must not be treated as sound authorization until that gap is closed**
+(this is a property of the existing flat regime that the entity-aware model must fix, not inherit).
+The safer default is to resolve authority from the **membership graph** — the caller individual's
+`get_memberships_of` over the target entity — rather than trusting the projected coop claim; i.e.
+prefer the general membership case as the real authority, and treat the degenerate projection as an
+optimization only once token↔coop binding is enforced (see the migration gate below).
+
 ### Layering (meaning firewall preserved)
 
 - **Generic machinery in ICN core.** Entity IDs are opaque coordinates; the membership-graph
@@ -237,7 +251,13 @@ proposes:
    `coop_id ↔ EntityId` mapping is the gating sub-task** — it is normalization + rejection of
    non-mappable ids + a stored bidirectional mapping/backfill per §1 (the namespaces don't line
    up and naive projection collides), **not** a naive string transform. Also add a DID→org-membership
-   convenience over `get_memberships_of`. No guard changes yet.
+   convenience over `get_memberships_of`. **Second blocking gate — token↔coop binding:** today
+   `issue_token` accepts a self-asserted `coop_id` with no membership check (see the critical caveat
+   above), so before any degenerate-case guard is converted, either make issuance
+   membership-verified (mint `coop_id`/`entity_id` only for coops the DID actually belongs to/acts
+   for) **or** have `require_entity_access` resolve membership from the graph at the guard. Until one
+   of those lands, the self-asserted coop claim is not a sound authority basis and the degenerate
+   projection must not stand alone. No guard changes yet.
 2. **Generalize the proven helper.** Lift `require_entity_write_access` →
    `require_entity_access(caller, target_entity, action)` with the degenerate case defined on the
    token's coop projection (above) + a per-action capability argument. Land it **with tests** for:
