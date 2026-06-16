@@ -99,7 +99,7 @@
     "proof_level_taxonomy": "docs/reference/project-index/proof-level-taxonomy-capability-matrix.md",
     "architecture": "docs/ARCHITECTURE.md",
     "kernel_app_separation": "docs/architecture/KERNEL_APP_SEPARATION.md",
-    "protocol_invariants": "AGENTS.md#icn-invariants",
+    "protocol_invariants": "AGENTS.md#icn-invariants-non-negotiable",
     "adr_decisions": "docs/adr/ (index: docs/adr/ADR-0018-adr-lifecycle-and-canonical-decision-index.md)",
     "rfcs": "docs/rfcs/ (README.md; process RFC-0000)",
     "truth_spine": "ops/state/truth/sources.json",

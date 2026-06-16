@@ -629,6 +629,22 @@ domain_tags = ["architecture", "kernel"]
 recommended_action = "keep"
 last_reviewed = "2026-06-14"
 
+[docs."docs/ATLAS.md"]
+category = "reference"
+status = "living"
+title = "ICN Ecosystem Atlas"
+description = "Top-level front door composing the project-index map family and the truth spine; cross-repo map (incl. private ops/provider repos), boundary/claims guardrail, and agent preflight. Index, not a source of truth."
+last_updated = "2026-06-16"
+owner = "matt"
+audiences = ["all", "agents"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["navigation", "index", "ecosystem"]
+recommended_action = "keep"
+last_reviewed = "2026-06-16"
+
 [docs."docs/DESIGN_PRINCIPLES.md"]
 category = "architecture"
 status = "canonical"
