@@ -115,7 +115,7 @@ Enumerated across `icn-gateway/src/api/`:
 
 | Family | Sites | Classification |
 |---|---|---|
-| ledger | 6 (`get_position`, `create_settlement`, `get_history`, `get_entries_by_decision`, `create_cross_settlement`, `get_cross_settlement_quote`) | 4 same-entity; **2 delegation candidates** — `create_cross_settlement` (`ledger.rs:558`), `get_cross_settlement_quote` (`ledger.rs:666`) cross coop boundaries and will need a federation-trust path |
+| ledger | 6 (`get_position`, `create_settlement`, `get_history`, `get_entries_by_decision`, `create_cross_settlement`, `get_cross_settlement_quote`) | **all 6 same-entity.** Note: `create_cross_settlement` (`ledger.rs:558`) + `get_cross_settlement_quote` (`ledger.rs:666`) are the `/{coop_id}/settle/convert` **cross-UNIT FX** endpoints (`from_unit ≠ to_unit`, e.g. hours→USD) operating **within a single coop** — they pass the same path `coop_id` to `create_cross_payment`/`get_cross_payment_quote`. They are **not** cross-coop, despite the "cross" in the name. |
 | treasury | 10 (status, position, nonce, budgets×2, audit, deposit, spend-propose, rules, budget-create) | same-entity today; **carries `entity_id` in its response model already** (`treasury.rs:85-106`), authorizes flat (`treasury.rs:300`) → **first reference conversion** |
 | coops | 6 (get, update_settings, delete, add_member, remove_member, update_member_role) | same-entity; membership mutations overlap with the entity-model role checks already in `api/entity.rs` |
 | escrow | 2 (`create_escrow` `&req.coop_id`, `release_escrow` `&escrow.coop_id`) | same-entity (hardened in #2058) |
@@ -123,8 +123,14 @@ Enumerated across `icn-gateway/src/api/`:
 | recurring | 1 (`create_recurring_settlement`) | same-entity (hardened in #2058) |
 | registry | 2 (`create_meeting`, `index_decision_endpoint`) | same-entity (hardened in #2052/#2056) |
 
-**28 same-entity-self-access, 2 delegation candidates.** The full per-site `file:line` table is
-maintained in the migration tracker (issue #2061); the families above are the migration units.
+**All ~30 sites are same-entity self-access.** There is **no cross-coop delegation request
+surface among the flat-guarded sites today** — consistent with #2061's own note that "no such
+flow exists" (federations operate via separate `federation:*` meta-endpoints). The "cross-settlement"
+rows are cross-**unit** FX within one coop, not cross-coop (corrected from an earlier draft).
+**Consequence:** the delegation model below is **net-new / forward-looking** — it does not retrofit
+existing cross-coop endpoints (there are none); delegated flows would first appear as *new* routes
+(federation/community), not as conversions of these flat sites. The full per-site `file:line` table
+is maintained in the migration tracker (issue #2061); the families above are the migration units.
 
 > **Correction to the issue framing (no readiness-laundering):** treasury carries `entity_id` in
 > its **response** model, not yet in the **request** body. The seam is present but one step
@@ -146,9 +152,20 @@ decides from:
 - per-action capability (converges with #1868 — broad scopes decomposed into per-action caps);
 - (where applicable) standing / `AuthorityGrant` + `TypedScope` for delegated execution.
 
-**Flat same-namespace equality becomes the degenerate same-entity case:** when caller and target
-resolve to the same entity and the action is a self-action, `require_entity_access` reduces to
-exactly today's `require_coop_access` check — so the default path is behavior-preserving.
+**Flat same-namespace equality becomes the degenerate same-entity case — defined on the token's
+authorized coop, NOT the caller individual.** Today's `require_coop_access` compares the *token's*
+coop scope (`claims.coop_id`) to the path `coop_id` (coop ↔ coop). The behavior-preserving
+degenerate case is therefore: project the token's authorized coop
+(`claims.coop_id → entity:icn:cooperative:<slug>`) and require it to equal the target entity.
+
+It must **not** be defined as "caller individual == target": a normal `food-coop` member token
+resolves via `EntityId::from_did(claims.sub)` to `entity:icn:individual:*`, which never equals the
+`entity:icn:cooperative:food-coop` target — defining the degenerate case on individual identity
+would deny valid requests, or push implementations toward minting an org-entity subject without a
+DID binding. The general case then **widens** the degenerate one: a caller individual who is a
+*member* of the target entity (with the required role/capability), or who holds delegated
+authority over it, is also allowed. (This means the authz subject is two-part — the caller
+individual *and* the coop the token authorizes for — see Identifier reconciliation below.)
 
 ### Layering (meaning firewall preserved)
 
@@ -169,7 +186,8 @@ exactly today's `require_coop_access` check — so the default path is behavior-
   compose: scope-gate first (coarse), then entity-gate (fine), mirroring the existing two-layer
   pattern in `api/entity.rs` (scope `entity:write` + role check).
 - **Authority/`TypedScope`** is how *delegated* authority (federation acting on a member) is
-  expressed; the delegation candidates (the 2 cross-settlement sites) are where it first matters.
+  expressed; since no flat-guarded site is cross-coop today, delegation first matters for
+  **net-new** federation/community routes, not for converting any existing endpoint.
 - **`PolicyOracle`** is the kernel-side enforcement seam the app-layer decision ultimately maps to.
 
 ## Identifier reconciliation (must be decided before implementation)
@@ -182,8 +200,16 @@ proposes:
    currency of the membership graph. A flat `coop_id` slug maps to
    `entity:icn:cooperative:<slug>` (a deterministic, reversible projection for the
    `Cooperative` case).
-2. **Canonical authz subject = the caller's `EntityId`**, resolved from the DID
-   (`EntityId::from_did`) for individuals, plus their memberships via `get_memberships_of`.
+2. **Canonical authz subject is two-part: (caller individual, authorized coop).** The caller
+   individual is `EntityId::from_did(claims.sub)` (an `entity:icn:individual:*`); the authorized
+   coop is the token's `claims.coop_id` projected to `entity:icn:cooperative:<slug>`. This split
+   matters because today's two regimes use *different* subjects — the flat guards compare the
+   **token's coop** to the target (coop↔coop), while the entity-management endpoints compare the
+   **caller individual's** membership/role in the target. `require_entity_access` must honor both:
+   the degenerate case is "authorized-coop projection == target" (preserving flat semantics), and
+   the general case is "caller individual is a member of (or holds delegated authority over) the
+   target," resolved via `get_memberships_of`. Conflating the two into a single subject is the
+   bug that would otherwise break behavior-preservation.
 3. **Token claim shape:** add an optional `entity_id` (and entity-type) claim **alongside**
    `coop_id` during migration; `coop_id` stays as the back-compat projection until all sites are
    converted, then can be deprecated. (Mirrors how treasury already pairs the two.)
@@ -199,9 +225,12 @@ proposes:
    (`coop_id ↔ EntityId` projection; a DID→org-membership convenience over `get_memberships_of`).
    No guard changes yet.
 2. **Generalize the proven helper.** Lift `require_entity_write_access` →
-   `require_entity_access(caller, target_entity, action)` with the same-entity degenerate case +
-   a per-action capability argument. Land it **with tests** for: same-entity (allow),
-   cross-entity-no-relationship (deny), delegated authority (allow), no-authority (deny).
+   `require_entity_access(caller, target_entity, action)` with the degenerate case defined on the
+   token's coop projection (above) + a per-action capability argument. Land it **with tests** for:
+   same-coop token → matching target (allow); different-coop token → target (deny); caller
+   individual is a member of the target with the required role (allow); non-member / insufficient
+   role (deny); delegated authority (allow); no authority (deny). Note the tests are built around
+   the token's coop projection and membership — **not** caller-individual==target identity.
 3. **First reference conversion: treasury.** Treasury already pairs `coop_id` + `entity_id`;
    convert its sites to `require_entity_access` as the worked example, keeping the flat guard as
    an assertion alongside until the entity path is proven.
@@ -209,9 +238,10 @@ proposes:
    recurring, registry, ledger-self) where the new primitive's degenerate case is provably
    equivalent; keep #2052/#2056/#2058 flat guards as defense-in-depth until each site's
    entity-path tests pass.
-5. **Delegation last.** The 2 cross-settlement sites (and any future federation/community
-   delegation) land only once the delegation/`AuthorityGrant` path is specified and tested — they
-   are the reason the model exists, and the highest-risk to get wrong.
+5. **Delegation last.** Cross-coop / federation / community delegated flows land only once the
+   delegation/`AuthorityGrant` path is specified and tested. These are **net-new routes** (no
+   existing flat-guarded site is cross-coop — see the call-site classification), the reason the
+   model exists, and the highest-risk to get wrong.
 
 **Hard rule:** no flat guard is removed without an **equivalent-or-stronger** entity-aware test at
 that site. Authorization is never weakened in a migration step.
