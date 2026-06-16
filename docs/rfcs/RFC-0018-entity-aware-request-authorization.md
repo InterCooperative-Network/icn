@@ -197,9 +197,20 @@ Four identifiers name the authz subject/target today: **`coop_id`** (flat slug),
 proposes:
 
 1. **Canonical authz target = `EntityId`.** It is typed (carries `EntityType`) and already the
-   currency of the membership graph. A flat `coop_id` slug maps to
-   `entity:icn:cooperative:<slug>` (a deterministic, reversible projection for the
-   `Cooperative` case).
+   currency of the membership graph. A flat `coop_id` maps to `entity:icn:cooperative:<slug>` —
+   **but this mapping is not a free string transform, and is not lossless/reversible in general.**
+   The two namespaces differ: `validate_coop_id` (`validation.rs:189-213`) accepts Unicode
+   alphanumerics, **uppercase**, **underscores**, and length **1–64**, whereas an `EntityId` slug
+   (`entity.rs:84-135`) requires **lowercase-ASCII** alphanumerics + hyphens only, length **4–64**,
+   must **start with a letter**, and forbids **consecutive hyphens**. So currently-valid coops like
+   `coop_A`, `abc` (len 3), `café`, or `1coop` have **no** valid slug, and naive normalization can
+   **collide** (`coop_A` and `coop-a` → `coop-a`). The migration must therefore define an explicit
+   **normalization + rejection + stored bidirectional mapping (backfill)** policy: a canonical
+   `coop_id ↔ EntityId` mapping **persisted per coop at activation** (so it survives normalization
+   collisions and stays reversible), with non-mappable ids **explicitly rejected** rather than
+   silently remapped. Only the subset of `coop_id`s that already satisfy the slug rules project
+   directly; everything else needs the stored mapping. This sub-task gates the migration (see
+   step 1 below) and must land before any guard is converted.
 2. **Canonical authz subject is two-part: (caller individual, authorized coop).** The caller
    individual is `EntityId::from_did(claims.sub)` (an `entity:icn:individual:*`); the authorized
    coop is the token's `claims.coop_id` projected to `entity:icn:cooperative:<slug>`. This split
@@ -221,9 +232,11 @@ proposes:
 ## Migration path (staged, defense-in-depth, no big-bang)
 
 1. **Identifier + claim groundwork.** Decide the canonical subject/target (above); add the
-   optional `entity_id`/entity-type token claim; add the missing resolution helpers
-   (`coop_id ↔ EntityId` projection; a DID→org-membership convenience over `get_memberships_of`).
-   No guard changes yet.
+   optional `entity_id`/entity-type token claim; add the missing resolution helpers. **The
+   `coop_id ↔ EntityId` mapping is the gating sub-task** — it is normalization + rejection of
+   non-mappable ids + a stored bidirectional mapping/backfill per §1 (the namespaces don't line
+   up and naive projection collides), **not** a naive string transform. Also add a DID→org-membership
+   convenience over `get_memberships_of`. No guard changes yet.
 2. **Generalize the proven helper.** Lift `require_entity_write_access` →
    `require_entity_access(caller, target_entity, action)` with the degenerate case defined on the
    token's coop projection (above) + a per-action capability argument. Land it **with tests** for:
