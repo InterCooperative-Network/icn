@@ -18,8 +18,8 @@ governance."*
 - **[#2064](https://github.com/InterCooperative-Network/icn/issues/2064)'s
   workspace migration applied to *runtime-integrated* top-level app crates** —
   those that influence daemon/core/gateway-visible behavior and therefore must be
-  first-class in `cargo test/clippy --workspace`. All of them have been migrated
-  under `icn/apps/*`:
+  first-class in `cargo test --workspace` / `cargo clippy --workspace`. All of
+  them have been migrated under `icn/apps/*`:
   - `icn-ledger-app` → `icn/apps/ledger-app` ([#2070](https://github.com/InterCooperative-Network/icn/pull/2070))
   - `icn-governance-app` → `icn/apps/governance-app` ([#2071](https://github.com/InterCooperative-Network/icn/pull/2071))
   - `icn-trust-app` → `icn/apps/trust-app` ([#2072](https://github.com/InterCooperative-Network/icn/pull/2072))
@@ -32,8 +32,10 @@ governance."*
 Because `icn-app-echo` is **not** a member of the `icn/` workspace, the standard
 CI gates (`cargo test --workspace`, `cargo clippy --workspace`) **do not cover
 it** — it compiles only when built directly. It currently builds clean against
-the current `icn-core` app API (verified: `cargo check --manifest-path
-apps/echo/Cargo.toml` succeeds), but as an uncovered crate it *can* drift/bit-rot
+the current `icn-core` app API (verified from the **repo root**: `cargo check
+--manifest-path apps/echo/Cargo.toml` succeeds — note this resolves relative to
+the repo root, not the `icn/` workspace dir), but as an uncovered crate it *can*
+drift/bit-rot
 if the app-runtime API changes and nobody rebuilds it. That is an accepted
 tradeoff for a demo example, not a hidden gap.
 
