@@ -42,6 +42,15 @@ members = [
     "apps/governance",
     "apps/membership",
     "apps/ledger",
+    # Runtime-integrated repo-root app, migrated under icn/apps/ for #2064 so
+    # `cargo test/clippy --workspace` covers its tests + lints (it was previously built
+    # only as a cap-lint'd path-dep of icn-gateway/icnd — the gap that let #2063 ship).
+    # Distinct crates from the icn/apps/* actors (icn-ledger-app vs icn-ledger-actor,
+    # icn-governance-app vs icn-governance-actor). All three runtime-integrated repo-root
+    # apps are now workspace members (#2064); only the apps/echo example remains at repo root.
+    "apps/ledger-app",
+    "apps/governance-app",
+    "apps/trust-app",
     "crates/icn-http-kit",
     "crates/icn-commons",
 ]

@@ -519,7 +519,7 @@ mod tests {
         let b = make_signed(&bob, target.did(), 0.4, now - 100);
 
         let reducer = AttestationReducer::new(now);
-        let r1 = reducer.reduce(&[a.clone()]);
+        let r1 = reducer.reduce(std::slice::from_ref(&a));
         let r2 = reducer.reduce(&[a, b]);
 
         // Different input sets → different hashes
@@ -626,7 +626,7 @@ mod tests {
 
         // Normal reducer rejects unsigned
         let normal_reducer = AttestationReducer::new(now);
-        let result_normal = normal_reducer.reduce(&[att.clone()]);
+        let result_normal = normal_reducer.reduce(std::slice::from_ref(&att));
         assert_eq!(result_normal.score, 0.0);
         assert_eq!(result_normal.input_count, 0);
 

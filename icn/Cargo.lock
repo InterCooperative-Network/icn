@@ -3352,11 +3352,16 @@ name = "icn-governance-app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ed25519-dalek",
  "icn-governance",
  "icn-identity",
  "icn-kernel-api",
  "icn-store",
  "parking_lot 0.12.5",
+ "rand 0.8.5",
+ "sled",
+ "tempfile",
+ "tokio",
  "tracing",
 ]
 
@@ -3481,6 +3486,7 @@ name = "icn-ledger-app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "ed25519-dalek",
  "icn-ccl",
  "icn-identity",
  "icn-kernel-api",
@@ -3490,9 +3496,11 @@ dependencies = [
  "icn-time",
  "metrics",
  "parking_lot 0.12.5",
+ "rand 0.8.5",
  "serde",
  "serde_json",
  "sled",
+ "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -3839,15 +3847,20 @@ name = "icn-trust-app"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "criterion",
+ "ed25519-dalek",
  "icn-identity",
  "icn-kernel-api",
  "icn-obs",
  "icn-security",
  "icn-store",
+ "icn-time",
  "icn-trust",
  "parking_lot 0.12.5",
+ "rand 0.8.5",
  "serde_json",
  "sha2",
+ "tempfile",
  "tokio",
  "tracing",
 ]

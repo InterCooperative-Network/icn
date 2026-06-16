@@ -59,6 +59,17 @@ If a change might impact any invariant:
 - If you touch a crate under `apps/`, you must either:
   - migrate it to `icn/apps/`, or
   - add a tracking issue that classifies it as an example/tool with a migration or removal date.
+- **Example-only crates must be clearly marked** (a `README.md` in the crate dir saying so),
+  so they are not mistaken for an uncovered runtime crate.
+
+**Current state (#2064 complete for runtime crates).** All runtime-integrated top-level app
+crates have been migrated under `icn/apps/*` and are now workspace-covered (`cargo
+test --workspace` / `cargo clippy --workspace`): `icn-ledger-app` (#2070), `icn-governance-app` (#2071),
+`icn-trust-app` (#2072) — each kept distinct from its `icn/apps/*` `*-actor` sibling.
+Top-level `apps/` now holds **only** `apps/echo` (`icn-app-echo`), which is **example-only**
+(no runtime consumers) and intentionally left outside the workspace — see
+[`apps/echo/README.md`](apps/echo/README.md). It is therefore not `--workspace` CI-covered;
+if it ever gains a runtime consumer, migrate it like the three above.
 
 ---
 

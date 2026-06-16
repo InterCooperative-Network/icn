@@ -122,9 +122,7 @@ pub fn build_credit_policy_manager(
 ) -> icn_ledger::CreditPolicyManager {
     use std::time::Duration;
     // Reuse the ledger crate's constant to avoid drift.
-    let ramp_secs = ramp_period_days
-        .checked_mul(icn_ledger::credit_policy::SECONDS_PER_DAY)
-        .unwrap_or(u64::MAX);
+    let ramp_secs = ramp_period_days.saturating_mul(icn_ledger::credit_policy::SECONDS_PER_DAY);
     let credit_policy = icn_ledger::CreditPolicy::new(
         baseline,
         trust_multiplier,
