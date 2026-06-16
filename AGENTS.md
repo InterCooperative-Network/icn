@@ -2,6 +2,10 @@
 
 Instructions for agentic coding agents operating in this repo.
 
+**Orient first:** read [`docs/ATLAS.md`](docs/ATLAS.md) — the whole-ecosystem map (what each repo
+owns, where each fact's canonical source lives, and what to read first). It is an index; for any
+conflict, the canonical owner it points to wins.
+
 ---
 
 ## Operating mode (must follow)

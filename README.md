@@ -13,6 +13,7 @@ The Rust workspace lives in [`icn/`](icn/). The public site lives in [`website/`
 
 ## Start Here by Role
 
+- **Want the whole ecosystem at a glance?**: read the [Ecosystem Atlas](docs/ATLAS.md) — what every repo owns, where each fact's canonical source lives, and what to read first (humans and agents).
 - **Understand the project first**: start with [intercooperative.network](https://intercooperative.network), especially [What is ICN](https://intercooperative.network/what-is-icn), [What's Real Now](https://intercooperative.network/whats-real-now), and [Get Involved](https://intercooperative.network/get-involved).
 - **Contribute technically**: read [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md), then [CONTRIBUTING.md](CONTRIBUTING.md), then [docs/onboarding/README.md](docs/onboarding/README.md). For a first scoped contribution, start with [good first issues](https://github.com/InterCooperative-Network/icn/issues?q=is%3Aissue+is%3Aopen+label%3Agood-first-issue).
 - **Contribute non-technically**: use the public [Get Involved](https://intercooperative.network/get-involved) page for docs, design, testing, research, policy, and ecosystem paths, then open a [GitHub Discussion](https://github.com/InterCooperative-Network/icn/discussions) or issue once the work is concrete.

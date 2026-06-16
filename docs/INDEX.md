@@ -34,6 +34,7 @@ Welcome to the ICN (Intercooperative Network) documentation! This index provides
 
 ## 📋 Quick Navigation
 
+- **Whole ecosystem at a glance?** → [Ecosystem Atlas](ATLAS.md) (cross-repo map + source-of-truth index + agent preflight)
 - **New to ICN?** → Start with [Getting Started Guide](GETTING_STARTED.md)
 - **Looking for the public engagement map?** → Start with [intercooperative.network/get-involved](https://intercooperative.network/get-involved)
 - **Understanding the system?** → Read [Architecture Overview](ARCHITECTURE.md)
