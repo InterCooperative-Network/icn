@@ -476,10 +476,9 @@ mod tests {
         // The success path parses claims.sub into a Did, so use a real DID subject.
         let sub = icn_identity::KeyPair::generate().unwrap().did().to_string();
 
-        // Assert on persisted state via `list()` (full primary-key scan) rather than
-        // `list_by_owner()`: the latter splits the index key on ':' expecting 3 parts
-        // and so cannot match DID owners (which themselves contain ':'). That's a
-        // pre-existing store-layer limitation, out of scope for this authz fix.
+        // Assert on persisted state via `list()` (a simple full primary-key scan).
+        // `list_by_owner()` for DID owners is exercised separately below in
+        // `list_recurring_settlements_returns_did_owner_settlements`.
         let (same, same_store) = run("coopA", "coopA", &sub).await;
         assert_eq!(same, StatusCode::CREATED);
         assert_eq!(
@@ -493,6 +492,67 @@ mod tests {
         assert!(
             cross_store.list().unwrap().is_empty(),
             "cross-coop reject must not create a recurring settlement"
+        );
+    }
+
+    /// Regression (#2063): `list_recurring_settlements` lists by `claims.sub` (a DID,
+    /// which contains ':'), so the store's owner index must match DID owners. This test
+    /// lives in icn-gateway — a workspace member CI runs via `cargo test -p icn-gateway`
+    /// — because the equivalent unit test in the `icn-ledger-app` crate (top-level
+    /// `apps/ledger`) is NOT executed by CI's `--workspace` runs (topology gap, #2064).
+    /// Guards the `list_by_owner` colon-split bug from reappearing on the live endpoint.
+    #[actix_web::test]
+    async fn list_recurring_settlements_returns_did_owner_settlements() {
+        let db = sled::Config::new().temporary(true).open().unwrap();
+        let store = RecurringPaymentStore::new(db);
+
+        // Owner is a real DID (contains ':').
+        let owner = icn_identity::KeyPair::generate().unwrap().did().to_string();
+        store
+            .insert(RecurringPayment {
+                id: "rp-did-1".to_string(),
+                coop_id: "coopA".to_string(),
+                owner: owner.clone(),
+                from_account: "acct-from".to_string(),
+                to_account: "acct-to".to_string(),
+                amount: 100,
+                currency: "hours".to_string(),
+                frequency: PaymentFrequency::Daily,
+                next_execution: 1,
+                end_date: None,
+                status: RecurringStatus::Active,
+                execution_count: 0,
+                last_execution: None,
+                created_at: 1,
+                updated_at: 1,
+            })
+            .unwrap();
+
+        let app = actix_test::init_service(
+            App::new()
+                .app_data(web::Data::new(store))
+                .service(list_recurring_settlements),
+        )
+        .await;
+
+        let claims = TokenClaims {
+            sub: owner.clone(),
+            iat: 1_000_000_000,
+            exp: 9_999_999_999,
+            coop_id: "coopA".to_string(),
+            scopes: vec!["settlements:read".to_string()],
+        };
+        let req = actix_test::TestRequest::get()
+            .uri("/settlements/recurring")
+            .to_request();
+        req.extensions_mut().insert(claims);
+        let resp = actix_test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::OK);
+
+        let body: serde_json::Value = actix_test::read_body_json(resp).await;
+        assert_eq!(
+            body["count"], 1,
+            "DID-owned recurring settlement must be listed (regression #2063)"
         );
     }
 }
