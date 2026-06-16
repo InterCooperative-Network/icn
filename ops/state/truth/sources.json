@@ -2,6 +2,12 @@
   "schema": "icn-truth-sources/v1",
   "description": "Canonical truth ownership for all important operational facts. One source per domain. If two files claim the same fact, this file wins.",
   "domains": {
+    "ecosystem_index": {
+      "owner": "docs/ATLAS.md",
+      "machine_view": "ops/state/ecosystem.json",
+      "stability": "slow-changing",
+      "description": "Cross-repo ecosystem map + read-first ordering + boundary/claims guardrail. INDEX ONLY: it points to the per-domain owners below and does NOT own any fact. If the atlas disagrees with a domain owner here, the owner wins."
+    },
     "repo_topology": {
       "owner": "ops/state/config/repo-map.json",
       "sections": ["repos", "worktrees", "relationships", "infrastructure"],

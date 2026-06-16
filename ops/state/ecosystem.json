@@ -1,0 +1,180 @@
+{
+  "schema": "icn-ecosystem-atlas/v1",
+  "description": "Machine-readable cross-repo ecosystem index. Companion to docs/ATLAS.md. INDEX ONLY: this file points to canonical owners; it does not own facts. For any per-domain fact, defer to ops/state/truth/sources.json (the truth spine). Manually maintained; keep thin.",
+  "canonical": false,
+  "last_reviewed": "2026-06-16",
+  "human_view": "docs/ATLAS.md",
+  "truth_spine": "ops/state/truth/sources.json",
+  "project_index": "docs/reference/project-index/README.md",
+  "composes": "This atlas composes the existing orientation maps under docs/reference/project-index/ and the truth spine under ops/state/truth/. It adds only the cross-repo view (incl. private icn-infra/network-ops) + the consolidated boundary/claims guardrail + the NYCN-home reconciliation flag. It does not duplicate the family maps.",
+  "principle": "ICN is the generic civic/institutional substrate; NYCN is the first institution package built on it; the meaning firewall keeps them apart. This index never restates volatile facts (status, phases, PR/sprint numbers, IPs) — it links them.",
+  "runtime_loop": [
+    "identity",
+    "standing",
+    "authority",
+    "action card",
+    "authorized action",
+    "CCL/runtime evaluation",
+    "storage/compute/governance/economic transition",
+    "receipt",
+    "sync/federation/replication",
+    "member shell + steward cockpit",
+    "challenge/repair/next action"
+  ],
+  "repos": {
+    "icn": {
+      "visibility": "public",
+      "role": "Generic civic/institutional substrate: primitives, runtime, public substrate docs, architecture, ADRs/RFCs, state, truth spine. Public truth surface.",
+      "canonical_for": ["ICN primitives", "runtime behavior", "architecture + meaning firewall", "ADRs", "RFCs", "public project state", "subsystem readiness"],
+      "must_not_contain": ["institution-local meaning", "private operating detail", "secrets", "real personal/partner data"],
+      "pointer": "this repo"
+    },
+    "nycn": {
+      "visibility": "private",
+      "role": "First institution ecosystem package / reference federation. Summit 2026 structure, committees, accessibility commitments, support-institution patterns, package manifest, private-overlay templates.",
+      "canonical_for": ["NYCN local institution meaning", "Summit 2026 package shape", "NYCN package manifest", "NYCN private-overlay templates", "NYCN->ICN dependency status"],
+      "must_not_contain": ["ICN primitives", "product/substrate truth", "real PII/sponsor/attendee data in git"],
+      "pointer": "InterCooperative-Network/nycn (access-gated)"
+    },
+    "icn-infra": {
+      "visibility": "private",
+      "role": "Org-level operating contracts, runbooks, cross-repo boundary contract, public-claims gates, source classification, host roles, service contracts.",
+      "canonical_for": ["cross-repo boundary (product/ops/provider)", "public-claims gates", "source classification scheme", "host roles", "service contracts"],
+      "must_not_contain": ["secrets (referenced by name only)", "product/substrate truth"],
+      "pointer": "InterCooperative-Network/icn-infra (access-gated)",
+      "key_docs": ["docs/boundary.md", "docs/PUBLIC-CLAIMS.md", "docs/SOURCE-CLASSIFICATION.md"]
+    },
+    "network-ops": {
+      "visibility": "private",
+      "role": "Concrete provider reality: personal/homelab topology, raw configs, secrets. Most-private layer.",
+      "canonical_for": ["provider topology", "secrets", "raw provider configs"],
+      "must_not_contain": ["product or org truth (extraction requires the icn-infra scrub gate)"],
+      "pointer": "private (access-gated)"
+    },
+    "icn-learn": {
+      "visibility": "private",
+      "role": "ICN Academy: role-based learning/onboarding. Teaches from canonical sources; is NOT canonical.",
+      "canonical_for": ["learning/onboarding content"],
+      "must_not_contain": ["canonical definitions of ICN (it consumes them)"],
+      "pointer": "InterCooperative-Network/icn-learn (access-gated)"
+    },
+    "icn-community-bridge": {
+      "visibility": "private",
+      "role": "Discord->Matrix onboarding bridge. Scaffold/docs-first, not deployed. Outreach/routing.",
+      "canonical_for": ["onboarding bridge policy/scaffold"],
+      "must_not_contain": ["governance authority", "canonical truth"],
+      "pointer": "InterCooperative-Network/icn-community-bridge (access-gated)"
+    },
+    "org-github": {
+      "visibility": "public",
+      "role": "Org profile + shared community-health files.",
+      "canonical_for": ["org profile", "shared community health files"],
+      "must_not_contain": ["product/architecture truth"],
+      "pointer": "InterCooperative-Network/.github"
+    },
+    "homelab-inventory": {
+      "visibility": "private",
+      "role": "Infra the homelab runs on; observed read-only from ops/. Provider/infra state.",
+      "canonical_for": ["homelab infra inventory"],
+      "must_not_contain": ["ICN code/product truth"],
+      "pointer": "fahertym/homelab-inventory (access-gated)"
+    }
+  },
+  "visibility_summary": {
+    "public": ["icn", "org-github"],
+    "private": ["nycn", "icn-infra", "icn-learn", "icn-community-bridge"],
+    "provider_personal_most_private": ["network-ops", "homelab-inventory"]
+  },
+  "sources_of_truth": {
+    "current_state": "docs/STATE.md",
+    "phase_tracking": "docs/PHASE_PROGRESS.md",
+    "phase_history": "docs/PHASE_HISTORY.md",
+    "subsystem_readiness": "docs/status.toml",
+    "project_index_hub": "docs/reference/project-index/README.md",
+    "current_truth_map": "docs/reference/project-index/current-truth-map.md",
+    "source_of_truth_hierarchy": "docs/reference/project-index/source-of-truth-map.md",
+    "show_readiness_map": "docs/reference/project-index/show-readiness-map.md",
+    "org_repo_map": "docs/reference/project-index/repository-map.md",
+    "subsystem_coverage_matrix": "docs/reference/project-index/project-coverage-matrix.md",
+    "proof_level_taxonomy": "docs/reference/project-index/proof-level-taxonomy-capability-matrix.md",
+    "architecture": "docs/ARCHITECTURE.md",
+    "kernel_app_separation": "docs/architecture/KERNEL_APP_SEPARATION.md",
+    "protocol_invariants": "AGENTS.md#icn-invariants",
+    "adr_decisions": "docs/adr/ (index: docs/adr/ADR-0018-adr-lifecycle-and-canonical-decision-index.md)",
+    "rfcs": "docs/rfcs/ (README.md; process RFC-0000)",
+    "truth_spine": "ops/state/truth/sources.json",
+    "repo_infra_topology": "ops/state/config/repo-map.json",
+    "merge_policy": "ops/state/truth/policy.json",
+    "doc_control_registry": "docs/registry.toml",
+    "institution_package_boundary": "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md",
+    "cross_repo_boundary": "icn-infra/docs/boundary.md (private)",
+    "public_claims_gates": "icn-infra/docs/PUBLIC-CLAIMS.md (private)",
+    "source_classification": "icn-infra/docs/SOURCE-CLASSIFICATION.md (private)",
+    "nycn_icn_dependency_status": "nycn/docs/sync/ICN_DEPENDENCY_STATUS.md (private)",
+    "live_branch_pr_ci_state": "git + gh (query live; never hardcode)"
+  },
+  "readiness_vocab": {
+    "subsystem_status_enum": ["exceeds-spec", "confirmed", "partially-confirmed", "working-immature", "simplified", "foundation-only"],
+    "subsystem_status_owner": "docs/status.toml",
+    "truth_class": {
+      "operational": "proven in tests/demos/CI",
+      "descriptive": "code exists, not fully verified",
+      "normative": "architecture only, not yet implemented"
+    },
+    "phase_markers": {"complete": "done/merged/tested/deployed", "in_progress": "active development", "planned": "scoped, not started"},
+    "maturity_tiers": [
+      "shipped/runtime-supported",
+      "local/demo/rehearsal",
+      "fixture-only",
+      "package-declared planned",
+      "blocked on ICN primitives",
+      "future/speculative",
+      "explicitly not true"
+    ],
+    "no_readiness_laundering": "Never restate a lower tier as a higher one: planned != done, rehearsed != live, private != public, fixture != real."
+  },
+  "ci_guardrails": [
+    "Readiness Overclaim Check",
+    "Regulatory Compliance Linter",
+    "Meaning Firewall Check",
+    "Firewall Contract Enforcement",
+    "Secrets Placeholder Check",
+    "Pilot Provenance Invariant"
+  ],
+  "nycn_upstream_pressure": [
+    {"need": "Obligation/allocation/settlement primitives", "icn_ref": "RFC-0001", "status": "draft", "note": "blocks NYCN sponsor obligation lifecycle"},
+    {"need": "Organizer/operating-body model", "icn_ref": "RFC-0012", "status": "candidate"},
+    {"need": "External settlement bridge institutions", "icn_ref": "RFC-0013", "status": "candidate"},
+    {"need": "Support-institution pattern (coop conversion/technical assistance)", "icn_ref": "RFC-0014", "status": "candidate"},
+    {"need": "Public maturity-claim convention", "icn_ref": "ADR-0033", "status": "proposed"},
+    {"need": "Public-surface + learning-repo architecture", "icn_ref": "RFC-0015", "status": "drafted"}
+  ],
+  "boundaries": {
+    "meaning_firewall": "ICN owns generic primitives + runtime; institution packages own local meaning; kernel/substrate stays meaning-blind. Local meanings must not be welded into substrate primitive types.",
+    "never_copy_across": [
+      "NYCN private operating detail / Summit fixtures / private overlays / real PII -> never into public icn",
+      "icn-infra / network-ops operational values / host addresses / secrets -> never into public icn (scrub gate required)",
+      "ICN primitives -> never copied into nycn (NYCN depends, does not fork)",
+      "icn-learn / icn-community-bridge -> never become canonical"
+    ],
+    "claims_requiring_gates": ["production readiness", "live federation", "formal pilot/partner", "running Forge (Forgejo is a component, not the Forge)", "live Matrix/community bridge"]
+  },
+  "read_first": [
+    "docs/ATLAS.md",
+    "AGENTS.md",
+    "docs/STATE.md",
+    "docs/PHASE_PROGRESS.md",
+    "docs/status.toml",
+    "docs/ARCHITECTURE.md",
+    "ops/state/truth/sources.json",
+    "live: git branch --show-current && gh pr list && gh run list"
+  ],
+  "open_questions": [
+    {
+      "id": "nycn-home-reconciliation",
+      "summary": "Two NYCN homes with divergent self-descriptions: in-core institutions/nycn/ calls itself the operational home (with conditions for a later split); the separate nycn repo calls the in-core tree a canonical test fixture it does not own.",
+      "current_treatment": "Treat the private nycn repo as the substantive package home and institutions/nycn/ as the in-core public-safe fixture/shape until an explicit decision lands.",
+      "reconcile_against": ["docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/strategy/ICN_NYCN_INSTITUTION_PACKAGE_BOUNDARY.md"]
+    }
+  ]
+}
