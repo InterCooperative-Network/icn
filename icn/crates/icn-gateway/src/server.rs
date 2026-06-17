@@ -601,12 +601,16 @@ impl GatewayServer {
         // token carrying its own `coop_id`, which `require_coop_access` then
         // trusts. DID ownership alone does not authorize that coop, so this
         // self-asserted issuance is fail-closed by default and only enabled for
-        // dev/demo deployments via the existing `ICN_DEV_MODE` posture (matching
-        // the gateway's dev-security convention used for CORS above). Production
+        // dev/demo deployments via an explicit truthy `ICN_DEV_MODE` ("1"/"true",
+        // matching the `ICN_SKIP_CORS` toggle convention in `security.rs`). The
+        // truthy parse is stricter than the CORS dev gate's bare presence check
+        // on purpose: `ICN_DEV_MODE=0` must NOT open this auth bypass. Production
         // binds coop authority through trusted issuance paths
         // (invites/sessions/enrollment) until RFC-0018's membership/entity
         // binding lands.
-        let allow_self_asserted_coop = std::env::var("ICN_DEV_MODE").is_ok();
+        let allow_self_asserted_coop = std::env::var("ICN_DEV_MODE")
+            .map(|v| v == "1" || v == "true")
+            .unwrap_or(false);
         if allow_self_asserted_coop {
             warn!(
                 "⚠️  ICN_DEV_MODE: self-asserted cooperative authority is ENABLED at \
