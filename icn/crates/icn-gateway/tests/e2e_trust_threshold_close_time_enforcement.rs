@@ -163,7 +163,7 @@ async fn build_app_with_trust_resolver(
     String, // actor JWT
 ) {
     let jwt_secret = b"trust-threshold-enforcement-sec32".to_vec();
-    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
 
     let resolver = Arc::new(TrustManagerMembershipResolver::new(trust_manager));

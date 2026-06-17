@@ -1727,7 +1727,7 @@ mod tests {
         async fn start_test_server() -> (tokio::task::JoinHandle<()>, String, BootstrapAuthContext)
         {
             let jwt_secret = b"bootstrap-apply-integration-test!".to_vec();
-            let auth_mgr = Arc::new(AuthManager::new(jwt_secret));
+            let auth_mgr = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
             let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
             let entity_mgr = Arc::new(EntityManager::new());
             let store = Arc::new(SledStore::temporary().expect("temp sled store"));

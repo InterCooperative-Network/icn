@@ -26,7 +26,10 @@
 //! # use icn_identity::IdentityBundle;
 //! # use icn_gateway::auth::AuthManager;
 //! let bundle = IdentityBundle::generate().unwrap();
-//! let auth = AuthManager::new(b"secret".to_vec());
+//! // Dev/demo only: enable self-service issuance with a caller-supplied coop_id.
+//! // Production leaves this off (fail-closed) and binds coop authority via
+//! // trusted issuance paths (invites/sessions/enrollment). See issue #2075.
+//! let auth = AuthManager::new(b"secret".to_vec()).with_self_asserted_coop(true);
 //!
 //! // Get challenge
 //! let nonce = auth.create_challenge(bundle.did()).unwrap();
@@ -52,7 +55,10 @@
 //! # use std::sync::Arc;
 //! # use ed25519_dalek::SigningKey;
 //! # use rand_core::OsRng;
-//! let auth = AuthManager::new(b"secret".to_vec());
+//! // Dev/demo only: enable self-service issuance with a caller-supplied coop_id.
+//! // Production leaves this off (fail-closed) and binds coop authority via
+//! // trusted issuance paths (invites/sessions/enrollment). See issue #2075.
+//! let auth = AuthManager::new(b"secret".to_vec()).with_self_asserted_coop(true);
 //!
 //! // Hardware-backed key (private key in HSM/TPM)
 //! # let sk = SigningKey::generate(&mut OsRng);
@@ -121,17 +127,49 @@ pub struct AuthManager {
     jwt_secret: Vec<u8>,
     challenge_ttl: Duration,
     token_ttl: Duration,
+    /// Whether the challenge/verify flow may mint a token carrying a
+    /// **caller-supplied** `coop_id` (see [`AuthManager::verify_challenge`]).
+    ///
+    /// SECURITY (issue #2075): DID ownership proves only that the caller holds a
+    /// key — it does **not** authorize that DID to act for an arbitrary
+    /// cooperative. When this is `false` (the safe default), `verify_challenge`
+    /// fails closed instead of binding self-asserted coop authority into a token.
+    /// It may be enabled only for dev/demo deployments via
+    /// [`AuthManager::with_self_asserted_coop`]. Production binds coop authority
+    /// through trusted issuance paths (invites/sessions/enrollment) and,
+    /// ultimately, RFC-0018's membership/entity binding.
+    allow_self_asserted_coop: bool,
 }
 
 impl AuthManager {
-    /// Create new auth manager
+    /// Create new auth manager.
+    ///
+    /// Self-asserted cooperative authority via the challenge/verify flow is
+    /// **disabled by default** (fail-closed); enable it for dev/demo only with
+    /// [`AuthManager::with_self_asserted_coop`].
     pub fn new(jwt_secret: Vec<u8>) -> Self {
         Self {
             challenges: Arc::new(RwLock::new(HashMap::new())),
             jwt_secret,
             challenge_ttl: Duration::from_secs(300), // 5 minutes
             token_ttl: Duration::from_secs(3600),    // 1 hour
+            allow_self_asserted_coop: false,
         }
+    }
+
+    /// Enable (or disable) self-service capability-token issuance via the
+    /// challenge/verify flow, where the caller chooses its own `coop_id`.
+    ///
+    /// SECURITY (issue #2075): enabling this permits a DID that has proven only
+    /// key ownership to mint a token carrying an **unverified** `coop_id`, which
+    /// `require_coop_access` then trusts. It MUST be restricted to dev/demo
+    /// deployments. The gateway wires this from the `ICN_DEV_MODE` posture; it is
+    /// off in production, where coop authority is bound through trusted issuance
+    /// paths (invites/sessions/enrollment) until RFC-0018's membership/entity
+    /// binding lands.
+    pub fn with_self_asserted_coop(mut self, enabled: bool) -> Self {
+        self.allow_self_asserted_coop = enabled;
+        self
     }
 
     /// Generate a challenge for a DID
@@ -229,6 +267,22 @@ impl AuthManager {
         // Short-circuit || would skip expiration check if signature invalid, creating timing leak
         if !signature_valid | is_expired {
             return Err(auth_error());
+        }
+
+        // SECURITY (issue #2075): identity is now proven, but the caller-supplied
+        // `coop_id` is NOT. DID ownership does not authorize this DID to act for
+        // an arbitrary cooperative, and `require_coop_access` trusts whatever
+        // `coop_id` lands in the token. Fail closed: refuse to bind self-asserted
+        // coop authority unless explicitly enabled for a dev/demo deployment.
+        // Production binds coop authority via trusted issuance paths
+        // (invites/sessions/enrollment) and, ultimately, RFC-0018's
+        // membership/entity binding. AuthorizationFailed (403), not
+        // AuthenticationFailed (401): the identity check passed; the coop claim
+        // is what is unauthorized.
+        if !self.allow_self_asserted_coop {
+            return Err(GatewayError::AuthorizationFailed(
+                "self-asserted cooperative authority is not permitted".to_string(),
+            ));
         }
 
         // Issue JWT token
@@ -354,7 +408,8 @@ mod tests {
 
     #[test]
     fn test_verify_challenge_success() {
-        let auth = AuthManager::new(b"test_secret".to_vec());
+        // Dev/demo self-service issuance: caller supplies its own coop_id (#2075).
+        let auth = AuthManager::new(b"test_secret".to_vec()).with_self_asserted_coop(true);
         let bundle = IdentityBundle::generate().unwrap();
 
         // Create challenge
@@ -426,7 +481,8 @@ mod tests {
         use rand_core::OsRng;
         use std::sync::Arc;
 
-        let auth = AuthManager::new(b"test_secret".to_vec());
+        // Dev/demo self-service issuance: caller supplies its own coop_id (#2075).
+        let auth = AuthManager::new(b"test_secret".to_vec()).with_self_asserted_coop(true);
 
         // Create a software signing key (for the backend), but present it as "hardware" to the bundle
         let signing_key = SigningKey::generate(&mut OsRng);
@@ -461,5 +517,60 @@ mod tests {
             .unwrap();
 
         assert!(!token.is_empty());
+    }
+
+    /// SECURITY (#2075): with the safe default (`AuthManager::new`), a DID that
+    /// has proven only key ownership must NOT be able to mint a token for a
+    /// self-asserted `coop_id`. Issuance fails closed with AuthorizationFailed
+    /// even though the signature is valid — identity is proven, but the coop
+    /// claim is not authorized.
+    #[test]
+    fn test_verify_challenge_self_asserted_coop_rejected_by_default() {
+        let auth = AuthManager::new(b"test_secret".to_vec()); // fail-closed default
+        let bundle = IdentityBundle::generate().unwrap();
+
+        let nonce = auth.create_challenge(bundle.did()).unwrap();
+        let nonce_bytes = hex::decode(&nonce).unwrap();
+        let signature = bundle
+            .sign(&nonce_bytes)
+            .expect("test setup: bundle must be able to sign nonce");
+
+        let result = auth.verify_challenge(
+            bundle.did(),
+            &signature.to_bytes(),
+            "some-coop",
+            vec!["ledger:write".to_string()],
+        );
+
+        assert!(
+            matches!(result, Err(GatewayError::AuthorizationFailed(_))),
+            "self-asserted coop authority must be rejected when not explicitly enabled",
+        );
+    }
+
+    /// The dev/demo bypass is opt-in and explicit: with
+    /// `with_self_asserted_coop(true)` the same flow succeeds and the token
+    /// carries the requested coop_id. This documents the intentional dev path.
+    #[test]
+    fn test_verify_challenge_self_asserted_coop_allowed_in_dev() {
+        let auth = AuthManager::new(b"test_secret".to_vec()).with_self_asserted_coop(true);
+        let bundle = IdentityBundle::generate().unwrap();
+
+        let nonce = auth.create_challenge(bundle.did()).unwrap();
+        let nonce_bytes = hex::decode(&nonce).unwrap();
+        let signature = bundle
+            .sign(&nonce_bytes)
+            .expect("test setup: bundle must be able to sign nonce");
+
+        let token = auth
+            .verify_challenge(
+                bundle.did(),
+                &signature.to_bytes(),
+                "some-coop",
+                vec!["ledger:write".to_string()],
+            )
+            .expect("dev mode permits self-service issuance");
+        let claims = auth.verify_token(&token).unwrap();
+        assert_eq!(claims.coop_id, "some-coop");
     }
 }

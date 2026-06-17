@@ -309,7 +309,7 @@ async fn test_e2e_freeze_member_suspends_commons_affiliation() {
 
     // ── Build test app (governance + auth) ───────────────────────────────────
     let jwt_secret = b"e2e-institutional-flow-test-secret32".to_vec();
-    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
     let governance_manager = Arc::new(
         GovernanceManager::new().with_receipt_store(Arc::new(TestReceiptBackend::default())),
@@ -568,7 +568,7 @@ async fn test_e2e_unfreeze_member_reinstates_commons_affiliation() {
 
     // ── Build test app ────────────────────────────────────────────────────────
     let jwt_secret = b"e2e-unfreeze-flow-test-secret-min32".to_vec();
-    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
     let governance_manager = Arc::new(
         GovernanceManager::new().with_receipt_store(Arc::new(TestReceiptBackend::default())),
@@ -916,7 +916,7 @@ async fn test_e2e_appoint_steward_scoped_to_chartered_domain() {
 
     // ── Build test app ────────────────────────────────────────────────────────
     let jwt_secret = b"e2e-scoped-steward-test-secret-32bc".to_vec();
-    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
     let governance_manager = Arc::new(
         GovernanceManager::new().with_receipt_store(Arc::new(TestReceiptBackend::default())),

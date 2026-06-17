@@ -212,7 +212,7 @@ async fn build_app_with_proposal(
         .expect("open_proposal");
 
     let jwt_secret = b"close-revalidation-jwt-secret-32b".to_vec();
-    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
 
     let gov_ctx = GovernanceContext {

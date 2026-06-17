@@ -170,7 +170,9 @@ mod tests {
 
     #[actix_web::test]
     async fn test_verify_endpoint_success() {
-        let auth = Arc::new(AuthManager::new(b"test_secret".to_vec()));
+        // Dev/demo self-service issuance: caller supplies its own coop_id (#2075).
+        let auth =
+            Arc::new(AuthManager::new(b"test_secret".to_vec()).with_self_asserted_coop(true));
         let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
         let bundle = IdentityBundle::generate().unwrap();
 
