@@ -144,6 +144,19 @@
     completionReceipt: "fixtures/demo-completion-receipt.json"
   };
 
+  // #2084 Community Proof Spine 0.1 — fixture/dev mirror of the civic loop.
+  // `?mode=demo&set=community` swaps the demo pack for a community-shaped
+  // walkthrough: belonging -> standing -> action card -> authorized transition
+  // -> receipt -> plain-language explanation. Fixture/dev only — nothing is live,
+  // the receipt hash is illustrative (see the receipt's demo hash label), and this
+  // models a community as an icn-entity Community entity, not a live community
+  // domain. See docs/spec/community-proof-spine-0.1.md.
+  if (MODE === "demo" && params.get("set") === "community") {
+    FIXTURES.standing = "fixtures/community-standing.json";
+    FIXTURES.cards = "fixtures/community-action-cards.json";
+    FIXTURES.completionReceipt = "fixtures/community-completion-receipt.json";
+  }
+
   // ---------------------------------------------------------------------
   // Small DOM helpers — element construction only, no innerHTML with
   // dynamic data, so fixture/gateway strings can never inject markup.

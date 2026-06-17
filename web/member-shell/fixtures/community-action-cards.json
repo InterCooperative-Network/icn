@@ -1,0 +1,24 @@
+{
+  "did": "did:icn:example-community-steward-demo-not-live",
+  "cards": [
+    {
+      "id": "demo-community-card-charter-ratify-001",
+      "source_kind": "action_item",
+      "action_kind": "complete",
+      "scope": "entity",
+      "title": "Ratify the Maple Street Mutual Aid charter",
+      "summary": "As a Steward of this community you may ratify the proposed mutual-aid charter. Completing this action produces a completion receipt.",
+      "authority_basis": "Steward (Founder) of the Maple Street Mutual Aid community (demo)",
+      "required_authority_scope": [
+        "community_action"
+      ],
+      "deadline": 1730500000,
+      "risk_level": "normal",
+      "accessibility_hint": "Plain-language outcome first; the authority basis is stated before the action. No color-only signaling.",
+      "receipt_expected": true,
+      "source_id": "demo-community-action-charter-001",
+      "domain_id": "community.maple-street-mutual-aid"
+    }
+  ],
+  "generated_at": 1730000000
+}
