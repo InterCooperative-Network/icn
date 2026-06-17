@@ -301,11 +301,13 @@ pub struct DepositRequest {
 /// passing `treasury.entity_id()` as the authoritative target.
 async fn observe_treasury(
     req: &HttpRequest,
-    entity_mgr: &EntityManager,
+    entity_mgr: &web::Data<Arc<EntityManager>>,
     treasury_entity_id: Option<&EntityId>,
     coop_id: &str,
     action: EntityAction,
 ) {
+    // Resolve the caller synchronously (cheap); bail quietly if the request is
+    // unauthenticated or the subject DID is unparseable.
     let Some(claims) = get_claims(req) else {
         return;
     };
@@ -313,9 +315,21 @@ async fn observe_treasury(
         return;
     };
     let caller = EntityId::from_did(&caller_did);
-    let _ =
-        observe_treasury_entity_access(entity_mgr, &caller, treasury_entity_id, coop_id, action)
-            .await;
+
+    // Run the observation as a detached, best-effort task. The entity-registry
+    // lookup may be a daemon-actor round trip; awaiting it inline would let a slow
+    // or stalled EntityManager block an already-authorized treasury response, even
+    // though the result is discarded and non-enforcing. Spawning keeps observe mode
+    // strictly off the request path — it can affect neither the response nor its
+    // latency. (RFC-0018 observe mode, ADR-0035.)
+    let entity_mgr = entity_mgr.get_ref().clone();
+    let target = treasury_entity_id.cloned();
+    let coop_id = coop_id.to_string();
+    actix_web::rt::spawn(async move {
+        let _ =
+            observe_treasury_entity_access(&entity_mgr, &caller, target.as_ref(), &coop_id, action)
+                .await;
+    });
 }
 
 #[get("/{coop_id}")]

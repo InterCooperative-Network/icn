@@ -88,6 +88,11 @@ risk breaking live authorization while membership data is still being backfilled
 - **Zero live authorization change.** No flat guard is removed or weakened; the
   entity path is observation-only. The risk of denying legitimate treasury calls
   (e.g. coops not yet entity-registered) is avoided by design.
+- **Off the request path entirely.** The observation (an entity-registry lookup
+  that may be a daemon-actor round trip) runs in a detached best-effort task, not
+  awaited inline. It therefore cannot affect the treasury response *or its
+  latency*, even if the `EntityManager` is slow or stalled — the observation can
+  be dropped without consequence.
 - The primitive gains one *live* caller immediately: `require_entity_write_access`
   delegates to it (`ModifyEntity`), proving it against the existing entity-write
   path without behavior change.
