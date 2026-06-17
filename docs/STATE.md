@@ -1,7 +1,7 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-06-17
+Last Reviewed: 2026-06-14
 ---
 
 # ICN State (living doc)
