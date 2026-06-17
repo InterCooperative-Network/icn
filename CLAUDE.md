@@ -501,6 +501,11 @@ See **[.github/ISSUE_POLICY.md](.github/ISSUE_POLICY.md)** for the complete issu
 
 See [docs/security/production-hardening.md](docs/security/production-hardening.md) for complete details.
 
+### Auth / dev-gate doctrine (#2075)
+- A capability token is not a mandate: DID ownership alone must never authorize a cooperative. Self-asserted `coop_id` issuance at `/auth/verify` is **fail-closed** — see RFC-0018, issue #2075, and [docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md](docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md).
+- Any dev/self-serve auth bypass must require BOTH an explicit opt-in (`ICN_DEV_MODE`) AND a loopback bind, and must NOT be settable from a config file (`#[serde(skip)]`, not `serde(default)`). Prefer a safe-by-construction gate over per-launcher patching.
+- Never enable a dev posture on a non-loopback (`0.0.0.0` / routable) bind — that exposes the bypass to the network. Production binds coop authority through trusted issuance paths (invites/sessions/enrollment).
+
 ## Notes
 
 - Daemon requires unlocked keystore (passphrase on startup)

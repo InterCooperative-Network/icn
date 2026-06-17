@@ -559,7 +559,7 @@ category = "reference"
 status = "canonical"
 title = "Claude Agent Onboarding"
 description = "Guidance for Claude Code sessions working with ICN codebase"
-last_updated = "2026-03-21"
+last_updated = "2026-06-17"
 owner = "matt"
 audiences = ["agents", "developers"]
 
