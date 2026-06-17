@@ -11,6 +11,7 @@
 //! proposal system.
 
 use actix_web::{get, post, web, HttpMessage, HttpRequest, HttpResponse};
+use icn_entity::EntityId;
 #[cfg_attr(not(test), allow(unused_imports))]
 use icn_governance::{
     GovernanceDomainId, GovernanceParams, MembershipConfig, ProposalId, ProposalPayload,
@@ -23,6 +24,8 @@ use std::sync::Arc;
 use tracing::info;
 
 use crate::auth::TokenClaims;
+use crate::authority::{observe_treasury_entity_access, EntityAction};
+use crate::entity_mgr::EntityManager;
 use crate::error::{GatewayError, Result};
 use crate::governance_mgr::GovernanceManager;
 use crate::middleware::{get_claims, require_coop_access, require_scope};
@@ -288,11 +291,93 @@ pub struct DepositRequest {
 ///
 /// Returns the overall status of the cooperative's treasury including
 /// balance, active budgets, and spending rules.
+/// Observe-mode entity-aware authorization (RFC-0018, ADR-0035).
+///
+/// Computes and records the entity-aware authorization decision ALONGSIDE the
+/// authoritative flat `require_coop_access` guard, which has already run by the
+/// time this is called. This is **observation-only**: it emits a metric and a log
+/// line and returns nothing, so it can never deny a request. Call it AFTER
+/// `require_coop_access` and (where available) after the treasury is loaded,
+/// passing `treasury.entity_id()` as the authoritative target.
+async fn observe_treasury(
+    req: &HttpRequest,
+    entity_mgr: &web::Data<Arc<EntityManager>>,
+    treasury_entity_id: Option<&EntityId>,
+    coop_id: &str,
+    action: EntityAction,
+) {
+    // Resolve the caller synchronously (cheap); bail quietly if the request is
+    // unauthenticated or the subject DID is unparseable.
+    let Some(claims) = get_claims(req) else {
+        return;
+    };
+    let Ok(caller_did) = claims.sub.parse::<Did>() else {
+        return;
+    };
+    let caller = EntityId::from_did(&caller_did);
+
+    // Run the observation as a detached, best-effort task. The entity-registry
+    // lookup may be a daemon-actor round trip; awaiting it inline would let a slow
+    // or stalled EntityManager block an already-authorized treasury response, even
+    // though the result is discarded and non-enforcing. Spawning keeps observe mode
+    // strictly off the request path — it can affect neither the response nor its
+    // latency. (RFC-0018 observe mode, ADR-0035.)
+    let entity_mgr = entity_mgr.get_ref().clone();
+    let target = treasury_entity_id.cloned();
+    let coop_id = coop_id.to_string();
+    actix_web::rt::spawn(async move {
+        let _ =
+            observe_treasury_entity_access(&entity_mgr, &caller, target.as_ref(), &coop_id, action)
+                .await;
+    });
+}
+
+/// Like [`observe_treasury`], but keyed by the **owning treasury's `treasury_did`**
+/// rather than a path `coop_id`. Used by `get_budget`, which fetches a budget by a
+/// globally-keyed `budget_id`: the budget may belong to a different cooperative than
+/// the path `coop_id` (the flat guard only checks the path coop). Observing against
+/// the path coop would record the entity decision for the wrong entity. Resolving
+/// from the budget's own `treasury_did` makes the observation reflect the budget's
+/// real owner — so a cross-coop budget read surfaces as a genuine `flat_allow_entity_deny`
+/// instead of a misleading `agree_allow`. The treasury is loaded **inside** the
+/// detached task (off the request hot path). (RFC-0018 observe mode, ADR-0035.)
+async fn observe_treasury_by_did(
+    req: &HttpRequest,
+    entity_mgr: &web::Data<Arc<EntityManager>>,
+    treasury_mgr: &web::Data<Arc<GatewayTreasuryManager>>,
+    treasury_did: &Did,
+    action: EntityAction,
+) {
+    let Some(claims) = get_claims(req) else {
+        return;
+    };
+    let Ok(caller_did) = claims.sub.parse::<Did>() else {
+        return;
+    };
+    let caller = EntityId::from_did(&caller_did);
+
+    let entity_mgr = entity_mgr.get_ref().clone();
+    let treasury_mgr = treasury_mgr.get_ref().clone();
+    let treasury_did = treasury_did.clone();
+    actix_web::rt::spawn(async move {
+        // Resolve the budget's owning treasury off the hot path; observe against
+        // its stored entity_id (and its own coop_id for the fallback projection).
+        let (target, coop_id) = match treasury_mgr.get_treasury(&treasury_did).await {
+            Ok(Some(t)) => (t.entity_id().cloned(), t.coop_id.clone()),
+            _ => (None, String::new()),
+        };
+        let _ =
+            observe_treasury_entity_access(&entity_mgr, &caller, target.as_ref(), &coop_id, action)
+                .await;
+    });
+}
+
 #[get("/{coop_id}")]
 pub async fn get_treasury_status(
     req: HttpRequest,
     path: web::Path<String>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    entity_mgr: web::Data<Arc<EntityManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:read")?;
 
@@ -312,6 +397,16 @@ pub async fn get_treasury_status(
             "Treasury not configured for cooperative '{coop_id}'. Register via governance proposal."
         )));
     };
+
+    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    observe_treasury(
+        &req,
+        &entity_mgr,
+        treasury.entity_id(),
+        &coop_id,
+        EntityAction::TreasuryRead,
+    )
+    .await;
 
     // Get budgets and spending rules
     let budgets = treasury_mgr
@@ -357,14 +452,16 @@ pub async fn get_treasury_position(
     req: HttpRequest,
     path: web::Path<String>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    entity_mgr: web::Data<Arc<EntityManager>>,
 ) -> Result<HttpResponse> {
-    do_get_treasury_position(req, path, treasury_mgr).await
+    do_get_treasury_position(req, path, treasury_mgr, entity_mgr).await
 }
 
 pub(crate) async fn do_get_treasury_position(
     req: HttpRequest,
     path: web::Path<String>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    entity_mgr: web::Data<Arc<EntityManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:read")?;
 
@@ -384,6 +481,16 @@ pub(crate) async fn do_get_treasury_position(
             "Treasury not configured for cooperative '{coop_id}'"
         )));
     };
+
+    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    observe_treasury(
+        &req,
+        &entity_mgr,
+        treasury.entity_id(),
+        &coop_id,
+        EntityAction::TreasuryRead,
+    )
+    .await;
 
     // Check if ledger is wired for position queries
     if !treasury_mgr.is_ledger_wired() {
@@ -416,6 +523,7 @@ pub async fn get_treasury_nonce(
     req: HttpRequest,
     path: web::Path<String>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    entity_mgr: web::Data<Arc<EntityManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:read")?;
 
@@ -432,6 +540,16 @@ pub async fn get_treasury_nonce(
             "Treasury not configured for cooperative '{coop_id}'"
         )));
     };
+
+    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    observe_treasury(
+        &req,
+        &entity_mgr,
+        treasury.entity_id(),
+        &coop_id,
+        EntityAction::TreasuryRead,
+    )
+    .await;
 
     let treasury_did = treasury.treasury_did.to_string();
     let nonce = treasury_mgr
@@ -460,6 +578,7 @@ pub async fn list_budgets(
     req: HttpRequest,
     path: web::Path<String>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    entity_mgr: web::Data<Arc<EntityManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:read")?;
 
@@ -480,6 +599,16 @@ pub async fn list_budgets(
             "Treasury not configured for cooperative '{coop_id}'. Register via governance proposal."
         )));
     };
+
+    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    observe_treasury(
+        &req,
+        &entity_mgr,
+        treasury.entity_id(),
+        &coop_id,
+        EntityAction::TreasuryRead,
+    )
+    .await;
 
     // Get budgets
     let budgets = treasury_mgr
@@ -519,6 +648,7 @@ pub async fn get_budget(
     req: HttpRequest,
     path: web::Path<(String, String)>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    entity_mgr: web::Data<Arc<EntityManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:read")?;
 
@@ -538,6 +668,19 @@ pub async fn get_budget(
             "Budget not found: {budget_id}"
         )));
     };
+
+    // RFC-0018 observe mode (ADR-0035): observe against the budget's OWN treasury
+    // (resolved from budget.treasury_did inside a detached task), not the path coop
+    // — the budget is globally keyed and may belong to a different cooperative.
+    // Observation-only; the flat require_coop_access guard above stays authoritative.
+    observe_treasury_by_did(
+        &req,
+        &entity_mgr,
+        &treasury_mgr,
+        &budget.treasury_did,
+        EntityAction::TreasuryRead,
+    )
+    .await;
 
     let response = BudgetDetailResponse {
         id: budget.id.clone(),
@@ -571,6 +714,7 @@ pub async fn create_budget(
     path: web::Path<String>,
     body: web::Json<CreateBudgetRequest>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    entity_mgr: web::Data<Arc<EntityManager>>,
     governance_mgr: web::Data<Arc<GovernanceManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:write")?;
@@ -628,6 +772,16 @@ pub async fn create_budget(
              Register a treasury before creating budgets."
         ))
     })?;
+
+    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    observe_treasury(
+        &req,
+        &entity_mgr,
+        treasury.entity_id(),
+        &coop_id,
+        EntityAction::TreasuryWrite,
+    )
+    .await;
 
     info!(
         coop_id = %coop_id,
@@ -699,6 +853,7 @@ pub async fn list_spending_rules(
     req: HttpRequest,
     path: web::Path<String>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    entity_mgr: web::Data<Arc<EntityManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:read")?;
 
@@ -720,6 +875,16 @@ pub async fn list_spending_rules(
         };
         return Ok(HttpResponse::Ok().json(response));
     };
+
+    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    observe_treasury(
+        &req,
+        &entity_mgr,
+        treasury.entity_id(),
+        &coop_id,
+        EntityAction::TreasuryRead,
+    )
+    .await;
 
     // Get spending rules
     let rules = treasury_mgr
@@ -756,6 +921,7 @@ pub async fn get_audit_trail(
     path: web::Path<String>,
     query: web::Query<HashMap<String, String>>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    entity_mgr: web::Data<Arc<EntityManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:read")?;
 
@@ -792,6 +958,16 @@ pub async fn get_audit_trail(
         };
         return Ok(HttpResponse::Ok().json(response));
     };
+
+    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    observe_treasury(
+        &req,
+        &entity_mgr,
+        treasury.entity_id(),
+        &coop_id,
+        EntityAction::TreasuryRead,
+    )
+    .await;
 
     // Get audit trail
     let audit_trail = treasury_mgr
@@ -835,6 +1011,7 @@ pub async fn deposit_to_treasury(
     path: web::Path<String>,
     body: web::Json<DepositRequest>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    entity_mgr: web::Data<Arc<EntityManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:write")?;
 
@@ -873,6 +1050,16 @@ pub async fn deposit_to_treasury(
         .ok_or_else(|| {
             GatewayError::NotFound(format!("Treasury not found for cooperative: {coop_id}"))
         })?;
+
+    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    observe_treasury(
+        &req,
+        &entity_mgr,
+        treasury.entity_id(),
+        &coop_id,
+        EntityAction::TreasuryWrite,
+    )
+    .await;
 
     info!(
         coop_id = %coop_id,
@@ -958,9 +1145,10 @@ pub async fn propose_spend(
     path: web::Path<String>,
     body: web::Json<SpendRequest>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    entity_mgr: web::Data<Arc<EntityManager>>,
     governance_mgr: web::Data<Arc<GovernanceManager>>,
 ) -> Result<HttpResponse> {
-    do_propose_spend(req, path, body, treasury_mgr, governance_mgr).await
+    do_propose_spend(req, path, body, treasury_mgr, entity_mgr, governance_mgr).await
 }
 
 pub(crate) async fn do_propose_spend(
@@ -968,6 +1156,7 @@ pub(crate) async fn do_propose_spend(
     path: web::Path<String>,
     body: web::Json<SpendRequest>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    entity_mgr: web::Data<Arc<EntityManager>>,
     governance_mgr: web::Data<Arc<GovernanceManager>>,
 ) -> Result<HttpResponse> {
     require_scope(&req, "treasury:write")?;
@@ -1006,6 +1195,16 @@ pub(crate) async fn do_propose_spend(
             "Treasury not configured for cooperative '{coop_id}'"
         ))
     })?;
+
+    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    observe_treasury(
+        &req,
+        &entity_mgr,
+        treasury.entity_id(),
+        &coop_id,
+        EntityAction::TreasuryWrite,
+    )
+    .await;
 
     let nonce = match body.expected_nonce {
         Some(n) => n,
@@ -1134,6 +1333,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(treasury_mgr))
+                .app_data(web::Data::new(Arc::new(EntityManager::new())))
                 .service(web::scope("/treasury").configure(configure)),
         )
         .await;
@@ -1153,6 +1353,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(treasury_mgr))
+                .app_data(web::Data::new(Arc::new(EntityManager::new())))
                 .service(web::scope("/treasury").configure(configure)),
         )
         .await;
@@ -1174,6 +1375,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(treasury_mgr))
+                .app_data(web::Data::new(Arc::new(EntityManager::new())))
                 .service(web::scope("/treasury").configure(configure)),
         )
         .await;
@@ -1193,6 +1395,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(treasury_mgr))
+                .app_data(web::Data::new(Arc::new(EntityManager::new())))
                 .service(web::scope("/treasury").configure(configure)),
         )
         .await;
@@ -1214,6 +1417,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(treasury_mgr))
+                .app_data(web::Data::new(Arc::new(EntityManager::new())))
                 .app_data(web::Data::new(governance_mgr))
                 .service(web::scope("/treasury").configure(configure)),
         )
@@ -1251,6 +1455,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(treasury_mgr))
+                .app_data(web::Data::new(Arc::new(EntityManager::new())))
                 .service(web::scope("/treasury").configure(configure)),
         )
         .await;
@@ -1270,6 +1475,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(treasury_mgr))
+                .app_data(web::Data::new(Arc::new(EntityManager::new())))
                 .service(web::scope("/treasury").configure(configure)),
         )
         .await;
@@ -1318,6 +1524,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(treasury_mgr.clone()))
+                .app_data(web::Data::new(Arc::new(EntityManager::new())))
                 .app_data(web::Data::new(governance_mgr.clone()))
                 .service(web::scope("/treasury").configure(configure)),
         )

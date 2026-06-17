@@ -35,6 +35,10 @@ fn can_track_currency(currency: &str) -> bool {
 
 /// Initialize gateway metric descriptions
 pub fn init_descriptions() {
+    describe_counter!(
+        "icn_gateway_entity_authz_observation_total",
+        "RFC-0018 observe mode: entity-aware authorization outcomes for requests that already passed the flat coop guard (observation-only, never enforced)"
+    );
     describe_gauge!(
         "icn_gateway_websocket_connections_active",
         "Current number of active WebSocket connections"
@@ -254,6 +258,27 @@ pub fn authorization_failures_inc(required_scope: &str) {
     counter!(
         "icn_gateway_authorization_failures_total",
         "required_scope" => required_scope.to_string()
+    )
+    .increment(1);
+}
+
+/// Record an entity-aware authorization *observation* (RFC-0018 observe mode).
+///
+/// Emitted for requests that already passed the authoritative flat
+/// `require_coop_access` guard, recording whether the entity-aware path would
+/// have agreed. Observation-only: it never affects a live authorization decision.
+/// Labels are bounded enums (no per-coop cardinality):
+/// - `family`: endpoint family (e.g. `treasury`)
+/// - `action`: `modify_entity` | `treasury_read` | `treasury_write`
+/// - `result`: `agree_allow` | `flat_allow_entity_deny` | `entity_indeterminate` | `entity_error`
+/// - `reason`: fine-grained category (e.g. `non_member`, `missing_capability`, `no_memberships`)
+pub fn entity_authz_observation_inc(family: &str, action: &str, result: &str, reason: &str) {
+    counter!(
+        "icn_gateway_entity_authz_observation_total",
+        "family" => family.to_string(),
+        "action" => action.to_string(),
+        "result" => result.to_string(),
+        "reason" => reason.to_string()
     )
     .increment(1);
 }
