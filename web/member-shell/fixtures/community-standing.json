@@ -1,0 +1,29 @@
+{
+  "did": "did:icn:example-community-steward-demo-not-live",
+  "display_label": "Demo community steward (fictional)",
+  "domains": [
+    {
+      "domain_id": "community.maple-street-mutual-aid",
+      "domain_name": "Maple Street Mutual Aid (community, demo)",
+      "membership_source": "static_list",
+      "status": "member"
+    }
+  ],
+  "roles": [
+    {
+      "role_assignment_id": "demo-community-role-001",
+      "structure_id": "community.maple-street-mutual-aid",
+      "structure_name": "Maple Street Mutual Aid (community, demo)",
+      "parent_entity_id": "entity:icn:community:maple-street-mutual-aid",
+      "role": "Steward (Founder)",
+      "authority_scope": [
+        "community_action"
+      ],
+      "start_date": 1700000000
+    }
+  ],
+  "authority_scopes": [
+    "community_action"
+  ],
+  "generated_at": 1730000000
+}

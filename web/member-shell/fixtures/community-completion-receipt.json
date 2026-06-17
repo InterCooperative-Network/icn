@@ -1,0 +1,13 @@
+{
+  "item_id": "demo-community-action-charter-001",
+  "domain_id": "community.maple-street-mutual-aid",
+  "actor_did": "did:icn:example-community-steward-demo-not-live",
+  "transition": "completed",
+  "completed_at": 1729900000,
+  "record_hash": [
+    198, 12, 77, 4, 233, 150, 61, 88,
+    19, 204, 41, 7, 162, 95, 130, 24,
+    58, 211, 6, 144, 73, 28, 187, 92,
+    3, 119, 240, 55, 101, 14, 166, 200
+  ]
+}

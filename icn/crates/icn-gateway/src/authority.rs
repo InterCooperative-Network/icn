@@ -666,3 +666,216 @@ mod entity_access_tests {
         assert_eq!(obs, EntityAccessObservation::AgreesAllow);
     }
 }
+
+// ============================================================================
+// Community Proof Spine 0.1 (#2084) — fixture/dev runtime proof
+// ============================================================================
+//
+// Proves the civic loop for a COMMUNITY-shaped entity end to end:
+//
+//   belonging (entity membership) -> standing -> authority (require_entity_access)
+//     -> action -> receipt (blake3 bind) -> verification (recompute) -> explanation
+//
+// The community is modeled as an `icn-entity` Community entity
+// (`EntityId::community(..)`) with `icn-entity` memberships — NOT the `icn-community`
+// civic crate. This is deliberately the SMALLEST honest proof that the
+// entity-authority spine (require_entity_access, RFC-0018 / #2079) can carry a
+// community-shaped civic action; it is **not** the final community domain model and
+// does not reconcile `icn-community` with `icn-entity`. The receipt hash is a
+// self-contained ADR-0026-style binding, not a new persisted production receipt
+// type. See `docs/spec/community-proof-spine-0.1.md`. A human-viewable mirror lives
+// in the member-shell community fixture (clearly labeled fixture/dev).
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod community_proof_spine {
+    use super::*;
+    use icn_entity::CooperativeEntity;
+    use icn_identity::KeyPair;
+
+    /// Deterministic fixture timestamp (so the receipt hash is reproducible).
+    const FIXTURE_AT: u64 = 1_750_000_000;
+
+    /// The canonical content of a discharged community action card — the record a
+    /// completion receipt binds over.
+    #[derive(Clone)]
+    struct CommunityActionRecord {
+        community_id: String,
+        action_id: String,
+        title: String,
+        actor_did: String,
+        authority_basis: String,
+        transition: String,
+        at: u64,
+    }
+
+    impl CommunityActionRecord {
+        /// ADR-0026-style binding: blake3 over a domain-separated, length-prefixed
+        /// canonical encoding of the record's fields. The domain tag is written raw
+        /// (no terminator) followed by length-prefixed fields, matching the
+        /// icn-governance receipt-hash convention (`proof.rs` `DOMAIN_TAG`).
+        /// Deterministic.
+        fn record_hash(&self) -> [u8; 32] {
+            let mut h = blake3::Hasher::new();
+            h.update(b"icn:community:action_completion:v0");
+            for field in [
+                self.community_id.as_str(),
+                self.action_id.as_str(),
+                self.title.as_str(),
+                self.actor_did.as_str(),
+                self.authority_basis.as_str(),
+                self.transition.as_str(),
+            ] {
+                h.update(&(field.len() as u64).to_le_bytes());
+                h.update(field.as_bytes());
+            }
+            h.update(&self.at.to_le_bytes());
+            *h.finalize().as_bytes()
+        }
+    }
+
+    /// Plain-language "why you can / cannot act" for a community ModifyEntity action.
+    /// Test-only seed for later member-shell surfacing (not a production API yet).
+    fn explain_community_authority(allowed: bool) -> String {
+        if allowed {
+            "You can act on this community because you are a Founder or Board Member of it."
+                .to_string()
+        } else {
+            "You cannot act on this community: this action requires Founder or Board Member \
+             standing, which your membership does not carry."
+                .to_string()
+        }
+    }
+
+    /// Register a Community-type entity + an individual member with `role`, returning
+    /// (manager, community EntityId, member EntityId).
+    async fn community_with_member(role: MembershipRole) -> (EntityManager, EntityId, EntityId) {
+        let mgr = EntityManager::new();
+        let community =
+            CooperativeEntity::community("maple-street-mutual-aid", "Maple Street Mutual Aid")
+                .unwrap();
+        let community_id = community.id.clone();
+        mgr.register(community).await.unwrap();
+
+        let kp = KeyPair::generate().unwrap();
+        let member = CooperativeEntity::individual(kp.did(), "Member");
+        let member_id = member.id.clone();
+        mgr.register(member).await.unwrap();
+        mgr.add_membership(Membership::active(
+            member_id.clone(),
+            community_id.clone(),
+            role,
+        ))
+        .await
+        .unwrap();
+        (mgr, community_id, member_id)
+    }
+
+    /// Full positive civic loop: a Steward (Founder) of a community is authorized to
+    /// complete a community action; the completion binds a receipt that verifies; the
+    /// authority is explained in plain language.
+    #[tokio::test]
+    async fn community_civic_loop_steward_can_complete() {
+        // belonging + standing: the steward holds an active Founder membership.
+        let (mgr, community_id, steward) = community_with_member(MembershipRole::Founder).await;
+
+        // authority: require_entity_access (the real RFC-0018 primitive) authorizes.
+        let decision =
+            require_entity_access(&mgr, &steward, &community_id, EntityAction::ModifyEntity).await;
+        assert!(
+            decision.is_ok(),
+            "a Founder of the community must be authorized for the community action"
+        );
+
+        // action -> receipt: bind the discharged action card as a blake3 receipt.
+        let record = CommunityActionRecord {
+            community_id: community_id.as_str().to_string(),
+            action_id: "action-charter-ratify-0001".to_string(),
+            title: "Ratify the Maple Street Mutual Aid charter".to_string(),
+            // The receipt binds a DID, not an entity id: recover the member's
+            // did:icn DID from the individual EntityId (to_did is Some for individuals).
+            actor_did: steward.to_did().unwrap().to_string(),
+            authority_basis: "founder_of_community".to_string(),
+            transition: "completed".to_string(),
+            at: FIXTURE_AT,
+        };
+        let receipt_hash = record.record_hash();
+
+        // verification: recomputing the hash over the same record matches.
+        assert_eq!(
+            receipt_hash,
+            record.record_hash(),
+            "receipt hash must verify by recompute"
+        );
+
+        // explanation: a plain-language authority basis is produced.
+        let why = explain_community_authority(true);
+        assert!(why.contains("Founder or Board Member"));
+    }
+
+    /// Negative path: a plain Member of the same community is denied the action, and
+    /// the denial is explained in plain language.
+    #[tokio::test]
+    async fn community_civic_loop_plain_member_denied() {
+        let (mgr, community_id, member) = community_with_member(MembershipRole::Member).await;
+
+        let decision =
+            require_entity_access(&mgr, &member, &community_id, EntityAction::ModifyEntity).await;
+        assert!(
+            decision.is_err(),
+            "a plain Member must NOT be authorized for the Founder/BoardMember community action"
+        );
+
+        let why = explain_community_authority(false);
+        assert!(why.contains("requires Founder or Board Member"));
+    }
+
+    /// Tampering with ANY bound field changes the receipt hash (integrity).
+    /// Mutates each field of the canonical record once — including the timestamp —
+    /// so the proof actually backs the spec's "any bound field" claim: a field
+    /// silently dropped from `record_hash()` would fail here, not pass.
+    #[tokio::test]
+    async fn community_action_receipt_detects_tampering() {
+        let baseline = CommunityActionRecord {
+            community_id: "entity:icn:community:maple-street-mutual-aid".to_string(),
+            action_id: "action-charter-ratify-0001".to_string(),
+            title: "Ratify the Maple Street Mutual Aid charter".to_string(),
+            actor_did: "did:icn:zsteward-demo-not-live".to_string(),
+            authority_basis: "founder_of_community".to_string(),
+            transition: "completed".to_string(),
+            at: FIXTURE_AT,
+        };
+        let base_hash = baseline.record_hash();
+
+        // Each closure mutates exactly one bound field; the resulting hash must differ.
+        type FieldMutation = (&'static str, fn(&mut CommunityActionRecord));
+        let cases: [FieldMutation; 7] = [
+            ("community_id", |r| {
+                r.community_id = "entity:icn:community:elm-street-mutual-aid".to_string()
+            }),
+            ("action_id", |r| {
+                r.action_id = "action-charter-ratify-0002".to_string()
+            }),
+            ("title", |r| {
+                r.title = "Ratify a DIFFERENT charter".to_string()
+            }),
+            ("actor_did", |r| {
+                r.actor_did = "did:icn:zother-demo-not-live".to_string()
+            }),
+            ("authority_basis", |r| {
+                r.authority_basis = "board_member_of_community".to_string()
+            }),
+            ("transition", |r| r.transition = "rejected".to_string()),
+            ("at", |r| r.at = FIXTURE_AT + 1),
+        ];
+        for (field, mutate) in cases {
+            let mut tampered = baseline.clone();
+            mutate(&mut tampered);
+            assert_ne!(
+                base_hash,
+                tampered.record_hash(),
+                "tampering with `{field}` must change the receipt hash"
+            );
+        }
+    }
+}
