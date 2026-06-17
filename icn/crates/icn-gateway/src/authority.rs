@@ -710,10 +710,13 @@ mod community_proof_spine {
 
     impl CommunityActionRecord {
         /// ADR-0026-style binding: blake3 over a domain-separated, length-prefixed
-        /// canonical encoding of the record's fields. Deterministic.
+        /// canonical encoding of the record's fields. The domain tag is written raw
+        /// (no terminator) followed by length-prefixed fields, matching the
+        /// icn-governance receipt-hash convention (`proof.rs` `DOMAIN_TAG`).
+        /// Deterministic.
         fn record_hash(&self) -> [u8; 32] {
             let mut h = blake3::Hasher::new();
-            h.update(b"icn:community:action_completion:v0\x00");
+            h.update(b"icn:community:action_completion:v0");
             for field in [
                 self.community_id.as_str(),
                 self.action_id.as_str(),
@@ -788,7 +791,9 @@ mod community_proof_spine {
             community_id: community_id.as_str().to_string(),
             action_id: "action-charter-ratify-0001".to_string(),
             title: "Ratify the Maple Street Mutual Aid charter".to_string(),
-            actor_did: steward.as_str().to_string(),
+            // The receipt binds a DID, not an entity id: recover the member's
+            // did:icn DID from the individual EntityId (to_did is Some for individuals).
+            actor_did: steward.to_did().unwrap().to_string(),
             authority_basis: "founder_of_community".to_string(),
             transition: "completed".to_string(),
             at: FIXTURE_AT,
@@ -831,7 +836,7 @@ mod community_proof_spine {
             community_id: "entity:icn:community:maple-street-mutual-aid".to_string(),
             action_id: "action-charter-ratify-0001".to_string(),
             title: title.to_string(),
-            actor_did: "entity:icn:individual:zSteward".to_string(),
+            actor_did: "did:icn:zsteward-demo-not-live".to_string(),
             authority_basis: "founder_of_community".to_string(),
             transition: "completed".to_string(),
             at: FIXTURE_AT,
