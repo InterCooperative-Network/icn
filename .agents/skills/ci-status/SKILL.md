@@ -38,6 +38,7 @@ hardcode it. Non-required reds never block. Read-only — never merges, reruns, 
    **UNVERIFIABLE**, never READY.
    ```bash
    REQ="$(gh api repos/InterCooperative-Network/icn/branches/main/protection/required_status_checks --jq '.contexts | join("|")')"
+   [ -z "$REQ" ] && { echo "UNVERIFIABLE: required-check set unavailable (branch-protection fetch failed/empty) — refusing to report READY"; exit 0; }
    RAW="$(gh pr checks "$PR")"                      # capture; gh exits 8 on mixed (not an error)
    [ -z "$RAW" ] && { echo "UNVERIFIABLE: no check data (auth/repo resolution failed)"; exit 0; }
    printf '%s\n' "$RAW" | awk -F'\t' -v reqs="$REQ" '
@@ -65,7 +66,7 @@ hardcode it. Non-required reds never block. Read-only — never merges, reruns, 
   `mergeStateStatus` is `BLOCKED` (failed required gate / unresolved thread / branch-protection rule),
   `DIRTY` (conflict), `BEHIND` (out of date — needs `gh pr update-branch`), or `DRAFT` (mark ready
   first). Name the exact blocker(s).
-- **UNVERIFIABLE** — the check or thread fetch failed; do not assert readiness.
+- **UNVERIFIABLE** — the required-check set, the check fetch, or the thread fetch could not be loaded; never assert readiness on missing inputs.
 
 > Note: `mergeable=MERGEABLE` alone is NOT sufficient — a PR can be MERGEABLE yet `BLOCKED`/`BEHIND`.
 
