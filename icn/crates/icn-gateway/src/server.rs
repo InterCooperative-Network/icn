@@ -595,8 +595,28 @@ impl GatewayServer {
             )));
         }
 
-        // Create shared managers
-        let auth_manager = Arc::new(AuthManager::new(self.jwt_secret));
+        // Create shared managers.
+        //
+        // SECURITY (issue #2075): the challenge/verify flow lets a caller mint a
+        // token carrying its own `coop_id`, which `require_coop_access` then
+        // trusts. DID ownership alone does not authorize that coop, so this
+        // self-asserted issuance is fail-closed by default and only enabled for
+        // dev/demo deployments via the existing `ICN_DEV_MODE` posture (matching
+        // the gateway's dev-security convention used for CORS above). Production
+        // binds coop authority through trusted issuance paths
+        // (invites/sessions/enrollment) until RFC-0018's membership/entity
+        // binding lands.
+        let allow_self_asserted_coop = std::env::var("ICN_DEV_MODE").is_ok();
+        if allow_self_asserted_coop {
+            warn!(
+                "⚠️  ICN_DEV_MODE: self-asserted cooperative authority is ENABLED at \
+                 /auth/verify — any DID may mint a token for any coop_id. DEV/DEMO ONLY; \
+                 never enable on a production gateway (see issue #2075)."
+            );
+        }
+        let auth_manager = Arc::new(
+            AuthManager::new(self.jwt_secret).with_self_asserted_coop(allow_self_asserted_coop),
+        );
 
         // Create cooperative manager (uses actor if handle available, otherwise in-memory)
         let coop_manager: Arc<CoopManager> = if let Some(handle) = self.coop_handle {

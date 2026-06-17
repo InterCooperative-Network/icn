@@ -59,7 +59,7 @@ use std::sync::Arc;
 async fn test_governance_proposal_full_lifecycle_with_real_auth() {
     // ── Setup ────────────────────────────────────────────────────────────────
     let jwt_secret = b"governance-proof-test-secret-min32!".to_vec();
-    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
 
     // In-memory governance manager.
@@ -337,7 +337,7 @@ async fn test_governance_proposal_full_lifecycle_with_real_auth() {
 #[actix_web::test]
 async fn test_auth_rejects_invalid_signature() {
     let jwt_secret = b"governance-proof-test-secret-min32!".to_vec();
-    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
 
     let app = test::init_service(
@@ -384,7 +384,7 @@ async fn test_auth_rejects_invalid_signature() {
 #[actix_web::test]
 async fn test_governance_endpoints_require_auth() {
     let jwt_secret = b"governance-proof-test-secret-min32!".to_vec();
-    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
     let governance_manager = Arc::new(GovernanceManager::new());
     let gov_ctx = GovernanceContext {

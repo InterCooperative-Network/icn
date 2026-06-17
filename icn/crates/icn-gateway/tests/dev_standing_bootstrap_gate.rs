@@ -140,9 +140,11 @@ async fn build_app(
         .await
         .expect("create_domain");
 
-    let auth_manager = Arc::new(AuthManager::new(
-        b"dev-standing-bridge-jwt-secret-32".to_vec(),
-    ));
+    let auth_manager = Arc::new(
+        // Dev/demo self-service issuance: caller supplies its own coop_id (#2075).
+        AuthManager::new(b"dev-standing-bridge-jwt-secret-32".to_vec())
+            .with_self_asserted_coop(true),
+    );
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
 
     let gov_ctx = GovernanceContext {
