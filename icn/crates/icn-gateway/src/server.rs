@@ -166,6 +166,18 @@ pub struct GatewayServer {
     dev_self_serve_auth: bool,
 }
 
+/// Decide whether self-asserted `/auth/verify` coop issuance may be enabled
+/// (issue #2075).
+///
+/// Requires BOTH an opted-in dev posture AND a loopback bind. The loopback
+/// condition is the safety invariant: self-serve can never be reached by an
+/// untrusted remote caller, even if a dev posture is mistakenly set on an
+/// all-interfaces listener. Mirrors the `--insecure-gateway-no-jwt` loopback
+/// guard. Kept as a free function so the invariant is unit-tested directly.
+fn self_serve_coop_allowed(dev_opt_in: bool, bind_addr: &SocketAddr) -> bool {
+    dev_opt_in && bind_addr.ip().is_loopback()
+}
+
 impl GatewayServer {
     /// Create a new gateway server (uses temporary storage for testing)
     pub fn new(bind_addr: SocketAddr, jwt_secret: Vec<u8>) -> Self {
@@ -328,7 +340,9 @@ impl GatewayServer {
     /// loopback-only local-dev hatch) to keep its challenge/verify smoke path
     /// working without mutating process environment after the Tokio runtime has
     /// started. `run()` OR's this with the `ICN_DEV_MODE` env read, so it never
-    /// disables an env-configured dev posture — it only adds one.
+    /// disables an env-configured dev posture — it only adds one. Self-serve is
+    /// additionally gated on a loopback bind (see `self_serve_coop_allowed`), so
+    /// setting this on an all-interfaces listener does NOT expose `/auth/verify`.
     pub fn with_dev_self_serve_auth(mut self, enabled: bool) -> Self {
         self.dev_self_serve_auth = enabled;
         self
@@ -623,27 +637,41 @@ impl GatewayServer {
         // SECURITY (issue #2075): the challenge/verify flow lets a caller mint a
         // token carrying its own `coop_id`, which `require_coop_access` then
         // trusts. DID ownership alone does not authorize that coop, so this
-        // self-asserted issuance is fail-closed by default and only enabled for
-        // dev/demo deployments. Two opt-in channels, OR'd together:
-        //   1. an explicit truthy `ICN_DEV_MODE` ("1"/"true", matching the
-        //      `ICN_SKIP_CORS` toggle convention in `security.rs`; stricter than
-        //      the CORS dev gate's bare presence check on purpose — `ICN_DEV_MODE=0`
-        //      must NOT open this auth bypass); and
-        //   2. `dev_self_serve_auth` set via `with_dev_self_serve_auth`, the
-        //      race-free channel for `icnd --insecure-gateway-no-jwt` (no env
-        //      mutation after the Tokio runtime starts).
-        // Production binds coop authority through trusted issuance paths
+        // self-asserted issuance is fail-closed and enabled ONLY when BOTH hold:
+        //   (a) a dev posture is opted in — an explicit truthy `ICN_DEV_MODE`
+        //       ("1"/"true", matching `ICN_SKIP_CORS` in `security.rs`; stricter
+        //       than the CORS dev gate's bare presence check so `ICN_DEV_MODE=0`
+        //       cannot open it), OR `dev_self_serve_auth` set via
+        //       `with_dev_self_serve_auth` (the race-free channel for
+        //       `icnd --insecure-gateway-no-jwt`); AND
+        //   (b) the gateway is bound to a LOOPBACK address.
+        // The loopback condition makes self-serve safe-by-construction: it can
+        // never be reached by an untrusted remote caller, even if a dev posture
+        // is mistakenly set on an all-interfaces listener. This matches the
+        // existing `--insecure-gateway-no-jwt` loopback guard. Production (and any
+        // routable-bind demo) binds coop authority through trusted issuance paths
         // (invites/sessions/enrollment) until RFC-0018's membership/entity
         // binding lands.
         let dev_mode_env = std::env::var("ICN_DEV_MODE")
             .map(|v| v == "1" || v == "true")
             .unwrap_or(false);
-        let allow_self_asserted_coop = self.dev_self_serve_auth || dev_mode_env;
+        let dev_opt_in = self.dev_self_serve_auth || dev_mode_env;
+        let allow_self_asserted_coop = self_serve_coop_allowed(dev_opt_in, &self.bind_addr);
         if allow_self_asserted_coop {
             warn!(
-                "⚠️  ICN_DEV_MODE: self-asserted cooperative authority is ENABLED at \
-                 /auth/verify — any DID may mint a token for any coop_id. DEV/DEMO ONLY; \
-                 never enable on a production gateway (see issue #2075)."
+                "⚠️  self-asserted cooperative authority is ENABLED at /auth/verify on loopback \
+                 bind {} — any local DID may mint a token for any coop_id. DEV/DEMO ONLY; never \
+                 use a dev posture on a production gateway (see issue #2075).",
+                self.bind_addr
+            );
+        } else if dev_opt_in {
+            // Dev posture requested but the bind is not loopback: stay fail-closed
+            // and say so, so the operator understands why /auth/verify returns 403.
+            warn!(
+                "Dev self-serve auth was requested (ICN_DEV_MODE / insecure-no-jwt) but the gateway \
+                 is bound to non-loopback {} — self-asserted /auth/verify issuance stays DISABLED \
+                 (fail-closed). Bind to loopback for local-dev self-serve (see issue #2075).",
+                self.bind_addr
             );
         }
         let auth_manager = Arc::new(
@@ -2394,6 +2422,29 @@ fn get_static_dir() -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// SECURITY (#2075): self-asserted coop issuance requires BOTH a dev opt-in
+    /// AND a loopback bind. A dev posture on a routable/all-interfaces listener
+    /// must NOT enable it.
+    #[test]
+    fn self_serve_coop_requires_dev_optin_and_loopback() {
+        let loopback_v4: SocketAddr = "127.0.0.1:8080".parse().unwrap();
+        let loopback_v6: SocketAddr = "[::1]:8080".parse().unwrap();
+        let all_ifaces: SocketAddr = "0.0.0.0:8080".parse().unwrap();
+        let routable: SocketAddr = "10.0.0.5:8080".parse().unwrap();
+
+        // dev opt-in + loopback => enabled
+        assert!(self_serve_coop_allowed(true, &loopback_v4));
+        assert!(self_serve_coop_allowed(true, &loopback_v6));
+
+        // dev opt-in but NOT loopback => disabled (the #2075 exposure guard)
+        assert!(!self_serve_coop_allowed(true, &all_ifaces));
+        assert!(!self_serve_coop_allowed(true, &routable));
+
+        // no dev opt-in => disabled regardless of bind
+        assert!(!self_serve_coop_allowed(false, &loopback_v4));
+        assert!(!self_serve_coop_allowed(false, &all_ifaces));
+    }
 
     #[tokio::test]
     async fn test_jwt_secret_empty_fails_startup() {

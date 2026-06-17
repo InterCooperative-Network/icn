@@ -47,9 +47,13 @@ if [ ! -f "$DATA_DIR/identity.age" ]; then
 fi
 
 echo "[4/4] Starting gateway on port 8080..."
+# NOTE (issue #2075): this demo binds the gateway to all interfaces ($BIND, default
+# 0.0.0.0). Self-asserted /auth/verify coop issuance is gated on a loopback bind, so
+# do NOT set ICN_DEV_MODE here — it would not enable self-serve on 0.0.0.0 anyway
+# (fail-closed by design), and must never be combined with an all-interfaces bind.
+# For a local self-serve demo, bind loopback (127.0.0.1) and set ICN_DEV_MODE=1.
 ICN_KEYSTORE_PASSPHRASE=demo \
 ICN_GATEWAY_JWT_SECRET="$JWT_SECRET" \
-ICN_DEV_MODE=1 \
 nohup "$ICND" \
   --gateway-enable \
   --gateway-bind "$BIND" \
