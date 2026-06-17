@@ -28,10 +28,11 @@ hardcode it. Non-required reds never block. Read-only — never merges, reruns, 
 - Repo: `InterCooperative-Network/icn`.
 
 ## Routine
-1. **HEAD + mergeability** — `mergeStateStatus` is part of the verdict, not just `mergeable`:
+1. **HEAD + mergeability + review decision** — `mergeStateStatus` and `reviewDecision` are part of
+   the verdict, not just `mergeable`:
    ```bash
-   gh pr view "$PR" --json state,isDraft,headRefOid,mergeable,mergeStateStatus \
-     --jq '{state,isDraft,headRefOid,mergeable,mergeStateStatus}'
+   gh pr view "$PR" --json state,isDraft,headRefOid,mergeable,mergeStateStatus,reviewDecision \
+     --jq '{state,isDraft,headRefOid,mergeable,mergeStateStatus,reviewDecision}'
    ```
 2. **Required checks** — load the set live, count `pass` / `pending` / `fail` **separately**. Do NOT
    swallow `gh` failures into a false green: if the check fetch errors or returns no rows, report
@@ -58,14 +59,16 @@ hardcode it. Non-required reds never block. Read-only — never merges, reruns, 
    ```
 
 ## Verdict
-- **READY** — required `fail=0 pending=0`, `unresolved=0` (and not `truncated`), `mergeable=MERGEABLE`,
-  AND `mergeStateStatus` is `CLEAN`, **or** `UNSTABLE` with only non-required checks outstanding.
+- **READY** — required `fail=0 pending=0`, `unresolved=0` (and not `truncated`),
+  `reviewDecision` is not `CHANGES_REQUESTED`, `mergeable=MERGEABLE`, AND `mergeStateStatus` is
+  `CLEAN`, **or** `UNSTABLE` with only non-required checks outstanding.
 - **PENDING** — required `pending>0` (still running/queued), or `mergeStateStatus=UNKNOWN` (GitHub
   still computing — re-check).
-- **BLOCKED** — any of: required `fail>0`; `unresolved>0`; `mergeable!=MERGEABLE` (`CONFLICTING`);
-  `mergeStateStatus` is `BLOCKED` (failed required gate / unresolved thread / branch-protection rule),
-  `DIRTY` (conflict), `BEHIND` (out of date — needs `gh pr update-branch`), or `DRAFT` (mark ready
-  first). Name the exact blocker(s).
+- **BLOCKED** — any of: required `fail>0`; `unresolved>0`; `reviewDecision=CHANGES_REQUESTED` (a
+  reviewer requested changes — blocks even when all line threads are resolved); `mergeable!=MERGEABLE`
+  (`CONFLICTING`); `mergeStateStatus` is `BLOCKED` (failed required gate / unresolved thread /
+  branch-protection rule), `DIRTY` (conflict), `BEHIND` (out of date — needs `gh pr update-branch`),
+  or `DRAFT` (mark ready first). Name the exact blocker(s).
 - **UNVERIFIABLE** — the required-check set, the check fetch, or the thread fetch could not be loaded; never assert readiness on missing inputs.
 
 > Note: `mergeable=MERGEABLE` alone is NOT sufficient — a PR can be MERGEABLE yet `BLOCKED`/`BEHIND`.
@@ -73,8 +76,9 @@ hardcode it. Non-required reds never block. Read-only — never merges, reruns, 
 ## Flake classification (before calling a required failure "real")
 - Non-required benchmark checks (e.g. `Compare Against Base`, `Save Benchmark Baseline`) → noise; ignore.
 - A failing job whose step shows `conclusion: null` (`gh api repos/InterCooperative-Network/icn/actions/jobs/<id>`)
-  = runner kill/eviction, not a test failure (the #1955 sled-flock class). Re-run that job **once**
-  (`gh run rerun <run-id> --failed`) before treating it as real.
+  = runner kill/eviction, not a test failure (the #1955 sled-flock class). Classify it as a
+  **rerun-once candidate** and report that — actually performing the rerun
+  (`gh run rerun <run-id> --failed`) is a separate write action, NOT done by this read-only skill.
 - Advisory checks (`claude`) `skipping` → ignore (never block).
 
 ## Boundaries
