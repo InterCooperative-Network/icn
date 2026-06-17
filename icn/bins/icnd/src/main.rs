@@ -649,17 +649,16 @@ async fn main() -> Result<()> {
         config.gateway.jwt_secret = INSECURE_DEV_JWT_SECRET.to_string();
 
         // SECURITY (issue #2075): the gateway now fail-closes self-asserted
-        // `/auth/verify` coop issuance unless its dev posture (`ICN_DEV_MODE`)
-        // is set. This loopback-only insecure-no-jwt hatch IS a dev posture and
-        // its challenge/verify flow is expected to work (above), so opt into the
-        // dev posture here — otherwise the documented local `icnctl auth token`
-        // / bootstrap smoke paths would start returning 403. Only set it when
-        // unset so an explicit operator `ICN_DEV_MODE` value still wins; the
-        // loopback guard above keeps this bounded to local dev. (edition 2021:
-        // `set_var` is safe.)
-        if std::env::var_os("ICN_DEV_MODE").is_none() {
-            std::env::set_var("ICN_DEV_MODE", "1");
-        }
+        // `/auth/verify` coop issuance unless a dev posture is set. This
+        // loopback-only insecure-no-jwt hatch IS a dev posture and its
+        // challenge/verify flow is expected to work (above), so opt into it via
+        // config — otherwise the documented local `icnctl auth token` /
+        // bootstrap smoke paths would start returning 403. Carried through
+        // `GatewayConfig` to `GatewayServer::with_dev_self_serve_auth` rather
+        // than mutating `ICN_DEV_MODE` in the process env, which would race other
+        // threads reading the environment after the Tokio runtime has started.
+        // The loopback guard above keeps this bounded to local dev.
+        config.gateway.dev_self_serve_auth = true;
     }
 
     // Handle --validate-config flag

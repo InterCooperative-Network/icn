@@ -157,6 +157,13 @@ pub struct GatewayServer {
     /// backfill ensures pruning cannot delete a terminal execution record whose
     /// evidence was lost in the crash window before the backfill heals it.
     post_backfill_cleanup: Option<Arc<dyn Fn() + Send + Sync>>,
+    /// Dev/demo posture: force-enable self-asserted `/auth/verify` coop issuance
+    /// without relying on the `ICN_DEV_MODE` env var (issue #2075). This is the
+    /// race-free channel for `icnd --insecure-gateway-no-jwt` (a loopback-only
+    /// dev hatch) to opt in, instead of mutating process env after the Tokio
+    /// runtime has started. `run()` OR's this with the `ICN_DEV_MODE` env read,
+    /// so explicit dev deployments that set the env var keep working too.
+    dev_self_serve_auth: bool,
 }
 
 impl GatewayServer {
@@ -195,6 +202,7 @@ impl GatewayServer {
             dispatch_evidence_sink_installer: None,
             execution_query_store: None,
             post_backfill_cleanup: None,
+            dev_self_serve_auth: false,
         }
     }
 
@@ -245,6 +253,7 @@ impl GatewayServer {
             dispatch_evidence_sink_installer: None,
             execution_query_store: None,
             post_backfill_cleanup: None,
+            dev_self_serve_auth: false,
         }
     }
 
@@ -296,6 +305,7 @@ impl GatewayServer {
             dispatch_evidence_sink_installer: None,
             execution_query_store: None,
             post_backfill_cleanup: None,
+            dev_self_serve_auth: false,
         }
     }
 
@@ -308,6 +318,19 @@ impl GatewayServer {
     /// Set default trust score
     pub fn with_default_trust_score(mut self, score: f64) -> Self {
         self.default_trust_score = Some(score);
+        self
+    }
+
+    /// Force-enable self-asserted `/auth/verify` coop issuance for a dev/demo
+    /// posture, independent of the `ICN_DEV_MODE` env var (issue #2075).
+    ///
+    /// This is the race-free way for `icnd --insecure-gateway-no-jwt` (a
+    /// loopback-only local-dev hatch) to keep its challenge/verify smoke path
+    /// working without mutating process environment after the Tokio runtime has
+    /// started. `run()` OR's this with the `ICN_DEV_MODE` env read, so it never
+    /// disables an env-configured dev posture — it only adds one.
+    pub fn with_dev_self_serve_auth(mut self, enabled: bool) -> Self {
+        self.dev_self_serve_auth = enabled;
         self
     }
 
@@ -601,16 +624,21 @@ impl GatewayServer {
         // token carrying its own `coop_id`, which `require_coop_access` then
         // trusts. DID ownership alone does not authorize that coop, so this
         // self-asserted issuance is fail-closed by default and only enabled for
-        // dev/demo deployments via an explicit truthy `ICN_DEV_MODE` ("1"/"true",
-        // matching the `ICN_SKIP_CORS` toggle convention in `security.rs`). The
-        // truthy parse is stricter than the CORS dev gate's bare presence check
-        // on purpose: `ICN_DEV_MODE=0` must NOT open this auth bypass. Production
-        // binds coop authority through trusted issuance paths
+        // dev/demo deployments. Two opt-in channels, OR'd together:
+        //   1. an explicit truthy `ICN_DEV_MODE` ("1"/"true", matching the
+        //      `ICN_SKIP_CORS` toggle convention in `security.rs`; stricter than
+        //      the CORS dev gate's bare presence check on purpose — `ICN_DEV_MODE=0`
+        //      must NOT open this auth bypass); and
+        //   2. `dev_self_serve_auth` set via `with_dev_self_serve_auth`, the
+        //      race-free channel for `icnd --insecure-gateway-no-jwt` (no env
+        //      mutation after the Tokio runtime starts).
+        // Production binds coop authority through trusted issuance paths
         // (invites/sessions/enrollment) until RFC-0018's membership/entity
         // binding lands.
-        let allow_self_asserted_coop = std::env::var("ICN_DEV_MODE")
+        let dev_mode_env = std::env::var("ICN_DEV_MODE")
             .map(|v| v == "1" || v == "true")
             .unwrap_or(false);
+        let allow_self_asserted_coop = self.dev_self_serve_auth || dev_mode_env;
         if allow_self_asserted_coop {
             warn!(
                 "⚠️  ICN_DEV_MODE: self-asserted cooperative authority is ENABLED at \

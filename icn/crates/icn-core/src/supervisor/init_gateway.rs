@@ -150,6 +150,10 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let execution_query_store = handles.execution_query_store;
     let post_backfill_cleanup = handles.post_backfill_cleanup;
     let default_trust_score = config.default_trust_score;
+    // Dev/demo posture (issue #2075): carried by config (set for the loopback
+    // `--insecure-gateway-no-jwt` hatch) instead of an env var, so it does not
+    // race threads reading the environment after the runtime has started.
+    let dev_self_serve_auth = config.dev_self_serve_auth;
 
     // Spawn gateway in a dedicated thread (actix-web has its own runtime)
     std::thread::spawn(move || {
@@ -167,6 +171,9 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
             } else {
                 icn_gateway::GatewayServer::new(gateway_addr, jwt_secret)
             };
+
+            // Dev/demo self-serve auth posture (issue #2075), race-free via config.
+            gateway_server = gateway_server.with_dev_self_serve_auth(dev_self_serve_auth);
 
             // Connect optional handles
             if let Some(handle) = compute_handle {
