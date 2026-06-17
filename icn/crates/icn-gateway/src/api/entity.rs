@@ -259,38 +259,26 @@ fn membership_to_response(m: &Membership) -> MembershipResponse {
 
 /// Check if the caller has permission to modify an entity.
 ///
-/// Returns Ok(()) if:
-/// - The caller is a Founder or BoardMember of the entity
-/// - The caller is the entity itself (for individual entities)
+/// Returns Ok(()) if the caller is a Founder or BoardMember of the entity;
+/// otherwise Err. Behavior is role-only (no active-standing gate), matching the
+/// historical implementation.
 ///
-/// Returns Err if the caller lacks permission.
+/// This now delegates to the entity-aware authorization primitive
+/// (`authority::require_entity_access` with `EntityAction::ModifyEntity`), which
+/// resolves the same membership and applies the same role threshold (RFC-0018,
+/// ADR-0035). Kept as a thin wrapper so existing call sites are undisturbed.
 async fn require_entity_write_access(
     entity_mgr: &EntityManager,
     entity_id: &EntityId,
     caller_id: &EntityId,
 ) -> Result<()> {
-    let members = entity_mgr
-        .get_members(entity_id)
-        .await
-        .map_err(|e| GatewayError::InternalError(format!("Failed to check permissions: {e}")))?;
-
-    // Check if caller is a founder or board member
-    let has_access = members.iter().any(|m| {
-        &m.member_id == caller_id
-            && matches!(
-                m.role,
-                MembershipRole::Founder | MembershipRole::BoardMember
-            )
-    });
-
-    if has_access {
-        return Ok(());
-    }
-
-    Err(GatewayError::Forbidden(format!(
-        "Caller {caller_id} lacks permission to modify entity {entity_id}. \
-         Only Founders and BoardMembers can modify entities."
-    )))
+    crate::authority::require_entity_access(
+        entity_mgr,
+        caller_id,
+        entity_id,
+        crate::authority::EntityAction::ModifyEntity,
+    )
+    .await
 }
 
 // ============================================================================

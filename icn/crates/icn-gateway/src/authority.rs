@@ -16,8 +16,13 @@
 //! propagation.
 
 use crate::commons_mgr::CommonsManager;
+use crate::entity_map::legacy_coop_id_to_entity_id_fallback;
+use crate::entity_mgr::EntityManager;
 use crate::error::{GatewayError, Result};
+use icn_entity::{EntityId, Membership, MembershipRole};
 use icn_identity::{Did, JurisdictionId, MembershipCapability, MembershipStatus};
+use icn_obs::metrics::gateway as gateway_metrics;
+use tracing::{debug, warn};
 
 /// Require that `caller_did` holds the `HoldOffice` capability in `jurisdiction`.
 ///
@@ -97,4 +102,567 @@ pub(crate) async fn require_membership_in_jurisdiction(
     }
 
     Ok(())
+}
+
+// ============================================================================
+// Entity-aware request authorization (RFC-0018, first slice)
+// ============================================================================
+
+/// The action a caller intends to take against a target entity.
+///
+/// The gateway translates an institutional action into a generic membership
+/// requirement here; the kernel never sees the action's meaning (Meaning
+/// Firewall). Keep this enum minimal — add a variant only when a real endpoint
+/// family needs it (no speculative `Invite`/`Delegate`/`Settle`/… variants).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum EntityAction {
+    /// Mutate the entity itself (settings, membership). Authorized by a role
+    /// threshold (`Founder` or `BoardMember`). Mirrors the historical
+    /// `require_entity_write_access` exactly — role-only, no active-standing gate.
+    ModifyEntity,
+    /// Read treasury state. Authorized by active membership of any role.
+    TreasuryRead,
+    /// Mutate treasury state. Authorized by the `TreasuryAccess` capability on an
+    /// active membership (Founder/BoardMember/Officer hold it by default; a plain
+    /// member only if explicitly granted) — capability, not role-name.
+    TreasuryWrite,
+}
+
+impl EntityAction {
+    /// Human-readable description of what this action requires, for deny messages.
+    fn required_basis(self) -> &'static str {
+        match self {
+            EntityAction::ModifyEntity => "Founder or BoardMember role",
+            EntityAction::TreasuryRead => "active membership",
+            EntityAction::TreasuryWrite => "active membership with the TreasuryAccess capability",
+        }
+    }
+
+    /// Stable, low-cardinality metric label for this action.
+    fn metric_label(self) -> &'static str {
+        match self {
+            EntityAction::ModifyEntity => "modify_entity",
+            EntityAction::TreasuryRead => "treasury_read",
+            EntityAction::TreasuryWrite => "treasury_write",
+        }
+    }
+}
+
+/// Entity-aware request authorization (RFC-0018, first slice).
+///
+/// Generalizes `require_entity_write_access`: resolves the caller's membership in
+/// `target` and checks that the membership authorizes `action`. Returns
+/// `Err(GatewayError::Forbidden)` naming the required authority basis.
+///
+/// `ModifyEntity` preserves the historical role-only check (no active-standing
+/// gate) for behavior parity; the treasury actions additionally require active
+/// standing. See `docs/adr/ADR-0035-entity-aware-request-authorization.md`.
+pub(crate) async fn require_entity_access(
+    entity_mgr: &EntityManager,
+    caller: &EntityId,
+    target: &EntityId,
+    action: EntityAction,
+) -> Result<()> {
+    let members = entity_mgr
+        .get_members(target)
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to resolve membership: {e}")))?;
+
+    let authorized = members
+        .iter()
+        .filter(|m| &m.member_id == caller)
+        .any(|m| action_authorized(m, action));
+
+    if authorized {
+        return Ok(());
+    }
+
+    Err(GatewayError::Forbidden(format!(
+        "Caller {caller} is not authorized for {action:?} on entity {target} \
+         (requires {})",
+        action.required_basis()
+    )))
+}
+
+/// Whether a single membership satisfies `action`'s authority requirement.
+///
+/// `ModifyEntity` is role-only (no active-standing gate) to exactly preserve the
+/// historical `require_entity_write_access` behavior. Treasury actions require
+/// active standing; `TreasuryWrite` additionally requires the `TreasuryAccess`
+/// capability (capability, not role-name). See ADR-0035.
+fn action_authorized(m: &Membership, action: EntityAction) -> bool {
+    match action {
+        EntityAction::ModifyEntity => {
+            matches!(
+                m.role,
+                MembershipRole::Founder | MembershipRole::BoardMember
+            )
+        }
+        EntityAction::TreasuryRead => m.is_active(),
+        EntityAction::TreasuryWrite => {
+            m.is_active() && m.has_capability(&icn_entity::MembershipCapability::TreasuryAccess)
+        }
+    }
+}
+
+// ----------------------------------------------------------------------------
+// Observe mode (RFC-0018 treasury slice)
+//
+// The entity-aware path is computed ALONGSIDE the authoritative flat
+// `require_coop_access` guard and recorded as an observation. It is NOT enforced:
+// `observe_treasury_entity_access` returns an `EntityAccessObservation` (data), not
+// a `Result` the caller propagates, so it is structurally incapable of denying a
+// request. The flat guard remains the sole enforced gate this slice. See ADR-0035.
+// ----------------------------------------------------------------------------
+
+/// Why the entity-aware path would deny a request the flat guard allowed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DenyReason {
+    /// Caller has no membership in the target entity.
+    NonMember,
+    /// Caller is a member but not in active standing.
+    InactiveMember,
+    /// Caller is an active member but lacks the capability the action requires.
+    MissingCapability,
+}
+
+impl DenyReason {
+    fn label(self) -> &'static str {
+        match self {
+            DenyReason::NonMember => "non_member",
+            DenyReason::InactiveMember => "inactive_member",
+            DenyReason::MissingCapability => "missing_capability",
+        }
+    }
+}
+
+/// Why the entity-aware path could not produce a decision (a data gap, not a deny).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum IndeterminateReason {
+    /// The treasury carried no stored `entity_id` and its `coop_id` is not a
+    /// projectable `EntityId` slug — the target cannot be resolved at all.
+    MissingTreasuryEntityId,
+    /// A target `EntityId` was resolved, but no such entity is registered.
+    MissingEntityRecord,
+    /// The target entity exists but has zero memberships.
+    NoMemberships,
+}
+
+impl IndeterminateReason {
+    fn label(self) -> &'static str {
+        match self {
+            IndeterminateReason::MissingTreasuryEntityId => "missing_treasury_entity_id",
+            IndeterminateReason::MissingEntityRecord => "missing_entity_record",
+            IndeterminateReason::NoMemberships => "no_memberships",
+        }
+    }
+}
+
+/// Outcome of computing the entity-aware decision in observe mode.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum EntityAccessObservation {
+    /// The entity path agrees with the flat guard (would also allow).
+    AgreesAllow,
+    /// Flat guard allowed, but the entity path would deny (recorded, not acted on).
+    EntityDeny(DenyReason),
+    /// The entity path could not produce a decision (data gap).
+    Indeterminate(IndeterminateReason),
+    /// A resolver error occurred while computing the entity decision.
+    Error(String),
+}
+
+impl EntityAccessObservation {
+    fn result_label(&self) -> &'static str {
+        match self {
+            EntityAccessObservation::AgreesAllow => "agree_allow",
+            EntityAccessObservation::EntityDeny(_) => "flat_allow_entity_deny",
+            EntityAccessObservation::Indeterminate(_) => "entity_indeterminate",
+            EntityAccessObservation::Error(_) => "entity_error",
+        }
+    }
+
+    fn reason_label(&self) -> &'static str {
+        match self {
+            EntityAccessObservation::AgreesAllow => "agree",
+            EntityAccessObservation::EntityDeny(r) => r.label(),
+            EntityAccessObservation::Indeterminate(r) => r.label(),
+            EntityAccessObservation::Error(_) => "entity_manager_error",
+        }
+    }
+}
+
+/// Compute, record, and return the entity-aware authorization observation for a
+/// treasury request that has ALREADY passed the flat `require_coop_access` guard.
+///
+/// This is observation-only — it emits a metric and a log line and returns the
+/// observation. It never denies the request (the caller discards the result).
+/// `treasury_entity_id` is the treasury's stored `EntityId` (`treasury.entity_id()`);
+/// `coop_id` is the path coop id used only as a best-effort fallback target.
+pub(crate) async fn observe_treasury_entity_access(
+    entity_mgr: &EntityManager,
+    caller: &EntityId,
+    treasury_entity_id: Option<&EntityId>,
+    coop_id: &str,
+    action: EntityAction,
+) -> EntityAccessObservation {
+    let observation =
+        compute_treasury_observation(entity_mgr, caller, treasury_entity_id, coop_id, action).await;
+
+    gateway_metrics::entity_authz_observation_inc(
+        "treasury",
+        action.metric_label(),
+        observation.result_label(),
+        observation.reason_label(),
+    );
+
+    match &observation {
+        EntityAccessObservation::AgreesAllow => {
+            debug!(
+                target: "entity_authz_observe",
+                caller = %caller,
+                action = action.metric_label(),
+                "entity-aware path agrees with flat guard (allow)"
+            );
+        }
+        EntityAccessObservation::EntityDeny(reason) => {
+            warn!(
+                target: "entity_authz_observe",
+                caller = %caller,
+                action = action.metric_label(),
+                reason = reason.label(),
+                "entity-aware path would DENY (observe-only; flat coop guard remains authoritative)"
+            );
+        }
+        EntityAccessObservation::Indeterminate(reason) => {
+            debug!(
+                target: "entity_authz_observe",
+                caller = %caller,
+                action = action.metric_label(),
+                reason = reason.label(),
+                "entity-aware path indeterminate (data gap)"
+            );
+        }
+        EntityAccessObservation::Error(err) => {
+            warn!(
+                target: "entity_authz_observe",
+                caller = %caller,
+                action = action.metric_label(),
+                error = %err,
+                "entity-aware observation errored (observe-only)"
+            );
+        }
+    }
+
+    observation
+}
+
+/// Pure decision half of [`observe_treasury_entity_access`] (no side effects).
+async fn compute_treasury_observation(
+    entity_mgr: &EntityManager,
+    caller: &EntityId,
+    treasury_entity_id: Option<&EntityId>,
+    coop_id: &str,
+    action: EntityAction,
+) -> EntityAccessObservation {
+    // Resolve the target entity: prefer the treasury's stored EntityId, else a
+    // best-effort (reject-not-normalize) projection of the flat coop_id.
+    let target = match treasury_entity_id {
+        Some(id) => id.clone(),
+        None => match legacy_coop_id_to_entity_id_fallback(coop_id) {
+            Ok(id) => id,
+            Err(_) => {
+                return EntityAccessObservation::Indeterminate(
+                    IndeterminateReason::MissingTreasuryEntityId,
+                );
+            }
+        },
+    };
+
+    match entity_mgr.get(&target).await {
+        Err(e) => return EntityAccessObservation::Error(e.to_string()),
+        Ok(None) => {
+            return EntityAccessObservation::Indeterminate(
+                IndeterminateReason::MissingEntityRecord,
+            );
+        }
+        Ok(Some(_)) => {}
+    }
+
+    let members = match entity_mgr.get_members(&target).await {
+        Ok(members) => members,
+        Err(e) => return EntityAccessObservation::Error(e.to_string()),
+    };
+    if members.is_empty() {
+        return EntityAccessObservation::Indeterminate(IndeterminateReason::NoMemberships);
+    }
+
+    match members.iter().find(|m| &m.member_id == caller) {
+        None => EntityAccessObservation::EntityDeny(DenyReason::NonMember),
+        Some(m) if action_authorized(m, action) => EntityAccessObservation::AgreesAllow,
+        Some(m) if !m.is_active() => {
+            EntityAccessObservation::EntityDeny(DenyReason::InactiveMember)
+        }
+        Some(_) => EntityAccessObservation::EntityDeny(DenyReason::MissingCapability),
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod entity_access_tests {
+    use super::*;
+    use icn_entity::{CooperativeEntity, MembershipCapability, MembershipStatus};
+    use icn_identity::KeyPair;
+
+    /// Register a fresh in-memory coop entity; return the manager and its EntityId.
+    async fn setup() -> (EntityManager, EntityId) {
+        let mgr = EntityManager::new();
+        let coop = CooperativeEntity::cooperative("treasury-coop", "Treasury Coop").unwrap();
+        let target = coop.id.clone();
+        mgr.register(coop).await.unwrap();
+        (mgr, target)
+    }
+
+    /// Register an individual and grant it an *active* membership of `role` in `target`.
+    async fn add_active_member(
+        mgr: &EntityManager,
+        target: &EntityId,
+        role: MembershipRole,
+    ) -> EntityId {
+        let kp = KeyPair::generate().unwrap();
+        let indiv = CooperativeEntity::individual(kp.did(), "Member");
+        let caller = indiv.id.clone();
+        mgr.register(indiv).await.unwrap();
+        mgr.add_membership(Membership::active(caller.clone(), target.clone(), role))
+            .await
+            .unwrap();
+        caller
+    }
+
+    #[tokio::test]
+    async fn founder_allowed_modify_and_treasury() {
+        let (mgr, target) = setup().await;
+        let caller = add_active_member(&mgr, &target, MembershipRole::Founder).await;
+        assert!(
+            require_entity_access(&mgr, &caller, &target, EntityAction::ModifyEntity)
+                .await
+                .is_ok()
+        );
+        assert!(
+            require_entity_access(&mgr, &caller, &target, EntityAction::TreasuryRead)
+                .await
+                .is_ok()
+        );
+        assert!(
+            require_entity_access(&mgr, &caller, &target, EntityAction::TreasuryWrite)
+                .await
+                .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn board_member_allowed_treasury_write() {
+        let (mgr, target) = setup().await;
+        let caller = add_active_member(&mgr, &target, MembershipRole::BoardMember).await;
+        assert!(
+            require_entity_access(&mgr, &caller, &target, EntityAction::TreasuryWrite)
+                .await
+                .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn active_member_reads_but_cannot_write_treasury() {
+        let (mgr, target) = setup().await;
+        let caller = add_active_member(&mgr, &target, MembershipRole::Member).await;
+        assert!(
+            require_entity_access(&mgr, &caller, &target, EntityAction::TreasuryRead)
+                .await
+                .is_ok()
+        );
+        assert!(
+            require_entity_access(&mgr, &caller, &target, EntityAction::TreasuryWrite)
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn capability_beats_role_for_treasury_write() {
+        // A plain Member explicitly granted TreasuryAccess can write — proving the
+        // decision is capability-driven, not a Founder/BoardMember role shortcut.
+        let (mgr, target) = setup().await;
+        let kp = KeyPair::generate().unwrap();
+        let indiv = CooperativeEntity::individual(kp.did(), "Granted Member");
+        let caller = indiv.id.clone();
+        mgr.register(indiv).await.unwrap();
+        let m = Membership::active(caller.clone(), target.clone(), MembershipRole::Member)
+            .with_capabilities(vec![
+                MembershipCapability::Vote,
+                MembershipCapability::TreasuryAccess,
+            ]);
+        mgr.add_membership(m).await.unwrap();
+        assert!(
+            require_entity_access(&mgr, &caller, &target, EntityAction::TreasuryWrite)
+                .await
+                .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn non_member_denied() {
+        let (mgr, target) = setup().await;
+        let kp = KeyPair::generate().unwrap();
+        let outsider = EntityId::from_did(kp.did());
+        assert!(
+            require_entity_access(&mgr, &outsider, &target, EntityAction::TreasuryRead)
+                .await
+                .is_err()
+        );
+        assert!(
+            require_entity_access(&mgr, &outsider, &target, EntityAction::ModifyEntity)
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn suspended_member_denied_treasury() {
+        let (mgr, target) = setup().await;
+        let kp = KeyPair::generate().unwrap();
+        let indiv = CooperativeEntity::individual(kp.did(), "Suspended");
+        let caller = indiv.id.clone();
+        mgr.register(indiv).await.unwrap();
+        let mut m = Membership::active(caller.clone(), target.clone(), MembershipRole::Founder);
+        m.status = MembershipStatus::Suspended;
+        mgr.add_membership(m).await.unwrap();
+        // Treasury actions require active standing -> denied even for a Founder.
+        assert!(
+            require_entity_access(&mgr, &caller, &target, EntityAction::TreasuryRead)
+                .await
+                .is_err()
+        );
+        assert!(
+            require_entity_access(&mgr, &caller, &target, EntityAction::TreasuryWrite)
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
+    async fn modify_entity_is_role_only_preserving_legacy_behavior() {
+        // require_entity_write_access historically checked role only (no active
+        // gate). ModifyEntity preserves that: a suspended Founder still passes.
+        // This guards against an accidental tightening that would change the
+        // existing entity-write path. (ADR-0035)
+        let (mgr, target) = setup().await;
+        let kp = KeyPair::generate().unwrap();
+        let indiv = CooperativeEntity::individual(kp.did(), "Suspended Founder");
+        let caller = indiv.id.clone();
+        mgr.register(indiv).await.unwrap();
+        let mut m = Membership::active(caller.clone(), target.clone(), MembershipRole::Founder);
+        m.status = MembershipStatus::Suspended;
+        mgr.add_membership(m).await.unwrap();
+        assert!(
+            require_entity_access(&mgr, &caller, &target, EntityAction::ModifyEntity)
+                .await
+                .is_ok()
+        );
+    }
+
+    // ---- observe mode ----
+
+    #[tokio::test]
+    async fn observe_agrees_allow_for_founder() {
+        let (mgr, target) = setup().await;
+        let caller = add_active_member(&mgr, &target, MembershipRole::Founder).await;
+        let obs = observe_treasury_entity_access(
+            &mgr,
+            &caller,
+            Some(&target),
+            "treasury-coop",
+            EntityAction::TreasuryWrite,
+        )
+        .await;
+        assert_eq!(obs, EntityAccessObservation::AgreesAllow);
+    }
+
+    #[tokio::test]
+    async fn observe_entity_deny_is_observation_only_never_denies() {
+        // A caller who passed the flat guard but is NOT a member yields an
+        // EntityDeny *observation* — a value, not an error. The handler discards
+        // it, so the request is never denied by this path. This is the core
+        // observe-mode safety property.
+        let (mgr, target) = setup().await;
+        let _founder = add_active_member(&mgr, &target, MembershipRole::Founder).await;
+        let kp = KeyPair::generate().unwrap();
+        let outsider = EntityId::from_did(kp.did());
+        let obs = observe_treasury_entity_access(
+            &mgr,
+            &outsider,
+            Some(&target),
+            "treasury-coop",
+            EntityAction::TreasuryRead,
+        )
+        .await;
+        assert_eq!(
+            obs,
+            EntityAccessObservation::EntityDeny(DenyReason::NonMember)
+        );
+    }
+
+    #[tokio::test]
+    async fn observe_indeterminate_when_entity_has_no_members() {
+        let (mgr, target) = setup().await; // coop registered, no members added
+        let kp = KeyPair::generate().unwrap();
+        let caller = EntityId::from_did(kp.did());
+        let obs = observe_treasury_entity_access(
+            &mgr,
+            &caller,
+            Some(&target),
+            "treasury-coop",
+            EntityAction::TreasuryRead,
+        )
+        .await;
+        assert_eq!(
+            obs,
+            EntityAccessObservation::Indeterminate(IndeterminateReason::NoMemberships)
+        );
+    }
+
+    #[tokio::test]
+    async fn observe_missing_treasury_entity_id_when_unresolvable() {
+        // No stored entity_id and a coop_id that is not a projectable slug.
+        let (mgr, _target) = setup().await;
+        let kp = KeyPair::generate().unwrap();
+        let caller = EntityId::from_did(kp.did());
+        let obs = observe_treasury_entity_access(
+            &mgr,
+            &caller,
+            None,
+            "bad_coop", // underscore -> not a valid EntityId slug
+            EntityAction::TreasuryRead,
+        )
+        .await;
+        assert_eq!(
+            obs,
+            EntityAccessObservation::Indeterminate(IndeterminateReason::MissingTreasuryEntityId)
+        );
+    }
+
+    #[tokio::test]
+    async fn observe_resolves_via_fallback_when_entity_id_none() {
+        // entity_id is None, but the coop_id is a valid slug matching the
+        // registered coop, so the fallback projection resolves the target.
+        let (mgr, target) = setup().await;
+        let caller = add_active_member(&mgr, &target, MembershipRole::Founder).await;
+        let obs = observe_treasury_entity_access(
+            &mgr,
+            &caller,
+            None,
+            "treasury-coop",
+            EntityAction::TreasuryWrite,
+        )
+        .await;
+        assert_eq!(obs, EntityAccessObservation::AgreesAllow);
+    }
 }

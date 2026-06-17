@@ -34,6 +34,7 @@ pub mod coop;
 mod dispatch_evidence_backfill;
 pub mod email_client;
 pub mod entity_audit;
+pub(crate) mod entity_map;
 pub mod entity_mgr;
 pub mod error;
 pub mod events;

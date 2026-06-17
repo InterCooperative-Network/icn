@@ -8,6 +8,7 @@ use std::sync::Arc;
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 
 use crate::api::treasury::{do_get_treasury_position, do_propose_spend, SpendRequest};
+use crate::entity_mgr::EntityManager;
 use crate::error::{GatewayError, Result};
 use crate::events::{EventBroadcaster, GatewayEvent};
 use crate::governance_mgr::GovernanceManager;
@@ -24,9 +25,10 @@ pub async fn propose_spend_alias(
     path: web::Path<String>,
     body: web::Json<SpendRequest>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    entity_mgr: web::Data<Arc<EntityManager>>,
     governance_mgr: web::Data<Arc<GovernanceManager>>,
 ) -> Result<HttpResponse> {
-    do_propose_spend(req, path, body, treasury_mgr, governance_mgr).await
+    do_propose_spend(req, path, body, treasury_mgr, entity_mgr, governance_mgr).await
 }
 
 /// GET /v1/coops/{coop_id}/treasury/position - Treasury position read.
@@ -35,8 +37,9 @@ pub async fn get_treasury_position_alias(
     req: HttpRequest,
     path: web::Path<String>,
     treasury_mgr: web::Data<Arc<GatewayTreasuryManager>>,
+    entity_mgr: web::Data<Arc<EntityManager>>,
 ) -> Result<HttpResponse> {
-    do_get_treasury_position(req, path, treasury_mgr).await
+    do_get_treasury_position(req, path, treasury_mgr, entity_mgr).await
 }
 
 /// POST /v1/proposals/{id}/vote - Cast vote alias.
@@ -191,6 +194,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(Arc::new(GatewayTreasuryManager::new())))
+                .app_data(web::Data::new(Arc::new(EntityManager::new())))
                 .app_data(web::Data::new(Arc::new(GovernanceManager::new())))
                 .service(web::scope("/coops").configure(configure_coops)),
         )
@@ -284,6 +288,7 @@ mod tests {
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(Arc::new(GatewayTreasuryManager::new())))
+                .app_data(web::Data::new(Arc::new(EntityManager::new())))
                 .app_data(web::Data::new(Arc::new(GovernanceManager::new())))
                 .service(web::scope("/coops").configure(configure_coops)),
         )
