@@ -698,6 +698,7 @@ mod community_proof_spine {
 
     /// The canonical content of a discharged community action card — the record a
     /// completion receipt binds over.
+    #[derive(Clone)]
     struct CommunityActionRecord {
         community_id: String,
         action_id: String,
@@ -829,23 +830,52 @@ mod community_proof_spine {
         assert!(why.contains("requires Founder or Board Member"));
     }
 
-    /// Tampering with any bound field changes the receipt hash (integrity).
+    /// Tampering with ANY bound field changes the receipt hash (integrity).
+    /// Mutates each field of the canonical record once — including the timestamp —
+    /// so the proof actually backs the spec's "any bound field" claim: a field
+    /// silently dropped from `record_hash()` would fail here, not pass.
     #[tokio::test]
     async fn community_action_receipt_detects_tampering() {
-        let record = |title: &str| CommunityActionRecord {
+        let baseline = CommunityActionRecord {
             community_id: "entity:icn:community:maple-street-mutual-aid".to_string(),
             action_id: "action-charter-ratify-0001".to_string(),
-            title: title.to_string(),
+            title: "Ratify the Maple Street Mutual Aid charter".to_string(),
             actor_did: "did:icn:zsteward-demo-not-live".to_string(),
             authority_basis: "founder_of_community".to_string(),
             transition: "completed".to_string(),
             at: FIXTURE_AT,
         };
-        let original = record("Ratify the Maple Street Mutual Aid charter").record_hash();
-        let tampered = record("Ratify a DIFFERENT charter").record_hash();
-        assert_ne!(
-            original, tampered,
-            "any change to the bound record must change the receipt hash"
-        );
+        let base_hash = baseline.record_hash();
+
+        // Each closure mutates exactly one bound field; the resulting hash must differ.
+        type FieldMutation = (&'static str, fn(&mut CommunityActionRecord));
+        let cases: [FieldMutation; 7] = [
+            ("community_id", |r| {
+                r.community_id = "entity:icn:community:elm-street-mutual-aid".to_string()
+            }),
+            ("action_id", |r| {
+                r.action_id = "action-charter-ratify-0002".to_string()
+            }),
+            ("title", |r| {
+                r.title = "Ratify a DIFFERENT charter".to_string()
+            }),
+            ("actor_did", |r| {
+                r.actor_did = "did:icn:zother-demo-not-live".to_string()
+            }),
+            ("authority_basis", |r| {
+                r.authority_basis = "board_member_of_community".to_string()
+            }),
+            ("transition", |r| r.transition = "rejected".to_string()),
+            ("at", |r| r.at = FIXTURE_AT + 1),
+        ];
+        for (field, mutate) in cases {
+            let mut tampered = baseline.clone();
+            mutate(&mut tampered);
+            assert_ne!(
+                base_hash,
+                tampered.record_hash(),
+                "tampering with `{field}` must change the receipt hash"
+            );
+        }
     }
 }
