@@ -29,7 +29,7 @@
       }
     ],
     "icn_level": [
-      "bench", "changelog", "demo-validate", "devnet", "diag-infra",
+      "bench", "changelog", "ci-status", "demo-validate", "devnet", "diag-infra",
       "firewall-check", "fix-ci", "fix-rust-lints", "handoff", "icn-dev",
       "icn-preflight", "integrate-pr-stack", "merge-pr", "merge-prs",
       "pr-create", "preflight", "push", "repair-gh-workflow",
