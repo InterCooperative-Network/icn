@@ -402,4 +402,92 @@ mod tests {
         let result = auth2.verify_token(&token);
         assert!(matches!(result, Err(GatewayError::AuthenticationFailed(_))));
     }
+
+    /// Characterization test for #2075 — token issuance accepts a self-asserted
+    /// `coop_id`, and `require_coop_access` then trusts that unverified claim.
+    ///
+    /// THIS PINS CURRENT (INSECURE) BEHAVIOR, NOT DESIRED BEHAVIOR.
+    ///
+    /// An arbitrary DID proves only *ownership* of its own key (challenge →
+    /// sign → verify). The gateway nonetheless mints it a capability token whose
+    /// `coop_id` and `scopes` are whatever the caller asked for, with **no
+    /// membership/agency check** binding that DID to that cooperative
+    /// (`auth::issue_token`). `require_coop_access` is a plain
+    /// `claims.coop_id == coop_id` equality, so the holder passes the cross-coop
+    /// guard on a cooperative it never joined.
+    ///
+    /// The `is_ok()` assertion below encodes the bypass so it is pinned in CI.
+    /// When the token↔coop binding gate from RFC-0018 (#2074) lands, this
+    /// expectation MUST flip to rejection — that inversion is the signal the
+    /// fix is complete. This PR does **not** fix the bug; it characterizes it.
+    /// See #2075.
+    #[actix_web::test]
+    async fn self_asserted_coop_id_currently_passes_require_coop_access() {
+        // An attacker controls a fresh DID — and nothing else.
+        let auth = Arc::new(AuthManager::new(b"test_secret".to_vec()));
+        let attacker = IdentityBundle::generate().unwrap();
+
+        // A cooperative the attacker is NOT a member of.
+        let victim_coop = "victim-coop";
+
+        // 1) Prove DID ownership: challenge → sign → verify.
+        let nonce = auth.create_challenge(attacker.did()).unwrap();
+        let nonce_bytes = hex::decode(&nonce).unwrap();
+        let signature = attacker
+            .sign(&nonce_bytes)
+            .expect("test setup: bundle must be able to sign nonce (software key configured)");
+
+        // 2) Mint a token asserting authority over `victim_coop` + a write scope.
+        //    The gateway performs NO membership check on the supplied `coop_id`.
+        let token = auth
+            .verify_challenge(
+                attacker.did(),
+                &signature.to_bytes(),
+                victim_coop,
+                vec!["ledger:write".to_string()],
+            )
+            .unwrap();
+
+        // 3) The issued token carries the self-asserted coop_id verbatim.
+        let claims = auth.verify_token(&token).unwrap();
+        assert_eq!(claims.sub, attacker.did().to_string());
+        assert_eq!(
+            claims.coop_id, victim_coop,
+            "current behavior: issuance stores the caller-supplied coop_id with no binding check",
+        );
+
+        // 4) The flat cross-coop guard trusts that self-minted claim.
+        let req = TestRequest::default().to_http_request();
+        req.extensions_mut().insert(claims);
+
+        // KNOWN GAP (#2075): once the token↔coop binding gate lands this SHOULD
+        // be denied. It currently passes because the DID was never bound to the
+        // coop. When the fix lands, invert this assertion.
+        assert!(
+            require_coop_access(&req, victim_coop).is_ok(),
+            "characterization: require_coop_access currently accepts a self-asserted coop_id",
+        );
+    }
+
+    /// Companion to the #2075 characterization: the equality check inside
+    /// `require_coop_access` is itself sound — a token for coop A is still
+    /// rejected against coop B. This localizes the #2075 gap to *issuance*
+    /// (which never binds the DID to the coop), NOT to a broken comparison, so a
+    /// future fix targets the right layer and does not weaken this guard.
+    #[actix_web::test]
+    async fn require_coop_access_rejects_token_for_a_different_coop() {
+        let req = TestRequest::default().to_http_request();
+        req.extensions_mut().insert(TokenClaims {
+            sub: "did:icn:test-user".to_string(),
+            iat: 1_000_000_000,
+            exp: 9_999_999_999,
+            coop_id: "coop-a".to_string(),
+            scopes: vec!["ledger:write".to_string()],
+        });
+
+        assert!(matches!(
+            require_coop_access(&req, "coop-b"),
+            Err(GatewayError::AuthorizationFailed(_))
+        ));
+    }
 }
