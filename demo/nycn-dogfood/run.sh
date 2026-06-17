@@ -158,7 +158,11 @@ start_gw(){
   "$ICND" --init --data-dir "$DATA_DIR" --init-gateway-port "$GW_PORT" --init-gossip-port "$GOSSIP_PORT" </dev/null >"$RUN_DIR/node-init.log" 2>&1 || die "node identity init failed (see $RUN_DIR/node-init.log)"
   sed -i "s#^listen_addr = \"0.0.0.0:${GOSSIP_PORT}\"#listen_addr = \"127.0.0.1:${GOSSIP_PORT}\"#" "$DATA_DIR/config.toml" 2>/dev/null || true
   local secret; secret="$(openssl rand -hex 32 2>/dev/null || head -c 32 /dev/urandom | od -An -tx1 | tr -d ' \n')"
-  setsid "$ICND" --config "$DATA_DIR/config.toml" --data-dir "$DATA_DIR" --gateway-enable \
+  # Dev gate (issue #2075): self-asserted /auth/verify coop issuance is fail-closed
+  # unless ICN_DEV_MODE is set. This rehearsal mints tokens that way on a loopback
+  # gateway, so opt into the explicit dev posture for this process only. Never set
+  # this on a production gateway.
+  ICN_DEV_MODE=1 setsid "$ICND" --config "$DATA_DIR/config.toml" --data-dir "$DATA_DIR" --gateway-enable \
     --gateway-bind "127.0.0.1:${GW_PORT}" --gateway-jwt-secret "$secret" \
     --log-level warn >"$LOG" 2>&1 </dev/null &
   local pid=$!

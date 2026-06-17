@@ -124,7 +124,7 @@ async fn build_app(
         .expect("create_domain");
 
     let jwt_secret = b"steward-gate-test-jwt-secret-32b".to_vec();
-    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
 
     let gov_ctx = GovernanceContext {

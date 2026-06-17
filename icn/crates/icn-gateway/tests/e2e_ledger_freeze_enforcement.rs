@@ -225,7 +225,7 @@ async fn test_freeze_member_blocks_ledger_entries_after_governance_acceptance() 
 
     // ── Build test app (governance + auth) ───────────────────────────────────
     let jwt_secret = b"ledger-freeze-enforcement-test-sec32".to_vec();
-    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
     let governance_manager = Arc::new(
         GovernanceManager::new().with_receipt_store(Arc::new(TestReceiptBackend::default())),

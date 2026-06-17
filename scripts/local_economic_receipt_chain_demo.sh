@@ -105,6 +105,10 @@ log "icnctl = $ICNCTL"
 export ICN_KEYSTORE_PASSPHRASE="econ-chain-demo-passphrase-not-secret-0000"
 JWT_SECRET="$(openssl rand -hex 32)"
 export ICN_GATEWAY_JWT_SECRET="$JWT_SECRET"
+# Dev gate (issue #2075): self-asserted /auth/verify coop issuance is fail-closed
+# unless ICN_DEV_MODE is set. This LOCAL loopback demo mints tokens that way, so
+# opt into the explicit dev posture. Never set this on a production gateway.
+export ICN_DEV_MODE=1
 # Dev gate for POST /v1/commons/dev/bootstrap-standing: requires admin endpoints
 # enabled AND a non-Production posture. Both are set for this LOCAL demo only.
 export ICN_ENABLE_ADMIN_ENDPOINTS=true

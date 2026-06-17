@@ -272,7 +272,7 @@ async fn test_suspended_member_cannot_create_delegation() {
 
     // ── Build test app ────────────────────────────────────────────────────────
     let jwt_secret = b"delegation-gate-enforcement-sec32".to_vec();
-    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
     let governance_manager = Arc::new(
         GovernanceManager::new().with_receipt_store(Arc::new(TestReceiptBackend::default())),
@@ -507,7 +507,7 @@ async fn test_suspended_member_cannot_create_blanket_delegation() {
 
     // ── Build test app ────────────────────────────────────────────────────────
     let jwt_secret = b"blanket-gate-enforcement-sec--32".to_vec();
-    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
     let governance_manager = Arc::new(
         GovernanceManager::new().with_receipt_store(Arc::new(TestReceiptBackend::default())),

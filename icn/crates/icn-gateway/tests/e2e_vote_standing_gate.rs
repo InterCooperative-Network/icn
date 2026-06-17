@@ -147,7 +147,7 @@ async fn build_app_with_open_proposal(
         .expect("open_proposal");
 
     let jwt_secret = b"vote-gate-test-jwt-secret-32bytes".to_vec();
-    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
 
     let gov_ctx = GovernanceContext {
@@ -401,7 +401,7 @@ async fn build_app_with_suspension_checker(
         Arc::new(move |_did, _domain| Box::pin(async move { is_suspended }));
 
     let jwt_secret = b"suspension-gate-test-jwt-secret32".to_vec();
-    let auth_manager = Arc::new(AuthManager::new(jwt_secret));
+    let auth_manager = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
     let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
 
     let gov_ctx = GovernanceContext {
