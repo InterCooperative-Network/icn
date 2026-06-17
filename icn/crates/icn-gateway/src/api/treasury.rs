@@ -332,19 +332,20 @@ async fn observe_treasury(
     });
 }
 
-/// Like [`observe_treasury`], but for handlers that have NOT already loaded the
-/// treasury record (e.g. `get_budget`, which fetches a budget by id). The owning
-/// treasury is loaded **inside** the detached task — off the request hot path — so
-/// the observation uses the treasury's real stored `entity_id` rather than a
-/// fallback projection of `coop_id`. Without this, a coop whose `coop_id` is
-/// flat-guard-valid but not slug-projectable (e.g. it contains `_`) yet which has
-/// a stored `entity_id` would be mis-recorded as `missing_treasury_entity_id`,
-/// corrupting the migration metric. (RFC-0018 observe mode, ADR-0035.)
-async fn observe_treasury_lazy(
+/// Like [`observe_treasury`], but keyed by the **owning treasury's `treasury_did`**
+/// rather than a path `coop_id`. Used by `get_budget`, which fetches a budget by a
+/// globally-keyed `budget_id`: the budget may belong to a different cooperative than
+/// the path `coop_id` (the flat guard only checks the path coop). Observing against
+/// the path coop would record the entity decision for the wrong entity. Resolving
+/// from the budget's own `treasury_did` makes the observation reflect the budget's
+/// real owner — so a cross-coop budget read surfaces as a genuine `flat_allow_entity_deny`
+/// instead of a misleading `agree_allow`. The treasury is loaded **inside** the
+/// detached task (off the request hot path). (RFC-0018 observe mode, ADR-0035.)
+async fn observe_treasury_by_did(
     req: &HttpRequest,
     entity_mgr: &web::Data<Arc<EntityManager>>,
     treasury_mgr: &web::Data<Arc<GatewayTreasuryManager>>,
-    coop_id: &str,
+    treasury_did: &Did,
     action: EntityAction,
 ) {
     let Some(claims) = get_claims(req) else {
@@ -357,13 +358,13 @@ async fn observe_treasury_lazy(
 
     let entity_mgr = entity_mgr.get_ref().clone();
     let treasury_mgr = treasury_mgr.get_ref().clone();
-    let coop_id = coop_id.to_string();
+    let treasury_did = treasury_did.clone();
     actix_web::rt::spawn(async move {
-        // Resolve the owning treasury's stored entity_id off the hot path; fall
-        // back to None (handled downstream) only if it is genuinely absent.
-        let target = match treasury_mgr.get_treasury_by_coop(&coop_id).await {
-            Ok(Some(t)) => t.entity_id().cloned(),
-            _ => None,
+        // Resolve the budget's owning treasury off the hot path; observe against
+        // its stored entity_id (and its own coop_id for the fallback projection).
+        let (target, coop_id) = match treasury_mgr.get_treasury(&treasury_did).await {
+            Ok(Some(t)) => (t.entity_id().cloned(), t.coop_id.clone()),
+            _ => (None, String::new()),
         };
         let _ =
             observe_treasury_entity_access(&entity_mgr, &caller, target.as_ref(), &coop_id, action)
@@ -654,19 +655,6 @@ pub async fn get_budget(
     let (coop_id, budget_id) = path.into_inner();
     require_coop_access(&req, &coop_id)?;
 
-    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
-    // This handler does not load the treasury record, so the owning treasury is
-    // resolved inside the detached task (off the hot path) to use its real stored
-    // entity_id rather than a lossy coop_id fallback projection.
-    observe_treasury_lazy(
-        &req,
-        &entity_mgr,
-        &treasury_mgr,
-        &coop_id,
-        EntityAction::TreasuryRead,
-    )
-    .await;
-
     info!(coop_id = %coop_id, budget_id = %budget_id, "Treasury budget details requested");
 
     // Get budget
@@ -680,6 +668,19 @@ pub async fn get_budget(
             "Budget not found: {budget_id}"
         )));
     };
+
+    // RFC-0018 observe mode (ADR-0035): observe against the budget's OWN treasury
+    // (resolved from budget.treasury_did inside a detached task), not the path coop
+    // — the budget is globally keyed and may belong to a different cooperative.
+    // Observation-only; the flat require_coop_access guard above stays authoritative.
+    observe_treasury_by_did(
+        &req,
+        &entity_mgr,
+        &treasury_mgr,
+        &budget.treasury_did,
+        EntityAction::TreasuryRead,
+    )
+    .await;
 
     let response = BudgetDetailResponse {
         id: budget.id.clone(),
