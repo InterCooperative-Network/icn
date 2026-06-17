@@ -45,12 +45,17 @@ pub struct GatewayConfig {
     pub service_discovery_persist: bool,
 
     /// Dev/demo posture: allow self-asserted `/auth/verify` coop issuance without
-    /// the `ICN_DEV_MODE` env var (issue #2075). Off by default (fail-closed);
-    /// the daemon sets this for the loopback-only `--insecure-gateway-no-jwt`
-    /// hatch so its challenge/verify smoke path keeps working without mutating
-    /// process environment after the Tokio runtime starts. Not a config-file
-    /// knob today; defaults false on deserialization.
-    #[serde(default)]
+    /// the `ICN_DEV_MODE` env var (issue #2075). Runtime-only — the daemon sets
+    /// this in-memory for the loopback-only `--insecure-gateway-no-jwt` hatch so
+    /// its challenge/verify smoke path keeps working without mutating process
+    /// environment after the Tokio runtime starts.
+    ///
+    /// SECURITY: `#[serde(skip)]` (NOT `serde(default)`) so it can NEVER be set
+    /// from a config file. Otherwise `[gateway] dev_self_serve_auth = true` in
+    /// operator TOML would silently reopen arbitrary coop-token issuance on an
+    /// externally-bound, real-JWT gateway. It is reachable only via the
+    /// insecure-loopback CLI path. Always deserializes to `false`.
+    #[serde(skip)]
     pub dev_self_serve_auth: bool,
 }
 

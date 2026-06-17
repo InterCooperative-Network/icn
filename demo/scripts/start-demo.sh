@@ -49,6 +49,7 @@ fi
 echo "[4/4] Starting gateway on port 8080..."
 ICN_KEYSTORE_PASSPHRASE=demo \
 ICN_GATEWAY_JWT_SECRET="$JWT_SECRET" \
+ICN_DEV_MODE=1 \
 nohup "$ICND" \
   --gateway-enable \
   --gateway-bind "$BIND" \

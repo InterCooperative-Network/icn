@@ -87,6 +87,10 @@ log "icnctl = $ICNCTL"
 export ICN_KEYSTORE_PASSPHRASE="audit-auth-demo-passphrase-not-secret-0000"
 JWT_SECRET="$(openssl rand -hex 32)"
 export ICN_GATEWAY_JWT_SECRET="$JWT_SECRET"
+# Dev gate (issue #2075): self-asserted /auth/verify coop issuance is fail-closed
+# unless ICN_DEV_MODE is set. This LOCAL loopback demo mints a token that way, so
+# opt into the explicit dev posture. Never set this on a production gateway.
+export ICN_DEV_MODE=1
 log "[1/5] init + start JWT-secured local gateway on $GW"
 "$ICND" --init --data-dir "$OUT/data" --node-name audit-auth-demo \
   --init-gateway-port "$PORT" --init-gossip-port "$((PORT+1000))" >"$OUT/init.log" 2>&1 \
