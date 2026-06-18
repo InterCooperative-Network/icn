@@ -478,6 +478,25 @@ impl CommonsHandle {
             .slash_steward_bond(steward_id, amount)
             .await
     }
+
+    /// Slash a steward's bond idempotently for a governance decision.
+    ///
+    /// `decision_key` (the sanction proposal's receipt id) dedupes by decision
+    /// so a crash-recovery re-dispatch of the same `SanctionSteward` cannot
+    /// double-slash. Returns the steward's remaining bond after the operation
+    /// (accurate on both the first application and an idempotent replay).
+    pub async fn slash_steward_bond_for_decision(
+        &self,
+        steward_id: &str,
+        amount: u64,
+        decision_key: &str,
+    ) -> Result<u64> {
+        self.inner
+            .write()
+            .await
+            .slash_steward_bond_for_decision(steward_id, amount, decision_key)
+            .await
+    }
 }
 
 // ============================================================================

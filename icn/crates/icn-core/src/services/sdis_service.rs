@@ -458,6 +458,31 @@ impl SdisService for SdisServiceImpl {
             proposal_id = %request.proposal_id,
             "Sanctioning steward via governance dispatch (bond slash)"
         );
+
+        // Fail closed without an idempotency key. `proposal_id` is the per-decision
+        // dedupe key for the slash; an empty one would be recorded as "" in
+        // `applied_sanctions`, so the first empty-id sanction would make every later
+        // empty-id sanction look like a replay and silently skip an authorized
+        // slash. A governed sanction always carries a non-empty proposal receipt id.
+        if request.proposal_id.trim().is_empty() {
+            warn!(
+                steward_did = %request.steward_did,
+                "Rejecting SanctionSteward: empty proposal_id (no per-decision idempotency key)"
+            );
+            return Ok(SanctionStewardResult {
+                success: false,
+                remaining_bond: 0,
+                suspended: false,
+                state_change_hash: String::new(),
+                error: Some(
+                    "SanctionSteward requires a non-empty proposal_id as the per-decision \
+                     idempotency key"
+                        .to_string(),
+                ),
+                receipt_ref: None,
+            });
+        }
+
         let steward_did = icn_identity::Did::from_str(&request.steward_did)
             .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
 
@@ -482,9 +507,17 @@ impl SdisService for SdisServiceImpl {
                         )
                     })?;
                 let steward_id = record.id().to_hex();
+                // Idempotent per governance decision (the sanction proposal's
+                // receipt id): a crash-recovery re-dispatch of the same
+                // SanctionSteward effect must not slash the bond twice, while
+                // distinct decisions still slash independently.
                 let remaining = self
                     .commons
-                    .slash_steward_bond(&steward_id, request.bond_slash_amount)
+                    .slash_steward_bond_for_decision(
+                        &steward_id,
+                        request.bond_slash_amount,
+                        &request.proposal_id,
+                    )
                     .await?;
                 Ok::<_, anyhow::Error>((steward_id, remaining))
             })
@@ -670,6 +703,129 @@ mod tests {
             "AppointStewardResult.receipt_ref must equal the commons StewardId::to_hex() \
              so kernel-path dispatch evidence carries the real downstream handle"
         );
+    }
+
+    /// SanctionSteward is idempotent per governance decision: re-dispatching the
+    /// same sanction (same `proposal_id`) — as crash recovery does — slashes the
+    /// bond only once, while a distinct decision slashes again. Guards the
+    /// replay window where a hard crash leaves the execution record non-terminal
+    /// and `recover_in_flight` re-runs the effect.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_sanction_steward_idempotent_per_decision() {
+        let (svc, commons) = make_service_with_commons();
+        let holder = test_did(40);
+        let sponsor = test_did(41);
+        create_strong_holder(&commons, &holder, &sponsor).await;
+
+        svc.appoint_steward(AppointStewardRequest {
+            steward_did: holder.to_string(),
+            jurisdiction_id: String::new(),
+            term_length_seconds: 86400 * 365,
+            bond_amount: 1000,
+            region: None,
+            proposal_id: "gov:coop:appoint:receipt".to_string(),
+        })
+        .unwrap();
+
+        let sanction = |proposal_id: &str| SanctionStewardRequest {
+            steward_did: holder.to_string(),
+            bond_slash_amount: 300,
+            suspend_reason: String::new(),
+            reason: "misbehavior".to_string(),
+            proposal_id: proposal_id.to_string(),
+        };
+        let bond_now = |c: Arc<icn_commons::CommonsHandle>, did: icn_identity::Did| async move {
+            c.get_steward_by_did(&did)
+                .await
+                .expect("get_steward_by_did must not error")
+                .expect("steward present")
+                .bond_amount
+        };
+
+        // First dispatch of decision A slashes 300 (1000 -> 700) and reports
+        // the remaining bond.
+        let first = svc
+            .sanction_steward(sanction("gov:coop:sanction-A:receipt"))
+            .unwrap();
+        assert!(first.success);
+        assert_eq!(
+            first.remaining_bond, 700,
+            "first dispatch reports the remaining bond"
+        );
+        assert_eq!(bond_now(commons.clone(), holder.clone()).await, 700);
+
+        // Re-dispatch of the SAME decision A (crash-recovery replay) must NOT
+        // slash again — the bond stays 700 — and the result must report the
+        // true remaining bond (700), not the per-call slashed amount (0).
+        let replay = svc
+            .sanction_steward(sanction("gov:coop:sanction-A:receipt"))
+            .unwrap();
+        assert!(replay.success);
+        assert_eq!(
+            replay.remaining_bond, 700,
+            "replay must report the true remaining bond (recovery/audit evidence), not 0"
+        );
+        assert_eq!(
+            bond_now(commons.clone(), holder.clone()).await,
+            700,
+            "same sanction decision must not double-slash the bond on replay"
+        );
+
+        // A DISTINCT decision B still slashes (700 -> 400).
+        assert!(
+            svc.sanction_steward(sanction("gov:coop:sanction-B:receipt"))
+                .unwrap()
+                .success
+        );
+        assert_eq!(
+            bond_now(commons.clone(), holder.clone()).await,
+            400,
+            "a distinct sanction decision must still slash"
+        );
+    }
+
+    /// A SanctionSteward with an empty `proposal_id` has no idempotency key.
+    /// Recording `""` would make every later empty-id sanction look like a
+    /// replay and silently skip an authorized slash, so the service must reject
+    /// it (fail closed) without slashing.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_sanction_steward_rejects_empty_proposal_id() {
+        let (svc, commons) = make_service_with_commons();
+        let holder = test_did(42);
+        let sponsor = test_did(43);
+        create_strong_holder(&commons, &holder, &sponsor).await;
+        svc.appoint_steward(AppointStewardRequest {
+            steward_did: holder.to_string(),
+            jurisdiction_id: String::new(),
+            term_length_seconds: 86400 * 365,
+            bond_amount: 1000,
+            region: None,
+            proposal_id: "gov:coop:appoint:receipt".to_string(),
+        })
+        .unwrap();
+
+        let result = svc
+            .sanction_steward(SanctionStewardRequest {
+                steward_did: holder.to_string(),
+                bond_slash_amount: 300,
+                suspend_reason: String::new(),
+                reason: "misbehavior".to_string(),
+                proposal_id: String::new(), // no idempotency key
+            })
+            .unwrap();
+
+        assert!(
+            !result.success,
+            "empty proposal_id must be rejected (fail closed)"
+        );
+        assert!(result.error.is_some());
+        let bond = commons
+            .get_steward_by_did(&holder)
+            .await
+            .unwrap()
+            .unwrap()
+            .bond_amount;
+        assert_eq!(bond, 1000, "a rejected sanction must not slash the bond");
     }
 
     /// AppointSteward → RevokeSteward → steward record removed from commons.
