@@ -664,15 +664,18 @@ pub async fn get_budget(
         .map_err(|e| GatewayError::InternalError(e.to_string()))?;
 
     let Some(budget) = budget else {
-        return Err(GatewayError::NotFound(format!(
-            "Budget not found: {budget_id}"
-        )));
+        // Generic message (no id): a genuinely missing budget and a foreign budget
+        // (the ownership check below) must be indistinguishable, so this endpoint
+        // cannot be used as a cross-coop budget-id enumeration oracle.
+        return Err(GatewayError::NotFound("Budget not found".to_string()));
     };
 
     // RFC-0018 observe mode (ADR-0035): observe against the budget's OWN treasury
     // (resolved from budget.treasury_did inside a detached task), not the path coop
     // — the budget is globally keyed and may belong to a different cooperative.
     // Observation-only; the flat require_coop_access guard above stays authoritative.
+    // This fires BEFORE the ownership enforcement below so a cross-coop attempt
+    // still registers (as flat_allow_entity_deny) even though it is then denied.
     observe_treasury_by_did(
         &req,
         &entity_mgr,
@@ -681,6 +684,24 @@ pub async fn get_budget(
         EntityAction::TreasuryRead,
     )
     .await;
+
+    // #2085: object-context binding in the flat-authz regime. The budget was
+    // fetched by a globally-keyed id; require it to belong to the treasury of the
+    // path coop before returning it. A foreign (or path-coop-has-no-treasury)
+    // budget is reported as NotFound — the same shape as a missing budget — so the
+    // caller cannot distinguish "exists elsewhere" from "does not exist." The flat
+    // require_coop_access guard above remains authoritative; this only ties the
+    // loaded object to the request path (no entity-auth enforcement; see #2081).
+    let path_treasury = treasury_mgr
+        .get_treasury_by_coop(&coop_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(e.to_string()))?;
+    let owns_budget = path_treasury
+        .as_ref()
+        .is_some_and(|t| t.treasury_did == budget.treasury_did);
+    if !owns_budget {
+        return Err(GatewayError::NotFound("Budget not found".to_string()));
+    }
 
     let response = BudgetDetailResponse {
         id: budget.id.clone(),
@@ -1327,6 +1348,42 @@ mod tests {
         Arc::new(GovernanceManager::new())
     }
 
+    /// Actor-backed gateway treasury manager. Standalone mode cannot register
+    /// treasuries or create budgets (both bail), so seeding real, coop-owned
+    /// budgets requires the ledger-backed handle.
+    fn actor_backed_treasury_manager() -> Arc<GatewayTreasuryManager> {
+        let handle = Arc::new(tokio::sync::RwLock::new(LedgerTreasuryManager::new()));
+        Arc::new(GatewayTreasuryManager::with_handle(handle))
+    }
+
+    /// Register a treasury for `coop_id` and create one budget in it.
+    /// Returns the new budget's globally-keyed id.
+    async fn seed_treasury_with_budget(mgr: &GatewayTreasuryManager, coop_id: &str) -> String {
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
+        let creator = KeyPair::generate().unwrap().did().clone();
+        mgr.register_treasury(
+            treasury_did.clone(),
+            coop_id.to_string(),
+            "USD".to_string(),
+            creator.clone(),
+            None,
+        )
+        .await
+        .unwrap();
+        mgr.create_budget(
+            treasury_did,
+            "operations".to_string(),
+            1000,
+            "USD".to_string(),
+            None,
+            creator,
+            None,
+        )
+        .await
+        .unwrap()
+        .id
+    }
+
     #[actix_web::test]
     async fn test_get_treasury_status_not_found() {
         let treasury_mgr = create_test_treasury_manager();
@@ -1408,6 +1465,127 @@ mod tests {
 
         let resp = test::call_service(&app, req).await;
         assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
+    }
+
+    /// #2085: a caller authorized for coop-a must not retrieve coop-b's budget
+    /// through the globally-keyed budget id. The flat guard checks only the path
+    /// coop; the budget is fetched by a global id and must be proven to belong to
+    /// the path coop's treasury before it is returned.
+    #[actix_web::test]
+    async fn test_get_budget_cross_coop_read_denied() {
+        let treasury_mgr = actor_backed_treasury_manager();
+        // Caller's own coop, plus a victim coop whose budget id the caller knows/guesses.
+        seed_treasury_with_budget(&treasury_mgr, "coop-a").await;
+        let victim_budget_id = seed_treasury_with_budget(&treasury_mgr, "coop-b").await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(treasury_mgr))
+                .app_data(web::Data::new(Arc::new(EntityManager::new())))
+                .service(web::scope("/treasury").configure(configure)),
+        )
+        .await;
+
+        // Valid coop-a token, reading coop-b's budget under the coop-a path.
+        let req = test::TestRequest::get()
+            .uri(&format!("/treasury/coop-a/budgets/{victim_budget_id}"))
+            .to_request();
+        req.extensions_mut().insert(test_claims("coop-a"));
+
+        let resp = test::call_service(&app, req).await;
+        let status = resp.status();
+
+        // Body must carry no foreign budget detail (id or contents) — status alone is not enough.
+        let body = test::read_body(resp).await;
+        let body = String::from_utf8_lossy(&body);
+        assert_eq!(
+            status,
+            actix_web::http::StatusCode::NOT_FOUND,
+            "cross-coop budget read must be denied (body: {body})"
+        );
+        assert!(
+            !body.contains(&victim_budget_id),
+            "404 body leaked the foreign budget id: {body}"
+        );
+        assert!(
+            !body.contains("operations"),
+            "404 body leaked the foreign budget purpose: {body}"
+        );
+    }
+
+    /// Same-coop read still works after the ownership check: the caller's own
+    /// budget is returned unchanged.
+    #[actix_web::test]
+    async fn test_get_budget_same_coop_read_ok() {
+        let treasury_mgr = actor_backed_treasury_manager();
+        let own_budget_id = seed_treasury_with_budget(&treasury_mgr, "coop-a").await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(treasury_mgr))
+                .app_data(web::Data::new(Arc::new(EntityManager::new())))
+                .service(web::scope("/treasury").configure(configure)),
+        )
+        .await;
+
+        let req = test::TestRequest::get()
+            .uri(&format!("/treasury/coop-a/budgets/{own_budget_id}"))
+            .to_request();
+        req.extensions_mut().insert(test_claims("coop-a"));
+
+        let resp = test::call_service(&app, req).await;
+        let status = resp.status();
+        let body = test::read_body(resp).await;
+        let body = String::from_utf8_lossy(&body);
+        assert_eq!(
+            status,
+            actix_web::http::StatusCode::OK,
+            "same-coop budget read must succeed (body: {body})"
+        );
+        assert!(
+            body.contains(&own_budget_id),
+            "200 body should include the budget id"
+        );
+    }
+
+    /// #2085 edge case: when the path coop has no treasury at all, a foreign
+    /// budget id must not resolve — no ownership context, so NotFound with no leak.
+    #[actix_web::test]
+    async fn test_get_budget_path_coop_without_treasury_does_not_reveal_foreign_budget() {
+        let treasury_mgr = actor_backed_treasury_manager();
+        // Only coop-b has a treasury/budget; coop-a has none.
+        let foreign_budget_id = seed_treasury_with_budget(&treasury_mgr, "coop-b").await;
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(treasury_mgr))
+                .app_data(web::Data::new(Arc::new(EntityManager::new())))
+                .service(web::scope("/treasury").configure(configure)),
+        )
+        .await;
+
+        let req = test::TestRequest::get()
+            .uri(&format!("/treasury/coop-a/budgets/{foreign_budget_id}"))
+            .to_request();
+        req.extensions_mut().insert(test_claims("coop-a"));
+
+        let resp = test::call_service(&app, req).await;
+        let status = resp.status();
+        let body = test::read_body(resp).await;
+        let body = String::from_utf8_lossy(&body);
+        assert_eq!(
+            status,
+            actix_web::http::StatusCode::NOT_FOUND,
+            "path coop without a treasury must not resolve a foreign budget (body: {body})"
+        );
+        assert!(
+            !body.contains(&foreign_budget_id),
+            "404 body leaked the foreign budget id: {body}"
+        );
+        assert!(
+            !body.contains("operations"),
+            "404 body leaked the foreign budget purpose: {body}"
+        );
     }
 
     #[actix_web::test]
