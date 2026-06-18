@@ -143,9 +143,9 @@ get that token matters:
 
 **Production** — obtain a cooperative-scoped token from a trusted institutional path
 (membership / invite / session / SDIS) out of band and pass it to the client. Self-asserted
-`coop_id` issuance at `/auth/verify` is fail-closed in production (issue
-[#2077](https://github.com/InterCooperative-Network/icn/issues/2077); trusted issuance is
-tracked by [#2080](https://github.com/InterCooperative-Network/icn/issues/2080)). See
+`coop_id` issuance at `/auth/verify` is fail-closed in production (PR
+[#2077](https://github.com/InterCooperative-Network/icn/pull/2077); trusted issuance is
+tracked by issue [#2080](https://github.com/InterCooperative-Network/icn/issues/2080)). See
 [`seed-demo-data.ts`](./seed-demo-data.ts) for this pattern.
 
 ```typescript
@@ -164,7 +164,7 @@ const client = new ICNClient({ baseUrl: 'http://localhost:8080' });
 
 // DEV/DEMO ONLY — self-asserted coop_id, fail-closed in production.
 const challenge = await client.getChallenge('did:icn:alice');
-const signature = await signChallenge(challenge.challenge);  // your Ed25519 signing
+const signature = await signChallenge(challenge.nonce);  // your Ed25519 signing
 const auth = await client.verify(
   'did:icn:alice',
   signature,
@@ -194,9 +194,10 @@ try {
 
 ### Automatic Token Refresh
 
-Enable auto-refresh to avoid managing token expiration. It re-runs the configured auth
-flow, so it inherits that flow's posture (the example below uses the dev/demo
-challenge/verify flow — see the Authentication note above):
+Enable auto-refresh to avoid managing token expiration. It only re-runs the **dev/demo
+challenge/verify flow** (it needs the signer + DID stored by `authenticate()`); a
+production token injected directly is **not** auto-refreshed. See the Authentication note
+above.
 
 ```typescript
 const client = new ICNClient({

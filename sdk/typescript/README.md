@@ -27,7 +27,7 @@ console.log('Gateway status:', health.status);
 // fail-closed in production. DID key control is not cooperative authority.
 // See "Authentication" below for the production-shaped pattern.
 const challenge = await client.getChallenge('did:icn:alice');
-const signature = await signWithYourKey(challenge.challenge);
+const signature = await signWithYourKey(challenge.nonce);
 const auth = await client.verify('did:icn:alice', signature, 'my-coop', ['ledger:read', 'ledger:write']);
 client.setToken(auth.token);
 
@@ -56,7 +56,7 @@ console.log('Position:', position.position, position.unit);
 ### Production: how `coop_id` is treated today
 
 Passing a caller-chosen `coop_id` to `/auth/verify` is **fail-closed in production**
-(issue [#2077](https://github.com/InterCooperative-Network/icn/issues/2077)): the gateway
+(PR [#2077](https://github.com/InterCooperative-Network/icn/pull/2077)): the gateway
 refuses to bind self-asserted cooperative authority into a token. A trusted production
 issuance path (first-admin bootstrap, invite/session, membership-resolved issuance) is
 **planned, not yet shipped** — tracked by
@@ -78,10 +78,10 @@ const client = new ICNClient({ baseUrl: 'http://localhost:8080', token });
 ### Dev/demo only: self-serve challenge → verify → token
 
 The challenge/verify flow below mints a token carrying a **caller-supplied, unverified**
-`coop_id`. The gateway honors it only when it is explicitly built for a dev/demo posture
-(`AuthManager::with_self_asserted_coop(true)`, which production never enables); per ICN's
-dev-gate doctrine such a posture must also be confined to an explicit opt-in
-(`ICN_DEV_MODE`) plus a loopback bind. This is **not** how production cooperative
+`coop_id`. The gateway honors it only under an explicit dev opt-in — `ICN_DEV_MODE`, or
+the daemon's `--insecure-gateway-no-jwt` flag — **and** a loopback bind; on any
+non-loopback bind it stays fail-closed (production leaves
+`AuthManager::with_self_asserted_coop` off). This is **not** how production cooperative
 authority is obtained — do not ship it as a login flow.
 
 1. Request a challenge for your DID
@@ -91,11 +91,11 @@ authority is obtained — do not ship it as a login flow.
 
 ```typescript
 // DEV/DEMO ONLY — fail-closed in production (see above).
-// 1. Get challenge
-const { challenge, expires_at } = await client.getChallenge('did:icn:alice');
+// 1. Get challenge (returns { nonce, expires_in })
+const { nonce } = await client.getChallenge('did:icn:alice');
 
-// 2. Sign challenge (implement your own signing logic)
-const signature = await ed25519Sign(challenge, privateKey);
+// 2. Sign the challenge nonce (implement your own signing logic)
+const signature = await ed25519Sign(nonce, privateKey);
 
 // 3. Verify and get token — the coop_id here is a SELF-ASSERTED claim,
 //    accepted only under a dev/demo gateway posture, not production authority.
@@ -130,9 +130,11 @@ const auth = await client.authenticate('did:icn:alice', signer, 'my-coop');
 
 #### Automatic Token Refresh
 
-`autoRefresh` re-runs whatever authentication you configured when the token nears expiry,
-so it inherits that flow's posture: with the dev/demo challenge/verify flow it stays
-dev/demo-only; in production it refreshes a token sourced from a trusted issuer.
+`autoRefresh` only re-runs the **dev/demo challenge/verify flow**: it works solely when
+`authenticate()` has stored a signer and DID, and there is no refresh path for a token you
+injected directly (the production-shaped pattern above). A production token obtained from a
+trusted issuer is therefore **not** auto-refreshed — re-issue it through that issuer before
+it expires.
 
 ```typescript
 const client = new ICNClient({

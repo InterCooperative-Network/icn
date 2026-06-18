@@ -6,8 +6,9 @@
  * IMPORTANT: this demonstrates DID *key control* plus dev/demo self-serve token
  * issuance, where the caller supplies its own `coop_id`. DID key control is NOT
  * cooperative authority. Passing a caller-chosen `coop_id` to `/auth/verify` is
- * fail-closed in production (issue #2077); the gateway honors it only under an
- * explicit dev/demo posture (loopback + ICN_DEV_MODE). This is NOT how production
+ * fail-closed in production (PR #2077); the gateway honors it only under an explicit
+ * dev opt-in (ICN_DEV_MODE or the daemon's --insecure-gateway-no-jwt) on a loopback
+ * bind. This is NOT how production
  * cooperative authority is obtained — trusted issuance is tracked by #2080. In
  * production, obtain a cooperative-scoped token from a trusted institutional path
  * and pass it to the client directly (see examples/seed-demo-data.ts).
@@ -66,7 +67,7 @@ async function main() {
     'my-coop', // self-asserted coop_id (dev/demo only)
     ['ledger:read', 'ledger:write', 'coop:read'] // scopes
   );
-  console.log('Token expires at:', new Date(auth.expires_at * 1000));
+  console.log('Token expires at:', new Date(auth.expires_at));
 
   // Set token for future requests
   client.setToken(auth.token);
@@ -82,7 +83,7 @@ async function main() {
     'my-coop', // self-asserted coop_id (dev/demo only)
     ['ledger:read', 'ledger:write']
   );
-  console.log('Authenticated! Token expires at:', new Date(authResult.expires_at * 1000));
+  console.log('Authenticated! Token expires at:', new Date(authResult.expires_at));
 
   // Now make authenticated requests
   console.log('\n--- Authenticated Requests ---');
