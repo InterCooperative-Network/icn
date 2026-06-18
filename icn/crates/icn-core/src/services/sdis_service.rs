@@ -482,9 +482,17 @@ impl SdisService for SdisServiceImpl {
                         )
                     })?;
                 let steward_id = record.id().to_hex();
+                // Idempotent per governance decision (the sanction proposal's
+                // receipt id): a crash-recovery re-dispatch of the same
+                // SanctionSteward effect must not slash the bond twice, while
+                // distinct decisions still slash independently.
                 let remaining = self
                     .commons
-                    .slash_steward_bond(&steward_id, request.bond_slash_amount)
+                    .slash_steward_bond_for_decision(
+                        &steward_id,
+                        request.bond_slash_amount,
+                        &request.proposal_id,
+                    )
                     .await?;
                 Ok::<_, anyhow::Error>((steward_id, remaining))
             })
@@ -669,6 +677,77 @@ mod tests {
             Some(expected_receipt_ref),
             "AppointStewardResult.receipt_ref must equal the commons StewardId::to_hex() \
              so kernel-path dispatch evidence carries the real downstream handle"
+        );
+    }
+
+    /// SanctionSteward is idempotent per governance decision: re-dispatching the
+    /// same sanction (same `proposal_id`) — as crash recovery does — slashes the
+    /// bond only once, while a distinct decision slashes again. Guards the
+    /// replay window where a hard crash leaves the execution record non-terminal
+    /// and `recover_in_flight` re-runs the effect.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_sanction_steward_idempotent_per_decision() {
+        let (svc, commons) = make_service_with_commons();
+        let holder = test_did(40);
+        let sponsor = test_did(41);
+        create_strong_holder(&commons, &holder, &sponsor).await;
+
+        svc.appoint_steward(AppointStewardRequest {
+            steward_did: holder.to_string(),
+            jurisdiction_id: String::new(),
+            term_length_seconds: 86400 * 365,
+            bond_amount: 1000,
+            region: None,
+            proposal_id: "gov:coop:appoint:receipt".to_string(),
+        })
+        .unwrap();
+
+        let sanction = |proposal_id: &str| SanctionStewardRequest {
+            steward_did: holder.to_string(),
+            bond_slash_amount: 300,
+            suspend_reason: String::new(),
+            reason: "misbehavior".to_string(),
+            proposal_id: proposal_id.to_string(),
+        };
+        let bond_now = |c: Arc<icn_commons::CommonsHandle>, did: icn_identity::Did| async move {
+            c.get_steward_by_did(&did)
+                .await
+                .expect("get_steward_by_did must not error")
+                .expect("steward present")
+                .bond_amount
+        };
+
+        // First dispatch of decision A slashes 300 (1000 -> 700).
+        assert!(
+            svc.sanction_steward(sanction("gov:coop:sanction-A:receipt"))
+                .unwrap()
+                .success
+        );
+        assert_eq!(bond_now(commons.clone(), holder.clone()).await, 700);
+
+        // Re-dispatch of the SAME decision A (crash-recovery replay) must NOT
+        // slash again — the bond stays 700.
+        assert!(
+            svc.sanction_steward(sanction("gov:coop:sanction-A:receipt"))
+                .unwrap()
+                .success
+        );
+        assert_eq!(
+            bond_now(commons.clone(), holder.clone()).await,
+            700,
+            "same sanction decision must not double-slash the bond on replay"
+        );
+
+        // A DISTINCT decision B still slashes (700 -> 400).
+        assert!(
+            svc.sanction_steward(sanction("gov:coop:sanction-B:receipt"))
+                .unwrap()
+                .success
+        );
+        assert_eq!(
+            bond_now(commons.clone(), holder.clone()).await,
+            400,
+            "a distinct sanction decision must still slash"
         );
     }
 

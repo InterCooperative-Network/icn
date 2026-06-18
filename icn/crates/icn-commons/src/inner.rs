@@ -1129,6 +1129,28 @@ impl CommonsInner {
         Ok(result)
     }
 
+    /// Slash a steward's bond idempotently for a governance decision.
+    ///
+    /// `decision_key` dedupes by governance decision so a crash-recovery
+    /// re-dispatch of the same `SanctionSteward` cannot double-slash. Returns
+    /// the amount slashed by THIS call (`0` if the decision was already
+    /// applied).
+    pub async fn slash_steward_bond_for_decision(
+        &self,
+        steward_id: &str,
+        amount: u64,
+        decision_key: &str,
+    ) -> Result<u64> {
+        let mut steward = self
+            .store
+            .get_steward(steward_id)?
+            .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
+
+        let result = steward.slash_bond_for_decision(amount, decision_key);
+        self.store.put_steward(&steward)?;
+        Ok(result)
+    }
+
     // ========== Revocation Operations ==========
 
     /// Add a revocation record

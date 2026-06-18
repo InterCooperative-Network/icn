@@ -12,6 +12,7 @@
 
 use icn_identity::Did;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::fmt;
 
 /// Unique identifier for a Steward record
@@ -109,6 +110,16 @@ pub struct StewardRecord {
 
     /// Last update timestamp
     pub updated_at: u64,
+
+    /// Governance decisions (by proposal-receipt id) whose bond slash has
+    /// already been applied to this steward. Makes governance-dispatched
+    /// sanctions replay-safe: a crash-recovery re-dispatch of the same decision
+    /// is a no-op, while distinct decisions still slash independently.
+    ///
+    /// Additive (`#[serde(default)]`) so records persisted before this field
+    /// existed deserialize to an empty set.
+    #[serde(default)]
+    pub applied_sanctions: BTreeSet<String>,
 }
 
 impl StewardRecord {
@@ -143,6 +154,7 @@ impl StewardRecord {
             contact_info: None,
             created_at: now,
             updated_at: now,
+            applied_sanctions: BTreeSet::new(),
         }
     }
 
@@ -284,6 +296,23 @@ impl StewardRecord {
         self.bond_amount -= slashed;
         self.updated_at = icn_time::current_timestamp_secs();
         slashed
+    }
+
+    /// Slash the bond for a governance sanction, idempotent per `decision_key`.
+    ///
+    /// `decision_key` is the per-decision governance identifier (the sanction
+    /// proposal's receipt id). The first call for a given key slashes
+    /// `min(amount, bond_amount)` and records the key; any later call with the
+    /// same key is a no-op returning `0` (bond unchanged). This makes
+    /// `SdisEffect::SanctionSteward` replay-safe — a crash-recovery
+    /// re-dispatch of the same governance decision cannot double-slash — while
+    /// distinct decisions still slash independently.
+    pub fn slash_bond_for_decision(&mut self, amount: u64, decision_key: &str) -> u64 {
+        if !self.applied_sanctions.insert(decision_key.to_string()) {
+            // This decision's slash was already applied; do not slash again.
+            return 0;
+        }
+        self.slash_bond(amount)
     }
 
     /// Get effectiveness score (combination of activity and reputation)
@@ -610,6 +639,28 @@ mod tests {
         let slashed = steward.slash_bond(2000);
         assert_eq!(slashed, 1200);
         assert_eq!(steward.bond_amount, 0);
+    }
+
+    #[test]
+    fn slash_bond_for_decision_is_idempotent_per_decision() {
+        let mut steward = create_test_steward();
+        assert_eq!(steward.bond_amount, 1000);
+
+        // First sanction by decision A slashes once.
+        let slashed = steward.slash_bond_for_decision(300, "proposal-A");
+        assert_eq!(slashed, 300);
+        assert_eq!(steward.bond_amount, 700);
+
+        // Re-dispatch of the SAME decision (e.g. crash-recovery replay) must be
+        // a no-op — the bond must not be slashed twice.
+        let replay = steward.slash_bond_for_decision(300, "proposal-A");
+        assert_eq!(replay, 0, "same decision must not slash the bond again");
+        assert_eq!(steward.bond_amount, 700, "bond unchanged on replay");
+
+        // A DISTINCT decision still slashes independently.
+        let slashed_b = steward.slash_bond_for_decision(200, "proposal-B");
+        assert_eq!(slashed_b, 200);
+        assert_eq!(steward.bond_amount, 500);
     }
 
     #[test]
