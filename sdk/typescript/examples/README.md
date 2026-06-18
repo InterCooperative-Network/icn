@@ -138,30 +138,39 @@ subscription.onEvent((event) => {
 
 ### Authentication
 
-All examples require authentication. Here's the pattern:
+All examples need a token. **DID key control is not cooperative authority**, so *how* you
+get that token matters:
+
+**Production** — obtain a cooperative-scoped token from a trusted institutional path
+(membership / invite / session / SDIS) out of band and pass it to the client. Self-asserted
+`coop_id` issuance at `/auth/verify` is fail-closed in production (PR
+[#2077](https://github.com/InterCooperative-Network/icn/pull/2077); trusted issuance is
+tracked by issue [#2080](https://github.com/InterCooperative-Network/icn/issues/2080)). See
+[`seed-demo-data.ts`](./seed-demo-data.ts) for this pattern.
 
 ```typescript
 import { ICNClient } from '@icn/client';
 
-const client = new ICNClient({
-  baseUrl: 'http://localhost:8080',
-});
+// Production-shaped: token comes from a trusted issuer, not a self-asserted coop_id.
+const client = new ICNClient({ baseUrl: 'http://localhost:8080', token });
+```
 
-// Get challenge
+**Dev/demo only** — the challenge/verify flow mints a token from a caller-supplied,
+**unverified** `coop_id`, accepted only under a dev/demo gateway posture. Do not ship it as
+a login flow. (See the SDK README's Authentication section for the full caveat.)
+
+```typescript
+const client = new ICNClient({ baseUrl: 'http://localhost:8080' });
+
+// DEV/DEMO ONLY — self-asserted coop_id, fail-closed in production.
 const challenge = await client.getChallenge('did:icn:alice');
-
-// Sign it (you need Ed25519 signing logic)
-const signature = await signChallenge(challenge.challenge);
-
-// Authenticate
+const signature = await signChallenge(challenge.nonce);  // your Ed25519 signing
 const auth = await client.verify(
   'did:icn:alice',
   signature,
-  'food-coop',
+  'food-coop',         // self-asserted coop_id (dev/demo only)
   ['ledger:read', 'ledger:write', 'coop:admin']
 );
-
-// Set token for future requests
 client.setToken(auth.token, auth.expires_at);
 ```
 
@@ -185,7 +194,10 @@ try {
 
 ### Automatic Token Refresh
 
-Enable auto-refresh to avoid managing token expiration:
+Enable auto-refresh to avoid managing token expiration. It only re-runs the **dev/demo
+challenge/verify flow** (it needs the signer + DID stored by `authenticate()`); a
+production token injected directly is **not** auto-refreshed. See the Authentication note
+above.
 
 ```typescript
 const client = new ICNClient({
@@ -194,7 +206,7 @@ const client = new ICNClient({
   refreshBeforeExpiry: 60,  // Refresh 60s before expiry
 });
 
-// Authenticate once with a signer
+// Dev/demo: re-authenticates via challenge/verify (self-asserted coop_id) before expiry.
 await client.authenticate('did:icn:alice', signer, 'food-coop');
 
 // Token automatically refreshes - no manual handling needed

@@ -1,7 +1,17 @@
 /**
- * Basic Authentication Example
+ * Basic Authentication Example — DEV/DEMO ONLY
  *
- * Shows how to authenticate with the ICN Gateway API.
+ * Shows DID key authentication (challenge/verify) against the ICN Gateway API.
+ *
+ * IMPORTANT: this demonstrates DID *key control* plus dev/demo self-serve token
+ * issuance, where the caller supplies its own `coop_id`. DID key control is NOT
+ * cooperative authority. Passing a caller-chosen `coop_id` to `/auth/verify` is
+ * fail-closed in production (PR #2077); the gateway honors it only under an explicit
+ * dev opt-in (ICN_DEV_MODE or the daemon's --insecure-gateway-no-jwt) on a loopback
+ * bind. This is NOT how production
+ * cooperative authority is obtained — trusted issuance is tracked by #2080. In
+ * production, obtain a cooperative-scoped token from a trusted institutional path
+ * and pass it to the client directly (see examples/seed-demo-data.ts).
  *
  * Run: npx ts-node examples/basic-auth.ts
  */
@@ -50,14 +60,14 @@ async function main() {
   // Sign the challenge (implement your own signing)
   const signature = 'your-hex-signature';
 
-  // Verify and get token
+  // Verify and get token (DEV/DEMO ONLY — self-asserted coop_id, fail-closed in production)
   const auth = await client.verify(
     myDid,
     signature,
-    'my-coop', // cooperative ID
+    'my-coop', // self-asserted coop_id (dev/demo only)
     ['ledger:read', 'ledger:write', 'coop:read'] // scopes
   );
-  console.log('Token expires at:', new Date(auth.expires_at * 1000));
+  console.log('Token expires at:', new Date(auth.expires_at));
 
   // Set token for future requests
   client.setToken(auth.token);
@@ -66,14 +76,14 @@ async function main() {
   console.log('\n--- SignatureProvider Auth ---');
   const signer = await createMockSigner(myPrivateKey);
 
-  // This handles the full flow automatically
+  // This handles the full flow automatically (still DEV/DEMO ONLY — self-asserted coop_id)
   const authResult = await client.authenticate(
     myDid,
     signer,
-    'my-coop',
+    'my-coop', // self-asserted coop_id (dev/demo only)
     ['ledger:read', 'ledger:write']
   );
-  console.log('Authenticated! Token expires at:', new Date(authResult.expires_at * 1000));
+  console.log('Authenticated! Token expires at:', new Date(authResult.expires_at));
 
   // Now make authenticated requests
   console.log('\n--- Authenticated Requests ---');
