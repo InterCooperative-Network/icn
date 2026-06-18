@@ -219,16 +219,25 @@ mod tests {
     /// idempotent recovery (`DecisionExecutor::recover_in_flight`), not here.
     #[test]
     fn terminal_record_with_results_survives_reopen_from_path() {
-        use icn_kernel_api::effects::{EffectOutcome, EffectResult};
+        use icn_kernel_api::effects::{EffectOutcome, EffectResult, KernelEffect};
 
         let dir = tempfile::TempDir::new().unwrap();
 
         // A terminal Confirmed record carrying both stored effects and the
         // per-effect results — the durable input the evidence backfill consumes.
-        let mut record =
-            ExecutionRecord::new_pending("dh-durable", "prop-durable", "receipt-durable", vec![]);
+        // Seed a real (if trivial) effect so the test exercises `effects`
+        // persistence, not just `results`.
+        let effects = vec![KernelEffect::NoOp {
+            reason: "ratified-text".to_string(),
+        }];
+        let mut record = ExecutionRecord::new_pending(
+            "dh-durable",
+            "prop-durable",
+            "receipt-durable",
+            effects.clone(),
+        );
         record.set_results(vec![EffectResult {
-            effect_id: "receipt-durable".to_string(),
+            effect_id: "effect-0".to_string(),
             success: true,
             message: "applied".to_string(),
             state_change_hash: Some("sch-durable".to_string()),
@@ -260,7 +269,10 @@ mod tests {
 
         assert_eq!(got.status, ExecutionStatus::Confirmed);
         assert!(got.is_terminal());
-        // The evidence source must round-trip intact across the reopen.
+        // Both halves of the evidence source must round-trip intact across the
+        // reopen — assert `effects` too, not just `results`, so a regression that
+        // only persists/loads `results` cannot pass.
+        assert_eq!(got.effects, effects, "stored effects survive reopen");
         assert_eq!(got.results.len(), 1, "per-effect results survive reopen");
         assert_eq!(
             got.results[0].ledger_entry_id.as_deref(),
