@@ -1801,6 +1801,107 @@ mod tests {
         assert!(proposal.state.is_closed());
     }
 
+    /// Terminal-state re-dispatch must be a no-op-with-error that mutates
+    /// nothing. This is the state-machine guarantee the control-effect replay
+    /// path relies on: `veto()`/`force_close()` bail on the `is_closed()` /
+    /// `!is_open() && !is_deliberating()` guard *before* touching `self.state`
+    /// or `self.updated_at`, so a re-dispatched control effect cannot
+    /// double-apply or overwrite the recorded outcome.
+    #[test]
+    fn test_proposal_terminal_state_redispatch_is_rejected() {
+        let kp = KeyPair::generate().unwrap();
+        let did = kp.did().clone();
+        let domain_id = GovernanceDomainId::new("test-domain");
+        let payload = ProposalPayload::Text {
+            body: "Test".to_string(),
+        };
+
+        // --- Force-close, then re-dispatch force-close + cross-veto ---
+        let mut force_closed = Proposal::new(
+            domain_id.clone(),
+            did.clone(),
+            "Force Close Redispatch".to_string(),
+            "Re-dispatch must not double-apply".to_string(),
+            payload.clone(),
+        );
+        force_closed.open(3600).unwrap();
+        force_closed
+            .force_close(crate::ProposalOutcome::Accepted, "First close".to_string())
+            .unwrap();
+        // Snapshot the terminal record so we can prove it is untouched.
+        let (first_closed_at, first_outcome, first_reason) = match &force_closed.state {
+            ProposalState::ForceClosed {
+                closed_at,
+                outcome,
+                reason,
+            } => (*closed_at, outcome.clone(), reason.clone()),
+            other => panic!("expected ForceClosed, got {other:?}"),
+        };
+        let updated_after_first = force_closed.updated_at;
+
+        // Second force-close on an already-ForceClosed proposal is rejected...
+        assert!(
+            force_closed
+                .force_close(crate::ProposalOutcome::Rejected, "Second close".to_string())
+                .is_err(),
+            "force_close on a terminal proposal must be rejected"
+        );
+        // ...and a cross-terminal veto on it is rejected too.
+        assert!(
+            force_closed.veto("Cross veto".to_string()).is_err(),
+            "veto on a terminal proposal must be rejected"
+        );
+        // The recorded outcome and timestamps are unchanged by the rejected calls.
+        match &force_closed.state {
+            ProposalState::ForceClosed {
+                closed_at,
+                outcome,
+                reason,
+            } => {
+                assert_eq!(*closed_at, first_closed_at);
+                assert_eq!(*outcome, first_outcome);
+                assert_eq!(*reason, first_reason);
+            }
+            other => panic!("state mutated to {other:?} after rejected re-dispatch"),
+        }
+        assert_eq!(
+            force_closed.updated_at, updated_after_first,
+            "rejected re-dispatch must not bump updated_at"
+        );
+
+        // --- Veto, then re-dispatch veto + cross-force-close ---
+        let mut vetoed = Proposal::new(
+            domain_id,
+            did,
+            "Veto Redispatch".to_string(),
+            "Re-dispatch must not overwrite the veto reason".to_string(),
+            payload,
+        );
+        vetoed.open(3600).unwrap();
+        vetoed.veto("Original reason".to_string()).unwrap();
+        let updated_after_veto = vetoed.updated_at;
+
+        assert!(
+            vetoed.veto("Replayed reason".to_string()).is_err(),
+            "veto on an already-vetoed proposal must be rejected"
+        );
+        assert!(
+            vetoed
+                .force_close(crate::ProposalOutcome::Accepted, "Cross close".to_string())
+                .is_err(),
+            "force_close on a vetoed proposal must be rejected"
+        );
+        // The original veto reason survived the replayed call (no overwrite).
+        assert!(matches!(
+            vetoed.state,
+            ProposalState::Vetoed { ref reason, .. } if reason == "Original reason"
+        ));
+        assert_eq!(
+            vetoed.updated_at, updated_after_veto,
+            "rejected re-dispatch must not bump updated_at"
+        );
+    }
+
     // ========== Labor Share Proposal Tests ==========
 
     #[test]
