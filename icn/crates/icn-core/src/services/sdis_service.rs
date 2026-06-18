@@ -717,20 +717,28 @@ mod tests {
                 .bond_amount
         };
 
-        // First dispatch of decision A slashes 300 (1000 -> 700).
-        assert!(
-            svc.sanction_steward(sanction("gov:coop:sanction-A:receipt"))
-                .unwrap()
-                .success
+        // First dispatch of decision A slashes 300 (1000 -> 700) and reports
+        // the remaining bond.
+        let first = svc
+            .sanction_steward(sanction("gov:coop:sanction-A:receipt"))
+            .unwrap();
+        assert!(first.success);
+        assert_eq!(
+            first.remaining_bond, 700,
+            "first dispatch reports the remaining bond"
         );
         assert_eq!(bond_now(commons.clone(), holder.clone()).await, 700);
 
         // Re-dispatch of the SAME decision A (crash-recovery replay) must NOT
-        // slash again — the bond stays 700.
-        assert!(
-            svc.sanction_steward(sanction("gov:coop:sanction-A:receipt"))
-                .unwrap()
-                .success
+        // slash again — the bond stays 700 — and the result must report the
+        // true remaining bond (700), not the per-call slashed amount (0).
+        let replay = svc
+            .sanction_steward(sanction("gov:coop:sanction-A:receipt"))
+            .unwrap();
+        assert!(replay.success);
+        assert_eq!(
+            replay.remaining_bond, 700,
+            "replay must report the true remaining bond (recovery/audit evidence), not 0"
         );
         assert_eq!(
             bond_now(commons.clone(), holder.clone()).await,

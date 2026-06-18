@@ -303,16 +303,23 @@ impl StewardRecord {
     /// `decision_key` is the per-decision governance identifier (the sanction
     /// proposal's receipt id). The first call for a given key slashes
     /// `min(amount, bond_amount)` and records the key; any later call with the
-    /// same key is a no-op returning `0` (bond unchanged). This makes
-    /// `SdisEffect::SanctionSteward` replay-safe — a crash-recovery
-    /// re-dispatch of the same governance decision cannot double-slash — while
-    /// distinct decisions still slash independently.
+    /// same key does not slash again. This makes `SdisEffect::SanctionSteward`
+    /// replay-safe — a crash-recovery re-dispatch of the same governance
+    /// decision cannot double-slash — while distinct decisions still slash
+    /// independently.
+    ///
+    /// Returns the steward's bond *after* the operation (the remaining bond),
+    /// identical across replays, so callers report the true post-sanction bond
+    /// for both the first application and an idempotent replay — not the
+    /// per-call slashed amount, which would be a misleading `0` on replay and
+    /// corrupt the recovery/audit evidence.
     pub fn slash_bond_for_decision(&mut self, amount: u64, decision_key: &str) -> u64 {
-        if !self.applied_sanctions.insert(decision_key.to_string()) {
-            // This decision's slash was already applied; do not slash again.
-            return 0;
+        if self.applied_sanctions.insert(decision_key.to_string()) {
+            // First time this decision is seen: apply the slash exactly once.
+            self.slash_bond(amount);
         }
-        self.slash_bond(amount)
+        // Report the actual post-operation bond, identical across replays.
+        self.bond_amount
     }
 
     /// Get effectiveness score (combination of activity and reputation)
@@ -646,20 +653,24 @@ mod tests {
         let mut steward = create_test_steward();
         assert_eq!(steward.bond_amount, 1000);
 
-        // First sanction by decision A slashes once.
-        let slashed = steward.slash_bond_for_decision(300, "proposal-A");
-        assert_eq!(slashed, 300);
+        // First sanction by decision A slashes once and reports the remaining bond.
+        let remaining = steward.slash_bond_for_decision(300, "proposal-A");
+        assert_eq!(remaining, 700, "returns the remaining bond after the slash");
         assert_eq!(steward.bond_amount, 700);
 
         // Re-dispatch of the SAME decision (e.g. crash-recovery replay) must be
-        // a no-op — the bond must not be slashed twice.
+        // a no-op — the bond must not be slashed twice, and the reported
+        // remaining bond must stay accurate (not 0).
         let replay = steward.slash_bond_for_decision(300, "proposal-A");
-        assert_eq!(replay, 0, "same decision must not slash the bond again");
+        assert_eq!(replay, 700, "replay reports the true remaining bond, not 0");
         assert_eq!(steward.bond_amount, 700, "bond unchanged on replay");
 
         // A DISTINCT decision still slashes independently.
-        let slashed_b = steward.slash_bond_for_decision(200, "proposal-B");
-        assert_eq!(slashed_b, 200);
+        let remaining_b = steward.slash_bond_for_decision(200, "proposal-B");
+        assert_eq!(
+            remaining_b, 500,
+            "returns remaining bond after a distinct slash"
+        );
         assert_eq!(steward.bond_amount, 500);
     }
 

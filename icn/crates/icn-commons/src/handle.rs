@@ -483,8 +483,8 @@ impl CommonsHandle {
     ///
     /// `decision_key` (the sanction proposal's receipt id) dedupes by decision
     /// so a crash-recovery re-dispatch of the same `SanctionSteward` cannot
-    /// double-slash. Returns the amount slashed by THIS call (`0` if already
-    /// applied for this decision).
+    /// double-slash. Returns the steward's remaining bond after the operation
+    /// (accurate on both the first application and an idempotent replay).
     pub async fn slash_steward_bond_for_decision(
         &self,
         steward_id: &str,
