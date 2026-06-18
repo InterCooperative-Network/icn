@@ -1146,6 +1146,12 @@ impl CommonsInner {
             .get_steward(steward_id)?
             .ok_or_else(|| anyhow::anyhow!("Steward not found: {steward_id}"))?;
 
+        // On an idempotent replay the decision is already recorded and nothing
+        // changes — skip the redundant durable write and just report the bond.
+        if steward.applied_sanctions.contains(decision_key) {
+            return Ok(steward.bond_amount);
+        }
+
         let result = steward.slash_bond_for_decision(amount, decision_key);
         self.store.put_steward(&steward)?;
         Ok(result)
