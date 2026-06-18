@@ -577,3 +577,252 @@ async fn force_close_preflight_failure_leaves_proposal_open() {
 
     actor_handle.shutdown().await;
 }
+
+// ============================================================================
+// Control-effect replay idempotency (re-dispatch after crash / redelivery).
+//
+// `ControlEffect::VetoProposal` / `ForceCloseProposal` flow through the
+// `ControlServiceImpl` adapter as `GovernanceCommand::VetoProposal` /
+// `ForceCloseProposal`. If a control effect is re-dispatched (e.g. effect
+// re-delivery after a crash before the dispatch evidence was recorded), the
+// second command must be a no-op-with-error: the terminal-state guard in
+// `Proposal::veto` / `Proposal::force_close` rejects it *before* any state
+// mutation, and the force-accept outcome side effects (institutional-effect
+// record + mandate) are not written a second time. These tests pin that the
+// re-dispatch path cannot double-apply.
+// ============================================================================
+
+/// Re-dispatching a `VetoProposal` command for an already-vetoed proposal must
+/// surface as `Err`, preserve the terminal `Vetoed` state, and leave the
+/// *original* veto reason in place — the replayed command's reason must not
+/// overwrite it.
+#[tokio::test(flavor = "current_thread")]
+async fn veto_redispatch_is_idempotent() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp.path().to_path_buf();
+
+    let bundle = IdentityBundle::generate().expect("IdentityBundle::generate");
+    let did = bundle.did().clone();
+
+    let store: Arc<dyn icn_store::Store> =
+        Arc::new(SledStore::open(&db_path).expect("SledStore::open"));
+    let gossip = gossip_with_governance_topic(did.clone()).await;
+    let resolver = Arc::new(StaticMembershipResolver::new());
+
+    let actor_handle =
+        GovernanceActor::spawn(did.clone(), store.clone(), gossip, resolver, None, None)
+            .await
+            .expect("GovernanceActor::spawn");
+
+    let domain_id = GovernanceDomainId("veto-redispatch-domain".to_string());
+    let manager = GovernanceManager::with_handle(
+        Arc::new(actor_handle.clone()) as Arc<dyn GovernanceOps + Send + Sync>
+    );
+    manager
+        .create_domain(
+            domain_id.clone(),
+            "Veto redispatch domain".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(50, 50, 3600),
+            MembershipConfig::static_list(vec![did.clone()]),
+        )
+        .await
+        .expect("create_domain");
+
+    let proposal_id = manager
+        .create_proposal(
+            ProposalId("_ignored".to_string()),
+            domain_id.clone(),
+            did.clone(),
+            "Veto redispatch proposal".to_string(),
+            "".to_string(),
+            ProposalPayload::Text {
+                body: "body".to_string(),
+            },
+            ProposalScope::Local,
+        )
+        .await
+        .expect("create_proposal");
+
+    manager
+        .open_proposal(proposal_id.clone(), 3600)
+        .await
+        .expect("open_proposal");
+
+    // First veto succeeds and records the original reason.
+    actor_handle
+        .submit(GovernanceCommand::VetoProposal {
+            proposal_id: proposal_id.clone(),
+            reason: "original veto".to_string(),
+        })
+        .await
+        .expect("first VetoProposal submit");
+
+    // Replay the same control effect with a different reason.
+    let replay = actor_handle
+        .submit(GovernanceCommand::VetoProposal {
+            proposal_id: proposal_id.clone(),
+            reason: "replayed veto".to_string(),
+        })
+        .await;
+    assert!(
+        replay.is_err(),
+        "re-dispatched veto on a terminal proposal must surface as Err"
+    );
+
+    // Persisted state is still Vetoed with the *original* reason — the replay
+    // neither double-applied nor overwrote anything.
+    let state_store: Arc<dyn GovernanceStateStore> =
+        Arc::new(SledGovernanceStateStore::new(store.clone()));
+    let persisted = state_store
+        .get_proposal(&proposal_id)
+        .expect("get_proposal")
+        .expect("proposal must still exist");
+    assert!(
+        matches!(
+            persisted.state,
+            ProposalState::Vetoed { ref reason, .. } if reason == "original veto"
+        ),
+        "veto replay must preserve the original Vetoed record; got {:?}",
+        persisted.state
+    );
+
+    actor_handle.shutdown().await;
+}
+
+/// Re-dispatching a `ForceCloseProposal` (force-accept of an execution-required
+/// proposal) for an already-force-closed proposal must surface as `Err`,
+/// preserve the terminal `ForceClosed` state, and NOT re-write the durable
+/// outcome side effects. The force-accept preflight re-runs on replay, but its
+/// institutional-effect and mandate writes are idempotent, so the durable write
+/// counts stay exactly where the first dispatch left them.
+#[tokio::test(flavor = "current_thread")]
+async fn force_close_redispatch_does_not_repeat_effects() {
+    let tmp = tempfile::tempdir().expect("tempdir");
+    let db_path = tmp.path().to_path_buf();
+
+    let bundle = IdentityBundle::generate().expect("IdentityBundle::generate");
+    let did = bundle.did().clone();
+    let candidate = IdentityBundle::generate().expect("candidate").did().clone();
+
+    let store: Arc<dyn icn_store::Store> =
+        Arc::new(SledStore::open(&db_path).expect("SledStore::open"));
+    let gossip = gossip_with_governance_topic(did.clone()).await;
+    let resolver = Arc::new(StaticMembershipResolver::new());
+
+    let actor_handle =
+        GovernanceActor::spawn(did.clone(), store.clone(), gossip, resolver, None, None)
+            .await
+            .expect("GovernanceActor::spawn");
+
+    let domain_id = GovernanceDomainId("force-close-redispatch-domain".to_string());
+    let manager = GovernanceManager::with_handle(
+        Arc::new(actor_handle.clone()) as Arc<dyn GovernanceOps + Send + Sync>
+    );
+    manager
+        .create_domain(
+            domain_id.clone(),
+            "Force-close redispatch domain".to_string(),
+            "cooperative_default".to_string(),
+            GovernanceParams::new(50, 50, 3600),
+            MembershipConfig::static_list(vec![did.clone()]),
+        )
+        .await
+        .expect("create_domain");
+
+    let proposal_id = manager
+        .create_proposal(
+            ProposalId("_ignored".to_string()),
+            domain_id.clone(),
+            did.clone(),
+            "Appoint steward (force-close redispatch)".to_string(),
+            "".to_string(),
+            appoint_steward_payload(candidate.clone(), did.clone()),
+            ProposalScope::Local,
+        )
+        .await
+        .expect("create_proposal");
+
+    manager
+        .open_proposal(proposal_id.clone(), 3600)
+        .await
+        .expect("open_proposal");
+
+    let backend = Arc::new(CountingReceiptBackend::new());
+    actor_handle.install_receipt_store(backend.clone()).await;
+
+    // First force-close (force-accept) succeeds and emits the outcome effect once.
+    actor_handle
+        .submit(GovernanceCommand::ForceCloseProposal {
+            proposal_id: proposal_id.clone(),
+            forced_outcome: ForcedOutcome::Accept,
+            reason: "first force-close".to_string(),
+        })
+        .await
+        .expect("first ForceCloseProposal submit");
+
+    assert_eq!(
+        backend
+            .put_institutional_effect_calls
+            .load(Ordering::SeqCst),
+        1,
+        "first force-accept must write exactly one institutional-effect record"
+    );
+    let mandate_writes_after_first = backend.put_mandate_with_grants_calls.load(Ordering::SeqCst);
+
+    let state_store: Arc<dyn GovernanceStateStore> =
+        Arc::new(SledGovernanceStateStore::new(store.clone()));
+    let closed_at_after_first = match state_store
+        .get_proposal(&proposal_id)
+        .expect("get_proposal")
+        .expect("proposal must exist")
+        .state
+    {
+        ProposalState::ForceClosed { closed_at, .. } => closed_at,
+        other => panic!("expected ForceClosed after first force-close, got {other:?}"),
+    };
+
+    // Replay the same control effect. The terminal-state guard rejects it.
+    let replay = actor_handle
+        .submit(GovernanceCommand::ForceCloseProposal {
+            proposal_id: proposal_id.clone(),
+            forced_outcome: ForcedOutcome::Accept,
+            reason: "replayed force-close".to_string(),
+        })
+        .await;
+    assert!(
+        replay.is_err(),
+        "re-dispatched force-close on a terminal proposal must surface as Err"
+    );
+
+    // The durable outcome side effects were not written a second time.
+    assert_eq!(
+        backend
+            .put_institutional_effect_calls
+            .load(Ordering::SeqCst),
+        1,
+        "force-close replay must not write a second institutional-effect record"
+    );
+    assert_eq!(
+        backend.put_mandate_with_grants_calls.load(Ordering::SeqCst),
+        mandate_writes_after_first,
+        "force-close replay must not mint/persist the mandate again"
+    );
+
+    // Terminal state is byte-for-byte preserved (same closed_at).
+    let persisted = state_store
+        .get_proposal(&proposal_id)
+        .expect("get_proposal")
+        .expect("proposal must still exist");
+    match persisted.state {
+        ProposalState::ForceClosed { closed_at, .. } => {
+            assert_eq!(
+                closed_at, closed_at_after_first,
+                "force-close replay must preserve the original ForceClosed record"
+            );
+        }
+        other => panic!("state mutated after force-close replay: {other:?}"),
+    }
+
+    actor_handle.shutdown().await;
+}
