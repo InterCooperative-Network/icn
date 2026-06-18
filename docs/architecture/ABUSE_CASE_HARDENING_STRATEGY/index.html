@@ -55,7 +55,7 @@ View source on GitHub →
 <li><strong>No new contract URN, no new schema field, no new wire format.</strong> Candidate vocabulary in §6 and §10 is <strong>draft</strong> and explicitly marked as such.</li>
 <li><strong>No production-readiness claim, no live-federation claim, no formal-NYCN-pilot claim, no Phase 2 completion claim.</strong> Phase 2 (see <a href="/docs/PHASE_PROGRESS">`../PHASE_PROGRESS.md`</a>) remains ⏳ and partner-bound; this document sequences hardening work that must precede a partner-formalization step that does not exist yet.</li>
 <li><strong>No K3s, DNS, Forgejo, gateway-deploy, or NYCN partner-data mutation.</strong></li>
-<li><strong>Code anchors below are pinned to <code>main</code> at session start (<code>d57ff1d6e</code>).</strong> They may drift; re-verify before citing in follow-up PRs.</li>
+<li><strong>Code anchors below are pinned to <code>main</code> at session start (<code>d57ff1d6e</code>).</strong> They may drift; re-verify before citing in follow-up PRs. The §2.11 / §3.11 / §4.11 additions (2026-06-18) are pinned to <code>main @ 040e44f0</code>.</li>
 </ul>
 <!-- truth: descriptive -->
 
@@ -96,6 +96,8 @@ View source on GitHub →
 <p><code>ScopedVault</code> and <code>PrivateEvidence</code> define what bodies a surface may read. Existence, scope, access path, authority basis, access receipts — these are renderable. Body bytes are not. Debug convenience cannot lift a body byte into a rendering layer; if it has, the surface has become a surveillance panel by accident.</p>
 <h3>2.10 Index absence is not record absence</h3>
 <p>A receipt may exist in the primary store and be missing from a secondary index. In the opaque receipt store this is impossible by construction (atomic primary + index + bind writes). On older typed-receipt paths it is currently possible. Absence from index must never silently become absence from truth.</p>
+<h3>2.11 A global id is not a grant</h3>
+<p>An object reachable by a globally-keyed id must still be proven to belong to the institutional context named by the request before it is returned. Knowing — or guessing — an object&#39;s id is not standing over the object. A correct check on the <em>caller&#39;s</em> context (path coop, token scope) does not bind the <em>object</em> to that context; the object carries its own context and must be matched to the request&#39;s. Where they differ, the answer is not-found, and a foreign object must be reported exactly as a missing one, so the endpoint cannot be used to enumerate or confirm objects in contexts the caller has no standing in.</p>
 <!-- truth: descriptive -->
 
 <h2>3. Abuse stories</h2>
@@ -120,6 +122,8 @@ View source on GitHub →
 <p>A rendering layer in the cockpit, or a &quot;debug preview&quot; in the shell, dereferences a <code>PrivateEvidence</code> body when it should be displaying only existence + scope + authority basis + access receipts. The current digest-only rendering boundary in <code>icn/crates/icn-kernel-api/src/proofs.rs:646-661</code> (<code>ArtifactDigest::scoped_vault_reference</code>) is clean; the abuse case is the regression test that doesn&#39;t yet exist.</p>
 <h3>3.10 Index-skew invisibility</h3>
 <p>A crash mid-write on an older typed-receipt path leaves the primary record durable but the secondary index missing. The opaque receipt store is atomic by construction; <code>icn/apps/governance/src/receipt_backend.rs:173-210</code> documents that the <strong>default</strong> <code>put_mandate_with_grants</code> is <strong>not atomic</strong> and depends on the sled-backed gateway override. Other typed write paths have not been inventoried for the same invariant.</p>
+<h3>3.11 Cross-context read by global id</h3>
+<p>A member holding a valid <code>coop-a</code> token requests <code>GET /treasury/coop-a/budgets/{id}</code> with a <code>coop-b</code> budget id they knew or guessed. The flat guard passes (token coop == path coop), the budget is fetched by its globally-keyed id, and — before #2087 — returned, leaking <code>coop-b</code>&#39;s treasury DID, purpose, and amount across the institutional boundary. The leak survived a <em>correct subject check</em> because the loaded object was never bound to the named context. Closed for this endpoint by #2087 (<code>icn/crates/icn-gateway/src/api/treasury.rs:699-702</code>, the <code>treasury_did</code> ownership match in <code>get_budget</code>; tests <code>test_get_budget_cross_coop_read_denied</code>, <code>_same_coop_read_ok</code>, <code>_path_coop_without_treasury_does_not_reveal_foreign_budget</code>). The class is older than this instance — caller-context siblings hardened in #2052 / #2056 / #2058 — and the cross-gateway generalization is still open as the enumeration-safe-404 audit <strong>#1642</strong>. Anchor: <code>icn/crates/icn-gateway/src/api/treasury.rs:647</code> (<code>get_budget</code>; generic <code>&quot;Budget not found&quot;</code> at <code>:670</code>, ownership match at <code>:699-702</code>).</p>
 <!-- truth: descriptive -->
 
 <h2>4. Hardening tracks</h2>
@@ -286,6 +290,21 @@ View source on GitHub →
 </ul>
 <p><strong>Doctrine.</strong> <em>Index absence must not silently become record absence.</em></p>
 <p><strong>Anchors.</strong> <code>icn/apps/governance/src/receipt_backend.rs:42, 80, 106, 146, 178-210, 248</code> (typed write entry points; default <code>put_mandate_with_grants</code> is documented as <strong>not atomic</strong> at lines 178-190).</p>
+<h3>4.11 Object-context binding on global-id reads</h3>
+<p><strong>Problem.</strong> Endpoints shaped <code>/{context}/{collection}/{object_id}</code> authorize on the path / token context but fetch by a globally-keyed object id. If the loaded object&#39;s own context is not matched to the named one, a caller with standing in context A can read an object in context B by id (#2087 in treasury budgets; the class also covers ledger, compute, storage, governance records, federation provenance, and the escrow / invite / recurring objects of #2058).</p>
+<p><strong>Hardening goal.</strong> Every global-id read binds the loaded object to the institutional context named by the request before returning it, and reports a foreign object identically to a missing one (enumeration-safe, per #1642).</p>
+<p><strong>Doctrine.</strong> <em>A record reached by a globally-keyed id must be proven to belong to the institutional context named by the request before it is returned; a foreign object is reported exactly as a missing one.</em></p>
+<p><strong>Draft design.</strong> Object-fetch checklist (the worked shape, from <code>get_budget</code>):</p>
+<ol>
+<li>resolve the institutional context named by the request path (e.g. path coop → its treasury, yielding the context&#39;s DID);</li>
+<li>load the object by its global id;</li>
+<li>prove the object&#39;s <strong>own</strong> context binding against that context (e.g. <code>object.treasury_did == path_treasury.treasury_did</code>) — not merely the path / token check;</li>
+<li>on mismatch, missing, or no-context, return one generic not-found shape carrying no id, owner, DID, or content (no enumeration oracle);</li>
+<li>keep any observe-mode / divergence recording firing <strong>before</strong> the enforced denial, so cross-context attempts stay visible as divergence rather than vanishing;</li>
+<li>this is the <strong>object axis</strong> and composes with — does not replace — the <strong>subject axis</strong> entity guard (RFC-0018 / ADR-0035, &quot;may this caller act on this entity&quot;). Both must hold.</li>
+</ol>
+<p>This is not RBAC and not tenant isolation: it adds no roles and no per-tenant ACL, only a generic context-DID equality between a loaded object and the request&#39;s named context. The meaning firewall is untouched.</p>
+<p><strong>Anchors.</strong> <code>icn/crates/icn-gateway/src/api/treasury.rs:647-705</code> (<code>get_budget</code>, #2087 — the proven example); #1642 (open enumeration-safe-404 audit, the generalization); #2052 / #2056 / #2058 (caller-context siblings). Unbound families to sweep next: ledger, compute, storage, governance records, federation provenance.</p>
 <!-- truth: descriptive -->
 
 <h2>5. Production invariants</h2>

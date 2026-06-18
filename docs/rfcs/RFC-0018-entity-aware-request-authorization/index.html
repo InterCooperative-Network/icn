@@ -368,6 +368,11 @@ tests; treasury conversion; then per-family conversions; delegation last.</li>
 <li><strong>#1868</strong> — decompose <code>governance:write</code> into per-action capabilities (the capability axis).</li>
 <li><strong>#1642</strong> — gateway service-discovery auth + enumeration-safe 404.</li>
 <li><strong>#2052, #2056, #2058</strong> — flat-regime hardening this generalizes (kept as defense-in-depth).</li>
+<li><strong>#2087 / hardening §4.11</strong> — <em>object-context binding</em> on global-id reads: the <strong>object axis</strong>
+(does the returned, globally-keyed object belong to the named context) that composes with this
+RFC&#39;s <strong>subject axis</strong> (may this caller act on this entity). Preserved as defense-in-depth through
+the entity-aware migration; no flat guard is removed without it still holding. See
+<a href="/docs/architecture/ABUSE_CASE_HARDENING_STRATEGY">`../architecture/ABUSE_CASE_HARDENING_STRATEGY.md`</a> §2.11 / §4.11.</li>
 <li><strong>#2063</strong> — the recurring <code>list_by_owner</code> DID-colon fix (already merged; the reliability bug
 #2061 noted is resolved and is <strong>not</strong> part of this authz model).</li>
 <li><code>docs/architecture/{KERNEL_APP_SEPARATION,MEMBER_STANDING,INSTITUTION_PACKAGE_BOUNDARY,THE_COMMONS}.md</code>;
