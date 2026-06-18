@@ -458,6 +458,31 @@ impl SdisService for SdisServiceImpl {
             proposal_id = %request.proposal_id,
             "Sanctioning steward via governance dispatch (bond slash)"
         );
+
+        // Fail closed without an idempotency key. `proposal_id` is the per-decision
+        // dedupe key for the slash; an empty one would be recorded as "" in
+        // `applied_sanctions`, so the first empty-id sanction would make every later
+        // empty-id sanction look like a replay and silently skip an authorized
+        // slash. A governed sanction always carries a non-empty proposal receipt id.
+        if request.proposal_id.trim().is_empty() {
+            warn!(
+                steward_did = %request.steward_did,
+                "Rejecting SanctionSteward: empty proposal_id (no per-decision idempotency key)"
+            );
+            return Ok(SanctionStewardResult {
+                success: false,
+                remaining_bond: 0,
+                suspended: false,
+                state_change_hash: String::new(),
+                error: Some(
+                    "SanctionSteward requires a non-empty proposal_id as the per-decision \
+                     idempotency key"
+                        .to_string(),
+                ),
+                receipt_ref: None,
+            });
+        }
+
         let steward_did = icn_identity::Did::from_str(&request.steward_did)
             .map_err(|e| anyhow::anyhow!("Invalid steward DID '{}': {}", request.steward_did, e))?;
 
@@ -757,6 +782,50 @@ mod tests {
             400,
             "a distinct sanction decision must still slash"
         );
+    }
+
+    /// A SanctionSteward with an empty `proposal_id` has no idempotency key.
+    /// Recording `""` would make every later empty-id sanction look like a
+    /// replay and silently skip an authorized slash, so the service must reject
+    /// it (fail closed) without slashing.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_sanction_steward_rejects_empty_proposal_id() {
+        let (svc, commons) = make_service_with_commons();
+        let holder = test_did(42);
+        let sponsor = test_did(43);
+        create_strong_holder(&commons, &holder, &sponsor).await;
+        svc.appoint_steward(AppointStewardRequest {
+            steward_did: holder.to_string(),
+            jurisdiction_id: String::new(),
+            term_length_seconds: 86400 * 365,
+            bond_amount: 1000,
+            region: None,
+            proposal_id: "gov:coop:appoint:receipt".to_string(),
+        })
+        .unwrap();
+
+        let result = svc
+            .sanction_steward(SanctionStewardRequest {
+                steward_did: holder.to_string(),
+                bond_slash_amount: 300,
+                suspend_reason: String::new(),
+                reason: "misbehavior".to_string(),
+                proposal_id: String::new(), // no idempotency key
+            })
+            .unwrap();
+
+        assert!(
+            !result.success,
+            "empty proposal_id must be rejected (fail closed)"
+        );
+        assert!(result.error.is_some());
+        let bond = commons
+            .get_steward_by_did(&holder)
+            .await
+            .unwrap()
+            .unwrap()
+            .bond_amount;
+        assert_eq!(bond, 1000, "a rejected sanction must not slash the bond");
     }
 
     /// AppointSteward → RevokeSteward → steward record removed from commons.
