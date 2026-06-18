@@ -1,7 +1,7 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-05-16
+Last Reviewed: 2026-06-18
 ---
 
 # Abuse-case hardening strategy
@@ -25,7 +25,7 @@ The doctrine is not a security checklist for transport encryption, key managemen
 - **No new contract URN, no new schema field, no new wire format.** Candidate vocabulary in §6 and §10 is **draft** and explicitly marked as such.
 - **No production-readiness claim, no live-federation claim, no formal-NYCN-pilot claim, no Phase 2 completion claim.** Phase 2 (see [`../PHASE_PROGRESS.md`](../PHASE_PROGRESS.md)) remains ⏳ and partner-bound; this document sequences hardening work that must precede a partner-formalization step that does not exist yet.
 - **No K3s, DNS, Forgejo, gateway-deploy, or NYCN partner-data mutation.**
-- **Code anchors below are pinned to `main` at session start (`d57ff1d6e`).** They may drift; re-verify before citing in follow-up PRs.
+- **Code anchors below are pinned to `main` at session start (`d57ff1d6e`).** They may drift; re-verify before citing in follow-up PRs. The §2.11 / §3.11 / §4.11 additions (2026-06-18) are pinned to `main @ 040e44f0`.
 
 <!-- truth: descriptive -->
 
@@ -91,6 +91,10 @@ Member shell and steward cockpit are designed to render real states: degraded, p
 
 A receipt may exist in the primary store and be missing from a secondary index. In the opaque receipt store this is impossible by construction (atomic primary + index + bind writes). On older typed-receipt paths it is currently possible. Absence from index must never silently become absence from truth.
 
+### 2.11 A global id is not a grant
+
+An object reachable by a globally-keyed id must still be proven to belong to the institutional context named by the request before it is returned. Knowing — or guessing — an object's id is not standing over the object. A correct check on the *caller's* context (path coop, token scope) does not bind the *object* to that context; the object carries its own context and must be matched to the request's. Where they differ, the answer is not-found, and a foreign object must be reported exactly as a missing one, so the endpoint cannot be used to enumerate or confirm objects in contexts the caller has no standing in.
+
 <!-- truth: descriptive -->
 
 ## 3. Abuse stories
@@ -136,6 +140,10 @@ A rendering layer in the cockpit, or a "debug preview" in the shell, dereference
 ### 3.10 Index-skew invisibility
 
 A crash mid-write on an older typed-receipt path leaves the primary record durable but the secondary index missing. The opaque receipt store is atomic by construction; `icn/apps/governance/src/receipt_backend.rs:173-210` documents that the **default** `put_mandate_with_grants` is **not atomic** and depends on the sled-backed gateway override. Other typed write paths have not been inventoried for the same invariant.
+
+### 3.11 Cross-context read by global id
+
+A member holding a valid `coop-a` token requests `GET /treasury/coop-a/budgets/{id}` with a `coop-b` budget id they knew or guessed. The flat guard passes (token coop == path coop), the budget is fetched by its globally-keyed id, and — before #2087 — returned, leaking `coop-b`'s treasury DID, purpose, and amount across the institutional boundary. The leak survived a *correct subject check* because the loaded object was never bound to the named context. Closed for this endpoint by #2087 (`icn/crates/icn-gateway/src/api/treasury.rs:699-702`, the `treasury_did` ownership match in `get_budget`; tests `test_get_budget_cross_coop_read_denied`, `_same_coop_read_ok`, `_path_coop_without_treasury_does_not_reveal_foreign_budget`). The class is older than this instance — caller-context siblings hardened in #2052 / #2056 / #2058 — and the cross-gateway generalization is still open as the enumeration-safe-404 audit **#1642**. Anchor: `icn/crates/icn-gateway/src/api/treasury.rs:647` (`get_budget`; generic `"Budget not found"` at `:670`, ownership match at `:699-702`).
 
 <!-- truth: descriptive -->
 
@@ -359,6 +367,27 @@ Fixture / dev / test bands are explicit and labeled in every surface that touche
 **Doctrine.** *Index absence must not silently become record absence.*
 
 **Anchors.** `icn/apps/governance/src/receipt_backend.rs:42, 80, 106, 146, 178-210, 248` (typed write entry points; default `put_mandate_with_grants` is documented as **not atomic** at lines 178-190).
+
+### 4.11 Object-context binding on global-id reads
+
+**Problem.** Endpoints shaped `/{context}/{collection}/{object_id}` authorize on the path / token context but fetch by a globally-keyed object id. If the loaded object's own context is not matched to the named one, a caller with standing in context A can read an object in context B by id (#2087 in treasury budgets; the class also covers ledger, compute, storage, governance records, federation provenance, and the escrow / invite / recurring objects of #2058).
+
+**Hardening goal.** Every global-id read binds the loaded object to the institutional context named by the request before returning it, and reports a foreign object identically to a missing one (enumeration-safe, per #1642).
+
+**Doctrine.** *A record reached by a globally-keyed id must be proven to belong to the institutional context named by the request before it is returned; a foreign object is reported exactly as a missing one.*
+
+**Draft design.** Object-fetch checklist (the worked shape, from `get_budget`):
+
+1. resolve the institutional context named by the request path (e.g. path coop → its treasury, yielding the context's DID);
+2. load the object by its global id;
+3. prove the object's **own** context binding against that context (e.g. `object.treasury_did == path_treasury.treasury_did`) — not merely the path / token check;
+4. on mismatch, missing, or no-context, return one generic not-found shape carrying no id, owner, DID, or content (no enumeration oracle);
+5. keep any observe-mode / divergence recording firing **before** the enforced denial, so cross-context attempts stay visible as divergence rather than vanishing;
+6. this is the **object axis** and composes with — does not replace — the **subject axis** entity guard (RFC-0018 / ADR-0035, "may this caller act on this entity"). Both must hold.
+
+This is not RBAC and not tenant isolation: it adds no roles and no per-tenant ACL, only a generic context-DID equality between a loaded object and the request's named context. The meaning firewall is untouched.
+
+**Anchors.** `icn/crates/icn-gateway/src/api/treasury.rs:647-705` (`get_budget`, #2087 — the proven example); #1642 (open enumeration-safe-404 audit, the generalization); #2052 / #2056 / #2058 (caller-context siblings). Unbound families to sweep next: ledger, compute, storage, governance records, federation provenance.
 
 <!-- truth: descriptive -->
 

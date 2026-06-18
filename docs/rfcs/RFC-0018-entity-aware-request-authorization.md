@@ -311,6 +311,11 @@ staged rather than a sweep.
 - **#1868** — decompose `governance:write` into per-action capabilities (the capability axis).
 - **#1642** — gateway service-discovery auth + enumeration-safe 404.
 - **#2052, #2056, #2058** — flat-regime hardening this generalizes (kept as defense-in-depth).
+- **#2087 / hardening §4.11** — *object-context binding* on global-id reads: the **object axis**
+  (does the returned, globally-keyed object belong to the named context) that composes with this
+  RFC's **subject axis** (may this caller act on this entity). Preserved as defense-in-depth through
+  the entity-aware migration; no flat guard is removed without it still holding. See
+  [`../architecture/ABUSE_CASE_HARDENING_STRATEGY.md`](../architecture/ABUSE_CASE_HARDENING_STRATEGY.md) §2.11 / §4.11.
 - **#2063** — the recurring `list_by_owner` DID-colon fix (already merged; the reliability bug
   #2061 noted is resolved and is **not** part of this authz model).
 - `docs/architecture/{KERNEL_APP_SEPARATION,MEMBER_STANDING,INSTITUTION_PACKAGE_BOUNDARY,THE_COMMONS}.md`;
