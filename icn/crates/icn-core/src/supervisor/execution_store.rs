@@ -202,4 +202,75 @@ mod tests {
         assert_eq!(counts.get(&ExecutionStatus::Pending), Some(&2));
         assert_eq!(counts.get(&ExecutionStatus::Confirmed), Some(&1));
     }
+
+    /// Durability characterization for the dispatch-evidence source (Issue #1987).
+    ///
+    /// A terminal `ExecutionRecord` carries the `(effects, results)` pair the
+    /// gateway dispatch-evidence backfill re-derives `EffectDispatchEvidence`
+    /// from. This proves that pair survives a real close-and-reopen of an
+    /// on-disk sled store from the same path — i.e. the evidence source is
+    /// durable across a restart, not merely within one process. The sibling
+    /// tests use `SledStore::temporary()`, which is deleted on drop and so
+    /// cannot demonstrate cross-reopen persistence.
+    ///
+    /// Scope note: this exercises the graceful-shutdown durability barrier
+    /// (explicit `flush()` / flush-on-drop). It does NOT simulate a hard crash
+    /// between an unflushed `put` and process death; that window is covered by
+    /// idempotent recovery (`DecisionExecutor::recover_in_flight`), not here.
+    #[test]
+    fn terminal_record_with_results_survives_reopen_from_path() {
+        use icn_kernel_api::effects::{EffectOutcome, EffectResult};
+
+        let dir = tempfile::TempDir::new().unwrap();
+
+        // A terminal Confirmed record carrying both stored effects and the
+        // per-effect results — the durable input the evidence backfill consumes.
+        let mut record =
+            ExecutionRecord::new_pending("dh-durable", "prop-durable", "receipt-durable", vec![]);
+        record.set_results(vec![EffectResult {
+            effect_id: "receipt-durable".to_string(),
+            success: true,
+            message: "applied".to_string(),
+            state_change_hash: Some("sch-durable".to_string()),
+            ledger_entry_id: Some("ledger-durable".to_string()),
+            not_executed: false,
+            receipt_ref: Some("steward-durable".to_string()),
+            outcome: Some(EffectOutcome::Applied),
+        }]);
+        record.mark_confirmed(vec!["ledger-durable".into()], vec!["sch-durable".into()]);
+        assert!(record.is_terminal());
+
+        // Write + flush through a real on-disk store, then drop it so the sled
+        // file lock is released (mirrors a graceful shutdown).
+        {
+            let store = Arc::new(SledStore::open(dir.path()).unwrap());
+            let exec_store = SledExecutionStore::new(store.clone());
+            exec_store.put(&record).unwrap();
+            // Explicit durability barrier (fsync), matching graceful shutdown.
+            store.flush().unwrap();
+        } // store + exec_store dropped here → sled Db closed, lock released
+
+        // Reopen from the same path with a fresh handle, as a restarted process
+        // would.
+        let reopened = SledExecutionStore::new(Arc::new(SledStore::open(dir.path()).unwrap()));
+        let got = reopened
+            .get("dh-durable")
+            .unwrap()
+            .expect("terminal execution record must survive store reopen");
+
+        assert_eq!(got.status, ExecutionStatus::Confirmed);
+        assert!(got.is_terminal());
+        // The evidence source must round-trip intact across the reopen.
+        assert_eq!(got.results.len(), 1, "per-effect results survive reopen");
+        assert_eq!(
+            got.results[0].ledger_entry_id.as_deref(),
+            Some("ledger-durable")
+        );
+        assert_eq!(
+            got.results[0].receipt_ref.as_deref(),
+            Some("steward-durable"),
+            "evidence attribution (receipt_ref) survives reopen"
+        );
+        assert_eq!(got.ledger_entry_ids, vec!["ledger-durable".to_string()]);
+    }
 }
