@@ -410,7 +410,18 @@ impl DecisionExecutor {
         // migration — and a no-op when the key never moved (empty-hash fallback
         // sets `decision_hash == decision_receipt_id`; treasury was always
         // hash-keyed, so no receipt-keyed record exists for it).
-        let decision_hash: &str = if decision_hash != decision_receipt_id {
+        //
+        // When BOTH rows exist for the same decision (reachable only if a node
+        // ran an intermediate hash-keying build before this compat fix landed),
+        // the canonical hash-keyed record wins if it is already terminal: never
+        // re-dispatch under a stale legacy row when the canonical decision is done.
+        let canonical_is_terminal = self
+            .store
+            .get(decision_hash)?
+            .map(|r| r.is_terminal())
+            .unwrap_or(false);
+        let decision_hash: &str = if decision_hash != decision_receipt_id && !canonical_is_terminal
+        {
             match self.store.get(decision_receipt_id)? {
                 Some(legacy)
                     if extract_decision_hash(&legacy.effects).as_deref() == Some(decision_hash) =>

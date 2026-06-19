@@ -621,6 +621,66 @@ async fn test_federation_legacy_record_does_not_collapse_distinct_same_receipt_d
     assert_eq!(a.status, ExecutionStatus::Confirmed);
 }
 
+/// Issue #2095 / Codex P2 (#2096): when BOTH a canonical hash-keyed record and a
+/// stale legacy receipt-keyed record exist for the same decision, the canonical
+/// terminal record wins.
+///
+/// This state is only reachable if a node ran an intermediate hash-keying build
+/// (which created the canonical row) before the legacy-key compatibility fix
+/// landed, leaving a stale non-terminal receipt-keyed row alongside a terminal
+/// hash-keyed row. A replay must dedupe on the terminal canonical record, not
+/// re-dispatch under the stale legacy key.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_federation_canonical_terminal_record_wins_over_legacy() {
+    use icn_core::supervisor::decision_executor::create_decision_executor_callback;
+
+    let (executor, exec_store) = make_executor();
+
+    let receipt_id = "receipt-both-rows";
+    let decision_hash = "sha256:fed-both-rows";
+
+    // Canonical hash-keyed record for the decision: terminal (Confirmed).
+    let mut canonical = ExecutionRecord::new_pending(
+        decision_hash,
+        "proposal-canonical",
+        receipt_id,
+        terminate_clearing_effect(decision_hash, "canonical"),
+    );
+    canonical.status = ExecutionStatus::Confirmed;
+    exec_store.put(&canonical).unwrap();
+
+    // Stale legacy receipt-keyed record for the SAME decision: still non-terminal.
+    let mut legacy = ExecutionRecord::new_pending(
+        receipt_id,
+        "proposal-legacy",
+        receipt_id,
+        terminate_clearing_effect(decision_hash, "legacy"),
+    );
+    legacy.status = ExecutionStatus::Failed;
+    legacy.retries = 1;
+    exec_store.put(&legacy).unwrap();
+
+    let callback = create_decision_executor_callback(executor);
+    callback(
+        terminate_clearing_effect(decision_hash, "replay"),
+        receipt_id.to_string(),
+    );
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    // The terminal canonical record wins: the stale legacy record is NOT
+    // re-dispatched (its status and retry count are untouched).
+    let legacy_after = exec_store.get(receipt_id).unwrap().unwrap();
+    assert_eq!(
+        legacy_after.status,
+        ExecutionStatus::Failed,
+        "stale legacy record must not be re-dispatched when the canonical record is terminal"
+    );
+    assert_eq!(
+        legacy_after.retries, 1,
+        "stale legacy record retry count must be untouched"
+    );
+}
+
 /// Test 3: Startup recovery picks up an Executing record and completes it.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_startup_recovery_completes_executing_decision() {
