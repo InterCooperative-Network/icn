@@ -25,10 +25,19 @@ env:
   # Scope controls for staged boundary enforcement
   GATE_RATCHET_KERNEL_DEPS_SCOPE: core-only
 
+permissions:
+  contents: read
+
 jobs:
   changes:
     name: Change Scope
     runs-on: ubuntu-latest
+    # Job-level elevation: dorny/paths-filter uses the PR API in pull_request
+    # mode and documents a pull-requests:read requirement. Kept here so the
+    # workflow's top-level contents:read default stays minimal for other jobs.
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
       has_rust: ${{ steps.filter.outputs.has_rust }}

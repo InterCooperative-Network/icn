@@ -18,6 +18,9 @@ on:
       - 'scripts/check-mcp-portability.py'
       - '.github/workflows/mcp-portability.yml'
 
+permissions:
+  contents: read
+
 jobs:
   mcp-portability:
     runs-on: ubuntu-latest
