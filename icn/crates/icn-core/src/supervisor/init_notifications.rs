@@ -64,6 +64,10 @@ pub struct NotificationDeps {
     pub profile_cache: ProfileCache,
     /// Cooperative store
     pub coop_store: Arc<icn_coop::CoopStore>,
+    /// Canonical `coop_id ↔ EntityId` name-binding store (non-authoritative).
+    /// Used to mirror the activation-time bind when an activated coop is synced
+    /// from a peer, keeping the resolver node-independent.
+    pub coop_entity_map: icn_coop::CoopEntityMapHandle,
     /// Community store for civic engine sync
     pub community_store: CommunityStoreHandle,
     /// Optional federation handler
@@ -706,7 +710,18 @@ pub async fn handle_node_profile(
 }
 
 /// Handle cooperative update messages
-pub async fn handle_coop_update(entry_data: Vec<u8>, coop_store: Arc<icn_coop::CoopStore>) {
+///
+/// When a peer gossips an **activated** cooperative, the receiving node records
+/// the same canonical `coop_id ↔ EntityId` name binding that the activating node
+/// made locally, so the resolver exposed via `CoopServices.coop_entity_map` is
+/// node-independent. The bind is deterministic, idempotent, non-authoritative,
+/// and non-fatal — a bind failure (including the common non-mappable case) never
+/// blocks the gossip sync.
+pub async fn handle_coop_update(
+    entry_data: Vec<u8>,
+    coop_store: Arc<icn_coop::CoopStore>,
+    coop_entity_map: Option<icn_coop::CoopEntityMapHandle>,
+) {
     match icn_encoding::decode::<icn_coop::Cooperative>(&entry_data) {
         Ok(coop) => {
             let existing = coop_store.get_cooperative(&coop.id);
@@ -729,6 +744,48 @@ pub async fn handle_coop_update(entry_data: Vec<u8>, coop_store: Arc<icn_coop::C
                     coop_name = %coop.name,
                     "Synced cooperative from gossip"
                 );
+
+                // Mirror the activation-time bind for activated coops only, so a
+                // peer records exactly the bindings the origin recorded (no more,
+                // no less). Same deterministic helper as the local path.
+                if coop.status == icn_coop::CoopStatus::Active {
+                    if let Some(ref map) = coop_entity_map {
+                        match icn_coop::bind_coop_entity_map(map.as_ref(), &coop.id) {
+                            icn_coop::EntityMapBindOutcome::Mapped(entity_id) => debug!(
+                                target: "coop_entity_bind",
+                                coop_id = %coop.id,
+                                entity_id = %entity_id,
+                                outcome = "mapped",
+                                source = "gossip",
+                                "bound coop_id to cooperative EntityId from gossip sync (name binding only; grants no authority)"
+                            ),
+                            icn_coop::EntityMapBindOutcome::NotMappable(reason) => debug!(
+                                target: "coop_entity_bind",
+                                coop_id = %coop.id,
+                                outcome = "not_mappable",
+                                source = "gossip",
+                                reason = %reason,
+                                "synced coop_id is not a mappable cooperative EntityId slug; left unbound"
+                            ),
+                            icn_coop::EntityMapBindOutcome::Conflict(reason) => warn!(
+                                target: "coop_entity_bind",
+                                coop_id = %coop.id,
+                                outcome = "conflict",
+                                source = "gossip",
+                                reason = %reason,
+                                "coop_id/entity mapping conflict during gossip sync; binding skipped"
+                            ),
+                            icn_coop::EntityMapBindOutcome::StorageError(reason) => warn!(
+                                target: "coop_entity_bind",
+                                coop_id = %coop.id,
+                                outcome = "storage_error",
+                                source = "gossip",
+                                reason = %reason,
+                                "coop_entity_map bind failed during gossip sync; binding skipped"
+                            ),
+                        }
+                    }
+                }
             }
         }
         Err(e) => {
@@ -998,8 +1055,9 @@ pub fn create_notification_callback(
         } else if topic == init_coop::COOP_UPDATES_TOPIC {
             if let Some(data) = entry_data {
                 let coop_store = deps.coop_store.clone();
+                let coop_entity_map = deps.coop_entity_map.clone();
                 tokio::spawn(async move {
-                    handle_coop_update(data, coop_store).await;
+                    handle_coop_update(data, coop_store, Some(coop_entity_map)).await;
                 });
             }
         } else if topic == icn_community::COMMUNITY_TOPIC {
@@ -1154,5 +1212,92 @@ mod tests {
             forwarded,
             "matching author/submitter must pass the guard (returns true even when handle is None)"
         );
+    }
+
+    // === Coop-update gossip path binds the canonical entity map (#2082 PR2) ===
+    //
+    // A coop activated on one node is gossiped to peers; the receiving node must
+    // record the same deterministic, non-authoritative coop_id -> EntityId binding
+    // so the canonical resolver is node-independent.
+
+    fn coop_store_and_map() -> (
+        tempfile::TempDir,
+        Arc<icn_coop::CoopStore>,
+        Arc<icn_entity::InMemoryCoopEntityMap>,
+    ) {
+        let dir = tempfile::tempdir().unwrap();
+        let sled_store = icn_store::SledStore::open(dir.path()).unwrap();
+        let db = Arc::new(sled_store.db().clone());
+        let coop_store = Arc::new(icn_coop::CoopStore::new(db));
+        let map = Arc::new(icn_entity::InMemoryCoopEntityMap::new());
+        // Return `dir` so the temp directory outlives the open sled handle.
+        (dir, coop_store, map)
+    }
+
+    #[tokio::test]
+    async fn test_coop_update_binds_active_mappable_coop() {
+        use icn_entity::{CoopEntityMap, EntityId};
+        let (_dir, coop_store, map) = coop_store_and_map();
+        let map_handle: icn_coop::CoopEntityMapHandle = map.clone();
+
+        let mut coop = icn_coop::Cooperative::new_with_id(
+            "synced-coop".to_string(),
+            "Synced Coop".to_string(),
+            icn_coop::CoopType::Worker,
+        );
+        coop.status = icn_coop::CoopStatus::Active;
+        let data = icn_encoding::encode(&coop).unwrap();
+
+        handle_coop_update(data, coop_store.clone(), Some(map_handle)).await;
+
+        // Saved AND bound through the canonical map.
+        assert!(coop_store.get_cooperative("synced-coop").is_ok());
+        assert_eq!(
+            map.entity_for_coop("synced-coop").unwrap(),
+            Some(EntityId::cooperative("synced-coop").unwrap())
+        );
+    }
+
+    #[tokio::test]
+    async fn test_coop_update_does_not_bind_forming_coop() {
+        use icn_entity::CoopEntityMap;
+        let (_dir, coop_store, map) = coop_store_and_map();
+        let map_handle: icn_coop::CoopEntityMapHandle = map.clone();
+
+        // A Forming coop is not yet activated; the origin does not bind it, so a
+        // peer must not bind it either (keeps the map symmetric across nodes).
+        let coop = icn_coop::Cooperative::new_with_id(
+            "forming-coop".to_string(),
+            "Forming Coop".to_string(),
+            icn_coop::CoopType::Worker,
+        );
+        assert_eq!(coop.status, icn_coop::CoopStatus::Forming);
+        let data = icn_encoding::encode(&coop).unwrap();
+
+        handle_coop_update(data, coop_store.clone(), Some(map_handle)).await;
+
+        assert!(coop_store.get_cooperative("forming-coop").is_ok());
+        assert_eq!(map.entity_for_coop("forming-coop").unwrap(), None);
+    }
+
+    #[tokio::test]
+    async fn test_coop_update_active_non_mappable_saved_but_not_bound() {
+        use icn_entity::CoopEntityMap;
+        let (_dir, coop_store, map) = coop_store_and_map();
+        let map_handle: icn_coop::CoopEntityMapHandle = map.clone();
+
+        // Default id is `coop:<uuid>` (non-mappable). Activation-sync must still
+        // save the coop and must not fail or bind.
+        let mut coop =
+            icn_coop::Cooperative::new("Default Id Coop".to_string(), icn_coop::CoopType::Worker);
+        coop.status = icn_coop::CoopStatus::Active;
+        let coop_id = coop.id.clone();
+        assert!(coop_id.starts_with("coop:"));
+        let data = icn_encoding::encode(&coop).unwrap();
+
+        handle_coop_update(data, coop_store.clone(), Some(map_handle)).await;
+
+        assert!(coop_store.get_cooperative(&coop_id).is_ok());
+        assert_eq!(map.entity_for_coop(&coop_id).unwrap(), None);
     }
 }

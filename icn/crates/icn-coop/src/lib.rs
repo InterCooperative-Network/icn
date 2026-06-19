@@ -18,7 +18,8 @@ pub mod store;
 pub mod types;
 
 pub use actor::{
-    CoopActor, CoopEntityMapHandle, CoopMessage, GossipHandle, TreasuryManagerHandle, COOP_TOPIC,
+    bind_coop_entity_map, CoopActor, CoopEntityMapHandle, CoopMessage, EntityMapBindOutcome,
+    GossipHandle, TreasuryManagerHandle, COOP_TOPIC,
 };
 pub use handle::CoopHandle;
 pub use lifecycle::{

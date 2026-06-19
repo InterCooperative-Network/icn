@@ -33,9 +33,11 @@ pub type CoopEntityMapHandle = Arc<dyn CoopEntityMap + Send + Sync>;
 /// [`CoopEntityMap`] during cooperative activation.
 ///
 /// This is an **observability signal only**. A mapping bind never gates
-/// activation success, and a binding confers no authority.
+/// activation success, and a binding confers no authority. Shared by the local
+/// activation handler and the gossip coop-update sync path so both perform the
+/// same deterministic bind.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum EntityMapBindOutcome {
+pub enum EntityMapBindOutcome {
     /// `coop_id` was bound (or was already bound) to this cooperative `EntityId`.
     Mapped(EntityId),
     /// `coop_id` is not a valid cooperative `EntityId` slug, so it was left
@@ -53,8 +55,10 @@ pub(crate) enum EntityMapBindOutcome {
 /// Returns the [`EntityMapBindOutcome`] without ever propagating an error: a
 /// mapping bind is an observability side effect and must not fail activation.
 /// `bind_projected` is idempotent for an identical pair, so repeated binds are
-/// safe.
-pub(crate) fn bind_coop_entity_map(
+/// safe. Used by both cooperative activation and the gossip coop-update sync
+/// path so a binding is recorded deterministically on every node that accepts an
+/// activated cooperative.
+pub fn bind_coop_entity_map(
     map: &(dyn CoopEntityMap + Send + Sync),
     coop_id: &str,
 ) -> EntityMapBindOutcome {
