@@ -56,11 +56,12 @@ pub enum CoopEntityClass {
     NonMappable,
     /// The persisted state for this `coop_id` is not trustworthy: either a map
     /// read failed (I/O, lock poison, decode error), or the mapping is
-    /// internally inconsistent — a forward binding exists whose reverse index
-    /// is missing or points at a *different* `coop_id`. Atomic binds keep a
-    /// healthy map consistent, so this signals corruption or a partial write,
-    /// which a pre-mutation inventory must surface distinctly from
-    /// [`AlreadyBound`].
+    /// internally inconsistent — a *one-sided* binding where only one of the
+    /// forward/reverse indexes is present (forward-only, or reverse-only), or
+    /// where a present forward binding's reverse index points at a *different*
+    /// `coop_id`. Atomic binds keep a healthy map consistent, so this signals
+    /// corruption or a partial write, which a pre-mutation inventory must
+    /// surface distinctly from [`AlreadyBound`] and [`MappableUnbound`].
     StorageError,
 }
 
@@ -219,8 +220,8 @@ fn classify_one(coop_id: &str, map: &dyn CoopEntityMap) -> CoopEntityInventoryEn
         }
     };
 
-    // Mappable + unbound: is the projected EntityId already taken by a
-    // different coop_id (which would make a bind conflict)?
+    // Mappable, with no forward binding: inspect the projected EntityId's
+    // reverse index.
     match map.coop_for_entity(&projected) {
         Err(e) => base(
             CoopEntityClass::StorageError,
@@ -229,16 +230,36 @@ fn classify_one(coop_id: &str, map: &dyn CoopEntityMap) -> CoopEntityInventoryEn
             None,
             Some(e.to_string()),
         ),
-        Ok(Some(other)) if other != coop_id => base(
+        // Reverse points back at this coop_id while the forward index is empty:
+        // a one-sided (reverse-only) binding, the mirror of the forward-only
+        // case above. Atomic binds keep both indexes in step, so this is
+        // corruption/partial state — surface it as StorageError rather than
+        // reporting the target as free (a later bind would silently repair the
+        // missing forward entry instead of operating on a truly unbound pair).
+        Ok(Some(occupant)) if occupant.as_str() == coop_id => {
+            let msg = format!(
+                "inconsistent mapping: reverse index maps {projected} -> {coop_id:?}, \
+                 but no forward binding for {coop_id:?} exists"
+            );
+            base(
+                CoopEntityClass::StorageError,
+                Some(projected),
+                None,
+                Some(occupant),
+                Some(msg),
+            )
+        }
+        // A different coop_id legitimately occupies the projected EntityId
+        // (its own forward+reverse are consistent): a naive bind would conflict.
+        Ok(Some(other)) => base(
             CoopEntityClass::MappableReverseConflict,
             Some(projected),
             None,
             Some(other),
             None,
         ),
-        // No reverse occupant, or a (degenerate) reverse pointing back at us
-        // while the forward index is empty: binding would succeed/be idempotent.
-        Ok(_) => base(
+        // Reverse index is free and forward is empty: a truly unbound, bindable pair.
+        Ok(None) => base(
             CoopEntityClass::MappableUnbound,
             Some(projected),
             None,
@@ -345,6 +366,23 @@ mod tests {
         assert_eq!(inv.already_bound, 1);
         assert_eq!(inv.storage_error, 0);
         assert_eq!(inv.entries[0].class, CoopEntityClass::AlreadyBound);
+    }
+
+    #[test]
+    fn reverse_only_without_forward_classifies_as_storage_error() {
+        // One-sided: no forward binding, but the projected entity's reverse
+        // index points back at this coop_id (corruption mirror of forward-only).
+        let map = FakeMap {
+            forward: None,
+            reverse: Some("ghost-coop".to_string()),
+        };
+        let inv = classify_coop_ids(ids(&["ghost-coop"]), &map);
+        assert_eq!(inv.storage_error, 1);
+        assert_eq!(inv.mappable_unbound, 0);
+        let entry = &inv.entries[0];
+        assert_eq!(entry.class, CoopEntityClass::StorageError);
+        assert_eq!(entry.projected_entity_id, Some(coop_eid("ghost-coop")));
+        assert!(entry.error.is_some());
     }
 
     #[test]
