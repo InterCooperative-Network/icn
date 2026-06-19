@@ -818,13 +818,19 @@ pub fn create_decision_executor_callback_with_sink(
     })
 }
 
-/// Extract the governance `decision_hash` from the first effect that carries a
-/// non-empty one, scanning in order. Used as the executor idempotency key.
+/// Extract the governance `decision_hash` to use as the executor idempotency
+/// key, taking it from the first *supported* effect variant (scanning in order)
+/// that carries a non-empty hash.
 ///
-/// Both Treasury and Federation effects embed a `decision_hash` (the latter
-/// since #2093/#2094). Empty/legacy hashes are skipped so the caller falls back
-/// to `decision_receipt_id`, preserving backward compatibility for pre-#2094
-/// serialized effects.
+/// "Supported" is a deliberately narrow allow-list, not every variant that has
+/// a `decision_hash` field: only `TreasuryEffect::{Spend, CreateBudget,
+/// ReleaseEscrow}` and `FederationEffect::{SettleClearing, TerminateClearing,
+/// RevokeVouch}` (the latter carried since #2093/#2094). Other variants and
+/// effect families that also embed `decision_hash` (e.g. the remaining Treasury
+/// variants, or Membership effects) are intentionally not consulted here;
+/// widening the allow-list is a deliberate change, not an oversight. Empty/legacy
+/// hashes are skipped so the caller falls back to `decision_receipt_id`,
+/// preserving backward compatibility for pre-#2094 serialized effects.
 fn extract_decision_hash(effects: &[KernelEffect]) -> Option<String> {
     use icn_kernel_api::effects::{FederationEffect, TreasuryEffect};
     for effect in effects {
