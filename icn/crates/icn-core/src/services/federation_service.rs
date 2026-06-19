@@ -291,13 +291,14 @@ impl FederationServiceImpl {
     /// not an authorization gate, so absence weakens provenance entropy rather
     /// than denying the operation.
     ///
-    /// NOTE: on the main `KernelEffect::Federation` path the bound value is
-    /// currently empty: `FederationEffect::TerminateClearing` carries no
-    /// `decision_hash` field, so `federation_effect_to_operation` sets it to
-    /// `None` and the executor passes `unwrap_or_default()`. This helper makes
-    /// the hash bind `decision_hash` whenever a caller supplies one; propagating
-    /// the canonical decision hash through the federation effect itself is a
-    /// tracked follow-up (see PR #2093 discussion).
+    /// On the main `KernelEffect::Federation` path the bound value is now
+    /// non-empty for governance-authorized terminations:
+    /// `FederationEffect::TerminateClearing` carries a `decision_hash` field,
+    /// `federation_effect_to_operation` forwards it as `Some(..)`, and the
+    /// executor threads it into this request — completing the canonical-path
+    /// propagation that the #2093 binding (above) depended on. An empty
+    /// `decision_hash` (legacy/unset) still folds as empty bytes per the policy
+    /// above; it is tolerated, not rejected.
     fn compute_terminate_clearing_hash(
         request: &FederationTerminateClearingRequest,
         agreement_id: &str,

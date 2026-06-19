@@ -364,6 +364,11 @@ pub enum FederationEffect {
         partner_coop_did: String,
         /// Human-readable reason for audit trail.
         reason: String,
+        /// Canonical hash of the governance decision authorizing this
+        /// termination, bound into the operation's provenance hash for audit.
+        /// Empty string for legacy/backwards-compatible serialized effects.
+        #[serde(default)]
+        decision_hash: String,
     },
     /// Revoke a previously-issued vouch for another cooperative.
     ///
@@ -376,6 +381,11 @@ pub enum FederationEffect {
         target_coop_did: String,
         /// Human-readable reason for audit trail.
         reason: String,
+        /// Canonical hash of the governance decision authorizing this
+        /// revocation, bound into the operation's provenance hash for audit.
+        /// Empty string for legacy/backwards-compatible serialized effects.
+        #[serde(default)]
+        decision_hash: String,
     },
 }
 
@@ -715,6 +725,70 @@ pub trait DispatchEvidenceSink: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn terminate_clearing_deserializes_legacy_record_without_decision_hash() {
+        // Pre-fix serialized effects carry no `decision_hash`. `#[serde(default)]`
+        // must let them deserialize to an empty hash (load-bearing for the
+        // federated two-node pilot, which serde-round-trips FederationEffect).
+        let legacy = r#"{
+            "federation_action": "terminate_clearing",
+            "initiating_coop_did": "coop-alpha",
+            "partner_coop_did": "coop-beta",
+            "reason": "persistent imbalance"
+        }"#;
+        let effect: FederationEffect = serde_json::from_str(legacy).unwrap();
+        match effect {
+            FederationEffect::TerminateClearing { decision_hash, .. } => {
+                assert_eq!(
+                    decision_hash, "",
+                    "legacy record must default to empty hash"
+                );
+            }
+            other => panic!("expected TerminateClearing, got {other:?}"),
+        }
+
+        // Round-trip with a populated hash preserves it.
+        let populated = FederationEffect::TerminateClearing {
+            initiating_coop_did: "coop-alpha".to_string(),
+            partner_coop_did: "coop-beta".to_string(),
+            reason: "persistent imbalance".to_string(),
+            decision_hash: "sha256:decision-a".to_string(),
+        };
+        let json = serde_json::to_string(&populated).unwrap();
+        let parsed: FederationEffect = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, populated);
+    }
+
+    #[test]
+    fn revoke_vouch_deserializes_legacy_record_without_decision_hash() {
+        let legacy = r#"{
+            "federation_action": "revoke_vouch",
+            "revoker_did": "coop-alpha",
+            "target_coop_did": "coop-gamma",
+            "reason": "governance misconduct"
+        }"#;
+        let effect: FederationEffect = serde_json::from_str(legacy).unwrap();
+        match effect {
+            FederationEffect::RevokeVouch { decision_hash, .. } => {
+                assert_eq!(
+                    decision_hash, "",
+                    "legacy record must default to empty hash"
+                );
+            }
+            other => panic!("expected RevokeVouch, got {other:?}"),
+        }
+
+        let populated = FederationEffect::RevokeVouch {
+            revoker_did: "coop-alpha".to_string(),
+            target_coop_did: "coop-gamma".to_string(),
+            reason: "governance misconduct".to_string(),
+            decision_hash: "sha256:decision-b".to_string(),
+        };
+        let json = serde_json::to_string(&populated).unwrap();
+        let parsed: FederationEffect = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, populated);
+    }
 
     #[test]
     fn kernel_effect_subsystem_labels_are_stable_lowercase() {
