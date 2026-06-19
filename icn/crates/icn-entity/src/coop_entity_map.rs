@@ -57,6 +57,13 @@ pub enum CoopEntityMapError {
     #[error("coop_id is not mappable to a cooperative EntityId (reject, do not normalize): {0}")]
     NotMappable(String),
 
+    /// The supplied `entity_id` is not a cooperative [`EntityId`]. A flat
+    /// `coop_id` denotes a cooperative target (RFC-0018 invariant), so binding
+    /// it to a community, federation, or individual entity is refused before
+    /// either index is written.
+    #[error("coop/entity binding requires a cooperative EntityId: {0}")]
+    InvalidEntityType(String),
+
     /// The requested binding conflicts with an existing one (in either
     /// direction): the `coop_id` is already bound to a different `EntityId`,
     /// or the `EntityId` is already bound to a different `coop_id`.
@@ -159,6 +166,15 @@ impl CoopEntityMap for InMemoryCoopEntityMap {
         // slugs, so a non-mappable coop_id is refused rather than rewritten.
         project_coop_id(coop_id)?;
 
+        // A flat coop_id denotes a cooperative target (RFC-0018): refuse to bind
+        // a non-cooperative entity_id before touching either index.
+        if !entity_id.is_cooperative() {
+            return Err(CoopEntityMapError::InvalidEntityType(format!(
+                "{entity_id} has type {}",
+                entity_id.entity_type()
+            )));
+        }
+
         let mut inner = self
             .inner
             .write()
@@ -252,6 +268,15 @@ impl CoopEntityMap for SledCoopEntityMap {
     fn bind_exact(&self, coop_id: &str, entity_id: &EntityId) -> Result<(), CoopEntityMapError> {
         // Reject-not-normalize gate (same invariant as the in-memory map).
         project_coop_id(coop_id)?;
+
+        // A flat coop_id denotes a cooperative target (RFC-0018): refuse to bind
+        // a non-cooperative entity_id before the transaction writes either index.
+        if !entity_id.is_cooperative() {
+            return Err(CoopEntityMapError::InvalidEntityType(format!(
+                "{entity_id} has type {}",
+                entity_id.entity_type()
+            )));
+        }
 
         let fkey = forward_key(coop_id);
         let rkey = reverse_key(entity_id);
@@ -592,5 +617,75 @@ mod tests {
             None,
             "rejected bind must not leave a one-sided reverse write"
         );
+    }
+
+    // ------------------------------------------------------------------
+    // Non-cooperative entity_id rejection
+    // (RFC-0018 invariant: a flat coop_id denotes a cooperative target)
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_inmem_bind_exact_rejects_community_entity() {
+        let map = InMemoryCoopEntityMap::new();
+        let community = EntityId::community("some-community").unwrap();
+        assert!(matches!(
+            map.bind_exact("coop-a", &community),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+    }
+
+    #[test]
+    fn test_inmem_bind_exact_rejects_federation_entity() {
+        let map = InMemoryCoopEntityMap::new();
+        let federation = EntityId::federation("some-federation").unwrap();
+        assert!(matches!(
+            map.bind_exact("coop-a", &federation),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+    }
+
+    #[test]
+    fn test_inmem_bind_exact_rejects_individual_entity() {
+        use icn_identity::KeyPair;
+        let map = InMemoryCoopEntityMap::new();
+        let kp = KeyPair::generate().unwrap();
+        let individual = EntityId::from_did(kp.did());
+        assert!(matches!(
+            map.bind_exact("coop-a", &individual),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+    }
+
+    #[test]
+    fn test_sled_bind_exact_rejects_community_entity() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        let community = EntityId::community("some-community").unwrap();
+        assert!(matches!(
+            map.bind_exact("coop-a", &community),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+    }
+
+    #[test]
+    fn test_sled_bind_exact_rejects_federation_entity() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        let federation = EntityId::federation("some-federation").unwrap();
+        assert!(matches!(
+            map.bind_exact("coop-a", &federation),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+    }
+
+    #[test]
+    fn test_sled_rejecting_non_cooperative_writes_no_index() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        let community = EntityId::community("some-community").unwrap();
+        assert!(matches!(
+            map.bind_exact("coop-a", &community),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+        // The rejection must happen before any write: neither index exists.
+        assert_eq!(map.entity_for_coop("coop-a").unwrap(), None);
+        assert_eq!(map.coop_for_entity(&community).unwrap(), None);
     }
 }

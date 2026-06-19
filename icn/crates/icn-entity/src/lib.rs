@@ -66,6 +66,7 @@
 //! # Modules
 //!
 //! - [`entity`] - Core types: `EntityId`, `EntityType`, `CooperativeEntity`
+//! - [`coop_entity_map`] - Canonical reversible `coop_id ↔ EntityId` mapping store
 //! - [`labor_exchange`] - Labor exchange types for worker mobility
 //! - [`membership`] - Membership types: `Membership`, `MembershipRole`
 //! - [`registry`] - Registry trait and in-memory implementation
