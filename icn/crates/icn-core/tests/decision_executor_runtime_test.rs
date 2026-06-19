@@ -18,7 +18,7 @@ use icn_governance::{ProposalPayload, TreasuryProposalOperation};
 use icn_governance_actor::translate_payload_to_effects;
 use icn_identity::Did;
 use icn_kernel_api::budget::{BudgetRecord, BudgetStore};
-use icn_kernel_api::effects::{KernelEffect, TreasuryEffect};
+use icn_kernel_api::effects::{FederationEffect, KernelEffect, TreasuryEffect};
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
 use icn_kernel_api::protocol_params::StubParamStore;
 use icn_kernel_api::services::LedgerEvent;
@@ -297,6 +297,20 @@ fn content_hash_from_hex(hash_hex: &str) -> Result<ContentHash> {
     Ok(ContentHash::from_bytes(bytes))
 }
 
+/// A federation-only effect batch carrying a governance `decision_hash`
+/// (since #2094). Used to exercise the executor idempotency-key path for
+/// federation decisions (#2095).
+fn terminate_clearing_effect(decision_hash: &str, reason: &str) -> Vec<KernelEffect> {
+    vec![KernelEffect::Federation(
+        FederationEffect::TerminateClearing {
+            initiating_coop_did: "coop-a".to_string(),
+            partner_coop_did: "coop-b".to_string(),
+            reason: reason.to_string(),
+            decision_hash: decision_hash.to_string(),
+        },
+    )]
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -387,6 +401,72 @@ async fn test_callback_idempotent_no_double_execute() {
     // Still confirmed, not re-executed
     let record2 = exec_store.get("hash-idem-1").unwrap().unwrap();
     assert_eq!(record2.status, ExecutionStatus::Confirmed);
+}
+
+/// Issue #2095: federation-only decisions are keyed by their propagated
+/// `decision_hash`, not by `decision_receipt_id`.
+///
+/// Two federation decisions that share a `decision_receipt_id` but carry
+/// distinct `decision_hash` values must BOTH be recorded independently. Before
+/// the fix, `extract_decision_hash` ignored federation effects, so both
+/// collapsed onto the shared receipt id and the second deduped against the
+/// first — exactly the replay hazard #2093/#2094 set out to remove.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_federation_same_receipt_different_hash_not_deduped() {
+    use icn_core::supervisor::decision_executor::create_decision_executor_callback;
+
+    let (executor, exec_store) = make_executor();
+    let callback = create_decision_executor_callback(executor);
+
+    // Same receipt id, two distinct federation decision hashes.
+    callback(
+        terminate_clearing_effect("sha256:fed-decision-a", "first"),
+        "receipt-shared".to_string(),
+    );
+    callback(
+        terminate_clearing_effect("sha256:fed-decision-b", "second"),
+        "receipt-shared".to_string(),
+    );
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    // Each decision is recorded under its own decision_hash key, proving the
+    // idempotency key reflects the federation decision_hash.
+    assert!(
+        exec_store.get("sha256:fed-decision-a").unwrap().is_some(),
+        "first federation decision must be recorded under its decision_hash"
+    );
+    assert!(
+        exec_store.get("sha256:fed-decision-b").unwrap().is_some(),
+        "second federation decision must be recorded under its decision_hash"
+    );
+    // The shared receipt id is NOT the idempotency key when a non-empty
+    // federation decision_hash is present (it would have collapsed the two).
+    assert!(
+        exec_store.get("receipt-shared").unwrap().is_none(),
+        "receipt id must not key the record when a federation decision_hash is present"
+    );
+}
+
+/// Issue #2095: an empty/legacy federation `decision_hash` preserves prior
+/// behavior — the executor falls back to `decision_receipt_id` as the
+/// idempotency key (no regression for pre-#2094 serialized effects).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_federation_empty_hash_falls_back_to_receipt() {
+    use icn_core::supervisor::decision_executor::create_decision_executor_callback;
+
+    let (executor, exec_store) = make_executor();
+    let callback = create_decision_executor_callback(executor);
+
+    callback(
+        terminate_clearing_effect("", "legacy"),
+        "receipt-legacy".to_string(),
+    );
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    assert!(
+        exec_store.get("receipt-legacy").unwrap().is_some(),
+        "empty federation decision_hash must fall back to the receipt id key"
+    );
 }
 
 /// Test 3: Startup recovery picks up an Executing record and completes it.
