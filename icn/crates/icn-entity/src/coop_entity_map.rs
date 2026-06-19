@@ -95,6 +95,30 @@ pub fn project_coop_id(coop_id: &str) -> Result<EntityId, CoopEntityMapError> {
         .map_err(|e| CoopEntityMapError::NotMappable(format!("{coop_id:?}: {e}")))
 }
 
+/// Validate that `entity_id` is a **well-formed cooperative** [`EntityId`].
+///
+/// [`EntityId`] derives `Deserialize` as a raw newtype, so an instance obtained
+/// from serde/backfill data (rather than the validating constructors) can carry
+/// a malformed inner string whose type tag still reads as `cooperative` — e.g.
+/// `entity:icn:cooperative:BAD_slug`, where [`EntityId::is_cooperative`] is
+/// `true` but the slug is invalid. Re-parsing via [`EntityId::from_str`] re-runs
+/// slug validation, so a value that `entity_for_coop` would later fail to read
+/// back is rejected here before any index is written.
+fn validate_cooperative_entity_id(entity_id: &EntityId) -> Result<(), CoopEntityMapError> {
+    let parsed = EntityId::from_str(entity_id.as_str()).map_err(|e| {
+        CoopEntityMapError::InvalidEntityType(format!(
+            "{entity_id} is not a well-formed EntityId: {e}"
+        ))
+    })?;
+    if !parsed.is_cooperative() {
+        return Err(CoopEntityMapError::InvalidEntityType(format!(
+            "{entity_id} has type {}",
+            parsed.entity_type()
+        )));
+    }
+    Ok(())
+}
+
 /// A canonical, reversible `coop_id ↔ EntityId` mapping store.
 ///
 /// Implementations persist a bidirectional binding. Binding is idempotent for an
@@ -167,13 +191,8 @@ impl CoopEntityMap for InMemoryCoopEntityMap {
         project_coop_id(coop_id)?;
 
         // A flat coop_id denotes a cooperative target (RFC-0018): refuse to bind
-        // a non-cooperative entity_id before touching either index.
-        if !entity_id.is_cooperative() {
-            return Err(CoopEntityMapError::InvalidEntityType(format!(
-                "{entity_id} has type {}",
-                entity_id.entity_type()
-            )));
-        }
+        // anything but a well-formed cooperative entity_id before touching either index.
+        validate_cooperative_entity_id(entity_id)?;
 
         let mut inner = self
             .inner
@@ -270,13 +289,8 @@ impl CoopEntityMap for SledCoopEntityMap {
         project_coop_id(coop_id)?;
 
         // A flat coop_id denotes a cooperative target (RFC-0018): refuse to bind
-        // a non-cooperative entity_id before the transaction writes either index.
-        if !entity_id.is_cooperative() {
-            return Err(CoopEntityMapError::InvalidEntityType(format!(
-                "{entity_id} has type {}",
-                entity_id.entity_type()
-            )));
-        }
+        // anything but a well-formed cooperative entity_id before the transaction writes either index.
+        validate_cooperative_entity_id(entity_id)?;
 
         let fkey = forward_key(coop_id);
         let rkey = reverse_key(entity_id);
@@ -687,5 +701,42 @@ mod tests {
         // The rejection must happen before any write: neither index exists.
         assert_eq!(map.entity_for_coop("coop-a").unwrap(), None);
         assert_eq!(map.coop_for_entity(&community).unwrap(), None);
+    }
+
+    // ------------------------------------------------------------------
+    // Malformed cooperative EntityId rejection
+    // (EntityId derives Deserialize as a raw newtype, so serde/backfill data
+    // can carry a cooperative-typed id whose slug is invalid; it must not be
+    // bound, or the forward index would be unreadable via from_str.)
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn test_inmem_bind_exact_rejects_malformed_cooperative_entity_id() {
+        let map = InMemoryCoopEntityMap::new();
+        // Bypass the validating constructor: build a cooperative-typed id with
+        // an invalid slug straight from serde.
+        let malformed: EntityId =
+            serde_json::from_str("\"entity:icn:cooperative:BAD_slug\"").unwrap();
+        assert!(malformed.is_cooperative()); // type tag reads cooperative...
+        assert!(matches!(
+            map.bind_exact("coop-a", &malformed),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+        // ...but nothing was persisted.
+        assert_eq!(map.entity_for_coop("coop-a").unwrap(), None);
+    }
+
+    #[test]
+    fn test_sled_bind_exact_rejects_malformed_cooperative_entity_id() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        let malformed: EntityId =
+            serde_json::from_str("\"entity:icn:cooperative:BAD_slug\"").unwrap();
+        assert!(matches!(
+            map.bind_exact("coop-a", &malformed),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+        // Neither index written, and the forward lookup stays readable (None).
+        assert_eq!(map.entity_for_coop("coop-a").unwrap(), None);
+        assert_eq!(map.coop_for_entity(&malformed).unwrap(), None);
     }
 }
