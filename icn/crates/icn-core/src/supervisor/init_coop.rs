@@ -1,7 +1,8 @@
 //! Cooperative actor initialization
 
 use anyhow::Result;
-use icn_coop::{CoopActor, CoopHandle, CoopStore, TreasuryManagerHandle};
+use icn_coop::{CoopActor, CoopEntityMapHandle, CoopHandle, CoopStore, TreasuryManagerHandle};
+use icn_entity::SledCoopEntityMap;
 use icn_gossip::GossipActor;
 use icn_identity::Did;
 use icn_store::SledStore;
@@ -20,6 +21,12 @@ pub struct CoopServices {
     pub coop_handle: CoopHandle,
     /// Direct access to cooperative store (for potential gateway use)
     pub coop_store: Arc<CoopStore>,
+    /// Canonical `coop_id ↔ EntityId` name-binding store, shared with the actor.
+    ///
+    /// A binding is a name binding only and grants no authority. Exposed here so
+    /// the supervisor/gateway can resolve identifiers; it is **not** an
+    /// authorization surface.
+    pub coop_entity_map: CoopEntityMapHandle,
 }
 
 /// Initialize cooperative services
@@ -63,6 +70,12 @@ pub async fn init_coop_services_with_treasury(
     // CoopStore needs direct Sled Db access
     let db = Arc::new(sled_store.db().clone());
     let coop_store = CoopStore::new(db.clone());
+
+    // Canonical coop_id <-> EntityId name-binding store, backed by the SAME
+    // cooperative sled DB (no separate database). Populated during activation as
+    // a non-authoritative side effect (#2082): a binding grants no authority.
+    let coop_entity_map: CoopEntityMapHandle = Arc::new(SledCoopEntityMap::new(db.clone()));
+
     let coop_store_for_gateway = Arc::new(CoopStore::new(db));
 
     info!("Cooperative store initialized at {:?}", store_path);
@@ -78,8 +91,14 @@ pub async fn init_coop_services_with_treasury(
         }
     }
 
-    // Spawn CoopActor with store, gossip handle, and optional treasury manager
-    let tx = CoopActor::spawn_with_treasury(coop_store, Some(gossip_handle), treasury_manager);
+    // Spawn CoopActor with store, gossip handle, optional treasury manager, and
+    // the canonical coop_id <-> EntityId name-binding map (shared via Arc).
+    let tx = CoopActor::spawn_with_treasury_and_map(
+        coop_store,
+        Some(gossip_handle),
+        treasury_manager,
+        Some(coop_entity_map.clone()),
+    );
     let coop_handle = CoopHandle::new(tx);
 
     info!("✓ Cooperative actor spawned");
@@ -87,5 +106,6 @@ pub async fn init_coop_services_with_treasury(
     Ok(CoopServices {
         coop_handle,
         coop_store: coop_store_for_gateway,
+        coop_entity_map,
     })
 }

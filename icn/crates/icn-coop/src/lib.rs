@@ -17,7 +17,10 @@ pub mod store;
 /// Cooperative types and data structures
 pub mod types;
 
-pub use actor::{CoopActor, CoopMessage, GossipHandle, TreasuryManagerHandle, COOP_TOPIC};
+pub use actor::{
+    bind_coop_entity_map, CoopActor, CoopEntityMapHandle, CoopMessage, EntityMapBindOutcome,
+    GossipHandle, TreasuryManagerHandle, COOP_TOPIC,
+};
 pub use handle::CoopHandle;
 pub use lifecycle::{
     derive_treasury_anchor, derive_treasury_did, LifecycleEvent, LifecycleManager,
