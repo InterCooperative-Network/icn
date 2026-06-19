@@ -429,6 +429,33 @@ impl DecisionExecutor {
             }
         }
 
+        // 1b. Backward-compatibility idempotency across the #2094->#2096 upgrade
+        // window. Before federation effects carried an extractable `decision_hash`,
+        // a federation-only decision produced no hash, so the callback keyed its
+        // `ExecutionRecord` under `decision_receipt_id`. Now that the propagated
+        // federation hash is the primary idempotency key, a replay of that same
+        // accepted event would probe `store.get(decision_hash)` (just missed
+        // above), not find the legacy receipt-keyed record, and re-run the
+        // operation. When the key differs from the receipt id, also probe for a
+        // terminal record under the receipt id and dedupe against it. This is a
+        // read-only compatibility shim — no record migration — and is a no-op for
+        // decisions whose key never moved (empty-hash fallback sets
+        // `decision_hash == decision_receipt_id`; treasury decisions were always
+        // hash-keyed, so no receipt-keyed record exists for them).
+        if decision_hash != decision_receipt_id {
+            if let Some(legacy) = self.store.get(decision_receipt_id)? {
+                if legacy.is_terminal() {
+                    debug!(
+                        decision_hash = %decision_hash,
+                        receipt_id = %decision_receipt_id,
+                        status = ?legacy.status,
+                        "Decision already executed under legacy receipt-id key (pre-#2096), skipping"
+                    );
+                    return Ok(vec![]);
+                }
+            }
+        }
+
         // 2. Preserve existing record if present (retains retry count),
         //    otherwise create a new Pending record.
         let (mut record, status_before) = if let Some(existing) = self.store.get(decision_hash)? {

@@ -469,6 +469,55 @@ async fn test_federation_empty_hash_falls_back_to_receipt() {
     );
 }
 
+/// Issue #2095 / Codex P1 (#2096): replay safety across the #2094->#2096 upgrade
+/// window.
+///
+/// A node that processed a federation effect *before* this change keyed its
+/// terminal `ExecutionRecord` under `decision_receipt_id` (the old extractor
+/// returned `None`). After the change, a replay of that same accepted event
+/// extracts the propagated federation `decision_hash`; without a compatibility
+/// check the executor would probe `store.get(<decision_hash>)`, miss the legacy
+/// receipt-keyed record, and re-run the terminate/revoke/settle operation. The
+/// executor must detect the legacy terminal record and dedupe instead.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_federation_replay_dedupes_against_legacy_receipt_keyed_record() {
+    use icn_core::supervisor::decision_executor::create_decision_executor_callback;
+
+    let (executor, exec_store) = make_executor();
+
+    // Simulate a pre-#2096 terminal record keyed under the *receipt id* (because
+    // the old extractor ignored federation effects and the callback fell back to
+    // the receipt id as the idempotency key).
+    let receipt_id = "receipt-upgrade-legacy";
+    let mut legacy =
+        ExecutionRecord::new_pending(receipt_id, "proposal-legacy", receipt_id, vec![]);
+    legacy.status = ExecutionStatus::Confirmed;
+    exec_store.put(&legacy).unwrap();
+
+    let callback = create_decision_executor_callback(executor);
+
+    // Replay the same accepted event, now carrying the propagated federation hash.
+    callback(
+        terminate_clearing_effect("sha256:fed-legacy-hash", "replay"),
+        receipt_id.to_string(),
+    );
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    // No second record is created under the new decision_hash key (deduped
+    // against the legacy receipt-keyed record).
+    assert!(
+        exec_store.get("sha256:fed-legacy-hash").unwrap().is_none(),
+        "replay must not create a second record under the federation decision_hash"
+    );
+    // The legacy receipt-keyed record is untouched and still terminal.
+    let still = exec_store.get(receipt_id).unwrap().unwrap();
+    assert_eq!(
+        still.status,
+        ExecutionStatus::Confirmed,
+        "legacy receipt-keyed record must be preserved (not re-executed)"
+    );
+}
+
 /// Test 3: Startup recovery picks up an Executing record and completes it.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_startup_recovery_completes_executing_decision() {
