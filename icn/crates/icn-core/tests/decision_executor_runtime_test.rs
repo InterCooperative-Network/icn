@@ -681,6 +681,55 @@ async fn test_federation_canonical_terminal_record_wins_over_legacy() {
     );
 }
 
+/// Issue #2095 / Codex P2 (#2096): the canonical-terminal-wins rule must also
+/// hold on the startup recovery path.
+///
+/// `recover_in_flight` re-executes a stale non-terminal record under its stored
+/// key. For a legacy receipt-keyed row that key equals the receipt id, so the
+/// callback-path shadow (which keys on the extracted federation hash) is skipped.
+/// If a terminal canonical record exists for the same decision, recovery must
+/// dedupe against it via the stored effects' federation hash — not re-dispatch.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_recovery_honors_canonical_terminal_over_stale_legacy() {
+    let (executor, exec_store) = make_executor();
+
+    let receipt_id = "receipt-recover-both";
+    let decision_hash = "sha256:fed-recover-both";
+
+    // Terminal canonical record under the federation decision_hash.
+    let mut canonical = ExecutionRecord::new_pending(
+        decision_hash,
+        "proposal-canonical",
+        receipt_id,
+        terminate_clearing_effect(decision_hash, "canonical"),
+    );
+    canonical.status = ExecutionStatus::Confirmed;
+    exec_store.put(&canonical).unwrap();
+
+    // Stale legacy receipt-keyed row for the SAME decision, still Executing
+    // (the state recover_in_flight picks up after a crash).
+    let mut legacy = ExecutionRecord::new_pending(
+        receipt_id,
+        "proposal-legacy",
+        receipt_id,
+        terminate_clearing_effect(decision_hash, "legacy"),
+    );
+    legacy.status = ExecutionStatus::Executing;
+    exec_store.put(&legacy).unwrap();
+
+    // Startup recovery scans non-terminal rows and re-executes them.
+    executor.recover_in_flight().await.unwrap();
+
+    // The stale legacy row is NOT re-dispatched — the terminal canonical record
+    // wins, so the legacy row's status is untouched.
+    let legacy_after = exec_store.get(receipt_id).unwrap().unwrap();
+    assert_eq!(
+        legacy_after.status,
+        ExecutionStatus::Executing,
+        "recovery must not re-dispatch a stale legacy row when the canonical record is terminal"
+    );
+}
+
 /// Test 3: Startup recovery picks up an Executing record and completes it.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_startup_recovery_completes_executing_decision() {

@@ -434,6 +434,32 @@ impl DecisionExecutor {
             decision_hash
         };
 
+        // Recovery-path canonical-terminal guard. The shadow above keys on the
+        // INPUT decision_hash; on the startup recovery path (`recover_in_flight`)
+        // a legacy receipt-keyed row is re-executed under its stored key, which
+        // equals the receipt id (`decision_hash == decision_receipt_id`), so the
+        // shadow is skipped. If that row's stored effects carry a federation
+        // decision_hash whose canonical record is already terminal, the canonical
+        // record still wins — dedupe instead of re-dispatching the stale row.
+        if decision_hash == decision_receipt_id {
+            if let Some(canonical_hash) = extract_decision_hash(&effects) {
+                if canonical_hash != decision_receipt_id
+                    && self
+                        .store
+                        .get(&canonical_hash)?
+                        .map(|r| r.is_terminal())
+                        .unwrap_or(false)
+                {
+                    debug!(
+                        decision_hash = %canonical_hash,
+                        receipt_id = %decision_receipt_id,
+                        "Canonical terminal record exists for recovered legacy row, skipping"
+                    );
+                    return Ok(vec![]);
+                }
+            }
+        }
+
         // 1. Idempotency check
         if let Some(existing) = self.store.get(decision_hash)? {
             if existing.is_terminal() {
