@@ -518,6 +518,55 @@ async fn test_federation_replay_dedupes_against_legacy_receipt_keyed_record() {
     );
 }
 
+/// Issue #2095 / Codex P1 follow-up (#2096): honor *in-flight / retryable* legacy
+/// receipt-keyed records, not just terminal ones.
+///
+/// A pre-#2096 federation record keyed under `decision_receipt_id` that is still
+/// non-terminal (e.g. a retryable `Failed` from before max-retry promotion) must
+/// continue under its own key on replay. Otherwise the executor would create a
+/// fresh record under the newly-extracted `decision_hash` with retries reset to
+/// zero, orphaning the legacy record and re-dispatching the operation.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_federation_replay_honors_legacy_in_flight_receipt_record() {
+    use icn_core::supervisor::decision_executor::create_decision_executor_callback;
+
+    let (executor, exec_store) = make_executor();
+
+    // Pre-#2096 NON-terminal record keyed under the receipt id: a retryable
+    // failure carried over the upgrade (retries already accumulated).
+    let receipt_id = "receipt-inflight-legacy";
+    let mut legacy =
+        ExecutionRecord::new_pending(receipt_id, "proposal-legacy", receipt_id, vec![]);
+    legacy.status = ExecutionStatus::Failed;
+    legacy.retries = 2;
+    exec_store.put(&legacy).unwrap();
+
+    let callback = create_decision_executor_callback(executor);
+    callback(
+        terminate_clearing_effect("sha256:fed-inflight-hash", "replay"),
+        receipt_id.to_string(),
+    );
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    // No fresh record under the new decision_hash key — the decision continues
+    // under its legacy receipt key.
+    assert!(
+        exec_store
+            .get("sha256:fed-inflight-hash")
+            .unwrap()
+            .is_none(),
+        "replay must not create a second record under the federation decision_hash"
+    );
+    // The legacy record continues under its own key with retry history intact
+    // (not reset to zero).
+    let cont = exec_store.get(receipt_id).unwrap().unwrap();
+    assert!(
+        cont.retries >= 2,
+        "legacy retry count must be preserved, not reset (was {})",
+        cont.retries
+    );
+}
+
 /// Test 3: Startup recovery picks up an Executing record and completes it.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_startup_recovery_completes_executing_decision() {

@@ -391,6 +391,29 @@ impl DecisionExecutor {
         decision_hash: &str,
         proposal_id: &str,
     ) -> Result<Vec<EffectResult>> {
+        // Backward-compatibility across the #2094->#2096 upgrade window. Before
+        // federation effects carried an extractable `decision_hash`, a
+        // federation-only decision produced no hash, so the callback keyed its
+        // `ExecutionRecord` under `decision_receipt_id`. Now that the propagated
+        // federation hash is the primary idempotency key, a replay of that same
+        // accepted event would key a fresh record under `decision_hash` and miss
+        // the legacy receipt-keyed record — re-running a completed operation, or
+        // orphaning an in-flight one and resetting its retry count. If a record
+        // already exists under the receipt id (and the keys differ), keep
+        // operating under that legacy key so its full idempotency state (terminal
+        // dedupe, retry count, in-flight status) is honored. This is read-only
+        // key selection — no record migration — and a no-op when the key never
+        // moved: the empty-hash fallback sets `decision_hash ==
+        // decision_receipt_id`, and treasury decisions were always hash-keyed so
+        // no receipt-keyed record exists for them.
+        let decision_hash: &str = if decision_hash != decision_receipt_id
+            && self.store.get(decision_receipt_id)?.is_some()
+        {
+            decision_receipt_id
+        } else {
+            decision_hash
+        };
+
         // 1. Idempotency check
         if let Some(existing) = self.store.get(decision_hash)? {
             if existing.is_terminal() {
@@ -426,33 +449,6 @@ impl DecisionExecutor {
                 self.store.put(&record)?;
                 self.mark_related_escrows_failed(&record, "max retries exceeded");
                 return Ok(vec![]);
-            }
-        }
-
-        // 1b. Backward-compatibility idempotency across the #2094->#2096 upgrade
-        // window. Before federation effects carried an extractable `decision_hash`,
-        // a federation-only decision produced no hash, so the callback keyed its
-        // `ExecutionRecord` under `decision_receipt_id`. Now that the propagated
-        // federation hash is the primary idempotency key, a replay of that same
-        // accepted event would probe `store.get(decision_hash)` (just missed
-        // above), not find the legacy receipt-keyed record, and re-run the
-        // operation. When the key differs from the receipt id, also probe for a
-        // terminal record under the receipt id and dedupe against it. This is a
-        // read-only compatibility shim — no record migration — and is a no-op for
-        // decisions whose key never moved (empty-hash fallback sets
-        // `decision_hash == decision_receipt_id`; treasury decisions were always
-        // hash-keyed, so no receipt-keyed record exists for them).
-        if decision_hash != decision_receipt_id {
-            if let Some(legacy) = self.store.get(decision_receipt_id)? {
-                if legacy.is_terminal() {
-                    debug!(
-                        decision_hash = %decision_hash,
-                        receipt_id = %decision_receipt_id,
-                        status = ?legacy.status,
-                        "Decision already executed under legacy receipt-id key (pre-#2096), skipping"
-                    );
-                    return Ok(vec![]);
-                }
             }
         }
 
