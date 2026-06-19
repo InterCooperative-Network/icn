@@ -9,10 +9,19 @@ on:
 env:
   CARGO_TERM_COLOR: always
 
+permissions:
+  contents: read
+
 jobs:
   security-audit:
     name: Security Audit
     runs-on: ubuntu-latest
+    # Job-level elevation: the "Create issue on failure" step (github-script
+    # → issues.create / createComment) needs issues:write. Kept here, not at
+    # workflow level, so the top-level contents:read default stays minimal.
+    permissions:
+      contents: read
+      issues: write
     steps:
       - uses: actions/checkout@v6
 

@@ -25,6 +25,9 @@ env:
   # Scope controls for staged boundary enforcement
   GATE_RATCHET_KERNEL_DEPS_SCOPE: core-only
 
+permissions:
+  contents: read
+
 jobs:
   changes:
     name: Change Scope

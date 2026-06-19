@@ -41,6 +41,9 @@ env:
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_LINKER: clang
   CARGO_TARGET_X86_64_UNKNOWN_LINUX_GNU_RUSTFLAGS: "-C link-arg=-fuse-ld=mold"
 
+permissions:
+  contents: read
+
 jobs:
   # Build and deploy runs on self-hosted runner.
   # Tests are not re-run here — ci.yml already runs cargo test --workspace as
