@@ -40,7 +40,9 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum CoopEntityClass {
-    /// A forward binding already exists for this `coop_id`.
+    /// A healthy bidirectional binding exists for this `coop_id`: the forward
+    /// index resolves to an `EntityId` and that entity's reverse index agrees
+    /// (points back at this same `coop_id`).
     AlreadyBound,
     /// No binding exists, the id projects to a valid cooperative `EntityId`,
     /// and that `EntityId` is free (binding it would succeed).
@@ -52,7 +54,13 @@ pub enum CoopEntityClass {
     /// The `coop_id` is not a valid cooperative `EntityId` slug (e.g. the
     /// default `coop:<uuid>` shape). It is reported, never normalized.
     NonMappable,
-    /// A map read failed for this `coop_id` (I/O, lock poison, decode error).
+    /// The persisted state for this `coop_id` is not trustworthy: either a map
+    /// read failed (I/O, lock poison, decode error), or the mapping is
+    /// internally inconsistent — a forward binding exists whose reverse index
+    /// is missing or points at a *different* `coop_id`. Atomic binds keep a
+    /// healthy map consistent, so this signals corruption or a partial write,
+    /// which a pre-mutation inventory must surface distinctly from
+    /// [`AlreadyBound`].
     StorageError,
 }
 
@@ -67,15 +75,18 @@ pub struct CoopEntityInventoryEntry {
     /// The `EntityId` this `coop_id` would project to, when it is mappable
     /// (`MappableUnbound` / `MappableReverseConflict`). `None` otherwise.
     pub projected_entity_id: Option<EntityId>,
-    /// The `EntityId` this `coop_id` is currently bound to, when
-    /// `AlreadyBound`. `None` otherwise.
+    /// The `EntityId` this `coop_id`'s forward index resolves to, when one
+    /// exists (`AlreadyBound`, or a `StorageError` caused by an inconsistent
+    /// forward-without-agreeing-reverse binding). `None` otherwise.
     pub bound_entity_id: Option<EntityId>,
     /// The `coop_id` currently occupying the relevant `EntityId`'s reverse
     /// index: for `AlreadyBound`, the (agreeing) reverse value; for
-    /// `MappableReverseConflict`, the *other* `coop_id` blocking the bind.
+    /// `MappableReverseConflict`, the *other* `coop_id` blocking the bind; for
+    /// an inconsistent `StorageError`, the mismatched reverse value (if any).
     pub reverse_bound_coop_id: Option<String>,
     /// A human-readable reason, for `NonMappable` (why the slug is invalid) and
-    /// `StorageError` (the read failure). `None` otherwise.
+    /// `StorageError` (the read failure or the consistency violation). `None`
+    /// otherwise.
     pub error: Option<String>,
 }
 
@@ -138,27 +149,53 @@ fn classify_one(coop_id: &str, map: &dyn CoopEntityMap) -> CoopEntityInventoryEn
             )
         }
         Ok(Some(bound)) => {
-            // Atomic binds keep the reverse index in agreement; record it for
-            // transparency. A read failure on the reverse is still a storage error.
-            let reverse = match map.coop_for_entity(&bound) {
-                Ok(rev) => rev,
-                Err(e) => {
-                    return base(
+            // A forward binding exists. It is only AlreadyBound if the reverse
+            // index agrees (points back at this coop_id). Atomic binds keep a
+            // healthy map consistent, so a missing or mismatched reverse means a
+            // corrupt/partial one-sided binding — surfaced as StorageError so a
+            // pre-mutation inventory does not mistake it for a healthy mapping.
+            return match map.coop_for_entity(&bound) {
+                Err(e) => base(
+                    CoopEntityClass::StorageError,
+                    None,
+                    Some(bound),
+                    None,
+                    Some(e.to_string()),
+                ),
+                Ok(Some(rev)) if rev.as_str() == coop_id => base(
+                    CoopEntityClass::AlreadyBound,
+                    None,
+                    Some(bound),
+                    Some(rev),
+                    None,
+                ),
+                Ok(Some(rev)) => {
+                    let msg = format!(
+                        "inconsistent mapping: forward binds {coop_id:?} -> {bound}, \
+                         but the reverse index maps {bound} -> {rev:?}"
+                    );
+                    base(
+                        CoopEntityClass::StorageError,
+                        None,
+                        Some(bound),
+                        Some(rev),
+                        Some(msg),
+                    )
+                }
+                Ok(None) => {
+                    let msg = format!(
+                        "inconsistent mapping: forward binds {coop_id:?} -> {bound}, \
+                         but no reverse index entry exists"
+                    );
+                    base(
                         CoopEntityClass::StorageError,
                         None,
                         Some(bound),
                         None,
-                        Some(e.to_string()),
+                        Some(msg),
                     )
                 }
             };
-            return base(
-                CoopEntityClass::AlreadyBound,
-                None,
-                Some(bound),
-                reverse,
-                None,
-            );
         }
         Ok(None) => {}
     }
@@ -240,6 +277,74 @@ mod tests {
 
     fn ids(list: &[&str]) -> Vec<String> {
         list.iter().map(|s| s.to_string()).collect()
+    }
+
+    /// Read-only test double returning caller-controlled forward/reverse
+    /// values, so the classifier can be exercised against inconsistent
+    /// (one-sided / cross-linked) states that the atomic real maps cannot
+    /// produce through their public API. Writing through it is a test failure.
+    struct FakeMap {
+        forward: Option<EntityId>,
+        reverse: Option<String>,
+    }
+
+    impl CoopEntityMap for FakeMap {
+        fn bind_exact(&self, _: &str, _: &EntityId) -> Result<(), CoopEntityMapError> {
+            unreachable!("classify_coop_ids must never write through the map");
+        }
+        fn entity_for_coop(&self, _: &str) -> Result<Option<EntityId>, CoopEntityMapError> {
+            Ok(self.forward.clone())
+        }
+        fn coop_for_entity(&self, _: &EntityId) -> Result<Option<String>, CoopEntityMapError> {
+            Ok(self.reverse.clone())
+        }
+    }
+
+    #[test]
+    fn forward_without_reverse_classifies_as_storage_error() {
+        // One-sided: forward resolves, reverse index is missing (corruption).
+        let map = FakeMap {
+            forward: Some(coop_eid("ghost-coop")),
+            reverse: None,
+        };
+        let inv = classify_coop_ids(ids(&["ghost-coop"]), &map);
+        assert_eq!(inv.total, 1);
+        assert_eq!(inv.storage_error, 1);
+        assert_eq!(inv.already_bound, 0);
+        let entry = &inv.entries[0];
+        assert_eq!(entry.class, CoopEntityClass::StorageError);
+        assert_eq!(entry.bound_entity_id, Some(coop_eid("ghost-coop")));
+        assert!(entry.error.is_some());
+    }
+
+    #[test]
+    fn forward_with_mismatched_reverse_classifies_as_storage_error() {
+        // Cross-linked: forward resolves, but the reverse points elsewhere.
+        let map = FakeMap {
+            forward: Some(coop_eid("ghost-coop")),
+            reverse: Some("other-coop".to_string()),
+        };
+        let inv = classify_coop_ids(ids(&["ghost-coop"]), &map);
+        assert_eq!(inv.storage_error, 1);
+        assert_eq!(inv.already_bound, 0);
+        let entry = &inv.entries[0];
+        assert_eq!(entry.class, CoopEntityClass::StorageError);
+        assert_eq!(entry.bound_entity_id, Some(coop_eid("ghost-coop")));
+        assert_eq!(entry.reverse_bound_coop_id, Some("other-coop".to_string()));
+        assert!(entry.error.is_some());
+    }
+
+    #[test]
+    fn forward_with_agreeing_reverse_classifies_as_already_bound() {
+        // Healthy bidirectional binding via the double: reverse agrees.
+        let map = FakeMap {
+            forward: Some(coop_eid("ghost-coop")),
+            reverse: Some("ghost-coop".to_string()),
+        };
+        let inv = classify_coop_ids(ids(&["ghost-coop"]), &map);
+        assert_eq!(inv.already_bound, 1);
+        assert_eq!(inv.storage_error, 0);
+        assert_eq!(inv.entries[0].class, CoopEntityClass::AlreadyBound);
     }
 
     #[test]
