@@ -66,6 +66,7 @@
 //! # Modules
 //!
 //! - [`entity`] - Core types: `EntityId`, `EntityType`, `CooperativeEntity`
+//! - [`coop_entity_map`] - Canonical reversible `coop_id ↔ EntityId` mapping store
 //! - [`labor_exchange`] - Labor exchange types for worker mobility
 //! - [`membership`] - Membership types: `Membership`, `MembershipRole`
 //! - [`registry`] - Registry trait and in-memory implementation
@@ -75,6 +76,7 @@
 //! - [`error`] - Error types
 
 pub mod actor;
+pub mod coop_entity_map;
 pub mod entity;
 pub mod error;
 pub mod handle;
@@ -86,6 +88,9 @@ pub mod sled_registry;
 
 // Re-export main types at crate root
 pub use actor::{EntityActor, GossipHandle, ENTITY_TOPIC};
+pub use coop_entity_map::{
+    project_coop_id, CoopEntityMap, CoopEntityMapError, InMemoryCoopEntityMap, SledCoopEntityMap,
+};
 pub use entity::{
     AccountId, AccountReference, CommunityProfile, CooperativeEntity, CooperativeProfile, EntityId,
     EntityKind, EntityRelationship, EntityStatus, EntityType, FederationProfile, RelationType,
