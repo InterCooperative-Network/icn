@@ -489,8 +489,12 @@ async fn test_federation_replay_dedupes_against_legacy_receipt_keyed_record() {
     // the old extractor ignored federation effects and the callback fell back to
     // the receipt id as the idempotency key).
     let receipt_id = "receipt-upgrade-legacy";
-    let mut legacy =
-        ExecutionRecord::new_pending(receipt_id, "proposal-legacy", receipt_id, vec![]);
+    let mut legacy = ExecutionRecord::new_pending(
+        receipt_id,
+        "proposal-legacy",
+        receipt_id,
+        terminate_clearing_effect("sha256:fed-legacy-hash", "legacy"),
+    );
     legacy.status = ExecutionStatus::Confirmed;
     exec_store.put(&legacy).unwrap();
 
@@ -535,8 +539,12 @@ async fn test_federation_replay_honors_legacy_in_flight_receipt_record() {
     // Pre-#2096 NON-terminal record keyed under the receipt id: a retryable
     // failure carried over the upgrade (retries already accumulated).
     let receipt_id = "receipt-inflight-legacy";
-    let mut legacy =
-        ExecutionRecord::new_pending(receipt_id, "proposal-legacy", receipt_id, vec![]);
+    let mut legacy = ExecutionRecord::new_pending(
+        receipt_id,
+        "proposal-legacy",
+        receipt_id,
+        terminate_clearing_effect("sha256:fed-inflight-hash", "legacy"),
+    );
     legacy.status = ExecutionStatus::Failed;
     legacy.retries = 2;
     exec_store.put(&legacy).unwrap();
@@ -565,6 +573,52 @@ async fn test_federation_replay_honors_legacy_in_flight_receipt_record() {
         "legacy retry count must be preserved, not reset (was {})",
         cont.retries
     );
+}
+
+/// Issue #2095 / Codex P1 (#2096): a legacy receipt-keyed record must NOT collapse
+/// a *different* decision that merely shares the same `decision_receipt_id`.
+///
+/// Multiple distinct federation decisions can share a receipt id but carry
+/// distinct `decision_hash` values (the #2095 same-receipt/different-hash case).
+/// After an upgrade, a pre-#2096 record sits under the receipt id; a later,
+/// distinct decision with the same receipt but a different hash must still
+/// execute under its own hash key — the legacy key is adopted only for the same
+/// decision (matched by the stored record's effects hash), never an unrelated one.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_federation_legacy_record_does_not_collapse_distinct_same_receipt_decision() {
+    use icn_core::supervisor::decision_executor::create_decision_executor_callback;
+
+    let (executor, exec_store) = make_executor();
+
+    // Legacy record for decision A (hash fed-a), keyed under the receipt id.
+    let receipt_id = "receipt-shared-upgrade";
+    let mut legacy = ExecutionRecord::new_pending(
+        receipt_id,
+        "proposal-a",
+        receipt_id,
+        terminate_clearing_effect("sha256:fed-decision-a", "decision-a"),
+    );
+    legacy.status = ExecutionStatus::Confirmed;
+    exec_store.put(&legacy).unwrap();
+
+    let callback = create_decision_executor_callback(executor);
+
+    // A DIFFERENT decision B (hash fed-b) shares the same receipt id.
+    callback(
+        terminate_clearing_effect("sha256:fed-decision-b", "decision-b"),
+        receipt_id.to_string(),
+    );
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    // Decision B executes under its own decision_hash key — it is not forced onto
+    // the legacy receipt key and deduped against the unrelated decision A.
+    assert!(
+        exec_store.get("sha256:fed-decision-b").unwrap().is_some(),
+        "a distinct same-receipt decision must execute under its own hash key"
+    );
+    // Decision A's legacy record is untouched.
+    let a = exec_store.get(receipt_id).unwrap().unwrap();
+    assert_eq!(a.status, ExecutionStatus::Confirmed);
 }
 
 /// Test 3: Startup recovery picks up an Executing record and completes it.

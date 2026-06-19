@@ -398,18 +398,27 @@ impl DecisionExecutor {
         // federation hash is the primary idempotency key, a replay of that same
         // accepted event would key a fresh record under `decision_hash` and miss
         // the legacy receipt-keyed record — re-running a completed operation, or
-        // orphaning an in-flight one and resetting its retry count. If a record
-        // already exists under the receipt id (and the keys differ), keep
-        // operating under that legacy key so its full idempotency state (terminal
-        // dedupe, retry count, in-flight status) is honored. This is read-only
-        // key selection — no record migration — and a no-op when the key never
-        // moved: the empty-hash fallback sets `decision_hash ==
-        // decision_receipt_id`, and treasury decisions were always hash-keyed so
-        // no receipt-keyed record exists for them.
-        let decision_hash: &str = if decision_hash != decision_receipt_id
-            && self.store.get(decision_receipt_id)?.is_some()
-        {
-            decision_receipt_id
+        // orphaning an in-flight one and resetting its retry count.
+        //
+        // Adopt the legacy receipt key ONLY when the stored record is the *same*
+        // decision — i.e. its own effects carry the same `decision_hash`. A
+        // receipt id is not unique to one decision (distinct federation decisions
+        // can share it; that is exactly the #2095 same-receipt/different-hash
+        // case), so adopting on mere key existence would let one legacy row
+        // collapse an unrelated decision. Matching on the stored effects' hash
+        // ties adoption to decision identity. Read-only key selection — no record
+        // migration — and a no-op when the key never moved (empty-hash fallback
+        // sets `decision_hash == decision_receipt_id`; treasury was always
+        // hash-keyed, so no receipt-keyed record exists for it).
+        let decision_hash: &str = if decision_hash != decision_receipt_id {
+            match self.store.get(decision_receipt_id)? {
+                Some(legacy)
+                    if extract_decision_hash(&legacy.effects).as_deref() == Some(decision_hash) =>
+                {
+                    decision_receipt_id
+                }
+                _ => decision_hash,
+            }
         } else {
             decision_hash
         };
