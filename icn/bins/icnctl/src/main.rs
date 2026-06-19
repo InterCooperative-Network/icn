@@ -231,6 +231,11 @@ enum CoopMaintenanceCommands {
         /// Emit machine-readable JSON instead of a human-readable table.
         #[arg(long)]
         json: bool,
+        /// Preview the deterministic surrogate `EntityId` that a later
+        /// allocation PR would propose for each non-mappable cooperative ID,
+        /// and flag any that would collide on bind. Read-only; binds nothing.
+        #[arg(long)]
+        preview_surrogates: bool,
     },
 }
 
@@ -2033,7 +2038,10 @@ fn get_store_path(data_dir: &Path) -> PathBuf {
 /// Dispatch read-only cooperative maintenance subcommands.
 fn handle_coop_maintenance_command(cmd: CoopMaintenanceCommands, data_dir: &Path) -> Result<()> {
     match cmd {
-        CoopMaintenanceCommands::EntityReport { json } => coop_entity_report(data_dir, json),
+        CoopMaintenanceCommands::EntityReport {
+            json,
+            preview_surrogates,
+        } => coop_entity_report(data_dir, json, preview_surrogates),
     }
 }
 
@@ -2045,9 +2053,12 @@ fn handle_coop_maintenance_command(cmd: CoopMaintenanceCommands, data_dir: &Path
 /// writes**, allocates **no** surrogate IDs, normalizes nothing, and changes
 /// no authorization state — a mapping is a name binding only and grants no
 /// authority.
-fn coop_entity_report(data_dir: &Path, json: bool) -> Result<()> {
+fn coop_entity_report(data_dir: &Path, json: bool, preview_surrogates: bool) -> Result<()> {
     use icn_coop::CoopStore;
-    use icn_entity::{classify_coop_ids, CoopEntityInventory, SledCoopEntityMap};
+    use icn_entity::{
+        classify_coop_ids, classify_coop_ids_with_surrogate_preview, CoopEntityInventory,
+        SledCoopEntityMap,
+    };
     use std::sync::Arc;
 
     let coop_store_path = get_store_path(data_dir).join("cooperative");
@@ -2062,7 +2073,11 @@ fn coop_entity_report(data_dir: &Path, json: bool) -> Result<()> {
                 coop_store_path.display()
             );
         }
-        return render_coop_entity_inventory(&CoopEntityInventory::default(), json);
+        return render_coop_entity_inventory(
+            &CoopEntityInventory::default(),
+            json,
+            preview_surrogates,
+        );
     }
 
     let sled_store = SledStore::open(&coop_store_path).with_context(|| {
@@ -2085,15 +2100,26 @@ fn coop_entity_report(data_dir: &Path, json: bool) -> Result<()> {
         .map(|coop| coop.id)
         .collect();
 
-    // Pure, read-only classification: no binds, no normalization.
-    let inventory = classify_coop_ids(coop_ids, &map);
-    render_coop_entity_inventory(&inventory, json)
+    // Read-only classification: no binds, no normalization. With
+    // --preview-surrogates, also propose (but never bind) a deterministic
+    // surrogate EntityId for each non-mappable id and flag bind collisions.
+    let inventory = if preview_surrogates {
+        classify_coop_ids_with_surrogate_preview(coop_ids, &map)
+    } else {
+        classify_coop_ids(coop_ids, &map)
+    };
+    render_coop_entity_inventory(&inventory, json, preview_surrogates)
 }
 
 /// Print a [`icn_entity::CoopEntityInventory`] as JSON or a human table.
+///
+/// `preview` controls only the human-readable extras (surrogate counts and the
+/// per-entry proposed surrogate); the JSON form carries the optional surrogate
+/// fields whenever they are present, so JSON callers see them regardless.
 fn render_coop_entity_inventory(
     inventory: &icn_entity::CoopEntityInventory,
     json: bool,
+    preview: bool,
 ) -> Result<()> {
     use icn_entity::CoopEntityClass;
 
@@ -2120,6 +2146,18 @@ fn render_coop_entity_inventory(
     );
     println!("  non_mappable:              {}", inventory.non_mappable);
     println!("  storage_error:             {}", inventory.storage_error);
+    if preview {
+        // Surrogate proposals are previews only — a proposal binds nothing and
+        // grants no authority. A collision is reported, never auto-resolved.
+        println!(
+            "  surrogate_proposed:        {}",
+            inventory.surrogate_proposed
+        );
+        println!(
+            "  surrogate_collision:       {}",
+            inventory.surrogate_collision
+        );
+    }
 
     if !inventory.entries.is_empty() {
         println!();
@@ -2141,6 +2179,11 @@ fn render_coop_entity_inventory(
             if entry.class == CoopEntityClass::MappableReverseConflict {
                 if let Some(other) = &entry.reverse_bound_coop_id {
                     print!(" (target already bound to {other:?})");
+                }
+            }
+            if preview {
+                if let Some(surrogate) = &entry.proposed_surrogate_entity_id {
+                    print!(" [proposed surrogate: {}]", surrogate.as_str());
                 }
             }
             if let Some(err) = &entry.error {

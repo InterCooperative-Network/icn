@@ -177,3 +177,155 @@ fn entity_report_on_missing_store_reports_empty() {
         "report must not create a database when none exists"
     );
 }
+
+// ----------------------------------------------------------------------------
+// Surrogate preview (#2082 PR4): --preview-surrogates is read-only and additive.
+// ----------------------------------------------------------------------------
+
+/// Without the flag, the JSON shape is exactly the pre-surrogate report: no
+/// `surrogate_*` aggregates and no per-entry `proposed_surrogate_entity_id`.
+#[test]
+fn default_json_omits_surrogate_fields() {
+    let temp = TempDir::new().unwrap();
+    let data_dir = temp.path().join("data");
+    seed_two_cooperatives(&data_dir);
+
+    let output = Command::new(icnctl_bin())
+        .env("RUST_LOG", "off")
+        .arg("--data-dir")
+        .arg(&data_dir)
+        .arg("coop")
+        .arg("entity-report")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let v: Value = serde_json::from_str(stdout.trim()).unwrap();
+
+    assert!(v.get("surrogate_proposed").is_none());
+    assert!(v.get("surrogate_collision").is_none());
+    for entry in v["entries"].as_array().unwrap() {
+        assert!(
+            entry.get("proposed_surrogate_entity_id").is_none(),
+            "default report must not include surrogate proposals"
+        );
+    }
+}
+
+/// With `--preview-surrogates --json`, the non-mappable default `coop:<uuid>`
+/// carries its deterministic proposed surrogate; the mappable coop does not.
+#[test]
+fn preview_json_includes_proposed_surrogate_for_default_id() {
+    let temp = TempDir::new().unwrap();
+    let data_dir = temp.path().join("data");
+    let default_id = seed_two_cooperatives(&data_dir);
+
+    let output = Command::new(icnctl_bin())
+        .env("RUST_LOG", "off")
+        .arg("--data-dir")
+        .arg(&data_dir)
+        .arg("coop")
+        .arg("entity-report")
+        .arg("--preview-surrogates")
+        .arg("--json")
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr={}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let v: Value = serde_json::from_str(stdout.trim()).unwrap();
+
+    assert_eq!(v["surrogate_proposed"].as_u64(), Some(1));
+    // `surrogate_collision` is omitted when zero (skip_serializing_if), so an
+    // absent key means "no collisions" — treat absent as 0.
+    assert_eq!(v["surrogate_collision"].as_u64().unwrap_or(0), 0);
+
+    let expected = icn_entity::propose_surrogate_entity_id(&default_id)
+        .unwrap()
+        .as_str()
+        .to_string();
+
+    let entries = v["entries"].as_array().unwrap();
+    let default_entry = entries
+        .iter()
+        .find(|e| e["coop_id"].as_str() == Some(default_id.as_str()))
+        .expect("default coop entry present");
+    assert_eq!(default_entry["class"].as_str(), Some("non_mappable"));
+    assert_eq!(
+        default_entry["proposed_surrogate_entity_id"].as_str(),
+        Some(expected.as_str())
+    );
+
+    let mappable_entry = entries
+        .iter()
+        .find(|e| e["coop_id"].as_str() == Some("real-coop"))
+        .expect("mappable coop entry present");
+    assert!(
+        mappable_entry.get("proposed_surrogate_entity_id").is_none(),
+        "mappable coop must not get a surrogate proposal"
+    );
+}
+
+/// Human output under `--preview-surrogates` shows the surrogate count and the
+/// proposed value.
+#[test]
+fn preview_human_output_includes_surrogate_count_and_value() {
+    let temp = TempDir::new().unwrap();
+    let data_dir = temp.path().join("data");
+    let default_id = seed_two_cooperatives(&data_dir);
+
+    let output = Command::new(icnctl_bin())
+        .env("RUST_LOG", "off")
+        .arg("--data-dir")
+        .arg(&data_dir)
+        .arg("coop")
+        .arg("entity-report")
+        .arg("--preview-surrogates")
+        .output()
+        .unwrap();
+    assert!(output.status.success());
+    let stdout = String::from_utf8(output.stdout).unwrap();
+
+    assert!(stdout.contains("surrogate_proposed:"));
+    let expected = icn_entity::propose_surrogate_entity_id(&default_id)
+        .unwrap()
+        .as_str()
+        .to_string();
+    assert!(
+        stdout.contains("proposed surrogate:") && stdout.contains(&expected),
+        "human preview output missing surrogate value; got:\n{stdout}"
+    );
+}
+
+/// The preview path is read-only: it must not bind the non-mappable id, its
+/// proposed surrogate target, or the mappable id.
+#[test]
+fn preview_writes_no_bindings() {
+    let temp = TempDir::new().unwrap();
+    let data_dir = temp.path().join("data");
+    let default_id = seed_two_cooperatives(&data_dir);
+
+    let status = Command::new(icnctl_bin())
+        .env("RUST_LOG", "off")
+        .arg("--data-dir")
+        .arg(&data_dir)
+        .arg("coop")
+        .arg("entity-report")
+        .arg("--preview-surrogates")
+        .arg("--json")
+        .status()
+        .unwrap();
+    assert!(status.success());
+
+    let store = SledStore::open(coop_store_path(&data_dir)).unwrap();
+    let db = Arc::new(store.db().clone());
+    let map = SledCoopEntityMap::new(db);
+    assert_eq!(map.entity_for_coop("real-coop").unwrap(), None);
+    assert_eq!(map.entity_for_coop(&default_id).unwrap(), None);
+    let surrogate = icn_entity::propose_surrogate_entity_id(&default_id).unwrap();
+    assert_eq!(map.coop_for_entity(&surrogate).unwrap(), None);
+}
