@@ -143,6 +143,10 @@ enum Commands {
         no_start: bool,
     },
 
+    /// Cooperative read-only maintenance queries
+    #[command(subcommand)]
+    Coop(CoopMaintenanceCommands),
+
     /// Gateway authentication (get JWT tokens)
     #[command(subcommand)]
     Auth(AuthCommands),
@@ -211,6 +215,22 @@ enum Commands {
         /// Shell type
         #[arg(value_enum)]
         shell: clap_complete::Shell,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum CoopMaintenanceCommands {
+    /// Read-only inventory of cooperative IDs against the canonical
+    /// `coop_id` ↔ `EntityId` mapping (#2082 lane). Writes nothing.
+    ///
+    /// Classifies each stored cooperative ID as already-bound,
+    /// mappable-unbound, mappable-reverse-conflict, non-mappable, or
+    /// storage-error. Reads the local cooperative store directly, so run it
+    /// with the daemon stopped (the daemon holds an exclusive lock).
+    EntityReport {
+        /// Emit machine-readable JSON instead of a human-readable table.
+        #[arg(long)]
+        json: bool,
     },
 }
 
@@ -2010,6 +2030,129 @@ fn get_store_path(data_dir: &Path) -> PathBuf {
     data_dir.join("store")
 }
 
+/// Dispatch read-only cooperative maintenance subcommands.
+fn handle_coop_maintenance_command(cmd: CoopMaintenanceCommands, data_dir: &Path) -> Result<()> {
+    match cmd {
+        CoopMaintenanceCommands::EntityReport { json } => coop_entity_report(data_dir, json),
+    }
+}
+
+/// Render a read-only `coop_id` ↔ `EntityId` mapping inventory (#2082 lane).
+///
+/// This opens the existing cooperative sled store, lists the stored
+/// cooperatives, and classifies each ID against the canonical
+/// [`icn_entity::CoopEntityMap`] using only read operations. It performs **no
+/// writes**, allocates **no** surrogate IDs, normalizes nothing, and changes
+/// no authorization state — a mapping is a name binding only and grants no
+/// authority.
+fn coop_entity_report(data_dir: &Path, json: bool) -> Result<()> {
+    use icn_coop::CoopStore;
+    use icn_entity::{classify_coop_ids, CoopEntityInventory, SledCoopEntityMap};
+    use std::sync::Arc;
+
+    let coop_store_path = get_store_path(data_dir).join("cooperative");
+
+    // Read-only contract: never create a database. `SledStore::open` would
+    // create the directory if it is absent, so a missing store is reported as
+    // an empty inventory rather than being materialized on disk.
+    if !coop_store_path.exists() {
+        if !json {
+            eprintln!(
+                "No cooperative store found at {} — reporting an empty inventory (nothing was created).",
+                coop_store_path.display()
+            );
+        }
+        return render_coop_entity_inventory(&CoopEntityInventory::default(), json);
+    }
+
+    let sled_store = SledStore::open(&coop_store_path).with_context(|| {
+        format!(
+            "Failed to open cooperative store at {} (stop the daemon first; it holds an exclusive lock)",
+            coop_store_path.display()
+        )
+    })?;
+
+    // Share one Db between the cooperative store and the canonical map, exactly
+    // as the daemon does in init_coop — no separate database is opened.
+    let db = Arc::new(sled_store.db().clone());
+    let coop_store = CoopStore::new(db.clone());
+    let map = SledCoopEntityMap::new(db);
+
+    let coop_ids: Vec<String> = coop_store
+        .list_cooperatives()
+        .context("Failed to list cooperatives from the store")?
+        .into_iter()
+        .map(|coop| coop.id)
+        .collect();
+
+    // Pure, read-only classification: no binds, no normalization.
+    let inventory = classify_coop_ids(coop_ids, &map);
+    render_coop_entity_inventory(&inventory, json)
+}
+
+/// Print a [`icn_entity::CoopEntityInventory`] as JSON or a human table.
+fn render_coop_entity_inventory(
+    inventory: &icn_entity::CoopEntityInventory,
+    json: bool,
+) -> Result<()> {
+    use icn_entity::CoopEntityClass;
+
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(inventory)
+                .context("Failed to serialize the inventory as JSON")?
+        );
+        return Ok(());
+    }
+
+    println!("coop_id <-> EntityId mapping inventory (read-only; a mapping grants no authority)");
+    println!();
+    println!("  total:                     {}", inventory.total);
+    println!("  already_bound:             {}", inventory.already_bound);
+    println!(
+        "  mappable_unbound:          {}",
+        inventory.mappable_unbound
+    );
+    println!(
+        "  mappable_reverse_conflict: {}",
+        inventory.mappable_reverse_conflict
+    );
+    println!("  non_mappable:              {}", inventory.non_mappable);
+    println!("  storage_error:             {}", inventory.storage_error);
+
+    if !inventory.entries.is_empty() {
+        println!();
+        println!("  detail:");
+        for entry in &inventory.entries {
+            let class = match entry.class {
+                CoopEntityClass::AlreadyBound => "already_bound",
+                CoopEntityClass::MappableUnbound => "mappable_unbound",
+                CoopEntityClass::MappableReverseConflict => "mappable_reverse_conflict",
+                CoopEntityClass::NonMappable => "non_mappable",
+                CoopEntityClass::StorageError => "storage_error",
+            };
+            print!("    [{class}] {}", entry.coop_id);
+            if let Some(bound) = &entry.bound_entity_id {
+                print!(" -> {}", bound.as_str());
+            } else if let Some(projected) = &entry.projected_entity_id {
+                print!(" -> {}", projected.as_str());
+            }
+            if entry.class == CoopEntityClass::MappableReverseConflict {
+                if let Some(other) = &entry.reverse_bound_coop_id {
+                    print!(" (target already bound to {other:?})");
+                }
+            }
+            if let Some(err) = &entry.error {
+                print!(" ({err})");
+            }
+            println!();
+        }
+    }
+
+    Ok(())
+}
+
 /// Read passphrase from environment variables.
 ///
 /// Checks ICN_KEYSTORE_PASSPHRASE first (preferred, matches icnd), then
@@ -2192,6 +2335,8 @@ async fn main() -> Result<()> {
             yes,
             no_start,
         } => handle_init_coop_command(&data_dir, name, members, yes, no_start).await?,
+
+        Commands::Coop(coop_cmd) => handle_coop_maintenance_command(coop_cmd, &data_dir)?,
 
         Commands::Auth(auth_cmd) => handle_auth_command(auth_cmd, &data_dir).await?,
 
