@@ -382,7 +382,7 @@ pub fn translate_payload_to_effects(
 
         // Federation proposals
         ProposalPayload::Federation(fed_proposal) => {
-            translate_federation_proposal(fed_proposal, domain_id)
+            translate_federation_proposal(fed_proposal, domain_id, decision_hash)
         }
 
         // Resource access proposals
@@ -623,6 +623,7 @@ fn translate_membership_action(
 fn translate_federation_proposal(
     proposal: &icn_governance::FederationProposal,
     domain_id: &str,
+    decision_hash: &str,
 ) -> Result<Vec<KernelEffect>, TranslationError> {
     use icn_governance::FederationProposal;
 
@@ -684,6 +685,7 @@ fn translate_federation_proposal(
                 initiating_coop_did: domain_id.to_string(),
                 partner_coop_did: partner_coop_id.clone(),
                 reason: reason.clone(),
+                decision_hash: decision_hash.to_string(),
             },
         )]),
         FederationProposal::RevokeVouch {
@@ -694,6 +696,7 @@ fn translate_federation_proposal(
                 revoker_did: domain_id.to_string(),
                 target_coop_did: target_coop_id.clone(),
                 reason: reason.clone(),
+                decision_hash: decision_hash.to_string(),
             },
         )]),
         // Fallback for other federation proposals (UpdateFederationPolicy etc.)
@@ -1143,6 +1146,7 @@ mod tests {
                     initiating_coop_did,
                     partner_coop_did,
                     reason,
+                    decision_hash,
                 },
             ) => {
                 assert_eq!(
@@ -1151,6 +1155,10 @@ mod tests {
                 );
                 assert_eq!(partner_coop_did, "coop-beta");
                 assert_eq!(reason, "persistent imbalance violations");
+                assert_eq!(
+                    decision_hash, "hash-tc-1",
+                    "effect must carry the decision_hash passed to translate_payload_to_effects"
+                );
             }
             other => panic!("expected TerminateClearing effect, got {other:?}"),
         }
@@ -1173,6 +1181,7 @@ mod tests {
                 revoker_did,
                 target_coop_did,
                 reason,
+                decision_hash,
             }) => {
                 assert_eq!(
                     revoker_did, "coop-alpha",
@@ -1180,6 +1189,10 @@ mod tests {
                 );
                 assert_eq!(target_coop_did, "coop-gamma");
                 assert_eq!(reason, "governance misconduct");
+                assert_eq!(
+                    decision_hash, "hash-rv-1",
+                    "effect must carry the decision_hash passed to translate_payload_to_effects"
+                );
             }
             other => panic!("expected RevokeVouch effect, got {other:?}"),
         }

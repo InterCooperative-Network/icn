@@ -664,12 +664,17 @@ pub fn federation_effect_to_operation(effect: &FederationEffect) -> FederationOp
             initiating_coop_did,
             partner_coop_did,
             reason: _,
+            decision_hash,
         } => FederationOperation {
             operation_type: FederationOperationType::TerminateClearing,
             coop_did: initiating_coop_did.clone(),
             target_id: Some(partner_coop_did.clone()),
             agreement_hash: None,
-            decision_hash: None,
+            decision_hash: if decision_hash.is_empty() {
+                None
+            } else {
+                Some(decision_hash.clone())
+            },
             settlement_interval: None,
             max_imbalance: None,
             source_agreement_id: None,
@@ -678,12 +683,17 @@ pub fn federation_effect_to_operation(effect: &FederationEffect) -> FederationOp
             revoker_did,
             target_coop_did,
             reason: _,
+            decision_hash,
         } => FederationOperation {
             operation_type: FederationOperationType::RevokeVouch,
             coop_did: revoker_did.clone(),
             target_id: Some(target_coop_did.clone()),
             agreement_hash: None,
-            decision_hash: None,
+            decision_hash: if decision_hash.is_empty() {
+                None
+            } else {
+                Some(decision_hash.clone())
+            },
             settlement_interval: None,
             max_imbalance: None,
             source_agreement_id: None,
@@ -699,6 +709,71 @@ mod tests {
     fn test_decision_receipt_id() {
         let id = DecisionReceiptId::new("proposal-123");
         assert_eq!(id.to_string(), "proposal-123");
+    }
+
+    #[test]
+    fn terminate_clearing_effect_forwards_decision_hash() {
+        // Canonical KernelEffect::Federation path: a non-empty decision_hash on
+        // the effect must reach FederationOperation.decision_hash (Some), and
+        // distinct decision hashes must produce distinct operations so the
+        // downstream terminate_clearing state_change_hash differs per decision.
+        let op_a = federation_effect_to_operation(&FederationEffect::TerminateClearing {
+            initiating_coop_did: "coop-alpha".to_string(),
+            partner_coop_did: "coop-beta".to_string(),
+            reason: "persistent imbalance".to_string(),
+            decision_hash: "sha256:decision-a".to_string(),
+        });
+        let op_b = federation_effect_to_operation(&FederationEffect::TerminateClearing {
+            initiating_coop_did: "coop-alpha".to_string(),
+            partner_coop_did: "coop-beta".to_string(),
+            reason: "persistent imbalance".to_string(),
+            decision_hash: "sha256:decision-b".to_string(),
+        });
+        assert_eq!(op_a.decision_hash, Some("sha256:decision-a".to_string()));
+        assert_eq!(op_b.decision_hash, Some("sha256:decision-b".to_string()));
+        assert_ne!(
+            op_a.decision_hash, op_b.decision_hash,
+            "distinct decision hashes must propagate distinctly"
+        );
+
+        // Empty decision_hash stays None (tolerated provenance, not an auth gate).
+        let op_empty = federation_effect_to_operation(&FederationEffect::TerminateClearing {
+            initiating_coop_did: "coop-alpha".to_string(),
+            partner_coop_did: "coop-beta".to_string(),
+            reason: "persistent imbalance".to_string(),
+            decision_hash: String::new(),
+        });
+        assert_eq!(op_empty.decision_hash, None);
+    }
+
+    #[test]
+    fn revoke_vouch_effect_forwards_decision_hash() {
+        let op_a = federation_effect_to_operation(&FederationEffect::RevokeVouch {
+            revoker_did: "coop-alpha".to_string(),
+            target_coop_did: "coop-gamma".to_string(),
+            reason: "governance misconduct".to_string(),
+            decision_hash: "sha256:decision-a".to_string(),
+        });
+        let op_b = federation_effect_to_operation(&FederationEffect::RevokeVouch {
+            revoker_did: "coop-alpha".to_string(),
+            target_coop_did: "coop-gamma".to_string(),
+            reason: "governance misconduct".to_string(),
+            decision_hash: "sha256:decision-b".to_string(),
+        });
+        assert_eq!(op_a.decision_hash, Some("sha256:decision-a".to_string()));
+        assert_eq!(op_b.decision_hash, Some("sha256:decision-b".to_string()));
+        assert_ne!(
+            op_a.decision_hash, op_b.decision_hash,
+            "distinct decision hashes must propagate distinctly"
+        );
+
+        let op_empty = federation_effect_to_operation(&FederationEffect::RevokeVouch {
+            revoker_did: "coop-alpha".to_string(),
+            target_coop_did: "coop-gamma".to_string(),
+            reason: "governance misconduct".to_string(),
+            decision_hash: String::new(),
+        });
+        assert_eq!(op_empty.decision_hash, None);
     }
 
     #[test]
