@@ -57,6 +57,52 @@ View source on GitHub →
 <li><strong>Not a generated file inventory.</strong> Listing every file is a job for tooling (<code>git ls-files</code>, registry summary), not for hand-maintained docs.</li>
 <li><strong>Not a sales pitch.</strong> Public messaging lives on the website (<code>website/</code> and <code>intercooperative.network</code>). This directory speaks to readers who already opened the repo.</li>
 </ul>
+<h2>Truth layer / claim discipline</h2>
+<p>ICN already has several truth- and freshness-tracking systems. <strong>This index does not replace them, and there is deliberately no separate <code>docs/truth/</code> tree</strong> — a parallel truth root would be a competing source of truth, the exact thing the meaning-firewall and source-precedence discipline exist to prevent. Instead, here is which <em>existing</em> system answers which question:</p>
+<table>
+<thead>
+<tr>
+<th>Question</th>
+<th>Authoritative system</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Which source wins when two disagree? (precedence, status labels, overclaim guardrails)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">`source-of-truth-map.md`</a></td>
+</tr>
+<tr>
+<td>How strong is the proof behind a claim? (L0–L8 ladder)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">`proof-level-taxonomy-capability-matrix.md`</a></td>
+</tr>
+<tr>
+<td>What truth-class / canonical status does a doc carry?</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/registry.toml">`docs/registry.toml`</a> + <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs-control-map">`docs-control-map.md`</a> (checked by <code>docs/scripts/doc_control_check.py</code>)</td>
+</tr>
+<tr>
+<td>How complete is a subsystem&#39;s implementation?</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/status.toml">`docs/status.toml`</a></td>
+</tr>
+<tr>
+<td>Is an <code>ARCHITECTURE.md</code> section stale?</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/freshness.toml">`docs/freshness.toml`</a> (checked by <code>docs/scripts/freshness-check.py</code>; broader SME re-review tracked in <a href="https://github.com/InterCooperative-Network/icn/issues/2047" target="_blank" rel="noopener">#2047</a>)</td>
+</tr>
+<tr>
+<td>What is real now vs planned?</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/current-truth-map">`current-truth-map.md`</a> → then <a href="/docs/STATE">`docs/STATE.md`</a> + <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a></td>
+</tr>
+<tr>
+<td>What is safe to show / claim publicly?</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">`show-readiness-map.md`</a> + <a href="https://github.com/InterCooperative-Network/icn/blob/main/website-truth-map">`website-truth-map.md`</a></td>
+</tr>
+</tbody></table>
+<p><strong>Discipline (for humans and agents):</strong></p>
+<ul>
+<li><strong>Orientation maps are not canonical state.</strong> Everything in this directory is <code>Canonical: no</code>. Defer to code/tests first, then <code>STATE.md</code>/<code>PHASE_PROGRESS.md</code>, then accepted ADRs/RFCs — the full ranking is in <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">`source-of-truth-map.md`</a>.</li>
+<li><strong>Bound every claim by its proof level.</strong> Do not describe an L0–L1 design as implemented, or an L4 fixture/demo as live. Public claims must not exceed what <code>show-readiness-map.md</code> plus current canonical state support.</li>
+<li><strong>Use the existing implementation-status labels</strong> (from <code>source-of-truth-map.md</code>); do not invent new ones:
+<code>implemented</code> · <code>implemented but partial</code> · <code>feature-gated</code> · <code>fixture-backed</code> · <code>gateway-backed</code> · <code>docs-only / design-direction</code> · <code>package-local</code> · <code>private-boundary</code> · <code>stale / historical</code> · <code>unknown / needs local verification</code>.</li>
+<li><strong>Proof ladder</strong> (from <code>proof-level-taxonomy-capability-matrix.md</code>): <code>L0</code> named/design-only → <code>L1</code> schema/contract → <code>L2</code> unit-tested → <code>L3</code> integration-tested → <code>L4</code> local proof loop → <code>L5</code> live daemon/gateway → <code>L6</code> multi-node/devnet → <code>L7</code> partner/organizer rehearsal → <code>L8</code> production hardening.</li>
+</ul>
 <h2>Start here by role</h2>
 <table>
 <thead>
