@@ -112,10 +112,16 @@ any endpoint is converted — &quot;architecture, not a sweep.&quot;</p>
 <td><code>icn/crates/icn-gateway/src/authority.rs:22-100</code></td>
 </tr>
 </tbody></table>
-<p>The token (<code>TokenClaims</code>, <code>icn/crates/icn-gateway/src/auth.rs:109-116</code>) is
-<code>{ sub (DID), iat, exp, coop_id (flat slug), scopes[] }</code>. <strong>There is no <code>EntityId</code> or
-entity-type claim today.</strong> The authz subject is therefore split: a DID (<code>sub</code>) <em>and</em> a flat coop
-slug (<code>coop_id</code>), with no typed entity binding.</p>
+<p>The token (<code>TokenClaims</code>, <code>icn/crates/icn-gateway/src/auth.rs</code>) is
+<code>{ sub (DID), iat, exp, coop_id (flat slug), scopes[] }</code>, plus — since PR #2111 (#2080
+lane PR1) — <strong>optional, non-enforcing</strong> <code>entity_id</code> / <code>entity_type</code> claims. Those optional
+claims are migration groundwork only: they are never set by the self-asserted path
+(<code>verify_challenge</code> → <code>issue_token</code> mints <code>None</code>), read by no guard, and <strong>not yet populated
+by any trusted issuance path</strong> — so there is <strong>no <em>trusted, enforced</em> typed entity binding
+today</strong>. The authz subject is therefore still split: a DID (<code>sub</code>) <em>and</em> a flat coop slug
+(<code>coop_id</code>), with no enforced typed entity binding. Distinguish the now-present optional claim
+<em>shape</em> (<code>issue_entity_token</code> mint seam) from the still-missing trusted <em>population</em> and
+<em>enforcement</em> (RFC migration steps below).</p>
 <h3>The entity model already available (Regime B)</h3>
 <p><code>icn-entity</code> provides the material an entity-aware primitive needs:</p>
 <ul>

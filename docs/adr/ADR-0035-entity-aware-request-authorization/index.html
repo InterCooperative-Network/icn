@@ -152,7 +152,10 @@ tests stay green.</li>
 <ul>
 <li>Treasury enforcement cutover (gated on clean observation metrics + membership
 backfill; possible <code>TreasuryRead</code>/<code>TreasurySensitiveRead</code> split).</li>
-<li><code>entity_id</code> token claim (only if/when a trusted issuance path exists).</li>
+<li><code>entity_id</code> token claim — <strong>partially landed.</strong> The optional, <strong>non-enforcing</strong>
+<code>entity_id</code>/<code>entity_type</code> claim shape + <code>issue_entity_token</code> mint seam landed in
+PR #2111 (#2080 lane PR1). It is never set by the self-asserted path and read by
+no guard. <em>Populating</em> it from a trusted issuance path remains the follow-up.</li>
 <li>Canonical persisted <code>coop_id ↔ EntityId</code> mapping/backfill.</li>
 <li>Other endpoint families; delegation/federation/community cross-entity authority
 (RFC-0018 Step 5).</li>
@@ -191,6 +194,14 @@ backfill; possible <code>TreasuryRead</code>/<code>TreasurySensitiveRead</code> 
 <p>This ADR records the first RFC-0018 implementation slice. The RFC remains the
 design of record for the full migration; this ADR fixes the concrete decisions the
 primitive and treasury-observe wiring bake in.</p>
+<p><strong>Update (2026-06-20, PR #2111 / #2080 lane PR1):</strong> the &quot;Carry an <code>entity_id</code>/authority
+claim in the JWT&quot; alternative above was rejected <em>for this slice&#39;s purpose</em> — resolving
+the caller&#39;s authority from a <strong>self-asserted, guard-trusted</strong> claim, which recreates the
+#2075 problem. PR #2111 adds an optional <code>entity_id</code>/<code>entity_type</code> claim that is <strong>not</strong> that:
+it is non-enforcing (no guard reads it), it is never set by the self-asserted path
+(<code>verify_challenge</code> → <code>issue_token</code> mints <code>None</code>), and it is populated only by a future
+trusted issuance path. The &quot;resolve at the guard&quot; decision for the observe slice stands;
+the claim is migration groundwork, not a trusted caller-supplied authority input.</p>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
