@@ -252,6 +252,45 @@ grep -RIn &quot;route\|service\|configure&quot; icn/apps/governance/src/http icn
 <li><strong>identity, position, obligation, allocation, settlement, unit</strong> — preferred.</li>
 <li><strong>payment, currency, wallet, balance</strong> — avoided. A <code>unit</code> is not a currency. A <code>position</code> is not a balance. A <code>settlement</code> is not a payment. The Regulatory Compliance Linter enforces this.</li>
 </ul>
+<h2>Reviewing public/API claims against generated evidence</h2>
+<p>Before a public, demo, or docs surface claims anything about ICN&#39;s API/route surface, check it against the <strong>mechanical evidence</strong>, not prose. This supports the public-surface truth-sync work in <a href="https://github.com/InterCooperative-Network/icn/issues/1779" target="_blank" rel="noopener">#1779</a> and the route/API inventory lane <a href="https://github.com/InterCooperative-Network/icn/issues/2112" target="_blank" rel="noopener">#2112</a>.</p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/generated/route-inventory">`generated/route-inventory.md`</a> — gateway route-macro declarations, unparsed gateway candidates, governance-app route-registration candidates, and OpenAPI matched/unmatched (regenerate/check with <code>docs/scripts/route_inventory.py</code>).</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/api/openapi.generated.yaml">`docs/api/openapi.generated.yaml`</a> — the documented contract.</li>
+</ul>
+<p><strong>What this evidence proves / does not prove:</strong> it proves route <strong>declarations / registration sites exist in source</strong> at a snapshot commit. It does <strong>not</strong> prove correctness, authn/authz, mounting, test coverage, runtime health, or production readiness. OpenAPI presence does not prove a route is served; a route being served does not prove it is public-safe.</p>
+<p><strong>Shape of the surface (see the inventory for live counts):</strong> the gateway has hundreds of route-macro declarations, plus a <strong>separate</strong> governance-app registration surface (served under the gateway&#39;s <code>/v1/gov</code> scope, not gateway macros), while the generated OpenAPI documents only a handful of paths. So &quot;the API&quot; is far larger than OpenAPI describes — most of it is <em>undocumented</em>, not absent.</p>
+<p><strong>Safe vs unsafe public/API claim patterns</strong> — use the existing status vocabulary from <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">`source-of-truth-map.md`</a>, bound by proof level in <a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">`proof-level-taxonomy-capability-matrix.md`</a>, and demo limits in <a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">`show-readiness-map.md`</a>:</p>
+<table>
+<thead>
+<tr>
+<th>Claim</th>
+<th>Verdict</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>&quot;Member standing and action cards are <strong>declared + OpenAPI-documented</strong> member-facing read models, fixture-backed in <code>?mode=demo</code>&quot;</td>
+<td>safe</td>
+<td><code>GET /v1/gov/me/standing</code> + <code>GET /v1/gov/me/action-cards</code> are governance-registered <strong>and</strong> OpenAPI-documented, and the demo panes are fixture-backed. Bounded to declared/documented + demo — does <strong>not</strong> assert a confirmed-live, authenticated runtime endpoint (per &quot;proves / does not prove&quot; above; confirm via <a href="/docs/STATE">`docs/STATE.md`</a> + ops).</td>
+</tr>
+<tr>
+<td>&quot;The API is documented / complete / fully specified&quot;</td>
+<td><strong>unsafe</strong></td>
+<td>OpenAPI documents only a handful of the hundreds of declared routes; the rest are <code>unknown / needs local verification</code>, not specified.</td>
+</tr>
+<tr>
+<td>&quot;Endpoint X is live / in production&quot;</td>
+<td><strong>unsafe</strong> unless ops-confirmed</td>
+<td>a declaration/registration is not a running, served, authenticated route; defer to <a href="/docs/STATE">`docs/STATE.md`</a> + current ops evidence.</td>
+</tr>
+<tr>
+<td>&quot;Governance <code>/v1/gov/*</code> routes are part of the gateway&#39;s documented surface&quot;</td>
+<td>partial</td>
+<td>they are governance-app registrations surfaced as candidates — not gateway route macros, and only a few reach OpenAPI.</td>
+</tr>
+</tbody></table>
+<p><strong>Rule:</strong> keep public claims at or below what the generated evidence <strong>plus</strong> current canonical state (<a href="/docs/STATE">`docs/STATE.md`</a>, <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>) support. When unsure, say <code>unknown / needs local verification</code> rather than implying coverage.</p>
 <h2>Where to read deeper</h2>
 <table>
 <thead>
