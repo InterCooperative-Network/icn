@@ -646,6 +646,8 @@ mod tests {
         // for handlers that call get_claims(). No holder exists for this DID, so the
         // handler should return 404 after auth passes.
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: did.clone(),
             iat: 1_000_000_000,
             exp: 9_999_999_999,

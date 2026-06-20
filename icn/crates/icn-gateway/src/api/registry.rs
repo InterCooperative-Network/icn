@@ -1042,6 +1042,8 @@ mod tests {
             )
             .await;
             let claims = TokenClaims {
+                entity_id: None,
+                entity_type: None,
                 sub: "did:icn:test-user".to_string(),
                 iat: 1_000_000_000,
                 exp: 9_999_999_999,
@@ -1108,6 +1110,8 @@ mod tests {
             )
             .await;
             let claims = TokenClaims {
+                entity_id: None,
+                entity_type: None,
                 sub: "did:icn:test-user".to_string(),
                 iat: 1_000_000_000,
                 exp: 9_999_999_999,
@@ -1178,6 +1182,8 @@ mod tests {
             )
             .await;
             let claims = TokenClaims {
+                entity_id: None,
+                entity_type: None,
                 sub: "did:icn:test-user".to_string(),
                 iat: 1_000_000_000,
                 exp: 9_999_999_999,
@@ -1230,6 +1236,8 @@ mod tests {
             )
             .await;
             let claims = TokenClaims {
+                entity_id: None,
+                entity_type: None,
                 sub: "did:icn:test-user".to_string(),
                 iat: 1_000_000_000,
                 exp: 9_999_999_999,
@@ -1586,6 +1594,8 @@ mod tests {
         .await;
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: KeyPair::generate().unwrap().did().to_string(),
             iat: 1_000_000_000,
             coop_id: "did:icn:test123".to_string(),
@@ -1661,6 +1671,8 @@ mod tests {
         .await;
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: KeyPair::generate().unwrap().did().to_string(),
             iat: 1_000_000_000,
             coop_id: coop_id.clone(),

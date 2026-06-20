@@ -1465,6 +1465,8 @@ mod tests {
 
         // Inject minimal JWT claims so require_scope("federation:read") passes.
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "coop-alpha".to_string(),
@@ -1510,6 +1512,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -1686,6 +1690,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -1731,6 +1737,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -1769,6 +1777,8 @@ mod tests {
         .await;
 
         let make_claims = || crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -1812,6 +1822,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -1853,6 +1865,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -1902,6 +1916,8 @@ mod tests {
         .await;
 
         let make_claims = || crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -1947,6 +1963,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -1986,6 +2004,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -2024,6 +2044,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -2061,6 +2083,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -2098,6 +2122,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -2136,6 +2162,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -2198,6 +2226,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: own_did.to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -2292,6 +2322,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: member_did.to_string(),
             iat: 1_000_000_000,
             coop_id: "coop-alpha".to_string(),
@@ -2423,6 +2455,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -2630,6 +2664,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -2697,6 +2733,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -2750,6 +2788,8 @@ mod tests {
         .await;
 
         let claims = crate::auth::TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test".to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
