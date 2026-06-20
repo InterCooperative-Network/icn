@@ -399,6 +399,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -417,6 +419,8 @@ mod tests {
 
         // Get coop with authorization
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -473,6 +477,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: owner.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -538,6 +544,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: owner.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -562,6 +570,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: owner.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -598,6 +608,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "alice-coop".to_string(),
@@ -680,6 +692,8 @@ mod tests {
 
         // Alice tries to read coop-tech info using her coop-food token (should fail)
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "coop-food".to_string(),
@@ -703,6 +717,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "coop-food".to_string(), // Alice's token is for coop-food

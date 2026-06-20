@@ -429,6 +429,8 @@ mod tests {
 
     fn write_claims(coop: &str, sub: &str) -> TokenClaims {
         TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: sub.to_string(),
             iat: 1_000_000_000,
             exp: 9_999_999_999,
@@ -536,6 +538,8 @@ mod tests {
         .await;
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: owner.clone(),
             iat: 1_000_000_000,
             exp: 9_999_999_999,
