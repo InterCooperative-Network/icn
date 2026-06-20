@@ -17,6 +17,11 @@ on:
       # outside src/api/ must still fire the drift check. The script and its
       # generated artifact under docs/ are already covered by docs/**.
       - 'icn/crates/icn-gateway/src/**'
+      # route-inventory also scans the governance app's route registrations
+      # (web::resource(...).route(...)) in apps/governance/src/http/, mounted under
+      # the gateway's /gov scope — include that source so governance route changes
+      # also fire the --check drift guard.
+      - 'icn/apps/governance/src/http/**'
       # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
       # under docs/scripts + docs/contracts are already covered by docs/**
       - 'web/pilot-ui/fixtures/**'
@@ -26,6 +31,10 @@ on:
       - 'ARCHITECTURE.md'
       - 'README.md'
       - 'CONTRIBUTING.md'
+      # include this workflow so a PR that only edits it self-validates on the
+      # pull_request event (push.paths already lists it; matches other
+      # path-filtered workflows e.g. mcp-portability.yml).
+      - '.github/workflows/docs-freshness.yml'
       - 'docs/scripts/doc_control_check.py'
       # gateway route source is code-truth for the API-doc canonical guard
       - 'icn/crates/icn-gateway/src/api/ledger.rs'
@@ -35,6 +44,11 @@ on:
       # outside src/api/ must still fire the drift check. The script and its
       # generated artifact under docs/ are already covered by docs/**.
       - 'icn/crates/icn-gateway/src/**'
+      # route-inventory also scans the governance app's route registrations
+      # (web::resource(...).route(...)) in apps/governance/src/http/, mounted under
+      # the gateway's /gov scope — include that source so governance route changes
+      # also fire the --check drift guard.
+      - 'icn/apps/governance/src/http/**'
       # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
       # under docs/scripts + docs/contracts are already covered by docs/**
       - 'web/pilot-ui/fixtures/**'
