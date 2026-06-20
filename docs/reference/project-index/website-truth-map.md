@@ -43,7 +43,6 @@ When the website and repo disagree, defer to the source-of-truth hierarchy, then
 | `for-cooperatives.astro` | Adoption framing. | high: can imply readiness or formal pilots. |
 | `for-developers.astro` | Contributor/developer framing. | medium: can point to stale commands or surfaces. |
 | `get-involved.astro` | Participation path. | medium: can overpromise. |
-| `src/content/docs/` | Website docs mirror/content. | high: can become stale duplicate documentation. |
 
 ## Public claim checklist
 
