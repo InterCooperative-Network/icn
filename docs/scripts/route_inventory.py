@@ -55,7 +55,9 @@ ATTR_RE = re.compile(r'#\[(get|post|put|delete|patch|head)\("([^"]*)"\)\]')
 ROUTE_RE = re.compile(r'#\[route\("([^"]*)"\s*,\s*method\s*=\s*"([A-Za-z]+)"')
 FN_RE = re.compile(r'\b(?:pub\s+)?(?:async\s+)?fn\s+([A-Za-z_]\w*)')
 SCOPE_RE = re.compile(r'web::scope\("(/[^"]*)"\)')
-MODREF_RE = re.compile(r'api::([A-Za-z_]\w*)::')
+# Anchored at an identifier boundary so it does NOT match `api::<seg>::` *inside*
+# longer crate paths like `icn_kernel_api::services::` or `icn_api::LedgerService::`.
+MODREF_RE = re.compile(r'(?<![A-Za-z0-9_])api::([A-Za-z_]\w*)::')
 OAPI_PATH_RE = re.compile(r'^  (/\S*):\s*$')
 
 
@@ -63,10 +65,19 @@ def discover_routes() -> list[dict]:
     routes: list[dict] = []
     if not GATEWAY_SRC.is_dir():
         return routes
+    api_root = GATEWAY_SRC / "api"
     for rs in sorted(GATEWAY_SRC.rglob("*.rs")):
         lines = rs.read_text(encoding="utf-8", errors="replace").splitlines()
         rel = rs.relative_to(ROOT).as_posix()
-        module = rs.stem if rs.stem != "mod" else rs.parent.name
+        # Key by the TOP-LEVEL `src/api/<group>` segment (what server.rs registers as
+        # `api::<group>::...`), not the leaf filename — otherwise nested files such as
+        # `api/sdis/simple_enrollment.rs` would key on `simple_enrollment` and never
+        # resolve a scope. Files directly under `api/` use their own stem.
+        try:
+            parts = rs.relative_to(api_root).parts
+            module = parts[0][:-3] if len(parts) == 1 else parts[0]
+        except ValueError:
+            module = rs.stem if rs.stem != "mod" else rs.parent.name
         for i, line in enumerate(lines):
             method = path = None
             m = ATTR_RE.search(line)
@@ -98,8 +109,11 @@ def discover_routes() -> list[dict]:
 
 
 def module_scope_map() -> dict[str, str]:
-    """Best-effort: associate each `web::scope("/seg")` with the api::<module>:: refs
-    that textually follow it (until the next scope). Approximate, not a real parser."""
+    """Best-effort: associate each `web::scope("/seg")` with the `api::<module>::` refs
+    that appear in `.service(...)`/`.configure(...)` *registration* calls beneath it
+    (until the next scope). Only registration sites count — bare type references
+    (e.g. `crate::api::sdis::SdisState::new()`) are skipped so they cannot win the
+    `setdefault` and mislead the mapping. Approximate, not a real parser."""
     out: dict[str, str] = {}
     if not SERVER_RS.is_file():
         return out
@@ -108,6 +122,8 @@ def module_scope_map() -> dict[str, str]:
         sm = SCOPE_RE.search(line)
         if sm:
             current = sm.group(1) if sm.group(1) != "/v1" else ""
+        if ".service(" not in line and ".configure(" not in line:
+            continue
         for mod in MODREF_RE.findall(line):
             out.setdefault(mod, current)
     return out
@@ -208,10 +224,11 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[str], commit: 
     out.append("")
     out.append("## Limitations (PR1)")
     out.append("")
-    out.append("- **Full mounted-path resolution is best-effort.** The `Group` column is inferred from a simple "
-               "`web::scope(\"…\")` ↔ `api::<module>::` association read from `server.rs`; it is **not** a real Rust "
-               "parser and may be wrong for deeply-nested or conditional scopes. The relative macro `Path` and the "
-               "`Source` file are authoritative.")
+    out.append("- **Full mounted-path resolution is best-effort.** The `Group` column is `/v1` + a `web::scope(\"…\")` "
+               "segment associated from `server.rs` `.service(...)`/`.configure(...)` registration sites (matched at "
+               "identifier boundaries, keyed by the handler's top-level `icn/crates/icn-gateway/src/api/<group>` "
+               "module) + the relative macro path. It is **not** a real Rust parser and may be wrong for "
+               "deeply-nested or conditional scopes. The relative macro `Path` and the `Source` file are authoritative.")
     out.append("- Scans **attribute macros only** in `icn-gateway/src`. `web::resource(\"…\")`/`.route(\"…\")` "
                "registrations and out-of-crate handlers (e.g. `icn-governance-actor::http`) are not fully captured.")
     out.append("- This is **generated-map work, not API documentation completion** (issue #2112). It does not add or "
@@ -219,16 +236,19 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[str], commit: 
     out.append("")
     out.append("## Routes")
     out.append("")
-    out.append("Status vocabulary is the existing set from `source-of-truth-map.md`. PR1 defaults every discovered "
-               "route to `gateway-backed` (it is served by the gateway) and claim-safety to `needs review` "
-               "(per-route proof level is `unknown / needs local verification` pending human review).")
+    out.append("Status vocabulary is the existing set from `source-of-truth-map.md`; no new labels are introduced. "
+               "A static macro scan proves only that a routing macro is **declared** in source — not that the handler "
+               "is mounted and served (registration happens elsewhere via `.service(...)` / `.configure(...)`, which "
+               "this pass does not resolve). PR1 therefore **cannot** assert `gateway-backed`: every discovered route's "
+               "status defaults to `unknown / needs local verification` and claim-safety to `needs review`, pending "
+               "human or runtime confirmation.")
     out.append("")
     out.append("| Method | Path (macro) | Group (best-effort) | Source | Handler | OpenAPI | Status | Claim safety |")
     out.append("|---|---|---|---|---|---|---|---|")
     for r, fp, doc in rows:
         out.append(
             f"| {r['method']} | `{md_table_escape(r['path'] or '(empty)')}` | `{md_table_escape(fp)}` | "
-            f"`{r['file']}`:{r['line']} | `{md_table_escape(r['handler'])}` | {doc} | gateway-backed | needs review |"
+            f"`{r['file']}`:{r['line']} | `{md_table_escape(r['handler'])}` | {doc} | unknown / needs local verification | needs review |"
         )
     out.append("")
     return "\n".join(out)
