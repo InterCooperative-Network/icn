@@ -127,25 +127,30 @@ fn validate_cooperative_entity_id(entity_id: &EntityId) -> Result<(), CoopEntity
 pub trait CoopEntityMap {
     /// Project `coop_id` to its cooperative [`EntityId`] and bind the pair.
     ///
-    /// Equivalent to `bind_exact(coop_id, &project_coop_id(coop_id)?)`. Returns
-    /// the bound [`EntityId`] on success. Non-mappable `coop_id`s return
+    /// Equivalent to `bind_resolved(coop_id, &project_coop_id(coop_id)?)`.
+    /// Returns the bound [`EntityId`] on success. Non-mappable `coop_id`s return
     /// [`CoopEntityMapError::NotMappable`].
     fn bind_projected(&self, coop_id: &str) -> Result<EntityId, CoopEntityMapError> {
         let entity_id = project_coop_id(coop_id)?;
-        self.bind_exact(coop_id, &entity_id)?;
+        self.bind_resolved(coop_id, &entity_id)?;
         Ok(entity_id)
     }
 
-    /// Bind a caller-supplied `(coop_id, entity_id)` pair.
+    /// Bind a caller-supplied `(coop_id, entity_id)` pair, requiring `coop_id`
+    /// to itself be mappable (a valid cooperative slug).
     ///
-    /// In this foundation the `coop_id` must itself be mappable (a valid
-    /// cooperative slug); non-mappable `coop_id`s are rejected with
-    /// [`CoopEntityMapError::NotMappable`] because surrogate slug allocation is
-    /// out of scope here. Idempotent for an identical pair; rejects
-    /// [`CoopEntityMapError::Conflict`] if either side is already bound to a
-    /// different counterpart. The forward and reverse indexes are written
-    /// atomically — a rejected bind leaves no one-sided write.
-    fn bind_exact(&self, coop_id: &str, entity_id: &EntityId) -> Result<(), CoopEntityMapError>;
+    /// This is the reject-not-normalize entry point: a non-mappable `coop_id` is
+    /// rejected with [`CoopEntityMapError::NotMappable`] because surrogate slug
+    /// allocation is out of scope here. After the gate it delegates to
+    /// [`bind_resolved`](CoopEntityMap::bind_resolved), which owns the shared
+    /// cooperative-type validation, both-direction conflict detection, and
+    /// atomic bidirectional write. A rejected bind leaves no one-sided write.
+    fn bind_exact(&self, coop_id: &str, entity_id: &EntityId) -> Result<(), CoopEntityMapError> {
+        // Reject-not-normalize gate: this entry point requires a mappable
+        // coop_id; the actual write is the shared `bind_resolved` primitive.
+        project_coop_id(coop_id)?;
+        self.bind_resolved(coop_id, entity_id)
+    }
 
     /// Bind an original `coop_id` to an already-resolved cooperative
     /// [`EntityId`], **without** projecting or normalizing the `coop_id`.
@@ -206,46 +211,10 @@ impl InMemoryCoopEntityMap {
 }
 
 impl CoopEntityMap for InMemoryCoopEntityMap {
-    fn bind_exact(&self, coop_id: &str, entity_id: &EntityId) -> Result<(), CoopEntityMapError> {
-        // Reject-not-normalize gate: this foundation does not allocate surrogate
-        // slugs, so a non-mappable coop_id is refused rather than rewritten.
-        project_coop_id(coop_id)?;
-
-        // A flat coop_id denotes a cooperative target (RFC-0018): refuse to bind
-        // anything but a well-formed cooperative entity_id before touching either index.
-        validate_cooperative_entity_id(entity_id)?;
-
-        let mut inner = self
-            .inner
-            .write()
-            .map_err(|_| CoopEntityMapError::Storage("in-memory map lock poisoned".into()))?;
-
-        if let Some(bound) = inner.forward.get(coop_id) {
-            if bound != entity_id {
-                return Err(CoopEntityMapError::Conflict(format!(
-                    "coop_id {coop_id:?} is already bound to {bound}"
-                )));
-            }
-        }
-        if let Some(bound_coop) = inner.reverse.get(entity_id.as_str()) {
-            if bound_coop.as_str() != coop_id {
-                return Err(CoopEntityMapError::Conflict(format!(
-                    "entity {entity_id} is already bound to coop_id {bound_coop:?}"
-                )));
-            }
-        }
-
-        // Idempotent for an identical pair; otherwise insert both indexes.
-        inner.forward.insert(coop_id.to_string(), entity_id.clone());
-        inner
-            .reverse
-            .insert(entity_id.as_str().to_string(), coop_id.to_string());
-        Ok(())
-    }
-
     fn bind_resolved(&self, coop_id: &str, entity_id: &EntityId) -> Result<(), CoopEntityMapError> {
-        // No project_coop_id gate here (the one difference from bind_exact): the
-        // caller has already resolved the cooperative EntityId, so a non-mappable
+        // Shared write primitive: no project_coop_id gate here (bind_exact and
+        // bind_projected run that gate, then delegate to this method). The caller
+        // supplies an already-resolved cooperative EntityId, so a non-mappable
         // original coop_id (e.g. `coop:<uuid>`) is accepted and preserved as-is.
         //
         // A flat coop_id denotes a cooperative target (RFC-0018): refuse to bind
@@ -342,56 +311,10 @@ fn map_tx_err(e: sled::transaction::TransactionError<CoopEntityMapError>) -> Coo
 }
 
 impl CoopEntityMap for SledCoopEntityMap {
-    fn bind_exact(&self, coop_id: &str, entity_id: &EntityId) -> Result<(), CoopEntityMapError> {
-        // Reject-not-normalize gate (same invariant as the in-memory map).
-        project_coop_id(coop_id)?;
-
-        // A flat coop_id denotes a cooperative target (RFC-0018): refuse to bind
-        // anything but a well-formed cooperative entity_id before the transaction writes either index.
-        validate_cooperative_entity_id(entity_id)?;
-
-        let fkey = forward_key(coop_id);
-        let rkey = reverse_key(entity_id);
-        let entity_str = entity_id.as_str().to_string();
-        let coop_string = coop_id.to_string();
-        let entity_display = entity_id.to_string();
-
-        self.db
-            .transaction(|tx| {
-                let existing_fwd = tx.get(&fkey)?;
-                let existing_rev = tx.get(&rkey)?;
-
-                if let Some(bytes) = &existing_fwd {
-                    if bytes.as_ref() != entity_str.as_bytes() {
-                        return Err(ConflictableTransactionError::Abort(
-                            CoopEntityMapError::Conflict(format!(
-                                "coop_id {coop_string:?} is already bound to a different entity"
-                            )),
-                        ));
-                    }
-                }
-                if let Some(bytes) = &existing_rev {
-                    if bytes.as_ref() != coop_string.as_bytes() {
-                        return Err(ConflictableTransactionError::Abort(
-                            CoopEntityMapError::Conflict(format!(
-                                "entity {entity_display} is already bound to a different coop_id"
-                            )),
-                        ));
-                    }
-                }
-
-                // Idempotent for an identical pair; otherwise write both indexes
-                // atomically (an aborted conflict above leaves nothing written).
-                tx.insert(fkey.as_slice(), entity_str.as_bytes())?;
-                tx.insert(rkey.as_slice(), coop_string.as_bytes())?;
-                Ok(())
-            })
-            .map_err(map_tx_err)
-    }
-
     fn bind_resolved(&self, coop_id: &str, entity_id: &EntityId) -> Result<(), CoopEntityMapError> {
-        // No project_coop_id gate here (the one difference from bind_exact): the
-        // caller has already resolved the cooperative EntityId, so a non-mappable
+        // Shared write primitive: no project_coop_id gate here (bind_exact and
+        // bind_projected run that gate, then delegate to this method). The caller
+        // supplies an already-resolved cooperative EntityId, so a non-mappable
         // original coop_id (e.g. `coop:<uuid>`) is accepted and preserved as-is.
         //
         // A flat coop_id denotes a cooperative target (RFC-0018): refuse to bind
@@ -402,7 +325,6 @@ impl CoopEntityMap for SledCoopEntityMap {
         let rkey = reverse_key(entity_id);
         let entity_str = entity_id.as_str().to_string();
         let coop_string = coop_id.to_string();
-        let entity_display = entity_id.to_string();
 
         self.db
             .transaction(|tx| {
@@ -422,7 +344,7 @@ impl CoopEntityMap for SledCoopEntityMap {
                     if bytes.as_ref() != coop_string.as_bytes() {
                         return Err(ConflictableTransactionError::Abort(
                             CoopEntityMapError::Conflict(format!(
-                                "entity {entity_display} is already bound to a different coop_id"
+                                "entity {entity_str} is already bound to a different coop_id"
                             )),
                         ));
                     }
