@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-20T13:02:09+00:00
+Generated: 2026-06-20T13:46:22+00:00
 ---
 
 # Gateway Route Inventory (generated)
@@ -17,7 +17,7 @@ Generated: 2026-06-20T13:02:09+00:00
 
 ## Snapshot
 
-- Source commit: `0d0e7d656122b8e54f0bbe2433886f5b23fe23eb`
+- Source commit: `7f241718e55dfd27c8864b1e702d635cca5ce9ae`
 - Gateway source scanned: `icn/crates/icn-gateway/src/**`
 - OpenAPI spec: `docs/api/openapi.generated.yaml`
 
@@ -34,7 +34,7 @@ Generated: 2026-06-20T13:02:09+00:00
 ## Limitations (PR1)
 
 - **Full mounted-path resolution is best-effort.** The `Group` column is `/v1` + a `web::scope("…")` segment associated from `server.rs` `.service(...)`/`.configure(...)` registration sites (matched at identifier boundaries, keyed by the handler's top-level `icn/crates/icn-gateway/src/api/<group>` module) + the relative macro path. It is **not** a real Rust parser and may be wrong for deeply-nested or conditional scopes. The relative macro `Path` and the `Source` file are authoritative.
-- Scans **attribute macros only** in `icn-gateway/src`. `web::resource("…")`/`.route("…")` registrations and out-of-crate handlers (e.g. `icn-governance-actor::http`) are not fully captured.
+- The route table is **attribute macros only**. Macro-less `web::resource("…")`/`.route(…)` registrations are now **flagged** below (see *Unparsed route-registration candidates*) but **not** parsed into routes; out-of-crate handlers (e.g. `icn-governance-actor::http`) are still not captured.
 - This is **generated-map work, not API documentation completion** (issue #2112). It does not add or change any OpenAPI content or runtime behavior.
 
 ## Routes
@@ -330,4 +330,17 @@ Status vocabulary is the existing set from `source-of-truth-map.md`; no new labe
 | GET | `/trust/{did}/edges` | `/v1/trust/trust/{did}/edges` | `icn/crates/icn-gateway/src/api/trust.rs`:72 | `get_trust_edges` | no | unknown / needs local verification | needs review |
 | GET | `/trust/{did}/network` | `/v1/trust/trust/{did}/network` | `icn/crates/icn-gateway/src/api/trust.rs`:143 | `get_trust_network` | no | unknown / needs local verification | needs review |
 | GET | `/ws/{coop_id}` | `/v1/ws/{coop_id}` | `icn/crates/icn-gateway/src/api/websocket.rs`:12 | `websocket` | no | unknown / needs local verification | needs review |
+
+## Unparsed route-registration candidates
+
+Beyond attribute macros, Actix can also register routes via `web::resource("…").route(web::<method>().to(handler))`. This scan **flags** such sites mechanically but does **not** parse them into routes: a regex cannot reliably tell a production registration from a **test fixture** (e.g. inside `#[cfg(test)]` / `test::init_service`), and it does not resolve the mounted path without a real parser. They are **not** counted in the route total above and remain `unknown / needs local verification` — treat them as leads for human review.
+
+- **Candidates flagged: 4** (`web::resource("…")`: 2 · `.route(…)`: 2)
+
+| Kind | Resource literal | Source |
+|---|---|---|
+| `web::resource` | `/notifications/register` | `icn/crates/icn-gateway/src/api/notifications.rs`:315 |
+| `.route` | — | `icn/crates/icn-gateway/src/api/notifications.rs`:316 |
+| `web::resource` | `/{session_id}/approve` | `icn/crates/icn-gateway/src/server.rs`:1968 |
+| `.route` | — | `icn/crates/icn-gateway/src/server.rs`:1969 |
 

@@ -14,9 +14,10 @@ This is deliberately humble (issue #2112, PR1):
 - Full mounted-path resolution is **best-effort** (a module->scope heuristic
   read from server.rs), not a real Rust parser. The relative macro path and the
   source file are authoritative; the "group" column is approximate.
-- It scans the gateway crate's attribute macros only. `web::resource`/`.route`
-  registrations and out-of-crate HTTP handlers (e.g. `icn-governance-actor`) are
-  not fully captured.
+- It scans the gateway crate's attribute macros for the route table, and
+  additionally FLAGS macro-less `web::resource("…")`/`.route(…)` registration
+  *candidates* by file:line (not parsed into routes — see `resource_candidates`).
+  Out-of-crate HTTP handlers (e.g. `icn-governance-actor`) are still not captured.
 
 Usage:
     python3 docs/scripts/route_inventory.py --write    # regenerate the artifact
@@ -59,6 +60,12 @@ SCOPE_RE = re.compile(r'web::scope\("(/[^"]*)"\)')
 # longer crate paths like `icn_kernel_api::services::` or `icn_api::LedgerService::`.
 MODREF_RE = re.compile(r'(?<![A-Za-z0-9_])api::([A-Za-z_]\w*)::')
 OAPI_PATH_RE = re.compile(r'^  (/\S*):\s*$')
+# Macro-less route-registration *candidates* (issue #2112, PR3). FLAGGED, not
+# parsed into routes: a quoted `web::resource("…")` literal, and `.route(…)`
+# method bindings. RESOURCE_RE requires a quoted argument, so `web::resource().to()`
+# in a doc comment does not match.
+RESOURCE_RE = re.compile(r'web::resource\("([^"]*)"\)')
+ROUTE_CALL_RE = re.compile(r'\.route\(')
 
 
 def discover_routes() -> list[dict]:
@@ -145,6 +152,28 @@ def openapi_paths() -> list[str]:
     return paths
 
 
+def resource_candidates() -> list[dict]:
+    """Mechanically FLAG macro-less Actix route-registration candidates in the
+    gateway crate: `web::resource("…")` resource literals and `.route(…)` method
+    bindings. These are deliberately NOT counted as routes and NOT path-resolved:
+    a regex scan cannot reliably distinguish a production registration from a
+    test fixture (e.g. inside `#[cfg(test)]` / `test::init_service`), nor resolve
+    the mounted path without a real parser. They are surfaced by file:line for
+    human review and stay `unknown / needs local verification`."""
+    out: list[dict] = []
+    if not GATEWAY_SRC.is_dir():
+        return out
+    for rs in sorted(GATEWAY_SRC.rglob("*.rs")):
+        rel = rs.relative_to(ROOT).as_posix()
+        for i, line in enumerate(rs.read_text(encoding="utf-8", errors="replace").splitlines()):
+            rm = RESOURCE_RE.search(line)
+            if rm:
+                out.append({"kind": "web::resource", "literal": rm.group(1), "file": rel, "line": i + 1})
+            elif ROUTE_CALL_RE.search(line):
+                out.append({"kind": ".route", "literal": "", "file": rel, "line": i + 1})
+    return out
+
+
 def norm(p: str) -> str:
     p = re.sub(r"\{[^}]+\}", "{}", p)
     p = re.sub(r"/+", "/", p)
@@ -162,7 +191,7 @@ def md_table_escape(s: str) -> str:
     return s.replace("|", "\\|")
 
 
-def render(routes: list[dict], scopes: dict[str, str], oapi: list[str], commit: str) -> str:
+def render(routes: list[dict], scopes: dict[str, str], oapi: list[str], reg_candidates: list[dict], commit: str) -> str:
     oapi_norm = {norm(p) for p in oapi}
     by_method: dict[str, int] = {}
     documented = 0
@@ -229,8 +258,9 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[str], commit: 
                "identifier boundaries, keyed by the handler's top-level `icn/crates/icn-gateway/src/api/<group>` "
                "module) + the relative macro path. It is **not** a real Rust parser and may be wrong for "
                "deeply-nested or conditional scopes. The relative macro `Path` and the `Source` file are authoritative.")
-    out.append("- Scans **attribute macros only** in `icn-gateway/src`. `web::resource(\"…\")`/`.route(\"…\")` "
-               "registrations and out-of-crate handlers (e.g. `icn-governance-actor::http`) are not fully captured.")
+    out.append("- The route table is **attribute macros only**. Macro-less `web::resource(\"…\")`/`.route(…)` "
+               "registrations are now **flagged** below (see *Unparsed route-registration candidates*) but **not** "
+               "parsed into routes; out-of-crate handlers (e.g. `icn-governance-actor::http`) are still not captured.")
     out.append("- This is **generated-map work, not API documentation completion** (issue #2112). It does not add or "
                "change any OpenAPI content or runtime behavior.")
     out.append("")
@@ -251,6 +281,29 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[str], commit: 
             f"`{r['file']}`:{r['line']} | `{md_table_escape(r['handler'])}` | {doc} | unknown / needs local verification | needs review |"
         )
     out.append("")
+
+    # Macro-less route-registration candidates (issue #2112, PR3) — flagged, not parsed.
+    res_n = sum(1 for c in reg_candidates if c["kind"] == "web::resource")
+    route_n = sum(1 for c in reg_candidates if c["kind"] == ".route")
+    out.append("## Unparsed route-registration candidates")
+    out.append("")
+    out.append("Beyond attribute macros, Actix can also register routes via "
+               "`web::resource(\"…\").route(web::<method>().to(handler))`. This scan **flags** such sites "
+               "mechanically but does **not** parse them into routes: a regex cannot reliably tell a production "
+               "registration from a **test fixture** (e.g. inside `#[cfg(test)]` / `test::init_service`), and it does "
+               "not resolve the mounted path without a real parser. They are **not** counted in the route total "
+               "above and remain `unknown / needs local verification` — treat them as leads for human review.")
+    out.append("")
+    out.append(f"- **Candidates flagged: {len(reg_candidates)}** "
+               f"(`web::resource(\"…\")`: {res_n} · `.route(…)`: {route_n})")
+    out.append("")
+    if reg_candidates:
+        out.append("| Kind | Resource literal | Source |")
+        out.append("|---|---|---|")
+        for c in sorted(reg_candidates, key=lambda x: (x["file"], x["line"])):
+            lit = f"`{md_table_escape(c['literal'])}`" if c["literal"] else "—"
+            out.append(f"| `{c['kind']}` | {lit} | `{c['file']}`:{c['line']} |")
+        out.append("")
     return "\n".join(out)
 
 
@@ -279,15 +332,17 @@ def main() -> int:
     routes = discover_routes()
     scopes = module_scope_map()
     oapi = openapi_paths()
+    reg_candidates = resource_candidates()
     if not routes:
         print(f"ERROR: no routes discovered under {GATEWAY_SRC} — wrong repo root?", file=sys.stderr)
         return 2
-    content = render(routes, scopes, oapi, commit)
+    content = render(routes, scopes, oapi, reg_candidates, commit)
 
     if args.write:
         ARTIFACT.parent.mkdir(parents=True, exist_ok=True)
         ARTIFACT.write_text(content + "\n", encoding="utf-8")
-        print(f"wrote {ARTIFACT.relative_to(ROOT)}: {len(routes)} routes, {len(oapi)} OpenAPI paths")
+        print(f"wrote {ARTIFACT.relative_to(ROOT)}: {len(routes)} routes, {len(oapi)} OpenAPI paths, "
+              f"{len(reg_candidates)} non-macro candidates")
         return 0
 
     # --check
@@ -296,7 +351,8 @@ def main() -> int:
         return 1
     committed = ARTIFACT.read_text(encoding="utf-8")
     if strip_volatile(committed).strip() == strip_volatile(content).strip():
-        print(f"OK: route inventory up to date ({len(routes)} routes, {len(oapi)} OpenAPI paths)")
+        print(f"OK: route inventory up to date ({len(routes)} routes, {len(oapi)} OpenAPI paths, "
+              f"{len(reg_candidates)} non-macro candidates)")
         return 0
     print(f"STALE: {ARTIFACT.relative_to(ROOT)} differs from a fresh scan — run --write and commit", file=sys.stderr)
     return 1
