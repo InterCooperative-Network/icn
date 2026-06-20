@@ -60,6 +60,7 @@ SCOPE_RE = re.compile(r'web::scope\("(/[^"]*)"\)')
 # longer crate paths like `icn_kernel_api::services::` or `icn_api::LedgerService::`.
 MODREF_RE = re.compile(r'(?<![A-Za-z0-9_])api::([A-Za-z_]\w*)::')
 OAPI_PATH_RE = re.compile(r'^  (/\S*):\s*$')
+OAPI_METHOD_RE = re.compile(r'^    (get|post|put|delete|patch|head):\s*$')
 # Macro-less route-registration *candidates* (issue #2112, PR3). FLAGGED, not
 # parsed into routes: a quoted `web::resource("…")` literal, and `.route(…)`
 # method bindings. RESOURCE_RE requires a quoted argument, so `web::resource().to()`
@@ -136,10 +137,13 @@ def module_scope_map() -> dict[str, str]:
     return out
 
 
-def openapi_paths() -> list[str]:
+def openapi_paths() -> list[dict]:
+    """Parse the generated OpenAPI `paths:` block into [{path, methods}].
+    Methods are the per-path operation keys (get/post/…), upper-cased."""
     if not OPENAPI.is_file():
         return []
-    paths, in_paths = [], False
+    out: list[dict] = []
+    in_paths, cur = False, None
     for line in OPENAPI.read_text(encoding="utf-8", errors="replace").splitlines():
         if line.rstrip() == "paths:":
             in_paths = True
@@ -148,8 +152,13 @@ def openapi_paths() -> list[str]:
             break
         m = OAPI_PATH_RE.match(line)
         if m:
-            paths.append(m.group(1))
-    return paths
+            cur = {"path": m.group(1), "methods": []}
+            out.append(cur)
+            continue
+        mm = OAPI_METHOD_RE.match(line)
+        if mm and cur is not None:
+            cur["methods"].append(mm.group(1).upper())
+    return out
 
 
 def resource_candidates() -> list[dict]:
@@ -193,8 +202,12 @@ def md_table_escape(s: str) -> str:
     return s.replace("|", "\\|")
 
 
-def render(routes: list[dict], scopes: dict[str, str], oapi: list[str], reg_candidates: list[dict], commit: str) -> str:
-    oapi_norm = {norm(p) for p in oapi}
+def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_candidates: list[dict], commit: str) -> str:
+    # Match by (METHOD, normalized-path) pairs, not path alone — otherwise a path
+    # documented for one verb but routed under another would falsely count as
+    # matched and be hidden from the unmatched section (issue #2112, PR4 review).
+    oapi_ops = {(m, norm(e["path"])) for e in oapi for m in (e["methods"] or ["?"])}
+    matched_ops: set = set()
     by_method: dict[str, int] = {}
     documented = 0
     rows = []
@@ -203,10 +216,20 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[str], reg_cand
         scope = scopes.get(r["module"], "")
         fp = full_path(scope, r["path"])
         candidates = {norm(fp), norm(scope + (r["path"] if r["path"].startswith("/") else "/" + r["path"])), norm(r["path"])}
-        documented_here = bool(candidates & oapi_norm)
+        hit = {(r["method"], c) for c in candidates} & oapi_ops
+        documented_here = bool(hit)
         if documented_here:
             documented += 1
+            matched_ops |= hit
         rows.append((r, fp, "yes" if documented_here else "no"))
+
+    # OpenAPI operations (method + path) that no discovered gateway route matched.
+    unmatched_ops = [
+        {"method": m, "path": e["path"]}
+        for e in oapi
+        for m in (e["methods"] or ["?"])
+        if (m, norm(e["path"])) not in matched_ops
+    ]
 
     total = len(routes)
     undoc = total - documented
@@ -243,9 +266,10 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[str], reg_cand
     out.append("")
     out.append(f"- **Discovered gateway route macros: {total}** ({method_line})")
     out.append(f"- **OpenAPI documented paths: {len(oapi)}**")
-    out.append(f"- Matched as documented (best-effort path match): {documented}")
+    out.append(f"- Matched as documented (best-effort method+path match): {documented}")
     out.append(f"- Not matched to OpenAPI (best-effort): {undoc} (~{undoc / total * 100:.0f}% of discovered)" if total else "- Not matched to OpenAPI: 0")
     out.append(f"- Documented share of discovered routes: ~{pct_doc:.1f}%")
+    out.append(f"- **OpenAPI operations (method + path) not matched to a discovered gateway route: {len(unmatched_ops)}** (see section below)")
     out.append("")
     out.append("> The gap is structural: only handlers hand-annotated for utoipa reach the OpenAPI spec. "
                "Of the OpenAPI paths, several belong to `icn-governance-actor` HTTP handlers that live outside "
@@ -253,6 +277,26 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[str], reg_cand
                "counts here are a best-effort comparison, while the two headline counts (discovered macros, "
                "OpenAPI paths) are the robust measured facts.")
     out.append("")
+    out.append("## OpenAPI paths not matched to discovered gateway routes")
+    out.append("")
+    out.append("These OpenAPI-documented paths did **not** mechanically match any discovered gateway route macro. "
+               "That is expected when a handler is documented via `#[utoipa::path]` but **registered outside the "
+               "scanned `icn/crates/icn-gateway/src/**` tree** — e.g. the governance app (`icn-governance-actor` = "
+               "`icn/apps/governance`) documents its `/gov/*` handlers with utoipa and mounts them via "
+               "`web::resource(\"…\").route(…)` in `apps/governance/src/http/configure.rs` (no attribute macros). "
+               "OpenAPI presence does **not** prove a runtime route exists or is mounted; these stay "
+               "`unknown / needs local verification`.")
+    out.append("")
+    if unmatched_ops:
+        out.append("| Method | OpenAPI path | Matched gateway route | Status | Claim safety |")
+        out.append("|---|---|---|---|---|")
+        for op in sorted(unmatched_ops, key=lambda x: (x["path"], x["method"])):
+            out.append(f"| {op['method']} | `{md_table_escape(op['path'])}` | no | "
+                       "unknown / needs local verification | needs review |")
+        out.append("")
+    else:
+        out.append("- None: every OpenAPI operation matched a discovered gateway route.")
+        out.append("")
     out.append("## Limitations")
     out.append("")
     out.append("- **Full mounted-path resolution is best-effort.** The `Group` column is `/v1` + a `web::scope(\"…\")` "
