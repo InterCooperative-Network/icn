@@ -36,6 +36,7 @@ ICN already has several truth- and freshness-tracking systems. **This index does
 | Is an `ARCHITECTURE.md` section stale? | [`docs/freshness.toml`](../../freshness.toml) (checked by `docs/scripts/freshness-check.py`; broader SME re-review tracked in [#2047](https://github.com/InterCooperative-Network/icn/issues/2047)) |
 | What is real now vs planned? | [`current-truth-map.md`](current-truth-map.md) → then [`docs/STATE.md`](../../STATE.md) + [`docs/PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md) |
 | What is safe to show / claim publicly? | [`show-readiness-map.md`](show-readiness-map.md) + [`website-truth-map.md`](website-truth-map.md) |
+| What routes does the gateway actually expose, and which reach OpenAPI? | [`generated/route-inventory.md`](generated/route-inventory.md) — mechanical scan, regenerate with `docs/scripts/route_inventory.py` ([#2112](https://github.com/InterCooperative-Network/icn/issues/2112)) |
 
 **Discipline (for humans and agents):**
 

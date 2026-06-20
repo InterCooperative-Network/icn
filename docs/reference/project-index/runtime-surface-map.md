@@ -10,6 +10,8 @@ Last Reviewed: 2026-04-29
 
 This document points at the gateway endpoints, primitives, and proof artifacts that exist as real runtime surfaces in the current main. It is not exhaustive — a full API reference lives in [`docs/reference/api/API_REFERENCE.md`](../api/API_REFERENCE.md) — and it does not over-document implementation details. It is a fast routing layer.
 
+> For a **mechanical inventory of every gateway route declaration** (Actix attribute macros) versus OpenAPI coverage, see the generated [`generated/route-inventory.md`](generated/route-inventory.md) (regenerate/check with `docs/scripts/route_inventory.py`; issue [#2112](https://github.com/InterCooperative-Network/icn/issues/2112)). It proves declarations exist in source — not correctness, auth, tests, or production readiness.
+
 ## The gateway
 
 The `icn-gateway` crate exposes the REST + WebSocket surface used by member-facing apps and SDKs.
