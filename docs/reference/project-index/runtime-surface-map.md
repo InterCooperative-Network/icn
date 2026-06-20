@@ -99,6 +99,28 @@ ICN's runtime surfaces use:
 - **identity, position, obligation, allocation, settlement, unit** — preferred.
 - **payment, currency, wallet, balance** — avoided. A `unit` is not a currency. A `position` is not a balance. A `settlement` is not a payment. The Regulatory Compliance Linter enforces this.
 
+## Reviewing public/API claims against generated evidence
+
+Before a public, demo, or docs surface claims anything about ICN's API/route surface, check it against the **mechanical evidence**, not prose. This supports the public-surface truth-sync work in [#1779](https://github.com/InterCooperative-Network/icn/issues/1779) and the route/API inventory lane [#2112](https://github.com/InterCooperative-Network/icn/issues/2112).
+
+- [`generated/route-inventory.md`](generated/route-inventory.md) — gateway route-macro declarations, unparsed gateway candidates, governance-app route-registration candidates, and OpenAPI matched/unmatched (regenerate/check with `docs/scripts/route_inventory.py`).
+- [`docs/api/openapi.generated.yaml`](../../api/openapi.generated.yaml) — the documented contract.
+
+**What this evidence proves / does not prove:** it proves route **declarations / registration sites exist in source** at a snapshot commit. It does **not** prove correctness, authn/authz, mounting, test coverage, runtime health, or production readiness. OpenAPI presence does not prove a route is served; a route being served does not prove it is public-safe.
+
+**Shape of the surface (see the inventory for live counts):** the gateway has hundreds of route-macro declarations, plus a **separate** governance-app registration surface (mounted under `/gov`, not gateway macros), while the generated OpenAPI documents only a handful of paths. So "the API" is far larger than OpenAPI describes — most of it is *undocumented*, not absent.
+
+**Safe vs unsafe public/API claim patterns** — use the existing status vocabulary from [`source-of-truth-map.md`](source-of-truth-map.md), bound by proof level in [`proof-level-taxonomy-capability-matrix.md`](proof-level-taxonomy-capability-matrix.md), and demo limits in [`show-readiness-map.md`](show-readiness-map.md):
+
+| Claim | Verdict | Why |
+|---|---|---|
+| "Member standing and action cards exist as member-facing read models" | safe | `GET /v1/gov/me/standing` + `GET /v1/gov/me/action-cards` are governance-registered **and** OpenAPI-documented; fixture-backed in `?mode=demo`. |
+| "The API is documented / complete / fully specified" | **unsafe** | OpenAPI documents only a handful of the hundreds of declared routes; the rest are `unknown / needs local verification`, not specified. |
+| "Endpoint X is live / in production" | **unsafe** unless ops-confirmed | a declaration/registration is not a running, served, authenticated route; defer to [`docs/STATE.md`](../../STATE.md) + current ops evidence. |
+| "Governance `/gov/*` routes are part of the gateway's documented surface" | partial | they are governance-app registrations surfaced as candidates — not gateway route macros, and only a few reach OpenAPI. |
+
+**Rule:** keep public claims at or below what the generated evidence **plus** current canonical state ([`docs/STATE.md`](../../STATE.md), [`docs/PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md)) support. When unsure, say `unknown / needs local verification` rather than implying coverage.
+
 ## Where to read deeper
 
 | Topic | Doc |
