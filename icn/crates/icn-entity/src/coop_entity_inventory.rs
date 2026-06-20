@@ -456,6 +456,9 @@ mod tests {
         fn bind_exact(&self, _: &str, _: &EntityId) -> Result<(), CoopEntityMapError> {
             unreachable!("classify_coop_ids must never write through the map");
         }
+        fn bind_resolved(&self, _: &str, _: &EntityId) -> Result<(), CoopEntityMapError> {
+            unreachable!("classify_coop_ids must never write through the map");
+        }
         fn entity_for_coop(&self, _: &str) -> Result<Option<EntityId>, CoopEntityMapError> {
             Ok(self.forward.clone())
         }
@@ -816,6 +819,9 @@ mod tests {
         struct ReverseErrMap;
         impl CoopEntityMap for ReverseErrMap {
             fn bind_exact(&self, _: &str, _: &EntityId) -> Result<(), CoopEntityMapError> {
+                unreachable!("preview must never write through the map");
+            }
+            fn bind_resolved(&self, _: &str, _: &EntityId) -> Result<(), CoopEntityMapError> {
                 unreachable!("preview must never write through the map");
             }
             // Ok(None) keeps "coop_A" classified NonMappable (unbound + unmappable).
