@@ -17,6 +17,11 @@ on:
       # outside src/api/ must still fire the drift check. The script and its
       # generated artifact under docs/ are already covered by docs/**.
       - 'icn/crates/icn-gateway/src/**'
+      # route-inventory also scans the governance app's route registrations
+      # (web::resource(...).route(...)) in apps/governance/src/http/, mounted under
+      # the gateway's /gov scope — include that source so governance route changes
+      # also fire the --check drift guard.
+      - 'icn/apps/governance/src/http/**'
       # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
       # under docs/scripts + docs/contracts are already covered by docs/**
       - 'web/pilot-ui/fixtures/**'
@@ -35,6 +40,11 @@ on:
       # outside src/api/ must still fire the drift check. The script and its
       # generated artifact under docs/ are already covered by docs/**.
       - 'icn/crates/icn-gateway/src/**'
+      # route-inventory also scans the governance app's route registrations
+      # (web::resource(...).route(...)) in apps/governance/src/http/, mounted under
+      # the gateway's /gov scope — include that source so governance route changes
+      # also fire the --check drift guard.
+      - 'icn/apps/governance/src/http/**'
       # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
       # under docs/scripts + docs/contracts are already covered by docs/**
       - 'web/pilot-ui/fixtures/**'
