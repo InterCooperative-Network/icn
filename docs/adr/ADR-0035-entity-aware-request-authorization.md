@@ -123,7 +123,10 @@ Not implemented (tracked follow-ups):
 
 - Treasury enforcement cutover (gated on clean observation metrics + membership
   backfill; possible `TreasuryRead`/`TreasurySensitiveRead` split).
-- `entity_id` token claim (only if/when a trusted issuance path exists).
+- `entity_id` token claim — **partially landed.** The optional, **non-enforcing**
+  `entity_id`/`entity_type` claim shape + `issue_entity_token` mint seam landed in
+  PR #2111 (#2080 lane PR1). It is never set by the self-asserted path and read by
+  no guard. *Populating* it from a trusted issuance path remains the follow-up.
 - Canonical persisted `coop_id ↔ EntityId` mapping/backfill.
 - Other endpoint families; delegation/federation/community cross-entity authority
   (RFC-0018 Step 5).
@@ -145,3 +148,12 @@ Not implemented (tracked follow-ups):
 This ADR records the first RFC-0018 implementation slice. The RFC remains the
 design of record for the full migration; this ADR fixes the concrete decisions the
 primitive and treasury-observe wiring bake in.
+
+**Update (2026-06-20, PR #2111 / #2080 lane PR1):** the "Carry an `entity_id`/authority
+claim in the JWT" alternative above was rejected *for this slice's purpose* — resolving
+the caller's authority from a **self-asserted, guard-trusted** claim, which recreates the
+#2075 problem. PR #2111 adds an optional `entity_id`/`entity_type` claim that is **not** that:
+it is non-enforcing (no guard reads it), it is never set by the self-asserted path
+(`verify_challenge` → `issue_token` mints `None`), and it is populated only by a future
+trusted issuance path. The "resolve at the guard" decision for the observe slice stands;
+the claim is migration groundwork, not a trusted caller-supplied authority input.

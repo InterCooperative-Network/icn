@@ -6,6 +6,20 @@ Last Reviewed: 2026-06-14
 
 # ICN State (living doc)
 
+<!-- [sync edit] 2026-06-20 (RFC-0018 token-claim groundwork — optional NON-ENFORCING `entity_id`/`entity_type` claim + mint seam — PR #2111, #2080 lane PR1, branch `feat/2080-entity-id-token-claim` off `origin/main` HEAD `d2aa7ecb`):
+     PR1 of the #2080 lane (trusted positive token issuance), building the RFC-0018 (#2074; spec #2061) migration rail the prior #2079 observe-mode slice deferred. **Real gateway code** (two optional struct fields + one mint helper) — additive and non-enforcing. **Supersedes the precondition recorded in the 2026-06-17 sync below** ("this slice does not include an `entity_id` token claim"): the optional claim shape now EXISTS but remains non-authoritative and unpopulated. No new ADR, no new RFC, no new contract URN, no new ADR-0026 receipt class, no NYCN partner data, no K3s/DNS/GitHub-settings mutation, no production-readiness claim.
+
+     ⚠️ HARD INVARIANT (verified): **no authorization decision changes.** `require_coop_access` remains flat `claims.coop_id == coop_id` string equality and ignores the new claim; treasury stays OBSERVE-mode. No guard reads `entity_id`.
+
+     WHAT LANDED:
+       - `TokenClaims` (`icn-gateway/src/auth.rs`) gains optional `entity_id` / `entity_type` (`#[serde(default, skip_serializing_if = "Option::is_none")]`) — pre-#2080 tokens still decode; legacy mints stay byte-identical (keys omitted when `None`).
+       - `AuthManager::issue_entity_token(did, coop_id, Option<EntityId>, scopes)` mint seam; `issue_token` delegates with `None`. `entity_type` is derived from the canonical `EntityId` so the two claims cannot disagree.
+       - SAFETY: no production caller passes `Some(..)` yet; the dev/self-asserted path (`verify_challenge` → `issue_token`) always mints `None`, so a self-asserting DID cannot fabricate typed entity authority a later enforcement slice would trust. This is why it does NOT recreate the #2075 self-asserted-claim problem ADR-0035 guards against.
+
+     EVIDENCE: `cargo test -p icn-gateway --features sled-storage` lib 617 + all integration suites green (incl. 6 new claim tests: back-compat decode, legacy-mint-`None`, typed round-trip, `None`-equals-legacy, dev-path-never-mints, `require_coop_access`-ignores-`entity_id`); `cargo clippy -p icn-gateway --all-targets -- -D warnings` clean; `cargo fmt --all --check` clean.
+
+     This sync explicitly does NOT claim: any change to enforced authorization; population of the claim from membership/standing (no trusted caller passes `Some` yet); a canonical/persisted `coop_id ↔ EntityId` mapping wired into issuance; treasury enforcement cutover (#2081); first-admin bootstrap replacement; production readiness; a formal NYCN pilot. Tracked follow-ups: populate `entity_id` from a trusted source (PR2); membership/standing-backed issuance after resolving the authority-source fork (PR3); first-admin bootstrap trusted path (PR4); then #2081 treasury enforcement cutover. Phase 2 status remains ⏳ (partner-bound); phase model unchanged. -->
+
 <!-- [sync edit] 2026-06-17 (RFC-0018 first slice — entity-aware authorization primitive + treasury OBSERVE-mode wiring — this PR, branch `feat/entity-access-treasury-observe` off `origin/main` HEAD `7eba7f8a`):
      First implementation slice of RFC-0018 (#2074; spec #2061), the entity-aware request-authorization model, following the #2075/#2077 self-asserted-coop issuance fix. **Real gateway code** (a new authorization primitive + observation wiring + one metric) plus a new ADR. Adds **ADR-0035** (`docs/adr/ADR-0035-entity-aware-request-authorization.md`, status accepted, implementation_status partial). No new contract URN, no new RFC, no new ADR-0026 receipt class, no NYCN partner data, no K3s/DNS/Forgejo/GitHub-settings mutation, no production-readiness claim, no live-federation claim, no formal NYCN pilot claim, no Phase 2 completion claim.
 
