@@ -51,6 +51,11 @@ SERVER_RS = GATEWAY_SRC / "server.rs"
 OPENAPI = ROOT / "docs" / "api" / "openapi.generated.yaml"
 ARTIFACT = ROOT / "docs" / "reference" / "project-index" / "generated" / "route-inventory.md"
 SCRIPT_REL = "docs/scripts/route_inventory.py"
+# Governance app (icn-governance-actor) HTTP route registrations. The governance
+# app uses NO route attribute macros — it mounts routes via
+# `web::resource("…").route(web::<verb>().to(handlers::…))` in configure.rs, under
+# the gateway's `web::scope("/gov")`. These are outside the gateway macro scan.
+GOV_CONFIGURE = ROOT / "icn" / "apps" / "governance" / "src" / "http" / "configure.rs"
 
 ATTR_RE = re.compile(r'#\[(get|post|put|delete|patch|head)\("([^"]*)"\)\]')
 ROUTE_RE = re.compile(r'#\[route\("([^"]*)"\s*,\s*method\s*=\s*"([A-Za-z]+)"')
@@ -67,6 +72,9 @@ OAPI_METHOD_RE = re.compile(r'^    (get|post|put|delete|patch|head):\s*$')
 # in a doc comment does not match.
 RESOURCE_RE = re.compile(r'web::resource\("([^"]*)"\)')
 ROUTE_CALL_RE = re.compile(r'\.route\(')
+# Governance app registration ops: `.route(web::<verb>().to(handlers::<name>...))`.
+# The path comes from the nearest preceding `web::resource("…")` (RESOURCE_RE).
+GOV_OP_RE = re.compile(r'\.route\(\s*web::(get|post|put|delete|patch|head)\(\)\s*\.to\(\s*handlers::([A-Za-z_]\w*)')
 
 
 def discover_routes() -> list[dict]:
@@ -185,6 +193,46 @@ def resource_candidates() -> list[dict]:
     return out
 
 
+def governance_candidates() -> list[dict]:
+    """Mechanically discover the governance app's route registrations in
+    configure.rs: `web::resource("REL").route(web::<verb>().to(handlers::<name>…))`,
+    mounted under the gateway's `web::scope("/gov")`. These are real registration
+    sites the gateway *macro* scan cannot see — the governance app uses no route
+    attribute macros and lives outside `icn-gateway/src/**`. They are listed as
+    candidates, NOT folded into the gateway macro count, and stay
+    `unknown / needs local verification`. The relative `web::resource` literal is
+    the authoritative path fragment; the `/gov` mount prefix is applied by the
+    gateway (server.rs `web::scope("/gov")`), so it is not reconstructed here."""
+    out: list[dict] = []
+    if not GOV_CONFIGURE.is_file():
+        return out
+    rel = GOV_CONFIGURE.relative_to(ROOT).as_posix()
+    current_lit = ""
+    for i, line in enumerate(GOV_CONFIGURE.read_text(encoding="utf-8", errors="replace").splitlines()):
+        # The nearest preceding (or same-line) `web::resource("…")` literal owns
+        # the `.route(...)` ops that follow it, until the next resource.
+        res = RESOURCE_RE.findall(line)
+        if res:
+            current_lit = res[-1]
+        for m in GOV_OP_RE.finditer(line):
+            out.append({
+                "verb": m.group(1).upper(),
+                "path": current_lit,
+                "handler": m.group(2),
+                "file": rel,
+                "line": i + 1,
+            })
+    return out
+
+
+def gov_matches_op(c: dict, method: str, oapi_path: str) -> bool:
+    """A governance candidate matches an OpenAPI operation when verbs agree and the
+    OpenAPI path ends with the candidate's relative `web::resource` literal (the
+    `/gov` scope prefix is mount-applied). Prefix-agnostic, segment-boundary safe
+    because the literal starts with `/`."""
+    return bool(c["path"]) and c["verb"] == method and norm(oapi_path).endswith(norm(c["path"]))
+
+
 def norm(p: str) -> str:
     p = re.sub(r"\{[^}]+\}", "{}", p)
     p = re.sub(r"/+", "/", p)
@@ -202,7 +250,7 @@ def md_table_escape(s: str) -> str:
     return s.replace("|", "\\|")
 
 
-def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_candidates: list[dict], commit: str) -> str:
+def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_candidates: list[dict], gov_candidates: list[dict], commit: str) -> str:
     # Match by (METHOD, normalized-path) pairs, not path alone — otherwise a path
     # documented for one verb but routed under another would falsely count as
     # matched and be hidden from the unmatched section (issue #2112, PR4 review).
@@ -230,6 +278,14 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_can
         for m in (e["methods"] or ["?"])
         if (m, norm(e["path"])) not in matched_ops
     ]
+    # Cross-reference each unmatched op to a governance-app registration candidate
+    # (longest suffix match wins, so /me/standing beats a hypothetical /standing).
+    for op in unmatched_ops:
+        regs = sorted(
+            (c for c in gov_candidates if gov_matches_op(c, op["method"], op["path"])),
+            key=lambda c: len(norm(c["path"])), reverse=True,
+        )
+        op["registration"] = regs[0] if regs else None
 
     total = len(routes)
     undoc = total - documented
@@ -270,6 +326,7 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_can
     out.append(f"- Not matched to OpenAPI (best-effort): {undoc} (~{undoc / total * 100:.0f}% of discovered)" if total else "- Not matched to OpenAPI: 0")
     out.append(f"- Documented share of discovered routes: ~{pct_doc:.1f}%")
     out.append(f"- **OpenAPI operations (method + path) not matched to a discovered gateway route: {len(unmatched_ops)}** (see section below)")
+    out.append(f"- **Governance app route-registration candidates (separate surface, not gateway macros): {len(gov_candidates)}** (see section below)")
     out.append("")
     out.append("> The gap is structural: only handlers hand-annotated for utoipa reach the OpenAPI spec. "
                "Of the OpenAPI paths, several belong to `icn-governance-actor` HTTP handlers that live outside "
@@ -288,15 +345,41 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_can
                "`unknown / needs local verification`.")
     out.append("")
     if unmatched_ops:
-        out.append("| Method | OpenAPI path | Matched gateway route | Status | Claim safety |")
-        out.append("|---|---|---|---|---|")
+        out.append("| Method | OpenAPI path | Matched gateway route | Governance registration candidate | Status | Claim safety |")
+        out.append("|---|---|---|---|---|---|")
         for op in sorted(unmatched_ops, key=lambda x: (x["path"], x["method"])):
-            out.append(f"| {op['method']} | `{md_table_escape(op['path'])}` | no | "
+            reg = op.get("registration")
+            reg_cell = f"`{reg['handler']}` @ `{reg['file']}`:{reg['line']}" if reg else "none"
+            out.append(f"| {op['method']} | `{md_table_escape(op['path'])}` | no | {reg_cell} | "
                        "unknown / needs local verification | needs review |")
         out.append("")
     else:
         out.append("- None: every OpenAPI operation matched a discovered gateway route.")
         out.append("")
+
+    # Governance app route-registration candidates (issue #2112, PR5).
+    out.append("## Governance app route-registration candidates")
+    out.append("")
+    out.append("The governance app (`icn-governance-actor` = `icn/apps/governance`) registers its HTTP routes via "
+               "`web::resource(\"…\").route(web::<verb>().to(handlers::…))` in `apps/governance/src/http/configure.rs`, "
+               "mounted under the gateway's `web::scope(\"/gov\")` (the served path is `/gov` + the relative path "
+               "below). It uses **no route attribute macros**, so the gateway macro scan above never sees these: they "
+               "are a **separate registration surface**, listed here as candidates and **not** counted among the "
+               f"{total} gateway macros. This is why the unmatched `/gov/*` OpenAPI operations have no gateway-macro "
+               "match — their handlers are registered here. The scan is mechanical (one `configure.rs`, one pattern); "
+               "a registration site does **not** prove correctness, auth, mounting health, tests, or production "
+               "readiness, so candidates stay `unknown / needs local verification`. `OpenAPI documented` = this "
+               "candidate's `(verb, /gov + path)` matches a generated OpenAPI operation.")
+    out.append("")
+    if gov_candidates:
+        out.append("| Method | Path (relative, under `/gov`) | Source | Handler | OpenAPI documented | Status | Claim safety |")
+        out.append("|---|---|---|---|---|---|---|")
+        for c in sorted(gov_candidates, key=lambda x: (x["path"], x["verb"])):
+            oapi_doc = "yes" if any(gov_matches_op(c, m, e["path"]) for e in oapi for m in (e["methods"] or ["?"])) else "no"
+            out.append(f"| {c['verb']} | `{md_table_escape(c['path'] or '(none)')}` | `{c['file']}`:{c['line']} | "
+                       f"`{md_table_escape(c['handler'])}` | {oapi_doc} | unknown / needs local verification | needs review |")
+        out.append("")
+
     out.append("## Limitations")
     out.append("")
     out.append("- **Full mounted-path resolution is best-effort.** The `Group` column is `/v1` + a `web::scope(\"…\")` "
@@ -305,8 +388,9 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_can
                "module) + the relative macro path. It is **not** a real Rust parser and may be wrong for "
                "deeply-nested or conditional scopes. The relative macro `Path` and the `Source` file are authoritative.")
     out.append("- The route table is **attribute macros only**. Macro-less `web::resource(\"…\")`/`.route(…)` "
-               "registrations are now **flagged** below (see *Unparsed route-registration candidates*) but **not** "
-               "parsed into routes; out-of-crate handlers (e.g. `icn-governance-actor::http`) are still not captured.")
+               "registrations in the gateway crate are **flagged** under *Unparsed route-registration candidates*; the "
+               "governance app's out-of-crate registrations are listed under *Governance app route-registration "
+               "candidates*. Neither is parsed into the gateway route table or counted as a gateway macro.")
     out.append("- This is **generated-map work, not API documentation completion** (issue #2112). It does not add or "
                "change any OpenAPI content or runtime behavior.")
     out.append("")
@@ -379,16 +463,17 @@ def main() -> int:
     scopes = module_scope_map()
     oapi = openapi_paths()
     reg_candidates = resource_candidates()
+    gov_candidates = governance_candidates()
     if not routes:
         print(f"ERROR: no routes discovered under {GATEWAY_SRC} — wrong repo root?", file=sys.stderr)
         return 2
-    content = render(routes, scopes, oapi, reg_candidates, commit)
+    content = render(routes, scopes, oapi, reg_candidates, gov_candidates, commit)
 
     if args.write:
         ARTIFACT.parent.mkdir(parents=True, exist_ok=True)
         ARTIFACT.write_text(content + "\n", encoding="utf-8")
         print(f"wrote {ARTIFACT.relative_to(ROOT)}: {len(routes)} routes, {len(oapi)} OpenAPI paths, "
-              f"{len(reg_candidates)} non-macro candidates")
+              f"{len(reg_candidates)} non-macro candidates, {len(gov_candidates)} governance candidates")
         return 0
 
     # --check
@@ -398,7 +483,7 @@ def main() -> int:
     committed = ARTIFACT.read_text(encoding="utf-8")
     if strip_volatile(committed).strip() == strip_volatile(content).strip():
         print(f"OK: route inventory up to date ({len(routes)} routes, {len(oapi)} OpenAPI paths, "
-              f"{len(reg_candidates)} non-macro candidates)")
+              f"{len(reg_candidates)} non-macro candidates, {len(gov_candidates)} governance candidates)")
         return 0
     print(f"STALE: {ARTIFACT.relative_to(ROOT)} differs from a fresh scan — run --write and commit", file=sys.stderr)
     return 1
