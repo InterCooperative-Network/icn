@@ -249,8 +249,9 @@ gaps = []
 [meaning-firewall]
 # Recomputed 2026-06-14 (#2047) from the per-crate [crates.*] entries in kernel_surface.toml.
 # The old summary (total_crates=29, clean=9, infected=11, needs_review=9) was copied from the
-# stale kernel_surface.toml [metadata] block (dated 2026-02-20), which does NOT match its own
-# per-crate entries. These numbers are the honest recount from those entries.
+# then-stale kernel_surface.toml [metadata] block (dated 2026-02-20), which did NOT match its own
+# per-crate entries. These numbers are the honest recount from those entries; the upstream
+# [metadata] summary was subsequently regenerated to match in PR #2110 (2026-06-20).
 inventoried_crates = 28
 clean = 13
 infected = 14
@@ -259,7 +260,7 @@ extracted_apps = 1   # icn-governance-actor
 source = "kernel_surface.toml"
 last_verified = "2026-06-14"
 verified_by = "freshness-2047"
-upstream_inconsistency = "kernel_surface.toml [metadata] summary (9/11/9) is stale and contradicts its per-crate entries; regenerate it from the entries. That file is out of scope for the docs-only #2047 PR and is listed as a follow-up."
+upstream_inconsistency = "RESOLVED 2026-06-20 (PR #2110): the kernel_surface.toml [metadata] summary was regenerated from its per-crate entries and now matches this block (28 / 13 clean / 14 infected / 1 needs-review, + 1 extracted app). The per-crate classifications themselves were NOT re-audited — that remains a separate meaning-firewall review."
 notes = "14 infected crates. Highest priority: icn-trust (cascades infections), icn-ledger (most heavily infected). GovernanceActor extracted to apps/governance Feb 2026; icn-core direct icn_governance:: refs now 0 (pinned in meaning_firewall.rs). 6-phase extraction plan in progress."
 
 # Aggregate stats

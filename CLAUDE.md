@@ -31,13 +31,12 @@ ICN implements a **constraint enforcement architecture** where Policy Oracles (a
 - **Governance**: Democratic proposals and voting → **Policy Oracle**
 - **Compute**: Trust-gated distributed task execution → **Policy Oracle**
 
-## Live Deployment
+## Deployment
 
-ICN daemon running on K3s cluster (deployed 2025-12-03). See **[docs/operations/deployment/HOMELAB_DEPLOYMENT.md](docs/operations/deployment/HOMELAB_DEPLOYMENT.md)** for:
-- Cluster details and node identity
-- Quick access commands
+ICN has K3s/devnet-oriented deployment manifests and smoke paths (`deploy/k8s`, `deploy/devnet`). **Current live runtime status is an ops claim, not source-verifiable** — `docs/status.toml` flags the K3s deployment `NEEDS OPS RE-CONFIRMATION`. Do not repeat "running in production / running for N months / live federation" publicly without current ops evidence. See **[docs/operations/deployment/HOMELAB_DEPLOYMENT.md](docs/operations/deployment/HOMELAB_DEPLOYMENT.md)** for:
+- Deployment design, cluster/node topology, and quick access commands
 - CI/CD pipeline and monitoring
-- Pilot testing status
+- Pilot testing posture (Phase 2, partner-bound — see `docs/PHASE_PROGRESS.md`)
 
 **Quick Commands**:
 ```bash
@@ -76,7 +75,7 @@ test -f Cargo.toml && echo "Rust root" || echo "Not Rust root"
 - `icn-ledger` - Double-entry mutual credit / state change journal (Merkle-DAG)
 - `icn-ccl` - Contract language AST, interpreter, fuel metering
 - `icn-store` - Persistent KV storage (Sled)
-- `icn-rpc` - gRPC API server
+- `icn-rpc` - JSON-RPC API server
 - `icn-obs` - Prometheus metrics, tracing, logging
 - `icn-gateway` - REST + WebSocket API for cooperative applications
 - `icn-governance` - Governance primitives for community decision-making
@@ -143,7 +142,7 @@ Navigate using `docs/INDEX.md` (complete index) or `docs/README.md` (overview).
 - `strategy/` - Gap analysis, active sprint, roadmaps, whitepaper, pitch docs (March 2026)
 - `mobile/icn-mobile-ux-spec-v1.md` - Mobile member UX spec (build-facing, anchored to gateway API)
 - `status/icn-status-march-2026.md` - Current status report
-- `GOLDEN_PROMPT.md` - Master agent context (27KB, complete project state)
+- `GOLDEN_PROMPT.md` - **Archived redirect stub.** Current agent reasoning foundation is `docs/ai/ICN_CONSTITUTIONAL_CORE.md`; current project state is `docs/STATE.md` + `docs/PHASE_PROGRESS.md`.
 
 **Main Categories:**
 - `architecture/` - Architecture documentation, design decisions, audits
@@ -187,7 +186,7 @@ cargo build && ./target/debug/icnctl status
 ```
 
 ### Rust Build Notes
-- This is a large workspace (~414K lines). Use `cargo check` before `cargo build` for faster feedback.
+- This is a large multi-crate workspace. For a current line count run `tokei`/`cloc` rather than trusting a hard-coded figure. Use `cargo check` before `cargo build` for faster feedback.
 - Toolchain is pinned in `icn/rust-toolchain.toml` — do NOT upgrade unless explicitly asked.
 - If builds SIGSEGV or fail mysteriously, run `cargo clean` first — incremental compilation cache corruption is a known issue on this machine.
 - Do not fix pre-existing clippy lints unrelated to the current task.
@@ -253,7 +252,7 @@ CCL (`icn-ccl`) is a domain-specific language for expressing agreements:
 
 - DIDs: `did:icn:<base58-pubkey>` (Ed25519)
 - Keystore: Age-encrypted at `~/.icn/keystore.age`
-- Auto-migration: v1 → v2 → v2.1 (adds TLS binding + X25519 keys)
+- Auto-migration chain: v1 → v2 → v2.1 → v3 → v4 (v2.1 adds TLS binding + X25519 keys; current chain per `icn-identity/src/keystore.rs`)
 
 **icnctl commands**: `id init`, `id show`, `id rotate`, `id export/import`
 
