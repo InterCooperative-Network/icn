@@ -7,7 +7,7 @@ Scans the gateway Rust source for Actix routing **attribute macros**
 route declarations against the documented OpenAPI paths, and writes a
 claim-disciplined markdown inventory.
 
-This is deliberately humble (issue #2112, PR1):
+This is deliberately humble (issue #2112):
 - It proves route **declarations** exist in source. It does NOT prove route
   correctness, authentication, test coverage, production readiness, or public
   safety. "OpenAPI documented" does not mean complete or correct.
@@ -166,10 +166,12 @@ def resource_candidates() -> list[dict]:
     for rs in sorted(GATEWAY_SRC.rglob("*.rs")):
         rel = rs.relative_to(ROOT).as_posix()
         for i, line in enumerate(rs.read_text(encoding="utf-8", errors="replace").splitlines()):
+            # Independent checks (not elif): a one-line `web::resource("…").route(…)`
+            # must record BOTH candidates, not just the resource.
             rm = RESOURCE_RE.search(line)
             if rm:
                 out.append({"kind": "web::resource", "literal": rm.group(1), "file": rel, "line": i + 1})
-            elif ROUTE_CALL_RE.search(line):
+            if ROUTE_CALL_RE.search(line):
                 out.append({"kind": ".route", "literal": "", "file": rel, "line": i + 1})
     return out
 
@@ -251,7 +253,7 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[str], reg_cand
                "counts here are a best-effort comparison, while the two headline counts (discovered macros, "
                "OpenAPI paths) are the robust measured facts.")
     out.append("")
-    out.append("## Limitations (PR1)")
+    out.append("## Limitations")
     out.append("")
     out.append("- **Full mounted-path resolution is best-effort.** The `Group` column is `/v1` + a `web::scope(\"…\")` "
                "segment associated from `server.rs` `.service(...)`/`.configure(...)` registration sites (matched at "
@@ -269,7 +271,7 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[str], reg_cand
     out.append("Status vocabulary is the existing set from `source-of-truth-map.md`; no new labels are introduced. "
                "A static macro scan proves only that a routing macro is **declared** in source — not that the handler "
                "is mounted and served (registration happens elsewhere via `.service(...)` / `.configure(...)`, which "
-               "this pass does not resolve). PR1 therefore **cannot** assert `gateway-backed`: every discovered route's "
+               "this pass does not resolve). This scan therefore **cannot** assert `gateway-backed`: every discovered route's "
                "status defaults to `unknown / needs local verification` and claim-safety to `needs review`, pending "
                "human or runtime confirmation.")
     out.append("")

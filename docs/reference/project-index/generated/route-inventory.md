@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-20T13:46:22+00:00
+Generated: 2026-06-20T13:51:41+00:00
 ---
 
 # Gateway Route Inventory (generated)
@@ -17,7 +17,7 @@ Generated: 2026-06-20T13:46:22+00:00
 
 ## Snapshot
 
-- Source commit: `7f241718e55dfd27c8864b1e702d635cca5ce9ae`
+- Source commit: `0d27da7d89df89249db5cd3d07e1c77ad195749e`
 - Gateway source scanned: `icn/crates/icn-gateway/src/**`
 - OpenAPI spec: `docs/api/openapi.generated.yaml`
 
@@ -31,7 +31,7 @@ Generated: 2026-06-20T13:46:22+00:00
 
 > The gap is structural: only handlers hand-annotated for utoipa reach the OpenAPI spec. Of the OpenAPI paths, several belong to `icn-governance-actor` HTTP handlers that live outside the gateway crate and are not captured by this macro scan — so the documented/undocumented counts here are a best-effort comparison, while the two headline counts (discovered macros, OpenAPI paths) are the robust measured facts.
 
-## Limitations (PR1)
+## Limitations
 
 - **Full mounted-path resolution is best-effort.** The `Group` column is `/v1` + a `web::scope("…")` segment associated from `server.rs` `.service(...)`/`.configure(...)` registration sites (matched at identifier boundaries, keyed by the handler's top-level `icn/crates/icn-gateway/src/api/<group>` module) + the relative macro path. It is **not** a real Rust parser and may be wrong for deeply-nested or conditional scopes. The relative macro `Path` and the `Source` file are authoritative.
 - The route table is **attribute macros only**. Macro-less `web::resource("…")`/`.route(…)` registrations are now **flagged** below (see *Unparsed route-registration candidates*) but **not** parsed into routes; out-of-crate handlers (e.g. `icn-governance-actor::http`) are still not captured.
@@ -39,7 +39,7 @@ Generated: 2026-06-20T13:46:22+00:00
 
 ## Routes
 
-Status vocabulary is the existing set from `source-of-truth-map.md`; no new labels are introduced. A static macro scan proves only that a routing macro is **declared** in source — not that the handler is mounted and served (registration happens elsewhere via `.service(...)` / `.configure(...)`, which this pass does not resolve). PR1 therefore **cannot** assert `gateway-backed`: every discovered route's status defaults to `unknown / needs local verification` and claim-safety to `needs review`, pending human or runtime confirmation.
+Status vocabulary is the existing set from `source-of-truth-map.md`; no new labels are introduced. A static macro scan proves only that a routing macro is **declared** in source — not that the handler is mounted and served (registration happens elsewhere via `.service(...)` / `.configure(...)`, which this pass does not resolve). This scan therefore **cannot** assert `gateway-backed`: every discovered route's status defaults to `unknown / needs local verification` and claim-safety to `needs review`, pending human or runtime confirmation.
 
 | Method | Path (macro) | Group (best-effort) | Source | Handler | OpenAPI | Status | Claim safety |
 |---|---|---|---|---|---|---|---|
