@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-20T16:01:55+00:00
+Generated: 2026-06-20T16:08:37+00:00
 ---
 
 # Gateway Route Inventory (generated)
@@ -17,7 +17,7 @@ Generated: 2026-06-20T16:01:55+00:00
 
 ## Snapshot
 
-- Source commit: `06cf308b8a703a8eb584c1cfa87e1729b981d9eb`
+- Source commit: `5cfabd25486cd10ddc6a6f4369d32179a73b2ada`
 - Gateway source scanned: `icn/crates/icn-gateway/src/**`
 - OpenAPI spec: `docs/api/openapi.generated.yaml`
 
@@ -25,10 +25,10 @@ Generated: 2026-06-20T16:01:55+00:00
 
 - **Discovered gateway route macros: 287** (DELETE 17 · GET 131 · POST 125 · PUT 14)
 - **OpenAPI documented paths: 5**
-- Matched as documented (best-effort path match): 2
+- Matched as documented (best-effort method+path match): 2
 - Not matched to OpenAPI (best-effort): 285 (~99% of discovered)
 - Documented share of discovered routes: ~0.7%
-- **OpenAPI paths not matched to a discovered gateway route: 3** (see section below)
+- **OpenAPI operations (method + path) not matched to a discovered gateway route: 3** (see section below)
 
 > The gap is structural: only handlers hand-annotated for utoipa reach the OpenAPI spec. Of the OpenAPI paths, several belong to `icn-governance-actor` HTTP handlers that live outside the gateway crate and are not captured by this macro scan — so the documented/undocumented counts here are a best-effort comparison, while the two headline counts (discovered macros, OpenAPI paths) are the robust measured facts.
 

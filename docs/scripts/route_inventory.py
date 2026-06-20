@@ -203,8 +203,11 @@ def md_table_escape(s: str) -> str:
 
 
 def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_candidates: list[dict], commit: str) -> str:
-    oapi_norm = {norm(e["path"]) for e in oapi}
-    matched_oapi: set[str] = set()
+    # Match by (METHOD, normalized-path) pairs, not path alone — otherwise a path
+    # documented for one verb but routed under another would falsely count as
+    # matched and be hidden from the unmatched section (issue #2112, PR4 review).
+    oapi_ops = {(m, norm(e["path"])) for e in oapi for m in (e["methods"] or ["?"])}
+    matched_ops: set = set()
     by_method: dict[str, int] = {}
     documented = 0
     rows = []
@@ -213,15 +216,20 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_can
         scope = scopes.get(r["module"], "")
         fp = full_path(scope, r["path"])
         candidates = {norm(fp), norm(scope + (r["path"] if r["path"].startswith("/") else "/" + r["path"])), norm(r["path"])}
-        hit = candidates & oapi_norm
+        hit = {(r["method"], c) for c in candidates} & oapi_ops
         documented_here = bool(hit)
         if documented_here:
             documented += 1
-            matched_oapi |= hit
+            matched_ops |= hit
         rows.append((r, fp, "yes" if documented_here else "no"))
 
-    # OpenAPI paths that no discovered gateway route matched (issue #2112, PR4).
-    unmatched_oapi = [e for e in oapi if norm(e["path"]) not in matched_oapi]
+    # OpenAPI operations (method + path) that no discovered gateway route matched.
+    unmatched_ops = [
+        {"method": m, "path": e["path"]}
+        for e in oapi
+        for m in (e["methods"] or ["?"])
+        if (m, norm(e["path"])) not in matched_ops
+    ]
 
     total = len(routes)
     undoc = total - documented
@@ -258,10 +266,10 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_can
     out.append("")
     out.append(f"- **Discovered gateway route macros: {total}** ({method_line})")
     out.append(f"- **OpenAPI documented paths: {len(oapi)}**")
-    out.append(f"- Matched as documented (best-effort path match): {documented}")
+    out.append(f"- Matched as documented (best-effort method+path match): {documented}")
     out.append(f"- Not matched to OpenAPI (best-effort): {undoc} (~{undoc / total * 100:.0f}% of discovered)" if total else "- Not matched to OpenAPI: 0")
     out.append(f"- Documented share of discovered routes: ~{pct_doc:.1f}%")
-    out.append(f"- **OpenAPI paths not matched to a discovered gateway route: {len(unmatched_oapi)}** (see section below)")
+    out.append(f"- **OpenAPI operations (method + path) not matched to a discovered gateway route: {len(unmatched_ops)}** (see section below)")
     out.append("")
     out.append("> The gap is structural: only handlers hand-annotated for utoipa reach the OpenAPI spec. "
                "Of the OpenAPI paths, several belong to `icn-governance-actor` HTTP handlers that live outside "
@@ -279,16 +287,15 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_can
                "OpenAPI presence does **not** prove a runtime route exists or is mounted; these stay "
                "`unknown / needs local verification`.")
     out.append("")
-    if unmatched_oapi:
+    if unmatched_ops:
         out.append("| Method | OpenAPI path | Matched gateway route | Status | Claim safety |")
         out.append("|---|---|---|---|---|")
-        for e in sorted(unmatched_oapi, key=lambda x: x["path"]):
-            methods = " · ".join(e["methods"]) if e["methods"] else "?"
-            out.append(f"| {methods} | `{md_table_escape(e['path'])}` | no | "
+        for op in sorted(unmatched_ops, key=lambda x: (x["path"], x["method"])):
+            out.append(f"| {op['method']} | `{md_table_escape(op['path'])}` | no | "
                        "unknown / needs local verification | needs review |")
         out.append("")
     else:
-        out.append("- None: every OpenAPI path matched a discovered gateway route.")
+        out.append("- None: every OpenAPI operation matched a discovered gateway route.")
         out.append("")
     out.append("## Limitations")
     out.append("")
