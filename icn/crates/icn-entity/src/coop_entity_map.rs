@@ -127,25 +127,51 @@ fn validate_cooperative_entity_id(entity_id: &EntityId) -> Result<(), CoopEntity
 pub trait CoopEntityMap {
     /// Project `coop_id` to its cooperative [`EntityId`] and bind the pair.
     ///
-    /// Equivalent to `bind_exact(coop_id, &project_coop_id(coop_id)?)`. Returns
-    /// the bound [`EntityId`] on success. Non-mappable `coop_id`s return
+    /// Equivalent to `bind_resolved(coop_id, &project_coop_id(coop_id)?)`.
+    /// Returns the bound [`EntityId`] on success. Non-mappable `coop_id`s return
     /// [`CoopEntityMapError::NotMappable`].
     fn bind_projected(&self, coop_id: &str) -> Result<EntityId, CoopEntityMapError> {
         let entity_id = project_coop_id(coop_id)?;
-        self.bind_exact(coop_id, &entity_id)?;
+        self.bind_resolved(coop_id, &entity_id)?;
         Ok(entity_id)
     }
 
-    /// Bind a caller-supplied `(coop_id, entity_id)` pair.
+    /// Bind a caller-supplied `(coop_id, entity_id)` pair, requiring `coop_id`
+    /// to itself be mappable (a valid cooperative slug).
     ///
-    /// In this foundation the `coop_id` must itself be mappable (a valid
-    /// cooperative slug); non-mappable `coop_id`s are rejected with
-    /// [`CoopEntityMapError::NotMappable`] because surrogate slug allocation is
-    /// out of scope here. Idempotent for an identical pair; rejects
+    /// This is the reject-not-normalize entry point: a non-mappable `coop_id` is
+    /// rejected with [`CoopEntityMapError::NotMappable`] because surrogate slug
+    /// allocation is out of scope here. After the gate it delegates to
+    /// [`bind_resolved`](CoopEntityMap::bind_resolved), which owns the shared
+    /// cooperative-type validation, both-direction conflict detection, and
+    /// atomic bidirectional write. A rejected bind leaves no one-sided write.
+    fn bind_exact(&self, coop_id: &str, entity_id: &EntityId) -> Result<(), CoopEntityMapError> {
+        // Reject-not-normalize gate: this entry point requires a mappable
+        // coop_id; the actual write is the shared `bind_resolved` primitive.
+        project_coop_id(coop_id)?;
+        self.bind_resolved(coop_id, entity_id)
+    }
+
+    /// Bind an original `coop_id` to an already-resolved cooperative
+    /// [`EntityId`], **without** projecting or normalizing the `coop_id`.
+    ///
+    /// Unlike [`bind_exact`](CoopEntityMap::bind_exact), this skips the
+    /// `project_coop_id` reject-not-normalize gate, so a non-mappable legacy id
+    /// (e.g. `coop:<uuid>`, `coop_A`, `food_coop`) is accepted and preserved
+    /// byte-for-byte. The caller supplies the resolved cooperative `EntityId`
+    /// (e.g. from
+    /// [`propose_surrogate_entity_id`](crate::propose_surrogate_entity_id) or a
+    /// projection). The `entity_id` must be a well-formed cooperative
+    /// `EntityId`, otherwise the bind is refused with
+    /// [`CoopEntityMapError::InvalidEntityType`] before either index is written.
+    ///
+    /// Idempotent for an identical pair; rejects
     /// [`CoopEntityMapError::Conflict`] if either side is already bound to a
-    /// different counterpart. The forward and reverse indexes are written
-    /// atomically — a rejected bind leaves no one-sided write.
-    fn bind_exact(&self, coop_id: &str, entity_id: &EntityId) -> Result<(), CoopEntityMapError>;
+    /// different counterpart; the forward and reverse indexes are written
+    /// atomically (a rejected bind leaves no one-sided write). It never returns
+    /// [`CoopEntityMapError::NotMappable`] — that gate is intentionally skipped.
+    /// A binding is a name binding only and confers no authority.
+    fn bind_resolved(&self, coop_id: &str, entity_id: &EntityId) -> Result<(), CoopEntityMapError>;
 
     /// Look up the [`EntityId`] bound to `coop_id`, if any.
     fn entity_for_coop(&self, coop_id: &str) -> Result<Option<EntityId>, CoopEntityMapError>;
@@ -185,11 +211,12 @@ impl InMemoryCoopEntityMap {
 }
 
 impl CoopEntityMap for InMemoryCoopEntityMap {
-    fn bind_exact(&self, coop_id: &str, entity_id: &EntityId) -> Result<(), CoopEntityMapError> {
-        // Reject-not-normalize gate: this foundation does not allocate surrogate
-        // slugs, so a non-mappable coop_id is refused rather than rewritten.
-        project_coop_id(coop_id)?;
-
+    fn bind_resolved(&self, coop_id: &str, entity_id: &EntityId) -> Result<(), CoopEntityMapError> {
+        // Shared write primitive: no project_coop_id gate here (bind_exact and
+        // bind_projected run that gate, then delegate to this method). The caller
+        // supplies an already-resolved cooperative EntityId, so a non-mappable
+        // original coop_id (e.g. `coop:<uuid>`) is accepted and preserved as-is.
+        //
         // A flat coop_id denotes a cooperative target (RFC-0018): refuse to bind
         // anything but a well-formed cooperative entity_id before touching either index.
         validate_cooperative_entity_id(entity_id)?;
@@ -284,10 +311,12 @@ fn map_tx_err(e: sled::transaction::TransactionError<CoopEntityMapError>) -> Coo
 }
 
 impl CoopEntityMap for SledCoopEntityMap {
-    fn bind_exact(&self, coop_id: &str, entity_id: &EntityId) -> Result<(), CoopEntityMapError> {
-        // Reject-not-normalize gate (same invariant as the in-memory map).
-        project_coop_id(coop_id)?;
-
+    fn bind_resolved(&self, coop_id: &str, entity_id: &EntityId) -> Result<(), CoopEntityMapError> {
+        // Shared write primitive: no project_coop_id gate here (bind_exact and
+        // bind_projected run that gate, then delegate to this method). The caller
+        // supplies an already-resolved cooperative EntityId, so a non-mappable
+        // original coop_id (e.g. `coop:<uuid>`) is accepted and preserved as-is.
+        //
         // A flat coop_id denotes a cooperative target (RFC-0018): refuse to bind
         // anything but a well-formed cooperative entity_id before the transaction writes either index.
         validate_cooperative_entity_id(entity_id)?;
@@ -296,7 +325,6 @@ impl CoopEntityMap for SledCoopEntityMap {
         let rkey = reverse_key(entity_id);
         let entity_str = entity_id.as_str().to_string();
         let coop_string = coop_id.to_string();
-        let entity_display = entity_id.to_string();
 
         self.db
             .transaction(|tx| {
@@ -316,7 +344,7 @@ impl CoopEntityMap for SledCoopEntityMap {
                     if bytes.as_ref() != coop_string.as_bytes() {
                         return Err(ConflictableTransactionError::Abort(
                             CoopEntityMapError::Conflict(format!(
-                                "entity {entity_display} is already bound to a different coop_id"
+                                "entity {entity_str} is already bound to a different coop_id"
                             )),
                         ));
                     }
@@ -738,5 +766,288 @@ mod tests {
         // Neither index written, and the forward lookup stays readable (None).
         assert_eq!(map.entity_for_coop("coop-a").unwrap(), None);
         assert_eq!(map.coop_for_entity(&malformed).unwrap(), None);
+    }
+
+    // ==================================================================
+    // bind_resolved (#2082 PR5): persist an original coop_id ↔ resolved
+    // cooperative EntityId WITHOUT projecting/normalizing the coop_id.
+    //
+    // The defining difference from bind_exact: a non-mappable legacy id
+    // such as `coop:<uuid>` is ACCEPTED (not rejected as NotMappable),
+    // while every other invariant — cooperative-type gate, both-direction
+    // conflict detection, atomic write, byte-for-byte reverse, idempotency
+    // — is preserved. A binding still confers no authority.
+    // ==================================================================
+
+    /// A non-mappable default cooperative id (`coop:<uuid>`) used throughout.
+    const UUID_COOP: &str = "coop:550e8400-e29b-41d4-a716-446655440000";
+
+    // ---- in-memory ----
+
+    #[test]
+    fn test_inmem_bind_resolved_non_mappable_uuid_binds_forward() {
+        let map = InMemoryCoopEntityMap::new();
+        let entity = coop_eid("canonical-coop");
+        map.bind_resolved(UUID_COOP, &entity).unwrap();
+        assert_eq!(map.entity_for_coop(UUID_COOP).unwrap(), Some(entity));
+    }
+
+    #[test]
+    fn test_inmem_bind_resolved_reverse_returns_original_coop_id() {
+        // The reverse index must return the ORIGINAL non-mappable coop_id
+        // byte-for-byte (colon, uuid shape, and all) — that is what makes the
+        // mapping reversible without normalizing the legacy id.
+        let map = InMemoryCoopEntityMap::new();
+        let entity = coop_eid("canonical-coop");
+        map.bind_resolved(UUID_COOP, &entity).unwrap();
+        assert_eq!(
+            map.coop_for_entity(&entity).unwrap(),
+            Some(UUID_COOP.to_string())
+        );
+    }
+
+    #[test]
+    fn test_inmem_bind_resolved_same_pair_idempotent() {
+        let map = InMemoryCoopEntityMap::new();
+        let entity = coop_eid("canonical-coop");
+        map.bind_resolved(UUID_COOP, &entity).unwrap();
+        map.bind_resolved(UUID_COOP, &entity).unwrap(); // no-op, must not error
+        assert_eq!(map.entity_for_coop(UUID_COOP).unwrap(), Some(entity));
+    }
+
+    #[test]
+    fn test_inmem_bind_resolved_same_coop_different_entity_conflicts() {
+        let map = InMemoryCoopEntityMap::new();
+        map.bind_resolved(UUID_COOP, &coop_eid("coop-a")).unwrap();
+        assert!(matches!(
+            map.bind_resolved(UUID_COOP, &coop_eid("coop-b")),
+            Err(CoopEntityMapError::Conflict(_))
+        ));
+    }
+
+    #[test]
+    fn test_inmem_bind_resolved_different_coop_same_entity_conflicts() {
+        let map = InMemoryCoopEntityMap::new();
+        let shared = coop_eid("shared-coop");
+        map.bind_resolved(UUID_COOP, &shared).unwrap();
+        assert!(matches!(
+            map.bind_resolved("coop:other-uuid", &shared),
+            Err(CoopEntityMapError::Conflict(_))
+        ));
+    }
+
+    #[test]
+    fn test_inmem_bind_resolved_rejects_non_cooperative_entity() {
+        let map = InMemoryCoopEntityMap::new();
+        let community = EntityId::community("some-community").unwrap();
+        assert!(matches!(
+            map.bind_resolved(UUID_COOP, &community),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+        let federation = EntityId::federation("some-federation").unwrap();
+        assert!(matches!(
+            map.bind_resolved(UUID_COOP, &federation),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+        let kp = icn_identity::KeyPair::generate().unwrap();
+        let individual = EntityId::from_did(kp.did());
+        assert!(matches!(
+            map.bind_resolved(UUID_COOP, &individual),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+        // Rejection happens before any write.
+        assert_eq!(map.entity_for_coop(UUID_COOP).unwrap(), None);
+    }
+
+    #[test]
+    fn test_inmem_bind_resolved_rejects_malformed_cooperative_entity_id() {
+        let map = InMemoryCoopEntityMap::new();
+        // Cooperative type tag, invalid slug (bypasses the validating ctor).
+        let malformed: EntityId =
+            serde_json::from_str("\"entity:icn:cooperative:BAD_slug\"").unwrap();
+        assert!(matches!(
+            map.bind_resolved(UUID_COOP, &malformed),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+        assert_eq!(map.entity_for_coop(UUID_COOP).unwrap(), None);
+    }
+
+    #[test]
+    fn test_inmem_bind_resolved_accepts_mappable_coop_id() {
+        // bind_resolved is general: a mappable coop_id can also be bound to an
+        // already-resolved projection. It simply does not REQUIRE mappability.
+        let map = InMemoryCoopEntityMap::new();
+        map.bind_resolved("food-coop", &coop_eid("food-coop"))
+            .unwrap();
+        assert_eq!(
+            map.entity_for_coop("food-coop").unwrap(),
+            Some(coop_eid("food-coop"))
+        );
+    }
+
+    // ---- sled ----
+
+    #[test]
+    fn test_sled_bind_resolved_non_mappable_uuid_round_trips() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        let entity = coop_eid("canonical-coop");
+        map.bind_resolved(UUID_COOP, &entity).unwrap();
+        assert_eq!(
+            map.entity_for_coop(UUID_COOP).unwrap(),
+            Some(entity.clone())
+        );
+        assert_eq!(
+            map.coop_for_entity(&entity).unwrap(),
+            Some(UUID_COOP.to_string())
+        );
+    }
+
+    #[test]
+    fn test_sled_bind_resolved_same_pair_idempotent() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        let entity = coop_eid("canonical-coop");
+        map.bind_resolved(UUID_COOP, &entity).unwrap();
+        map.bind_resolved(UUID_COOP, &entity).unwrap();
+        assert_eq!(map.entity_for_coop(UUID_COOP).unwrap(), Some(entity));
+    }
+
+    #[test]
+    fn test_sled_bind_resolved_same_coop_different_entity_conflicts() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        map.bind_resolved(UUID_COOP, &coop_eid("coop-a")).unwrap();
+        assert!(matches!(
+            map.bind_resolved(UUID_COOP, &coop_eid("coop-b")),
+            Err(CoopEntityMapError::Conflict(_))
+        ));
+    }
+
+    #[test]
+    fn test_sled_bind_resolved_different_coop_same_entity_conflicts() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        let shared = coop_eid("shared-coop");
+        map.bind_resolved(UUID_COOP, &shared).unwrap();
+        assert!(matches!(
+            map.bind_resolved("coop:other-uuid", &shared),
+            Err(CoopEntityMapError::Conflict(_))
+        ));
+    }
+
+    #[test]
+    fn test_sled_bind_resolved_rejects_non_cooperative_writes_no_index() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        let community = EntityId::community("some-community").unwrap();
+        assert!(matches!(
+            map.bind_resolved(UUID_COOP, &community),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+        // The rejection must happen before any write: neither index exists.
+        assert_eq!(map.entity_for_coop(UUID_COOP).unwrap(), None);
+        assert_eq!(map.coop_for_entity(&community).unwrap(), None);
+    }
+
+    #[test]
+    fn test_sled_bind_resolved_rejects_malformed_cooperative_entity_id() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        let malformed: EntityId =
+            serde_json::from_str("\"entity:icn:cooperative:BAD_slug\"").unwrap();
+        assert!(matches!(
+            map.bind_resolved(UUID_COOP, &malformed),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+        assert_eq!(map.entity_for_coop(UUID_COOP).unwrap(), None);
+        assert_eq!(map.coop_for_entity(&malformed).unwrap(), None);
+    }
+
+    #[test]
+    fn test_sled_bind_resolved_conflict_leaves_no_one_sided_write() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        map.bind_resolved(UUID_COOP, &coop_eid("coop-a")).unwrap();
+        // A forward-conflicting bind must be rejected AND must not leave a
+        // reverse index for the rejected entity.
+        let other = coop_eid("other-coop");
+        assert!(matches!(
+            map.bind_resolved(UUID_COOP, &other),
+            Err(CoopEntityMapError::Conflict(_))
+        ));
+        assert_eq!(
+            map.coop_for_entity(&other).unwrap(),
+            None,
+            "rejected bind must not leave a one-sided reverse write"
+        );
+    }
+
+    #[test]
+    fn test_sled_bind_resolved_persists_across_reopen() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("bind_resolved_persist_test");
+
+        // Session 1: bind a non-mappable coop_id to a resolved cooperative id.
+        {
+            let db = sled::open(&db_path).unwrap();
+            let map = SledCoopEntityMap::new(Arc::new(db));
+            map.bind_resolved(UUID_COOP, &coop_eid("canonical-coop"))
+                .unwrap();
+        }
+        // Session 2: reopen and verify both directions survived.
+        {
+            let db = sled::open(&db_path).unwrap();
+            let map = SledCoopEntityMap::new(Arc::new(db));
+            assert_eq!(
+                map.entity_for_coop(UUID_COOP).unwrap(),
+                Some(coop_eid("canonical-coop"))
+            );
+            assert_eq!(
+                map.coop_for_entity(&coop_eid("canonical-coop")).unwrap(),
+                Some(UUID_COOP.to_string())
+            );
+        }
+    }
+
+    // ---- contrast with bind_exact + PR4 surrogate composition ----
+
+    #[test]
+    fn test_bind_resolved_accepts_what_bind_exact_rejects_as_not_mappable() {
+        // The single behavioral difference is the reject-not-normalize gate.
+        let map = InMemoryCoopEntityMap::new();
+        let surrogate = crate::propose_surrogate_entity_id(UUID_COOP).unwrap();
+        // bind_exact runs project_coop_id and rejects the non-mappable id...
+        assert!(matches!(
+            map.bind_exact(UUID_COOP, &surrogate),
+            Err(CoopEntityMapError::NotMappable(_))
+        ));
+        // ...bind_resolved accepts the very same pair.
+        map.bind_resolved(UUID_COOP, &surrogate).unwrap();
+        assert_eq!(map.entity_for_coop(UUID_COOP).unwrap(), Some(surrogate));
+    }
+
+    #[test]
+    fn test_bind_resolved_never_returns_not_mappable() {
+        // Even for an id that project_coop_id would reject (uppercase +
+        // underscore), bind_resolved must not surface NotMappable — that gate
+        // is intentionally skipped.
+        let map = InMemoryCoopEntityMap::new();
+        let result = map.bind_resolved("coop_A", &coop_eid("legacy-coop-a"));
+        assert!(!matches!(result, Err(CoopEntityMapError::NotMappable(_))));
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_bind_resolved_pr4_golden_surrogate_round_trips() {
+        // Pins PR4's golden vector composed with the PR5 write primitive.
+        let surrogate = crate::propose_surrogate_entity_id(UUID_COOP).unwrap();
+        assert_eq!(
+            surrogate.as_str(),
+            "entity:icn:cooperative:coop-legacy-edf6152975301bd80c13"
+        );
+        let map = SledCoopEntityMap::temporary().unwrap();
+        map.bind_resolved(UUID_COOP, &surrogate).unwrap();
+        assert_eq!(
+            map.entity_for_coop(UUID_COOP).unwrap(),
+            Some(surrogate.clone())
+        );
+        assert_eq!(
+            map.coop_for_entity(&surrogate).unwrap(),
+            Some(UUID_COOP.to_string())
+        );
     }
 }
