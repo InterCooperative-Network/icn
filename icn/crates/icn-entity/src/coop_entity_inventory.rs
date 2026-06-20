@@ -341,10 +341,14 @@ pub fn classify_coop_ids_with_surrogate_preview(
     // Base classification first (read-only, identical to classify_coop_ids).
     let mut inventory = classify_coop_ids(coop_ids, map);
 
-    // Pass 1 (pure): propose a surrogate for each NonMappable entry and tally how
-    // many entries land on each surrogate, so within-batch duplicates are visible.
+    // Pass 1 (pure): propose a surrogate for each NonMappable entry and tally,
+    // per EntityId, how many entries in this batch would occupy it on a later
+    // bind. The occupancy count includes BOTH proposed surrogates and the
+    // projected/bound EntityId of mappable/already-bound entries — otherwise a
+    // surrogate that coincides with a same-batch mappable coop's projection (its
+    // slug literally equals the surrogate) would go undetected until PR5's bind.
     let mut surrogate_for: Vec<Option<EntityId>> = Vec::with_capacity(inventory.entries.len());
-    let mut surrogate_counts: HashMap<String, usize> = HashMap::new();
+    let mut entity_claims: HashMap<String, usize> = HashMap::new();
     for entry in &inventory.entries {
         let surrogate = if entry.class == CoopEntityClass::NonMappable {
             // The surrogate is valid by construction; an (unreachable) error is
@@ -353,8 +357,17 @@ pub fn classify_coop_ids_with_surrogate_preview(
         } else {
             None
         };
-        if let Some(s) = &surrogate {
-            *surrogate_counts.entry(s.as_str().to_string()).or_insert(0) += 1;
+        // The EntityId this entry would occupy on a bind: a NonMappable claims its
+        // proposed surrogate; a mappable claims its projection; an already-bound
+        // entry its bound id. StorageError entries claim nothing.
+        if let Some(claimed) = surrogate
+            .as_ref()
+            .or(entry.projected_entity_id.as_ref())
+            .or(entry.bound_entity_id.as_ref())
+        {
+            *entity_claims
+                .entry(claimed.as_str().to_string())
+                .or_insert(0) += 1;
         }
         surrogate_for.push(surrogate);
     }
@@ -371,13 +384,10 @@ pub fn classify_coop_ids_with_surrogate_preview(
         let mut collision_notes: Vec<String> = Vec::new();
         let mut error_notes: Vec<String> = Vec::new();
 
-        // Within-batch: another entry proposes the same surrogate.
-        if surrogate_counts
-            .get(surrogate.as_str())
-            .copied()
-            .unwrap_or(0)
-            > 1
-        {
+        // Within-batch: another entry in this batch would occupy the same
+        // EntityId (another surrogate proposal, or a mappable/bound entry whose
+        // projected/bound id equals this surrogate).
+        if entity_claims.get(surrogate.as_str()).copied().unwrap_or(0) > 1 {
             collision_notes.push(format!(
                 "proposed surrogate {} collides within-batch with another coop_id",
                 surrogate.as_str()
@@ -835,5 +845,40 @@ mod tests {
             err.contains("reverse-lookup failed"),
             "lookup error must still be surfaced; got: {err}"
         );
+    }
+
+    #[test]
+    fn preview_flags_surrogate_colliding_with_same_batch_mappable_projection() {
+        // A mappable coop literally named the surrogate slug of a non-mappable
+        // coop projects to the EXACT EntityId being proposed. Neither is bound,
+        // so the reverse-index check is empty — but binding both later would
+        // conflict on the same entity id, so the in-batch occupancy check must
+        // include mappable projections, not just other surrogate proposals.
+        let map = InMemoryCoopEntityMap::new();
+        let surrogate = propose_surrogate_entity_id(DEFAULT_COOP).unwrap();
+        let collider = surrogate.identifier().to_string(); // valid slug, unbound
+
+        let inv = classify_coop_ids_with_surrogate_preview(
+            vec![DEFAULT_COOP.to_string(), collider.clone()],
+            &map,
+        );
+
+        assert_eq!(inv.non_mappable, 1);
+        assert_eq!(inv.mappable_unbound, 1);
+        assert_eq!(inv.surrogate_proposed, 1);
+        assert_eq!(
+            inv.surrogate_collision, 1,
+            "surrogate must collide with a same-batch mappable projection"
+        );
+        let nm = inv
+            .entries
+            .iter()
+            .find(|e| e.coop_id == DEFAULT_COOP)
+            .unwrap();
+        assert!(nm
+            .error
+            .as_ref()
+            .expect("collision note")
+            .contains("within-batch"));
     }
 }
