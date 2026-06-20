@@ -237,6 +237,28 @@ enum CoopMaintenanceCommands {
         #[arg(long)]
         preview_surrogates: bool,
     },
+
+    /// Controlled surrogate backfill: bind each non-mappable cooperative ID
+    /// (e.g. the default `coop:<uuid>`) to its deterministic surrogate
+    /// `EntityId` (#2082 lane). Dry-run by default — writes require `--apply`.
+    ///
+    /// Selects only safe, collision-free non-mappable IDs, preserves each
+    /// original `coop_id` byte-for-byte, and never normalizes. A mapping grants
+    /// no authority. Reads the local cooperative store directly, so run it with
+    /// the daemon stopped (the daemon holds an exclusive lock).
+    EntityBackfillSurrogates {
+        /// Perform the binds. Without this flag the command is a dry run and
+        /// writes nothing.
+        #[arg(long)]
+        apply: bool,
+        /// Explicitly request a dry run (the default). Mutually exclusive with
+        /// `--apply`; useful to make the read-only intent unambiguous.
+        #[arg(long, conflicts_with = "apply")]
+        dry_run: bool,
+        /// Emit machine-readable JSON instead of a human-readable table.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -2035,13 +2057,18 @@ fn get_store_path(data_dir: &Path) -> PathBuf {
     data_dir.join("store")
 }
 
-/// Dispatch read-only cooperative maintenance subcommands.
+/// Dispatch cooperative maintenance subcommands.
 fn handle_coop_maintenance_command(cmd: CoopMaintenanceCommands, data_dir: &Path) -> Result<()> {
     match cmd {
         CoopMaintenanceCommands::EntityReport {
             json,
             preview_surrogates,
         } => coop_entity_report(data_dir, json, preview_surrogates),
+        CoopMaintenanceCommands::EntityBackfillSurrogates {
+            apply,
+            dry_run: _,
+            json,
+        } => coop_entity_backfill_surrogates(data_dir, json, apply),
     }
 }
 
@@ -2188,6 +2215,163 @@ fn render_coop_entity_inventory(
             }
             if let Some(err) = &entry.error {
                 print!(" ({err})");
+            }
+            println!();
+        }
+    }
+
+    Ok(())
+}
+
+/// Run a controlled surrogate backfill over the local cooperative store
+/// (#2082 lane). Dry-run by default; `apply` performs the binds.
+///
+/// Opens the existing cooperative sled store, lists the stored cooperatives, and
+/// binds each safe, collision-free non-mappable id (e.g. the default
+/// `coop:<uuid>`) to its deterministic surrogate `EntityId` via
+/// [`icn_entity::CoopEntityMap::bind_resolved`]. The original `coop_id` is
+/// preserved byte-for-byte and nothing is normalized; a mapping grants no
+/// authority. In dry-run mode it writes nothing. Returns a non-zero exit (via
+/// `Err`) when an `--apply` run hits a bind conflict/error, a refused surrogate
+/// collision, or a storage error.
+fn coop_entity_backfill_surrogates(data_dir: &Path, json: bool, apply: bool) -> Result<()> {
+    use icn_coop::CoopStore;
+    use icn_entity::{
+        backfill_coop_surrogates, InMemoryCoopEntityMap, SledCoopEntityMap, SurrogateBackfillMode,
+    };
+    use std::sync::Arc;
+
+    let mode = if apply {
+        SurrogateBackfillMode::Apply
+    } else {
+        SurrogateBackfillMode::DryRun
+    };
+
+    let coop_store_path = get_store_path(data_dir).join("cooperative");
+
+    // No store -> nothing to back-fill. Never create a database (apply included):
+    // an absent store is reported as an empty result, not materialized on disk.
+    if !coop_store_path.exists() {
+        if !json {
+            eprintln!(
+                "No cooperative store found at {} — nothing to back-fill (nothing was created).",
+                coop_store_path.display()
+            );
+        }
+        let empty =
+            backfill_coop_surrogates(Vec::<String>::new(), &InMemoryCoopEntityMap::new(), mode);
+        return render_coop_surrogate_backfill(&empty, json);
+    }
+
+    let sled_store = SledStore::open(&coop_store_path).with_context(|| {
+        format!(
+            "Failed to open cooperative store at {} (stop the daemon first; it holds an exclusive lock)",
+            coop_store_path.display()
+        )
+    })?;
+
+    // Share one Db between the cooperative store and the canonical map, exactly
+    // as the daemon does in init_coop — no separate database is opened.
+    let db = Arc::new(sled_store.db().clone());
+    let coop_store = CoopStore::new(db.clone());
+    let map = SledCoopEntityMap::new(db);
+
+    let coop_ids: Vec<String> = coop_store
+        .list_cooperatives()
+        .context("Failed to list cooperatives from the store")?
+        .into_iter()
+        .map(|coop| coop.id)
+        .collect();
+
+    let report = backfill_coop_surrogates(coop_ids, &map, mode);
+    render_coop_surrogate_backfill(&report, json)?;
+
+    // An --apply run that could not cleanly complete (a bind conflict/error, a
+    // refused collision, or a storage error) exits non-zero so callers can gate
+    // on it. The report above already details each affected entry.
+    if report.apply_had_failures() {
+        bail!(
+            "surrogate backfill --apply did not fully complete: {} applied, {} conflict(s), \
+             {} bind error(s), {} collision(s), {} storage error(s) — see report above",
+            report.applied,
+            report.bind_conflict,
+            report.bind_error,
+            report.surrogate_collision,
+            report.skipped_storage_error,
+        );
+    }
+    Ok(())
+}
+
+/// Print a [`icn_entity::CoopSurrogateBackfill`] as JSON or a human table.
+fn render_coop_surrogate_backfill(
+    report: &icn_entity::CoopSurrogateBackfill,
+    json: bool,
+) -> Result<()> {
+    use icn_entity::{SurrogateBackfillAction, SurrogateBackfillMode};
+
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(report)
+                .context("Failed to serialize the backfill report as JSON")?
+        );
+        return Ok(());
+    }
+
+    let mode = match report.mode {
+        SurrogateBackfillMode::DryRun => "dry-run (no writes; pass --apply to bind)",
+        SurrogateBackfillMode::Apply => "apply (binds performed)",
+    };
+    println!(
+        "coop surrogate backfill [{mode}] (a mapping grants no authority; coop_id preserved exactly)"
+    );
+    println!();
+    println!("  total:                    {}", report.total);
+    println!("  eligible:                 {}", report.eligible);
+    println!("  applied:                  {}", report.applied);
+    println!(
+        "  skipped_already_bound:    {}",
+        report.skipped_already_bound
+    );
+    println!(
+        "  skipped_mappable_unbound: {}",
+        report.skipped_mappable_unbound
+    );
+    println!(
+        "  skipped_reverse_conflict: {}",
+        report.skipped_reverse_conflict
+    );
+    println!(
+        "  skipped_storage_error:    {}",
+        report.skipped_storage_error
+    );
+    println!("  surrogate_collision:      {}", report.surrogate_collision);
+    println!("  bind_conflict:            {}", report.bind_conflict);
+    println!("  bind_error:               {}", report.bind_error);
+
+    if !report.entries.is_empty() {
+        println!();
+        println!("  detail:");
+        for entry in &report.entries {
+            let action = match entry.action {
+                SurrogateBackfillAction::WouldBind => "would_bind",
+                SurrogateBackfillAction::Bound => "bound",
+                SurrogateBackfillAction::SkippedAlreadyBound => "skipped_already_bound",
+                SurrogateBackfillAction::SkippedMappableUnbound => "skipped_mappable_unbound",
+                SurrogateBackfillAction::SkippedReverseConflict => "skipped_reverse_conflict",
+                SurrogateBackfillAction::SkippedStorageError => "skipped_storage_error",
+                SurrogateBackfillAction::SurrogateCollision => "surrogate_collision",
+                SurrogateBackfillAction::BindConflict => "bind_conflict",
+                SurrogateBackfillAction::BindError => "bind_error",
+            };
+            print!("    [{action}] {}", entry.coop_id);
+            if let Some(surrogate) = &entry.proposed_entity_id {
+                print!(" -> {}", surrogate.as_str());
+            }
+            print!(" ({})", entry.reason);
+            if let Some(err) = &entry.error {
+                print!(" [error: {err}]");
             }
             println!();
         }

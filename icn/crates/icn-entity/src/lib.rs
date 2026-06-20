@@ -76,6 +76,7 @@
 //! - [`error`] - Error types
 
 pub mod actor;
+pub mod coop_entity_backfill;
 pub mod coop_entity_inventory;
 pub mod coop_entity_map;
 pub mod coop_entity_surrogate;
@@ -90,6 +91,10 @@ pub mod sled_registry;
 
 // Re-export main types at crate root
 pub use actor::{EntityActor, GossipHandle, ENTITY_TOPIC};
+pub use coop_entity_backfill::{
+    backfill_coop_surrogates, CoopSurrogateBackfill, SurrogateBackfillAction,
+    SurrogateBackfillEntry, SurrogateBackfillMode,
+};
 pub use coop_entity_inventory::{
     classify_coop_ids, classify_coop_ids_with_surrogate_preview, CoopEntityClass,
     CoopEntityInventory, CoopEntityInventoryEntry,
