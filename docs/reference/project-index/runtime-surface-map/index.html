@@ -44,6 +44,9 @@ View source on GitHub →
 <p>For current project truth, defer to <a href="/docs/STATE">`docs/STATE.md`</a> and <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>. This map is a routing guide for the surfaces a member or app actually touches today.</p>
 </blockquote>
 <p>This document points at the gateway endpoints, primitives, and proof artifacts that exist as real runtime surfaces in the current main. It is not exhaustive — a full API reference lives in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/api/API_REFERENCE">`docs/reference/api/API_REFERENCE.md`</a> — and it does not over-document implementation details. It is a fast routing layer.</p>
+<blockquote>
+<p>For a <strong>mechanical inventory of every gateway route declaration</strong> (Actix attribute macros) versus OpenAPI coverage, see the generated <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/generated/route-inventory">`generated/route-inventory.md`</a> (regenerate/check with <code>docs/scripts/route_inventory.py</code>; issue <a href="https://github.com/InterCooperative-Network/icn/issues/2112" target="_blank" rel="noopener">#2112</a>). It proves declarations exist in source — not correctness, auth, tests, or production readiness.</p>
+</blockquote>
 <h2>The gateway</h2>
 <p>The <code>icn-gateway</code> crate exposes the REST + WebSocket surface used by member-facing apps and SDKs.</p>
 <ul>
