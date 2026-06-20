@@ -2348,8 +2348,8 @@ audiences = ["operators"]
 category = "reference"
 status = "living"
 title = "ICN Project Index"
-description = "Show-ready orientation layer — routes outside readers, contributors, and agents to the right canonical doc, source tree, or external URL. Defers to STATE.md and PHASE_PROGRESS.md for current truth."
-last_updated = "2026-05-11"
+description = "Show-ready orientation layer — routes outside readers, contributors, and agents to the right canonical doc, source tree, or external URL. Defers to STATE.md and PHASE_PROGRESS.md for current truth. Includes the Truth Layer / Claim Discipline section cross-linking the existing truth systems."
+last_updated = "2026-06-20"
 owner = "matt"
 audiences = ["all"]
 truth_class = "operational"
@@ -2358,7 +2358,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation"]
 recommended_action = "keep"
-last_reviewed = "2026-05-11"
+last_reviewed = "2026-06-20"
 
 [docs."docs/reference/project-index/current-truth-map.md"]
 category = "reference"
