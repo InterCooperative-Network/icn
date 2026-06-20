@@ -53,7 +53,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 </ul>
 <h2>Snapshot</h2>
 <ul>
-<li>Source commit: <code>0d27da7d89df89249db5cd3d07e1c77ad195749e</code></li>
+<li>Source commit: <code>5cfabd25486cd10ddc6a6f4369d32179a73b2ada</code></li>
 <li>Gateway source scanned: <code>icn/crates/icn-gateway/src/**</code></li>
 <li>OpenAPI spec: <code>docs/api/openapi.generated.yaml</code></li>
 </ul>
@@ -61,13 +61,48 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <ul>
 <li><strong>Discovered gateway route macros: 287</strong> (DELETE 17 · GET 131 · POST 125 · PUT 14)</li>
 <li><strong>OpenAPI documented paths: 5</strong></li>
-<li>Matched as documented (best-effort path match): 2</li>
+<li>Matched as documented (best-effort method+path match): 2</li>
 <li>Not matched to OpenAPI (best-effort): 285 (~99% of discovered)</li>
 <li>Documented share of discovered routes: ~0.7%</li>
+<li><strong>OpenAPI operations (method + path) not matched to a discovered gateway route: 3</strong> (see section below)</li>
 </ul>
 <blockquote>
 <p>The gap is structural: only handlers hand-annotated for utoipa reach the OpenAPI spec. Of the OpenAPI paths, several belong to <code>icn-governance-actor</code> HTTP handlers that live outside the gateway crate and are not captured by this macro scan — so the documented/undocumented counts here are a best-effort comparison, while the two headline counts (discovered macros, OpenAPI paths) are the robust measured facts.</p>
 </blockquote>
+<h2>OpenAPI paths not matched to discovered gateway routes</h2>
+<p>These OpenAPI-documented paths did <strong>not</strong> mechanically match any discovered gateway route macro. That is expected when a handler is documented via <code>#[utoipa::path]</code> but <strong>registered outside the scanned <code>icn/crates/icn-gateway/src/**</code> tree</strong> — e.g. the governance app (<code>icn-governance-actor</code> = <code>icn/apps/governance</code>) documents its <code>/gov/*</code> handlers with utoipa and mounts them via <code>web::resource(&quot;…&quot;).route(…)</code> in <code>apps/governance/src/http/configure.rs</code> (no attribute macros). OpenAPI presence does <strong>not</strong> prove a runtime route exists or is mounted; these stay <code>unknown / needs local verification</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>OpenAPI path</th>
+<th>Matched gateway route</th>
+<th>Status</th>
+<th>Claim safety</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/gov/me/action-cards</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/gov/me/standing</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+</tbody></table>
 <h2>Limitations</h2>
 <ul>
 <li><strong>Full mounted-path resolution is best-effort.</strong> The <code>Group</code> column is <code>/v1</code> + a <code>web::scope(&quot;…&quot;)</code> segment associated from <code>server.rs</code> <code>.service(...)</code>/<code>.configure(...)</code> registration sites (matched at identifier boundaries, keyed by the handler&#39;s top-level <code>icn/crates/icn-gateway/src/api/&lt;group&gt;</code> module) + the relative macro path. It is <strong>not</strong> a real Rust parser and may be wrong for deeply-nested or conditional scopes. The relative macro <code>Path</code> and the <code>Source</code> file are authoritative.</li>
