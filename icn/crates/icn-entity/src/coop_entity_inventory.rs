@@ -365,7 +365,11 @@ pub fn classify_coop_ids_with_surrogate_preview(
         let Some(surrogate) = surrogate else { continue };
         inventory.surrogate_proposed += 1;
 
-        let mut notes: Vec<String> = Vec::new();
+        // Collision notes count toward `surrogate_collision` (a later bind would
+        // be rejected); error notes are surfaced but are read failures, not
+        // collisions, so they must not inflate the collision count.
+        let mut collision_notes: Vec<String> = Vec::new();
+        let mut error_notes: Vec<String> = Vec::new();
 
         // Within-batch: another entry proposes the same surrogate.
         if surrogate_counts
@@ -374,28 +378,34 @@ pub fn classify_coop_ids_with_surrogate_preview(
             .unwrap_or(0)
             > 1
         {
-            notes.push(format!(
+            collision_notes.push(format!(
                 "proposed surrogate {} collides within-batch with another coop_id",
                 surrogate.as_str()
             ));
         }
 
         // Reverse-binding: the surrogate target is already bound to a *different*
-        // coop_id, so a later bind_exact would be rejected as a conflict.
+        // coop_id, so a later bind_exact would be rejected as a conflict. A read
+        // failure is surfaced as an error, not counted as a collision.
         match map.coop_for_entity(&surrogate) {
-            Ok(Some(occupant)) if occupant != entry.coop_id => notes.push(format!(
+            Ok(Some(occupant)) if occupant != entry.coop_id => collision_notes.push(format!(
                 "proposed surrogate {} already reverse-bound to {occupant:?}",
                 surrogate.as_str()
             )),
             Ok(_) => {}
-            Err(e) => notes.push(format!(
+            Err(e) => error_notes.push(format!(
                 "proposed surrogate {} reverse-lookup failed: {e}",
                 surrogate.as_str()
             )),
         }
 
-        if !notes.is_empty() {
+        if !collision_notes.is_empty() {
             inventory.surrogate_collision += 1;
+        }
+
+        // Surface both collision and lookup-error notes on the entry.
+        let notes: Vec<String> = collision_notes.into_iter().chain(error_notes).collect();
+        if !notes.is_empty() {
             let joined = notes.join("; ");
             entry.error = Some(match entry.error.take() {
                 Some(existing) => format!("{existing}; {joined}"),
@@ -786,5 +796,44 @@ mod tests {
         );
         assert_eq!(inv.non_mappable, 2);
         assert_eq!(inv.surrogate_proposed, 2);
+    }
+
+    #[test]
+    fn preview_reverse_lookup_error_is_not_counted_as_collision() {
+        // A `coop_for_entity` *read failure* during preview is surfaced in the
+        // entry's error, but it is NOT a collision: `surrogate_collision` counts
+        // bind conflicts (within-batch dup / already-reverse-bound) only.
+        struct ReverseErrMap;
+        impl CoopEntityMap for ReverseErrMap {
+            fn bind_exact(&self, _: &str, _: &EntityId) -> Result<(), CoopEntityMapError> {
+                unreachable!("preview must never write through the map");
+            }
+            // Ok(None) keeps "coop_A" classified NonMappable (unbound + unmappable).
+            fn entity_for_coop(&self, _: &str) -> Result<Option<EntityId>, CoopEntityMapError> {
+                Ok(None)
+            }
+            // The surrogate reverse-lookup fails.
+            fn coop_for_entity(&self, _: &EntityId) -> Result<Option<String>, CoopEntityMapError> {
+                Err(CoopEntityMapError::Storage(
+                    "reverse index unreadable".into(),
+                ))
+            }
+        }
+
+        let inv = classify_coop_ids_with_surrogate_preview(ids(&["coop_A"]), &ReverseErrMap);
+        assert_eq!(inv.non_mappable, 1);
+        assert_eq!(inv.surrogate_proposed, 1);
+        assert_eq!(
+            inv.surrogate_collision, 0,
+            "a reverse-lookup error is a read failure, not a bind collision"
+        );
+        let err = inv.entries[0]
+            .error
+            .as_ref()
+            .expect("lookup error surfaced");
+        assert!(
+            err.contains("reverse-lookup failed"),
+            "lookup error must still be surfaced; got: {err}"
+        );
     }
 }

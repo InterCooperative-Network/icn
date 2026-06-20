@@ -197,6 +197,7 @@ mod tests {
         // Every shape the inventory classifies NonMappable must still produce a
         // valid surrogate (the function must not choke on uppercase, underscore,
         // Unicode, short ids, leading digits, consecutive hyphens, or colons).
+        let long = "x".repeat(4096);
         for coop_id in [
             "coop:550e8400-e29b-41d4-a716-446655440000",
             "coop_A",
@@ -206,7 +207,7 @@ mod tests {
             "1coop",
             "coop--east",
             "",
-            &"x".repeat(4096),
+            long.as_str(),
         ] {
             let surrogate = propose_surrogate_entity_id(coop_id)
                 .unwrap_or_else(|e| panic!("surrogate failed for {coop_id:?}: {e}"));
