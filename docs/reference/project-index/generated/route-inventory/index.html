@@ -53,7 +53,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 </ul>
 <h2>Snapshot</h2>
 <ul>
-<li>Source commit: <code>5cfabd25486cd10ddc6a6f4369d32179a73b2ada</code></li>
+<li>Source commit: <code>4b47261a3fb9b2c7bd7c979d6556e3fb06bb0ce2</code></li>
 <li>Gateway source scanned: <code>icn/crates/icn-gateway/src/**</code></li>
 <li>OpenAPI spec: <code>docs/api/openapi.generated.yaml</code></li>
 </ul>
@@ -65,6 +65,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <li>Not matched to OpenAPI (best-effort): 285 (~99% of discovered)</li>
 <li>Documented share of discovered routes: ~0.7%</li>
 <li><strong>OpenAPI operations (method + path) not matched to a discovered gateway route: 3</strong> (see section below)</li>
+<li><strong>Governance app route-registration candidates (separate surface, not gateway macros): 80</strong> (see section below)</li>
 </ul>
 <blockquote>
 <p>The gap is structural: only handlers hand-annotated for utoipa reach the OpenAPI spec. Of the OpenAPI paths, several belong to <code>icn-governance-actor</code> HTTP handlers that live outside the gateway crate and are not captured by this macro scan — so the documented/undocumented counts here are a best-effort comparison, while the two headline counts (discovered macros, OpenAPI paths) are the robust measured facts.</p>
@@ -77,6 +78,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <th>Method</th>
 <th>OpenAPI path</th>
 <th>Matched gateway route</th>
+<th>Governance registration candidate</th>
 <th>Status</th>
 <th>Claim safety</th>
 </tr>
@@ -85,6 +87,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt</code></td>
 <td>no</td>
+<td><code>get_action_item_completion_receipt</code> @ <code>icn/apps/governance/src/http/configure.rs</code>:682</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -92,12 +95,749 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/gov/me/action-cards</code></td>
 <td>no</td>
+<td><code>get_my_action_cards</code> @ <code>icn/apps/governance/src/http/configure.rs</code>:834</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
 <tr>
 <td>GET</td>
 <td><code>/gov/me/standing</code></td>
+<td>no</td>
+<td><code>get_my_standing</code> @ <code>icn/apps/governance/src/http/configure.rs</code>:830</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+</tbody></table>
+<h2>Governance app route-registration candidates</h2>
+<p>The governance app (<code>icn-governance-actor</code> = <code>icn/apps/governance</code>) registers its HTTP routes via <code>web::resource(&quot;…&quot;).route(web::&lt;verb&gt;().to(handlers::…))</code> in <code>apps/governance/src/http/configure.rs</code>, mounted under the gateway&#39;s <code>web::scope(&quot;/gov&quot;)</code> (the served path is <code>/gov</code> + the relative path below). It uses <strong>no route attribute macros</strong>, so the gateway macro scan above never sees these: they are a <strong>separate registration surface</strong>, listed here as candidates and <strong>not</strong> counted among the 287 gateway macros. This is why the unmatched <code>/gov/*</code> OpenAPI operations have no gateway-macro match — their handlers are registered here. The scan is mechanical (one <code>configure.rs</code>, one pattern); a registration site does <strong>not</strong> prove correctness, auth, mounting health, tests, or production readiness, so candidates stay <code>unknown / needs local verification</code>. <code>OpenAPI documented</code> = this candidate&#39;s <code>(verb, /gov + path)</code> matches a generated OpenAPI operation.</p>
+<table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path (relative, under <code>/gov</code>)</th>
+<th>Source</th>
+<th>Handler</th>
+<th>OpenAPI documented</th>
+<th>Status</th>
+<th>Claim safety</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/activities/{activity_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:707</td>
+<td><code>get_activity</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/charters</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:587</td>
+<td><code>activate_charter</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/delegations</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:654</td>
+<td><code>list_delegations</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/delegations</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:653</td>
+<td><code>create_delegation</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/delegations/{delegation_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:658</td>
+<td><code>revoke_delegation</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/digest</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:827</td>
+<td><code>get_digest</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/domains</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:576</td>
+<td><code>list_domains</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/domains</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:575</td>
+<td><code>create_domain</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/domains/{domain_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:579</td>
+<td><code>get_domain</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/domains/{domain_id}/action-items</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:664</td>
+<td><code>list_action_items</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/domains/{domain_id}/action-items</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:663</td>
+<td><code>create_action_item</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/domains/{domain_id}/action-items/{item_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:670</td>
+<td><code>delete_action_item</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/domains/{domain_id}/action-items/{item_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:668</td>
+<td><code>get_action_item</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/domains/{domain_id}/action-items/{item_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:669</td>
+<td><code>update_action_item</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/domains/{domain_id}/action-items/{item_id}/completion-receipt</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:682</td>
+<td><code>get_action_item_completion_receipt</code></td>
+<td>yes</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/domains/{domain_id}/action-items/{item_id}/notes</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:678</td>
+<td><code>add_action_item_note</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/domains/{domain_id}/action-items/{item_id}/status</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:674</td>
+<td><code>update_action_item_status</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/domains/{domain_id}/meetings</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:758</td>
+<td><code>list_meetings</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/domains/{domain_id}/meetings</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:757</td>
+<td><code>create_meeting</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/domains/{domain_id}/members</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:584</td>
+<td><code>remove_domain_member</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/domains/{domain_id}/members</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:583</td>
+<td><code>add_domain_member</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/domains/{domain_id}/programs</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:713</td>
+<td><code>list_programs_by_domain</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/domains/{domain_id}/programs</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:712</td>
+<td><code>create_program</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/entities/{entity_id}/activities</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:703</td>
+<td><code>list_activities</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/entities/{entity_id}/activities</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:702</td>
+<td><code>create_activity</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/entities/{entity_id}/structures</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:688</td>
+<td><code>list_structures</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/entities/{entity_id}/structures</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:687</td>
+<td><code>create_structure</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/me/action-cards</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:834</td>
+<td><code>get_my_action_cards</code></td>
+<td>yes</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/me/scopes</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:829</td>
+<td><code>get_my_scopes</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/me/standing</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:830</td>
+<td><code>get_my_standing</code></td>
+<td>yes</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/me/work</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:831</td>
+<td><code>get_my_work</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/meetings/{meeting_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:762</td>
+<td><code>get_meeting</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/meetings/{meeting_id}/agenda</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:782</td>
+<td><code>add_agenda_item</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/meetings/{meeting_id}/agenda/{item_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:786</td>
+<td><code>update_agenda_item</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/meetings/{meeting_id}/attendance</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:778</td>
+<td><code>mark_attendance</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/meetings/{meeting_id}/attendees</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:774</td>
+<td><code>add_attendee</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/meetings/{meeting_id}/end</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:770</td>
+<td><code>end_meeting</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/meetings/{meeting_id}/start</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:766</td>
+<td><code>start_meeting</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/milestones/{milestone_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:743</td>
+<td><code>get_milestone</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/milestones/{milestone_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:744</td>
+<td><code>update_milestone_status</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/milestones/{milestone_id}/history</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:752</td>
+<td><code>get_milestone_history</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/milestones/{milestone_id}/preview</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:748</td>
+<td><code>preview_milestone</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/programs/{program_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:717</td>
+<td><code>get_program</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/programs/{program_id}/activities/{activity_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:739</td>
+<td><code>unlink_activity_from_program</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/programs/{program_id}/activities/{activity_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:738</td>
+<td><code>link_activity_to_program</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/programs/{program_id}/dashboard</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:725</td>
+<td><code>get_program_dashboard</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/programs/{program_id}/milestones</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:734</td>
+<td><code>list_milestones_by_program</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/programs/{program_id}/milestones</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:733</td>
+<td><code>create_milestone</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/programs/{program_id}/status</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:721</td>
+<td><code>update_program_status</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/programs/{program_id}/summary</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:729</td>
+<td><code>get_program_summary</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:592</td>
+<td><code>list_proposals</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:591</td>
+<td><code>create_proposal</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/federation/clearing/establish</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:799</td>
+<td><code>create_establish_clearing_proposal</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/federation/clearing/terminate</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:803</td>
+<td><code>create_terminate_clearing_proposal</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/federation/join</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:791</td>
+<td><code>create_join_federation_proposal</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/federation/leave</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:795</td>
+<td><code>create_leave_federation_proposal</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/federation/policy</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:815</td>
+<td><code>create_update_federation_policy_proposal</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/federation/vouch</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:807</td>
+<td><code>create_vouch_proposal</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/federation/vouch/revoke</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:811</td>
+<td><code>create_revoke_vouch_proposal</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/sdis/appoint-steward</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:820</td>
+<td><code>create_appoint_steward_proposal</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/sdis/remove-steward</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:824</td>
+<td><code>create_remove_steward_proposal</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals/{proposal_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:596</td>
+<td><code>get_proposal</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals/{proposal_id}/chain</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:620</td>
+<td><code>get_chain</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/{proposal_id}/close</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:604</td>
+<td><code>close_proposal</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals/{proposal_id}/deliberation</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:624</td>
+<td><code>get_proposal_deliberation</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals/{proposal_id}/discussion</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:633</td>
+<td><code>get_discussion</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals/{proposal_id}/discussion/comments</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:638</td>
+<td><code>list_comments</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/{proposal_id}/discussion/comments</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:637</td>
+<td><code>add_comment</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/proposals/{proposal_id}/discussion/comments/{comment_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:643</td>
+<td><code>delete_comment</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/proposals/{proposal_id}/discussion/comments/{comment_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:642</td>
+<td><code>edit_comment</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/proposals/{proposal_id}/discussion/comments/{comment_id}/reactions</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:648</td>
+<td><code>remove_reaction</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/{proposal_id}/discussion/comments/{comment_id}/reactions</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:647</td>
+<td><code>add_reaction</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals/{proposal_id}/effects</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:628</td>
+<td><code>list_proposal_effects</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/{proposal_id}/open</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:600</td>
+<td><code>open_proposal</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals/{proposal_id}/proof</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:616</td>
+<td><code>get_proof</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/proposals/{proposal_id}/tally</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:612</td>
+<td><code>get_vote_tally</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/proposals/{proposal_id}/vote</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:608</td>
+<td><code>cast_vote</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/structures/{structure_id}</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:692</td>
+<td><code>get_structure</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/structures/{structure_id}/roles</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:697</td>
+<td><code>list_roles</code></td>
+<td>no</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/structures/{structure_id}/roles</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:696</td>
+<td><code>assign_role</code></td>
 <td>no</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
@@ -106,7 +846,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <h2>Limitations</h2>
 <ul>
 <li><strong>Full mounted-path resolution is best-effort.</strong> The <code>Group</code> column is <code>/v1</code> + a <code>web::scope(&quot;…&quot;)</code> segment associated from <code>server.rs</code> <code>.service(...)</code>/<code>.configure(...)</code> registration sites (matched at identifier boundaries, keyed by the handler&#39;s top-level <code>icn/crates/icn-gateway/src/api/&lt;group&gt;</code> module) + the relative macro path. It is <strong>not</strong> a real Rust parser and may be wrong for deeply-nested or conditional scopes. The relative macro <code>Path</code> and the <code>Source</code> file are authoritative.</li>
-<li>The route table is <strong>attribute macros only</strong>. Macro-less <code>web::resource(&quot;…&quot;)</code>/<code>.route(…)</code> registrations are now <strong>flagged</strong> below (see <em>Unparsed route-registration candidates</em>) but <strong>not</strong> parsed into routes; out-of-crate handlers (e.g. <code>icn-governance-actor::http</code>) are still not captured.</li>
+<li>The route table is <strong>attribute macros only</strong>. Macro-less <code>web::resource(&quot;…&quot;)</code>/<code>.route(…)</code> registrations in the gateway crate are <strong>flagged</strong> under <em>Unparsed route-registration candidates</em>; the governance app&#39;s out-of-crate registrations are listed under <em>Governance app route-registration candidates</em>. Neither is parsed into the gateway route table or counted as a gateway macro.</li>
 <li>This is <strong>generated-map work, not API documentation completion</strong> (issue #2112). It does not add or change any OpenAPI content or runtime behavior.</li>
 </ul>
 <h2>Routes</h2>
