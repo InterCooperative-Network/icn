@@ -166,10 +166,10 @@ def resource_candidates() -> list[dict]:
     for rs in sorted(GATEWAY_SRC.rglob("*.rs")):
         rel = rs.relative_to(ROOT).as_posix()
         for i, line in enumerate(rs.read_text(encoding="utf-8", errors="replace").splitlines()):
-            # Independent checks (not elif): a one-line `web::resource("…").route(…)`
-            # must record BOTH candidates, not just the resource.
-            rm = RESOURCE_RE.search(line)
-            if rm:
+            # Independent checks (not elif), and finditer over resources, so a
+            # one-line `web::resource("…").route(…)` — or several resource literals
+            # on one line — are all recorded, not just the first match.
+            for rm in RESOURCE_RE.finditer(line):
                 out.append({"kind": "web::resource", "literal": rm.group(1), "file": rel, "line": i + 1})
             if ROUTE_CALL_RE.search(line):
                 out.append({"kind": ".route", "literal": "", "file": rel, "line": i + 1})
