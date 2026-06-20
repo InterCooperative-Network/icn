@@ -11,6 +11,11 @@ on:
       - 'docs/scripts/doc_control_check.py'
       # gateway route source is code-truth for the API-doc canonical guard
       - 'icn/crates/icn-gateway/src/api/ledger.rs'
+      # route-inventory code-truth: gateway route macros (api/**) + scope wiring
+      # (server.rs) feed docs/scripts/route_inventory.py --check. The script and
+      # its generated artifact under docs/ are already covered by docs/**.
+      - 'icn/crates/icn-gateway/src/api/**'
+      - 'icn/crates/icn-gateway/src/server.rs'
       # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
       # under docs/scripts + docs/contracts are already covered by docs/**
       - 'web/pilot-ui/fixtures/**'
@@ -23,6 +28,11 @@ on:
       - 'docs/scripts/doc_control_check.py'
       # gateway route source is code-truth for the API-doc canonical guard
       - 'icn/crates/icn-gateway/src/api/ledger.rs'
+      # route-inventory code-truth: gateway route macros (api/**) + scope wiring
+      # (server.rs) feed docs/scripts/route_inventory.py --check. The script and
+      # its generated artifact under docs/ are already covered by docs/**.
+      - 'icn/crates/icn-gateway/src/api/**'
+      - 'icn/crates/icn-gateway/src/server.rs'
       # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
       # under docs/scripts + docs/contracts are already covered by docs/**
       - 'web/pilot-ui/fixtures/**'
@@ -199,9 +209,39 @@ jobs:
           python3 docs/scripts/validate-rehearsal-shell-fixtures.py
         continue-on-error: false
 
+  route_inventory:
+    name: Check Generated Route Inventory
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      # Generated-artifact drift guard, mirroring the INDEX.md check above: a stale
+      # docs/reference/project-index/generated/route-inventory.md is a WARNING, not a
+      # merge blocker (the artifact is Canonical: no, orientation-only — issue #2112).
+      # The script is stdlib-only and reads git + gateway source; no extra deps.
+      #   exit 0 = current   ->  pass
+      #   exit 1 = stale      ->  ::warning:: (regenerate with --write); job still succeeds
+      #   exit >=2 = checker itself broke (e.g. no routes found) -> fail
+      - name: Check route inventory is current (warn on drift)
+        run: |
+          python3 docs/scripts/route_inventory.py --check && rc=0 || rc=$?
+          if [ "$rc" = "0" ]; then
+            echo "Route inventory is current."
+          elif [ "$rc" = "1" ]; then
+            echo "::warning::docs/reference/project-index/generated/route-inventory.md is stale vs a fresh gateway scan. Regenerate: python3 docs/scripts/route_inventory.py --write"
+          else
+            echo "::error::route_inventory.py failed (exit $rc) — checker error, not a staleness signal."
+            exit "$rc"
+          fi
+
   summary:
     name: Documentation CI Summary
-    needs: [doc_control, lint, freshness, index, fixture_bundle]
+    needs: [doc_control, lint, freshness, index, fixture_bundle, route_inventory]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -226,6 +266,12 @@ jobs:
           fi
           if [ "${{ needs.index.result }}" = "failure" ]; then
             echo "::error::INDEX.md generation failed"
+            exit 1
+          fi
+          # Drift is emitted as a ::warning:: inside the job (success); a failure here
+          # means the checker itself errored, which is worth surfacing.
+          if [ "${{ needs.route_inventory.result }}" = "failure" ]; then
+            echo "::error::Route inventory checker errored (not a staleness signal)"
             exit 1
           fi
 
