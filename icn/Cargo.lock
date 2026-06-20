@@ -3136,6 +3136,7 @@ dependencies = [
  "icn-time",
  "serde",
  "serde_json",
+ "sha2",
  "sled",
  "tempfile",
  "thiserror 2.0.18",

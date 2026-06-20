@@ -33,8 +33,17 @@
 //!   for non-mappable ids; that is deliberately later work.
 
 use crate::coop_entity_map::{project_coop_id, CoopEntityMap, CoopEntityMapError};
+use crate::coop_entity_surrogate::propose_surrogate_entity_id;
 use crate::entity::EntityId;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// Serde helper: omit a `usize` field when it is zero, so the surrogate-preview
+/// aggregates do not appear in the default (non-preview) report — keeping that
+/// output byte-identical to the pre-surrogate inventory.
+fn is_zero(n: &usize) -> bool {
+    *n == 0
+}
 
 /// How a single `coop_id` stands relative to the canonical mapping.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -87,8 +96,17 @@ pub struct CoopEntityInventoryEntry {
     pub reverse_bound_coop_id: Option<String>,
     /// A human-readable reason, for `NonMappable` (why the slug is invalid) and
     /// `StorageError` (the read failure or the consistency violation). `None`
-    /// otherwise.
+    /// otherwise. When surrogate preview is enabled, a collision note for the
+    /// proposed surrogate is appended here.
     pub error: Option<String>,
+    /// The deterministic surrogate cooperative `EntityId` a later allocation PR
+    /// would propose for this `coop_id`. Populated **only** by
+    /// [`classify_coop_ids_with_surrogate_preview`] and **only** for
+    /// [`CoopEntityClass::NonMappable`] entries; `None` otherwise (including the
+    /// default [`classify_coop_ids`] path). A surrogate is a name proposal only
+    /// and grants no authority; nothing is bound.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposed_surrogate_entity_id: Option<EntityId>,
 }
 
 /// Aggregate, read-only inventory of a set of `coop_id`s against the canonical
@@ -107,6 +125,18 @@ pub struct CoopEntityInventory {
     pub non_mappable: usize,
     /// Count of [`CoopEntityClass::StorageError`].
     pub storage_error: usize,
+    /// Count of `NonMappable` entries for which a surrogate `EntityId` was
+    /// proposed. Set only by [`classify_coop_ids_with_surrogate_preview`]; `0`
+    /// (and omitted from JSON) on the default [`classify_coop_ids`] path. This
+    /// is a preview statistic, **not** part of the class partition.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub surrogate_proposed: usize,
+    /// Count of proposed surrogates that would collide on a later bind — either
+    /// already reverse-bound to a *different* `coop_id`, or duplicated by another
+    /// `coop_id` within this same batch. Set only by the preview path; `0` (and
+    /// omitted from JSON) otherwise. A collision is reported, never auto-resolved.
+    #[serde(default, skip_serializing_if = "is_zero")]
+    pub surrogate_collision: usize,
     /// Per-`coop_id` detail, in input order.
     pub entries: Vec<CoopEntityInventoryEntry>,
 }
@@ -135,6 +165,8 @@ fn classify_one(coop_id: &str, map: &dyn CoopEntityMap) -> CoopEntityInventoryEn
         bound_entity_id: bound,
         reverse_bound_coop_id: reverse,
         error,
+        // Surrogate preview is opt-in; the base classifier never proposes one.
+        proposed_surrogate_entity_id: None,
     };
 
     // Forward lookup first: a present binding means AlreadyBound regardless of
@@ -286,8 +318,119 @@ pub fn classify_coop_ids(
     inventory
 }
 
+/// Classify a set of `coop_id`s and, for every [`CoopEntityClass::NonMappable`]
+/// entry, attach the deterministic surrogate cooperative `EntityId` that a later
+/// allocation/backfill PR would propose to bind — **read-only**, binding nothing.
+///
+/// Beyond the base [`classify_coop_ids`] classification this:
+/// - sets [`CoopEntityInventoryEntry::proposed_surrogate_entity_id`] for
+///   `NonMappable` entries (and leaves it `None` for every other class),
+/// - counts proposals in [`CoopEntityInventory::surrogate_proposed`],
+/// - flags, in [`CoopEntityInventory::surrogate_collision`] and the entry's
+///   `error`, any proposed surrogate that would collide on a later bind: one
+///   already reverse-bound to a *different* `coop_id`, or one duplicated by
+///   another `coop_id` within this same batch.
+///
+/// It performs **no writes** and **no normalization**: the only map access is
+/// the read-only [`CoopEntityMap::coop_for_entity`], used to detect collisions.
+/// A surrogate is a name proposal only and grants no authority.
+pub fn classify_coop_ids_with_surrogate_preview(
+    coop_ids: impl IntoIterator<Item = String>,
+    map: &dyn CoopEntityMap,
+) -> CoopEntityInventory {
+    // Base classification first (read-only, identical to classify_coop_ids).
+    let mut inventory = classify_coop_ids(coop_ids, map);
+
+    // Pass 1 (pure): propose a surrogate for each NonMappable entry and tally,
+    // per EntityId, how many entries in this batch would occupy it on a later
+    // bind. The occupancy count includes BOTH proposed surrogates and the
+    // projected/bound EntityId of mappable/already-bound entries — otherwise a
+    // surrogate that coincides with a same-batch mappable coop's projection (its
+    // slug literally equals the surrogate) would go undetected until PR5's bind.
+    let mut surrogate_for: Vec<Option<EntityId>> = Vec::with_capacity(inventory.entries.len());
+    let mut entity_claims: HashMap<String, usize> = HashMap::new();
+    for entry in &inventory.entries {
+        let surrogate = if entry.class == CoopEntityClass::NonMappable {
+            // The surrogate is valid by construction; an (unreachable) error is
+            // treated as "no proposal" rather than panicking.
+            propose_surrogate_entity_id(&entry.coop_id).ok()
+        } else {
+            None
+        };
+        // The EntityId this entry would occupy on a bind: a NonMappable claims its
+        // proposed surrogate; a mappable claims its projection; an already-bound
+        // entry its bound id. StorageError entries claim nothing.
+        if let Some(claimed) = surrogate
+            .as_ref()
+            .or(entry.projected_entity_id.as_ref())
+            .or(entry.bound_entity_id.as_ref())
+        {
+            *entity_claims
+                .entry(claimed.as_str().to_string())
+                .or_insert(0) += 1;
+        }
+        surrogate_for.push(surrogate);
+    }
+
+    // Pass 2: attach proposals, detect collisions (read-only: coop_for_entity
+    // only), and update the preview aggregates.
+    for (entry, surrogate) in inventory.entries.iter_mut().zip(surrogate_for) {
+        let Some(surrogate) = surrogate else { continue };
+        inventory.surrogate_proposed += 1;
+
+        // Collision notes count toward `surrogate_collision` (a later bind would
+        // be rejected); error notes are surfaced but are read failures, not
+        // collisions, so they must not inflate the collision count.
+        let mut collision_notes: Vec<String> = Vec::new();
+        let mut error_notes: Vec<String> = Vec::new();
+
+        // Within-batch: another entry in this batch would occupy the same
+        // EntityId (another surrogate proposal, or a mappable/bound entry whose
+        // projected/bound id equals this surrogate).
+        if entity_claims.get(surrogate.as_str()).copied().unwrap_or(0) > 1 {
+            collision_notes.push(format!(
+                "proposed surrogate {} collides within-batch with another coop_id",
+                surrogate.as_str()
+            ));
+        }
+
+        // Reverse-binding: the surrogate target is already bound to a *different*
+        // coop_id, so a later bind_exact would be rejected as a conflict. A read
+        // failure is surfaced as an error, not counted as a collision.
+        match map.coop_for_entity(&surrogate) {
+            Ok(Some(occupant)) if occupant != entry.coop_id => collision_notes.push(format!(
+                "proposed surrogate {} already reverse-bound to {occupant:?}",
+                surrogate.as_str()
+            )),
+            Ok(_) => {}
+            Err(e) => error_notes.push(format!(
+                "proposed surrogate {} reverse-lookup failed: {e}",
+                surrogate.as_str()
+            )),
+        }
+
+        if !collision_notes.is_empty() {
+            inventory.surrogate_collision += 1;
+        }
+
+        // Surface both collision and lookup-error notes on the entry.
+        let notes: Vec<String> = collision_notes.into_iter().chain(error_notes).collect();
+        if !notes.is_empty() {
+            let joined = notes.join("; ");
+            entry.error = Some(match entry.error.take() {
+                Some(existing) => format!("{existing}; {joined}"),
+                None => joined,
+            });
+        }
+
+        entry.proposed_surrogate_entity_id = Some(surrogate);
+    }
+
+    inventory
+}
+
 #[cfg(test)]
-#[allow(clippy::unwrap_used)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
     use crate::coop_entity_map::{CoopEntityMap, InMemoryCoopEntityMap};
@@ -530,5 +673,212 @@ mod tests {
                 + inv.storage_error,
             inv.total
         );
+    }
+
+    // ------------------------------------------------------------------
+    // Surrogate preview (#2082 PR4) — read-only, proposes but never binds.
+    // ------------------------------------------------------------------
+
+    const DEFAULT_COOP: &str = "coop:550e8400-e29b-41d4-a716-446655440000";
+
+    #[test]
+    fn default_classify_attaches_no_surrogate() {
+        // The non-preview path must not propose surrogates or set the aggregates.
+        let map = InMemoryCoopEntityMap::new();
+        let inv = classify_coop_ids(ids(&[DEFAULT_COOP]), &map);
+        assert_eq!(inv.non_mappable, 1);
+        assert_eq!(inv.surrogate_proposed, 0);
+        assert_eq!(inv.surrogate_collision, 0);
+        assert_eq!(inv.entries[0].proposed_surrogate_entity_id, None);
+    }
+
+    #[test]
+    fn preview_attaches_surrogate_to_non_mappable() {
+        let map = InMemoryCoopEntityMap::new();
+        let inv = classify_coop_ids_with_surrogate_preview(ids(&[DEFAULT_COOP]), &map);
+        assert_eq!(inv.non_mappable, 1);
+        assert_eq!(inv.surrogate_proposed, 1);
+        assert_eq!(inv.surrogate_collision, 0);
+        let entry = &inv.entries[0];
+        assert_eq!(entry.class, CoopEntityClass::NonMappable);
+        assert_eq!(
+            entry.proposed_surrogate_entity_id,
+            Some(propose_surrogate_entity_id(DEFAULT_COOP).unwrap())
+        );
+        // The golden vector pins the exact proposed handle.
+        assert_eq!(
+            entry
+                .proposed_surrogate_entity_id
+                .as_ref()
+                .unwrap()
+                .as_str(),
+            "entity:icn:cooperative:coop-legacy-edf6152975301bd80c13"
+        );
+    }
+
+    #[test]
+    fn preview_leaves_mappable_unbound_without_surrogate() {
+        let map = InMemoryCoopEntityMap::new();
+        let inv = classify_coop_ids_with_surrogate_preview(ids(&["food-coop"]), &map);
+        assert_eq!(inv.mappable_unbound, 1);
+        assert_eq!(inv.surrogate_proposed, 0);
+        assert_eq!(inv.entries[0].proposed_surrogate_entity_id, None);
+    }
+
+    #[test]
+    fn preview_leaves_already_bound_without_surrogate() {
+        let map = InMemoryCoopEntityMap::new();
+        map.bind_projected("coop-a").unwrap();
+        let inv = classify_coop_ids_with_surrogate_preview(ids(&["coop-a"]), &map);
+        assert_eq!(inv.already_bound, 1);
+        assert_eq!(inv.surrogate_proposed, 0);
+        assert_eq!(inv.entries[0].proposed_surrogate_entity_id, None);
+    }
+
+    #[test]
+    fn preview_detects_reverse_binding_collision() {
+        // Occupy the surrogate target with a DIFFERENT (mappable) coop, so the
+        // proposed surrogate for DEFAULT_COOP would conflict on a later bind.
+        let map = InMemoryCoopEntityMap::new();
+        let surrogate = propose_surrogate_entity_id(DEFAULT_COOP).unwrap();
+        map.bind_exact("alpha-coop", &surrogate).unwrap();
+
+        let inv = classify_coop_ids_with_surrogate_preview(ids(&[DEFAULT_COOP]), &map);
+        assert_eq!(inv.non_mappable, 1);
+        assert_eq!(inv.surrogate_proposed, 1);
+        assert_eq!(inv.surrogate_collision, 1);
+        let entry = &inv.entries[0];
+        // The surrogate is still surfaced...
+        assert_eq!(entry.proposed_surrogate_entity_id, Some(surrogate));
+        // ...and the collision is reported in the entry's error.
+        let err = entry.error.as_ref().expect("collision note expected");
+        assert!(
+            err.contains("alpha-coop") && err.to_lowercase().contains("reverse-bound"),
+            "got error: {err}"
+        );
+    }
+
+    #[test]
+    fn preview_detects_within_batch_collision() {
+        // Two coop_ids that propose the same surrogate. SHA-256 makes distinct
+        // inputs collide only astronomically, so we exercise the dedup logic with
+        // a duplicated id (real `list_cooperatives` input is distinct).
+        let map = InMemoryCoopEntityMap::new();
+        let inv =
+            classify_coop_ids_with_surrogate_preview(ids(&[DEFAULT_COOP, DEFAULT_COOP]), &map);
+        assert_eq!(inv.non_mappable, 2);
+        assert_eq!(inv.surrogate_proposed, 2);
+        assert_eq!(inv.surrogate_collision, 2, "both colliding entries flagged");
+        for entry in &inv.entries {
+            let err = entry.error.as_ref().expect("collision note expected");
+            assert!(err.contains("within-batch"), "got error: {err}");
+        }
+    }
+
+    #[test]
+    fn preview_writes_nothing() {
+        let map = InMemoryCoopEntityMap::new();
+        let _ = classify_coop_ids_with_surrogate_preview(ids(&[DEFAULT_COOP, "food-coop"]), &map);
+        // Neither the non-mappable id, its surrogate target, nor the mappable id
+        // was bound as a side effect.
+        assert_eq!(map.entity_for_coop(DEFAULT_COOP).unwrap(), None);
+        assert_eq!(map.entity_for_coop("food-coop").unwrap(), None);
+        let surrogate = propose_surrogate_entity_id(DEFAULT_COOP).unwrap();
+        assert_eq!(map.coop_for_entity(&surrogate).unwrap(), None);
+    }
+
+    #[test]
+    fn preview_class_counts_still_partition_total() {
+        let map = InMemoryCoopEntityMap::new();
+        map.bind_projected("bound-coop").unwrap();
+        let inv = classify_coop_ids_with_surrogate_preview(
+            ids(&["bound-coop", "free-coop", DEFAULT_COOP, "coop_A"]),
+            &map,
+        );
+        // surrogate_proposed/collision are separate statistics, not classes.
+        assert_eq!(
+            inv.already_bound
+                + inv.mappable_unbound
+                + inv.mappable_reverse_conflict
+                + inv.non_mappable
+                + inv.storage_error,
+            inv.total
+        );
+        assert_eq!(inv.non_mappable, 2);
+        assert_eq!(inv.surrogate_proposed, 2);
+    }
+
+    #[test]
+    fn preview_reverse_lookup_error_is_not_counted_as_collision() {
+        // A `coop_for_entity` *read failure* during preview is surfaced in the
+        // entry's error, but it is NOT a collision: `surrogate_collision` counts
+        // bind conflicts (within-batch dup / already-reverse-bound) only.
+        struct ReverseErrMap;
+        impl CoopEntityMap for ReverseErrMap {
+            fn bind_exact(&self, _: &str, _: &EntityId) -> Result<(), CoopEntityMapError> {
+                unreachable!("preview must never write through the map");
+            }
+            // Ok(None) keeps "coop_A" classified NonMappable (unbound + unmappable).
+            fn entity_for_coop(&self, _: &str) -> Result<Option<EntityId>, CoopEntityMapError> {
+                Ok(None)
+            }
+            // The surrogate reverse-lookup fails.
+            fn coop_for_entity(&self, _: &EntityId) -> Result<Option<String>, CoopEntityMapError> {
+                Err(CoopEntityMapError::Storage(
+                    "reverse index unreadable".into(),
+                ))
+            }
+        }
+
+        let inv = classify_coop_ids_with_surrogate_preview(ids(&["coop_A"]), &ReverseErrMap);
+        assert_eq!(inv.non_mappable, 1);
+        assert_eq!(inv.surrogate_proposed, 1);
+        assert_eq!(
+            inv.surrogate_collision, 0,
+            "a reverse-lookup error is a read failure, not a bind collision"
+        );
+        let err = inv.entries[0]
+            .error
+            .as_ref()
+            .expect("lookup error surfaced");
+        assert!(
+            err.contains("reverse-lookup failed"),
+            "lookup error must still be surfaced; got: {err}"
+        );
+    }
+
+    #[test]
+    fn preview_flags_surrogate_colliding_with_same_batch_mappable_projection() {
+        // A mappable coop literally named the surrogate slug of a non-mappable
+        // coop projects to the EXACT EntityId being proposed. Neither is bound,
+        // so the reverse-index check is empty — but binding both later would
+        // conflict on the same entity id, so the in-batch occupancy check must
+        // include mappable projections, not just other surrogate proposals.
+        let map = InMemoryCoopEntityMap::new();
+        let surrogate = propose_surrogate_entity_id(DEFAULT_COOP).unwrap();
+        let collider = surrogate.identifier().to_string(); // valid slug, unbound
+
+        let inv = classify_coop_ids_with_surrogate_preview(
+            vec![DEFAULT_COOP.to_string(), collider.clone()],
+            &map,
+        );
+
+        assert_eq!(inv.non_mappable, 1);
+        assert_eq!(inv.mappable_unbound, 1);
+        assert_eq!(inv.surrogate_proposed, 1);
+        assert_eq!(
+            inv.surrogate_collision, 1,
+            "surrogate must collide with a same-batch mappable projection"
+        );
+        let nm = inv
+            .entries
+            .iter()
+            .find(|e| e.coop_id == DEFAULT_COOP)
+            .unwrap();
+        assert!(nm
+            .error
+            .as_ref()
+            .expect("collision note")
+            .contains("within-batch"));
     }
 }

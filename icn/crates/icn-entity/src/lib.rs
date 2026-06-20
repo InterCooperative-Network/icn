@@ -78,6 +78,7 @@
 pub mod actor;
 pub mod coop_entity_inventory;
 pub mod coop_entity_map;
+pub mod coop_entity_surrogate;
 pub mod entity;
 pub mod error;
 pub mod handle;
@@ -90,10 +91,14 @@ pub mod sled_registry;
 // Re-export main types at crate root
 pub use actor::{EntityActor, GossipHandle, ENTITY_TOPIC};
 pub use coop_entity_inventory::{
-    classify_coop_ids, CoopEntityClass, CoopEntityInventory, CoopEntityInventoryEntry,
+    classify_coop_ids, classify_coop_ids_with_surrogate_preview, CoopEntityClass,
+    CoopEntityInventory, CoopEntityInventoryEntry,
 };
 pub use coop_entity_map::{
     project_coop_id, CoopEntityMap, CoopEntityMapError, InMemoryCoopEntityMap, SledCoopEntityMap,
+};
+pub use coop_entity_surrogate::{
+    propose_surrogate_entity_id, SURROGATE_DOMAIN_V1, SURROGATE_PREFIX,
 };
 pub use entity::{
     AccountId, AccountReference, CommunityProfile, CooperativeEntity, CooperativeProfile, EntityId,
