@@ -53,7 +53,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 </ul>
 <h2>Snapshot</h2>
 <ul>
-<li>Source commit: <code>0d0e7d656122b8e54f0bbe2433886f5b23fe23eb</code></li>
+<li>Source commit: <code>0d27da7d89df89249db5cd3d07e1c77ad195749e</code></li>
 <li>Gateway source scanned: <code>icn/crates/icn-gateway/src/**</code></li>
 <li>OpenAPI spec: <code>docs/api/openapi.generated.yaml</code></li>
 </ul>
@@ -68,14 +68,14 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <blockquote>
 <p>The gap is structural: only handlers hand-annotated for utoipa reach the OpenAPI spec. Of the OpenAPI paths, several belong to <code>icn-governance-actor</code> HTTP handlers that live outside the gateway crate and are not captured by this macro scan — so the documented/undocumented counts here are a best-effort comparison, while the two headline counts (discovered macros, OpenAPI paths) are the robust measured facts.</p>
 </blockquote>
-<h2>Limitations (PR1)</h2>
+<h2>Limitations</h2>
 <ul>
 <li><strong>Full mounted-path resolution is best-effort.</strong> The <code>Group</code> column is <code>/v1</code> + a <code>web::scope(&quot;…&quot;)</code> segment associated from <code>server.rs</code> <code>.service(...)</code>/<code>.configure(...)</code> registration sites (matched at identifier boundaries, keyed by the handler&#39;s top-level <code>icn/crates/icn-gateway/src/api/&lt;group&gt;</code> module) + the relative macro path. It is <strong>not</strong> a real Rust parser and may be wrong for deeply-nested or conditional scopes. The relative macro <code>Path</code> and the <code>Source</code> file are authoritative.</li>
-<li>Scans <strong>attribute macros only</strong> in <code>icn-gateway/src</code>. <code>web::resource(&quot;…&quot;)</code>/<code>.route(&quot;…&quot;)</code> registrations and out-of-crate handlers (e.g. <code>icn-governance-actor::http</code>) are not fully captured.</li>
+<li>The route table is <strong>attribute macros only</strong>. Macro-less <code>web::resource(&quot;…&quot;)</code>/<code>.route(…)</code> registrations are now <strong>flagged</strong> below (see <em>Unparsed route-registration candidates</em>) but <strong>not</strong> parsed into routes; out-of-crate handlers (e.g. <code>icn-governance-actor::http</code>) are still not captured.</li>
 <li>This is <strong>generated-map work, not API documentation completion</strong> (issue #2112). It does not add or change any OpenAPI content or runtime behavior.</li>
 </ul>
 <h2>Routes</h2>
-<p>Status vocabulary is the existing set from <code>source-of-truth-map.md</code>; no new labels are introduced. A static macro scan proves only that a routing macro is <strong>declared</strong> in source — not that the handler is mounted and served (registration happens elsewhere via <code>.service(...)</code> / <code>.configure(...)</code>, which this pass does not resolve). PR1 therefore <strong>cannot</strong> assert <code>gateway-backed</code>: every discovered route&#39;s status defaults to <code>unknown / needs local verification</code> and claim-safety to <code>needs review</code>, pending human or runtime confirmation.</p>
+<p>Status vocabulary is the existing set from <code>source-of-truth-map.md</code>; no new labels are introduced. A static macro scan proves only that a routing macro is <strong>declared</strong> in source — not that the handler is mounted and served (registration happens elsewhere via <code>.service(...)</code> / <code>.configure(...)</code>, which this pass does not resolve). This scan therefore <strong>cannot</strong> assert <code>gateway-backed</code>: every discovered route&#39;s status defaults to <code>unknown / needs local verification</code> and claim-safety to <code>needs review</code>, pending human or runtime confirmation.</p>
 <table>
 <thead>
 <tr>
@@ -2958,6 +2958,40 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>no</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
+</tr>
+</tbody></table>
+<h2>Unparsed route-registration candidates</h2>
+<p>Beyond attribute macros, Actix can also register routes via <code>web::resource(&quot;…&quot;).route(web::&lt;method&gt;().to(handler))</code>. This scan <strong>flags</strong> such sites mechanically but does <strong>not</strong> parse them into routes: a regex cannot reliably tell a production registration from a <strong>test fixture</strong> (e.g. inside <code>#[cfg(test)]</code> / <code>test::init_service</code>), and it does not resolve the mounted path without a real parser. They are <strong>not</strong> counted in the route total above and remain <code>unknown / needs local verification</code> — treat them as leads for human review.</p>
+<ul>
+<li><strong>Candidates flagged: 4</strong> (<code>web::resource(&quot;…&quot;)</code>: 2 · <code>.route(…)</code>: 2)</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Kind</th>
+<th>Resource literal</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>web::resource</code></td>
+<td><code>/notifications/register</code></td>
+<td><code>icn/crates/icn-gateway/src/api/notifications.rs</code>:315</td>
+</tr>
+<tr>
+<td><code>.route</code></td>
+<td>—</td>
+<td><code>icn/crates/icn-gateway/src/api/notifications.rs</code>:316</td>
+</tr>
+<tr>
+<td><code>web::resource</code></td>
+<td><code>/{session_id}/approve</code></td>
+<td><code>icn/crates/icn-gateway/src/server.rs</code>:1968</td>
+</tr>
+<tr>
+<td><code>.route</code></td>
+<td>—</td>
+<td><code>icn/crates/icn-gateway/src/server.rs</code>:1969</td>
 </tr>
 </tbody></table>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
