@@ -202,7 +202,7 @@ def md_table_escape(s: str) -> str:
     return s.replace("|", "\\|")
 
 
-def render(routes: list[dict], scopes: dict[str, str], oapi: list[str], reg_candidates: list[dict], commit: str) -> str:
+def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_candidates: list[dict], commit: str) -> str:
     oapi_norm = {norm(e["path"]) for e in oapi}
     matched_oapi: set[str] = set()
     by_method: dict[str, int] = {}
