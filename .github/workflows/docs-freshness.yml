@@ -11,11 +11,12 @@ on:
       - 'docs/scripts/doc_control_check.py'
       # gateway route source is code-truth for the API-doc canonical guard
       - 'icn/crates/icn-gateway/src/api/ledger.rs'
-      # route-inventory code-truth: gateway route macros (api/**) + scope wiring
-      # (server.rs) feed docs/scripts/route_inventory.py --check. The script and
-      # its generated artifact under docs/ are already covered by docs/**.
-      - 'icn/crates/icn-gateway/src/api/**'
-      - 'icn/crates/icn-gateway/src/server.rs'
+      # route-inventory code-truth: route_inventory.py scans the WHOLE gateway
+      # crate (GATEWAY_SRC.rglob("*.rs")) for route macros + reads server.rs for
+      # scope wiring, so the trigger matches that scan scope — route macros added
+      # outside src/api/ must still fire the drift check. The script and its
+      # generated artifact under docs/ are already covered by docs/**.
+      - 'icn/crates/icn-gateway/src/**'
       # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
       # under docs/scripts + docs/contracts are already covered by docs/**
       - 'web/pilot-ui/fixtures/**'
@@ -28,11 +29,12 @@ on:
       - 'docs/scripts/doc_control_check.py'
       # gateway route source is code-truth for the API-doc canonical guard
       - 'icn/crates/icn-gateway/src/api/ledger.rs'
-      # route-inventory code-truth: gateway route macros (api/**) + scope wiring
-      # (server.rs) feed docs/scripts/route_inventory.py --check. The script and
-      # its generated artifact under docs/ are already covered by docs/**.
-      - 'icn/crates/icn-gateway/src/api/**'
-      - 'icn/crates/icn-gateway/src/server.rs'
+      # route-inventory code-truth: route_inventory.py scans the WHOLE gateway
+      # crate (GATEWAY_SRC.rglob("*.rs")) for route macros + reads server.rs for
+      # scope wiring, so the trigger matches that scan scope — route macros added
+      # outside src/api/ must still fire the drift check. The script and its
+      # generated artifact under docs/ are already covered by docs/**.
+      - 'icn/crates/icn-gateway/src/**'
       # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
       # under docs/scripts + docs/contracts are already covered by docs/**
       - 'web/pilot-ui/fixtures/**'
