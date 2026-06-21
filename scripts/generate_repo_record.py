@@ -21,10 +21,13 @@ without review.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import hashlib
 import json
 import subprocess
+import sys
+import tempfile
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -539,6 +542,109 @@ def parse_repo_arg(value: str) -> tuple[str, Path]:
     return name, Path(path)
 
 
+def _normalize_record(text: str, ext: str) -> str:
+    """Strip incidental, non-content fields so --check compares the snapshot
+    payload (file inventory, sizes, SHAs, head) rather than the generation
+    timestamp or the branch the snapshot happened to be taken on.
+
+    Normalized out:
+      - JSON `generated_at` (changes every run) and `branch` (incidental: a
+        refresh on any branch is equivalent).
+      - Markdown `Generated:` front-matter line and the `- Branch:` line.
+    `head` and the file inventory are intentionally KEPT — a head/inventory
+    difference is real snapshot staleness, which is exactly what --check reports.
+    """
+    if ext == "json":
+        data = json.loads(text)
+        data.pop("generated_at", None)
+        data["branch"] = "<normalized>"
+        return json.dumps(data, indent=2, sort_keys=True)
+    # markdown
+    kept = [
+        line
+        for line in text.splitlines()
+        if not line.startswith("Generated:") and not line.startswith("- Branch:")
+    ]
+    return "\n".join(kept)
+
+
+def check_repos(
+    repos: list[tuple[str, Path]],
+    out_dir: Path,
+    include_untracked: bool,
+) -> int:
+    """Regenerate each repo record into a temp dir and compare it against the
+    committed artifact under `out_dir`, ignoring the volatile fields above.
+
+    Exit contract:
+      0  every committed record matches the working tree (modulo timestamp/branch)
+      1  drift — a committed record is stale or missing
+      2  checker error — regeneration or comparison itself failed (e.g. a repo
+         path is not a git checkout, git failed, or a committed artifact is
+         unreadable/invalid JSON/MD). Kept distinct from drift so CI can fail on
+         real breakage while only warning on staleness.
+    Never writes to `out_dir`.
+    """
+
+    def _regenerate_command() -> str:
+        # Reconstruct the actual command (every --repo entry + the real --out),
+        # not just the first repo / a hard-coded path.
+        repo_args = " ".join(f"--repo {name}={path}" for name, path in repos)
+        return f"python3 scripts/generate_repo_record.py {repo_args} --out {out_dir}"
+
+    drift = False
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_dir = Path(tmp)
+            for repo_name, repo_path in repos:
+                # allow_dirty=True: --check compares against the current working
+                # tree (it must not refuse on a dirty checkout); it never persists
+                # a misleading artifact because it only writes into the temp dir.
+                with contextlib.redirect_stdout(sys.stderr):
+                    generate_for_repo(repo_name, repo_path, tmp_dir, include_untracked, True)
+                for ext in ("json", "md"):
+                    committed = out_dir / f"{repo_name}-file-record.{ext}"
+                    fresh = tmp_dir / f"{repo_name}-file-record.{ext}"
+                    if not committed.exists():
+                        print(f"DRIFT: committed artifact missing: {committed}")
+                        drift = True
+                        continue
+                    if _normalize_record(committed.read_text(encoding="utf-8"), ext) != _normalize_record(
+                        fresh.read_text(encoding="utf-8"), ext
+                    ):
+                        drift = True
+                        print(f"DRIFT: {committed} differs from a fresh generation.")
+                        if ext == "json":
+                            c = json.loads(committed.read_text(encoding="utf-8"))
+                            f = json.loads(fresh.read_text(encoding="utf-8"))
+                            print(
+                                f"  committed head={c.get('head', '?')[:12]} "
+                                f"file_count={c.get('summary', {}).get('file_count')}"
+                            )
+                            print(
+                                f"  working   head={f.get('head', '?')[:12]} "
+                                f"file_count={f.get('summary', {}).get('file_count')}"
+                            )
+    except SystemExit as exc:
+        # generate_for_repo raises SystemExit (with a message) on a real
+        # regeneration failure (path is not a git repo, git failure, etc.).
+        # Map it to a checker error (>=2) so CI fails rather than mistaking it
+        # for drift (rc=1).
+        print(f"CHECKER ERROR: repo file-record regeneration failed: {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:
+        # Any other unexpected failure (e.g. an unreadable/invalid committed
+        # JSON/MD artifact) is a checker error (>=2), not staleness (rc=1).
+        print(f"CHECKER ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+
+    if drift:
+        print(f"\nRegenerate with:\n  {_regenerate_command()}", file=sys.stderr)
+        return 1
+    print("OK: repo file-record matches the working tree (timestamp/branch ignored).")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -553,6 +659,16 @@ def main() -> None:
         type=Path,
         default=Path("docs/reference/project-index/generated"),
         help="Output directory for generated JSON and Markdown records.",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help=(
+            "Do not write. Regenerate each record into a temp dir and compare "
+            "it against the committed artifact under --out, ignoring the "
+            "generation timestamp and branch. Exit 0 if current, 1 on drift "
+            "(stale or missing snapshot), 2 on checker error."
+        ),
     )
     parser.add_argument(
         "--include-untracked",
@@ -570,6 +686,9 @@ def main() -> None:
         ),
     )
     args = parser.parse_args()
+
+    if args.check:
+        raise SystemExit(check_repos(args.repo, args.out, args.include_untracked))
 
     for repo_name, repo_path in args.repo:
         generate_for_repo(
