@@ -26,7 +26,7 @@ mirrors the existing route-inventory guard in
 | `scripts/generate_repo_record.py --repo icn=. --check` | `docs/reference/project-index/generated/icn-file-record.{json,md}` matches the working tree (timestamp/branch ignored) | `python3 scripts/generate_repo_record.py --repo icn=. --out docs/reference/project-index/generated` | **stale-warn** (periodic snapshot; see below) |
 | `scripts/check-claude-plugin.py` | Claude agent pack skeleton is portable (no machine paths) | n/a (validation only) | green on main |
 | `scripts/check-claude-plugin-root-resolution.py` | Agent-pack repo-root resolver behaves across worktree layouts | n/a (validation only) | green on main |
-| `scripts/generate-live-state-overlay.py --check --no-gh` | Live-state overlay generator self-check (13 sections, claim discipline). The overlay is **on-demand with NO committed snapshot**, so this is a runnable-smoke, not a drift check. | n/a (never committed) | green on main |
+| `scripts/generate-live-state-overlay.py --check --no-gh` | Live-state overlay generator self-check (14 sections, claim discipline). The overlay is **on-demand with NO committed snapshot**, so this is a runnable-smoke, not a drift check. | n/a (never committed) | green on main |
 | `scripts/check-state-lag.py` | **Canonical-state lag** — the *newest* `docs/STATE.md` sync block asserts nothing as "open / not merged / not on `main`" that git history shows merged (the #2128 recurrence). Not a generated artifact: it guards the canonical doc against stale not-merged claims. STATE.md is append-only, so only the current view is checked; `--all` audits history. | n/a (refresh the STATE.md sync block) | green on main |
 
 ## Rule: every committed generated artifact is covered or declared on-demand

@@ -22,7 +22,7 @@ confirmed from git history, the check stays silent rather than cry wolf.
 Exit codes (mirrors generate_repo_record.py / the generated-truth gate):
     0  no lag found (or nothing to check)
     1  lag found -> advisory; CI maps this to ::warning::, does not block
-    2  checker error (bad path, git failure) -> real breakage
+    2  checker error (STATE.md unreadable, non-git checkout, or unresolvable --ref) -> real breakage
 
 Python standard library only.
 """
@@ -88,7 +88,14 @@ def find_asserted_not_merged(scope: str) -> set[str]:
 
 def git_merge_evidence(ref_num: str, repo: Path, gitref: str) -> str | None:
     """Return a one-line merge-commit description if `#ref_num` appears merged
-    in git history, else None. Strict `#N` boundary to avoid #21 matching #210."""
+    in git history, else None. Strict `#N` boundary to avoid #21 matching #210.
+
+    The git environment (work-tree + ref) is validated up front in main(), so a
+    `CalledProcessError` here is not a broken checkout — `git log --grep` exits 0
+    with empty output when there is simply no match. We therefore treat an error
+    as "no positive evidence" (return None) by design: positive-evidence-only,
+    never cry wolf. The real-breakage cases (non-git checkout, unresolvable ref)
+    are caught earlier and exit 2."""
     try:
         out = subprocess.check_output(
             ["git", "-C", str(repo), "log", gitref, "--no-merges",
@@ -123,6 +130,20 @@ def main() -> int:
     state = Path(args.state) if args.state else repo / "docs" / "STATE.md"
     if not state.is_file():
         print(f"::error::STATE.md not found at {state}", file=sys.stderr)
+        return 2
+
+    # Validate the git environment up front so a non-git checkout or an
+    # unresolvable --ref is a checker error (exit 2), not a silent false "OK".
+    try:
+        subprocess.check_output(
+            ["git", "-C", str(repo), "rev-parse", "--is-inside-work-tree"],
+            text=True, stderr=subprocess.DEVNULL)
+        subprocess.check_output(
+            ["git", "-C", str(repo), "rev-parse", "--verify", "--quiet", f"{args.ref}^{{commit}}"],
+            text=True, stderr=subprocess.DEVNULL)
+    except subprocess.CalledProcessError:
+        print(f"::error::not a git work tree at {repo}, or unresolvable --ref {args.ref!r}",
+              file=sys.stderr)
         return 2
 
     text = state.read_text(encoding="utf-8")

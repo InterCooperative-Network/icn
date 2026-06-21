@@ -170,7 +170,7 @@ Every ICN node provides these eight primitives. Apps compose them into instituti
 
 **CCL (Cooperative Contract Language):** Domain-specific language, not Turing-complete. Fuel metering prevents infinite loops. Determinism guarantees: no system time access, deterministic PRNG, canonical ordering of inputs. Capability-based: contracts declare what they can read (ledger, trust) and write (ledger entries, governance proposals).
 
-**WASM:** Optional feature (`--features wasm`). Sandboxed via wasmtime. **Experimental — not held to CCL's fuel/determinism guarantees:** `icn-compute/src/wasm_executor.rs` uses `Engine::default()` (no wasmtime fuel metering — "fuel metering can be enabled later"; a coarse per-call counter only) plus a wall-clock `SystemTime::now()` host import, so WASM execution is non-deterministic. Real wasmtime fuel metering and deterministic imports are planned (see §11 and `docs/freshness.toml` §11).
+**WASM:** Optional feature (`--features wasm`). Sandboxed via wasmtime. **Experimental — not held to CCL's fuel/determinism guarantees:** `icn/crates/icn-compute/src/wasm_executor.rs` uses `Engine::default()` (no wasmtime fuel metering — "fuel metering can be enabled later"; a coarse per-call counter only) plus a wall-clock `SystemTime::now()` host import, so WASM execution is non-deterministic. Real wasmtime fuel metering and deterministic imports are planned (see §11 and `docs/freshness.toml` §11).
 
 **Execution model:** Trust-gated (only peers above a trust threshold can submit tasks), gossip-based distribution (submitter broadcasts to network, executors claim work), proof-of-execution (workers sign completion proofs).
 
