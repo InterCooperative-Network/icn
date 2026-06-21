@@ -42,7 +42,8 @@ docs/reference/project-index/generated/agent-context-spine.json
 ## Node and edge model
 
 Node types: `crate`, `subsystem`, `doc`, `route_surface`, `skill`, `agent`, `mcp_tool`, `script`,
-`invariant`, `claim_surface`, `truth_source`, `generated_artifact`.
+`invariant`, `claim_surface`, `truth_source`, `generated_artifact`, `path_guidance` (the path-prefix
+rules that back the code-quality brief).
 
 Edge types: `owned_by_subsystem`, `documents`, `verifies`, `generates`, `exposes`, `requires_skill`,
 `canonical_source`, `touches_claim_surface`, `depends_on`.
@@ -69,14 +70,51 @@ unique node ids, resolvable edge endpoints, on-disk evidence/paths, that every `
 
 > CI wiring for these checks is intentionally **not** part of v0 — it is a follow-up PR.
 
+## Path briefs — the immediate use case (path → code-quality brief)
+
+The highest-value query is the **changed-path brief**: given the files a change touches, get an
+actionable first-pass checklist *before* editing or reviewing. The brief is derived from
+`path_guidance` nodes (path-prefix rules) layered with crate→subsystem / crate→claim-surface graph
+edges, then deduplicated.
+
+```bash
+# brief for the files in a diff
+git diff --name-only origin/main...HEAD | xargs python3 scripts/generate-agent-context-spine.py --brief
+# or explicit paths
+python3 scripts/generate-agent-context-spine.py --brief ops/mcp/src/tools/agent-ops.ts docs/INDEX.md
+```
+
+Worked example — changed:
+
+```
+- ops/mcp/src/tools/agent-ops.ts
+- docs/guides/developer/agent-context-spine.md
+```
+
+the brief returns (abridged):
+
+- **areas:** `icn-ops MCP server (TypeScript)`, `Documentation (truth / claim discipline)`
+- **review_focus:** read-only/no-mutation, clear failure modes, ICN root/path portability; truth-source
+  alignment, no production/live/pilot overclaims
+- **verification_commands:** `npm --prefix ./ops/mcp run build`, `npm --prefix ./ops/mcp test`,
+  `python3 scripts/check-mcp-portability.py`, `python3 docs/scripts/doc_control_check.py`
+- **claim_surfaces:** `claim_surface:public-website-claims`, `…:production-readiness`, …
+- **recommended_skills:** `skill:doctor`, `skill:navigator`, `skill:truth-sync`
+- **recommended_agents:** `agent:icn-ops`, `agent:icn-code-reviewer`, `agent:icn-docs-truth-auditor`
+
+An unknown path returns a clear `note: "no direct guidance match"` with a navigator fallback rather
+than nothing. The brief is **advisory orientation, not a gate** — confirm against the source before
+asserting anything.
+
 ## Read it from MCP
 
 The `icn-ops` MCP server exposes the spine read-only:
 
-- **Tool:** `icn_ops_agent_context_spine` — no arguments returns a summary (counts by node/edge type);
-  `node=<id>` returns one node plus its incident edges (or a contains-match list); `type=`,
-  `subsystem=`, and `path=` filter the node list. It never executes commands or mutates files, and
-  fails clearly if the artifact is missing or malformed.
+- **Tool:** `icn_ops_agent_context_spine` — `paths=[...]` returns the per-path + combined **code-quality
+  brief** (takes precedence); no arguments returns a summary (counts by node/edge type); `node=<id>`
+  returns one node plus its incident edges (or a contains-match list); `type=`, `subsystem=`, and
+  `path=` filter the node list. It never executes commands or mutates files, and fails clearly if the
+  artifact is missing or malformed.
 - **Resource:** `icn-ops://project-index/agent-context-spine` — the raw artifact JSON.
 
 ## Scope and follow-ups

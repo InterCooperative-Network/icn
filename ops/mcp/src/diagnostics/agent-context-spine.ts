@@ -85,6 +85,22 @@ function countBy<T>(items: T[], key: (t: T) => string): Record<string, number> {
   return out;
 }
 
+function dedup(seq: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const x of seq) {
+    if (!seen.has(x)) {
+      seen.add(x);
+      out.push(x);
+    }
+  }
+  return out;
+}
+
+function asStrings(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+
 function compact(n: SpineNode): Record<string, unknown> {
   const c: Record<string, unknown> = { id: n.id, type: n.type, name: n.name };
   if (typeof n.subsystem === "string") c.subsystem = n.subsystem;
@@ -257,6 +273,127 @@ export function buildAgentContextSpineView(
     edge_types: spine.edge_types ?? Object.keys(countBy(edges, (e) => e.type)).sort(),
     usage:
       "Filter with node=<id> (exact node + incident edges, or a contains match), " +
-      "or type=/subsystem=/path= to list matching nodes.",
+      "type=/subsystem=/path= to list matching nodes, or paths=[...] for a " +
+      "code-quality brief on changed files.",
+  };
+}
+
+type BriefEntry = {
+  path: string;
+  matched_nodes: string[];
+  subsystems: string[];
+  areas: string[];
+  docs: string[];
+  invariants: string[];
+  claim_surfaces: string[];
+  review_focus: string[];
+  verification_commands: string[];
+  recommended_skills: string[];
+  recommended_agents: string[];
+  note?: string;
+};
+
+/**
+ * Code-quality brief for a set of changed paths. For each path, match every
+ * path_guidance rule whose prefix covers it (general -> specific), resolve the
+ * owning crate -> subsystem(s) and claim surface(s) from the graph, and merge.
+ * Mirrors `compute_brief` in scripts/generate-agent-context-spine.py. Read-only.
+ */
+export function buildPathBrief(repoRoot: string, paths: string[]): SpineView {
+  const loaded = loadSpine(repoRoot);
+  if (!loaded.ok) return loaded;
+  const { spine, artifact } = loaded;
+  const nodes = spine.nodes;
+  const edges = spine.edges;
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const guidance = nodes.filter((n) => n.type === "path_guidance");
+  const crates = nodes.filter((n) => n.type === "crate" && typeof n.path === "string");
+
+  const norm = (p: string): string => {
+    const t = p.trim();
+    return t === "." || t === "" ? t : t.replace(/^\.\//, "");
+  };
+
+  const perPath: BriefEntry[] = paths.map((raw) => {
+    const path = norm(raw);
+    const matched = guidance
+      .filter((g) => {
+        const m = String(g["match"] ?? "");
+        return m !== "" && (path === m.replace(/\/+$/, "") || path.startsWith(m));
+      })
+      .sort((a, b) => String(a["match"]).length - String(b["match"]).length);
+
+    const cands = crates.filter(
+      (c) => path === c.path || path.startsWith((c.path as string) + "/")
+    );
+    const crate = cands.length
+      ? cands.reduce((a, b) => ((a.path as string).length >= (b.path as string).length ? a : b))
+      : undefined;
+
+    const subsystems: string[] = [];
+    const crateClaims: string[] = [];
+    const matchedNodes: string[] = [];
+    if (crate) {
+      matchedNodes.push(crate.id);
+      for (const e of edges) {
+        if (e.from === crate.id && e.type === "owned_by_subsystem") {
+          subsystems.push(byId.get(e.to)?.name ?? e.to);
+        }
+        if (e.from === crate.id && e.type === "touches_claim_surface") {
+          crateClaims.push(e.to);
+        }
+      }
+    }
+    matchedNodes.push(...matched.map((g) => g.id));
+
+    const collect = (field: string): string[] =>
+      matched.flatMap((g) => asStrings(g[field]));
+
+    const entry: BriefEntry = {
+      path,
+      matched_nodes: dedup(matchedNodes),
+      subsystems: dedup(subsystems),
+      areas: dedup(matched.map((g) => g.name)),
+      docs: dedup(collect("docs")),
+      invariants: dedup(collect("invariants")),
+      claim_surfaces: dedup([...collect("risk_surfaces"), ...crateClaims]),
+      review_focus: dedup(collect("review_focus")),
+      verification_commands: dedup(collect("verification_commands")),
+      recommended_skills: dedup(collect("recommended_skills")),
+      recommended_agents: dedup(collect("recommended_agents")),
+    };
+    if (matched.length === 0 && !crate) {
+      entry.note = "no direct guidance match — fallback to general orientation";
+      entry.recommended_skills = ["skill:navigator"];
+      entry.recommended_agents = ["agent:icn-code-reviewer"];
+      entry.review_focus = [
+        "No path rule matched; orient with the navigator and run the closest " +
+          "verification for the affected area.",
+      ];
+    }
+    return entry;
+  });
+
+  const flat = (field: keyof BriefEntry): string[] =>
+    dedup(perPath.flatMap((e) => e[field] as string[]));
+
+  return {
+    ok: true,
+    artifact,
+    mode: "filtered",
+    meta: spineMeta(spine),
+    query: { paths },
+    paths: perPath,
+    combined: {
+      review_focus: flat("review_focus"),
+      verification_commands: flat("verification_commands"),
+      risk_surfaces: flat("claim_surfaces"),
+      subsystems: flat("subsystems"),
+      areas: flat("areas"),
+      invariants: flat("invariants"),
+      docs: flat("docs"),
+      recommended_skills: flat("recommended_skills"),
+      recommended_agents: flat("recommended_agents"),
+    },
   };
 }

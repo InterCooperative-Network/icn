@@ -101,6 +101,9 @@ DOCS = [
     ("doc:source-of-truth-map", "docs/reference/project-index/source-of-truth-map.md", "Precedence map: which sources outrank which when material disagrees.", "orientation"),
     ("doc:show-readiness-map", "docs/reference/project-index/show-readiness-map.md", "What can be shown now vs. what is not finished; red lines.", "orientation"),
     ("doc:proof-level-taxonomy", "docs/reference/project-index/proof-level-taxonomy-capability-matrix.md", "Proof-level taxonomy (L0-L8) and capability matrix.", "orientation"),
+    ("doc:agent-mcp-tooling", "docs/guides/developer/agent-mcp-tooling.md", "The icn-ops MCP server: read-mostly diagnostics and launch doctrine.", "guide"),
+    ("doc:agent-context-spine", "docs/guides/developer/agent-context-spine.md", "Agent Context Spine guide: model, regenerate/check, MCP exposure, path briefs.", "guide"),
+    ("doc:claude-code-plugin", "docs/guides/developer/claude-code-plugin.md", "The icn-agent-pack Claude Code plugin (portable MCP launch, skills/agents).", "guide"),
 ]
 
 # generated_artifact nodes: (id, path, description, generator script path)
@@ -164,6 +167,137 @@ CLAIM_SURFACES = [
     ("route-api-docs-drift", "Route/API/docs drift surface.",
      "Gateway routes, the OpenAPI spec, and docs can drift apart. Verify with route_inventory.py --check before claiming API or documentation coverage.",
      ["docs/reference/project-index/generated/route-inventory.md", "docs/scripts/route_inventory.py"]),
+]
+
+# Path-guidance rules: the "code-quality brief" layer. Each rule maps a path
+# prefix to the things an agent should care about when editing/reviewing files
+# under it. Curated seed (evidence is the prefix dir + AGENTS.md verification
+# matrix). All id references must resolve to real nodes — the validator enforces
+# this. A changed path matches EVERY rule whose prefix it falls under, and the
+# briefs are merged (most specific rules add to the general ones).
+#
+# Tuple: (slug, prefix, label, review_focus[], verification_commands[],
+#         risk_surfaces[claim_surface id], invariants[invariant id], docs[doc id],
+#         skills[skill id], agents[agent id])
+PATH_GUIDANCE = [
+    ("rust-workspace", "icn/", "ICN Rust workspace crate",
+     ["Kernel/app boundary: no domain imports in kernel crates; no reverse meaning firewall",
+      "No panics in protocol/actor/deserialization paths (no unwrap/expect on untrusted input)",
+      "Determinism: no HashMap iteration-order or unseeded-random reliance",
+      "Canonical encodings unchanged without explicit versioning + tests"],
+     ["cd icn && cargo fmt --all --check",
+      "cd icn && cargo clippy --workspace --all-targets --all-features -- -D warnings",
+      "cd icn && cargo test"],
+     [], ["invariant:adversarial-by-default", "invariant:determinism",
+          "invariant:canonical-encodings", "invariant:no-panics-in-protocol-paths",
+          "invariant:kernel-app-boundaries"],
+     ["doc:agents", "doc:claude"],
+     ["skill:navigator"], ["agent:icn-architect", "agent:icn-code-reviewer"],
+     "AGENTS.md"),
+    ("gateway", "icn/crates/icn-gateway/", "icn-gateway (gateway / route / API surface)",
+     ["Route/API drift: gateway handlers vs OpenAPI vs SDK types",
+      "Public-surface and auth/authz on new or changed routes",
+      "Regenerate the route inventory + OpenAPI when routes change",
+      "No panics on untrusted request input"],
+     ["python3 docs/scripts/route_inventory.py --check",
+      "cd icn && cargo clippy -p icn-gateway --all-targets -- -D warnings",
+      "cd icn && cargo test -p icn-gateway"],
+     ["claim_surface:route-api-docs-drift", "claim_surface:public-website-claims"],
+     ["invariant:no-panics-in-protocol-paths", "invariant:adversarial-by-default"],
+     ["doc:source-of-truth-map", "doc:show-readiness-map"],
+     ["skill:route-impact", "skill:truth-sync"],
+     ["agent:icn-code-reviewer", "agent:icn-docs-truth-auditor"],
+     "AGENTS.md"),
+    ("ledger", "icn/crates/icn-ledger/", "icn-ledger (mutual credit / settlement)",
+     ["Mutual-credit / double-entry invariants (no value created or destroyed)",
+      "Use settlement (not payment) terminology — regulatory framing",
+      "Determinism of journal/state-change derivation"],
+     ["cd icn && cargo test -p icn-ledger",
+      "cd icn && cargo clippy -p icn-ledger --all-targets -- -D warnings"],
+     [], ["invariant:determinism", "invariant:canonical-encodings"],
+     ["doc:claude"],
+     ["skill:navigator"], ["agent:icn-economist", "agent:icn-code-reviewer"],
+     "AGENTS.md"),
+    ("mcp", "ops/mcp/", "icn-ops MCP server (TypeScript)",
+     ["Read-only / no mutation unless explicitly designed",
+      "Clear failure modes on missing or malformed inputs",
+      "ICN root & path portability (resolveMonorepoRoot; no hardcoded paths)",
+      "Stable MCP tool/resource contract"],
+     ["npm --prefix ./ops/mcp run build",
+      "npm --prefix ./ops/mcp test",
+      "python3 scripts/check-mcp-portability.py"],
+     [], [],
+     ["doc:agent-mcp-tooling", "doc:agent-context-spine"],
+     ["skill:doctor", "skill:navigator"],
+     ["agent:icn-ops", "agent:icn-code-reviewer"],
+     "docs/guides/developer/agent-mcp-tooling.md"),
+    ("generated", "docs/reference/project-index/generated/", "Generated project-index artifact",
+     ["Do NOT hand-edit generated artifacts — regenerate via the owning script",
+      "Every node/edge evidence path must resolve on disk",
+      "No production/live/pilot overclaims in generated fields"],
+     ["python3 scripts/generate-agent-context-spine.py --check",
+      "python3 scripts/check-agent-context-spine.py",
+      "python3 docs/scripts/route_inventory.py --check"],
+     ["claim_surface:public-website-claims"], [],
+     ["doc:source-of-truth-map"],
+     ["skill:truth-sync", "skill:navigator"],
+     ["agent:icn-docs-truth-auditor"],
+     "docs/reference/project-index/generated"),
+    ("docs", "docs/", "Documentation (truth / claim discipline)",
+     ["Truth-source alignment and source precedence",
+      "No production/live/pilot overclaims; bound claims by proof level",
+      "Freshness and evidence for any asserted state"],
+     ["python3 docs/scripts/doc_control_check.py"],
+     ["claim_surface:public-website-claims", "claim_surface:production-readiness",
+      "claim_surface:live-federation", "claim_surface:pilot-readiness"],
+     [], ["doc:source-of-truth-map", "doc:show-readiness-map"],
+     ["skill:truth-sync", "skill:navigator"],
+     ["agent:icn-docs-truth-auditor"],
+     "docs/reference/project-index/source-of-truth-map.md"),
+    ("scripts", "scripts/", "Repo automation script (generator / validator)",
+     ["Python standard library only; dependency-free",
+      "Deterministic output; --check drift mode stays correct",
+      "No overclaim language emitted into generated artifacts"],
+     ["python3 scripts/check-agent-context-spine.py",
+      "python3 scripts/generate-agent-context-spine.py --check"],
+     [], [], ["doc:agent-context-spine"],
+     ["skill:navigator"], ["agent:icn-code-reviewer"],
+     "scripts"),
+    ("docs-scripts", "docs/scripts/", "Docs automation script (generator / validator)",
+     ["Python standard library only; dependency-free",
+      "Deterministic output; --check drift mode stays correct"],
+     ["python3 docs/scripts/route_inventory.py --check",
+      "python3 docs/scripts/doc_control_check.py"],
+     [], [], ["doc:source-of-truth-map"],
+     ["skill:navigator"], ["agent:icn-code-reviewer", "agent:icn-docs-truth-auditor"],
+     "docs/scripts"),
+    ("plugin", "tools/claude-code/plugins/icn-agent-pack/", "icn-agent-pack Claude Code plugin",
+     ["Plugin manifest / skill / agent schema validity and loadability",
+      "Advisory hooks stay non-blocking; root resolution stays portable",
+      "Do not change project-local .claude/ or root MCP config"],
+     ["python3 scripts/check-claude-plugin.py",
+      "python3 scripts/check-claude-plugin-root-resolution.py",
+      "claude plugin validate ./tools/claude-code/plugins/icn-agent-pack"],
+     [], [], ["doc:claude-code-plugin"],
+     ["skill:doctor"], ["agent:icn-code-reviewer"],
+     "tools/claude-code/plugins/icn-agent-pack"),
+    ("truth-spine", "ops/state/truth/", "Canonical truth spine (fact ownership)",
+     ["This directory OWNS fact authority — keep one source per fact",
+      "Never hardcode sprint/PR/branch/cluster IPs in skills or agents",
+      "Downstream skills/agents read from here; do not duplicate facts"],
+     [],
+     [], [], ["doc:source-of-truth-map"],
+     ["skill:navigator"], ["agent:icn-architect", "agent:icn-code-reviewer"],
+     "ops/state/truth"),
+    ("sdk-ts", "sdk/typescript/", "TypeScript SDK (generated types drift)",
+     ["Commit only regenerated types under src/generated/*",
+      "API drift chain: gateway -> OpenAPI -> TS types",
+      "No mixed refactor + regen commits"],
+     ["cd sdk/typescript && npm ci && npm run generate-types && npm run check-types"],
+     ["claim_surface:route-api-docs-drift"], [],
+     ["doc:source-of-truth-map"],
+     ["skill:route-impact"], ["agent:icn-code-reviewer"],
+     "sdk/typescript"),
 ]
 
 
@@ -459,6 +593,31 @@ def build_spine(commit: str, now: str) -> dict:
     if "crate:icn-federation" in crate_ids:
         add_edge("crate:icn-federation", "claim_surface:live-federation", "touches_claim_surface", CLAUDE_REL)
 
+    # path_guidance: the code-quality brief layer (curated seed, id-validated).
+    for (slug, prefix, label, review_focus, verify, risks, invs, docs_ids,
+         skills, agents, src) in PATH_GUIDANCE:
+        if not rel_exists(prefix):
+            continue
+        nid = f"guidance:{slug}"
+        ev = evidence(prefix, kind="path-prefix")
+        if rel_exists(src) and src != prefix:
+            ev.append({"source": src, "kind": "authority"})
+        add_node(
+            id=nid, type="path_guidance", name=label, match=prefix,
+            match_kind="prefix",
+            description=f"Code-quality brief for changes under `{prefix}`.",
+            review_focus=review_focus, verification_commands=verify,
+            risk_surfaces=risks, invariants=invs, docs=docs_ids,
+            recommended_skills=skills, recommended_agents=agents,
+            source_of_truth=src, status="curated-seed", evidence=ev,
+        )
+        # graph edges so the guidance is navigable, not just a payload
+        for sk in skills:
+            if sk in skill_ids:
+                add_edge(nid, sk, "requires_skill", prefix)
+        for cs in risks:
+            add_edge(nid, cs, "touches_claim_surface", prefix)
+
     # deterministic ordering
     nodes.sort(key=lambda n: (n["type"], n["id"]))
     edges.sort(key=lambda e: (e["type"], e["from"], e["to"]))
@@ -507,12 +666,120 @@ def normalize(text: str) -> str:
     return json.dumps(data, indent=2, ensure_ascii=False, sort_keys=True)
 
 
+def _dedup(seq):
+    """Order-preserving de-duplication."""
+    seen, out = set(), []
+    for x in seq:
+        if x not in seen:
+            seen.add(x)
+            out.append(x)
+    return out
+
+
+def compute_brief(spine: dict, paths: list[str]) -> dict:
+    """Derive a code-quality brief for the given changed paths from the spine.
+
+    For each path: match every path_guidance rule whose prefix covers it
+    (general before specific), resolve the owning crate -> subsystem(s) and
+    crate -> claim surface(s) from the graph, and merge the guidance. Returns a
+    compact per-path list plus a deduplicated `combined` checklist. Pure
+    function over the spine dict — no filesystem or command execution.
+    """
+    nodes = spine.get("nodes", [])
+    edges = spine.get("edges", [])
+    by_id = {n["id"]: n for n in nodes}
+    guidance = [n for n in nodes if n.get("type") == "path_guidance"]
+    crates = [n for n in nodes if n.get("type") == "crate" and n.get("path")]
+
+    def norm(p: str) -> str:
+        return p.strip().lstrip("./") if p not in ("", ".") else p
+
+    per_path = []
+    for raw in paths:
+        path = norm(raw)
+        matched = [g for g in guidance
+                   if path == g["match"].rstrip("/") or path.startswith(g["match"])]
+        matched.sort(key=lambda g: (len(g["match"]), g["match"]))  # general -> specific
+
+        # owning crate (longest matching crate path)
+        cands = [c for c in crates
+                 if path == c["path"] or path.startswith(c["path"] + "/")]
+        crate = max(cands, key=lambda c: len(c["path"])) if cands else None
+
+        subsystems, crate_claims, matched_nodes = [], [], []
+        if crate:
+            matched_nodes.append(crate["id"])
+            for e in edges:
+                if e["from"] == crate["id"] and e["type"] == "owned_by_subsystem":
+                    sub = by_id.get(e["to"])
+                    if sub:
+                        subsystems.append(sub.get("name", e["to"]))
+                if e["from"] == crate["id"] and e["type"] == "touches_claim_surface":
+                    crate_claims.append(e["to"])
+        matched_nodes += [g["id"] for g in matched]
+
+        review = [x for g in matched for x in g.get("review_focus", [])]
+        verify = [x for g in matched for x in g.get("verification_commands", [])]
+        risks = [x for g in matched for x in g.get("risk_surfaces", [])] + crate_claims
+        invs = [x for g in matched for x in g.get("invariants", [])]
+        docs = [x for g in matched for x in g.get("docs", [])]
+        skills = [x for g in matched for x in g.get("recommended_skills", [])]
+        agents = [x for g in matched for x in g.get("recommended_agents", [])]
+        areas = [g["name"] for g in matched]
+
+        entry = {
+            "path": path,
+            "matched_nodes": _dedup(matched_nodes),
+            "subsystems": _dedup(subsystems),
+            "areas": _dedup(areas),
+            "docs": _dedup(docs),
+            "invariants": _dedup(invs),
+            "claim_surfaces": _dedup(risks),
+            "review_focus": _dedup(review),
+            "verification_commands": _dedup(verify),
+            "recommended_skills": _dedup(skills),
+            "recommended_agents": _dedup(agents),
+        }
+        if not matched and not crate:
+            entry["note"] = "no direct guidance match — fallback to general orientation"
+            entry["recommended_skills"] = ["skill:navigator"]
+            entry["recommended_agents"] = ["agent:icn-code-reviewer"]
+            entry["review_focus"] = [
+                "No path rule matched; orient with the navigator and run the closest "
+                "verification for the affected area."
+            ]
+        per_path.append(entry)
+
+    combined = {
+        "review_focus": _dedup([x for e in per_path for x in e["review_focus"]]),
+        "verification_commands": _dedup([x for e in per_path for x in e["verification_commands"]]),
+        "risk_surfaces": _dedup([x for e in per_path for x in e["claim_surfaces"]]),
+        "subsystems": _dedup([x for e in per_path for x in e["subsystems"]]),
+        "areas": _dedup([x for e in per_path for x in e["areas"]]),
+        "invariants": _dedup([x for e in per_path for x in e["invariants"]]),
+        "docs": _dedup([x for e in per_path for x in e["docs"]]),
+        "recommended_skills": _dedup([x for e in per_path for x in e["recommended_skills"]]),
+        "recommended_agents": _dedup([x for e in per_path for x in e["recommended_agents"]]),
+    }
+    return {
+        "artifact": ARTIFACT_REL,
+        "note": ("Orientation brief, not a gate. Non-canonical; defer to "
+                 "docs/reference/project-index/source-of-truth-map.md. Asserts no "
+                 "production/live/pilot readiness."),
+        "paths": per_path,
+        "combined": combined,
+    }
+
+
 def main() -> int:
-    ap = argparse.ArgumentParser(description="Generate or check the ICN agent context spine.")
-    g = ap.add_mutually_exclusive_group(required=True)
-    g.add_argument("--write", action="store_true", help="regenerate the spine artifact")
-    g.add_argument("--check", action="store_true", help="exit 1 if the committed artifact is stale")
+    ap = argparse.ArgumentParser(description="Generate, check, or brief the ICN agent context spine.")
+    ap.add_argument("--write", action="store_true", help="regenerate the spine artifact")
+    ap.add_argument("--check", action="store_true", help="exit 1 if the committed artifact is stale")
+    ap.add_argument("--brief", nargs="+", metavar="PATH",
+                    help="print a code-quality brief for the given changed paths")
     args = ap.parse_args()
+    if sum(1 for m in (args.write, args.check, bool(args.brief)) if m) != 1:
+        ap.error("exactly one of --write / --check / --brief is required")
 
     try:
         commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
@@ -522,6 +789,11 @@ def main() -> int:
 
     spine = build_spine(commit, now)
     content = serialize(spine)
+
+    if args.brief:
+        data = json.loads(ARTIFACT.read_text(encoding="utf-8")) if ARTIFACT.is_file() else spine
+        print(json.dumps(compute_brief(data, args.brief), indent=2, ensure_ascii=False))
+        return 0
 
     if args.write:
         ARTIFACT.parent.mkdir(parents=True, exist_ok=True)

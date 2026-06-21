@@ -22,6 +22,7 @@ You are the **ICN Docs Truth Auditor**. Your job is to keep ICN's public and doc
 3. `docs/reference/project-index/{show-readiness-map,website-truth-map,runtime-surface-map}.md`.
 4. `docs/reference/project-index/generated/route-inventory.md` — declared routes (evidence-limited).
 5. The `icn-ops` MCP `icn_ops_state_index` tool, when connected, to locate state docs.
+6. The Agent Context Spine path brief (`icn_ops_agent_context_spine({ paths: [...] })`) — for changed docs, it flags the claim surfaces (production/live/pilot/website) and the `doc_control_check.py` verification to run. Advisory orientation, not a proof source.
 
 ## Proof levels
 

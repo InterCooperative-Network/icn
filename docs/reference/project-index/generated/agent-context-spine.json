@@ -2,8 +2,8 @@
   "schema": "icn-agent-context-spine/v0",
   "status": "generated",
   "canonical": false,
-  "generated": "2026-06-21T05:03:36+00:00",
-  "source_commit": "880b85db17ecac976a82bbccde475c4523293ea0",
+  "generated": "2026-06-21T05:23:52+00:00",
+  "source_commit": "74c9fc5a15b6c9c30d4886ad1fb6149510a8e7e6",
   "generator": "scripts/generate-agent-context-spine.py",
   "regenerate": "python3 scripts/generate-agent-context-spine.py --write",
   "check": "python3 scripts/generate-agent-context-spine.py --check",
@@ -16,6 +16,7 @@
     "generated_artifact",
     "invariant",
     "mcp_tool",
+    "path_guidance",
     "route_surface",
     "script",
     "skill",
@@ -34,8 +35,8 @@
     "verifies"
   ],
   "counts": {
-    "nodes": 116,
-    "edges": 62
+    "nodes": 130,
+    "edges": 85
   },
   "nodes": [
     {
@@ -1164,6 +1165,38 @@
       ]
     },
     {
+      "id": "doc:agent-context-spine",
+      "type": "doc",
+      "name": "agent-context-spine.md",
+      "path": "docs/guides/developer/agent-context-spine.md",
+      "description": "Agent Context Spine guide: model, regenerate/check, MCP exposure, path briefs.",
+      "doc_role": "guide",
+      "source_of_truth": "docs/guides/developer/agent-context-spine.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "docs/guides/developer/agent-context-spine.md",
+          "kind": "doc"
+        }
+      ]
+    },
+    {
+      "id": "doc:agent-mcp-tooling",
+      "type": "doc",
+      "name": "agent-mcp-tooling.md",
+      "path": "docs/guides/developer/agent-mcp-tooling.md",
+      "description": "The icn-ops MCP server: read-mostly diagnostics and launch doctrine.",
+      "doc_role": "guide",
+      "source_of_truth": "docs/guides/developer/agent-mcp-tooling.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "docs/guides/developer/agent-mcp-tooling.md",
+          "kind": "doc"
+        }
+      ]
+    },
+    {
       "id": "doc:agents",
       "type": "doc",
       "name": "AGENTS.md",
@@ -1191,6 +1224,22 @@
       "evidence": [
         {
           "source": "CLAUDE.md",
+          "kind": "doc"
+        }
+      ]
+    },
+    {
+      "id": "doc:claude-code-plugin",
+      "type": "doc",
+      "name": "claude-code-plugin.md",
+      "path": "docs/guides/developer/claude-code-plugin.md",
+      "description": "The icn-agent-pack Claude Code plugin (portable MCP launch, skills/agents).",
+      "doc_role": "guide",
+      "source_of_truth": "docs/guides/developer/claude-code-plugin.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "docs/guides/developer/claude-code-plugin.md",
           "kind": "doc"
         }
       ]
@@ -1542,6 +1591,486 @@
         {
           "source": "ops/mcp/src/diagnostics/verification-plan.ts",
           "kind": "mcp-tool"
+        }
+      ]
+    },
+    {
+      "id": "guidance:docs",
+      "type": "path_guidance",
+      "name": "Documentation (truth / claim discipline)",
+      "match": "docs/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `docs/`.",
+      "review_focus": [
+        "Truth-source alignment and source precedence",
+        "No production/live/pilot overclaims; bound claims by proof level",
+        "Freshness and evidence for any asserted state"
+      ],
+      "verification_commands": [
+        "python3 docs/scripts/doc_control_check.py"
+      ],
+      "risk_surfaces": [
+        "claim_surface:public-website-claims",
+        "claim_surface:production-readiness",
+        "claim_surface:live-federation",
+        "claim_surface:pilot-readiness"
+      ],
+      "invariants": [],
+      "docs": [
+        "doc:source-of-truth-map",
+        "doc:show-readiness-map"
+      ],
+      "recommended_skills": [
+        "skill:truth-sync",
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-docs-truth-auditor"
+      ],
+      "source_of_truth": "docs/reference/project-index/source-of-truth-map.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "docs/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "docs/reference/project-index/source-of-truth-map.md",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:docs-scripts",
+      "type": "path_guidance",
+      "name": "Docs automation script (generator / validator)",
+      "match": "docs/scripts/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `docs/scripts/`.",
+      "review_focus": [
+        "Python standard library only; dependency-free",
+        "Deterministic output; --check drift mode stays correct"
+      ],
+      "verification_commands": [
+        "python3 docs/scripts/route_inventory.py --check",
+        "python3 docs/scripts/doc_control_check.py"
+      ],
+      "risk_surfaces": [],
+      "invariants": [],
+      "docs": [
+        "doc:source-of-truth-map"
+      ],
+      "recommended_skills": [
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-code-reviewer",
+        "agent:icn-docs-truth-auditor"
+      ],
+      "source_of_truth": "docs/scripts",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "docs/scripts/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "docs/scripts",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:gateway",
+      "type": "path_guidance",
+      "name": "icn-gateway (gateway / route / API surface)",
+      "match": "icn/crates/icn-gateway/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `icn/crates/icn-gateway/`.",
+      "review_focus": [
+        "Route/API drift: gateway handlers vs OpenAPI vs SDK types",
+        "Public-surface and auth/authz on new or changed routes",
+        "Regenerate the route inventory + OpenAPI when routes change",
+        "No panics on untrusted request input"
+      ],
+      "verification_commands": [
+        "python3 docs/scripts/route_inventory.py --check",
+        "cd icn && cargo clippy -p icn-gateway --all-targets -- -D warnings",
+        "cd icn && cargo test -p icn-gateway"
+      ],
+      "risk_surfaces": [
+        "claim_surface:route-api-docs-drift",
+        "claim_surface:public-website-claims"
+      ],
+      "invariants": [
+        "invariant:no-panics-in-protocol-paths",
+        "invariant:adversarial-by-default"
+      ],
+      "docs": [
+        "doc:source-of-truth-map",
+        "doc:show-readiness-map"
+      ],
+      "recommended_skills": [
+        "skill:route-impact",
+        "skill:truth-sync"
+      ],
+      "recommended_agents": [
+        "agent:icn-code-reviewer",
+        "agent:icn-docs-truth-auditor"
+      ],
+      "source_of_truth": "AGENTS.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "icn/crates/icn-gateway/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "AGENTS.md",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:generated",
+      "type": "path_guidance",
+      "name": "Generated project-index artifact",
+      "match": "docs/reference/project-index/generated/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `docs/reference/project-index/generated/`.",
+      "review_focus": [
+        "Do NOT hand-edit generated artifacts — regenerate via the owning script",
+        "Every node/edge evidence path must resolve on disk",
+        "No production/live/pilot overclaims in generated fields"
+      ],
+      "verification_commands": [
+        "python3 scripts/generate-agent-context-spine.py --check",
+        "python3 scripts/check-agent-context-spine.py",
+        "python3 docs/scripts/route_inventory.py --check"
+      ],
+      "risk_surfaces": [
+        "claim_surface:public-website-claims"
+      ],
+      "invariants": [],
+      "docs": [
+        "doc:source-of-truth-map"
+      ],
+      "recommended_skills": [
+        "skill:truth-sync",
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-docs-truth-auditor"
+      ],
+      "source_of_truth": "docs/reference/project-index/generated",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "docs/reference/project-index/generated/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "docs/reference/project-index/generated",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:ledger",
+      "type": "path_guidance",
+      "name": "icn-ledger (mutual credit / settlement)",
+      "match": "icn/crates/icn-ledger/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `icn/crates/icn-ledger/`.",
+      "review_focus": [
+        "Mutual-credit / double-entry invariants (no value created or destroyed)",
+        "Use settlement (not payment) terminology — regulatory framing",
+        "Determinism of journal/state-change derivation"
+      ],
+      "verification_commands": [
+        "cd icn && cargo test -p icn-ledger",
+        "cd icn && cargo clippy -p icn-ledger --all-targets -- -D warnings"
+      ],
+      "risk_surfaces": [],
+      "invariants": [
+        "invariant:determinism",
+        "invariant:canonical-encodings"
+      ],
+      "docs": [
+        "doc:claude"
+      ],
+      "recommended_skills": [
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-economist",
+        "agent:icn-code-reviewer"
+      ],
+      "source_of_truth": "AGENTS.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "icn/crates/icn-ledger/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "AGENTS.md",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:mcp",
+      "type": "path_guidance",
+      "name": "icn-ops MCP server (TypeScript)",
+      "match": "ops/mcp/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `ops/mcp/`.",
+      "review_focus": [
+        "Read-only / no mutation unless explicitly designed",
+        "Clear failure modes on missing or malformed inputs",
+        "ICN root & path portability (resolveMonorepoRoot; no hardcoded paths)",
+        "Stable MCP tool/resource contract"
+      ],
+      "verification_commands": [
+        "npm --prefix ./ops/mcp run build",
+        "npm --prefix ./ops/mcp test",
+        "python3 scripts/check-mcp-portability.py"
+      ],
+      "risk_surfaces": [],
+      "invariants": [],
+      "docs": [
+        "doc:agent-mcp-tooling",
+        "doc:agent-context-spine"
+      ],
+      "recommended_skills": [
+        "skill:doctor",
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-ops",
+        "agent:icn-code-reviewer"
+      ],
+      "source_of_truth": "docs/guides/developer/agent-mcp-tooling.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "ops/mcp/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "docs/guides/developer/agent-mcp-tooling.md",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:plugin",
+      "type": "path_guidance",
+      "name": "icn-agent-pack Claude Code plugin",
+      "match": "tools/claude-code/plugins/icn-agent-pack/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `tools/claude-code/plugins/icn-agent-pack/`.",
+      "review_focus": [
+        "Plugin manifest / skill / agent schema validity and loadability",
+        "Advisory hooks stay non-blocking; root resolution stays portable",
+        "Do not change project-local .claude/ or root MCP config"
+      ],
+      "verification_commands": [
+        "python3 scripts/check-claude-plugin.py",
+        "python3 scripts/check-claude-plugin-root-resolution.py",
+        "claude plugin validate ./tools/claude-code/plugins/icn-agent-pack"
+      ],
+      "risk_surfaces": [],
+      "invariants": [],
+      "docs": [
+        "doc:claude-code-plugin"
+      ],
+      "recommended_skills": [
+        "skill:doctor"
+      ],
+      "recommended_agents": [
+        "agent:icn-code-reviewer"
+      ],
+      "source_of_truth": "tools/claude-code/plugins/icn-agent-pack",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:rust-workspace",
+      "type": "path_guidance",
+      "name": "ICN Rust workspace crate",
+      "match": "icn/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `icn/`.",
+      "review_focus": [
+        "Kernel/app boundary: no domain imports in kernel crates; no reverse meaning firewall",
+        "No panics in protocol/actor/deserialization paths (no unwrap/expect on untrusted input)",
+        "Determinism: no HashMap iteration-order or unseeded-random reliance",
+        "Canonical encodings unchanged without explicit versioning + tests"
+      ],
+      "verification_commands": [
+        "cd icn && cargo fmt --all --check",
+        "cd icn && cargo clippy --workspace --all-targets --all-features -- -D warnings",
+        "cd icn && cargo test"
+      ],
+      "risk_surfaces": [],
+      "invariants": [
+        "invariant:adversarial-by-default",
+        "invariant:determinism",
+        "invariant:canonical-encodings",
+        "invariant:no-panics-in-protocol-paths",
+        "invariant:kernel-app-boundaries"
+      ],
+      "docs": [
+        "doc:agents",
+        "doc:claude"
+      ],
+      "recommended_skills": [
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-architect",
+        "agent:icn-code-reviewer"
+      ],
+      "source_of_truth": "AGENTS.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "icn/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "AGENTS.md",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:scripts",
+      "type": "path_guidance",
+      "name": "Repo automation script (generator / validator)",
+      "match": "scripts/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `scripts/`.",
+      "review_focus": [
+        "Python standard library only; dependency-free",
+        "Deterministic output; --check drift mode stays correct",
+        "No overclaim language emitted into generated artifacts"
+      ],
+      "verification_commands": [
+        "python3 scripts/check-agent-context-spine.py",
+        "python3 scripts/generate-agent-context-spine.py --check"
+      ],
+      "risk_surfaces": [],
+      "invariants": [],
+      "docs": [
+        "doc:agent-context-spine"
+      ],
+      "recommended_skills": [
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-code-reviewer"
+      ],
+      "source_of_truth": "scripts",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "scripts/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "scripts",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:sdk-ts",
+      "type": "path_guidance",
+      "name": "TypeScript SDK (generated types drift)",
+      "match": "sdk/typescript/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `sdk/typescript/`.",
+      "review_focus": [
+        "Commit only regenerated types under src/generated/*",
+        "API drift chain: gateway -> OpenAPI -> TS types",
+        "No mixed refactor + regen commits"
+      ],
+      "verification_commands": [
+        "cd sdk/typescript && npm ci && npm run generate-types && npm run check-types"
+      ],
+      "risk_surfaces": [
+        "claim_surface:route-api-docs-drift"
+      ],
+      "invariants": [],
+      "docs": [
+        "doc:source-of-truth-map"
+      ],
+      "recommended_skills": [
+        "skill:route-impact"
+      ],
+      "recommended_agents": [
+        "agent:icn-code-reviewer"
+      ],
+      "source_of_truth": "sdk/typescript",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "sdk/typescript/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "sdk/typescript",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:truth-spine",
+      "type": "path_guidance",
+      "name": "Canonical truth spine (fact ownership)",
+      "match": "ops/state/truth/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `ops/state/truth/`.",
+      "review_focus": [
+        "This directory OWNS fact authority — keep one source per fact",
+        "Never hardcode sprint/PR/branch/cluster IPs in skills or agents",
+        "Downstream skills/agents read from here; do not duplicate facts"
+      ],
+      "verification_commands": [],
+      "risk_surfaces": [],
+      "invariants": [],
+      "docs": [
+        "doc:source-of-truth-map"
+      ],
+      "recommended_skills": [
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-architect",
+        "agent:icn-code-reviewer"
+      ],
+      "source_of_truth": "ops/state/truth",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "ops/state/truth/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "ops/state/truth",
+          "kind": "authority"
         }
       ]
     },
@@ -2594,6 +3123,126 @@
       }
     },
     {
+      "from": "guidance:docs",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "docs/"
+      }
+    },
+    {
+      "from": "guidance:docs",
+      "to": "skill:truth-sync",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "docs/"
+      }
+    },
+    {
+      "from": "guidance:docs-scripts",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "docs/scripts/"
+      }
+    },
+    {
+      "from": "guidance:gateway",
+      "to": "skill:route-impact",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "icn/crates/icn-gateway/"
+      }
+    },
+    {
+      "from": "guidance:gateway",
+      "to": "skill:truth-sync",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "icn/crates/icn-gateway/"
+      }
+    },
+    {
+      "from": "guidance:generated",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "docs/reference/project-index/generated/"
+      }
+    },
+    {
+      "from": "guidance:generated",
+      "to": "skill:truth-sync",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "docs/reference/project-index/generated/"
+      }
+    },
+    {
+      "from": "guidance:ledger",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "icn/crates/icn-ledger/"
+      }
+    },
+    {
+      "from": "guidance:mcp",
+      "to": "skill:doctor",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "ops/mcp/"
+      }
+    },
+    {
+      "from": "guidance:mcp",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "ops/mcp/"
+      }
+    },
+    {
+      "from": "guidance:plugin",
+      "to": "skill:doctor",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "tools/claude-code/plugins/icn-agent-pack/"
+      }
+    },
+    {
+      "from": "guidance:rust-workspace",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "icn/"
+      }
+    },
+    {
+      "from": "guidance:scripts",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "scripts/"
+      }
+    },
+    {
+      "from": "guidance:sdk-ts",
+      "to": "skill:route-impact",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "sdk/typescript/"
+      }
+    },
+    {
+      "from": "guidance:truth-spine",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "ops/state/truth/"
+      }
+    },
+    {
       "from": "crate:icn-federation",
       "to": "claim_surface:live-federation",
       "type": "touches_claim_surface",
@@ -2607,6 +3256,70 @@
       "type": "touches_claim_surface",
       "evidence": {
         "source": "docs/reference/project-index/generated/route-inventory.md"
+      }
+    },
+    {
+      "from": "guidance:docs",
+      "to": "claim_surface:live-federation",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "docs/"
+      }
+    },
+    {
+      "from": "guidance:docs",
+      "to": "claim_surface:pilot-readiness",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "docs/"
+      }
+    },
+    {
+      "from": "guidance:docs",
+      "to": "claim_surface:production-readiness",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "docs/"
+      }
+    },
+    {
+      "from": "guidance:docs",
+      "to": "claim_surface:public-website-claims",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "docs/"
+      }
+    },
+    {
+      "from": "guidance:gateway",
+      "to": "claim_surface:public-website-claims",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "icn/crates/icn-gateway/"
+      }
+    },
+    {
+      "from": "guidance:gateway",
+      "to": "claim_surface:route-api-docs-drift",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "icn/crates/icn-gateway/"
+      }
+    },
+    {
+      "from": "guidance:generated",
+      "to": "claim_surface:public-website-claims",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "docs/reference/project-index/generated/"
+      }
+    },
+    {
+      "from": "guidance:sdk-ts",
+      "to": "claim_surface:route-api-docs-drift",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "sdk/typescript/"
       }
     },
     {

@@ -18,8 +18,14 @@ You are read-mostly. Map from evidence; do not refactor source. **Write a genera
 
 ## Evidence sources (in order)
 
-1. The `icn-ops` MCP server (read-mostly, current): `icn_ops_repo_map` (topology), `icn_ops_state_index`
-   (state/truth docs), `icn_ops_agent_brief` (orientation), `icn_ops_verification_plan` (impact/verify).
+0. **Prefer the Agent Context Spine path brief before broad repo search.** When you have one or
+   more changed/target paths, run `icn_ops_agent_context_spine({ paths: [...] })` (or
+   `python3 scripts/generate-agent-context-spine.py --brief <paths>`) first — it returns subsystem
+   ownership, invariants, docs, verification commands, claim surfaces, and recommended skills/agents
+   straight from repo-owned data, so you don't have to crawl the tree to reconstruct them.
+1. The `icn-ops` MCP server (read-mostly, current): `icn_ops_agent_context_spine` (path brief / graph),
+   `icn_ops_repo_map` (topology), `icn_ops_state_index` (state/truth docs), `icn_ops_agent_brief`
+   (orientation), `icn_ops_verification_plan` (impact/verify).
 2. `docs/reference/project-index/*.md` — source-of-truth, runtime-surface, website-truth, show-readiness maps.
 3. The crate tree (`icn/crates/`, `icn/apps/`, `icn/bins/`) and `CLAUDE.md` topology — fallback only; say so.
 

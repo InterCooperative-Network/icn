@@ -135,6 +135,37 @@ def main() -> int:
             if n.get("asserts_readiness") is not False:
                 errors.append(f"claim_surface {nid}: must carry asserts_readiness=false")
 
+    # path_guidance referential integrity (the code-quality brief layer)
+    types_by_id = {n.get("id"): n.get("type") for n in nodes}
+    # (id-prefix -> allowed node types it may reference)
+    ref_specs = [
+        ("risk_surfaces", {"claim_surface"}),
+        ("invariants", {"invariant"}),
+        ("docs", {"doc", "generated_artifact"}),
+        ("recommended_skills", {"skill"}),
+        ("recommended_agents", {"agent"}),
+    ]
+    for n in nodes:
+        if n.get("type") != "path_guidance":
+            continue
+        nid = n.get("id", "<no-id>")
+        match = n.get("match")
+        if not match or not isinstance(match, str):
+            errors.append(f"path_guidance {nid}: missing 'match' prefix")
+        elif not (ROOT / match).exists():
+            errors.append(f"path_guidance {nid}: match prefix does not exist: {match}")
+        if not n.get("review_focus"):
+            errors.append(f"path_guidance {nid}: 'review_focus' must be non-empty")
+        for field, allowed in ref_specs:
+            for ref in n.get(field, []):
+                if ref not in node_ids:
+                    errors.append(f"path_guidance {nid}: {field} references unknown node id: {ref}")
+                elif types_by_id.get(ref) not in allowed:
+                    errors.append(
+                        f"path_guidance {nid}: {field} ref {ref} is type "
+                        f"'{types_by_id.get(ref)}', expected one of {sorted(allowed)}"
+                    )
+
     # edges
     for e in edges:
         label = f"{e.get('from','?')}->{e.get('to','?')} ({e.get('type','?')})"

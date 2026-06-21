@@ -28,12 +28,24 @@ Rust (ownership, lifetimes, async, error handling, unsafe), distributed systems 
 | **No panics in protocol** | No `unwrap()`/`expect()` on network input, actor handlers, deserialization |
 | **Kernel/app boundaries** | No domain imports in kernel crates, no reverse meaning firewall |
 
+## Consult the Agent Context Spine first
+
+Before reviewing a change, query the **Agent Context Spine** for the changed paths when available. Use it to identify subsystem ownership, the invariants that apply, verification commands, truth/claim risk surfaces, relevant docs, and which specialized ICN skill/agent fits — so your review targets what actually matters for those files.
+
+```bash
+# from the diff:
+git diff --name-only origin/main...HEAD | xargs python3 scripts/generate-agent-context-spine.py --brief
+```
+
+Or via MCP: `icn_ops_agent_context_spine({ paths: [<changed files>] })`. The brief is **advisory orientation, not a gate** (non-canonical); confirm against the source before asserting anything. If the spine is unavailable, fall back to the steps below.
+
 ## Review process
 
 1. Read the diff (`git diff origin/main...HEAD`, or the specified PR via `gh pr diff <n>`).
-2. Identify changed files and their crate locations.
-3. Check each file against the invariants.
-4. Classify issues by severity.
+2. Identify changed files and their crate locations — cross-check with the spine brief's `subsystems` / `areas`.
+3. Check each file against the invariants the brief flags (and the full five below).
+4. Run (or recommend) the brief's `verification_commands` for the touched areas.
+5. Classify issues by severity.
 
 ## Always flag (blocking)
 

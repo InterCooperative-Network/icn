@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   buildAgentContextSpineView,
+  buildPathBrief,
   SPINE_REL,
 } from "../diagnostics/agent-context-spine.js";
 
@@ -168,5 +169,150 @@ describe("buildAgentContextSpineView", () => {
     expect(view.ok).toBe(false);
     if (view.ok) return;
     expect(view.error).toMatch(/nodes.*edges/i);
+  });
+});
+
+const BRIEF_SAMPLE = {
+  schema: "icn-agent-context-spine/v0",
+  status: "generated",
+  canonical: false,
+  generated: "2026-06-21T00:00:00+00:00",
+  source_commit: "deadbeef",
+  generator: "scripts/generate-agent-context-spine.py",
+  regenerate: "x",
+  check: "x",
+  nodes: [
+    {
+      id: "crate:icn-trust",
+      type: "crate",
+      name: "icn-trust",
+      path: "icn/crates/icn-trust",
+      source_of_truth: "icn/Cargo.toml",
+      evidence: [{ source: "icn/Cargo.toml" }],
+    },
+    { id: "subsystem:trust", type: "subsystem", name: "trust", source_of_truth: "CLAUDE.md", evidence: [{ source: "CLAUDE.md" }] },
+    {
+      id: "guidance:rust-workspace",
+      type: "path_guidance",
+      name: "ICN Rust workspace crate",
+      match: "icn/",
+      source_of_truth: "AGENTS.md",
+      review_focus: ["No panics in protocol paths", "Determinism"],
+      verification_commands: ["cd icn && cargo test"],
+      risk_surfaces: [],
+      invariants: ["invariant:determinism"],
+      docs: ["doc:agents"],
+      recommended_skills: ["skill:navigator"],
+      recommended_agents: ["agent:icn-code-reviewer"],
+      evidence: [{ source: "icn" }],
+    },
+    {
+      id: "guidance:mcp",
+      type: "path_guidance",
+      name: "icn-ops MCP server (TypeScript)",
+      match: "ops/mcp/",
+      source_of_truth: "docs/guides/developer/agent-mcp-tooling.md",
+      review_focus: ["Read-only / no mutation"],
+      verification_commands: ["npm --prefix ./ops/mcp test"],
+      risk_surfaces: [],
+      invariants: [],
+      docs: ["doc:agent-mcp-tooling"],
+      recommended_skills: ["skill:navigator", "skill:doctor"],
+      recommended_agents: ["agent:icn-ops", "agent:icn-code-reviewer"],
+      evidence: [{ source: "ops/mcp" }],
+    },
+    {
+      id: "guidance:docs",
+      type: "path_guidance",
+      name: "Documentation (truth / claim discipline)",
+      match: "docs/",
+      source_of_truth: "docs/reference/project-index/source-of-truth-map.md",
+      review_focus: ["No production/live/pilot overclaims"],
+      verification_commands: ["python3 docs/scripts/doc_control_check.py"],
+      risk_surfaces: ["claim_surface:public-website-claims"],
+      invariants: [],
+      docs: ["doc:source-of-truth-map"],
+      recommended_skills: ["skill:truth-sync", "skill:navigator"],
+      recommended_agents: ["agent:icn-docs-truth-auditor"],
+      evidence: [{ source: "docs" }],
+    },
+  ],
+  edges: [
+    {
+      from: "crate:icn-trust",
+      to: "subsystem:trust",
+      type: "owned_by_subsystem",
+      evidence: { source: "CLAUDE.md" },
+    },
+  ],
+};
+
+describe("buildPathBrief", () => {
+  it("briefs a known ops/mcp path", () => {
+    const dir = fixtureRoot(BRIEF_SAMPLE);
+    const view = buildPathBrief(dir, ["ops/mcp/src/tools/agent-ops.ts"]);
+    expect(view.ok).toBe(true);
+    if (!view.ok) return;
+    const entry = (view.paths as Array<Record<string, string[]>>)[0];
+    expect(entry.areas).toContain("icn-ops MCP server (TypeScript)");
+    expect(entry.verification_commands).toContain("npm --prefix ./ops/mcp test");
+    expect(entry.recommended_agents).toContain("agent:icn-ops");
+  });
+
+  it("briefs a known docs path with claim-surface risk", () => {
+    const dir = fixtureRoot(BRIEF_SAMPLE);
+    const view = buildPathBrief(dir, ["docs/INDEX.md"]);
+    expect(view.ok).toBe(true);
+    if (!view.ok) return;
+    const entry = (view.paths as Array<Record<string, string[]>>)[0];
+    expect(entry.claim_surfaces).toContain("claim_surface:public-website-claims");
+    expect(entry.recommended_agents).toContain("agent:icn-docs-truth-auditor");
+  });
+
+  it("resolves crate -> subsystem from the graph for a Rust path", () => {
+    const dir = fixtureRoot(BRIEF_SAMPLE);
+    const view = buildPathBrief(dir, ["icn/crates/icn-trust/src/lib.rs"]);
+    expect(view.ok).toBe(true);
+    if (!view.ok) return;
+    const entry = (view.paths as Array<Record<string, string[]>>)[0];
+    expect(entry.subsystems).toContain("trust");
+    expect(entry.matched_nodes).toContain("crate:icn-trust");
+    expect(entry.invariants).toContain("invariant:determinism");
+  });
+
+  it("combines multiple paths and deduplicates commands and skills", () => {
+    const dir = fixtureRoot(BRIEF_SAMPLE);
+    const view = buildPathBrief(dir, [
+      "ops/mcp/src/a.ts",
+      "ops/mcp/src/b.ts", // same area twice -> must dedupe
+      "docs/INDEX.md",
+    ]);
+    expect(view.ok).toBe(true);
+    if (!view.ok) return;
+    const combined = view.combined as Record<string, string[]>;
+    // navigator appears in both mcp and docs guidance -> exactly once
+    expect(combined.recommended_skills.filter((s) => s === "skill:navigator").length).toBe(1);
+    expect(
+      combined.verification_commands.filter((c) => c === "npm --prefix ./ops/mcp test").length
+    ).toBe(1);
+  });
+
+  it("returns a clear fallback for an unknown path", () => {
+    const dir = fixtureRoot(BRIEF_SAMPLE);
+    const view = buildPathBrief(dir, ["totally/unknown/file.xyz"]);
+    expect(view.ok).toBe(true);
+    if (!view.ok) return;
+    const entry = (view.paths as Array<Record<string, unknown>>)[0];
+    expect(entry.note).toMatch(/no direct guidance match/i);
+    expect(entry.recommended_skills).toContain("skill:navigator");
+    expect((entry.matched_nodes as string[]).length).toBe(0);
+  });
+
+  it("fails clearly when the artifact is missing (brief mode)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "icn-mcp-brief-missing-"));
+    const view = buildPathBrief(dir, ["ops/mcp/x.ts"]);
+    expect(view.ok).toBe(false);
+    if (view.ok) return;
+    expect(view.error).toMatch(/not found/i);
   });
 });

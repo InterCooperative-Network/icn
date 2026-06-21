@@ -15,6 +15,7 @@ Arguments: `$ARGUMENTS` may name a concept, crate, or subsystem to focus the map
 
 Prefer the `icn-ops` MCP tools over re-deriving structure by hand — they are read-mostly and reflect the current repo:
 
+- `icn_ops_agent_context_spine` — the Agent Context Spine. **When you have changed/target paths, run the path brief first** (`icn_ops_agent_context_spine({ paths: [...] })`, or `python3 scripts/generate-agent-context-spine.py --brief <paths>`) before broad repo search: it returns subsystem ownership, invariants, docs, verification commands, claim surfaces, and recommended skills/agents from repo-owned data.
 - `icn_ops_repo_map` — crate/app/binary topology and boundaries
 - `icn_ops_state_index` — index of declared state / truth documents
 - `icn_ops_agent_brief` — current orientation brief for agents
