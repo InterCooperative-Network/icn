@@ -50,6 +50,7 @@ def repo_root() -> Path:
         if out.returncode == 0 and out.stdout.strip():
             return Path(out.stdout.strip())
     except Exception:
+        # Not a git checkout (or git unavailable): fall through to the __file__ fallback.
         pass
     return Path(__file__).resolve().parents[1]
 
@@ -202,6 +203,7 @@ def _freshness(rel: str) -> str:
                 if stripped.startswith(key):
                     return stripped[: len(key) + 16].strip()
     except Exception:
+        # Best-effort freshness read: a missing/unreadable doc falls through to RECONFIRM.
         pass
     return RECONFIRM
 
@@ -241,6 +243,7 @@ def section_canonical_state() -> list[dict]:
                 phase = line.split("**Current Phase:**", 1)[1].strip()[:160]
                 break
     except Exception:
+        # Best-effort phase extraction: an unreadable PHASE_PROGRESS leaves phase = RECONFIRM.
         pass
     return [
         {
@@ -322,6 +325,7 @@ def section_grounding_artifacts() -> list[dict]:
                     macros = line.strip().lstrip("- ").strip()
                     break
         except Exception:
+            # Best-effort count parse: an unreadable route inventory leaves macros = RECONFIRM.
             pass
         out.append({
             "artifact": "Gateway route inventory",
@@ -368,6 +372,7 @@ def section_active_lanes(use_gh: bool) -> list[dict]:
                         status = f"{st} (live-reconfirmed {datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')})"
                         source = f"GitHub issue {issue}"
                 except Exception:
+                    # Best-effort gh parse: bad/absent output leaves status = NEEDS_LIVE_RECONFIRMATION.
                     pass
         out.append({"lane": issue, "description": desc, "status": status, "source": source})
     return out
