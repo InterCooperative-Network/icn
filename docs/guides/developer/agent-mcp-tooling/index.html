@@ -187,8 +187,14 @@ timeout 5 npm --prefix ./ops/mcp run start:stdio   # exit 124 while server runs 
 </code></pre>
 <p><strong>Agents:</strong> use <code>icn_ops_doctor</code> / <code>icn_ops_next_steps</code> for “what’s wrong?” and “what should I run?” — all suggested commands are <strong>strings only</strong>; MCP does not run shells or auto-remediation.</p>
 <p><strong>Warnings vs blockers:</strong> missing <code>kubectl</code> / <code>gh</code> / dirty tree → usually <strong>warn</strong>. Missing <code>ops/mcp/node_modules</code>, failed <code>better-sqlite3</code> load, portability script failure → treat as <strong>blockers</strong> for MCP until fixed.</p>
+<h2>Plugin packaging</h2>
+<p>The same <code>icn-ops</code> launch is also bundled, with the highest-value skills/agents/hooks, into the
+<code>icn-agent-pack</code> Claude Code plugin at <code>tools/claude-code/plugins/icn-agent-pack/</code> (a portable,
+additive packaging path that does not replace this repo&#39;s project-local <code>.claude/</code> config). See
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/claude-code-plugin">claude-code-plugin.md</a>.</p>
 <h2>Related docs</h2>
 <ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/claude-code-plugin">claude-code-plugin.md</a> — the icn-agent-pack plugin (packaging path)</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/cursor-mcp-setup">cursor-mcp-setup.md</a> — Cursor vs Claude wiring and smoke-test commands</li>
 <li><code>AGENTS.md</code> (repo root) — invariants and verification matrix</li>
 <li><code>ops/CLAUDE.md</code> — orchestration plane layout</li>

@@ -1,0 +1,266 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Claude Code plugin: icn-agent-pack | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>developer</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>claude code plugin</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/developer/claude-code-plugin.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Claude Code plugin: icn-agent-pack</h1>
+<p>This guide explains the <code>icn-agent-pack</code> Claude Code plugin: what it is, how to test it, how it
+relates to the repository&#39;s project-local <code>.claude/</code> configuration, and what would be involved in
+migrating to it later.</p>
+<blockquote>
+<p><strong>Status:</strong> first packaging pass, not production-ready. This pass <strong>adds</strong> a plugin; it removes
+nothing. The project-local <code>.claude/</code> config remains the active, canonical configuration.</p>
+</blockquote>
+<h2>Two configuration paths (and why both exist)</h2>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Location</th>
+<th>Role today</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Project-local config</strong></td>
+<td><code>.claude/</code> (<code>settings.json</code>, <code>hooks/*</code>, <code>agents/*</code>, <code>skills/*</code>), <code>.mcp.json</code>, <code>.cursor/mcp.json</code></td>
+<td><strong>Canonical and active.</strong> This is what runs in a normal repo session — including the blocking safety hooks.</td>
+</tr>
+<tr>
+<td><strong>Plugin packaging</strong></td>
+<td><code>tools/claude-code/plugins/icn-agent-pack/</code></td>
+<td><strong>New, additive.</strong> A self-contained, portable bundle of the highest-value skills/agents/hooks plus the <code>icn-ops</code> MCP launch.</td>
+</tr>
+</tbody></table>
+<p>The plugin path exists so the tooling can be loaded from any checkout (or eventually shared/installed)
+without being entangled with one machine&#39;s setup. It is intentionally a <em>superset-friendly</em> second
+path, not a replacement.</p>
+<h2>What the plugin contains</h2>
+<ul>
+<li><strong>Skills</strong> (<code>skills/</code>, all <code>disable-model-invocation: true</code>, user-invoked via <code>/icn-agent-pack:&lt;name&gt;</code>):
+<code>preflight</code>, <code>truth-sync</code>, <code>authority-spine</code>, <code>route-impact</code>, <code>navigator</code>, and <code>doctor</code>
+(plugin/root/MCP self-diagnosis).</li>
+<li><strong>Agents</strong> (<code>agents/</code>): <code>icn-architect</code>, <code>icn-economist</code>, <code>icn-code-reviewer</code>, <code>icn-ops</code>
+(de-staled, MCP-first), plus new <code>icn-docs-truth-auditor</code> and <code>icn-navigator</code>.</li>
+<li><strong>Hooks</strong> (<code>hooks/hooks.json</code>): advisory only — a SessionStart context pointer and PostToolUse
+route/claim hints. Non-blocking; they do <strong>not</strong> duplicate or weaken the project-local safety hooks.</li>
+<li><strong>MCP</strong> (<code>.mcp.json</code>): the <code>icn-ops</code> server launched through the portable wrapper
+<code>${CLAUDE_PLUGIN_ROOT}/bin/icn-ops-mcp</code> (see &quot;Portable MCP launch&quot; below) — <strong>not</strong> identical to the
+root configs, which stay repo-root-relative.</li>
+<li><strong>LSP</strong> (<code>.lsp.json</code>): a documented <code>{}</code> placeholder; see the plugin README for the intended,
+non-installing Rust/TS/Python servers.</li>
+<li><strong>bin/</strong>: the MCP launcher (<code>icn-ops-mcp</code>) and root resolver (<code>icn-find-root</code>) in Python, plus the
+POSIX-sh hook helpers (<code>icn-session-context</code>, <code>icn-route-impact-hint</code>, <code>icn-truth-sync-hint</code>) that
+read hook input JSON from stdin. None make network calls or mutate anything.</li>
+</ul>
+<p>See <code>tools/claude-code/plugins/icn-agent-pack/README.md</code> for the full inventory and safety model.</p>
+<h2>How this plugin is loaded</h2>
+<h3>Development / test loading (current)</h3>
+<p>Load the plugin directly from the repo — no marketplace install, no change to project config:</p>
+<pre><code class="language-bash">claude --plugin-dir ./tools/claude-code/plugins/icn-agent-pack   # from the repo root
+</code></pre>
+<p>Inside the session:</p>
+<pre><code class="language-text">/reload-plugins                 # after editing plugin files (hooks need a reload/restart)
+/icn-agent-pack:doctor           # diagnose plugin load + ICN root + MCP reachability
+/icn-agent-pack:preflight        # session preflight
+/icn-agent-pack:route-impact icn/crates/icn-gateway/src/routes/governance.rs
+</code></pre>
+<h3>Launching from a higher-level / parent directory</h3>
+<p>The <code>icn-ops</code> MCP launch is portable (see &quot;Portable MCP launch&quot; below), so it also works when Claude
+Code is started above the repo. If root discovery is ambiguous (e.g. several ICN worktrees under one
+parent), set <code>ICN_ROOT</code> explicitly:</p>
+<pre><code class="language-bash">cd ..
+ICN_ROOT=/path/to/icn claude --plugin-dir /path/to/icn/tools/claude-code/plugins/icn-agent-pack
+</code></pre>
+<h3>Not yet automatic</h3>
+<p>The plugin is <strong>not</strong> installed as a project-scoped plugin and is <strong>not</strong> auto-discovered. It does not
+replace the project-local <code>.claude/</code> config; you opt in per session with <code>--plugin-dir</code>. This first
+pass is plugin-<em>packaging</em> infrastructure, not a cutover.</p>
+<h3>Future option</h3>
+<p>Later we may mirror or move the pack into <code>.claude/skills/icn-agent-pack/</code> (or publish it via a
+marketplace) for project-scoped auto-discovery after workspace trust. That is a deliberate, separate
+decision — see &quot;Migrating later&quot;.</p>
+<h2>Portable MCP launch</h2>
+<p>Root <code>.mcp.json</code> and <code>.cursor/mcp.json</code> stay <strong>canonical and repo-root-relative</strong> for normal repo-root
+sessions (<code>npm --prefix ./ops/mcp run start:stdio</code>, enforced by <code>scripts/check-mcp-portability.py</code>).
+This pass does <strong>not</strong> change them.</p>
+<p>The plugin&#39;s own <code>.mcp.json</code> is <strong>wrapper-based and portable</strong>:</p>
+<pre><code class="language-json">{ &quot;mcpServers&quot;: { &quot;icn-ops&quot;: { &quot;command&quot;: &quot;${CLAUDE_PLUGIN_ROOT}/bin/icn-ops-mcp&quot; } } }
+</code></pre>
+<p><code>bin/icn-ops-mcp</code> resolves the ICN root via <code>bin/icn-find-root</code>, exports <code>ICN_ROOT</code>, then execs
+<code>npm --prefix &quot;$ICN_ROOT/ops/mcp&quot; run start:stdio</code> (never <code>ops/mcp/dist/index.js</code>), so MCP startup no
+longer depends on Claude Code&#39;s launch directory. <code>bin/icn-find-root</code> resolves the root, in order, by
+<code>ICN_ROOT</code> → git toplevel → upward walk → a small set of common dev layouts, accepting only a directory
+containing both <code>ops/mcp/package.json</code> and <code>docs/STATE.md</code>; a not-found or multiple-distinct-roots
+situation fails clearly and asks you to set <code>ICN_ROOT</code>. Diagnose with <code>/icn-agent-pack:doctor</code>.</p>
+<h2>Validate</h2>
+<pre><code class="language-bash">python3 scripts/check-claude-plugin.py                              # structure + wrapper-launch pre-check
+python3 scripts/check-claude-plugin-root-resolution.py              # icn-find-root branch tests
+claude plugin validate ./tools/claude-code/plugins/icn-agent-pack   # Anthropic&#39;s official validator
+</code></pre>
+<p><code>scripts/check-claude-plugin.py</code> (standard library only) verifies: the manifest parses and is named
+<code>icn-agent-pack</code>; <code>.claude-plugin/</code> contains only <code>plugin.json</code>; the <code>skills/</code>, <code>agents/</code>, <code>hooks/</code>,
+and <code>bin/</code> directories exist; <code>bin/icn-find-root</code> and <code>bin/icn-ops-mcp</code> exist and are executable; all
+required skills (incl. <code>doctor</code>) and agents exist; every skill has a <code>description</code> and the heavy
+workflows (and any user-invocable skill) set <code>disable-model-invocation: true</code>; every agent has <code>name</code> +
+<code>description</code>; <code>hooks.json</code> has a top-level <code>hooks</code> object and no stray top-level <code>description</code>; hook
+commands quote <code>${CLAUDE_PLUGIN_ROOT}</code> and point at existing, executable scripts; the plugin <code>.mcp.json</code>
+launches <code>icn-ops</code> via the <code>${CLAUDE_PLUGIN_ROOT}/bin/icn-ops-mcp</code> wrapper and contains none of
+<code>./ops/mcp</code>, <code>ops/mcp/dist/index.js</code>, or <code>node dist/index.js</code>; <code>.lsp.json</code> is <code>{}</code> or a valid LSP server
+map; the README and this guide exist; and every file in <code>bin/</code> passes a shebang-aware syntax check
+(builtin <code>compile()</code> for Python — no <code>.pyc</code> cache written — and <code>sh -n</code> for shell), iterating files
+only so directories like <code>__pycache__</code> are ignored. <code>check-claude-plugin-root-resolution.py</code> unit-tests
+the resolver branches (repo root, subdir, parent + <code>ICN_ROOT</code>, spaces, invalid <code>ICN_ROOT</code>, ambiguous,
+higher-level unique <code>./icn</code> layout, git, no-root) against temp fixtures. Both are fast pre-checks that
+complement <code>claude plugin validate</code>.</p>
+<h2>Interactive smoke test (manual acceptance)</h2>
+<p>The checks above are static. <code>claude plugin validate</code> proves the plugin&#39;s <strong>schema and loadability</strong>,
+but it does <strong>not</strong> prove an interactive session can actually start <code>icn-ops</code> through the plugin
+wrapper. The manual acceptance test is <code>/icn-agent-pack:doctor</code> in a live session.</p>
+<p>Launch from a higher-level directory, setting <code>ICN_ROOT</code> so discovery is unambiguous when several ICN
+worktrees share a parent:</p>
+<pre><code class="language-bash">cd ~/icn-dev
+ICN_ROOT=/home/ubuntu/icn-dev/worktrees/icn/task-claude-agent-pack \
+  claude --plugin-dir /home/ubuntu/icn-dev/worktrees/icn/task-claude-agent-pack/tools/claude-code/plugins/icn-agent-pack
+</code></pre>
+<p>Inside Claude Code:</p>
+<pre><code class="language-text">/reload-plugins            # pick up the plugin
+/icn-agent-pack:doctor      # plugin loaded? root resolved? icn-ops MCP reachable?
+/icn-agent-pack:preflight   # session env preflight
+</code></pre>
+<ul>
+<li><code>/icn-agent-pack:doctor</code> is the manual smoke test for plugin load + ICN root resolution + MCP reachability.</li>
+<li>When launching from a parent/higher-level directory, set <code>ICN_ROOT</code> if discovery is ambiguous.</li>
+<li>Root <code>.mcp.json</code> and <code>.cursor/mcp.json</code> stay repo-root-relative for normal repo-root sessions; the
+plugin&#39;s <code>.mcp.json</code> is wrapper-based and portable.</li>
+</ul>
+<h2>What must stay canonical in project-local config (for now)</h2>
+<p>Until a deliberate migration, treat these as authoritative in <code>.claude/</code> — the plugin does not own them:</p>
+<ul>
+<li><strong>Blocking safety hooks</strong> — <code>firewall-guard.sh</code> (meaning firewall), <code>panic-guard.sh</code>,
+<code>scope-guard.sh</code>, <code>dep-guard.sh</code>, <code>todo-guard.sh</code>, and the <code>pre-*</code>/<code>post-*</code> guards in
+<code>.claude/hooks/</code>. The plugin&#39;s hooks are advisory only and do not replace these.</li>
+<li><strong>Permissions</strong> — the <code>allow</code>/<code>deny</code>/<code>ask</code> lists in <code>.claude/settings.json</code>.</li>
+<li><strong>The project-local <code>/icn-preflight</code> skill</strong> and the existing <code>.claude/agents/*</code> set.</li>
+<li><strong>Root MCP configs</strong> — <code>.mcp.json</code> and <code>.cursor/mcp.json</code> (kept identical, enforced by
+<code>scripts/check-mcp-portability.py</code>).</li>
+</ul>
+<p>The plugin&#39;s namespaced skills (<code>/icn-agent-pack:*</code>) coexist with the project-local ones without
+collision.</p>
+<h2>Migrating later (if we choose)</h2>
+<p>This pass deliberately stops short of migration. If the project later decides to consolidate on the
+plugin, the considerations are:</p>
+<ol>
+<li><strong>Decide ownership per component.</strong> For each skill/agent/hook, decide whether the plugin or
+<code>.claude/</code> is the single source. Avoid maintaining two copies that drift.</li>
+<li><strong>Port the blocking hooks carefully.</strong> The safety guards are blocking and depend on
+<code>$CLAUDE_PROJECT_DIR</code>. Moving them into a plugin means re-validating they still block (and still
+read stdin JSON) under <code>${CLAUDE_PLUGIN_ROOT}</code>. Do this behind a test, one hook at a time.</li>
+<li><strong>Keep the MCP launch identical</strong> across whichever configs survive; keep the portability check green.</li>
+<li><strong>Add CI</strong> for <code>scripts/check-claude-plugin.py</code> so the plugin can&#39;t rot.</li>
+<li><strong>Only then</strong> remove the duplicated project-local copies — never before the plugin equivalents are
+proven in real sessions.</li>
+</ol>
+<p>Follow-ups tracked for later phases: whether to move project-local config into the plugin; whether to
+populate <code>.lsp.json</code>; whether to add monitors; whether to expose MCP resources for the truth maps and
+the repo graph; whether to add CI for plugin validation; and whether to build <code>repo_knowledge_graph.py</code>.</p>
+<h2>Related docs</h2>
+<ul>
+<li><code>docs/guides/developer/agent-mcp-tooling.md</code> — the <code>icn-ops</code> MCP server and its launch doctrine.</li>
+<li><code>tools/claude-code/plugins/icn-agent-pack/README.md</code> — plugin inventory, safety model, and LSP notes.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
