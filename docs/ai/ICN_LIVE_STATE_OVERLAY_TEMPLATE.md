@@ -25,7 +25,7 @@ python3 scripts/generate-live-state-overlay.py --check         # self-validate, 
 ```
 
 - **On-demand, not committed.** Default output is stdout. Use `--output PATH` to write a local copy you will **not** commit. There is intentionally no committed snapshot file.
-- **No network required for a useful overlay.** It reads canonical docs, the generated grounding artifacts, the latest `docs/dev/` handoff, and git locally. `gh` is consulted **only** for live PR/issue state and is labeled `live-reconfirmed` at generation time; without it (or with `--no-gh`) those fields are marked `NEEDS_LIVE_RECONFIRMATION`, never guessed.
+- **No network required for a useful overlay.** It reads canonical docs, the generated grounding artifacts, the latest `docs/dev/` handoff, and git locally. `gh` is consulted **only** for the live OPEN/CLOSED state of the curated issue lanes (`gh issue view …`) and is labeled `live-reconfirmed` at generation time; without it (or with `--no-gh`) those fields are marked `NEEDS_LIVE_RECONFIRMATION`, never guessed.
 - **Every line is source- or freshness-bound.** Nothing exceeds canonical state; the overlay carries an explicit `claim_boundaries` section.
 
 ### Sources it reads
@@ -43,7 +43,7 @@ python3 scripts/generate-live-state-overlay.py --check         # self-validate, 
 
 Agents: run it, then follow the overlay's own `agent_start_rules` (read overlay → read the relevant Agent Context Spine path brief → identify canonical vs generated-reference → identify required checks → identify claim hazards → only then plan; never merge without explicit per-PR authorization). Humans: skim sections 1–6 to orient, then 7–8 for what to do next. The `claim_boundaries` section lists what must never be claimed.
 
-The self-check (`--check`) verifies the eight required sections exist, every claim carries a source/freshness or `NEEDS_LIVE_RECONFIRMATION` marker, the JSON round-trips, the markdown carries caveats, and no production-readiness / live-federation / formal-pilot / entity-auth-enforced overclaim appears in the fact-bearing sections.
+The self-check (`--check`) verifies the eight required sections exist, the structured entries in the canonical-state, grounding-artifact, and lane sections carry source/freshness (or `NEEDS_LIVE_RECONFIRMATION`) markers, the `claim_boundaries` cover the required hazards, the JSON round-trips, the markdown carries caveats, and no production-readiness / live-federation / formal-pilot / entity-auth-enforced overclaim appears in the fact-bearing sections.
 
 ---
 

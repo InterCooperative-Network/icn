@@ -36,8 +36,25 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Resolve the repo root from this script's location (scripts/ is at repo root).
-ROOT = Path(__file__).resolve().parent.parent
+def repo_root() -> Path:
+    """Repo root via `git rev-parse --show-toplevel`, falling back to this script's
+    location (scripts/ is at repo root). Mirrors scripts/generate-agent-context-spine.py."""
+    try:
+        out = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            cwd=Path(__file__).resolve().parent,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if out.returncode == 0 and out.stdout.strip():
+            return Path(out.stdout.strip())
+    except Exception:
+        pass
+    return Path(__file__).resolve().parents[1]
+
+
+ROOT = repo_root()
 
 RECONFIRM = "NEEDS_LIVE_RECONFIRMATION"
 
@@ -254,6 +271,9 @@ def section_canonical_state() -> list[dict]:
 
 
 def _latest_handoff() -> str:
+    # handoff-YYYY-MM-DD-*.md names sort chronologically by their ISO date prefix, so the
+    # lexicographic max is the newest — and deterministic, unlike mtime (which a git
+    # checkout flattens). Same-day handoffs tiebreak by filename.
     hand = sorted((ROOT / "docs/dev").glob("handoff-*.md"))
     return f"docs/dev/{hand[-1].name}" if hand else f"none found ({RECONFIRM})"
 
@@ -321,10 +341,14 @@ def section_recent_completed() -> dict:
     log = _run(["git", "log", "--oneline", "-12", "HEAD"])
     merges = log.splitlines() if log else []
     return {
-        "source": "git log --oneline -12 HEAD (local main history)",
-        "caveat": "Historical context (merged commits). NOT live truth — reconfirm any "
-        "issue/PR open/closed state via GitHub. Spine #2128, truth-sync #2129, and repo "
-        "file-record #2130 grounding work landed in this window.",
+        "source": (
+            "git log --oneline -12 HEAD (current checkout history — may be a branch, "
+            "not main; reconfirm against origin/main)"
+        ),
+        "caveat": (
+            "Historical context (the merged commits listed below). NOT live truth — "
+            "reconfirm any issue/PR open/closed state via GitHub."
+        ),
         "recent_merges": merges or [RECONFIRM],
     }
 
@@ -354,10 +378,13 @@ def section_next_safe_targets() -> list[dict]:
             "NOT push/merge without explicit per-PR authorization.")
     return [
         {
-            "target": "Spine follow-up PR B — CI gate for plugin + spine validators",
-            "rationale": "check-claude-plugin.py, check-claude-plugin-root-resolution.py, and "
-            "check-agent-context-spine.py exist on main but are referenced by no workflow.",
-            "source": "scripts/ on main + .github/workflows/ (grep)",
+            "target": "Spine/plugin validators — confirm whether they have a CI gate",
+            "rationale": (
+                "check-claude-plugin.py, check-claude-plugin-root-resolution.py, and "
+                "check-agent-context-spine.py exist on main; a non-blocking CI gate is a "
+                "candidate IF they are not already wired (do not assume — verify)."
+            ),
+            "source": "VERIFY: grep .github/workflows/ for the script names before proposing",
             "authorization": note,
         },
         {
