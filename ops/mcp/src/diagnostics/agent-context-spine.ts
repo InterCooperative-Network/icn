@@ -237,8 +237,21 @@ export function buildAgentContextSpineView(
   if (filter.type || filter.subsystem || filter.path) {
     let matches = nodes;
     if (filter.type) matches = matches.filter((n) => n.type === filter.type);
-    if (filter.subsystem)
-      matches = matches.filter((n) => n.subsystem === filter.subsystem);
+    if (filter.subsystem) {
+      // crate->subsystem ownership is modeled as `owned_by_subsystem` edges, not a
+      // node-level field, so derive matches from those edges. This keeps the artifact
+      // normalized and makes subsystem filtering work against the real spine (crate
+      // nodes carry no `subsystem` field).
+      const subsystemNodeId = `subsystem:${filter.subsystem}`;
+      const ownedIds = new Set(
+        edges
+          .filter(
+            (e) => e.type === "owned_by_subsystem" && e.to === subsystemNodeId
+          )
+          .map((e) => e.from)
+      );
+      matches = matches.filter((n) => ownedIds.has(n.id));
+    }
     if (filter.path) {
       const pl = filter.path.toLowerCase();
       matches = matches.filter(

@@ -2,8 +2,8 @@
   "schema": "icn-agent-context-spine/v0",
   "status": "generated",
   "canonical": false,
-  "generated": "2026-06-21T05:23:52+00:00",
-  "source_commit": "74c9fc5a15b6c9c30d4886ad1fb6149510a8e7e6",
+  "generated": "2026-06-21T13:51:06+00:00",
+  "source_commit": "a97841b116997c29bc0bff1dd3fa675399b81072",
   "generator": "scripts/generate-agent-context-spine.py",
   "regenerate": "python3 scripts/generate-agent-context-spine.py --write",
   "check": "python3 scripts/generate-agent-context-spine.py --check",
@@ -35,8 +35,8 @@
     "verifies"
   ],
   "counts": {
-    "nodes": 130,
-    "edges": 85
+    "nodes": 131,
+    "edges": 92
   },
   "nodes": [
     {
@@ -1462,6 +1462,25 @@
       ]
     },
     {
+      "id": "mcp_tool:icn_ops_agent_context_spine",
+      "type": "mcp_tool",
+      "name": "icn_ops_agent_context_spine",
+      "short": "agent_context_spine",
+      "description": "Read-only icn-ops MCP diagnostic (agent_context_spine). Returns context as strings; never executes repo commands.",
+      "source_of_truth": "ops/mcp/src/tools/agent-ops.ts",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/mcp/src/tools/agent-ops.ts",
+          "kind": "mcp-tool"
+        },
+        {
+          "source": "ops/mcp/src/diagnostics/agent-context-spine.ts",
+          "kind": "mcp-tool"
+        }
+      ]
+    },
+    {
       "id": "mcp_tool:icn_ops_command_catalog",
       "type": "mcp_tool",
       "name": "icn_ops_command_catalog",
@@ -2739,6 +2758,14 @@
       }
     },
     {
+      "from": "crate:icn-baseline-lock",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-baseline-lock/Cargo.toml"
+      }
+    },
+    {
       "from": "crate:icn-ccl",
       "to": "crate:icn-kernel-api",
       "type": "depends_on",
@@ -2760,6 +2787,14 @@
       "type": "depends_on",
       "evidence": {
         "source": "icn/crates/icn-core/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-federation",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-federation/Cargo.toml"
       }
     },
     {
@@ -2787,11 +2822,43 @@
       }
     },
     {
+      "from": "crate:icn-ledger",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-ledger/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-naming",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-naming/Cargo.toml"
+      }
+    },
+    {
       "from": "crate:icn-net",
       "to": "crate:icn-kernel-api",
       "type": "depends_on",
       "evidence": {
         "source": "icn/crates/icn-net/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-rpc",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-rpc/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-security",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-security/Cargo.toml"
       }
     },
     {
@@ -2808,6 +2875,14 @@
       "type": "depends_on",
       "evidence": {
         "source": "icn/crates/icn-testkit/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icnd",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/bins/icnd/Cargo.toml"
       }
     },
     {

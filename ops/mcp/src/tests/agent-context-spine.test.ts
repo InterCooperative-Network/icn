@@ -41,7 +41,6 @@ const SAMPLE = {
       id: "crate:icn-trust",
       type: "crate",
       name: "icn-trust",
-      subsystem: "trust",
       path: "icn/crates/icn-trust",
       description: "Trust crate.",
       source_of_truth: "icn/Cargo.toml",

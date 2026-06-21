@@ -136,6 +136,7 @@ MCP_TOOLS = [
     ("next_steps", "next-steps.ts"),
     ("verification_plan", "verification-plan.ts"),
     ("repo_map", "repo-map.ts"),
+    ("agent_context_spine", "agent-context-spine.ts"),
 ]
 MCP_TOOLS_REG_REL = "ops/mcp/src/tools/agent-ops.ts"
 MCP_DIAG_DIR_REL = "ops/mcp/src/diagnostics"
@@ -383,7 +384,10 @@ def crate_depends_on(member: str, dep_name: str) -> bool:
         if line.startswith("#"):
             continue
         key = line.split("=", 1)[0].strip().strip("\"'")
-        if key == dep_name:
+        # Match both the plain key (`icn-kernel-api = ...`) and TOML dotted-key
+        # workspace-inheritance forms (`icn-kernel-api.workspace = true`, etc.), where
+        # the dependency name is the segment before the first dot.
+        if key == dep_name or key.startswith(dep_name + "."):
             return True
     return False
 
