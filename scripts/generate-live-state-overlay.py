@@ -60,21 +60,33 @@ ACTIVE_LANES = [
 # Claim boundaries (doctrine). These are PROHIBITIONS — the overclaim scan
 # deliberately skips this section because it states what NOT to claim.
 CLAIM_BOUNDARIES = [
-    "NYCN is a partner-track / private operating context, NOT a public formal pilot. "
-    "Do not represent NYCN as a launched, signed, or committed pilot.",
-    "ICN must NOT be claimed production-ready. Some surfaces are mature; the substrate "
-    "as a whole is not production-hardened.",
+    (
+        "NYCN is a partner-track / private operating context, NOT a public formal pilot. "
+        "Do not represent NYCN as a launched, signed, or committed pilot."
+    ),
+    (
+        "ICN must NOT be claimed production-ready. Some surfaces are mature; the substrate "
+        "as a whole is not production-hardened."
+    ),
     "Live federation between cooperatives is NOT complete/deployed (Phase 3, not Phase 2).",
-    "Entity-aware authorization is NOT production-enforced. Optional entity_id/entity_type "
-    "token claims are non-enforcing; the trusted-issuance source is fail-closed and unwired "
-    "(see #2080).",
-    "The route inventory is route DISCOVERY / registration-candidate evidence — NOT proof "
-    "of API correctness, auth, mounting, runtime health, or OpenAPI completeness.",
-    "Generated artifacts (agent-context-spine, repo file-record, route inventory) are "
-    "orientation / reference layers — NOT canonical truth roots. Canonical state is "
-    "docs/STATE.md + docs/PHASE_PROGRESS.md.",
-    "Private NYCN / summit / operator / partner material must NEVER be published into "
-    "public ICN docs.",
+    (
+        "Entity-aware authorization is NOT production-enforced. Optional entity_id/entity_type "
+        "token claims are non-enforcing; the trusted-issuance source is fail-closed and unwired "
+        "(see #2080)."
+    ),
+    (
+        "The route inventory is route DISCOVERY / registration-candidate evidence — NOT proof "
+        "of API correctness, auth, mounting, runtime health, or OpenAPI completeness."
+    ),
+    (
+        "Generated artifacts (agent-context-spine, repo file-record, route inventory) are "
+        "orientation / reference layers — NOT canonical truth roots. Canonical state is "
+        "docs/STATE.md + docs/PHASE_PROGRESS.md."
+    ),
+    (
+        "Private NYCN / summit / operator / partner material must NEVER be published into "
+        "public ICN docs."
+    ),
 ]
 CLAIM_BOUNDARY_SOURCES = [
     "docs/reference/project-index/show-readiness-map.md",
@@ -84,16 +96,26 @@ CLAIM_BOUNDARY_SOURCES = [
 
 AGENT_START_RULES = [
     "Generate/read this Live State Overlay before planning repo work.",
-    "Read the relevant Agent Context Spine path brief for the files you will touch "
-    "(`python3 scripts/generate-agent-context-spine.py --brief <paths>`).",
-    "Identify which facts are canonical (docs/STATE.md, docs/PHASE_PROGRESS.md) vs "
-    "generated-reference (the grounding artifacts).",
-    "Identify the required verification checks for the path/subsystem you touch "
-    "(see the spine path brief and AGENTS.md change-routing).",
-    "Identify the claim hazards in the claim_boundaries section before writing any "
-    "public/docs/PR copy.",
-    "Reconfirm anything marked NEEDS_LIVE_RECONFIRMATION against GitHub/live state "
-    "before relying on it.",
+    (
+        "Read the relevant Agent Context Spine path brief for the files you will touch "
+        "(`python3 scripts/generate-agent-context-spine.py --brief <paths>`)."
+    ),
+    (
+        "Identify which facts are canonical (docs/STATE.md, docs/PHASE_PROGRESS.md) vs "
+        "generated-reference (the grounding artifacts)."
+    ),
+    (
+        "Identify the required verification checks for the path/subsystem you touch "
+        "(see the spine path brief and AGENTS.md change-routing)."
+    ),
+    (
+        "Identify the claim hazards in the claim_boundaries section before writing any "
+        "public/docs/PR copy."
+    ),
+    (
+        "Reconfirm anything marked NEEDS_LIVE_RECONFIRMATION against GitHub/live state "
+        "before relying on it."
+    ),
     "Only then plan the work. Do not merge anything without explicit per-PR authorization.",
 ]
 
