@@ -207,7 +207,7 @@ impl RateLimiter {
 <h3>4.4 Compute</h3>
 <p><strong>What it does:</strong> Executes work—CCL contracts or WASM modules—in a trust-gated, sandboxed, fuel-metered environment. No work happens without explicit authorization.</p>
 <p><strong>CCL (Cooperative Contract Language):</strong> Domain-specific language, not Turing-complete. Fuel metering prevents infinite loops. Determinism guarantees: no system time access, deterministic PRNG, canonical ordering of inputs. Capability-based: contracts declare what they can read (ledger, trust) and write (ledger entries, governance proposals).</p>
-<p><strong>WASM:</strong> Optional feature (<code>--features wasm</code>). Sandboxed via wasmtime. Fuel metering enforced by ICN runtime. Deterministic imports (no system time, no random without seed).</p>
+<p><strong>WASM:</strong> Optional feature (<code>--features wasm</code>). Sandboxed via wasmtime. <strong>Experimental — not held to CCL&#39;s fuel/determinism guarantees:</strong> <code>icn/crates/icn-compute/src/wasm_executor.rs</code> uses <code>Engine::default()</code> (no wasmtime fuel metering — &quot;fuel metering can be enabled later&quot;; a coarse per-call counter only) plus a wall-clock <code>SystemTime::now()</code> host import, so WASM execution is non-deterministic. Real wasmtime fuel metering and deterministic imports are planned (see §11 and <code>docs/freshness.toml</code> §11).</p>
 <p><strong>Execution model:</strong> Trust-gated (only peers above a trust threshold can submit tasks), gossip-based distribution (submitter broadcasts to network, executors claim work), proof-of-execution (workers sign completion proofs).</p>
 <p><strong>Crate:</strong> <code>icn-ccl</code>, <code>icn-compute</code></p>
 <!-- truth: descriptive -->
@@ -1103,7 +1103,7 @@ Federation ──→ Federation (nested federations)
 <p><strong>&quot;Institution-in-a-Box&quot; starter kit:</strong></p>
 <p>A new cooperative needs:</p>
 <ol>
-<li>A charter (governance rules) — written in TOML</li>
+<li>A charter (governance rules) — written in YAML (CCL schema; parsed by <code>CclDocument::from_yaml</code>, templates at <code>contracts/templates/*.yaml</code>)</li>
 <li>Initial members (founding group) — DIDs</li>
 <li>A name (<code>/org/my-coop</code>) — registered</li>
 <li>Ledger initialization (unit types, credit limits) — config</li>
