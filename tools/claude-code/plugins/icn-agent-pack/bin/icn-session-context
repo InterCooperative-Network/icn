@@ -1,0 +1,25 @@
+#!/bin/sh
+# icn-agent-pack :: SessionStart context (advisory, non-blocking)
+#
+# Prints a short orientation pointing at the plugin's skills and the canonical
+# truth sources. Reads (and discards) the hook input JSON from stdin so the hook
+# protocol is honored; does not depend on it. No network, no mutation, no repo
+# assumptions — safe to run from anywhere.
+
+# Consume stdin to honor the hook input protocol (and avoid SIGPIPE on writers).
+cat >/dev/null 2>&1 || true
+
+cat <<'EOF'
+[icn-agent-pack] Plugin skills (user-invoke with /icn-agent-pack:<name>):
+  preflight        - session env + canonical-doc preflight
+  truth-sync       - classify public/docs/API claims vs. truth sources
+  authority-spine  - plan entity-aware auth / coop_id<->EntityId / treasury work
+  route-impact     - downstream impact of a route/API change
+  navigator        - repo knowledge graph / source-to-claim / impact maps
+
+Current truth lives in docs/STATE.md + docs/PHASE_PROGRESS.md (canonical).
+Liveness/production claims are ops claims — verify, don't assume.
+This plugin complements the project-local .claude/ config; it does not replace it.
+EOF
+
+exit 0

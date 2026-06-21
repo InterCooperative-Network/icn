@@ -1,0 +1,197 @@
+#!/usr/bin/env python3
+"""Resolve the ICN repository root for the icn-agent-pack plugin.
+
+The plugin MCP launcher must find the ICN repo regardless of where Claude Code
+was started (repo root, a subdirectory, a parent/higher-level directory, or a
+path containing spaces). This resolver centralizes that logic.
+
+Resolution order (the first method that yields a result wins; within a method a
+single unique valid root is accepted, while two or more distinct valid roots are
+ambiguous and fail):
+
+  1. $ICN_ROOT, if set — decisive: it must be a valid ICN root, else hard-fail.
+  2. git toplevel from $PWD and $CLAUDE_PROJECT_DIR.
+  3. Upward directory walk from $PWD and $CLAUDE_PROJECT_DIR.
+  4. A small, fixed set of common ICN dev layouts.
+
+A directory is a valid ICN root iff it contains BOTH:
+    ops/mcp/package.json
+    docs/STATE.md
+
+On success: print the absolute root to stdout, exit 0.
+On failure: print a clear message to stderr, exit non-zero.
+
+`resolve_root()` is import-friendly and free of process/global side effects, so
+scripts/check-claude-plugin-root-resolution.py can unit-test every branch with
+temporary fixtures and an injected git function (no network, no real-repo writes).
+"""
+
+from __future__ import annotations
+
+import glob
+import os
+import subprocess
+import sys
+from pathlib import Path
+from typing import Callable, Optional
+
+NO_ROOT_MSG = (
+    "Could not resolve ICN root. Launch Claude from the ICN repo root "
+    "or set ICN_ROOT=/path/to/icn."
+)
+
+
+def is_icn_root(d: Path) -> bool:
+    """A directory is an ICN root iff it has ops/mcp/package.json AND docs/STATE.md."""
+    return (d / "ops" / "mcp" / "package.json").is_file() and (d / "docs" / "STATE.md").is_file()
+
+
+def _real(path) -> str:
+    return os.path.realpath(str(path))
+
+
+def _git_toplevel_real(start: str) -> Optional[str]:
+    """Return `git -C <start> rev-parse --show-toplevel`, or None if unavailable."""
+    if not start or not os.path.isdir(start):
+        return None
+    try:
+        proc = subprocess.run(
+            ["git", "-C", start, "rev-parse", "--show-toplevel"],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if proc.returncode != 0:
+        return None
+    top = proc.stdout.strip()
+    return top or None
+
+
+def _dedupe(paths) -> list[str]:
+    """Realpath-dedupe while preserving order; drop falsy entries."""
+    seen: set[str] = set()
+    result: list[str] = []
+    for p in paths:
+        if not p:
+            continue
+        rp = _real(p)
+        if rp not in seen:
+            seen.add(rp)
+            result.append(rp)
+    return result
+
+
+def _walk_up(start: str) -> Optional[str]:
+    """Walk upward from `start` returning the first ancestor that is an ICN root."""
+    if not start:
+        return None
+    try:
+        base = Path(_real(start))
+    except OSError:
+        return None
+    for cand in [base, *base.parents]:
+        if is_icn_root(cand):
+            return _real(cand)
+    return None
+
+
+def _layout_candidates(pwd: Optional[str], home: Optional[str]) -> list[str]:
+    """Check a small, fixed set of common ICN dev layouts; return valid roots."""
+    patterns: list[str] = []
+    if pwd:
+        patterns.append(os.path.join(pwd, "icn"))
+        patterns.append(os.path.join(pwd, "worktrees", "icn", "*"))
+    if home:
+        patterns.append(os.path.join(home, "icn-dev", "worktrees", "icn", "*"))
+        patterns.append(os.path.join(home, "icn-dev", "icn"))
+    found: list[str] = []
+    for pattern in patterns:
+        for hit in sorted(glob.glob(pattern)):
+            if os.path.isdir(hit) and is_icn_root(Path(hit)):
+                found.append(hit)
+    return found
+
+
+def _decide(roots: list[str]):
+    """Map a method's candidate list to a result.
+
+    Returns:
+      None              -> method found nothing; caller continues to next method.
+      (root, None)      -> unique success.
+      (None, message)   -> ambiguous failure (two or more distinct roots).
+    """
+    if len(roots) == 1:
+        return roots[0], None
+    if len(roots) > 1:
+        listing = ", ".join(roots)
+        return None, (
+            f"Multiple candidate ICN roots found: {listing}. "
+            "Set ICN_ROOT=/path/to/icn to choose one."
+        )
+    return None
+
+
+def resolve_root(
+    *,
+    icn_root_env: Optional[str] = None,
+    pwd: Optional[str] = None,
+    project_dir: Optional[str] = None,
+    home: Optional[str] = None,
+    git_toplevel: Callable[[str], Optional[str]] = _git_toplevel_real,
+):
+    """Resolve the ICN root. Return (root, None) on success or (None, error) on failure."""
+    # 1. ICN_ROOT is decisive when set.
+    if icn_root_env:
+        d = Path(icn_root_env)
+        if is_icn_root(d):
+            return _real(d), None
+        return None, (
+            f"ICN_ROOT is set to {icn_root_env!r} but it is not a valid ICN repo root "
+            "(needs ops/mcp/package.json and docs/STATE.md). "
+            "Unset it or point it at a valid ICN checkout."
+        )
+
+    starts = [s for s in (pwd, project_dir) if s]
+
+    # 2. git toplevel from each start directory.
+    git_roots = _dedupe(
+        t for t in (git_toplevel(s) for s in starts) if t and is_icn_root(Path(t))
+    )
+    decided = _decide(git_roots)
+    if decided is not None:
+        return decided
+
+    # 3. Upward directory walk from each start directory.
+    walk_roots = _dedupe(_walk_up(s) for s in starts)
+    decided = _decide(walk_roots)
+    if decided is not None:
+        return decided
+
+    # 4. Common ICN dev layouts (only a unique match is accepted).
+    layout_roots = _dedupe(_layout_candidates(pwd, home))
+    decided = _decide(layout_roots)
+    if decided is not None:
+        return decided
+
+    return None, NO_ROOT_MSG
+
+
+def main() -> int:
+    root, err = resolve_root(
+        icn_root_env=os.environ.get("ICN_ROOT") or None,
+        pwd=os.getcwd(),
+        project_dir=os.environ.get("CLAUDE_PROJECT_DIR") or None,
+        home=os.environ.get("HOME") or None,
+    )
+    if err:
+        print(err, file=sys.stderr)
+        return 1
+    print(root)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

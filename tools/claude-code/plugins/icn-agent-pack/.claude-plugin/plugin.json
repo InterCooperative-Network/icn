@@ -1,0 +1,17 @@
+{
+  "name": "icn-agent-pack",
+  "version": "0.1.0",
+  "description": "Portable, plugin-ready bundle of ICN's Claude Code agent tooling: preflight/truth-sync/authority-spine/route-impact/navigator skills, specialist subagents, advisory hooks, and the icn-ops MCP launch. Safe-by-default; complements (does not replace) the repository's project-local .claude/ config.",
+  "author": {
+    "name": "InterCooperative Network"
+  },
+  "homepage": "https://github.com/InterCooperative-Network/icn",
+  "repository": "https://github.com/InterCooperative-Network/icn",
+  "keywords": [
+    "icn",
+    "coordination-substrate",
+    "agent-tooling",
+    "mcp",
+    "truth-sync"
+  ]
+}

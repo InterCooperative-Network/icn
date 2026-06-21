@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "icn-ops": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/icn-ops-mcp"
+    }
+  }
+}

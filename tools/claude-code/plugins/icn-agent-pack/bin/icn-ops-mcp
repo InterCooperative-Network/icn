@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Portable launcher for the icn-ops MCP server (plugin wrapper).
+
+Claude Code launches this as the `icn-ops` MCP `command`. It resolves the ICN
+repo root via the sibling `icn-find-root` resolver — so it works regardless of
+Claude Code's launch directory — then execs:
+
+    npm --prefix "$ICN_ROOT/ops/mcp" run start:stdio
+
+Notes:
+  - Never points at ops/mcp/dist/index.js directly; it runs the npm script so
+    tsc + node run under one Node and postinstall keeps better-sqlite3 aligned.
+  - Uses exec(), so the npm/node MCP process inherits Claude Code's stdio pipes
+    directly (Claude Code manages the process; the JSON-RPC stdio transport is
+    preserved).
+  - Fails clearly if the root cannot be resolved, ops/mcp/package.json is
+    missing, or npm is not on PATH.
+"""
+
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+
+HERE = os.path.dirname(os.path.realpath(__file__))
+FINDER = os.path.join(HERE, "icn-find-root")
+
+
+def fail(message: str) -> "NoReturn":  # type: ignore[name-defined]
+    sys.stderr.write(f"icn-ops-mcp: {message}\n")
+    sys.exit(1)
+
+
+def main() -> None:
+    # 1. Resolve the ICN root via the shared resolver. It inherits this process's
+    #    environment (ICN_ROOT / CLAUDE_PROJECT_DIR / cwd), so it resolves identically.
+    if not os.path.isfile(FINDER):
+        fail(f"resolver not found at {FINDER}")
+    proc = subprocess.run(
+        [sys.executable, FINDER],
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if proc.returncode != 0:
+        sys.stderr.write(proc.stderr)
+        fail("could not resolve ICN root (see message above); set ICN_ROOT=/path/to/icn")
+    root = proc.stdout.strip()
+    if not root or not os.path.isdir(root):
+        fail(f"resolver returned an invalid path: {root!r}")
+
+    # 2. Validate the ops/mcp project is present at the resolved root.
+    package_json = os.path.join(root, "ops", "mcp", "package.json")
+    if not os.path.isfile(package_json):
+        fail(f"missing {package_json} — resolved ICN root {root} has no ops/mcp/package.json")
+
+    # 3. Require npm.
+    npm = shutil.which("npm")
+    if npm is None:
+        fail("npm not found on PATH. Install Node.js/npm to run the icn-ops MCP server.")
+
+    # 4. Export ICN_ROOT and exec npm, preserving stdio. execvp does not return on success.
+    os.environ["ICN_ROOT"] = root
+    prefix = os.path.join(root, "ops", "mcp")
+    os.execvp(npm, [npm, "--prefix", prefix, "run", "start:stdio"])
+    fail("exec of npm failed")  # pragma: no cover - only reached if execvp fails
+
+
+if __name__ == "__main__":
+    main()

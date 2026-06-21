@@ -1,0 +1,36 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/bin/icn-session-context",
+            "timeout": 10,
+            "statusMessage": "icn-agent-pack: loading context pointer..."
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/bin/icn-route-impact-hint",
+            "timeout": 10,
+            "statusMessage": "icn-agent-pack: checking route/API impact..."
+          },
+          {
+            "type": "command",
+            "command": "\"${CLAUDE_PLUGIN_ROOT}\"/bin/icn-truth-sync-hint",
+            "timeout": 10,
+            "statusMessage": "icn-agent-pack: checking public-claim surface..."
+          }
+        ]
+      }
+    ]
+  }
+}
