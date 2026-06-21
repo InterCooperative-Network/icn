@@ -1,0 +1,120 @@
+name: Generated-truth drift
+
+# Observational drift guard for the repo's generated orientation/truth artifacts
+# and the agent/plugin validation tooling (#2128 spine, #2130 file-record, #2127
+# Claude agent pack, #2131 live-state overlay). These artifacts are
+# "Canonical: no" — orientation/reference layers, NOT truth roots (canonical
+# state is docs/STATE.md + docs/PHASE_PROGRESS.md). Drift here is therefore a
+# WARNING, not a merge blocker, mirroring the route-inventory guard in
+# docs-freshness.yml. The job only FAILS if a checker itself errors (not on
+# drift). Promote individual checks to blocking only after a clean CI baseline
+# is proven and they are added to branch protection.
+#
+# See docs/ci/GENERATED_TRUTH_DRIFT.md for what is gated, what is advisory, and
+# the regenerate commands.
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/generate-agent-context-spine.py'
+      - 'scripts/check-agent-context-spine.py'
+      - 'scripts/generate_repo_record.py'
+      - 'scripts/check-claude-plugin.py'
+      - 'scripts/check-claude-plugin-root-resolution.py'
+      - 'scripts/generate-live-state-overlay.py'
+      - 'docs/reference/project-index/generated/**'
+      - 'docs/ai/ICN_LIVE_STATE_OVERLAY_TEMPLATE.md'
+      - 'tools/claude-code/plugins/**'
+      - '.github/workflows/generated-truth.yml'
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/generate-agent-context-spine.py'
+      - 'scripts/check-agent-context-spine.py'
+      - 'scripts/generate_repo_record.py'
+      - 'scripts/check-claude-plugin.py'
+      - 'scripts/check-claude-plugin-root-resolution.py'
+      - 'scripts/generate-live-state-overlay.py'
+      - 'docs/reference/project-index/generated/**'
+      - 'docs/ai/ICN_LIVE_STATE_OVERLAY_TEMPLATE.md'
+      - 'tools/claude-code/plugins/**'
+      - '.github/workflows/generated-truth.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  generated-truth:
+    name: Generated-truth drift (observational)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      # Spine: structural validation + freshness vs a fresh generation
+      # (check-agent-context-spine.py runs generate-agent-context-spine.py --check).
+      # Currently green on main; observational here. exit 0 = current.
+      - name: Agent context spine — valid + fresh
+        run: |
+          python3 scripts/check-agent-context-spine.py && rc=0 || rc=$?
+          if [ "${rc:-0}" = "0" ]; then
+            echo "Agent context spine is valid and current."
+          else
+            echo "::warning::agent-context-spine drift/validation issue (exit $rc). Regenerate: python3 scripts/generate-agent-context-spine.py --write"
+          fi
+
+      # Claude agent pack: portable skeleton + repo-root resolution. Currently
+      # green on main; observational here.
+      - name: Claude plugin skeleton portability
+        run: |
+          python3 scripts/check-claude-plugin.py && rc=0 || rc=$?
+          if [ "${rc:-0}" = "0" ]; then
+            echo "Claude plugin skeleton OK."
+          else
+            echo "::warning::check-claude-plugin.py reported an issue (exit $rc)."
+          fi
+
+      - name: Claude plugin root resolution
+        run: |
+          python3 scripts/check-claude-plugin-root-resolution.py && rc=0 || rc=$?
+          if [ "${rc:-0}" = "0" ]; then
+            echo "Claude plugin root-resolution OK."
+          else
+            echo "::warning::check-claude-plugin-root-resolution.py reported an issue (exit $rc)."
+          fi
+
+      # Live-state overlay generator is on-demand with NO committed snapshot, so
+      # there is nothing to drift-check; this is a runnable-smoke (--check
+      # self-validates the 13 sections). --no-gh keeps it offline/deterministic.
+      - name: Live-state overlay generator smoke (--check, offline)
+        run: |
+          python3 scripts/generate-live-state-overlay.py --check --no-gh && rc=0 || rc=$?
+          if [ "${rc:-0}" = "0" ]; then
+            echo "Live-state overlay generator self-check passed."
+          else
+            echo "::warning::generate-live-state-overlay.py --check failed (exit $rc) — generator regression."
+          fi
+
+      # Repo file-record is a periodic snapshot (Canonical: no). It legitimately
+      # lags main between refreshes, so drift is a WARNING (refresh is a separate
+      # generated-only commit). Mirrors the route-inventory guard:
+      #   exit 0 = current  -> pass
+      #   exit 1 = stale     -> ::warning:: (regenerate); job still succeeds
+      #   exit >=2 = checker errored -> fail (real breakage, not staleness)
+      - name: Repo file-record snapshot drift (warn on stale)
+        run: |
+          python3 scripts/generate_repo_record.py --repo icn=. --check && rc=0 || rc=$?
+          if [ "${rc:-0}" = "0" ]; then
+            echo "Repo file-record snapshot is current."
+          elif [ "${rc:-0}" = "1" ]; then
+            echo "::warning::docs/reference/project-index/generated/icn-file-record.{json,md} is stale vs the working tree. Regenerate (generated-only commit): python3 scripts/generate_repo_record.py --repo icn=. --out docs/reference/project-index/generated"
+          else
+            echo "::error::generate_repo_record.py --check errored (exit $rc) — checker error, not a staleness signal."
+            exit "$rc"
+          fi
