@@ -266,6 +266,8 @@ Technical guides for contributors:
 
 - [README.md](guides/developer/README.md) - Developer guide index
 - [claude-code-plugin.md](guides/developer/claude-code-plugin.md) - ICN Agent Pack Claude Code plugin (portable MCP launch, skills/agents, validation)
+- [agent-context-spine.md](guides/developer/agent-context-spine.md) - Agent Context Spine v0: generated, non-canonical, evidence-grounded repo orientation map (+ `icn_ops_agent_context_spine` MCP tool)
+- [agent-context-spine-plan.md](guides/developer/agent-context-spine-plan.md) - Agent Context Spine design, node/edge model, and PR sequence
 - [DEV_ENVIRONMENT.md](guides/developer/DEV_ENVIRONMENT.md) - Development environment setup
 - [DOCUMENTATION_STYLE.md](guides/developer/DOCUMENTATION_STYLE.md) - Documentation conventions
 - [i18n-guide.md](guides/developer/i18n-guide.md) - Internationalization guide

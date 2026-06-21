@@ -18,8 +18,14 @@ You are read-mostly. Map from evidence; do not refactor source. **Write a genera
 
 ## Evidence sources (in order)
 
-1. The `icn-ops` MCP server (read-mostly, current): `icn_ops_repo_map` (topology), `icn_ops_state_index`
-   (state/truth docs), `icn_ops_agent_brief` (orientation), `icn_ops_verification_plan` (impact/verify).
+0. **Prefer the Agent Context Spine path brief before broad repo search.** When you have one or
+   more changed/target paths, run `icn_ops_agent_context_spine({ paths: [...] })` (or
+   `python3 scripts/generate-agent-context-spine.py --brief <paths>`) first — it returns subsystem
+   ownership, invariants, docs, verification commands, claim surfaces, and recommended skills/agents
+   straight from repo-owned data, so you don't have to crawl the tree to reconstruct them.
+1. The `icn-ops` MCP server (read-mostly, current): `icn_ops_agent_context_spine` (path brief / graph),
+   `icn_ops_repo_map` (topology), `icn_ops_state_index` (state/truth docs), `icn_ops_agent_brief`
+   (orientation), `icn_ops_verification_plan` (impact/verify).
 2. `docs/reference/project-index/*.md` — source-of-truth, runtime-surface, website-truth, show-readiness maps.
 3. The crate tree (`icn/crates/`, `icn/apps/`, `icn/bins/`) and `CLAUDE.md` topology — fallback only; say so.
 
@@ -42,9 +48,20 @@ Prefer MCP over re-deriving structure by hand. If MCP is unavailable, fall back 
 
 ## Generated artifacts
 
-A future `repo_knowledge_graph.py` is expected to emit a machine-readable graph under
-`docs/reference/project-index/generated/`. Until it exists, produce maps inline (markdown node/edge
-lists + mermaid). Do not fabricate a generated-file path or claim one exists.
+A generated, non-canonical, evidence-grounded **Agent Context Spine v0** exists at
+`docs/reference/project-index/generated/agent-context-spine.json`. Prefer reading it (directly or via
+the `icn-ops` MCP tool `icn_ops_agent_context_spine`) over re-deriving structure by hand. Refresh /
+validate only when asked:
+
+```bash
+python3 scripts/generate-agent-context-spine.py --write   # regenerate
+python3 scripts/generate-agent-context-spine.py --check    # fail if stale
+python3 scripts/check-agent-context-spine.py               # validate integrity + evidence
+```
+
+The spine is v0: it does not yet parse the Rust module graph or enumerate per-route nodes. For
+anything it does not cover, produce maps inline (markdown node/edge lists + mermaid) and do not
+fabricate a generated-file path or claim one exists.
 
 ## Output
 

@@ -37,6 +37,7 @@ ICN already has several truth- and freshness-tracking systems. **This index does
 | What is real now vs planned? | [`current-truth-map.md`](current-truth-map.md) → then [`docs/STATE.md`](../../STATE.md) + [`docs/PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md) |
 | What is safe to show / claim publicly? | [`show-readiness-map.md`](show-readiness-map.md) + [`website-truth-map.md`](website-truth-map.md) |
 | What routes does the gateway actually expose, and which reach OpenAPI? | [`generated/route-inventory.md`](generated/route-inventory.md) — mechanical scan, regenerate with `docs/scripts/route_inventory.py` ([#2112](https://github.com/InterCooperative-Network/icn/issues/2112)) |
+| Given a path/crate, what subsystem/docs/tests/invariants/claims/skills apply? (orientation, non-canonical) | [`generated/agent-context-spine.json`](generated/agent-context-spine.json) — generated, evidence-grounded; see [`docs/guides/developer/agent-context-spine.md`](../../guides/developer/agent-context-spine.md). Regenerate with `scripts/generate-agent-context-spine.py` |
 
 **Discipline (for humans and agents):**
 

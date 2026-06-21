@@ -15,6 +15,7 @@ Arguments: `$ARGUMENTS` may name a concept, crate, or subsystem to focus the map
 
 Prefer the `icn-ops` MCP tools over re-deriving structure by hand — they are read-mostly and reflect the current repo:
 
+- `icn_ops_agent_context_spine` — the Agent Context Spine. **When you have changed/target paths, run the path brief first** (`icn_ops_agent_context_spine({ paths: [...] })`, or `python3 scripts/generate-agent-context-spine.py --brief <paths>`) before broad repo search: it returns subsystem ownership, invariants, docs, verification commands, claim surfaces, and recommended skills/agents from repo-owned data.
 - `icn_ops_repo_map` — crate/app/binary topology and boundaries
 - `icn_ops_state_index` — index of declared state / truth documents
 - `icn_ops_agent_brief` — current orientation brief for agents
@@ -32,10 +33,21 @@ crate tree directly, and say which evidence source you used.
 
 ## Refresh discipline
 
-Only generate or overwrite a graph artifact when the user explicitly asks to refresh. Future generated
-graph files are expected under `docs/reference/project-index/generated/` (e.g. a `repo-knowledge-graph.*`
-produced by a future `repo_knowledge_graph.py`). Until that generator exists, produce the map inline
-(markdown + optional mermaid) and do not fabricate a generated-file path that does not exist.
+A generated, non-canonical, evidence-grounded **Agent Context Spine** now exists at
+`docs/reference/project-index/generated/agent-context-spine.json` (the v0 foundation of this map).
+Read it first; it answers "what subsystem/crate/docs/tests/invariants/claims/skills apply here" from
+repo-owned data. To refresh or check it (only when the user asks):
+
+```bash
+python3 scripts/generate-agent-context-spine.py --write   # regenerate
+python3 scripts/generate-agent-context-spine.py --check    # fail if stale
+python3 scripts/check-agent-context-spine.py               # validate integrity + evidence
+```
+
+You can also read it live via the `icn-ops` MCP tool `icn_ops_agent_context_spine` (summary, or
+`node`/`type`/`subsystem`/`path` filters). The spine is v0: it does not yet parse the Rust module
+graph or enumerate per-route nodes — for anything it does not cover, produce the map inline (markdown
++ optional mermaid) and never fabricate a generated-file path that does not exist.
 
 ## Output
 

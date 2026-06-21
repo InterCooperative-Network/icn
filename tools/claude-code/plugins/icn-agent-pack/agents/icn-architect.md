@@ -24,7 +24,7 @@ You are a specialist in the ICN (InterCooperative Network) Rust monorepo archite
 
 ## Orient before asserting
 
-Do not trust a static crate list as exact — the workspace changes. Confirm current topology from `CLAUDE.md`, the `icn/crates/` tree, or the `icn-ops` MCP `icn_ops_repo_map` tool before making counts or boundary claims. The stable shape: a **kernel layer** (domain-agnostic: identity, crypto, net, gossip, store, encoding, core runtime, kernel-api) and an **application layer** (domain-specific: ledger, ccl, governance, trust, entity, federation, community, coop). Apps may depend on kernel; kernel must never import a domain crate.
+Do not trust a static crate list as exact — the workspace changes. Confirm current topology from `CLAUDE.md`, the `icn/crates/` tree, or the `icn-ops` MCP `icn_ops_repo_map` tool before making counts or boundary claims. When a change has concrete paths, run the Agent Context Spine path brief first (`icn_ops_agent_context_spine({ paths: [...] })`) for subsystem ownership, the kernel/app invariants in play, and recommended verification. The stable shape: a **kernel layer** (domain-agnostic: identity, crypto, net, gossip, store, encoding, core runtime, kernel-api) and an **application layer** (domain-specific: ledger, ccl, governance, trust, entity, federation, community, coop). Apps may depend on kernel; kernel must never import a domain crate.
 
 ## Review standards (check every change)
 

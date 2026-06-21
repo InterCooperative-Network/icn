@@ -10,6 +10,7 @@ import { startGitPolling } from "./polling/git.js";
 import { startClusterPolling } from "./polling/cluster.js";
 import { startBuildsPolling } from "./polling/builds.js";
 import { readFileSync, existsSync } from "fs";
+import { join } from "node:path";
 import { resolveMonorepoRoot, resolveOpsStatePath } from "./paths.js";
 import { registerEventTools } from "./tools/events.js";
 import { registerCommsTools } from "./tools/comms.js";
@@ -20,6 +21,14 @@ import { registerAgentOpsTools } from "./tools/agent-ops.js";
 const ICN_ROOT = resolveMonorepoRoot();
 const SPRINT_FILE = resolveOpsStatePath("sprint", "current.json");
 const REPO_MAP_FILE = resolveOpsStatePath("config", "repo-map.json");
+const AGENT_CONTEXT_SPINE_FILE = join(
+  ICN_ROOT,
+  "docs",
+  "reference",
+  "project-index",
+  "generated",
+  "agent-context-spine.json"
+);
 
 async function main() {
   const db = initDb();
@@ -120,6 +129,49 @@ async function main() {
           contents: [
             {
               uri: "icn-ops://config/repo-map",
+              mimeType: "application/json",
+              text: JSON.stringify({
+                error: "read_failed",
+                message: e instanceof Error ? e.message : String(e),
+              }),
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  server.resource(
+    "agent-context-spine",
+    "icn-ops://project-index/agent-context-spine",
+    { mimeType: "application/json" },
+    async () => {
+      const uri = "icn-ops://project-index/agent-context-spine";
+      try {
+        if (!existsSync(AGENT_CONTEXT_SPINE_FILE)) {
+          return {
+            contents: [
+              {
+                uri,
+                mimeType: "application/json",
+                text: JSON.stringify({
+                  error: "missing_file",
+                  path: AGENT_CONTEXT_SPINE_FILE,
+                  hint: "Generate with: python3 scripts/generate-agent-context-spine.py --write",
+                }),
+              },
+            ],
+          };
+        }
+        const text = readFileSync(AGENT_CONTEXT_SPINE_FILE, "utf-8");
+        return {
+          contents: [{ uri, mimeType: "application/json", text }],
+        };
+      } catch (e) {
+        return {
+          contents: [
+            {
+              uri,
               mimeType: "application/json",
               text: JSON.stringify({
                 error: "read_failed",

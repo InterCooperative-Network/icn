@@ -188,4 +188,7 @@ the repo graph; whether to add CI for plugin validation; and whether to build `r
 ## Related docs
 
 - `docs/guides/developer/agent-mcp-tooling.md` — the `icn-ops` MCP server and its launch doctrine.
+- `docs/guides/developer/agent-context-spine.md` — the Agent Context Spine v0 that the `navigator`
+  skill/agent read (generated, non-canonical, evidence-grounded; exposed via the
+  `icn_ops_agent_context_spine` MCP tool).
 - `tools/claude-code/plugins/icn-agent-pack/README.md` — plugin inventory, safety model, and LSP notes.
