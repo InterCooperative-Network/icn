@@ -41,6 +41,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
+try:
+    import tomllib  # Python 3.11+ (stdlib)
+except ModuleNotFoundError:  # pragma: no cover - <3.11 fallback
+    tomllib = None  # type: ignore[assignment]
+
 def repo_root() -> Path:
     """Repo root via `git rev-parse --show-toplevel`, falling back to this script's
     location (scripts/ is at repo root). Mirrors scripts/generate-agent-context-spine.py."""
@@ -863,6 +868,53 @@ def section_development_safety_map() -> list[str]:
     return list(DEVELOPMENT_SAFETY_MAP)
 
 
+def section_architecture_freshness() -> dict:
+    """Surface stale docs/ARCHITECTURE.md sections at session start so they get
+    re-verified instead of silently rotting. Mirrors docs/scripts/freshness-check.py:
+    a non-auto section is STALE when (today - last_updated) > staleness_threshold_days.
+    Advisory only — freshness is a maintenance signal, not a correctness claim."""
+    rel = "docs/freshness.toml"
+    info: dict = {
+        "source": f"{rel} (per-section staleness_threshold_days)",
+        "evidence": "python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml "
+        "--status docs/status.toml --repo .",
+        "caveat": "Advisory: a stale section is past its review threshold and must be re-verified "
+        "against current code/canonical docs BEFORE being repeated or date-bumped — never blind-bump.",
+        "checked": 0,
+        "stale_sections": [],
+    }
+    if tomllib is None or not (ROOT / rel).exists():
+        info["stale_sections"] = [{"section": RECONFIRM,
+                                   "note": "freshness.toml unreadable or tomllib unavailable"}]
+        return info
+    try:
+        data = tomllib.loads((ROOT / rel).read_text(encoding="utf-8"))
+    except Exception:
+        info["stale_sections"] = [{"section": RECONFIRM, "note": "freshness.toml parse error"}]
+        return info
+    today = datetime.now(timezone.utc).date()
+    for key, sec in (data.get("sections") or {}).items():
+        last = str(sec.get("last_updated", ""))
+        if last == "auto" or sec.get("source"):
+            continue  # auto-generated sections are fresh by definition
+        try:
+            d = datetime.strptime(last, "%Y-%m-%d").date()
+        except ValueError:
+            continue
+        info["checked"] += 1
+        threshold = int(sec.get("staleness_threshold_days", 90))
+        age = (today - d).days
+        if age > threshold:
+            info["stale_sections"].append({
+                "section": key,
+                "title": sec.get("title", key),
+                "age_days": age,
+                "threshold_days": threshold,
+                "last_updated": last,
+            })
+    return info
+
+
 def build_overlay(use_gh: bool) -> dict:
     now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     return {
@@ -890,6 +942,7 @@ def build_overlay(use_gh: bool) -> dict:
         "claim_boundaries": {"sources": CLAIM_BOUNDARY_SOURCES, "boundaries": CLAIM_BOUNDARIES},
         "agent_start_rules": AGENT_START_RULES,
         "next_safe_targets": section_next_safe_targets(),
+        "architecture_freshness": section_architecture_freshness(),
     }
 
 
@@ -907,6 +960,7 @@ REQUIRED_SECTIONS = [
     "claim_boundaries",
     "agent_start_rules",
     "next_safe_targets",
+    "architecture_freshness",
 ]
 
 
@@ -1003,6 +1057,23 @@ def to_markdown(o: dict) -> str:
         L.append(f"  - rationale: {e['rationale']}")
         L.append(f"  - source: {e['source']}")
         L.append(f"  - authorization: {e['authorization']}")
+    L.append("")
+    af = o["architecture_freshness"]
+    L.append("## 14. architecture_freshness (advisory — re-verify before repeating)")
+    if af["stale_sections"]:
+        L.append(f"- STALE docs/ARCHITECTURE.md sections ({len(af['stale_sections'])} of "
+                 f"{af['checked']} tracked) — re-verify against current code/docs; do NOT blind-bump:")
+        for s in af["stale_sections"]:
+            if "age_days" in s:
+                L.append(f"  - **{s['section']}** ({s.get('title', '')}) — {s['age_days']}d old "
+                         f"(threshold {s['threshold_days']}d; last_updated {s['last_updated']})")
+            else:
+                L.append(f"  - {s['section']}: {s.get('note', '')}")
+    else:
+        L.append(f"- All {af['checked']} tracked docs/ARCHITECTURE.md sections are fresh.")
+    L.append(f"- source: {af['source']}")
+    L.append(f"- evidence: `{af['evidence']}`")
+    L.append(f"- caveat: {af['caveat']}")
     L.append("")
     return "\n".join(L)
 
