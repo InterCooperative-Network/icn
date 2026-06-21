@@ -42,9 +42,20 @@ Prefer MCP over re-deriving structure by hand. If MCP is unavailable, fall back 
 
 ## Generated artifacts
 
-A future `repo_knowledge_graph.py` is expected to emit a machine-readable graph under
-`docs/reference/project-index/generated/`. Until it exists, produce maps inline (markdown node/edge
-lists + mermaid). Do not fabricate a generated-file path or claim one exists.
+A generated, non-canonical, evidence-grounded **Agent Context Spine v0** exists at
+`docs/reference/project-index/generated/agent-context-spine.json`. Prefer reading it (directly or via
+the `icn-ops` MCP tool `icn_ops_agent_context_spine`) over re-deriving structure by hand. Refresh /
+validate only when asked:
+
+```bash
+python3 scripts/generate-agent-context-spine.py --write   # regenerate
+python3 scripts/generate-agent-context-spine.py --check    # fail if stale
+python3 scripts/check-agent-context-spine.py               # validate integrity + evidence
+```
+
+The spine is v0: it does not yet parse the Rust module graph or enumerate per-route nodes. For
+anything it does not cover, produce maps inline (markdown node/edge lists + mermaid) and do not
+fabricate a generated-file path or claim one exists.
 
 ## Output
 

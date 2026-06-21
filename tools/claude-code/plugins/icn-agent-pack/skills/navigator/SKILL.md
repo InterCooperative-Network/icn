@@ -32,10 +32,21 @@ crate tree directly, and say which evidence source you used.
 
 ## Refresh discipline
 
-Only generate or overwrite a graph artifact when the user explicitly asks to refresh. Future generated
-graph files are expected under `docs/reference/project-index/generated/` (e.g. a `repo-knowledge-graph.*`
-produced by a future `repo_knowledge_graph.py`). Until that generator exists, produce the map inline
-(markdown + optional mermaid) and do not fabricate a generated-file path that does not exist.
+A generated, non-canonical, evidence-grounded **Agent Context Spine** now exists at
+`docs/reference/project-index/generated/agent-context-spine.json` (the v0 foundation of this map).
+Read it first; it answers "what subsystem/crate/docs/tests/invariants/claims/skills apply here" from
+repo-owned data. To refresh or check it (only when the user asks):
+
+```bash
+python3 scripts/generate-agent-context-spine.py --write   # regenerate
+python3 scripts/generate-agent-context-spine.py --check    # fail if stale
+python3 scripts/check-agent-context-spine.py               # validate integrity + evidence
+```
+
+You can also read it live via the `icn-ops` MCP tool `icn_ops_agent_context_spine` (summary, or
+`node`/`type`/`subsystem`/`path` filters). The spine is v0: it does not yet parse the Rust module
+graph or enumerate per-route nodes — for anything it does not cover, produce the map inline (markdown
++ optional mermaid) and never fabricate a generated-file path that does not exist.
 
 ## Output
 

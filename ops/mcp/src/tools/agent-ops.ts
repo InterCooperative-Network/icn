@@ -9,6 +9,7 @@ import { buildStateIndex } from "../diagnostics/state-index.js";
 import { buildNextStepsReport } from "../diagnostics/next-steps.js";
 import { buildVerificationPlan } from "../diagnostics/verification-plan.js";
 import { buildRepoMap } from "../diagnostics/repo-map.js";
+import { buildAgentContextSpineView } from "../diagnostics/agent-context-spine.js";
 
 export function registerAgentOpsTools(server: McpServer): void {
   const repoRoot = resolveMonorepoRoot();
@@ -120,6 +121,26 @@ export function registerAgentOpsTools(server: McpServer): void {
       const map = buildRepoMap(repoRoot);
       return {
         content: [{ type: "text", text: JSON.stringify(map, null, 2) }],
+      };
+    }
+  );
+
+  server.tool(
+    "icn_ops_agent_context_spine",
+    "Read-only view of the generated Agent Context Spine (docs/reference/project-index/generated/agent-context-spine.json): a non-canonical, evidence-grounded orientation map of crates, subsystems, docs, routes, invariants, claim surfaces, truth sources, skills/agents and MCP tools. No filter returns a summary; node=<id> returns one node + its incident edges (or a contains-match list); type/subsystem/path filter the node list. Never executes commands or mutates files. Structure is not runtime liveness; asserts no production/live/pilot readiness.",
+    {
+      node: z.string().optional().describe("Node id (e.g. crate:icn-gateway). Exact match returns the node and its incident edges; otherwise a contains-match list of ids/names."),
+      type: z
+        .string()
+        .optional()
+        .describe("Filter nodes by type (crate, subsystem, doc, route_surface, skill, agent, mcp_tool, script, invariant, claim_surface, truth_source, generated_artifact)."),
+      subsystem: z.string().optional().describe("Filter nodes by subsystem id (e.g. trust, gossip)."),
+      path: z.string().optional().describe("Filter nodes whose path contains this substring (e.g. icn-gateway)."),
+    },
+    async ({ node, type, subsystem, path }) => {
+      const view = buildAgentContextSpineView(repoRoot, { node, type, subsystem, path });
+      return {
+        content: [{ type: "text", text: JSON.stringify(view, null, 2) }],
       };
     }
   );

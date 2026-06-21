@@ -37,15 +37,20 @@ Node/edge taxonomy, boundaries, and future-generator notes for the `navigator` s
 3. The crate tree (`icn/crates/`, `icn/apps/`, `icn/bins/`) and `CLAUDE.md` topology — fall back only
    when MCP and project-index are unavailable; say so in the output.
 
-## Future generated artifacts (do not fabricate yet)
+## Generated artifacts
 
-A future `repo_knowledge_graph.py` is expected to emit a machine-readable graph under
-`docs/reference/project-index/generated/` (e.g. `repo-knowledge-graph.json` and a rendered
-`repo-knowledge-graph.md`). Until that generator is committed:
+The **Agent Context Spine v0** is committed at
+`docs/reference/project-index/generated/agent-context-spine.json`, produced by
+`scripts/generate-agent-context-spine.py` (validated by `scripts/check-agent-context-spine.py`, and
+readable live via the `icn-ops` MCP tool `icn_ops_agent_context_spine`). It is a generated,
+non-canonical, evidence-grounded node/edge map — see
+[`docs/guides/developer/agent-context-spine.md`](../../../../../../docs/guides/developer/agent-context-spine.md).
 
-- Produce maps **inline** (markdown node/edge lists + mermaid diagrams).
-- Do not write to a generated path or claim a generated file exists.
-- When the generator lands, this skill should prefer reading/refreshing its output over re-deriving.
+- Prefer reading/refreshing the spine over re-deriving structure by hand.
+- The spine is v0: it does **not** yet parse the Rust module graph or enumerate per-route nodes. For
+  anything it does not cover, produce maps **inline** (markdown node/edge lists + mermaid diagrams)
+  and do not fabricate a generated path or claim a generated file exists.
+- Refresh only when asked: `python3 scripts/generate-agent-context-spine.py --write`.
 
 ## Suggested mermaid skeleton
 
