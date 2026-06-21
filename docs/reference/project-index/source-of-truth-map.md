@@ -1,7 +1,7 @@
 ---
 Status: draft
 Canonical: no
-Last Reviewed: 2026-05-09
+Last Reviewed: 2026-06-21
 ---
 
 # Source-of-Truth Map
@@ -50,7 +50,7 @@ These are the first files to inspect before making claims about ICN’s current 
 | Area | First source | Then inspect |
 |---|---|---|
 | Current project posture | `docs/STATE.md` | `docs/PHASE_PROGRESS.md`, latest merged PRs |
-| Phase / pilot readiness | `docs/PHASE_PROGRESS.md` | `docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md`, open Phase 2 issues |
+| Phase / pilot readiness | `docs/PHASE_PROGRESS.md` | the NYCN rehearsal gate (in the partner `InterCooperative-Network/nycn` repo — there is no in-repo `docs/strategy/NYCN_PHASE_2_PILOT_REHEARSAL_GATE.md`), open Phase 2 issues (#1703) |
 | Runtime architecture | `docs/ARCHITECTURE.md` | `docs/architecture/KERNEL_APP_SEPARATION.md`, current Rust workspace |
 | Package boundary | `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md` | standalone `InterCooperative-Network/nycn`, `institutions/nycn/` reconciliation status |
 | Member surfaces | runtime code + `runtime-surface-map.md` | `/me/standing`, `/me/action-cards`, pilot-ui demo fixtures |
