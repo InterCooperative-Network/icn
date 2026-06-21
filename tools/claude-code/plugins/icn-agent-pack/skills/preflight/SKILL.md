@@ -16,6 +16,7 @@ This is the portable companion to the project-local `/icn-preflight` skill in `.
 2. If present, read `docs/ai/ICN_CONSTITUTIONAL_CORE.md` (reasoning foundation — scan).
 3. Find and read the latest handoff: `ls -t docs/dev/handoff-*.md 2>/dev/null | head -1`. If none exists (fresh clone), note "no prior handoff found" and continue.
 4. Note any divergence between declared state and the handoff's execution state.
+5. Generate the bounded **live-state overlay** for one-screen, source/freshness-bound grounding (no overclaims): `python3 scripts/generate-live-state-overlay.py --no-gh` (drop `--no-gh` to add live PR/issue state). Read it before planning repo work; do not cache it across sessions. Details: `docs/ai/ICN_LIVE_STATE_OVERLAY_TEMPLATE.md`.
 
 ## Step 1 — Verify environment (one line per check, prefix pass/warn/fail)
 
