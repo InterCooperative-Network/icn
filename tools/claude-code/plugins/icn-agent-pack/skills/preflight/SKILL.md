@@ -16,7 +16,12 @@ This is the portable companion to the project-local `/icn-preflight` skill in `.
 2. If present, read `docs/ai/ICN_CONSTITUTIONAL_CORE.md` (reasoning foundation — scan).
 3. Find and read the latest handoff: `ls -t docs/dev/handoff-*.md 2>/dev/null | head -1`. If none exists (fresh clone), note "no prior handoff found" and continue.
 4. Note any divergence between declared state and the handoff's execution state.
-5. Generate the bounded **live-state overlay** for one-screen, source/freshness-bound grounding (no overclaims): `python3 scripts/generate-live-state-overlay.py --no-gh` (drop `--no-gh` to add live issue-lane OPEN/CLOSED state). Read it before planning repo work; do not cache it across sessions. Details: `docs/ai/ICN_LIVE_STATE_OVERLAY_TEMPLATE.md`.
+5. Generate and **read** the bounded **live-state overlay** — a bird's-eye, whole-repo orientation layer (source/freshness-bound, no overclaims): `python3 scripts/generate-live-state-overlay.py --no-gh` (drop `--no-gh` to add live issue-lane OPEN/CLOSED state). Use it to:
+   - understand the **whole repo/project** at a glance (`project_map`, `subsystem_overview`);
+   - **identify systems that already exist** (`repo_systems`) so you do not reinvent the spine, generators, route inventory, doc control, worktree-OS, plugin, MCP, or CI lanes;
+   - understand **how subsystems interact** and the **required validation commands** for what you will touch (`system_interactions`, `subsystem_overview` checks, `development_safety_map`);
+   - confirm what must **not** be claimed (`claim_boundaries`).
+   Then, for the specific files you will touch, read the **Agent Context Spine path brief** (`python3 scripts/generate-agent-context-spine.py --brief <paths>`). Read the overlay before planning repo work; do not cache it across sessions. Details: `docs/ai/ICN_LIVE_STATE_OVERLAY_TEMPLATE.md`.
 
 ## Step 1 — Verify environment (one line per check, prefix pass/warn/fail)
 

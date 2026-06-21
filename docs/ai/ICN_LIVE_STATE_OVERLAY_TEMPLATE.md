@@ -7,9 +7,17 @@ Last verified: 2026-06-21
 
 # ICN Live State Overlay
 
-Bounded, on-demand **session-start grounding** for agents and humans working on the ICN repo. Before planning any work it answers: what is the current repo/project state, which facts are canonical vs generated-reference, what recently changed, what is stale, what must **not** be claimed, which lanes own the next work, and what checks to run.
+Bounded, on-demand **whole-repo orientation + session-start grounding** for agents and humans working on the ICN repo. It is a **bird's-eye comprehension layer for the whole project**, not just a current-status readout. Before planning any work it answers:
 
-This is **not** canonical truth — canonical state is `docs/STATE.md` + `docs/PHASE_PROGRESS.md`. It is **not** a committed snapshot (a committed "live snapshot" rots); it is generated on demand and never cached across sessions.
+- **What is the integrated system?** (`project_map`) — the core dependency flow identity → trust → entity/membership → networking/federation → state/storage → governance → economics → applications/interfaces.
+- **What subsystems exist and where is their code/docs/checks?** (`subsystem_overview`) — derived from the Agent Context Spine where possible.
+- **Which systems already exist so I do NOT reinvent them?** (`repo_systems`) — the spine, generators, route inventory, doc control, worktree-OS, plugin, MCP, CI lanes, each classified canonical / generated-reference / advisory / operational / tooling.
+- **How do those systems interact?** (`system_interactions`).
+- **How do I change the repo safely?** (`development_safety_map`).
+
+…and the session-start essentials: current repo/project state, which facts are canonical vs generated-reference, what recently changed, what must **not** be claimed (`claim_boundaries` — NYCN is one boundary item among several, not the focus), which lanes own the next work, and what checks to run.
+
+This is **not** canonical truth — canonical state is `docs/STATE.md` + `docs/PHASE_PROGRESS.md`. It is **not** a new truth root, **not** a dashboard, and **not** a committed snapshot (a committed "live snapshot" rots); it is generated on demand and never cached across sessions.
 
 ---
 
@@ -43,7 +51,7 @@ python3 scripts/generate-live-state-overlay.py --check         # self-validate, 
 
 Agents: run it, then follow the overlay's own `agent_start_rules` (read overlay → read the relevant Agent Context Spine path brief → identify canonical vs generated-reference → identify required checks → identify claim hazards → only then plan; never merge without explicit per-PR authorization). Humans: skim sections 1–6 to orient, then 7–8 for what to do next. The `claim_boundaries` section lists what must never be claimed.
 
-The self-check (`--check`) verifies the eight required sections exist, the structured entries in the canonical-state, grounding-artifact, and lane sections carry source/freshness (or `NEEDS_LIVE_RECONFIRMATION`) markers, the `claim_boundaries` cover the required hazards, the JSON round-trips, the markdown carries caveats, and no production-readiness / live-federation / formal-pilot / entity-auth-enforced overclaim appears in the fact-bearing sections.
+The self-check (`--check`) verifies the thirteen required sections exist (including the whole-repo `project_map`, `subsystem_overview`, `repo_systems`, `system_interactions`, and `development_safety_map`); that `subsystem_overview` covers the major subsystems and each entry carries paths/check/status; that every `repo_systems` entry has a repo-relative path and a valid classification (canonical / generated-reference / advisory / operational / tooling); that the structured entries in the canonical-state, grounding-artifact, and lane sections carry source/freshness (or `NEEDS_LIVE_RECONFIRMATION`) markers; that the `claim_boundaries` cover the required hazards; that **NYCN appears only as a single claim-boundary item — never first, never a top-level section, never dominant**; that the JSON round-trips and the markdown carries caveats; and that no production-readiness / live-federation / formal-pilot / entity-auth-enforced overclaim appears in the fact-bearing sections.
 
 ---
 
