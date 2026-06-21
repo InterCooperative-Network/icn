@@ -2,8 +2,8 @@
   "schema": "icn-agent-context-spine/v0",
   "status": "generated",
   "canonical": false,
-  "generated": "2026-06-21T13:51:06+00:00",
-  "source_commit": "a97841b116997c29bc0bff1dd3fa675399b81072",
+  "generated": "2026-06-21T14:08:16+00:00",
+  "source_commit": "cb3ac76d36ea64f25d65e59d614f2f1c048496e2",
   "generator": "scripts/generate-agent-context-spine.py",
   "regenerate": "python3 scripts/generate-agent-context-spine.py --write",
   "check": "python3 scripts/generate-agent-context-spine.py --check",
@@ -1715,7 +1715,9 @@
       "verification_commands": [
         "python3 docs/scripts/route_inventory.py --check",
         "cd icn && cargo clippy -p icn-gateway --all-targets -- -D warnings",
-        "cd icn && cargo test -p icn-gateway"
+        "cd icn && cargo test -p icn-gateway --features sled-storage",
+        "If routes/API shape change, regenerate OpenAPI: cd icn && cargo build -p icnctl && ./target/debug/icnctl api export-openapi -o ../docs/api/openapi.generated.yaml",
+        "If the API shape changed, regenerate + check SDK types: cd sdk/typescript && npm ci && npm run generate-types && npm run check-types"
       ],
       "risk_surfaces": [
         "claim_surface:route-api-docs-drift",
@@ -2017,17 +2019,19 @@
     {
       "id": "guidance:sdk-ts",
       "type": "path_guidance",
-      "name": "TypeScript SDK (generated types drift)",
+      "name": "TypeScript SDK (build/test/lint + generated-types drift)",
       "match": "sdk/typescript/",
       "match_kind": "prefix",
       "description": "Code-quality brief for changes under `sdk/typescript/`.",
       "review_focus": [
-        "Commit only regenerated types under src/generated/*",
+        "Run the full package gates for code edits: npm ci, build, test, lint",
+        "Generated types: commit only regenerated files under src/generated/*",
         "API drift chain: gateway -> OpenAPI -> TS types",
         "No mixed refactor + regen commits"
       ],
       "verification_commands": [
-        "cd sdk/typescript && npm ci && npm run generate-types && npm run check-types"
+        "cd sdk/typescript && npm ci && npm run build && npm test && npm run lint",
+        "Generated types only (after a gateway API change), commit only src/generated/*: cd sdk/typescript && npm ci && npm run generate-types && npm run check-types"
       ],
       "risk_surfaces": [
         "claim_surface:route-api-docs-drift"

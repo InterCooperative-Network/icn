@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   buildAgentContextSpineView,
   buildPathBrief,
@@ -313,5 +314,43 @@ describe("buildPathBrief", () => {
     expect(view.ok).toBe(false);
     if (view.ok) return;
     expect(view.error).toMatch(/not found/i);
+  });
+});
+
+// Guards the *real* committed artifact (what agents actually consume), so the
+// repo-required gateway/SDK verification gates cannot silently drop out of the
+// generated path briefs. Repo root = up from ops/mcp/src/tests/.
+const REPO_ROOT = join(
+  dirname(fileURLToPath(import.meta.url)),
+  "..",
+  "..",
+  "..",
+  ".."
+);
+
+describe("buildPathBrief against the committed artifact", () => {
+  it("gateway brief includes the sled-storage gate and API-shape regen guidance", () => {
+    const view = buildPathBrief(REPO_ROOT, [
+      "icn/crates/icn-gateway/src/api/auth.rs",
+    ]);
+    expect(view.ok).toBe(true);
+    if (!view.ok) return;
+    const entry = (view.paths as Array<Record<string, string[]>>)[0];
+    const cmds = entry.verification_commands.join("\n");
+    expect(cmds).toContain("cargo test -p icn-gateway --features sled-storage");
+    // OpenAPI + TS-type regen guidance when the gateway API shape changes
+    expect(cmds.toLowerCase()).toContain("openapi");
+    expect(cmds).toContain("generate-types");
+  });
+
+  it("typescript SDK brief includes the npm ci/build/test/lint gates", () => {
+    const view = buildPathBrief(REPO_ROOT, ["sdk/typescript/src/client.ts"]);
+    expect(view.ok).toBe(true);
+    if (!view.ok) return;
+    const entry = (view.paths as Array<Record<string, string[]>>)[0];
+    const cmds = entry.verification_commands.join("\n");
+    for (const c of ["npm ci", "npm run build", "npm test", "npm run lint"]) {
+      expect(cmds).toContain(c);
+    }
   });
 });
