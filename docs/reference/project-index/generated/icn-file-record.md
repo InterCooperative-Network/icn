@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-21T14:23:11.702360+00:00
+Generated: 2026-06-21T21:21:29.799055+00:00
 ---
 
 # Full Repository Record — `icn`
@@ -11,23 +11,23 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 ## Snapshot
 
 - Repo: `icn`
-- Branch: `docs/record-refresh-2126`
-- HEAD: `41c7082b330a6249bead068d641c6e4e495d2075`
+- Branch: `fix/file-record-exclude-self`
+- HEAD: `fa819b47fbf774296400b42ca6f7c7c8630004af`
 - Working tree: `clean (no uncommitted changes against HEAD)`
 - SHA source: `working tree bytes (may differ from HEAD blob bytes when .gitattributes filters apply, e.g. CRLF normalization)`
-- Files recorded: `3093`
-- Tracked files recorded: `3093`
+- Files recorded: `3094`
+- Tracked files recorded: `3094`
 - Directories recorded: `610`
-- Total recorded bytes: `48274562`
-- Total tracked bytes: `48274562`
-- Entry kinds: `file: 3093`
+- Total recorded bytes: `46534125`
+- Total tracked bytes: `46534125`
+- Entry kinds: `file: 3094`
 
 ## Role summary
 
 | Role guess | Files |
 |---|---:|
 | Rust library crate | 922 |
-| documentation | 897 |
+| documentation | 898 |
 | uncategorized | 155 |
 | repo configuration | 144 |
 | React Native SDK | 139 |
@@ -36,14 +36,14 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | operations / coordination | 87 |
 | pilot UI | 84 |
 | public website | 71 |
+| script | 54 |
 | demo | 53 |
-| script | 53 |
 | institution package | 40 |
 | architecture decision record | 36 |
 | TypeScript SDK | 29 |
-| project index / atlas | 27 |
+| project index / atlas | 25 |
 | agent definition | 22 |
-| GitHub Actions workflow | 17 |
+| GitHub Actions workflow | 18 |
 | Rust binary | 16 |
 | contract template | 12 |
 | monitoring | 9 |
@@ -58,15 +58,15 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 |---|---:|
 | `.md` | 1168 |
 | `.rs` | 940 |
-| `.json` | 154 |
+| `.json` | 153 |
 | `.sh` | 119 |
 | `.toml` | 112 |
 | `.ts` | 112 |
 | `.yaml` | 92 |
-| `.yml` | 59 |
+| `.yml` | 60 |
 | `.js` | 43 |
 | `.tsx` | 43 |
-| `.py` | 40 |
+| `.py` | 41 |
 | `.astro` | 31 |
 | `.png` | 24 |
 | `(none)` | 19 |
@@ -109,13 +109,13 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 
 | Directory | Depth | Files under directory | Child dirs | Size bytes | Role guess |
 |---|---:|---:|---:|---:|---|
-| `.` | 0 | 3093 | 25 | 48274562 | repo root |
+| `.` | 0 | 3094 | 25 | 46534125 | repo root |
 | `.agents` | 1 | 25 | 1 | 71663 | repo configuration |
 | `.claude` | 1 | 65 | 5 | 228531 | repo configuration |
 | `.codex` | 1 | 16 | 2 | 19783 | repo configuration |
 | `.cursor` | 1 | 1 | 0 | 135 | repo configuration |
 | `.devcontainer` | 1 | 1 | 0 | 1307 | repo configuration |
-| `.github` | 1 | 68 | 6 | 284056 | repo configuration |
+| `.github` | 1 | 69 | 6 | 289482 | repo configuration |
 | `.opencode` | 1 | 2 | 1 | 1837 | repo configuration |
 | `apps` | 1 | 5 | 1 | 11841 | legacy/top-level app |
 | `config` | 1 | 11 | 0 | 34536 | uncategorized |
@@ -123,16 +123,16 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `demo` | 1 | 53 | 6 | 512850 | demo |
 | `deploy` | 1 | 130 | 10 | 571828 | deployment |
 | `docker` | 1 | 6 | 0 | 17165 | uncategorized |
-| `docs` | 1 | 968 | 46 | 15760928 | documentation |
+| `docs` | 1 | 967 | 46 | 13955313 | documentation |
 | `examples` | 1 | 43 | 5 | 562715 | uncategorized |
 | `icn` | 1 | 1081 | 9 | 21916668 | uncategorized |
 | `institutions` | 1 | 40 | 1 | 102081 | institution package |
 | `monitoring` | 1 | 9 | 0 | 67029 | monitoring |
 | `ops` | 1 | 87 | 8 | 843723 | operations / coordination |
-| `scripts` | 1 | 53 | 0 | 423147 | script |
+| `scripts` | 1 | 54 | 0 | 481807 | script |
 | `sdk` | 1 | 168 | 2 | 2524210 | uncategorized |
 | `sims` | 1 | 19 | 1 | 92514 | uncategorized |
-| `tools` | 1 | 26 | 1 | 88907 | uncategorized |
+| `tools` | 1 | 26 | 1 | 89999 | uncategorized |
 | `web` | 1 | 106 | 4 | 1667858 | uncategorized |
 | `website` | 1 | 71 | 6 | 1910144 | public website |
 | `.agents/skills` | 2 | 25 | 25 | 71663 | repo configuration |
@@ -148,7 +148,7 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `.github/agents` | 2 | 22 | 0 | 59062 | agent definition |
 | `.github/instructions` | 2 | 5 | 0 | 28980 | repo configuration |
 | `.github/scripts` | 2 | 8 | 1 | 39349 | repo configuration |
-| `.github/workflows` | 2 | 17 | 0 | 108418 | GitHub Actions workflow |
+| `.github/workflows` | 2 | 18 | 0 | 113844 | GitHub Actions workflow |
 | `.opencode/commands` | 2 | 1 | 0 | 409 | repo configuration |
 | `apps/echo` | 2 | 5 | 1 | 11841 | legacy/top-level app |
 | `contracts/governance` | 2 | 5 | 0 | 69912 | contract template |
@@ -171,11 +171,11 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `deploy/kubernetes` | 2 | 12 | 0 | 25850 | deployment |
 | `deploy/prometheus` | 2 | 1 | 0 | 4149 | deployment |
 | `docs/adr` | 2 | 36 | 0 | 300071 | architecture decision record |
-| `docs/ai` | 2 | 5 | 0 | 21008 | documentation |
+| `docs/ai` | 2 | 5 | 0 | 26161 | documentation |
 | `docs/api` | 2 | 6 | 0 | 143308 | documentation |
 | `docs/architecture` | 2 | 43 | 0 | 1241547 | documentation |
 | `docs/archive` | 2 | 78 | 2 | 1050816 | documentation |
-| `docs/ci` | 2 | 3 | 0 | 13817 | documentation |
+| `docs/ci` | 2 | 4 | 0 | 18053 | documentation |
 | `docs/contracts` | 2 | 13 | 1 | 138697 | documentation |
 | `docs/crate-manifests` | 2 | 42 | 0 | 46904 | documentation |
 | `docs/demo` | 2 | 14 | 0 | 191732 | documentation |
@@ -202,7 +202,7 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `docs/pilots` | 2 | 4 | 0 | 38839 | documentation |
 | `docs/planning` | 2 | 7 | 0 | 102284 | documentation |
 | `docs/plans` | 2 | 17 | 1 | 415015 | documentation |
-| `docs/reference` | 2 | 40 | 3 | 2290330 | documentation |
+| `docs/reference` | 2 | 38 | 3 | 475326 | documentation |
 | `docs/rfcs` | 2 | 8 | 0 | 176908 | request for comments |
 | `docs/scripts` | 2 | 9 | 0 | 105739 | documentation |
 | `docs/sdis` | 2 | 13 | 0 | 161014 | documentation |
@@ -242,7 +242,7 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `sdk/react-native` | 2 | 139 | 3 | 1829453 | React Native SDK |
 | `sdk/typescript` | 2 | 29 | 2 | 694757 | TypeScript SDK |
 | `sims/mutual-credit` | 2 | 19 | 2 | 92514 | uncategorized |
-| `tools/claude-code` | 2 | 26 | 1 | 88907 | uncategorized |
+| `tools/claude-code` | 2 | 26 | 1 | 89999 | uncategorized |
 | `web/api-docs` | 2 | 5 | 0 | 51150 | uncategorized |
 | `web/dashboard` | 2 | 7 | 0 | 53602 | dashboard UI |
 | `web/member-shell` | 2 | 10 | 1 | 106320 | uncategorized |
@@ -360,7 +360,7 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `docs/plans/.scratch` | 3 | 1 | 0 | 1229 | documentation |
 | `docs/reference/api` | 3 | 5 | 0 | 52497 | documentation |
 | `docs/reference/config` | 3 | 4 | 0 | 24982 | documentation |
-| `docs/reference/project-index` | 3 | 27 | 1 | 2172323 | project index / atlas |
+| `docs/reference/project-index` | 3 | 25 | 1 | 357319 | project index / atlas |
 | `docs/strategy/grants` | 3 | 7 | 0 | 32301 | documentation |
 | `docs/superpowers/plans` | 3 | 1 | 0 | 42648 | documentation |
 | `docs/superpowers/specs` | 3 | 7 | 0 | 69765 | documentation |
@@ -443,7 +443,7 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `sdk/typescript/src` | 3 | 9 | 1 | 357779 | TypeScript SDK |
 | `sims/mutual-credit/analysis` | 3 | 1 | 0 | 11430 | uncategorized |
 | `sims/mutual-credit/scenarios` | 3 | 5 | 0 | 5395 | uncategorized |
-| `tools/claude-code/plugins` | 3 | 26 | 1 | 88907 | uncategorized |
+| `tools/claude-code/plugins` | 3 | 26 | 1 | 89999 | uncategorized |
 | `web/member-shell/fixtures` | 3 | 4 | 0 | 2606 | uncategorized |
 | `web/pilot-ui/components` | 3 | 1 | 0 | 11066 | pilot UI |
 | `web/pilot-ui/fixtures` | 3 | 5 | 1 | 21453 | pilot UI |
@@ -499,7 +499,7 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `docs/onboarding/path/phase-2-architecture` | 4 | 4 | 0 | 36895 | documentation |
 | `docs/onboarding/path/phase-3-systems` | 4 | 4 | 0 | 15550 | documentation |
 | `docs/onboarding/path/phase-4-ownership` | 4 | 3 | 0 | 9932 | documentation |
-| `docs/reference/project-index/generated` | 4 | 4 | 0 | 1997717 | project index / atlas |
+| `docs/reference/project-index/generated` | 4 | 2 | 0 | 182713 | project index / atlas |
 | `examples/mobile-app/src/contexts` | 4 | 1 | 0 | 673 | uncategorized |
 | `examples/mobile-app/src/screens` | 4 | 7 | 0 | 27991 | uncategorized |
 | `examples/mobile-app/src/services` | 4 | 2 | 0 | 11096 | uncategorized |
@@ -610,7 +610,7 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `sdk/react-native/examples/CoopWallet` | 4 | 94 | 3 | 868144 | React Native SDK |
 | `sdk/react-native/src/__mocks__` | 4 | 2 | 0 | 2265 | React Native SDK |
 | `sdk/typescript/src/generated` | 4 | 1 | 0 | 61644 | TypeScript SDK |
-| `tools/claude-code/plugins/icn-agent-pack` | 4 | 26 | 5 | 88907 | uncategorized |
+| `tools/claude-code/plugins/icn-agent-pack` | 4 | 26 | 5 | 89999 | uncategorized |
 | `web/pilot-ui/fixtures/icn-organizer-demo` | 4 | 5 | 0 | 21453 | pilot UI |
 | `web/pilot-ui/tests/e2e` | 4 | 8 | 0 | 75708 | pilot UI |
 | `website/public/.well-known/matrix` | 4 | 1 | 0 | 86 | public website |
@@ -669,7 +669,7 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `tools/claude-code/plugins/icn-agent-pack/agents` | 5 | 6 | 0 | 26694 | uncategorized |
 | `tools/claude-code/plugins/icn-agent-pack/bin` | 5 | 5 | 0 | 12793 | uncategorized |
 | `tools/claude-code/plugins/icn-agent-pack/hooks` | 5 | 1 | 0 | 937 | uncategorized |
-| `tools/claude-code/plugins/icn-agent-pack/skills` | 5 | 10 | 6 | 34294 | uncategorized |
+| `tools/claude-code/plugins/icn-agent-pack/skills` | 5 | 10 | 6 | 35386 | uncategorized |
 | `deploy/devnet/monitoring/grafana/provisioning/dashboards` | 6 | 1 | 0 | 232 | deployment |
 | `deploy/devnet/monitoring/grafana/provisioning/datasources` | 6 | 1 | 0 | 241 | deployment |
 | `icn/crates/icn-ccl/fuzz/corpus/fuzz_contract_json` | 6 | 13 | 0 | 83966 | Rust library crate |
@@ -691,7 +691,7 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `tools/claude-code/plugins/icn-agent-pack/skills/authority-spine` | 6 | 2 | 0 | 6996 | uncategorized |
 | `tools/claude-code/plugins/icn-agent-pack/skills/doctor` | 6 | 1 | 0 | 3167 | uncategorized |
 | `tools/claude-code/plugins/icn-agent-pack/skills/navigator` | 6 | 2 | 0 | 7602 | uncategorized |
-| `tools/claude-code/plugins/icn-agent-pack/skills/preflight` | 6 | 1 | 0 | 2605 | uncategorized |
+| `tools/claude-code/plugins/icn-agent-pack/skills/preflight` | 6 | 1 | 0 | 3697 | uncategorized |
 | `tools/claude-code/plugins/icn-agent-pack/skills/route-impact` | 6 | 2 | 0 | 6333 | uncategorized |
 | `tools/claude-code/plugins/icn-agent-pack/skills/truth-sync` | 6 | 2 | 0 | 7591 | uncategorized |
 | `sdk/react-native/examples/CoopWallet/android/app/src` | 7 | 33 | 3 | 39802 | React Native SDK |
@@ -895,6 +895,7 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `.github/workflows/docker-build-deploy.yml` | 11985 | `9ae7de0aa36858caba55dfbaa911f4994c26e1069ea730e974608259d8b6b538` | YAML | GitHub Actions workflow |
 | `.github/workflows/docs-freshness.yml` | 11562 | `f474a69b3d3639e195b703e215bd4f93c4df2fada10a53b97cd278a9b3bce1dd` | YAML | GitHub Actions workflow |
 | `.github/workflows/fuzz.yml` | 3037 | `e2ff1c562395135582738e773e5db1b984d190e8204fab5e4b7bffb57d9612fa` | YAML | GitHub Actions workflow |
+| `.github/workflows/generated-truth.yml` | 5426 | `cf03e607fbfac884f97a1301c6fe40f53f6d4aa1403beaa9e7d00e1ec5f1c3d9` | YAML | GitHub Actions workflow |
 | `.github/workflows/issue-label-enforcer.yml` | 6117 | `ff4342a962c2d2395a24033abfdb5ad1d9a4f21230f120204829a78cdf474731` | YAML | GitHub Actions workflow |
 | `.github/workflows/mcp-portability.yml` | 999 | `312f0e0ec6c3eb9e507863dcda9dea8705a53cb9563b3913598db66bd34e058d` | YAML | GitHub Actions workflow |
 | `.github/workflows/npm-publish.yml` | 2107 | `cc0712289070cc9b08630b359acb6b296174e3df6749750ffe7fd98afefd5db1` | YAML | GitHub Actions workflow |
@@ -1195,7 +1196,7 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `docs/adr/template.md` | 2116 | `93da786ffa4d64a75f1df8f7e4bd7f393e7b6d2ec7c26001c8d9220405c6c211` | Markdown | architecture decision record |
 | `docs/ai/CODEX_WORKFLOW.md` | 3221 | `a60b6df40d2cc7e46d0408b2cc9f590ac43fb2f472e2204a72f193dfb1548b27` | Markdown | documentation |
 | `docs/ai/ICN_CONSTITUTIONAL_CORE.md` | 10280 | `d8139c260917ea8d3d9775ea4d5ca0f934be9d560522b78bb08b7f34a7a267db` | Markdown | documentation |
-| `docs/ai/ICN_LIVE_STATE_OVERLAY_TEMPLATE.md` | 2748 | `6af52b6ee876dad633c6fe8265da357daf17535092db20dc4a4736d8e28e2ddd` | Markdown | documentation |
+| `docs/ai/ICN_LIVE_STATE_OVERLAY_TEMPLATE.md` | 7901 | `00421d4642a229ef027df1ccaacc4ba49cbc44c6861e99a86ad47e4064e324e8` | Markdown | documentation |
 | `docs/ai/ICN_SESSION_FRAME_TEMPLATE.md` | 1934 | `a78fabbc162396b4ff26c49112ab0dd0da48b131a896a29bb9a4b392fc73bcf5` | Markdown | documentation |
 | `docs/ai/WORKFLOW_ARCHITECTURE.md` | 2825 | `adfa98a30d85a672d1181b2922824dd0cd342b8fceb1d31115c055ce4f85f0c1` | Markdown | documentation |
 | `docs/api/OPENAPI.md` | 7922 | `8b2b5ccfbcbca4083d113aed86dad301fe100b51210d1d782e0f4cf3259a6d28` | Markdown | documentation |
@@ -1328,6 +1329,7 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `docs/ci/CI_ALL_GREEN_REPORT.md` | 3384 | `1c5b85e4f9f8270c282d602d11514fdf7df52b687ab8d44ab5f8940fb0f81528` | Markdown | documentation |
 | `docs/ci/CI_CURRENT_STATUS.md` | 1709 | `3212b15b6adbb956eb5a42e2c1660928af6418c1697d94cd6eeccdb0e3ab09fb` | Markdown | documentation |
 | `docs/ci/GATE_RATCHET_PLAN.md` | 8724 | `9debcec8b18cadb02071d2277b80ad8a040da8932c61a761a4c7751b4c9ebd98` | Markdown | documentation |
+| `docs/ci/GENERATED_TRUTH_DRIFT.md` | 4236 | `46753d3d2baf4c0c709efc771a7a8b304bd4477ebf4d66fea06fcdc0e20e7085` | Markdown | documentation |
 | `docs/contracts/institution-package/README.md` | 7597 | `54d05a99be96955597dce088b32f261d0e4798b7e9550812386f04912e942743` | Markdown | documentation |
 | `docs/contracts/institution-package/action-card.example.json` | 726 | `7f9e1b55b852517dcb03c274c1d374cb182bb403ac7bcdc263062ac00a1f48e5` | JSON | documentation |
 | `docs/contracts/institution-package/action-card.schema.json` | 5435 | `d58485a48ab5c1f05623fc216580260bdc7505053bcfba2bcb7cc147171ab755` | JSON | documentation |
@@ -1936,8 +1938,6 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `docs/reference/project-index/docs-control-map.md` | 7227 | `41469ea307fb54c0466e6d20feaa8449b7bc643c45790574683237f030987c7c` | Markdown | project index / atlas |
 | `docs/reference/project-index/full-repo-record.md` | 7597 | `56a3be5e123f70aaf8fce07505f6143d486e04951ea35a94b8f5b0b7dd4d7730` | Markdown | project index / atlas |
 | `docs/reference/project-index/generated/agent-context-spine.json` | 106372 | `a68345f938a12c782befa3e4fa1c597068c9911537aaaa5c599bed9d63ff6e57` | JSON | project index / atlas |
-| `docs/reference/project-index/generated/icn-file-record.json` | 1350034 | `cf7c2b7e6c389a6adec7f68dfd68cfeeb0824add14fa9e5c2656b80a49fb2f74` | JSON | project index / atlas |
-| `docs/reference/project-index/generated/icn-file-record.md` | 464970 | `3b9cf01f4205225e78ebfcfb81cabd6ecdb5a7457bc1205b92d71aa9b4b2c480` | Markdown | project index / atlas |
 | `docs/reference/project-index/generated/route-inventory.md` | 76341 | `9298458ceb36c2a253a982be6e0136699fc9a0262fdcbfc3c0d616db828de6ae` | Markdown | project index / atlas |
 | `docs/reference/project-index/identity-crypto-map.md` | 5006 | `cffd912bd654b76ee514ab3a3a574e44adeec3e7a953de89e4adfcfe5ebac828` | Markdown | project index / atlas |
 | `docs/reference/project-index/network-gossip-map.md` | 6833 | `2b4269277bcc2291b85f66a676eb1d382359f8d2e73b3af4c69eb32ee02ce117` | Markdown | project index / atlas |
@@ -3393,8 +3393,9 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `scripts/federated-governance-demo.sh` | 12412 | `913fc025cbead401c35727ba64114e7ca818bb1f2a5ac706e2a9e992e141427a` | Shell | script |
 | `scripts/forbidden-deps-allowlist.txt` | 737 | `e3acf72c847044428dc42af1cc9a11c78e5c68a8b6cf731d63b5fcef1454d11d` | Text | script |
 | `scripts/generate-agent-context-spine.py` | 39619 | `e6a3ae3d2042febc9754d6a6fa6ec8c6d27dddbefde12fea9c6b84824e352dbd` | Python | script |
+| `scripts/generate-live-state-overlay.py` | 50165 | `04398e0a68e0c8a4293f82a881aaaacb77eae0d90a36a00bc2690069532fe61f` | Python | script |
 | `scripts/generate-test-token.sh` | 1581 | `bea751d5058b9d0ab6b841980e143acd23356ec207ad2da886afc3680b0b8714` | Shell | script |
-| `scripts/generate_repo_record.py` | 21852 | `fd4ae442a188064be1d5699548ddc045413ac7268180732249778af228d4f96d` | Python | script |
+| `scripts/generate_repo_record.py` | 30347 | `1b7f9aec71df765a4df383b254cecdde81a46b011998123dd1a30b23f66f83ff` | Python | script |
 | `scripts/governance-demo.sh` | 9746 | `d9db1799692b5323e8a0cf2bf51ebdada86bf616bd14699e6316a4af80159d20` | Shell | script |
 | `scripts/icn-preflight.sh` | 2129 | `3d69b9f78b307bd5cda606d8844a58c7d0c299f49c5356883e324da3bc4d121d` | Shell | script |
 | `scripts/install.sh` | 14015 | `9f453776a7a9b96944c42a1b3ced4434e8ccae5cb97280a9a1c064c2ae1f25a0` | Shell | script |
@@ -3635,7 +3636,7 @@ Generated: 2026-06-21T14:23:11.702360+00:00
 | `tools/claude-code/plugins/icn-agent-pack/skills/doctor/SKILL.md` | 3167 | `f2a4d2aa4f069d12bb6f7aba19464703863c32dd3570b32290e79411ff622078` | Markdown | uncategorized |
 | `tools/claude-code/plugins/icn-agent-pack/skills/navigator/SKILL.md` | 4102 | `05ed1280a4c2a62551201daf58bd4da3028dd96e8b38f379a4a4177c9a53d2d6` | Markdown | uncategorized |
 | `tools/claude-code/plugins/icn-agent-pack/skills/navigator/reference.md` | 3500 | `e0e789473ad7623faaa497d83636b7b5863fcd58c98a6ca171e358493e42a546` | Markdown | uncategorized |
-| `tools/claude-code/plugins/icn-agent-pack/skills/preflight/SKILL.md` | 2605 | `1b6fa063b261175d86aae48321adfc9fb187d8ac9f0b5838e3caf21c39253602` | Markdown | uncategorized |
+| `tools/claude-code/plugins/icn-agent-pack/skills/preflight/SKILL.md` | 3697 | `cf2c29ef43dd689c46c3c877d38693c719ba7dc6895ba899810da5a13e43a386` | Markdown | uncategorized |
 | `tools/claude-code/plugins/icn-agent-pack/skills/route-impact/SKILL.md` | 3171 | `9bfb268c41e5c1ec98a0254aea26a9ce7cd74ef89657a83846a10a9840e7cf7d` | Markdown | uncategorized |
 | `tools/claude-code/plugins/icn-agent-pack/skills/route-impact/reference.md` | 3162 | `f760ff25218cc7faccb1124f7cb6ff54f05994ffc0a234a201f30c84d4a673ec` | Markdown | uncategorized |
 | `tools/claude-code/plugins/icn-agent-pack/skills/truth-sync/SKILL.md` | 3050 | `4f685ac367100aaa2846317465c291462ebe496721791f83e82df5e5b548ca51` | Markdown | uncategorized |
