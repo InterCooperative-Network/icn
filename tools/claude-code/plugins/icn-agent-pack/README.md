@@ -227,8 +227,11 @@ user's machine:
 
 - First pass: skills are concise starting points; expect iteration.
 - `.lsp.json` is a placeholder (see above); no LSP servers are configured yet.
-- `navigator` produces maps inline; the generated knowledge-graph artifact and its
-  `repo_knowledge_graph.py` generator do not exist yet.
+- `navigator` reads the generated **Agent Context Spine v0**
+  (`docs/reference/project-index/generated/agent-context-spine.json`, via the `icn-ops` MCP tool
+  `icn_ops_agent_context_spine`) and otherwise produces maps inline. The spine is v0 — it does not
+  yet parse the Rust module graph or enumerate per-route nodes. See
+  [`docs/guides/developer/agent-context-spine.md`](../../../../docs/guides/developer/agent-context-spine.md).
 - Hooks load at session start — edits to `hooks/hooks.json` or `bin/*` require a restart (or
   `/reload-plugins`) to take effect.
 - No CI wiring for plugin validation yet (run `scripts/check-claude-plugin.py` and
