@@ -2,7 +2,8 @@ name: Generated-truth drift
 
 # Observational drift guard for the repo's generated orientation/truth artifacts
 # and the agent/plugin validation tooling (#2128 spine, #2130 file-record, #2127
-# Claude agent pack, #2131 live-state overlay). These artifacts are
+# Claude agent pack, #2131 live-state overlay) PLUS a canonical-state-lag check
+# (docs/STATE.md vs git merge history). These generated artifacts are
 # "Canonical: no" — orientation/reference layers, NOT truth roots (canonical
 # state is docs/STATE.md + docs/PHASE_PROGRESS.md). Drift here is therefore a
 # WARNING, not a merge blocker, mirroring the route-inventory guard in
@@ -25,6 +26,8 @@ on:
       - 'docs/reference/project-index/generated/**'
       - 'docs/ai/ICN_LIVE_STATE_OVERLAY_TEMPLATE.md'
       - 'tools/claude-code/plugins/**'
+      - 'scripts/check-state-lag.py'
+      - 'docs/STATE.md'
       - '.github/workflows/generated-truth.yml'
   push:
     branches:
@@ -39,6 +42,8 @@ on:
       - 'docs/reference/project-index/generated/**'
       - 'docs/ai/ICN_LIVE_STATE_OVERLAY_TEMPLATE.md'
       - 'tools/claude-code/plugins/**'
+      - 'scripts/check-state-lag.py'
+      - 'docs/STATE.md'
       - '.github/workflows/generated-truth.yml'
   workflow_dispatch:
 
@@ -116,5 +121,24 @@ jobs:
             echo "::warning::docs/reference/project-index/generated/icn-file-record.{json,md} is stale vs the working tree. Regenerate (generated-only commit): python3 scripts/generate_repo_record.py --repo icn=. --out docs/reference/project-index/generated"
           else
             echo "::error::generate_repo_record.py --check errored (exit $rc) — checker error, not a staleness signal."
+            exit "$rc"
+          fi
+
+      # Canonical-state lag: the NEWEST docs/STATE.md sync block must not assert a
+      # PR/issue is unmerged / not-on-main when git history shows it merged (the
+      # #2128 recurrence). STATE.md is append-only, so only the current view is
+      # checked. Same exit convention as the file-record check:
+      #   exit 0 = no lag  -> pass
+      #   exit 1 = lag      -> ::warning:: (refresh the sync block); job succeeds
+      #   exit >=2 = checker errored -> fail
+      - name: Canonical-state lag (STATE.md vs merge history)
+        run: |
+          python3 scripts/check-state-lag.py && rc=0 || rc=$?
+          if [ "${rc:-0}" = "0" ]; then
+            echo "docs/STATE.md newest sync block is consistent with merge history."
+          elif [ "${rc:-0}" = "1" ]; then
+            echo "::warning::docs/STATE.md's newest sync block asserts a PR/issue is unmerged/not-on-main that git shows merged. Refresh the sync block. Audit all blocks: python3 scripts/check-state-lag.py --all"
+          else
+            echo "::error::check-state-lag.py errored (exit $rc) — checker error, not a lag signal."
             exit "$rc"
           fi

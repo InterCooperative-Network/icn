@@ -42,8 +42,9 @@ notes = "Invariants are stable but infection status changes as crates get cleane
 
 [sections."04-eight-primitives"]
 title = "The Eight Primitives"
-last_updated = "2026-03-21"
-last_verified_by = "matt"
+last_updated = "2026-06-21"
+last_verified_by = "state-truth-refresh"
+review_note = "Re-verified 2026-06-21 against current src: the eight primitive definitions (Identity/Authorization/State/Compute/Communication/Time/Coordination/Naming) and their crate mappings hold. Correction made this pass: §4.4 'WASM' overclaimed 'Fuel metering enforced by ICN runtime. Deterministic imports (no system time...)'. Reworded to experimental / non-deterministic to match the code (icn-compute/src/wasm_executor.rs: Engine::default() with 'fuel metering can be enabled later', a coarse saturating_sub(100) per-call counter, and wall-clock std::time::SystemTime::now() host imports) and the already-corrected §11 review_note. CCL interpreter determinism/fuel claims unchanged (verified)."
 staleness_threshold_days = 90
 truth_class = "normative"
 depends_on = ["icn/crates/icn-kernel-api/src/**"]
@@ -215,8 +216,9 @@ notes = "Auto-generated from Cargo.toml + kernel_surface.toml."
 
 [sections."18-institution-primitives"]
 title = "Institution Primitives"
-last_updated = "2026-03-21"
-last_verified_by = "matt"
+last_updated = "2026-06-21"
+last_verified_by = "state-truth-refresh"
+review_note = "Re-verified 2026-06-21: the four institution primitives (Identity & Membership / Governance / Economics / Federation) still compose from the eight kernel primitives as described; normative framing holds. Correction made this pass: the 'Institution-in-a-Box' starter kit listed the charter as 'written in TOML' — corrected to YAML to match the live v1 charter interface (parsed by serde_yaml via CclDocument::from_yaml in icn-ccl; templates are contracts/templates/*.yaml; Phase 1 canonical = YAML schema). NOTE (out of scope, flagged): docs/status.toml governance evidence still says 'Charter system (TOML format ...)' — pre-existing stale wording in a separately-reviewed doc; left for a status.toml follow-up rather than edited here."
 staleness_threshold_days = 90
 truth_class = "normative"
 depends_on = ["VISION.md", "docs/design/institution-in-a-box.md"]
