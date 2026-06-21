@@ -1,5 +1,5 @@
 {
-  "branch": "docs/record-refresh-2126",
+  "branch": "fix/file-record-exclude-self",
   "directories": [
     {
       "child_directory_count": 25,
@@ -24,7 +24,7 @@
         ".ipynb": 1,
         ".jar": 1,
         ".js": 43,
-        ".json": 154,
+        ".json": 153,
         ".keystore": 1,
         ".kt": 2,
         ".lock": 3,
@@ -37,7 +37,7 @@
         ".pptx": 1,
         ".pro": 1,
         ".properties": 2,
-        ".py": 40,
+        ".py": 41,
         ".rs": 940,
         ".service": 4,
         ".sh": 119,
@@ -52,12 +52,12 @@
         ".webp": 15,
         ".xml": 11,
         ".yaml": 92,
-        ".yml": 59
+        ".yml": 60
       },
-      "file_count": 3093,
+      "file_count": 3094,
       "path": ".",
       "role_guess": "repo root",
-      "total_size_bytes": 48274562
+      "total_size_bytes": 46534125
     },
     {
       "child_directory_count": 1,
@@ -127,12 +127,12 @@
       "extensions": {
         ".md": 35,
         ".py": 4,
-        ".yml": 29
+        ".yml": 30
       },
-      "file_count": 68,
+      "file_count": 69,
       "path": ".github",
       "role_guess": "repo configuration",
-      "total_size_bytes": 284056
+      "total_size_bytes": 289482
     },
     {
       "child_directory_count": 1,
@@ -253,7 +253,7 @@
       "depth": 1,
       "extensions": {
         ".html": 3,
-        ".json": 16,
+        ".json": 15,
         ".md": 881,
         ".mermaid": 1,
         ".pdf": 5,
@@ -264,10 +264,10 @@
         ".toml": 45,
         ".yaml": 4
       },
-      "file_count": 968,
+      "file_count": 967,
       "path": "docs",
       "role_guess": "documentation",
-      "total_size_bytes": 15760928
+      "total_size_bytes": 13955313
     },
     {
       "child_directory_count": 5,
@@ -364,14 +364,14 @@
       "depth": 1,
       "extensions": {
         ".js": 1,
-        ".py": 9,
+        ".py": 10,
         ".sh": 42,
         ".txt": 1
       },
-      "file_count": 53,
+      "file_count": 54,
       "path": "scripts",
       "role_guess": "script",
-      "total_size_bytes": 423147
+      "total_size_bytes": 481807
     },
     {
       "child_directory_count": 2,
@@ -428,7 +428,7 @@
       "file_count": 26,
       "path": "tools",
       "role_guess": "uncategorized",
-      "total_size_bytes": 88907
+      "total_size_bytes": 89999
     },
     {
       "child_directory_count": 4,
@@ -629,12 +629,12 @@
       "child_directory_count": 0,
       "depth": 2,
       "extensions": {
-        ".yml": 17
+        ".yml": 18
       },
-      "file_count": 17,
+      "file_count": 18,
       "path": ".github/workflows",
       "role_guess": "GitHub Actions workflow",
-      "total_size_bytes": 108418
+      "total_size_bytes": 113844
     },
     {
       "child_directory_count": 0,
@@ -926,7 +926,7 @@
       "file_count": 5,
       "path": "docs/ai",
       "role_guess": "documentation",
-      "total_size_bytes": 21008
+      "total_size_bytes": 26161
     },
     {
       "child_directory_count": 0,
@@ -968,12 +968,12 @@
       "child_directory_count": 0,
       "depth": 2,
       "extensions": {
-        ".md": 3
+        ".md": 4
       },
-      "file_count": 3,
+      "file_count": 4,
       "path": "docs/ci",
       "role_guess": "documentation",
-      "total_size_bytes": 13817
+      "total_size_bytes": 18053
     },
     {
       "child_directory_count": 1,
@@ -1268,14 +1268,14 @@
       "child_directory_count": 3,
       "depth": 2,
       "extensions": {
-        ".json": 2,
-        ".md": 37,
+        ".json": 1,
+        ".md": 36,
         ".yaml": 1
       },
-      "file_count": 40,
+      "file_count": 38,
       "path": "docs/reference",
       "role_guess": "documentation",
-      "total_size_bytes": 2290330
+      "total_size_bytes": 475326
     },
     {
       "child_directory_count": 0,
@@ -1783,7 +1783,7 @@
       "file_count": 26,
       "path": "tools/claude-code",
       "role_guess": "uncategorized",
-      "total_size_bytes": 88907
+      "total_size_bytes": 89999
     },
     {
       "child_directory_count": 0,
@@ -3135,13 +3135,13 @@
       "child_directory_count": 1,
       "depth": 3,
       "extensions": {
-        ".json": 2,
-        ".md": 25
+        ".json": 1,
+        ".md": 24
       },
-      "file_count": 27,
+      "file_count": 25,
       "path": "docs/reference/project-index",
       "role_guess": "project index / atlas",
-      "total_size_bytes": 2172323
+      "total_size_bytes": 357319
     },
     {
       "child_directory_count": 0,
@@ -4155,7 +4155,7 @@
       "file_count": 26,
       "path": "tools/claude-code/plugins",
       "role_guess": "uncategorized",
-      "total_size_bytes": 88907
+      "total_size_bytes": 89999
     },
     {
       "child_directory_count": 0,
@@ -4776,13 +4776,13 @@
       "child_directory_count": 0,
       "depth": 4,
       "extensions": {
-        ".json": 2,
-        ".md": 2
+        ".json": 1,
+        ".md": 1
       },
-      "file_count": 4,
+      "file_count": 2,
       "path": "docs/reference/project-index/generated",
       "role_guess": "project index / atlas",
-      "total_size_bytes": 1997717
+      "total_size_bytes": 182713
     },
     {
       "child_directory_count": 0,
@@ -6034,7 +6034,7 @@
       "file_count": 26,
       "path": "tools/claude-code/plugins/icn-agent-pack",
       "role_guess": "uncategorized",
-      "total_size_bytes": 88907
+      "total_size_bytes": 89999
     },
     {
       "child_directory_count": 0,
@@ -6698,7 +6698,7 @@
       "file_count": 10,
       "path": "tools/claude-code/plugins/icn-agent-pack/skills",
       "role_guess": "uncategorized",
-      "total_size_bytes": 34294
+      "total_size_bytes": 35386
     },
     {
       "child_directory_count": 0,
@@ -6950,7 +6950,7 @@
       "file_count": 1,
       "path": "tools/claude-code/plugins/icn-agent-pack/skills/preflight",
       "role_guess": "uncategorized",
-      "total_size_bytes": 2605
+      "total_size_bytes": 3697
     },
     {
       "child_directory_count": 0,
@@ -9480,6 +9480,19 @@
       "role_guess": "GitHub Actions workflow",
       "sha256": "e2ff1c562395135582738e773e5db1b984d190e8204fab5e4b7bffb57d9612fa",
       "size_bytes": 3037,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": ".github/workflows",
+      "extension": ".yml",
+      "kind": "file",
+      "language": "YAML",
+      "name": "generated-truth.yml",
+      "path": ".github/workflows/generated-truth.yml",
+      "role_guess": "GitHub Actions workflow",
+      "sha256": "cf03e607fbfac884f97a1301c6fe40f53f6d4aa1403beaa9e7d00e1ec5f1c3d9",
+      "size_bytes": 5426,
       "symlink_target": null,
       "tracked": true
     },
@@ -13391,8 +13404,8 @@
       "name": "ICN_LIVE_STATE_OVERLAY_TEMPLATE.md",
       "path": "docs/ai/ICN_LIVE_STATE_OVERLAY_TEMPLATE.md",
       "role_guess": "documentation",
-      "sha256": "6af52b6ee876dad633c6fe8265da357daf17535092db20dc4a4736d8e28e2ddd",
-      "size_bytes": 2748,
+      "sha256": "00421d4642a229ef027df1ccaacc4ba49cbc44c6861e99a86ad47e4064e324e8",
+      "size_bytes": 7901,
       "symlink_target": null,
       "tracked": true
     },
@@ -15109,6 +15122,19 @@
       "role_guess": "documentation",
       "sha256": "9debcec8b18cadb02071d2277b80ad8a040da8932c61a761a4c7751b4c9ebd98",
       "size_bytes": 8724,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/ci",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
+      "name": "GENERATED_TRUTH_DRIFT.md",
+      "path": "docs/ci/GENERATED_TRUTH_DRIFT.md",
+      "role_guess": "documentation",
+      "sha256": "46753d3d2baf4c0c709efc771a7a8b304bd4477ebf4d66fea06fcdc0e20e7085",
+      "size_bytes": 4236,
       "symlink_target": null,
       "tracked": true
     },
@@ -23013,32 +23039,6 @@
       "role_guess": "project index / atlas",
       "sha256": "a68345f938a12c782befa3e4fa1c597068c9911537aaaa5c599bed9d63ff6e57",
       "size_bytes": 106372,
-      "symlink_target": null,
-      "tracked": true
-    },
-    {
-      "directory": "docs/reference/project-index/generated",
-      "extension": ".json",
-      "kind": "file",
-      "language": "JSON",
-      "name": "icn-file-record.json",
-      "path": "docs/reference/project-index/generated/icn-file-record.json",
-      "role_guess": "project index / atlas",
-      "sha256": "cf7c2b7e6c389a6adec7f68dfd68cfeeb0824add14fa9e5c2656b80a49fb2f74",
-      "size_bytes": 1350034,
-      "symlink_target": null,
-      "tracked": true
-    },
-    {
-      "directory": "docs/reference/project-index/generated",
-      "extension": ".md",
-      "kind": "file",
-      "language": "Markdown",
-      "name": "icn-file-record.md",
-      "path": "docs/reference/project-index/generated/icn-file-record.md",
-      "role_guess": "project index / atlas",
-      "sha256": "3b9cf01f4205225e78ebfcfb81cabd6ecdb5a7457bc1205b92d71aa9b4b2c480",
-      "size_bytes": 464970,
       "symlink_target": null,
       "tracked": true
     },
@@ -41959,6 +41959,19 @@
     },
     {
       "directory": "scripts",
+      "extension": ".py",
+      "kind": "file",
+      "language": "Python",
+      "name": "generate-live-state-overlay.py",
+      "path": "scripts/generate-live-state-overlay.py",
+      "role_guess": "script",
+      "sha256": "04398e0a68e0c8a4293f82a881aaaacb77eae0d90a36a00bc2690069532fe61f",
+      "size_bytes": 50165,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "scripts",
       "extension": ".sh",
       "kind": "file",
       "language": "Shell",
@@ -41978,8 +41991,8 @@
       "name": "generate_repo_record.py",
       "path": "scripts/generate_repo_record.py",
       "role_guess": "script",
-      "sha256": "fd4ae442a188064be1d5699548ddc045413ac7268180732249778af228d4f96d",
-      "size_bytes": 21852,
+      "sha256": "1b7f9aec71df765a4df383b254cecdde81a46b011998123dd1a30b23f66f83ff",
+      "size_bytes": 30347,
       "symlink_target": null,
       "tracked": true
     },
@@ -45111,8 +45124,8 @@
       "name": "SKILL.md",
       "path": "tools/claude-code/plugins/icn-agent-pack/skills/preflight/SKILL.md",
       "role_guess": "uncategorized",
-      "sha256": "1b6fa063b261175d86aae48321adfc9fb187d8ac9f0b5838e3caf21c39253602",
-      "size_bytes": 2605,
+      "sha256": "cf2c29ef43dd689c46c3c877d38693c719ba7dc6895ba899810da5a13e43a386",
+      "size_bytes": 3697,
       "symlink_target": null,
       "tracked": true
     },
@@ -47470,8 +47483,8 @@
       "tracked": true
     }
   ],
-  "generated_at": "2026-06-21T14:23:11.642134+00:00",
-  "head": "41c7082b330a6249bead068d641c6e4e495d2075",
+  "generated_at": "2026-06-21T21:21:29.736718+00:00",
+  "head": "fa819b47fbf774296400b42ca6f7c7c8630004af",
   "include_untracked": false,
   "repo": "icn",
   "schema": "icn.repo_record.v1",
@@ -47497,7 +47510,7 @@
       ".ipynb": 1,
       ".jar": 1,
       ".js": 43,
-      ".json": 154,
+      ".json": 153,
       ".keystore": 1,
       ".kt": 2,
       ".lock": 3,
@@ -47510,7 +47523,7 @@
       ".pptx": 1,
       ".pro": 1,
       ".properties": 2,
-      ".py": 40,
+      ".py": 41,
       ".rs": 940,
       ".service": 4,
       ".sh": 119,
@@ -47525,14 +47538,14 @@
       ".webp": 15,
       ".xml": 11,
       ".yaml": 92,
-      ".yml": 59
+      ".yml": 60
     },
-    "file_count": 3093,
+    "file_count": 3094,
     "kinds": {
-      "file": 3093
+      "file": 3094
     },
     "roles": {
-      "GitHub Actions workflow": 17,
+      "GitHub Actions workflow": 18,
       "React Native SDK": 139,
       "Rust binary": 16,
       "Rust library crate": 922,
@@ -47543,25 +47556,25 @@
       "dashboard UI": 7,
       "demo": 53,
       "deployment": 130,
-      "documentation": 897,
+      "documentation": 898,
       "institution package": 40,
       "legacy/top-level app": 5,
       "monitoring": 9,
       "operations / coordination": 87,
       "pilot UI": 84,
-      "project index / atlas": 27,
+      "project index / atlas": 25,
       "public website": 71,
       "repo configuration": 144,
       "repo control document": 4,
       "request for comments": 8,
       "runtime app crate": 126,
-      "script": 53,
+      "script": 54,
       "uncategorized": 155
     },
     "skipped_paths": [],
-    "total_size_bytes": 48274562,
-    "tracked_file_count": 3093,
-    "tracked_total_size_bytes": 48274562,
+    "total_size_bytes": 46534125,
+    "tracked_file_count": 3094,
+    "tracked_total_size_bytes": 46534125,
     "untracked_file_count": 0,
     "untracked_total_size_bytes": 0
   },
