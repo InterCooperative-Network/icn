@@ -1,0 +1,379 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Invariants Catalog | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>project index</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>invariants catalog</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/project-index/invariants-catalog.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Invariants Catalog</h1>
+<blockquote>
+<p>This catalog indexes invariants. It does not define them. The canonical source listed for each entry remains authoritative.</p>
+</blockquote>
+<p>ICN&#39;s invariants are real but scattered across four canonical sources in different formats, so the
+families get conflated or miscounted. This page is a single searchable enumeration that links each
+invariant back to where it is actually defined. The machine-readable form is
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/invariants-catalog.toml">`invariants-catalog.toml`</a>.</p>
+<p><strong>This is an orientation/index layer (<code>Canonical: no</code>), not a truth root.</strong> It restates nothing; it
+only points. The numbers below are the live source counts (verified 2026-06-22) and they match the
+counts in <a href="https://github.com/InterCooperative-Network/icn/issues/2114" target="_blank" rel="noopener">#2114</a>: 5 + 6 + 10 + 7 = <strong>28</strong>.</p>
+<h2>Non-goals</h2>
+<ul>
+<li>Not new invariants or doctrine — this page invents nothing.</li>
+<li>Not a redefinition — definitions live in the canonical sources; only one-line labels appear here.</li>
+<li>Not a competing source of truth — when this page and a canonical source disagree, the canonical
+source wins. The full precedence ladder is in <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">`source-of-truth-map.md`</a>.</li>
+</ul>
+<h2>How to read an entry</h2>
+<p>Each entry carries: family, a stable id, a one-line label (mirroring the source&#39;s own wording), the
+canonical source path, a stable <strong>anchor</strong> (a section heading, Rust enum variant name, or bold
+label — not a line number, which drifts), source type (doc/code), and whether the source states it
+normatively.</p>
+<hr>
+<h2>1. Operational invariants (tier 1)</h2>
+<p>Canonical source: <a href="/docs/DESIGN_PRINCIPLES">`docs/DESIGN_PRINCIPLES.md`</a> §1 · 5 invariants · doc</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Invariant</th>
+<th>Anchor</th>
+<th>Normative</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>adversarial_by_default</code></td>
+<td>Every peer is untrusted until verifiable participation establishes trust.</td>
+<td>§1.1 Adversarial-by-default</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>determinism</code></td>
+<td>Same inputs produce same outputs; no floating point in consensus paths.</td>
+<td>§1.2 Determinism</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>canonical_encodings</code></td>
+<td>One valid byte representation per value (definite-length CBOR).</td>
+<td>§1.3 Canonical encodings</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>no_panics_in_protocol_paths</code></td>
+<td>Protocol/network/actor paths return <code>Result</code>, never panic on bad input.</td>
+<td>§1.4 No panics in protocol paths</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>kernel_app_boundary_inviolable</code></td>
+<td>The dependency graph forbids domain crates inside kernel crates.</td>
+<td>§1.5 Kernel/app boundary is inviolable</td>
+<td>yes</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p><code>kernel_app_boundary_inviolable</code> is the tier-1 statement of the tier-2 firewall contract below —
+the same rule, decomposed into six mechanically checkable sub-rules.</p>
+</blockquote>
+<h2>2. Firewall contract (tier 2)</h2>
+<p>Canonical source: <a href="/docs/architecture/KERNEL_APP_SEPARATION">`docs/architecture/KERNEL_APP_SEPARATION.md`</a> · 6 invariants · doc · mechanically enforced via CI</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Invariant</th>
+<th>Anchor</th>
+<th>Normative</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>kernel_no_domain_imports</code></td>
+<td>Kernel must not import domain crates.</td>
+<td>Invariant 1</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>kernel_pure_data_types</code></td>
+<td>Kernel only accepts pure data types at its entrypoints.</td>
+<td>Invariant 2</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>semantic_lookup_in_policy_oracle</code></td>
+<td>All semantic lookup is confined to <code>PolicyOracle</code>.</td>
+<td>Invariant 3</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>no_pattern_match_constraintset_custom</code></td>
+<td>Kernel must not pattern-match on <code>ConstraintSet.custom</code> keys.</td>
+<td>Invariant 4</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>mechanism_not_policy</code></td>
+<td>Kernel contains enforcement mechanisms, not policy decisions.</td>
+<td>Invariant 5</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>opaque_receipt_storage</code></td>
+<td>Kernel stores app-generated receipts opaquely (never parses the body).</td>
+<td>Invariant 6</td>
+<td>yes</td>
+</tr>
+</tbody></table>
+<h2>3. Frozen-core invariants (tier 3)</h2>
+<p>Canonical source: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-kernel-api/src/invariants.rs">`icn/crates/icn-kernel-api/src/invariants.rs`</a> (<code>enum InvariantId</code>) · 10 invariants · code</p>
+<p>The count is asserted in-crate by <code>test_all_invariants_returns_10</code>. Anchors are the enum variant names.</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Invariant</th>
+<th>Variant</th>
+<th>Domain</th>
+<th>Normative</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>right_of_exit</code></td>
+<td>No rule can prevent an identity from leaving an entity.</td>
+<td><code>RightOfExit</code></td>
+<td>SovereigntyCore</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>no_retroactive_obligations</code></td>
+<td>Rules only apply to actions after activation block.</td>
+<td><code>NoRetroactiveObligations</code></td>
+<td>SovereigntyCore</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>explicit_cryptographic_entry</code></td>
+<td>Adding an identity requires their cryptographic signature.</td>
+<td><code>ExplicitCryptographicEntry</code></td>
+<td>SovereigntyCore</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>no_silent_power_changes</code></td>
+<td>Authz changes must include a computable capability delta.</td>
+<td><code>NoSilentPowerChanges</code></td>
+<td>AntiCaptureCore</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>bounded_authority</code></td>
+<td>No wildcard capabilities across all resources.</td>
+<td><code>BoundedAuthority</code></td>
+<td>AntiCaptureCore</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>mandatory_execution_delay</code></td>
+<td>Economic/capability changes require timelock delay.</td>
+<td><code>MandatoryExecutionDelay</code></td>
+<td>AntiCaptureCore</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>capability_conservation</code></td>
+<td>Cannot delegate capabilities you don&#39;t possess.</td>
+<td><code>CapabilityConservation</code></td>
+<td>AntiCaptureCore</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>mutual_credit_conservation</code></td>
+<td>Mutual credit loops must net to zero.</td>
+<td><code>MutualCreditConservation</code></td>
+<td>EconomicCore</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>sovereign_signature_requirement</code></td>
+<td>Funds move only via owner signature or pre-consented dispute hook.</td>
+<td><code>SovereignSignatureRequirement</code></td>
+<td>EconomicCore</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>universal_receipt_generation</code></td>
+<td>Every state transition emits an immutable receipt.</td>
+<td><code>UniversalReceiptGeneration</code></td>
+<td>EconomicCore</td>
+<td>yes</td>
+</tr>
+</tbody></table>
+<h2>4. Regulatory invariants (tier 4)</h2>
+<p>Canonical source: <a href="/docs/ARCHITECTURE">`docs/ARCHITECTURE.md`</a> §5 (&quot;Seven regulatory invariants&quot;) · 7 invariants · doc</p>
+<table>
+<thead>
+<tr>
+<th>ID</th>
+<th>Invariant</th>
+<th>Anchor</th>
+<th>Normative</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>user_signed_transitions_only</code></td>
+<td>No transition without the user&#39;s cryptographic signature.</td>
+<td>User-signed transitions only</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>no_hosted_positions</code></td>
+<td>ICN holds no balances on behalf of users.</td>
+<td>No hosted positions</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>no_operator_routing_of_value</code></td>
+<td>Units move directly debtor → creditor, not through an operator account.</td>
+<td>No operator routing of value</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>derived_views_not_primitives</code></td>
+<td>A balance is a computed view, not enforced protocol state.</td>
+<td>Derived views are not protocol primitives</td>
+<td>no (descriptive)</td>
+</tr>
+<tr>
+<td><code>no_embedded_convertibility</code></td>
+<td>Cross-coop settlement requires explicit trust agreements + governance approval.</td>
+<td>No embedded convertibility</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>matching_market_opt_in</code></td>
+<td>Marketplace features are opt-in, scoped, governance-authorized (a CCL contract, not a platform feature).</td>
+<td>Matching/market features are opt-in, scoped, governance-authorized</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><code>execution_receipts_close_loop</code></td>
+<td>Every state transition produces a cryptographically signed receipt.</td>
+<td>Execution receipts close the loop</td>
+<td>yes</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>Cross-reference: <code>execution_receipts_close_loop</code> (regulatory) and <code>universal_receipt_generation</code>
+(frozen-core) are the same receipt-universality property seen from two tiers. The catalog records
+the link via <code>related_to</code>; it does not merge them.</p>
+</blockquote>
+<hr>
+<h2>Related enumerations (NOT indexed here)</h2>
+<p>The four families above are exactly the ones #2114 names. The repo contains other invariant-shaped
+lists that are deliberately <strong>out of scope</strong> for this catalog, to avoid double-counting and taxonomy
+sprawl:</p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/AGENTS">`AGENTS.md`</a> restates the five operational invariants as a PR-review gate for
+the <code>icn-invariants-guardian</code>. That is the same family 1, not a fifth family — <code>docs/DESIGN_PRINCIPLES.md</code>
+remains its canonical source. <code>AGENTS.md</code> points here for the broader source-linked index.</li>
+<li><a href="/docs/genesis">`docs/genesis.md`</a> describes &quot;hard mechanisms&quot; and &quot;meta-invariants&quot; under a
+different framing. Indexing those would require separate scoping; they are not part of #2114.</li>
+</ul>
+<h2>Orientation discipline</h2>
+<p>This page lives in the project-index orientation layer. Like every map here it is <code>Canonical: no</code>:
+defer to code/tests first, then <a href="/docs/STATE">`docs/STATE.md`</a> and
+<a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>, then accepted ADRs/RFCs. Generated project-index
+artifacts (under <code>generated/</code>) and these hand-maintained maps are navigation, not state.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
