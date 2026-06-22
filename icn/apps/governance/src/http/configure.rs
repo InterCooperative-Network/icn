@@ -681,6 +681,11 @@ where
             web::resource("/domains/{domain_id}/action-items/{item_id}/completion-receipt")
                 .route(web::get().to(handlers::get_action_item_completion_receipt::<E>)),
         )
+        // ── Process gate results (#2144 — first ProcessTransitionReceipt) ──
+        .service(
+            web::resource("/domains/{domain_id}/process-sessions/{session_id}/gate-results")
+                .route(web::post().to(handlers::record_process_gate_result::<E>)),
+        )
         // ── Structure endpoints ──────────────────────────────────────────
         .service(
             web::resource("/entities/{entity_id}/structures")

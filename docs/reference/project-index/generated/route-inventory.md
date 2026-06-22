@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-20T16:19:03+00:00
+Generated: 2026-06-22T18:19:04+00:00
 ---
 
 # Gateway Route Inventory (generated)
@@ -17,7 +17,7 @@ Generated: 2026-06-20T16:19:03+00:00
 
 ## Snapshot
 
-- Source commit: `4b47261a3fb9b2c7bd7c979d6556e3fb06bb0ce2`
+- Source commit: `7c7158c8a9b32d8a73c41f6570a50977eaf6d386`
 - Gateway source scanned: `icn/crates/icn-gateway/src/**`
 - OpenAPI spec: `docs/api/openapi.generated.yaml`
 
@@ -29,7 +29,7 @@ Generated: 2026-06-20T16:19:03+00:00
 - Not matched to OpenAPI (best-effort): 285 (~99% of discovered)
 - Documented share of discovered routes: ~0.7%
 - **OpenAPI operations (method + path) not matched to a discovered gateway route: 3** (see section below)
-- **Governance app route-registration candidates (separate surface, not gateway macros): 80** (see section below)
+- **Governance app route-registration candidates (separate surface, not gateway macros): 81** (see section below)
 
 > The gap is structural: only handlers hand-annotated for utoipa reach the OpenAPI spec. Of the OpenAPI paths, several belong to `icn-governance-actor` HTTP handlers that live outside the gateway crate and are not captured by this macro scan — so the documented/undocumented counts here are a best-effort comparison, while the two headline counts (discovered macros, OpenAPI paths) are the robust measured facts.
 
@@ -40,8 +40,8 @@ These OpenAPI-documented paths did **not** mechanically match any discovered gat
 | Method | OpenAPI path | Matched gateway route | Governance registration candidate | Status | Claim safety |
 |---|---|---|---|---|---|
 | GET | `/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt` | no | `get_action_item_completion_receipt` @ `icn/apps/governance/src/http/configure.rs`:682 | unknown / needs local verification | needs review |
-| GET | `/gov/me/action-cards` | no | `get_my_action_cards` @ `icn/apps/governance/src/http/configure.rs`:834 | unknown / needs local verification | needs review |
-| GET | `/gov/me/standing` | no | `get_my_standing` @ `icn/apps/governance/src/http/configure.rs`:830 | unknown / needs local verification | needs review |
+| GET | `/gov/me/action-cards` | no | `get_my_action_cards` @ `icn/apps/governance/src/http/configure.rs`:839 | unknown / needs local verification | needs review |
+| GET | `/gov/me/standing` | no | `get_my_standing` @ `icn/apps/governance/src/http/configure.rs`:835 | unknown / needs local verification | needs review |
 
 ## Governance app route-registration candidates
 
@@ -49,12 +49,12 @@ The governance app (`icn-governance-actor` = `icn/apps/governance`) registers it
 
 | Method | Path (relative, under `/gov`) | Source | Handler | OpenAPI documented | Status | Claim safety |
 |---|---|---|---|---|---|---|
-| GET | `/activities/{activity_id}` | `icn/apps/governance/src/http/configure.rs`:707 | `get_activity` | no | unknown / needs local verification | needs review |
+| GET | `/activities/{activity_id}` | `icn/apps/governance/src/http/configure.rs`:712 | `get_activity` | no | unknown / needs local verification | needs review |
 | POST | `/charters` | `icn/apps/governance/src/http/configure.rs`:587 | `activate_charter` | no | unknown / needs local verification | needs review |
 | GET | `/delegations` | `icn/apps/governance/src/http/configure.rs`:654 | `list_delegations` | no | unknown / needs local verification | needs review |
 | POST | `/delegations` | `icn/apps/governance/src/http/configure.rs`:653 | `create_delegation` | no | unknown / needs local verification | needs review |
 | DELETE | `/delegations/{delegation_id}` | `icn/apps/governance/src/http/configure.rs`:658 | `revoke_delegation` | no | unknown / needs local verification | needs review |
-| GET | `/digest` | `icn/apps/governance/src/http/configure.rs`:827 | `get_digest` | no | unknown / needs local verification | needs review |
+| GET | `/digest` | `icn/apps/governance/src/http/configure.rs`:832 | `get_digest` | no | unknown / needs local verification | needs review |
 | GET | `/domains` | `icn/apps/governance/src/http/configure.rs`:576 | `list_domains` | no | unknown / needs local verification | needs review |
 | POST | `/domains` | `icn/apps/governance/src/http/configure.rs`:575 | `create_domain` | no | unknown / needs local verification | needs review |
 | GET | `/domains/{domain_id}` | `icn/apps/governance/src/http/configure.rs`:579 | `get_domain` | no | unknown / needs local verification | needs review |
@@ -66,50 +66,51 @@ The governance app (`icn-governance-actor` = `icn/apps/governance`) registers it
 | GET | `/domains/{domain_id}/action-items/{item_id}/completion-receipt` | `icn/apps/governance/src/http/configure.rs`:682 | `get_action_item_completion_receipt` | yes | unknown / needs local verification | needs review |
 | POST | `/domains/{domain_id}/action-items/{item_id}/notes` | `icn/apps/governance/src/http/configure.rs`:678 | `add_action_item_note` | no | unknown / needs local verification | needs review |
 | PUT | `/domains/{domain_id}/action-items/{item_id}/status` | `icn/apps/governance/src/http/configure.rs`:674 | `update_action_item_status` | no | unknown / needs local verification | needs review |
-| GET | `/domains/{domain_id}/meetings` | `icn/apps/governance/src/http/configure.rs`:758 | `list_meetings` | no | unknown / needs local verification | needs review |
-| POST | `/domains/{domain_id}/meetings` | `icn/apps/governance/src/http/configure.rs`:757 | `create_meeting` | no | unknown / needs local verification | needs review |
+| GET | `/domains/{domain_id}/meetings` | `icn/apps/governance/src/http/configure.rs`:763 | `list_meetings` | no | unknown / needs local verification | needs review |
+| POST | `/domains/{domain_id}/meetings` | `icn/apps/governance/src/http/configure.rs`:762 | `create_meeting` | no | unknown / needs local verification | needs review |
 | DELETE | `/domains/{domain_id}/members` | `icn/apps/governance/src/http/configure.rs`:584 | `remove_domain_member` | no | unknown / needs local verification | needs review |
 | POST | `/domains/{domain_id}/members` | `icn/apps/governance/src/http/configure.rs`:583 | `add_domain_member` | no | unknown / needs local verification | needs review |
-| GET | `/domains/{domain_id}/programs` | `icn/apps/governance/src/http/configure.rs`:713 | `list_programs_by_domain` | no | unknown / needs local verification | needs review |
-| POST | `/domains/{domain_id}/programs` | `icn/apps/governance/src/http/configure.rs`:712 | `create_program` | no | unknown / needs local verification | needs review |
-| GET | `/entities/{entity_id}/activities` | `icn/apps/governance/src/http/configure.rs`:703 | `list_activities` | no | unknown / needs local verification | needs review |
-| POST | `/entities/{entity_id}/activities` | `icn/apps/governance/src/http/configure.rs`:702 | `create_activity` | no | unknown / needs local verification | needs review |
-| GET | `/entities/{entity_id}/structures` | `icn/apps/governance/src/http/configure.rs`:688 | `list_structures` | no | unknown / needs local verification | needs review |
-| POST | `/entities/{entity_id}/structures` | `icn/apps/governance/src/http/configure.rs`:687 | `create_structure` | no | unknown / needs local verification | needs review |
-| GET | `/me/action-cards` | `icn/apps/governance/src/http/configure.rs`:834 | `get_my_action_cards` | yes | unknown / needs local verification | needs review |
-| GET | `/me/scopes` | `icn/apps/governance/src/http/configure.rs`:829 | `get_my_scopes` | no | unknown / needs local verification | needs review |
-| GET | `/me/standing` | `icn/apps/governance/src/http/configure.rs`:830 | `get_my_standing` | yes | unknown / needs local verification | needs review |
-| GET | `/me/work` | `icn/apps/governance/src/http/configure.rs`:831 | `get_my_work` | no | unknown / needs local verification | needs review |
-| GET | `/meetings/{meeting_id}` | `icn/apps/governance/src/http/configure.rs`:762 | `get_meeting` | no | unknown / needs local verification | needs review |
-| POST | `/meetings/{meeting_id}/agenda` | `icn/apps/governance/src/http/configure.rs`:782 | `add_agenda_item` | no | unknown / needs local verification | needs review |
-| PUT | `/meetings/{meeting_id}/agenda/{item_id}` | `icn/apps/governance/src/http/configure.rs`:786 | `update_agenda_item` | no | unknown / needs local verification | needs review |
-| PUT | `/meetings/{meeting_id}/attendance` | `icn/apps/governance/src/http/configure.rs`:778 | `mark_attendance` | no | unknown / needs local verification | needs review |
-| POST | `/meetings/{meeting_id}/attendees` | `icn/apps/governance/src/http/configure.rs`:774 | `add_attendee` | no | unknown / needs local verification | needs review |
-| POST | `/meetings/{meeting_id}/end` | `icn/apps/governance/src/http/configure.rs`:770 | `end_meeting` | no | unknown / needs local verification | needs review |
-| POST | `/meetings/{meeting_id}/start` | `icn/apps/governance/src/http/configure.rs`:766 | `start_meeting` | no | unknown / needs local verification | needs review |
-| GET | `/milestones/{milestone_id}` | `icn/apps/governance/src/http/configure.rs`:743 | `get_milestone` | no | unknown / needs local verification | needs review |
-| PATCH | `/milestones/{milestone_id}` | `icn/apps/governance/src/http/configure.rs`:744 | `update_milestone_status` | no | unknown / needs local verification | needs review |
-| GET | `/milestones/{milestone_id}/history` | `icn/apps/governance/src/http/configure.rs`:752 | `get_milestone_history` | no | unknown / needs local verification | needs review |
-| GET | `/milestones/{milestone_id}/preview` | `icn/apps/governance/src/http/configure.rs`:748 | `preview_milestone` | no | unknown / needs local verification | needs review |
-| GET | `/programs/{program_id}` | `icn/apps/governance/src/http/configure.rs`:717 | `get_program` | no | unknown / needs local verification | needs review |
-| DELETE | `/programs/{program_id}/activities/{activity_id}` | `icn/apps/governance/src/http/configure.rs`:739 | `unlink_activity_from_program` | no | unknown / needs local verification | needs review |
-| PUT | `/programs/{program_id}/activities/{activity_id}` | `icn/apps/governance/src/http/configure.rs`:738 | `link_activity_to_program` | no | unknown / needs local verification | needs review |
-| GET | `/programs/{program_id}/dashboard` | `icn/apps/governance/src/http/configure.rs`:725 | `get_program_dashboard` | no | unknown / needs local verification | needs review |
-| GET | `/programs/{program_id}/milestones` | `icn/apps/governance/src/http/configure.rs`:734 | `list_milestones_by_program` | no | unknown / needs local verification | needs review |
-| POST | `/programs/{program_id}/milestones` | `icn/apps/governance/src/http/configure.rs`:733 | `create_milestone` | no | unknown / needs local verification | needs review |
-| PATCH | `/programs/{program_id}/status` | `icn/apps/governance/src/http/configure.rs`:721 | `update_program_status` | no | unknown / needs local verification | needs review |
-| GET | `/programs/{program_id}/summary` | `icn/apps/governance/src/http/configure.rs`:729 | `get_program_summary` | no | unknown / needs local verification | needs review |
+| POST | `/domains/{domain_id}/process-sessions/{session_id}/gate-results` | `icn/apps/governance/src/http/configure.rs`:687 | `record_process_gate_result` | no | unknown / needs local verification | needs review |
+| GET | `/domains/{domain_id}/programs` | `icn/apps/governance/src/http/configure.rs`:718 | `list_programs_by_domain` | no | unknown / needs local verification | needs review |
+| POST | `/domains/{domain_id}/programs` | `icn/apps/governance/src/http/configure.rs`:717 | `create_program` | no | unknown / needs local verification | needs review |
+| GET | `/entities/{entity_id}/activities` | `icn/apps/governance/src/http/configure.rs`:708 | `list_activities` | no | unknown / needs local verification | needs review |
+| POST | `/entities/{entity_id}/activities` | `icn/apps/governance/src/http/configure.rs`:707 | `create_activity` | no | unknown / needs local verification | needs review |
+| GET | `/entities/{entity_id}/structures` | `icn/apps/governance/src/http/configure.rs`:693 | `list_structures` | no | unknown / needs local verification | needs review |
+| POST | `/entities/{entity_id}/structures` | `icn/apps/governance/src/http/configure.rs`:692 | `create_structure` | no | unknown / needs local verification | needs review |
+| GET | `/me/action-cards` | `icn/apps/governance/src/http/configure.rs`:839 | `get_my_action_cards` | yes | unknown / needs local verification | needs review |
+| GET | `/me/scopes` | `icn/apps/governance/src/http/configure.rs`:834 | `get_my_scopes` | no | unknown / needs local verification | needs review |
+| GET | `/me/standing` | `icn/apps/governance/src/http/configure.rs`:835 | `get_my_standing` | yes | unknown / needs local verification | needs review |
+| GET | `/me/work` | `icn/apps/governance/src/http/configure.rs`:836 | `get_my_work` | no | unknown / needs local verification | needs review |
+| GET | `/meetings/{meeting_id}` | `icn/apps/governance/src/http/configure.rs`:767 | `get_meeting` | no | unknown / needs local verification | needs review |
+| POST | `/meetings/{meeting_id}/agenda` | `icn/apps/governance/src/http/configure.rs`:787 | `add_agenda_item` | no | unknown / needs local verification | needs review |
+| PUT | `/meetings/{meeting_id}/agenda/{item_id}` | `icn/apps/governance/src/http/configure.rs`:791 | `update_agenda_item` | no | unknown / needs local verification | needs review |
+| PUT | `/meetings/{meeting_id}/attendance` | `icn/apps/governance/src/http/configure.rs`:783 | `mark_attendance` | no | unknown / needs local verification | needs review |
+| POST | `/meetings/{meeting_id}/attendees` | `icn/apps/governance/src/http/configure.rs`:779 | `add_attendee` | no | unknown / needs local verification | needs review |
+| POST | `/meetings/{meeting_id}/end` | `icn/apps/governance/src/http/configure.rs`:775 | `end_meeting` | no | unknown / needs local verification | needs review |
+| POST | `/meetings/{meeting_id}/start` | `icn/apps/governance/src/http/configure.rs`:771 | `start_meeting` | no | unknown / needs local verification | needs review |
+| GET | `/milestones/{milestone_id}` | `icn/apps/governance/src/http/configure.rs`:748 | `get_milestone` | no | unknown / needs local verification | needs review |
+| PATCH | `/milestones/{milestone_id}` | `icn/apps/governance/src/http/configure.rs`:749 | `update_milestone_status` | no | unknown / needs local verification | needs review |
+| GET | `/milestones/{milestone_id}/history` | `icn/apps/governance/src/http/configure.rs`:757 | `get_milestone_history` | no | unknown / needs local verification | needs review |
+| GET | `/milestones/{milestone_id}/preview` | `icn/apps/governance/src/http/configure.rs`:753 | `preview_milestone` | no | unknown / needs local verification | needs review |
+| GET | `/programs/{program_id}` | `icn/apps/governance/src/http/configure.rs`:722 | `get_program` | no | unknown / needs local verification | needs review |
+| DELETE | `/programs/{program_id}/activities/{activity_id}` | `icn/apps/governance/src/http/configure.rs`:744 | `unlink_activity_from_program` | no | unknown / needs local verification | needs review |
+| PUT | `/programs/{program_id}/activities/{activity_id}` | `icn/apps/governance/src/http/configure.rs`:743 | `link_activity_to_program` | no | unknown / needs local verification | needs review |
+| GET | `/programs/{program_id}/dashboard` | `icn/apps/governance/src/http/configure.rs`:730 | `get_program_dashboard` | no | unknown / needs local verification | needs review |
+| GET | `/programs/{program_id}/milestones` | `icn/apps/governance/src/http/configure.rs`:739 | `list_milestones_by_program` | no | unknown / needs local verification | needs review |
+| POST | `/programs/{program_id}/milestones` | `icn/apps/governance/src/http/configure.rs`:738 | `create_milestone` | no | unknown / needs local verification | needs review |
+| PATCH | `/programs/{program_id}/status` | `icn/apps/governance/src/http/configure.rs`:726 | `update_program_status` | no | unknown / needs local verification | needs review |
+| GET | `/programs/{program_id}/summary` | `icn/apps/governance/src/http/configure.rs`:734 | `get_program_summary` | no | unknown / needs local verification | needs review |
 | GET | `/proposals` | `icn/apps/governance/src/http/configure.rs`:592 | `list_proposals` | no | unknown / needs local verification | needs review |
 | POST | `/proposals` | `icn/apps/governance/src/http/configure.rs`:591 | `create_proposal` | no | unknown / needs local verification | needs review |
-| POST | `/proposals/federation/clearing/establish` | `icn/apps/governance/src/http/configure.rs`:799 | `create_establish_clearing_proposal` | no | unknown / needs local verification | needs review |
-| POST | `/proposals/federation/clearing/terminate` | `icn/apps/governance/src/http/configure.rs`:803 | `create_terminate_clearing_proposal` | no | unknown / needs local verification | needs review |
-| POST | `/proposals/federation/join` | `icn/apps/governance/src/http/configure.rs`:791 | `create_join_federation_proposal` | no | unknown / needs local verification | needs review |
-| POST | `/proposals/federation/leave` | `icn/apps/governance/src/http/configure.rs`:795 | `create_leave_federation_proposal` | no | unknown / needs local verification | needs review |
-| POST | `/proposals/federation/policy` | `icn/apps/governance/src/http/configure.rs`:815 | `create_update_federation_policy_proposal` | no | unknown / needs local verification | needs review |
-| POST | `/proposals/federation/vouch` | `icn/apps/governance/src/http/configure.rs`:807 | `create_vouch_proposal` | no | unknown / needs local verification | needs review |
-| POST | `/proposals/federation/vouch/revoke` | `icn/apps/governance/src/http/configure.rs`:811 | `create_revoke_vouch_proposal` | no | unknown / needs local verification | needs review |
-| POST | `/proposals/sdis/appoint-steward` | `icn/apps/governance/src/http/configure.rs`:820 | `create_appoint_steward_proposal` | no | unknown / needs local verification | needs review |
-| POST | `/proposals/sdis/remove-steward` | `icn/apps/governance/src/http/configure.rs`:824 | `create_remove_steward_proposal` | no | unknown / needs local verification | needs review |
+| POST | `/proposals/federation/clearing/establish` | `icn/apps/governance/src/http/configure.rs`:804 | `create_establish_clearing_proposal` | no | unknown / needs local verification | needs review |
+| POST | `/proposals/federation/clearing/terminate` | `icn/apps/governance/src/http/configure.rs`:808 | `create_terminate_clearing_proposal` | no | unknown / needs local verification | needs review |
+| POST | `/proposals/federation/join` | `icn/apps/governance/src/http/configure.rs`:796 | `create_join_federation_proposal` | no | unknown / needs local verification | needs review |
+| POST | `/proposals/federation/leave` | `icn/apps/governance/src/http/configure.rs`:800 | `create_leave_federation_proposal` | no | unknown / needs local verification | needs review |
+| POST | `/proposals/federation/policy` | `icn/apps/governance/src/http/configure.rs`:820 | `create_update_federation_policy_proposal` | no | unknown / needs local verification | needs review |
+| POST | `/proposals/federation/vouch` | `icn/apps/governance/src/http/configure.rs`:812 | `create_vouch_proposal` | no | unknown / needs local verification | needs review |
+| POST | `/proposals/federation/vouch/revoke` | `icn/apps/governance/src/http/configure.rs`:816 | `create_revoke_vouch_proposal` | no | unknown / needs local verification | needs review |
+| POST | `/proposals/sdis/appoint-steward` | `icn/apps/governance/src/http/configure.rs`:825 | `create_appoint_steward_proposal` | no | unknown / needs local verification | needs review |
+| POST | `/proposals/sdis/remove-steward` | `icn/apps/governance/src/http/configure.rs`:829 | `create_remove_steward_proposal` | no | unknown / needs local verification | needs review |
 | GET | `/proposals/{proposal_id}` | `icn/apps/governance/src/http/configure.rs`:596 | `get_proposal` | no | unknown / needs local verification | needs review |
 | GET | `/proposals/{proposal_id}/chain` | `icn/apps/governance/src/http/configure.rs`:620 | `get_chain` | no | unknown / needs local verification | needs review |
 | POST | `/proposals/{proposal_id}/close` | `icn/apps/governance/src/http/configure.rs`:604 | `close_proposal` | no | unknown / needs local verification | needs review |
@@ -126,9 +127,9 @@ The governance app (`icn-governance-actor` = `icn/apps/governance`) registers it
 | GET | `/proposals/{proposal_id}/proof` | `icn/apps/governance/src/http/configure.rs`:616 | `get_proof` | no | unknown / needs local verification | needs review |
 | GET | `/proposals/{proposal_id}/tally` | `icn/apps/governance/src/http/configure.rs`:612 | `get_vote_tally` | no | unknown / needs local verification | needs review |
 | POST | `/proposals/{proposal_id}/vote` | `icn/apps/governance/src/http/configure.rs`:608 | `cast_vote` | no | unknown / needs local verification | needs review |
-| GET | `/structures/{structure_id}` | `icn/apps/governance/src/http/configure.rs`:692 | `get_structure` | no | unknown / needs local verification | needs review |
-| GET | `/structures/{structure_id}/roles` | `icn/apps/governance/src/http/configure.rs`:697 | `list_roles` | no | unknown / needs local verification | needs review |
-| POST | `/structures/{structure_id}/roles` | `icn/apps/governance/src/http/configure.rs`:696 | `assign_role` | no | unknown / needs local verification | needs review |
+| GET | `/structures/{structure_id}` | `icn/apps/governance/src/http/configure.rs`:697 | `get_structure` | no | unknown / needs local verification | needs review |
+| GET | `/structures/{structure_id}/roles` | `icn/apps/governance/src/http/configure.rs`:702 | `list_roles` | no | unknown / needs local verification | needs review |
+| POST | `/structures/{structure_id}/roles` | `icn/apps/governance/src/http/configure.rs`:701 | `assign_role` | no | unknown / needs local verification | needs review |
 
 ## Limitations
 

@@ -7,6 +7,8 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use icn_governance::{ProcessGateKind, ProcessGateResult};
+
 // ============================================================================
 // Domain
 // ============================================================================
@@ -45,6 +47,25 @@ pub struct AddDomainMemberRequest {
 
 fn default_weight() -> f64 {
     1.0
+}
+
+// ============================================================================
+// Process gate results (#2144 — first ProcessTransitionReceipt class)
+// ============================================================================
+
+/// Request body for `POST /gov/domains/{domain_id}/process-sessions/{session_id}/gate-results`.
+///
+/// `gate_kind` and `result` are the closed `icn_governance` taxonomies
+/// ([`ProcessGateKind`], [`ProcessGateResult`]); an out-of-taxonomy value is
+/// rejected by JSON deserialization (400) rather than silently coerced. The
+/// `session_id` and `domain_id` come from the path, and the recording actor
+/// comes from the authenticated token — not the body.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordProcessGateResultRequest {
+    /// Closed-taxonomy gate kind being recorded (e.g. `"privacy_review"`).
+    pub gate_kind: ProcessGateKind,
+    /// Pass/fail result of the gate evaluation (`"pass"` | `"fail"`).
+    pub result: ProcessGateResult,
 }
 
 // ============================================================================
