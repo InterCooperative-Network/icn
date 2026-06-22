@@ -148,7 +148,9 @@ pub use state::{
     BlobService, KvService, LogService, ObjectReplication, ReplicationPolicy, StateBackend,
     StateKey, StateOp, StateScope, StateValue,
 };
-pub use storage::{DataLocality, StorageClass, StorageValidationError};
+pub use storage::{
+    validate_storage_access, DataLocality, StorageClass, StorageSpec, StorageValidationError,
+};
 pub use time::TimeService;
 pub use version::Version;
 

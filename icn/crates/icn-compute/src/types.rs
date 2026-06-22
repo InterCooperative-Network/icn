@@ -310,15 +310,25 @@ impl ComputeTask {
             }
         }
 
-        // Validate storage specification fields (E4)
-        // Canonical tasks producing outputs SHOULD use StorageClass::Canonical
-        if self.determinism_class == DeterminismClass::Canonical {
-            if let Some(storage_class) = &self.storage_class {
-                if !storage_class.can_hold_canonical_output() {
-                    // This is a SHOULD, not a MUST - log warning but don't reject
-                    // The scheduler may apply stricter enforcement
-                }
-            }
+        // Validate storage specification fields (E4 / #2143).
+        // A Canonical-determinism task producing outputs MUST use a storage
+        // class that can hold canonical output. Enforced through the generic
+        // kernel helper `validate_storage_access`. We only check when a
+        // storage_class is explicitly declared; an unset (None) class is left
+        // to placement-time defaulting, preserving prior behavior. The task
+        // validates its own declared storage, so the locality check is the
+        // degenerate equal-spec case here — only the canonical-output rule
+        // can fire (cross-locality data access is validated where a task spec
+        // is compared against a distinct data spec).
+        if let Some(storage_class) = self.storage_class {
+            let spec = icn_kernel_api::storage::StorageSpec::new(
+                storage_class,
+                self.data_locality
+                    .unwrap_or(icn_kernel_api::storage::DataLocality::CellLocal),
+            );
+            let canonical_output = self.determinism_class == DeterminismClass::Canonical;
+            icn_kernel_api::storage::validate_storage_access(spec, spec, canonical_output)
+                .map_err(|e| crate::error::ComputeError::InvalidCode(e.to_string()))?;
         }
 
         // CellLocal data cannot be accessed by tasks with FederationMirrored locality
@@ -1193,9 +1203,32 @@ mod tests {
     fn test_task_with_all_storage_fields() {
         use icn_kernel_api::storage::{DataLocality, StorageClass};
         let mut task = valid_task();
+        // Advisory output may use a non-Canonical storage class (#2143:
+        // only Canonical-output tasks are constrained to Canonical storage).
+        task.determinism_class = DeterminismClass::Advisory;
         task.storage_class = Some(StorageClass::ServiceState);
         task.data_locality = Some(DataLocality::CoopReplicated);
         assert!(task.validate().is_ok());
+    }
+
+    #[test]
+    fn test_validate_canonical_task_rejects_non_canonical_storage() {
+        use icn_kernel_api::storage::StorageClass;
+        // A Canonical-determinism task (the default) that declares a
+        // non-Canonical storage class for its outputs must be rejected.
+        // Previously this was a SHOULD-only no-op (#2143).
+        let mut task = valid_task();
+        assert_eq!(task.determinism_class, DeterminismClass::Canonical);
+        task.storage_class = Some(StorageClass::ServiceState);
+        let err = task.validate().unwrap_err();
+        assert!(
+            matches!(err, crate::error::ComputeError::InvalidCode(_)),
+            "expected InvalidCode, got {err:?}"
+        );
+        assert!(
+            err.to_string().contains("Canonical"),
+            "error must reference the canonical-storage rule: {err}"
+        );
     }
 
     #[test]

@@ -1,7 +1,7 @@
 # Storage is Governance — ICN Storage Specification
 
 **Issue**: [#1131](https://github.com/InterCooperative-Network/icn/issues/1131)
-**Status**: Core types implemented; StorageSpec and validate_storage_access() not yet present
+**Status**: Implemented — `StorageClass`, `DataLocality`, `StorageSpec`, and `validate_storage_access()` are present; the canonical-output rule is enforced at the compute task-validation boundary (#2143)
 **Date**: 2026-03-22
 
 ## Thesis
@@ -83,21 +83,27 @@ Three error variants encode the governance violations the system can detect:
   `CellLocal` data accessed by a `FederationMirrored` task. This is the highest-risk
   locality violation (federation-scope task reaching into local-only data).
 
-### Implementation Gap (as of Sprint 23)
+### Enforcement Layer (#2143)
 
-The task brief for s23-t7 anticipated two additional types:
+Two callable items complete the enforcement path in `storage.rs`:
 
-- `StorageSpec` — A composite struct combining `StorageClass` and `DataLocality` into a
-  single constraint that could be attached to compute tasks.
-- `validate_storage_access()` — A free function to enforce storage governance at the
-  kernel boundary, returning `Result<(), StorageValidationError>`.
+- `StorageSpec` — A composite struct pairing `StorageClass` and `DataLocality`. A generic
+  custody/runtime policy shape with no domain meaning.
+- `validate_storage_access(task: StorageSpec, data: StorageSpec, canonical_output: bool)
+  -> Result<(), StorageValidationError>` — the free function that enforces storage
+  governance at the kernel boundary, mapping violations onto the existing error variants:
+  - `canonical_output` with a non-canonical `task.class` → `CanonicalTaskNonCanonicalStorage`
+  - `task.locality` cannot access `data.locality` → `LocalityAccessViolation`, with the
+    `FederationMirrored`-task / `CellLocal`-data case reported as `CellLocalFederationViolation`.
 
-Neither is present in the current `storage.rs`. The error variants exist but are not
-wired to any enforcement function. This means the error taxonomy is defined but not
-yet callable at the kernel boundary.
-
-**Required follow-up**: Implement `StorageSpec` and `validate_storage_access()` to
-complete the enforcement path. The error types and semantics are already correct.
+The error taxonomy is now callable. The first runtime caller is `ComputeTask::validate()`
+(`icn-compute`), which builds a `StorageSpec` from the task's declared `storage_class` /
+`data_locality` and rejects a Canonical-determinism task that declares a non-Canonical
+storage class — reached live through `ComputeActor::handle_submit`. On that self-validation
+path `task` and `data` are the same spec, so the locality check is the degenerate
+equal-spec case and only the canonical-output rule fires; the cross-locality access rules
+(`LocalityAccessViolation` / `CellLocalFederationViolation`) are enforced wherever a caller
+supplies a task spec and a distinct data spec, and are covered by the kernel unit tests.
 
 ## Governance Semantics
 
@@ -126,17 +132,17 @@ coop-internal state.
 
 ## Relationship to P0 Completion
 
-This spec closes the documentation gap for issue #1131. The `StorageClass` and
-`DataLocality` types were implemented as part of the Meaning Firewall arc (Sprints
-19-22). The `StorageSpec` and `validate_storage_access()` function referenced in the
-original issue acceptance criteria are not yet implemented — they are a remaining
-follow-up. This document provides the written specification that makes the existing
-implementation's governance intent legible, and identifies the outstanding gap.
+This spec documents issue #1131. The `StorageClass` and `DataLocality` types were
+implemented as part of the Meaning Firewall arc (Sprints 19-22). The `StorageSpec` and
+`validate_storage_access()` function referenced in the original issue acceptance criteria
+are now implemented (#2143) and callable, with the canonical-output rule enforced on the
+compute task-validation path.
 
 ## Sprint 23 Notes
 
 This task (s23-t7) is independent of s23-t5 (CRDT) and s23-t6 (ContainerRuntime).
-The `StorageClass` and `DataLocality` implementation is complete with full test coverage
-(21 tests covering ordering, access rules, serde roundtrips, and error display).
-`StorageSpec` and `validate_storage_access()` remain to be implemented to complete
-the acceptance criteria from the original issue.
+The `StorageClass` and `DataLocality` implementation is complete with full test coverage.
+`StorageSpec` and `validate_storage_access()` are now implemented (#2143) with unit tests
+covering the default spec, serde roundtrip, and all three `StorageValidationError`
+variants, plus compute-side tests proving the canonical-output rule rejects through
+`ComputeTask::validate()` and the live `handle_submit` path.
