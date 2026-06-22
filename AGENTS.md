@@ -41,6 +41,8 @@ If a change might impact any invariant:
 - Add tests proving the invariant still holds
 - Update the relevant docs/specs
 
+For the full source-linked index of all four invariant families (operational, firewall-contract, frozen-core, regulatory), see [`docs/reference/project-index/invariants-catalog.md`](docs/reference/project-index/invariants-catalog.md). That catalog indexes canonical sources; it does not define new invariants.
+
 ---
 
 ## Repo layout (critical)

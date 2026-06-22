@@ -240,6 +240,7 @@ Show-ready orientation layer — routes outside readers, contributors, and agent
 - [ci-ops-deploy-map.md](reference/project-index/ci-ops-deploy-map.md) - Workflows, deploy paths, K3s smoke runbooks
 - [show-readiness-map.md](reference/project-index/show-readiness-map.md) - What can be shown now, what should not be shown as finished, red lines
 - [proof-level-taxonomy-capability-matrix.md](reference/project-index/proof-level-taxonomy-capability-matrix.md) - Proof-level taxonomy (L0-L8) and a capability matrix for the organizer-rehearsal path
+- [invariants-catalog.md](reference/project-index/invariants-catalog.md) - Source-linked index of the four canonical invariant families (index only; canonical sources authoritative); machine-readable companion `invariants-catalog.toml`
 
 ---
 
