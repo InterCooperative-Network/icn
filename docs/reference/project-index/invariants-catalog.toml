@@ -1,0 +1,383 @@
+# ICN Invariants Catalog (machine-readable index)
+#
+# This catalog INDEXES invariants. It does not define them. The canonical source
+# listed for each entry remains authoritative. See invariants-catalog.md for the
+# human-facing view and the claim-discipline note.
+#
+# Hand-curated (not generated). Anchors are stable identifiers — section headings,
+# Rust enum variant names, or bold list labels — NOT line numbers, which drift.
+# Each `source_anchor` is a verbatim substring of its `source_path` (see the
+# anchor-sanity check in invariants-catalog.md).
+
+[meta]
+title = "ICN Invariants Catalog"
+issue = "https://github.com/InterCooperative-Network/icn/issues/2114"
+status = "descriptive"
+canonical = false
+indexes_not_defines = true
+generated_by = "hand-curated"
+last_reviewed = "2026-06-22"
+disclaimer = "This catalog indexes invariants. It does not define them. The canonical source listed for each entry remains authoritative."
+canonical_sources = [
+  "docs/DESIGN_PRINCIPLES.md",
+  "docs/architecture/KERNEL_APP_SEPARATION.md",
+  "icn/crates/icn-kernel-api/src/invariants.rs",
+  "docs/ARCHITECTURE.md",
+]
+
+# Family roll-up. Counts are the live source counts (verified 2026-06-22); they
+# match #2114's stated 5 / 6 / 10 / 7.
+[[family]]
+key = "operational"
+title = "Operational invariants (tier 1)"
+count = 5
+canonical_source = "docs/DESIGN_PRINCIPLES.md"
+source_type = "doc"
+
+[[family]]
+key = "firewall_contract"
+title = "Firewall contract (tier 2)"
+count = 6
+canonical_source = "docs/architecture/KERNEL_APP_SEPARATION.md"
+source_type = "doc"
+
+[[family]]
+key = "frozen_core"
+title = "Frozen-core invariants (tier 3)"
+count = 10
+canonical_source = "icn/crates/icn-kernel-api/src/invariants.rs"
+source_type = "code"
+
+[[family]]
+key = "regulatory"
+title = "Regulatory invariants (tier 4)"
+count = 7
+canonical_source = "docs/ARCHITECTURE.md"
+source_type = "doc"
+
+# ---------------------------------------------------------------------------
+# Family 1 — Operational invariants (tier 1)
+# Canonical source: docs/DESIGN_PRINCIPLES.md §1
+# ---------------------------------------------------------------------------
+
+[[invariant]]
+family = "operational"
+id = "adversarial_by_default"
+label = "Adversarial-by-default: every peer is untrusted until verifiable participation establishes trust."
+source_path = "docs/DESIGN_PRINCIPLES.md"
+source_anchor = "1.1 Adversarial-by-default"
+source_type = "doc"
+normative = true
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "operational"
+id = "determinism"
+label = "Determinism: same inputs produce same outputs; no floating point in consensus paths."
+source_path = "docs/DESIGN_PRINCIPLES.md"
+source_anchor = "1.2 Determinism"
+source_type = "doc"
+normative = true
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "operational"
+id = "canonical_encodings"
+label = "Canonical encodings: one valid byte representation per value (definite-length CBOR)."
+source_path = "docs/DESIGN_PRINCIPLES.md"
+source_anchor = "1.3 Canonical encodings"
+source_type = "doc"
+normative = true
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "operational"
+id = "no_panics_in_protocol_paths"
+label = "No panics in protocol paths: protocol/network/actor paths return Result, never panic on bad input."
+source_path = "docs/DESIGN_PRINCIPLES.md"
+source_anchor = "1.4 No panics in protocol paths"
+source_type = "doc"
+normative = true
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "operational"
+id = "kernel_app_boundary_inviolable"
+label = "Kernel/app boundary is inviolable: the dependency graph forbids domain crates inside kernel crates."
+source_path = "docs/DESIGN_PRINCIPLES.md"
+source_anchor = "1.5 Kernel/app boundary is inviolable"
+source_type = "doc"
+normative = true
+related_to = ["kernel_no_domain_imports"]
+notes = "Tier-1 statement of the tier-2 firewall contract; decomposed into the six firewall_contract sub-rules."
+
+# ---------------------------------------------------------------------------
+# Family 2 — Firewall contract (tier 2)
+# Canonical source: docs/architecture/KERNEL_APP_SEPARATION.md
+# ---------------------------------------------------------------------------
+
+[[invariant]]
+family = "firewall_contract"
+id = "kernel_no_domain_imports"
+label = "Kernel must not import domain crates."
+source_path = "docs/architecture/KERNEL_APP_SEPARATION.md"
+source_anchor = "Invariant 1: Kernel Must Not Import Domain Crates"
+source_type = "doc"
+normative = true
+notes = "Index entry only; mechanically enforced via CI. Canonical source authoritative."
+
+[[invariant]]
+family = "firewall_contract"
+id = "kernel_pure_data_types"
+label = "Kernel only accepts pure data types at its entrypoints."
+source_path = "docs/architecture/KERNEL_APP_SEPARATION.md"
+source_anchor = "Invariant 2: Kernel Only Accepts Pure Data Types"
+source_type = "doc"
+normative = true
+notes = "Index entry only; mechanically enforced via CI. Canonical source authoritative."
+
+[[invariant]]
+family = "firewall_contract"
+id = "semantic_lookup_in_policy_oracle"
+label = "All semantic lookup is confined to PolicyOracle."
+source_path = "docs/architecture/KERNEL_APP_SEPARATION.md"
+source_anchor = "Invariant 3: All Semantic Lookup Confined to PolicyOracle"
+source_type = "doc"
+normative = true
+notes = "Index entry only; mechanically enforced via CI. Canonical source authoritative."
+
+[[invariant]]
+family = "firewall_contract"
+id = "no_pattern_match_constraintset_custom"
+label = "Kernel must not pattern-match on ConstraintSet.custom keys."
+source_path = "docs/architecture/KERNEL_APP_SEPARATION.md"
+source_anchor = "Invariant 4: Kernel Must Not Pattern-Match on"
+source_type = "doc"
+normative = true
+notes = "Anchor truncated before a backticked term so it stays a verbatim substring. Canonical source authoritative."
+
+[[invariant]]
+family = "firewall_contract"
+id = "mechanism_not_policy"
+label = "Kernel contains enforcement mechanisms, not policy decisions."
+source_path = "docs/architecture/KERNEL_APP_SEPARATION.md"
+source_anchor = "Invariant 5: Kernel Contains Enforcement Mechanisms, Not Policy Decisions"
+source_type = "doc"
+normative = true
+notes = "Index entry only; mechanically enforced via CI. Canonical source authoritative."
+
+[[invariant]]
+family = "firewall_contract"
+id = "opaque_receipt_storage"
+label = "Kernel stores app-generated receipts opaquely (never parses the body)."
+source_path = "docs/architecture/KERNEL_APP_SEPARATION.md"
+source_anchor = "Invariant 6: Kernel Stores App-Generated Receipts Opaquely"
+source_type = "doc"
+normative = true
+notes = "Index entry only; mechanically enforced via CI. Canonical source authoritative."
+
+# ---------------------------------------------------------------------------
+# Family 3 — Frozen-core invariants (tier 3)
+# Canonical source: icn/crates/icn-kernel-api/src/invariants.rs (enum InvariantId)
+# Anchors are the Rust enum variant names. source_symbol gives the full path.
+# ---------------------------------------------------------------------------
+
+[[invariant]]
+family = "frozen_core"
+id = "right_of_exit"
+label = "No rule can prevent an identity from leaving an entity."
+source_path = "icn/crates/icn-kernel-api/src/invariants.rs"
+source_anchor = "RightOfExit"
+source_symbol = "InvariantId::RightOfExit"
+source_type = "code"
+domain = "SovereigntyCore"
+normative = true
+notes = "Index entry only; canonical source authoritative. Count asserted by test_all_invariants_returns_10."
+
+[[invariant]]
+family = "frozen_core"
+id = "no_retroactive_obligations"
+label = "Rules only apply to actions after activation block."
+source_path = "icn/crates/icn-kernel-api/src/invariants.rs"
+source_anchor = "NoRetroactiveObligations"
+source_symbol = "InvariantId::NoRetroactiveObligations"
+source_type = "code"
+domain = "SovereigntyCore"
+normative = true
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "frozen_core"
+id = "explicit_cryptographic_entry"
+label = "Adding an identity requires their cryptographic signature."
+source_path = "icn/crates/icn-kernel-api/src/invariants.rs"
+source_anchor = "ExplicitCryptographicEntry"
+source_symbol = "InvariantId::ExplicitCryptographicEntry"
+source_type = "code"
+domain = "SovereigntyCore"
+normative = true
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "frozen_core"
+id = "no_silent_power_changes"
+label = "Authz changes must include a computable capability delta."
+source_path = "icn/crates/icn-kernel-api/src/invariants.rs"
+source_anchor = "NoSilentPowerChanges"
+source_symbol = "InvariantId::NoSilentPowerChanges"
+source_type = "code"
+domain = "AntiCaptureCore"
+normative = true
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "frozen_core"
+id = "bounded_authority"
+label = "No wildcard capabilities across all resources."
+source_path = "icn/crates/icn-kernel-api/src/invariants.rs"
+source_anchor = "BoundedAuthority"
+source_symbol = "InvariantId::BoundedAuthority"
+source_type = "code"
+domain = "AntiCaptureCore"
+normative = true
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "frozen_core"
+id = "mandatory_execution_delay"
+label = "Economic/capability changes require timelock delay."
+source_path = "icn/crates/icn-kernel-api/src/invariants.rs"
+source_anchor = "MandatoryExecutionDelay"
+source_symbol = "InvariantId::MandatoryExecutionDelay"
+source_type = "code"
+domain = "AntiCaptureCore"
+normative = true
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "frozen_core"
+id = "capability_conservation"
+label = "Cannot delegate capabilities you don't possess."
+source_path = "icn/crates/icn-kernel-api/src/invariants.rs"
+source_anchor = "CapabilityConservation"
+source_symbol = "InvariantId::CapabilityConservation"
+source_type = "code"
+domain = "AntiCaptureCore"
+normative = true
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "frozen_core"
+id = "mutual_credit_conservation"
+label = "Mutual credit loops must net to zero."
+source_path = "icn/crates/icn-kernel-api/src/invariants.rs"
+source_anchor = "MutualCreditConservation"
+source_symbol = "InvariantId::MutualCreditConservation"
+source_type = "code"
+domain = "EconomicCore"
+normative = true
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "frozen_core"
+id = "sovereign_signature_requirement"
+label = "Funds move only via owner signature or pre-consented dispute hook."
+source_path = "icn/crates/icn-kernel-api/src/invariants.rs"
+source_anchor = "SovereignSignatureRequirement"
+source_symbol = "InvariantId::SovereignSignatureRequirement"
+source_type = "code"
+domain = "EconomicCore"
+normative = true
+related_to = ["user_signed_transitions_only"]
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "frozen_core"
+id = "universal_receipt_generation"
+label = "Every state transition emits an immutable receipt."
+source_path = "icn/crates/icn-kernel-api/src/invariants.rs"
+source_anchor = "UniversalReceiptGeneration"
+source_symbol = "InvariantId::UniversalReceiptGeneration"
+source_type = "code"
+domain = "EconomicCore"
+normative = true
+related_to = ["execution_receipts_close_loop"]
+notes = "Index entry only; canonical source authoritative. DESIGN_PRINCIPLES.md §A2 notes it is structurally a tier-1 invariant."
+
+# ---------------------------------------------------------------------------
+# Family 4 — Regulatory invariants (tier 4)
+# Canonical source: docs/ARCHITECTURE.md §5 ("Seven regulatory invariants")
+# Anchors are the bold list labels.
+# ---------------------------------------------------------------------------
+
+[[invariant]]
+family = "regulatory"
+id = "user_signed_transitions_only"
+label = "User-signed transitions only: no transition without the user's cryptographic signature."
+source_path = "docs/ARCHITECTURE.md"
+source_anchor = "User-signed transitions only."
+source_type = "doc"
+normative = true
+related_to = ["sovereign_signature_requirement"]
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "regulatory"
+id = "no_hosted_positions"
+label = "No hosted positions: ICN holds no balances on behalf of users."
+source_path = "docs/ARCHITECTURE.md"
+source_anchor = "No hosted positions."
+source_type = "doc"
+normative = true
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "regulatory"
+id = "no_operator_routing_of_value"
+label = "No operator routing of value: units move directly debtor to creditor, not through an operator account."
+source_path = "docs/ARCHITECTURE.md"
+source_anchor = "No operator routing of value."
+source_type = "doc"
+normative = true
+notes = "Index entry only; canonical source authoritative. Foundational to the software-provider regulatory framing."
+
+[[invariant]]
+family = "regulatory"
+id = "derived_views_not_primitives"
+label = "Derived views are not protocol primitives: a balance is a computed view, not enforced protocol state."
+source_path = "docs/ARCHITECTURE.md"
+source_anchor = "Derived views are not protocol primitives."
+source_type = "doc"
+normative = false
+notes = "Descriptive in the source: the protocol does not enforce balance invariants; governance may. Canonical source authoritative."
+
+[[invariant]]
+family = "regulatory"
+id = "no_embedded_convertibility"
+label = "No embedded convertibility: cross-coop settlement requires explicit trust agreements and governance approval."
+source_path = "docs/ARCHITECTURE.md"
+source_anchor = "No embedded convertibility."
+source_type = "doc"
+normative = true
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "regulatory"
+id = "matching_market_opt_in"
+label = "Matching/market features are opt-in, scoped, governance-authorized (a CCL contract, not a platform feature)."
+source_path = "docs/ARCHITECTURE.md"
+source_anchor = "Matching/market features are opt-in, scoped, governance-authorized."
+source_type = "doc"
+normative = true
+notes = "Index entry only; canonical source authoritative."
+
+[[invariant]]
+family = "regulatory"
+id = "execution_receipts_close_loop"
+label = "Execution receipts close the loop: every state transition produces a cryptographically signed receipt."
+source_path = "docs/ARCHITECTURE.md"
+source_anchor = "Execution receipts close the loop."
+source_type = "doc"
+normative = true
+related_to = ["universal_receipt_generation"]
+notes = "Index entry only; canonical source authoritative."

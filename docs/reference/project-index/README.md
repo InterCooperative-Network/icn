@@ -38,6 +38,7 @@ ICN already has several truth- and freshness-tracking systems. **This index does
 | What is safe to show / claim publicly? | [`show-readiness-map.md`](show-readiness-map.md) + [`website-truth-map.md`](website-truth-map.md) |
 | What routes does the gateway actually expose, and which reach OpenAPI? | [`generated/route-inventory.md`](generated/route-inventory.md) — mechanical scan, regenerate with `docs/scripts/route_inventory.py` ([#2112](https://github.com/InterCooperative-Network/icn/issues/2112)) |
 | Given a path/crate, what subsystem/docs/tests/invariants/claims/skills apply? (orientation, non-canonical) | [`generated/agent-context-spine.json`](generated/agent-context-spine.json) — generated, evidence-grounded; see [`docs/guides/developer/agent-context-spine.md`](../../guides/developer/agent-context-spine.md). Regenerate with `scripts/generate-agent-context-spine.py` |
+| Which invariants exist, and where are they canonically defined? | [`invariants-catalog.md`](invariants-catalog.md) (+ [`invariants-catalog.toml`](invariants-catalog.toml)) — indexes the four canonical families; index only, canonical sources remain authoritative ([#2114](https://github.com/InterCooperative-Network/icn/issues/2114)) |
 
 **Discipline (for humans and agents):**
 
@@ -74,6 +75,7 @@ ICN already has several truth- and freshness-tracking systems. **This index does
 | [`show-readiness-map.md`](show-readiness-map.md) | What can be shown now, what should not be shown as finished, the suggested demo narrative, and red lines. |
 | [`project-coverage-matrix.md`](project-coverage-matrix.md) | Coverage-style matrix: subsystem → anchors → drift and show risks. |
 | [`proof-level-taxonomy-capability-matrix.md`](proof-level-taxonomy-capability-matrix.md) | Proof-level taxonomy (L0–L8) as shared claim-boundary vocabulary, plus a capability matrix for the current organizer-rehearsal path. Supports #1746, narrows #1796. |
+| [`invariants-catalog.md`](invariants-catalog.md) | Source-linked index of the four canonical invariant families (operational / firewall-contract / frozen-core / regulatory, 28 total). Index only; canonical sources remain authoritative. Machine-readable: [`invariants-catalog.toml`](invariants-catalog.toml). |
 | [`identity-crypto-map.md`](identity-crypto-map.md) | Identity, keys, DIDs, signing — where code and docs live. |
 | [`network-gossip-map.md`](network-gossip-map.md) | QUIC, gossip, discovery — runtime surfaces and overclaim guardrails. |
 | [`ccl-map.md`](ccl-map.md) | Cooperative Contract Language interpreter and governance wiring. |

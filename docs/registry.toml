@@ -2520,6 +2520,22 @@ domain_tags = ["project-index", "navigation", "proof-level", "rehearsal", "show-
 recommended_action = "keep"
 last_reviewed = "2026-06-09"
 
+[docs."docs/reference/project-index/invariants-catalog.md"]
+category = "reference"
+status = "living"
+title = "ICN Invariants Catalog"
+description = "Source-linked index of the four canonical ICN invariant families (5 operational / 6 firewall-contract / 10 frozen-core / 7 regulatory = 28), each linked to its canonical source with a stable anchor. Indexes only; it does not define invariants, and the canonical sources remain authoritative. Machine-readable companion: invariants-catalog.toml. Implements the #2114 deliverable."
+last_updated = "2026-06-22"
+owner = "matt"
+audiences = ["all", "team"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "invariants", "architecture"]
+recommended_action = "keep"
+last_reviewed = "2026-06-22"
+
 [docs."docs/glossary.md"]
 category = "reference"
 status = "living"
