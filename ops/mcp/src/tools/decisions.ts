@@ -264,13 +264,48 @@ export function syncDecisionIndex(db: Database.Database): void {
   }
 }
 
-function nextAdrNumber(dir: string): string {
+export function nextAdrNumber(dir: string): string {
   const files = readdirSync(dir)
     .filter((f) => ADR_FILENAME_RE.test(f))
     .map((f) => parseInt(f.match(ADR_FILENAME_RE)![1], 10))
     .sort((a, b) => a - b);
   if (files.length === 0) return "0001";
   return (files[files.length - 1] + 1).toString().padStart(4, "0");
+}
+
+/**
+ * Run the decision-index search. The query is split into whitespace-delimited
+ * terms and ALL must match (title OR tags). An empty or whitespace-only query
+ * has no terms — return the full index ordered by id rather than building an
+ * invalid `WHERE` clause, which SQLite rejects with a syntax error.
+ */
+export function searchDecisionRows(
+  db: Database.Database,
+  query: string
+): unknown[] {
+  const terms = query.split(/\s+/).filter(Boolean);
+  if (terms.length === 0) {
+    return db
+      .prepare(
+        `SELECT id, title, tags, file_path, created_at
+         FROM decision_index
+         ORDER BY id DESC`
+      )
+      .all();
+  }
+  // e.g. "mcp registration" finds ADRs containing both "mcp" and "registration".
+  const conditions = terms
+    .map(() => "(title LIKE ? OR tags LIKE ?)")
+    .join(" AND ");
+  const params = terms.flatMap((t) => [`%${t}%`, `%${t}%`]);
+  return db
+    .prepare(
+      `SELECT id, title, tags, file_path, created_at
+       FROM decision_index
+       WHERE ${conditions}
+       ORDER BY id DESC`
+    )
+    .all(...params);
 }
 
 export function registerDecisionTools(
@@ -359,22 +394,7 @@ ${alternatives}
       query: z.string().describe("Search term"),
     },
     async ({ query }) => {
-      // Split into individual terms and require ALL to match (AND logic)
-      // e.g. "mcp registration" finds ADRs containing both "mcp" and "registration"
-      const terms = query.split(/\s+/).filter(Boolean);
-      const conditions = terms
-        .map(() => "(title LIKE ? OR tags LIKE ?)")
-        .join(" AND ");
-      const params = terms.flatMap((t) => [`%${t}%`, `%${t}%`]);
-
-      const rows = db
-        .prepare(
-          `SELECT id, title, tags, file_path, created_at
-           FROM decision_index
-           WHERE ${conditions}
-           ORDER BY id DESC`
-        )
-        .all(...params);
+      const rows = searchDecisionRows(db, query);
       return {
         content: [{ type: "text", text: JSON.stringify(rows, null, 2) }],
       };
