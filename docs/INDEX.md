@@ -111,6 +111,7 @@ In-depth architectural documentation and design specifications.
 
 Comprehensive architectural reviews and design decisions:
 
+- [ICN_OPERATING_MODEL.md](architecture/ICN_OPERATING_MODEL.md) - Vocabulary, placement & operating-model doctrine (grammar map; not a current-state truth root)
 - [ARCHITECTURE_INDEX.md](architecture/ARCHITECTURE_INDEX.md) - Architecture document index
 - [ARCHITECTURE_MAP.md](architecture/ARCHITECTURE_MAP.md) - Visual architecture guide (197KB)
 - [ARCHITECTURE_QUICK_REF.md](architecture/ARCHITECTURE_QUICK_REF.md) - Quick reference card

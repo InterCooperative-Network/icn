@@ -180,6 +180,12 @@ Forward-direction integrating spine across substrate, governance, CCL contract l
 
 **For:** `developers`, `architects`, `contributors` | **Updated:** 2026-05-14
 
+### ⚪ **active** [ICN Operating Model](/docs/architecture/ICN_OPERATING_MODEL.md)
+
+Doctrine for vocabulary, placement, and operating-model grammar — the grammar map of ICN. Normative for what each layer means, what belongs where (ICN core vs engine vs package vs tool vs service vs surface vs kernel), who authorizes what, and what receipt proves it; NOT normative for current implementation status, which remains docs/STATE.md + docs/PHASE_PROGRESS.md. Fixes the standardized vocabulary (Substrate/Kernel, Engine, Domain, Policy, CCL, Tool, Service, Surface, Package, Binding, Manifest, Provider, Instance, Receipt, Bridge, Artifact, Vault, Agreement, Node) by cross-linking each term's canonical home rather than redefining it; restates the whole-system stack, the central civic loop, the definition/binding/instance/receipt pattern, the meaning-firewall and package/core boundary (package nouns appear only as examples of what does not belong in core), a placement table, a transition grammar (declare->review->adopt->bind->run->observe->amend->suspend->repair->export->exit->archive), and a six-question feature-placement checklist. Names the immediate vertical spine (package->domain->policy->binding->action->receipt->surface->evidence/export) and the parked zero-coverage gaps (CCL evaluator-selection runtime, GovernedServiceBinding runtime, BoundaryOutcomeReceipt/AgreementRegistry runtime). Makes no current-state claim; preserves regulatory vocabulary. Does not introduce schema, wire format, or runtime behavior.
+
+**For:** `developers`, `architects`, `contributors` | **Updated:** 2026-06-22
+
 ### 📝 **Living** [Identity and Membership Architecture](/docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md)
 
 Design of identity primitives, membership verification, and member lifecycle
@@ -1910,9 +1916,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 311
+**Total documents:** 312
 
 **By status:**
+- Active: 1
 - Canonical: 40
 - Draft: 72
 - Living: 199

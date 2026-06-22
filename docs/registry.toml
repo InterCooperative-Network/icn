@@ -948,6 +948,22 @@ domain_tags = ["architecture", "integration", "governance", "ccl", "service-host
 depends_on = ["docs/architecture/KERNEL_APP_SEPARATION.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md", "docs/architecture/SERVICE_HOSTING_MODEL.md", "docs/architecture/COOPERATIVE_TOOL_COMMONS.md", "docs/architecture/DOMAIN_ROUTING_AND_DNS_BINDINGS.md", "docs/architecture/MODEL_WORKLOADS_AND_DELIBERATION.md", "docs/state/storage-governance-spec.md", "docs/design/deterministic-core.md", "docs/design/compute-classes.md", "docs/rfcs/RFC-0017-tool-install-infrastructure.md"]
 recommended_action = "keep"
 
+[docs."docs/architecture/ICN_OPERATING_MODEL.md"]
+category = "architecture"
+status = "active"
+truth_class = "descriptive"
+title = "ICN Operating Model"
+description = "Doctrine for vocabulary, placement, and operating-model grammar — the grammar map of ICN. Normative for what each layer means, what belongs where (ICN core vs engine vs package vs tool vs service vs surface vs kernel), who authorizes what, and what receipt proves it; NOT normative for current implementation status, which remains docs/STATE.md + docs/PHASE_PROGRESS.md. Fixes the standardized vocabulary (Substrate/Kernel, Engine, Domain, Policy, CCL, Tool, Service, Surface, Package, Binding, Manifest, Provider, Instance, Receipt, Bridge, Artifact, Vault, Agreement, Node) by cross-linking each term's canonical home rather than redefining it; restates the whole-system stack, the central civic loop, the definition/binding/instance/receipt pattern, the meaning-firewall and package/core boundary (package nouns appear only as examples of what does not belong in core), a placement table, a transition grammar (declare->review->adopt->bind->run->observe->amend->suspend->repair->export->exit->archive), and a six-question feature-placement checklist. Names the immediate vertical spine (package->domain->policy->binding->action->receipt->surface->evidence/export) and the parked zero-coverage gaps (CCL evaluator-selection runtime, GovernedServiceBinding runtime, BoundaryOutcomeReceipt/AgreementRegistry runtime). Makes no current-state claim; preserves regulatory vocabulary. Does not introduce schema, wire format, or runtime behavior."
+last_updated = "2026-06-22"
+last_reviewed = "2026-06-22"
+owner = "matt"
+audiences = ["developers", "architects", "contributors"]
+role = "architecture"
+canonical = "no"
+freshness = "current"
+depends_on = ["docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md", "docs/architecture/KERNEL_APP_SEPARATION.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md", "docs/architecture/COOPERATIVE_TOOL_COMMONS.md", "docs/architecture/SERVICE_HOSTING_MODEL.md", "docs/architecture/DEBIAN_APPLIANCE_MODEL.md", "docs/spec/institutional-domain.md", "docs/spec/effect-dispatch-contract.md", "docs/spec/ccl-policy-registry.md", "docs/spec/governed-service-binding.md", "docs/spec/artifact-registry-and-scoped-vault.md", "docs/spec/storage-durability-policies.md", "docs/state/storage-governance-spec.md", "docs/spec/compute-placement-policy.md", "docs/spec/network-anti-entropy-proof-loops.md", "docs/spec/member-shell-v0.md", "docs/spec/steward-cockpit-v0.md", "docs/adr/ADR-0014-constitutional-object-model.md", "docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md", "docs/adr/ADR-0025-institutional-effect-record-canonical-schema.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/adr/ADR-0027-action-card-contract.md"]
+recommended_action = "keep"
+
 [docs."docs/architecture/CELLS_AND_SCOPES.md"]
 category = "architecture"
 status = "living"
