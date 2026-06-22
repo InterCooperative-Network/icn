@@ -17,6 +17,17 @@ async function gitLine(cwd: string, args: readonly string[]): Promise<string> {
   return r.ok ? r.stdout.trim() : "";
 }
 
+/**
+ * Resolve which branch ci_status should query. `git rev-parse --abbrev-ref HEAD`
+ * prints "HEAD" on a detached checkout, and gitLine returns "" when git fails —
+ * in both cases fall back to "main" so ci_status still returns useful runs
+ * instead of an empty list.
+ */
+export function resolveBranch(rawBranch: string): string {
+  const branch = rawBranch.trim();
+  return branch === "" || branch === "HEAD" ? "main" : branch;
+}
+
 async function repoStatus(repoPath: string, name: string) {
   const branch = await gitLine(repoPath, ["rev-parse", "--abbrev-ref", "HEAD"]);
   const dirty = await gitLine(repoPath, ["status", "--porcelain"]);
@@ -143,7 +154,7 @@ export function registerRepoTools(
       try {
         const repoPath = join(ICN_ROOT, repo);
         const targetBranch =
-          branch ?? (await gitLine(repoPath, ["rev-parse", "--abbrev-ref", "HEAD"]));
+          branch ?? resolveBranch(await gitLine(repoPath, ["rev-parse", "--abbrev-ref", "HEAD"]));
         const r = await runCommand(
           "gh",
           [
