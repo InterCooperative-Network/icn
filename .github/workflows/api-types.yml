@@ -8,6 +8,9 @@ on:
       - 'sdk/typescript/**'
       - 'docs/api/openapi.generated.yaml'
 
+permissions:
+  contents: read
+
 jobs:
   check-api-types:
     name: Check API Types Drift

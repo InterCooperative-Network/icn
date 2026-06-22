@@ -171,6 +171,8 @@ mod tests {
 
     fn test_claims(coop_id: &str, scopes: Vec<&str>) -> TokenClaims {
         TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test-user".to_string(),
             iat: 1000000000,
             coop_id: coop_id.to_string(),

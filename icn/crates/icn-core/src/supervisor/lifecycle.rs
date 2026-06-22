@@ -435,6 +435,7 @@ async fn spawn_actors_with_identity(
     icn_obs::metrics::supervisor::actor_active_set("coop", true);
     let coop_handle = coop_services.coop_handle.clone();
     let coop_store = coop_services.coop_store.clone();
+    let coop_entity_map = coop_services.coop_entity_map.clone();
 
     // Initialize community services (civic engine)
     let community_services =
@@ -623,6 +624,7 @@ async fn spawn_actors_with_identity(
         &recovery_store,
         &ledger_handle,
         &coop_store,
+        &coop_entity_map,
         &community_store,
         &snapshot_coordinator,
         &compute_handle_holder,
@@ -1319,6 +1321,7 @@ async fn configure_gossip_actor(
     recovery_store: &Arc<dyn icn_store::Store>,
     ledger_handle: &super::actors::LedgerHandle,
     coop_store: &Arc<icn_coop::CoopStore>,
+    coop_entity_map: &icn_coop::CoopEntityMapHandle,
     community_store: &Arc<icn_community::CommunityStore>,
     snapshot_coordinator: &Arc<RwLock<icn_snapshot::SnapshotCoordinator>>,
     compute_handle_holder: &Arc<RwLock<Option<icn_compute::ComputeHandle>>>,
@@ -1369,6 +1372,7 @@ async fn configure_gossip_actor(
             node_profile: node_profile_handle.clone(),
             profile_cache: profile_cache.clone(),
             coop_store: coop_store.clone(),
+            coop_entity_map: coop_entity_map.clone(),
             community_store: community_store.clone(),
             federation_handler: federation_handler.clone(),
             attestation_rate_limiter,

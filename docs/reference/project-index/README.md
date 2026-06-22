@@ -1,7 +1,7 @@
 ---
 Status: operational
 Canonical: no
-Last Reviewed: 2026-05-11
+Last Reviewed: 2026-06-20
 ---
 
 # ICN Project Index
@@ -22,6 +22,31 @@ This directory is a **show-ready orientation layer** for the ICN repository. Its
 - **Not a replacement for `docs/STATE.md`.**
 - **Not a generated file inventory.** Listing every file is a job for tooling (`git ls-files`, registry summary), not for hand-maintained docs.
 - **Not a sales pitch.** Public messaging lives on the website (`website/` and `intercooperative.network`). This directory speaks to readers who already opened the repo.
+
+## Truth layer / claim discipline
+
+ICN already has several truth- and freshness-tracking systems. **This index does not replace them, and there is deliberately no separate `docs/truth/` tree** — a parallel truth root would be a competing source of truth, the exact thing the meaning-firewall and source-precedence discipline exist to prevent. Instead, here is which *existing* system answers which question:
+
+| Question | Authoritative system |
+|---|---|
+| Which source wins when two disagree? (precedence, status labels, overclaim guardrails) | [`source-of-truth-map.md`](source-of-truth-map.md) |
+| How strong is the proof behind a claim? (L0–L8 ladder) | [`proof-level-taxonomy-capability-matrix.md`](proof-level-taxonomy-capability-matrix.md) |
+| What truth-class / canonical status does a doc carry? | [`docs/registry.toml`](../../registry.toml) + [`docs-control-map.md`](docs-control-map.md) (checked by `docs/scripts/doc_control_check.py`) |
+| How complete is a subsystem's implementation? | [`docs/status.toml`](../../status.toml) |
+| Is an `ARCHITECTURE.md` section stale? | [`docs/freshness.toml`](../../freshness.toml) (checked by `docs/scripts/freshness-check.py`; broader SME re-review tracked in [#2047](https://github.com/InterCooperative-Network/icn/issues/2047)) |
+| What is real now vs planned? | [`current-truth-map.md`](current-truth-map.md) → then [`docs/STATE.md`](../../STATE.md) + [`docs/PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md) |
+| What is safe to show / claim publicly? | [`show-readiness-map.md`](show-readiness-map.md) + [`website-truth-map.md`](website-truth-map.md) |
+| What routes does the gateway actually expose, and which reach OpenAPI? | [`generated/route-inventory.md`](generated/route-inventory.md) — mechanical scan, regenerate with `docs/scripts/route_inventory.py` ([#2112](https://github.com/InterCooperative-Network/icn/issues/2112)) |
+| Given a path/crate, what subsystem/docs/tests/invariants/claims/skills apply? (orientation, non-canonical) | [`generated/agent-context-spine.json`](generated/agent-context-spine.json) — generated, evidence-grounded; see [`docs/guides/developer/agent-context-spine.md`](../../guides/developer/agent-context-spine.md). Regenerate with `scripts/generate-agent-context-spine.py` |
+| Which invariants exist, and where are they canonically defined? | [`invariants-catalog.md`](invariants-catalog.md) (+ [`invariants-catalog.toml`](invariants-catalog.toml)) — indexes the four canonical families; index only, canonical sources remain authoritative ([#2114](https://github.com/InterCooperative-Network/icn/issues/2114)) |
+
+**Discipline (for humans and agents):**
+
+- **Orientation maps are not canonical state.** Everything in this directory is `Canonical: no`. Defer to code/tests first, then `STATE.md`/`PHASE_PROGRESS.md`, then accepted ADRs/RFCs — the full ranking is in [`source-of-truth-map.md`](source-of-truth-map.md).
+- **Bound every claim by its proof level.** Do not describe an L0–L1 design as implemented, or an L4 fixture/demo as live. Public claims must not exceed what `show-readiness-map.md` plus current canonical state support.
+- **Use the existing implementation-status labels** (from `source-of-truth-map.md`); do not invent new ones:
+  `implemented` · `implemented but partial` · `feature-gated` · `fixture-backed` · `gateway-backed` · `docs-only / design-direction` · `package-local` · `private-boundary` · `stale / historical` · `unknown / needs local verification`.
+- **Proof ladder** (from `proof-level-taxonomy-capability-matrix.md`): `L0` named/design-only → `L1` schema/contract → `L2` unit-tested → `L3` integration-tested → `L4` local proof loop → `L5` live daemon/gateway → `L6` multi-node/devnet → `L7` partner/organizer rehearsal → `L8` production hardening.
 
 ## Start here by role
 
@@ -50,6 +75,7 @@ This directory is a **show-ready orientation layer** for the ICN repository. Its
 | [`show-readiness-map.md`](show-readiness-map.md) | What can be shown now, what should not be shown as finished, the suggested demo narrative, and red lines. |
 | [`project-coverage-matrix.md`](project-coverage-matrix.md) | Coverage-style matrix: subsystem → anchors → drift and show risks. |
 | [`proof-level-taxonomy-capability-matrix.md`](proof-level-taxonomy-capability-matrix.md) | Proof-level taxonomy (L0–L8) as shared claim-boundary vocabulary, plus a capability matrix for the current organizer-rehearsal path. Supports #1746, narrows #1796. |
+| [`invariants-catalog.md`](invariants-catalog.md) | Source-linked index of the four canonical invariant families (operational / firewall-contract / frozen-core / regulatory, 28 total). Index only; canonical sources remain authoritative. Machine-readable: [`invariants-catalog.toml`](invariants-catalog.toml). |
 | [`identity-crypto-map.md`](identity-crypto-map.md) | Identity, keys, DIDs, signing — where code and docs live. |
 | [`network-gossip-map.md`](network-gossip-map.md) | QUIC, gossip, discovery — runtime surfaces and overclaim guardrails. |
 | [`ccl-map.md`](ccl-map.md) | Cooperative Contract Language interpreter and governance wiring. |

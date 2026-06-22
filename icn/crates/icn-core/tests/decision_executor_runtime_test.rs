@@ -18,7 +18,7 @@ use icn_governance::{ProposalPayload, TreasuryProposalOperation};
 use icn_governance_actor::translate_payload_to_effects;
 use icn_identity::Did;
 use icn_kernel_api::budget::{BudgetRecord, BudgetStore};
-use icn_kernel_api::effects::{KernelEffect, TreasuryEffect};
+use icn_kernel_api::effects::{FederationEffect, KernelEffect, TreasuryEffect};
 use icn_kernel_api::execution::{ExecutionRecord, ExecutionStatus, ExecutionStore};
 use icn_kernel_api::protocol_params::StubParamStore;
 use icn_kernel_api::services::LedgerEvent;
@@ -297,6 +297,20 @@ fn content_hash_from_hex(hash_hex: &str) -> Result<ContentHash> {
     Ok(ContentHash::from_bytes(bytes))
 }
 
+/// A federation-only effect batch carrying a governance `decision_hash`
+/// (since #2094). Used to exercise the executor idempotency-key path for
+/// federation decisions (#2095).
+fn terminate_clearing_effect(decision_hash: &str, reason: &str) -> Vec<KernelEffect> {
+    vec![KernelEffect::Federation(
+        FederationEffect::TerminateClearing {
+            initiating_coop_did: "coop-a".to_string(),
+            partner_coop_did: "coop-b".to_string(),
+            reason: reason.to_string(),
+            decision_hash: decision_hash.to_string(),
+        },
+    )]
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -387,6 +401,333 @@ async fn test_callback_idempotent_no_double_execute() {
     // Still confirmed, not re-executed
     let record2 = exec_store.get("hash-idem-1").unwrap().unwrap();
     assert_eq!(record2.status, ExecutionStatus::Confirmed);
+}
+
+/// Issue #2095: federation-only decisions are keyed by their propagated
+/// `decision_hash`, not by `decision_receipt_id`.
+///
+/// Two federation decisions that share a `decision_receipt_id` but carry
+/// distinct `decision_hash` values must BOTH be recorded independently. Before
+/// the fix, `extract_decision_hash` ignored federation effects, so both
+/// collapsed onto the shared receipt id and the second deduped against the
+/// first — exactly the replay hazard #2093/#2094 set out to remove.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_federation_same_receipt_different_hash_not_deduped() {
+    use icn_core::supervisor::decision_executor::create_decision_executor_callback;
+
+    let (executor, exec_store) = make_executor();
+    let callback = create_decision_executor_callback(executor);
+
+    // Same receipt id, two distinct federation decision hashes.
+    callback(
+        terminate_clearing_effect("sha256:fed-decision-a", "first"),
+        "receipt-shared".to_string(),
+    );
+    callback(
+        terminate_clearing_effect("sha256:fed-decision-b", "second"),
+        "receipt-shared".to_string(),
+    );
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    // Each decision is recorded under its own decision_hash key, proving the
+    // idempotency key reflects the federation decision_hash.
+    assert!(
+        exec_store.get("sha256:fed-decision-a").unwrap().is_some(),
+        "first federation decision must be recorded under its decision_hash"
+    );
+    assert!(
+        exec_store.get("sha256:fed-decision-b").unwrap().is_some(),
+        "second federation decision must be recorded under its decision_hash"
+    );
+    // The shared receipt id is NOT the idempotency key when a non-empty
+    // federation decision_hash is present (it would have collapsed the two).
+    assert!(
+        exec_store.get("receipt-shared").unwrap().is_none(),
+        "receipt id must not key the record when a federation decision_hash is present"
+    );
+}
+
+/// Issue #2095: an empty/legacy federation `decision_hash` preserves prior
+/// behavior — the executor falls back to `decision_receipt_id` as the
+/// idempotency key (no regression for pre-#2094 serialized effects).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_federation_empty_hash_falls_back_to_receipt() {
+    use icn_core::supervisor::decision_executor::create_decision_executor_callback;
+
+    let (executor, exec_store) = make_executor();
+    let callback = create_decision_executor_callback(executor);
+
+    callback(
+        terminate_clearing_effect("", "legacy"),
+        "receipt-legacy".to_string(),
+    );
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    assert!(
+        exec_store.get("receipt-legacy").unwrap().is_some(),
+        "empty federation decision_hash must fall back to the receipt id key"
+    );
+}
+
+/// Issue #2095 / Codex P1 (#2096): replay safety across the #2094->#2096 upgrade
+/// window.
+///
+/// A node that processed a federation effect *before* this change keyed its
+/// terminal `ExecutionRecord` under `decision_receipt_id` (the old extractor
+/// returned `None`). After the change, a replay of that same accepted event
+/// extracts the propagated federation `decision_hash`; without a compatibility
+/// check the executor would probe `store.get(<decision_hash>)`, miss the legacy
+/// receipt-keyed record, and re-run the terminate/revoke/settle operation. The
+/// executor must detect the legacy terminal record and dedupe instead.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_federation_replay_dedupes_against_legacy_receipt_keyed_record() {
+    use icn_core::supervisor::decision_executor::create_decision_executor_callback;
+
+    let (executor, exec_store) = make_executor();
+
+    // Simulate a pre-#2096 terminal record keyed under the *receipt id* (because
+    // the old extractor ignored federation effects and the callback fell back to
+    // the receipt id as the idempotency key).
+    let receipt_id = "receipt-upgrade-legacy";
+    let mut legacy = ExecutionRecord::new_pending(
+        receipt_id,
+        "proposal-legacy",
+        receipt_id,
+        terminate_clearing_effect("sha256:fed-legacy-hash", "legacy"),
+    );
+    legacy.status = ExecutionStatus::Confirmed;
+    exec_store.put(&legacy).unwrap();
+
+    let callback = create_decision_executor_callback(executor);
+
+    // Replay the same accepted event, now carrying the propagated federation hash.
+    callback(
+        terminate_clearing_effect("sha256:fed-legacy-hash", "replay"),
+        receipt_id.to_string(),
+    );
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    // No second record is created under the new decision_hash key (deduped
+    // against the legacy receipt-keyed record).
+    assert!(
+        exec_store.get("sha256:fed-legacy-hash").unwrap().is_none(),
+        "replay must not create a second record under the federation decision_hash"
+    );
+    // The legacy receipt-keyed record is untouched and still terminal.
+    let still = exec_store.get(receipt_id).unwrap().unwrap();
+    assert_eq!(
+        still.status,
+        ExecutionStatus::Confirmed,
+        "legacy receipt-keyed record must be preserved (not re-executed)"
+    );
+}
+
+/// Issue #2095 / Codex P1 follow-up (#2096): honor *in-flight / retryable* legacy
+/// receipt-keyed records, not just terminal ones.
+///
+/// A pre-#2096 federation record keyed under `decision_receipt_id` that is still
+/// non-terminal (e.g. a retryable `Failed` from before max-retry promotion) must
+/// continue under its own key on replay. Otherwise the executor would create a
+/// fresh record under the newly-extracted `decision_hash` with retries reset to
+/// zero, orphaning the legacy record and re-dispatching the operation.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_federation_replay_honors_legacy_in_flight_receipt_record() {
+    use icn_core::supervisor::decision_executor::create_decision_executor_callback;
+
+    let (executor, exec_store) = make_executor();
+
+    // Pre-#2096 NON-terminal record keyed under the receipt id: a retryable
+    // failure carried over the upgrade (retries already accumulated).
+    let receipt_id = "receipt-inflight-legacy";
+    let mut legacy = ExecutionRecord::new_pending(
+        receipt_id,
+        "proposal-legacy",
+        receipt_id,
+        terminate_clearing_effect("sha256:fed-inflight-hash", "legacy"),
+    );
+    legacy.status = ExecutionStatus::Failed;
+    legacy.retries = 2;
+    exec_store.put(&legacy).unwrap();
+
+    let callback = create_decision_executor_callback(executor);
+    callback(
+        terminate_clearing_effect("sha256:fed-inflight-hash", "replay"),
+        receipt_id.to_string(),
+    );
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    // No fresh record under the new decision_hash key — the decision continues
+    // under its legacy receipt key.
+    assert!(
+        exec_store
+            .get("sha256:fed-inflight-hash")
+            .unwrap()
+            .is_none(),
+        "replay must not create a second record under the federation decision_hash"
+    );
+    // The legacy record continues under its own key with retry history intact
+    // (not reset to zero).
+    let cont = exec_store.get(receipt_id).unwrap().unwrap();
+    assert!(
+        cont.retries >= 2,
+        "legacy retry count must be preserved, not reset (was {})",
+        cont.retries
+    );
+}
+
+/// Issue #2095 / Codex P1 (#2096): a legacy receipt-keyed record must NOT collapse
+/// a *different* decision that merely shares the same `decision_receipt_id`.
+///
+/// Multiple distinct federation decisions can share a receipt id but carry
+/// distinct `decision_hash` values (the #2095 same-receipt/different-hash case).
+/// After an upgrade, a pre-#2096 record sits under the receipt id; a later,
+/// distinct decision with the same receipt but a different hash must still
+/// execute under its own hash key — the legacy key is adopted only for the same
+/// decision (matched by the stored record's effects hash), never an unrelated one.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_federation_legacy_record_does_not_collapse_distinct_same_receipt_decision() {
+    use icn_core::supervisor::decision_executor::create_decision_executor_callback;
+
+    let (executor, exec_store) = make_executor();
+
+    // Legacy record for decision A (hash fed-a), keyed under the receipt id.
+    let receipt_id = "receipt-shared-upgrade";
+    let mut legacy = ExecutionRecord::new_pending(
+        receipt_id,
+        "proposal-a",
+        receipt_id,
+        terminate_clearing_effect("sha256:fed-decision-a", "decision-a"),
+    );
+    legacy.status = ExecutionStatus::Confirmed;
+    exec_store.put(&legacy).unwrap();
+
+    let callback = create_decision_executor_callback(executor);
+
+    // A DIFFERENT decision B (hash fed-b) shares the same receipt id.
+    callback(
+        terminate_clearing_effect("sha256:fed-decision-b", "decision-b"),
+        receipt_id.to_string(),
+    );
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    // Decision B executes under its own decision_hash key — it is not forced onto
+    // the legacy receipt key and deduped against the unrelated decision A.
+    assert!(
+        exec_store.get("sha256:fed-decision-b").unwrap().is_some(),
+        "a distinct same-receipt decision must execute under its own hash key"
+    );
+    // Decision A's legacy record is untouched.
+    let a = exec_store.get(receipt_id).unwrap().unwrap();
+    assert_eq!(a.status, ExecutionStatus::Confirmed);
+}
+
+/// Issue #2095 / Codex P2 (#2096): when BOTH a canonical hash-keyed record and a
+/// stale legacy receipt-keyed record exist for the same decision, the canonical
+/// terminal record wins.
+///
+/// This state is only reachable if a node ran an intermediate hash-keying build
+/// (which created the canonical row) before the legacy-key compatibility fix
+/// landed, leaving a stale non-terminal receipt-keyed row alongside a terminal
+/// hash-keyed row. A replay must dedupe on the terminal canonical record, not
+/// re-dispatch under the stale legacy key.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_federation_canonical_terminal_record_wins_over_legacy() {
+    use icn_core::supervisor::decision_executor::create_decision_executor_callback;
+
+    let (executor, exec_store) = make_executor();
+
+    let receipt_id = "receipt-both-rows";
+    let decision_hash = "sha256:fed-both-rows";
+
+    // Canonical hash-keyed record for the decision: terminal (Confirmed).
+    let mut canonical = ExecutionRecord::new_pending(
+        decision_hash,
+        "proposal-canonical",
+        receipt_id,
+        terminate_clearing_effect(decision_hash, "canonical"),
+    );
+    canonical.status = ExecutionStatus::Confirmed;
+    exec_store.put(&canonical).unwrap();
+
+    // Stale legacy receipt-keyed record for the SAME decision: still non-terminal.
+    let mut legacy = ExecutionRecord::new_pending(
+        receipt_id,
+        "proposal-legacy",
+        receipt_id,
+        terminate_clearing_effect(decision_hash, "legacy"),
+    );
+    legacy.status = ExecutionStatus::Failed;
+    legacy.retries = 1;
+    exec_store.put(&legacy).unwrap();
+
+    let callback = create_decision_executor_callback(executor);
+    callback(
+        terminate_clearing_effect(decision_hash, "replay"),
+        receipt_id.to_string(),
+    );
+    tokio::time::sleep(tokio::time::Duration::from_millis(150)).await;
+
+    // The terminal canonical record wins: the stale legacy record is NOT
+    // re-dispatched (its status and retry count are untouched).
+    let legacy_after = exec_store.get(receipt_id).unwrap().unwrap();
+    assert_eq!(
+        legacy_after.status,
+        ExecutionStatus::Failed,
+        "stale legacy record must not be re-dispatched when the canonical record is terminal"
+    );
+    assert_eq!(
+        legacy_after.retries, 1,
+        "stale legacy record retry count must be untouched"
+    );
+}
+
+/// Issue #2095 / Codex P2 (#2096): the canonical-terminal-wins rule must also
+/// hold on the startup recovery path.
+///
+/// `recover_in_flight` re-executes a stale non-terminal record under its stored
+/// key. For a legacy receipt-keyed row that key equals the receipt id, so the
+/// callback-path shadow (which keys on the extracted federation hash) is skipped.
+/// If a terminal canonical record exists for the same decision, recovery must
+/// dedupe against it via the stored effects' federation hash — not re-dispatch.
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_recovery_honors_canonical_terminal_over_stale_legacy() {
+    let (executor, exec_store) = make_executor();
+
+    let receipt_id = "receipt-recover-both";
+    let decision_hash = "sha256:fed-recover-both";
+
+    // Terminal canonical record under the federation decision_hash.
+    let mut canonical = ExecutionRecord::new_pending(
+        decision_hash,
+        "proposal-canonical",
+        receipt_id,
+        terminate_clearing_effect(decision_hash, "canonical"),
+    );
+    canonical.status = ExecutionStatus::Confirmed;
+    exec_store.put(&canonical).unwrap();
+
+    // Stale legacy receipt-keyed row for the SAME decision, still Executing
+    // (the state recover_in_flight picks up after a crash).
+    let mut legacy = ExecutionRecord::new_pending(
+        receipt_id,
+        "proposal-legacy",
+        receipt_id,
+        terminate_clearing_effect(decision_hash, "legacy"),
+    );
+    legacy.status = ExecutionStatus::Executing;
+    exec_store.put(&legacy).unwrap();
+
+    // Startup recovery scans non-terminal rows and re-executes them.
+    executor.recover_in_flight().await.unwrap();
+
+    // The stale legacy row is NOT re-dispatched — the terminal canonical record
+    // wins, so the legacy row's status is untouched.
+    let legacy_after = exec_store.get(receipt_id).unwrap().unwrap();
+    assert_eq!(
+        legacy_after.status,
+        ExecutionStatus::Executing,
+        "recovery must not re-dispatch a stale legacy row when the canonical record is terminal"
+    );
 }
 
 /// Test 3: Startup recovery picks up an Executing record and completes it.

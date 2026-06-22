@@ -1,0 +1,3421 @@
+{
+  "schema": "icn-agent-context-spine/v0",
+  "status": "generated",
+  "canonical": false,
+  "generated": "2026-06-21T14:08:16+00:00",
+  "source_commit": "cb3ac76d36ea64f25d65e59d614f2f1c048496e2",
+  "generator": "scripts/generate-agent-context-spine.py",
+  "regenerate": "python3 scripts/generate-agent-context-spine.py --write",
+  "check": "python3 scripts/generate-agent-context-spine.py --check",
+  "description": "ICN Agent Context Spine v0: a generated, non-canonical, evidence-grounded orientation map that bridges ops/state/truth/*.json and the generated project-index artifacts. Structure is not runtime liveness; this artifact asserts no production/live/pilot readiness. Defer to the canonical precedence in docs/reference/project-index/source-of-truth-map.md.",
+  "node_types": [
+    "agent",
+    "claim_surface",
+    "crate",
+    "doc",
+    "generated_artifact",
+    "invariant",
+    "mcp_tool",
+    "path_guidance",
+    "route_surface",
+    "script",
+    "skill",
+    "subsystem",
+    "truth_source"
+  ],
+  "edge_types": [
+    "canonical_source",
+    "depends_on",
+    "documents",
+    "exposes",
+    "generates",
+    "owned_by_subsystem",
+    "requires_skill",
+    "touches_claim_surface",
+    "verifies"
+  ],
+  "counts": {
+    "nodes": 131,
+    "edges": 92
+  },
+  "nodes": [
+    {
+      "id": "agent:icn-architect",
+      "type": "agent",
+      "name": "icn-architect",
+      "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-architect.md",
+      "description": "ICN protocol architect. Use this agent for crate boundary decisions, cross-crate refactors, public API surface changes, kernel/app separation, and threat modeling. Typical triggers include \"should this live in the kernel or an app\", \"review this cross-crate refactor\", \"does this change need an ADR\", and \"threat-model this surface\". NOT for economics/ledger (use icn-economist), NOT for deployment/ops (use icn-ops). See \"When to invoke\" in the body.",
+      "source_of_truth": "tools/claude-code/plugins/icn-agent-pack/agents/icn-architect.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack/agents/icn-architect.md",
+          "kind": "agent"
+        }
+      ]
+    },
+    {
+      "id": "agent:icn-code-reviewer",
+      "type": "agent",
+      "name": "icn-code-reviewer",
+      "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-code-reviewer.md",
+      "description": "ICN PR/diff reviewer with the invariants lens. Use this agent to review PRs, diffs, or staged changes for bugs, security issues, and ICN invariant violations. Typical triggers include \"review this diff\", \"is this PR safe to merge\", \"check this change against the invariants\", and proactively after a logical chunk of code is written. High signal-to-noise — surfaces only issues that genuinely matter. See \"When to invoke\" in the body.",
+      "source_of_truth": "tools/claude-code/plugins/icn-agent-pack/agents/icn-code-reviewer.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack/agents/icn-code-reviewer.md",
+          "kind": "agent"
+        }
+      ]
+    },
+    {
+      "id": "agent:icn-docs-truth-auditor",
+      "type": "agent",
+      "name": "icn-docs-truth-auditor",
+      "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-docs-truth-auditor.md",
+      "description": "ICN docs / public-claim truth auditor. Use this agent to audit docs, READMEs, website copy, and API descriptions for claim safety, proof level, and stale state before anything is published. Typical triggers include \"audit these docs for over-claims\", \"what proof backs this statement\", \"is this safe to put on the website\", and \"find stale state in docs/\". Read-only. See \"When to invoke\" in the body.",
+      "source_of_truth": "tools/claude-code/plugins/icn-agent-pack/agents/icn-docs-truth-auditor.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack/agents/icn-docs-truth-auditor.md",
+          "kind": "agent"
+        }
+      ]
+    },
+    {
+      "id": "agent:icn-economist",
+      "type": "agent",
+      "name": "icn-economist",
+      "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-economist.md",
+      "description": "ICN economics specialist. Use this agent for ledger logic, CCL contracts, mutual credit invariants, treasury integration, mana/resource allocation, settlement flows, and regulatory terminology compliance. Typical triggers include \"review this JournalEntry / settlement path\", \"check the credit-limit logic\", \"does this CCL change roll back atomically\", and \"is this terminology regulatory-safe\". NOT for protocol architecture (use icn-architect), NOT for deployment (use icn-ops). See \"When to invoke\" in the body.",
+      "source_of_truth": "tools/claude-code/plugins/icn-agent-pack/agents/icn-economist.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack/agents/icn-economist.md",
+          "kind": "agent"
+        }
+      ]
+    },
+    {
+      "id": "agent:icn-navigator",
+      "type": "agent",
+      "name": "icn-navigator",
+      "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-navigator.md",
+      "description": "ICN repository navigator and knowledge-graph builder. Use this agent to map the repo's crates/subsystems/claims, trace a concept or claim to the source that backs it, and build impact maps for a proposed change area. Typical triggers include \"map this subsystem\", \"trace this concept to its source\", \"what would this change impact\", and \"refresh the repo knowledge graph\". Read-mostly, and only writes a generated map artifact when explicitly asked. See \"When to invoke\" in the body.",
+      "source_of_truth": "tools/claude-code/plugins/icn-agent-pack/agents/icn-navigator.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack/agents/icn-navigator.md",
+          "kind": "agent"
+        }
+      ]
+    },
+    {
+      "id": "agent:icn-ops",
+      "type": "agent",
+      "name": "icn-ops",
+      "path": "tools/claude-code/plugins/icn-agent-pack/agents/icn-ops.md",
+      "description": "ICN operations specialist (read-mostly, MCP-first). Use this agent for CI/CD health, demo-flow readiness, release-readiness checks, deployment-manifest review, and pre-demo checklists. Typical triggers include \"is the demo ready to run\", \"check CI health\", \"are we release-ready\", and \"review this deploy manifest\". Consults the icn-ops MCP server and live evidence — it does NOT assert cluster state from static text. NOT for protocol design (use icn-architect), NOT for economics (use icn-economist). See \"When to invoke\" in the body.",
+      "source_of_truth": "tools/claude-code/plugins/icn-agent-pack/agents/icn-ops.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack/agents/icn-ops.md",
+          "kind": "agent"
+        }
+      ]
+    },
+    {
+      "id": "claim_surface:live-federation",
+      "type": "claim_surface",
+      "name": "Federation-liveness claim surface.",
+      "description": "A change here could be misread as asserting federation is operating across nodes. The spine maps declared structure only, not runtime liveness. Route liveness claims to the truth-sync / docs-truth-auditor workflows.",
+      "source_of_truth": "docs/reference/project-index/show-readiness-map.md",
+      "status": "advisory",
+      "asserts_readiness": false,
+      "evidence": [
+        {
+          "source": "CLAUDE.md",
+          "kind": "claim-doc"
+        },
+        {
+          "source": "docs/reference/project-index/show-readiness-map.md",
+          "kind": "claim-doc"
+        }
+      ]
+    },
+    {
+      "id": "claim_surface:pilot-readiness",
+      "type": "claim_surface",
+      "name": "Pilot-status claim surface.",
+      "description": "The current phase is partner-bound and not a committed pilot. Do not assert pilot status from code or docs. Route such claims to the truth-sync / docs-truth-auditor workflows.",
+      "source_of_truth": "docs/reference/project-index/show-readiness-map.md",
+      "status": "advisory",
+      "asserts_readiness": false,
+      "evidence": [
+        {
+          "source": "docs/PHASE_PROGRESS.md",
+          "kind": "claim-doc"
+        },
+        {
+          "source": "CLAUDE.md",
+          "kind": "claim-doc"
+        }
+      ]
+    },
+    {
+      "id": "claim_surface:production-readiness",
+      "type": "claim_surface",
+      "name": "Production-readiness claim surface.",
+      "description": "A change here could be misread as asserting the system is fit for production. The spine asserts no such status; declared structure is not runtime evidence. Confirm runtime via current ops evidence and route claims to the truth-sync / docs-truth-auditor workflows.",
+      "source_of_truth": "docs/reference/project-index/show-readiness-map.md",
+      "status": "advisory",
+      "asserts_readiness": false,
+      "evidence": [
+        {
+          "source": "CLAUDE.md",
+          "kind": "claim-doc"
+        },
+        {
+          "source": "docs/reference/project-index/show-readiness-map.md",
+          "kind": "claim-doc"
+        }
+      ]
+    },
+    {
+      "id": "claim_surface:public-website-claims",
+      "type": "claim_surface",
+      "name": "Public-website claim surface.",
+      "description": "Website content can outrun the daemon. Website presence is not proof of implementation. Route public claims to the docs-truth-auditor / truth-sync workflows.",
+      "source_of_truth": "docs/reference/project-index/show-readiness-map.md",
+      "status": "advisory",
+      "asserts_readiness": false,
+      "evidence": [
+        {
+          "source": "docs/reference/project-index/show-readiness-map.md",
+          "kind": "claim-doc"
+        },
+        {
+          "source": "docs/reference/project-index/source-of-truth-map.md",
+          "kind": "claim-doc"
+        }
+      ]
+    },
+    {
+      "id": "claim_surface:route-api-docs-drift",
+      "type": "claim_surface",
+      "name": "Route/API/docs drift surface.",
+      "description": "Gateway routes, the OpenAPI spec, and docs can drift apart. Verify with route_inventory.py --check before claiming API or documentation coverage.",
+      "source_of_truth": "docs/reference/project-index/show-readiness-map.md",
+      "status": "advisory",
+      "asserts_readiness": false,
+      "evidence": [
+        {
+          "source": "docs/reference/project-index/generated/route-inventory.md",
+          "kind": "claim-doc"
+        },
+        {
+          "source": "docs/scripts/route_inventory.py",
+          "kind": "claim-doc"
+        }
+      ]
+    },
+    {
+      "id": "crate:charter",
+      "type": "crate",
+      "name": "charter",
+      "group": "apps",
+      "path": "icn/apps/charter",
+      "description": "Workspace member crate (apps). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/apps/charter",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:governance",
+      "type": "crate",
+      "name": "governance",
+      "group": "apps",
+      "path": "icn/apps/governance",
+      "description": "Workspace member crate (apps). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/apps/governance",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:governance-app",
+      "type": "crate",
+      "name": "governance-app",
+      "group": "apps",
+      "path": "icn/apps/governance-app",
+      "description": "Workspace member crate (apps). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/apps/governance-app",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-api",
+      "type": "crate",
+      "name": "icn-api",
+      "group": "crates",
+      "path": "icn/crates/icn-api",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-api",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-authz",
+      "type": "crate",
+      "name": "icn-authz",
+      "group": "crates",
+      "path": "icn/crates/icn-authz",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-authz",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-baseline-lock",
+      "type": "crate",
+      "name": "icn-baseline-lock",
+      "group": "crates",
+      "path": "icn/crates/icn-baseline-lock",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-baseline-lock",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-boundary",
+      "type": "crate",
+      "name": "icn-boundary",
+      "group": "crates",
+      "path": "icn/crates/icn-boundary",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-boundary",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-ccl",
+      "type": "crate",
+      "name": "icn-ccl",
+      "group": "crates",
+      "path": "icn/crates/icn-ccl",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-ccl",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-commons",
+      "type": "crate",
+      "name": "icn-commons",
+      "group": "crates",
+      "path": "icn/crates/icn-commons",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-commons",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-community",
+      "type": "crate",
+      "name": "icn-community",
+      "group": "crates",
+      "path": "icn/crates/icn-community",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-community",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-compute",
+      "type": "crate",
+      "name": "icn-compute",
+      "group": "crates",
+      "path": "icn/crates/icn-compute",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-compute",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-console",
+      "type": "crate",
+      "name": "icn-console",
+      "group": "bins",
+      "path": "icn/bins/icn-console",
+      "description": "Workspace member crate (bins). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/bins/icn-console",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-coop",
+      "type": "crate",
+      "name": "icn-coop",
+      "group": "crates",
+      "path": "icn/crates/icn-coop",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-coop",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-core",
+      "type": "crate",
+      "name": "icn-core",
+      "group": "crates",
+      "path": "icn/crates/icn-core",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-core",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-crypto",
+      "type": "crate",
+      "name": "icn-crypto",
+      "group": "crates",
+      "path": "icn/crates/icn-crypto",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-crypto",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-crypto-pq",
+      "type": "crate",
+      "name": "icn-crypto-pq",
+      "group": "crates",
+      "path": "icn/crates/icn-crypto-pq",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-crypto-pq",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-encoding",
+      "type": "crate",
+      "name": "icn-encoding",
+      "group": "crates",
+      "path": "icn/crates/icn-encoding",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-encoding",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-entity",
+      "type": "crate",
+      "name": "icn-entity",
+      "group": "crates",
+      "path": "icn/crates/icn-entity",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-entity",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-federation",
+      "type": "crate",
+      "name": "icn-federation",
+      "group": "crates",
+      "path": "icn/crates/icn-federation",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-federation",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-gateway",
+      "type": "crate",
+      "name": "icn-gateway",
+      "group": "crates",
+      "path": "icn/crates/icn-gateway",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-gateway",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-gossip",
+      "type": "crate",
+      "name": "icn-gossip",
+      "group": "crates",
+      "path": "icn/crates/icn-gossip",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-gossip",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-governance",
+      "type": "crate",
+      "name": "icn-governance",
+      "group": "crates",
+      "path": "icn/crates/icn-governance",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-governance",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-http-kit",
+      "type": "crate",
+      "name": "icn-http-kit",
+      "group": "crates",
+      "path": "icn/crates/icn-http-kit",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-http-kit",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-identity",
+      "type": "crate",
+      "name": "icn-identity",
+      "group": "crates",
+      "path": "icn/crates/icn-identity",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-identity",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-kernel-api",
+      "type": "crate",
+      "name": "icn-kernel-api",
+      "group": "crates",
+      "path": "icn/crates/icn-kernel-api",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-kernel-api",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-ledger",
+      "type": "crate",
+      "name": "icn-ledger",
+      "group": "crates",
+      "path": "icn/crates/icn-ledger",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-ledger",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-naming",
+      "type": "crate",
+      "name": "icn-naming",
+      "group": "crates",
+      "path": "icn/crates/icn-naming",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-naming",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-net",
+      "type": "crate",
+      "name": "icn-net",
+      "group": "crates",
+      "path": "icn/crates/icn-net",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-net",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-obs",
+      "type": "crate",
+      "name": "icn-obs",
+      "group": "crates",
+      "path": "icn/crates/icn-obs",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-obs",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-privacy",
+      "type": "crate",
+      "name": "icn-privacy",
+      "group": "crates",
+      "path": "icn/crates/icn-privacy",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-privacy",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-protocol",
+      "type": "crate",
+      "name": "icn-protocol",
+      "group": "crates",
+      "path": "icn/crates/icn-protocol",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-protocol",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-rpc",
+      "type": "crate",
+      "name": "icn-rpc",
+      "group": "crates",
+      "path": "icn/crates/icn-rpc",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-rpc",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-security",
+      "type": "crate",
+      "name": "icn-security",
+      "group": "crates",
+      "path": "icn/crates/icn-security",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-security",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-services",
+      "type": "crate",
+      "name": "icn-services",
+      "group": "crates",
+      "path": "icn/crates/icn-services",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-services",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-snapshot",
+      "type": "crate",
+      "name": "icn-snapshot",
+      "group": "crates",
+      "path": "icn/crates/icn-snapshot",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-snapshot",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-steward",
+      "type": "crate",
+      "name": "icn-steward",
+      "group": "crates",
+      "path": "icn/crates/icn-steward",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-steward",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-store",
+      "type": "crate",
+      "name": "icn-store",
+      "group": "crates",
+      "path": "icn/crates/icn-store",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-store",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-testkit",
+      "type": "crate",
+      "name": "icn-testkit",
+      "group": "crates",
+      "path": "icn/crates/icn-testkit",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-testkit",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-time",
+      "type": "crate",
+      "name": "icn-time",
+      "group": "crates",
+      "path": "icn/crates/icn-time",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-time",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-trust",
+      "type": "crate",
+      "name": "icn-trust",
+      "group": "crates",
+      "path": "icn/crates/icn-trust",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-trust",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-zkp",
+      "type": "crate",
+      "name": "icn-zkp",
+      "group": "crates",
+      "path": "icn/crates/icn-zkp",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-zkp",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icnctl",
+      "type": "crate",
+      "name": "icnctl",
+      "group": "bins",
+      "path": "icn/bins/icnctl",
+      "description": "Workspace member crate (bins). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/bins/icnctl",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icnd",
+      "type": "crate",
+      "name": "icnd",
+      "group": "bins",
+      "path": "icn/bins/icnd",
+      "description": "Workspace member crate (bins). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/bins/icnd",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:ledger",
+      "type": "crate",
+      "name": "ledger",
+      "group": "apps",
+      "path": "icn/apps/ledger",
+      "description": "Workspace member crate (apps). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/apps/ledger",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:ledger-app",
+      "type": "crate",
+      "name": "ledger-app",
+      "group": "apps",
+      "path": "icn/apps/ledger-app",
+      "description": "Workspace member crate (apps). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/apps/ledger-app",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:membership",
+      "type": "crate",
+      "name": "membership",
+      "group": "apps",
+      "path": "icn/apps/membership",
+      "description": "Workspace member crate (apps). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/apps/membership",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:trust-app",
+      "type": "crate",
+      "name": "trust-app",
+      "group": "apps",
+      "path": "icn/apps/trust-app",
+      "description": "Workspace member crate (apps). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/apps/trust-app",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "doc:agent-context-spine",
+      "type": "doc",
+      "name": "agent-context-spine.md",
+      "path": "docs/guides/developer/agent-context-spine.md",
+      "description": "Agent Context Spine guide: model, regenerate/check, MCP exposure, path briefs.",
+      "doc_role": "guide",
+      "source_of_truth": "docs/guides/developer/agent-context-spine.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "docs/guides/developer/agent-context-spine.md",
+          "kind": "doc"
+        }
+      ]
+    },
+    {
+      "id": "doc:agent-mcp-tooling",
+      "type": "doc",
+      "name": "agent-mcp-tooling.md",
+      "path": "docs/guides/developer/agent-mcp-tooling.md",
+      "description": "The icn-ops MCP server: read-mostly diagnostics and launch doctrine.",
+      "doc_role": "guide",
+      "source_of_truth": "docs/guides/developer/agent-mcp-tooling.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "docs/guides/developer/agent-mcp-tooling.md",
+          "kind": "doc"
+        }
+      ]
+    },
+    {
+      "id": "doc:agents",
+      "type": "doc",
+      "name": "AGENTS.md",
+      "path": "AGENTS.md",
+      "description": "Agent operating rules and the five ICN invariants.",
+      "doc_role": "guidance",
+      "source_of_truth": "AGENTS.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "AGENTS.md",
+          "kind": "doc"
+        }
+      ]
+    },
+    {
+      "id": "doc:claude",
+      "type": "doc",
+      "name": "CLAUDE.md",
+      "path": "CLAUDE.md",
+      "description": "Repo guidance for Claude Code: topology, subsystems, conventions.",
+      "doc_role": "guidance",
+      "source_of_truth": "CLAUDE.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "CLAUDE.md",
+          "kind": "doc"
+        }
+      ]
+    },
+    {
+      "id": "doc:claude-code-plugin",
+      "type": "doc",
+      "name": "claude-code-plugin.md",
+      "path": "docs/guides/developer/claude-code-plugin.md",
+      "description": "The icn-agent-pack Claude Code plugin (portable MCP launch, skills/agents).",
+      "doc_role": "guide",
+      "source_of_truth": "docs/guides/developer/claude-code-plugin.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "docs/guides/developer/claude-code-plugin.md",
+          "kind": "doc"
+        }
+      ]
+    },
+    {
+      "id": "doc:phase-progress",
+      "type": "doc",
+      "name": "PHASE_PROGRESS.md",
+      "path": "docs/PHASE_PROGRESS.md",
+      "description": "Phase progress tracking (canonical, truth-synced).",
+      "doc_role": "canonical-state",
+      "source_of_truth": "docs/PHASE_PROGRESS.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "docs/PHASE_PROGRESS.md",
+          "kind": "doc"
+        }
+      ]
+    },
+    {
+      "id": "doc:proof-level-taxonomy",
+      "type": "doc",
+      "name": "proof-level-taxonomy-capability-matrix.md",
+      "path": "docs/reference/project-index/proof-level-taxonomy-capability-matrix.md",
+      "description": "Proof-level taxonomy (L0-L8) and capability matrix.",
+      "doc_role": "orientation",
+      "source_of_truth": "docs/reference/project-index/proof-level-taxonomy-capability-matrix.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "docs/reference/project-index/proof-level-taxonomy-capability-matrix.md",
+          "kind": "doc"
+        }
+      ]
+    },
+    {
+      "id": "doc:show-readiness-map",
+      "type": "doc",
+      "name": "show-readiness-map.md",
+      "path": "docs/reference/project-index/show-readiness-map.md",
+      "description": "What can be shown now vs. what is not finished; red lines.",
+      "doc_role": "orientation",
+      "source_of_truth": "docs/reference/project-index/show-readiness-map.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "docs/reference/project-index/show-readiness-map.md",
+          "kind": "doc"
+        }
+      ]
+    },
+    {
+      "id": "doc:source-of-truth-map",
+      "type": "doc",
+      "name": "source-of-truth-map.md",
+      "path": "docs/reference/project-index/source-of-truth-map.md",
+      "description": "Precedence map: which sources outrank which when material disagrees.",
+      "doc_role": "orientation",
+      "source_of_truth": "docs/reference/project-index/source-of-truth-map.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "docs/reference/project-index/source-of-truth-map.md",
+          "kind": "doc"
+        }
+      ]
+    },
+    {
+      "id": "doc:state",
+      "type": "doc",
+      "name": "STATE.md",
+      "path": "docs/STATE.md",
+      "description": "Current project state (canonical, truth-synced).",
+      "doc_role": "canonical-state",
+      "source_of_truth": "docs/STATE.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "docs/STATE.md",
+          "kind": "doc"
+        }
+      ]
+    },
+    {
+      "id": "generated_artifact:agent-context-spine",
+      "type": "generated_artifact",
+      "name": "agent-context-spine.json",
+      "path": "docs/reference/project-index/generated/agent-context-spine.json",
+      "description": "This artifact: the agent context spine (generated, non-canonical).",
+      "generated_by": "scripts/generate-agent-context-spine.py",
+      "source_of_truth": "scripts/generate-agent-context-spine.py",
+      "status": "generated",
+      "evidence": [
+        {
+          "source": "docs/reference/project-index/generated/agent-context-spine.json",
+          "kind": "generated-artifact"
+        }
+      ]
+    },
+    {
+      "id": "generated_artifact:icn-file-record",
+      "type": "generated_artifact",
+      "name": "icn-file-record.json",
+      "path": "docs/reference/project-index/generated/icn-file-record.json",
+      "description": "Mechanical file/directory record snapshot of the repo.",
+      "generated_by": "scripts/generate_repo_record.py",
+      "source_of_truth": "scripts/generate_repo_record.py",
+      "status": "generated",
+      "evidence": [
+        {
+          "source": "docs/reference/project-index/generated/icn-file-record.json",
+          "kind": "generated-artifact"
+        }
+      ]
+    },
+    {
+      "id": "generated_artifact:route-inventory",
+      "type": "generated_artifact",
+      "name": "route-inventory.md",
+      "path": "docs/reference/project-index/generated/route-inventory.md",
+      "description": "Mechanical gateway route inventory (route declarations at a snapshot commit).",
+      "generated_by": "docs/scripts/route_inventory.py",
+      "source_of_truth": "docs/scripts/route_inventory.py",
+      "status": "generated",
+      "evidence": [
+        {
+          "source": "docs/reference/project-index/generated/route-inventory.md",
+          "kind": "generated-artifact"
+        }
+      ]
+    },
+    {
+      "id": "invariant:adversarial-by-default",
+      "type": "invariant",
+      "name": "adversarial-by-default",
+      "description": "Treat peers as untrusted until trust is established; no implicit trust shortcuts.",
+      "source_of_truth": "AGENTS.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "AGENTS.md",
+          "kind": "icn-invariants-section"
+        }
+      ]
+    },
+    {
+      "id": "invariant:canonical-encodings",
+      "type": "invariant",
+      "name": "canonical-encodings",
+      "description": "Do not change wire/proof/encoding structures without explicit intent, docs, and tests.",
+      "source_of_truth": "AGENTS.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "AGENTS.md",
+          "kind": "icn-invariants-section"
+        }
+      ]
+    },
+    {
+      "id": "invariant:determinism",
+      "type": "invariant",
+      "name": "determinism",
+      "description": "Protocol state transitions, proofs, and derived roots must be deterministic; same inputs produce same outputs.",
+      "source_of_truth": "AGENTS.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "AGENTS.md",
+          "kind": "icn-invariants-section"
+        }
+      ]
+    },
+    {
+      "id": "invariant:kernel-app-boundaries",
+      "type": "invariant",
+      "name": "kernel-app-boundaries",
+      "description": "Keep crate layering clean; avoid dependency cycles; follow the forbidden-deps policy.",
+      "source_of_truth": "AGENTS.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "AGENTS.md",
+          "kind": "icn-invariants-section"
+        }
+      ]
+    },
+    {
+      "id": "invariant:no-panics-in-protocol-paths",
+      "type": "invariant",
+      "name": "no-panics-in-protocol-paths",
+      "description": "Never panic in network/protocol/actor-runtime/deserialization paths; use Result.",
+      "source_of_truth": "AGENTS.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "AGENTS.md",
+          "kind": "icn-invariants-section"
+        }
+      ]
+    },
+    {
+      "id": "mcp_tool:icn_ops_agent_brief",
+      "type": "mcp_tool",
+      "name": "icn_ops_agent_brief",
+      "short": "agent_brief",
+      "description": "Read-only icn-ops MCP diagnostic (agent_brief). Returns context as strings; never executes repo commands.",
+      "source_of_truth": "ops/mcp/src/tools/agent-ops.ts",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/mcp/src/tools/agent-ops.ts",
+          "kind": "mcp-tool"
+        },
+        {
+          "source": "ops/mcp/src/diagnostics/agent-brief.ts",
+          "kind": "mcp-tool"
+        }
+      ]
+    },
+    {
+      "id": "mcp_tool:icn_ops_agent_context_spine",
+      "type": "mcp_tool",
+      "name": "icn_ops_agent_context_spine",
+      "short": "agent_context_spine",
+      "description": "Read-only icn-ops MCP diagnostic (agent_context_spine). Returns context as strings; never executes repo commands.",
+      "source_of_truth": "ops/mcp/src/tools/agent-ops.ts",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/mcp/src/tools/agent-ops.ts",
+          "kind": "mcp-tool"
+        },
+        {
+          "source": "ops/mcp/src/diagnostics/agent-context-spine.ts",
+          "kind": "mcp-tool"
+        }
+      ]
+    },
+    {
+      "id": "mcp_tool:icn_ops_command_catalog",
+      "type": "mcp_tool",
+      "name": "icn_ops_command_catalog",
+      "short": "command_catalog",
+      "description": "Read-only icn-ops MCP diagnostic (command_catalog). Returns context as strings; never executes repo commands.",
+      "source_of_truth": "ops/mcp/src/tools/agent-ops.ts",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/mcp/src/tools/agent-ops.ts",
+          "kind": "mcp-tool"
+        },
+        {
+          "source": "ops/mcp/src/diagnostics/command-catalog.ts",
+          "kind": "mcp-tool"
+        }
+      ]
+    },
+    {
+      "id": "mcp_tool:icn_ops_doctor",
+      "type": "mcp_tool",
+      "name": "icn_ops_doctor",
+      "short": "doctor",
+      "description": "Read-only icn-ops MCP diagnostic (doctor). Returns context as strings; never executes repo commands.",
+      "source_of_truth": "ops/mcp/src/tools/agent-ops.ts",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/mcp/src/tools/agent-ops.ts",
+          "kind": "mcp-tool"
+        },
+        {
+          "source": "ops/mcp/src/diagnostics/doctor.ts",
+          "kind": "mcp-tool"
+        }
+      ]
+    },
+    {
+      "id": "mcp_tool:icn_ops_environment_report",
+      "type": "mcp_tool",
+      "name": "icn_ops_environment_report",
+      "short": "environment_report",
+      "description": "Read-only icn-ops MCP diagnostic (environment_report). Returns context as strings; never executes repo commands.",
+      "source_of_truth": "ops/mcp/src/tools/agent-ops.ts",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/mcp/src/tools/agent-ops.ts",
+          "kind": "mcp-tool"
+        },
+        {
+          "source": "ops/mcp/src/diagnostics/environment-report.ts",
+          "kind": "mcp-tool"
+        }
+      ]
+    },
+    {
+      "id": "mcp_tool:icn_ops_next_steps",
+      "type": "mcp_tool",
+      "name": "icn_ops_next_steps",
+      "short": "next_steps",
+      "description": "Read-only icn-ops MCP diagnostic (next_steps). Returns context as strings; never executes repo commands.",
+      "source_of_truth": "ops/mcp/src/tools/agent-ops.ts",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/mcp/src/tools/agent-ops.ts",
+          "kind": "mcp-tool"
+        },
+        {
+          "source": "ops/mcp/src/diagnostics/next-steps.ts",
+          "kind": "mcp-tool"
+        }
+      ]
+    },
+    {
+      "id": "mcp_tool:icn_ops_repo_map",
+      "type": "mcp_tool",
+      "name": "icn_ops_repo_map",
+      "short": "repo_map",
+      "description": "Read-only icn-ops MCP diagnostic (repo_map). Returns context as strings; never executes repo commands.",
+      "source_of_truth": "ops/mcp/src/tools/agent-ops.ts",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/mcp/src/tools/agent-ops.ts",
+          "kind": "mcp-tool"
+        },
+        {
+          "source": "ops/mcp/src/diagnostics/repo-map.ts",
+          "kind": "mcp-tool"
+        }
+      ]
+    },
+    {
+      "id": "mcp_tool:icn_ops_state_index",
+      "type": "mcp_tool",
+      "name": "icn_ops_state_index",
+      "short": "state_index",
+      "description": "Read-only icn-ops MCP diagnostic (state_index). Returns context as strings; never executes repo commands.",
+      "source_of_truth": "ops/mcp/src/tools/agent-ops.ts",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/mcp/src/tools/agent-ops.ts",
+          "kind": "mcp-tool"
+        },
+        {
+          "source": "ops/mcp/src/diagnostics/state-index.ts",
+          "kind": "mcp-tool"
+        }
+      ]
+    },
+    {
+      "id": "mcp_tool:icn_ops_verification_plan",
+      "type": "mcp_tool",
+      "name": "icn_ops_verification_plan",
+      "short": "verification_plan",
+      "description": "Read-only icn-ops MCP diagnostic (verification_plan). Returns context as strings; never executes repo commands.",
+      "source_of_truth": "ops/mcp/src/tools/agent-ops.ts",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/mcp/src/tools/agent-ops.ts",
+          "kind": "mcp-tool"
+        },
+        {
+          "source": "ops/mcp/src/diagnostics/verification-plan.ts",
+          "kind": "mcp-tool"
+        }
+      ]
+    },
+    {
+      "id": "guidance:docs",
+      "type": "path_guidance",
+      "name": "Documentation (truth / claim discipline)",
+      "match": "docs/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `docs/`.",
+      "review_focus": [
+        "Truth-source alignment and source precedence",
+        "No production/live/pilot overclaims; bound claims by proof level",
+        "Freshness and evidence for any asserted state"
+      ],
+      "verification_commands": [
+        "python3 docs/scripts/doc_control_check.py"
+      ],
+      "risk_surfaces": [
+        "claim_surface:public-website-claims",
+        "claim_surface:production-readiness",
+        "claim_surface:live-federation",
+        "claim_surface:pilot-readiness"
+      ],
+      "invariants": [],
+      "docs": [
+        "doc:source-of-truth-map",
+        "doc:show-readiness-map"
+      ],
+      "recommended_skills": [
+        "skill:truth-sync",
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-docs-truth-auditor"
+      ],
+      "source_of_truth": "docs/reference/project-index/source-of-truth-map.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "docs/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "docs/reference/project-index/source-of-truth-map.md",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:docs-scripts",
+      "type": "path_guidance",
+      "name": "Docs automation script (generator / validator)",
+      "match": "docs/scripts/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `docs/scripts/`.",
+      "review_focus": [
+        "Python standard library only; dependency-free",
+        "Deterministic output; --check drift mode stays correct"
+      ],
+      "verification_commands": [
+        "python3 docs/scripts/route_inventory.py --check",
+        "python3 docs/scripts/doc_control_check.py"
+      ],
+      "risk_surfaces": [],
+      "invariants": [],
+      "docs": [
+        "doc:source-of-truth-map"
+      ],
+      "recommended_skills": [
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-code-reviewer",
+        "agent:icn-docs-truth-auditor"
+      ],
+      "source_of_truth": "docs/scripts",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "docs/scripts/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "docs/scripts",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:gateway",
+      "type": "path_guidance",
+      "name": "icn-gateway (gateway / route / API surface)",
+      "match": "icn/crates/icn-gateway/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `icn/crates/icn-gateway/`.",
+      "review_focus": [
+        "Route/API drift: gateway handlers vs OpenAPI vs SDK types",
+        "Public-surface and auth/authz on new or changed routes",
+        "Regenerate the route inventory + OpenAPI when routes change",
+        "No panics on untrusted request input"
+      ],
+      "verification_commands": [
+        "python3 docs/scripts/route_inventory.py --check",
+        "cd icn && cargo clippy -p icn-gateway --all-targets -- -D warnings",
+        "cd icn && cargo test -p icn-gateway --features sled-storage",
+        "If routes/API shape change, regenerate OpenAPI: cd icn && cargo build -p icnctl && ./target/debug/icnctl api export-openapi -o ../docs/api/openapi.generated.yaml",
+        "If the API shape changed, regenerate + check SDK types: cd sdk/typescript && npm ci && npm run generate-types && npm run check-types"
+      ],
+      "risk_surfaces": [
+        "claim_surface:route-api-docs-drift",
+        "claim_surface:public-website-claims"
+      ],
+      "invariants": [
+        "invariant:no-panics-in-protocol-paths",
+        "invariant:adversarial-by-default"
+      ],
+      "docs": [
+        "doc:source-of-truth-map",
+        "doc:show-readiness-map"
+      ],
+      "recommended_skills": [
+        "skill:route-impact",
+        "skill:truth-sync"
+      ],
+      "recommended_agents": [
+        "agent:icn-code-reviewer",
+        "agent:icn-docs-truth-auditor"
+      ],
+      "source_of_truth": "AGENTS.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "icn/crates/icn-gateway/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "AGENTS.md",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:generated",
+      "type": "path_guidance",
+      "name": "Generated project-index artifact",
+      "match": "docs/reference/project-index/generated/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `docs/reference/project-index/generated/`.",
+      "review_focus": [
+        "Do NOT hand-edit generated artifacts — regenerate via the owning script",
+        "Every node/edge evidence path must resolve on disk",
+        "No production/live/pilot overclaims in generated fields"
+      ],
+      "verification_commands": [
+        "python3 scripts/generate-agent-context-spine.py --check",
+        "python3 scripts/check-agent-context-spine.py",
+        "python3 docs/scripts/route_inventory.py --check"
+      ],
+      "risk_surfaces": [
+        "claim_surface:public-website-claims"
+      ],
+      "invariants": [],
+      "docs": [
+        "doc:source-of-truth-map"
+      ],
+      "recommended_skills": [
+        "skill:truth-sync",
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-docs-truth-auditor"
+      ],
+      "source_of_truth": "docs/reference/project-index/generated",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "docs/reference/project-index/generated/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "docs/reference/project-index/generated",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:ledger",
+      "type": "path_guidance",
+      "name": "icn-ledger (mutual credit / settlement)",
+      "match": "icn/crates/icn-ledger/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `icn/crates/icn-ledger/`.",
+      "review_focus": [
+        "Mutual-credit / double-entry invariants (no value created or destroyed)",
+        "Use settlement (not payment) terminology — regulatory framing",
+        "Determinism of journal/state-change derivation"
+      ],
+      "verification_commands": [
+        "cd icn && cargo test -p icn-ledger",
+        "cd icn && cargo clippy -p icn-ledger --all-targets -- -D warnings"
+      ],
+      "risk_surfaces": [],
+      "invariants": [
+        "invariant:determinism",
+        "invariant:canonical-encodings"
+      ],
+      "docs": [
+        "doc:claude"
+      ],
+      "recommended_skills": [
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-economist",
+        "agent:icn-code-reviewer"
+      ],
+      "source_of_truth": "AGENTS.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "icn/crates/icn-ledger/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "AGENTS.md",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:mcp",
+      "type": "path_guidance",
+      "name": "icn-ops MCP server (TypeScript)",
+      "match": "ops/mcp/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `ops/mcp/`.",
+      "review_focus": [
+        "Read-only / no mutation unless explicitly designed",
+        "Clear failure modes on missing or malformed inputs",
+        "ICN root & path portability (resolveMonorepoRoot; no hardcoded paths)",
+        "Stable MCP tool/resource contract"
+      ],
+      "verification_commands": [
+        "npm --prefix ./ops/mcp run build",
+        "npm --prefix ./ops/mcp test",
+        "python3 scripts/check-mcp-portability.py"
+      ],
+      "risk_surfaces": [],
+      "invariants": [],
+      "docs": [
+        "doc:agent-mcp-tooling",
+        "doc:agent-context-spine"
+      ],
+      "recommended_skills": [
+        "skill:doctor",
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-ops",
+        "agent:icn-code-reviewer"
+      ],
+      "source_of_truth": "docs/guides/developer/agent-mcp-tooling.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "ops/mcp/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "docs/guides/developer/agent-mcp-tooling.md",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:plugin",
+      "type": "path_guidance",
+      "name": "icn-agent-pack Claude Code plugin",
+      "match": "tools/claude-code/plugins/icn-agent-pack/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `tools/claude-code/plugins/icn-agent-pack/`.",
+      "review_focus": [
+        "Plugin manifest / skill / agent schema validity and loadability",
+        "Advisory hooks stay non-blocking; root resolution stays portable",
+        "Do not change project-local .claude/ or root MCP config"
+      ],
+      "verification_commands": [
+        "python3 scripts/check-claude-plugin.py",
+        "python3 scripts/check-claude-plugin-root-resolution.py",
+        "claude plugin validate ./tools/claude-code/plugins/icn-agent-pack"
+      ],
+      "risk_surfaces": [],
+      "invariants": [],
+      "docs": [
+        "doc:claude-code-plugin"
+      ],
+      "recommended_skills": [
+        "skill:doctor"
+      ],
+      "recommended_agents": [
+        "agent:icn-code-reviewer"
+      ],
+      "source_of_truth": "tools/claude-code/plugins/icn-agent-pack",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:rust-workspace",
+      "type": "path_guidance",
+      "name": "ICN Rust workspace crate",
+      "match": "icn/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `icn/`.",
+      "review_focus": [
+        "Kernel/app boundary: no domain imports in kernel crates; no reverse meaning firewall",
+        "No panics in protocol/actor/deserialization paths (no unwrap/expect on untrusted input)",
+        "Determinism: no HashMap iteration-order or unseeded-random reliance",
+        "Canonical encodings unchanged without explicit versioning + tests"
+      ],
+      "verification_commands": [
+        "cd icn && cargo fmt --all --check",
+        "cd icn && cargo clippy --workspace --all-targets --all-features -- -D warnings",
+        "cd icn && cargo test"
+      ],
+      "risk_surfaces": [],
+      "invariants": [
+        "invariant:adversarial-by-default",
+        "invariant:determinism",
+        "invariant:canonical-encodings",
+        "invariant:no-panics-in-protocol-paths",
+        "invariant:kernel-app-boundaries"
+      ],
+      "docs": [
+        "doc:agents",
+        "doc:claude"
+      ],
+      "recommended_skills": [
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-architect",
+        "agent:icn-code-reviewer"
+      ],
+      "source_of_truth": "AGENTS.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "icn/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "AGENTS.md",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:scripts",
+      "type": "path_guidance",
+      "name": "Repo automation script (generator / validator)",
+      "match": "scripts/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `scripts/`.",
+      "review_focus": [
+        "Python standard library only; dependency-free",
+        "Deterministic output; --check drift mode stays correct",
+        "No overclaim language emitted into generated artifacts"
+      ],
+      "verification_commands": [
+        "python3 scripts/check-agent-context-spine.py",
+        "python3 scripts/generate-agent-context-spine.py --check"
+      ],
+      "risk_surfaces": [],
+      "invariants": [],
+      "docs": [
+        "doc:agent-context-spine"
+      ],
+      "recommended_skills": [
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-code-reviewer"
+      ],
+      "source_of_truth": "scripts",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "scripts/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "scripts",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:sdk-ts",
+      "type": "path_guidance",
+      "name": "TypeScript SDK (build/test/lint + generated-types drift)",
+      "match": "sdk/typescript/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `sdk/typescript/`.",
+      "review_focus": [
+        "Run the full package gates for code edits: npm ci, build, test, lint",
+        "Generated types: commit only regenerated files under src/generated/*",
+        "API drift chain: gateway -> OpenAPI -> TS types",
+        "No mixed refactor + regen commits"
+      ],
+      "verification_commands": [
+        "cd sdk/typescript && npm ci && npm run build && npm test && npm run lint",
+        "Generated types only (after a gateway API change), commit only src/generated/*: cd sdk/typescript && npm ci && npm run generate-types && npm run check-types"
+      ],
+      "risk_surfaces": [
+        "claim_surface:route-api-docs-drift"
+      ],
+      "invariants": [],
+      "docs": [
+        "doc:source-of-truth-map"
+      ],
+      "recommended_skills": [
+        "skill:route-impact"
+      ],
+      "recommended_agents": [
+        "agent:icn-code-reviewer"
+      ],
+      "source_of_truth": "sdk/typescript",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "sdk/typescript/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "sdk/typescript",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "guidance:truth-spine",
+      "type": "path_guidance",
+      "name": "Canonical truth spine (fact ownership)",
+      "match": "ops/state/truth/",
+      "match_kind": "prefix",
+      "description": "Code-quality brief for changes under `ops/state/truth/`.",
+      "review_focus": [
+        "This directory OWNS fact authority — keep one source per fact",
+        "Never hardcode sprint/PR/branch/cluster IPs in skills or agents",
+        "Downstream skills/agents read from here; do not duplicate facts"
+      ],
+      "verification_commands": [],
+      "risk_surfaces": [],
+      "invariants": [],
+      "docs": [
+        "doc:source-of-truth-map"
+      ],
+      "recommended_skills": [
+        "skill:navigator"
+      ],
+      "recommended_agents": [
+        "agent:icn-architect",
+        "agent:icn-code-reviewer"
+      ],
+      "source_of_truth": "ops/state/truth",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "ops/state/truth/",
+          "kind": "path-prefix"
+        },
+        {
+          "source": "ops/state/truth",
+          "kind": "authority"
+        }
+      ]
+    },
+    {
+      "id": "route_surface:gateway",
+      "type": "route_surface",
+      "name": "gateway-route-surface",
+      "path": "docs/reference/project-index/generated/route-inventory.md",
+      "description": "Single pointer to the mechanically generated gateway route inventory. v0 does not create per-route nodes; counts and snapshot commit live in the artifact.",
+      "source_of_truth": "docs/scripts/route_inventory.py",
+      "status": "generated-pointer",
+      "evidence": [
+        {
+          "source": "docs/reference/project-index/generated/route-inventory.md",
+          "kind": "route-source"
+        },
+        {
+          "source": "docs/scripts/route_inventory.py",
+          "kind": "route-source"
+        }
+      ]
+    },
+    {
+      "id": "script:check-agent-context-spine",
+      "type": "script",
+      "name": "check-agent-context-spine.py",
+      "path": "scripts/check-agent-context-spine.py",
+      "description": "Repo script: scripts/check-agent-context-spine.py.",
+      "source_of_truth": "scripts/check-agent-context-spine.py",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "scripts/check-agent-context-spine.py",
+          "kind": "script"
+        }
+      ]
+    },
+    {
+      "id": "script:check-claude-plugin",
+      "type": "script",
+      "name": "check-claude-plugin.py",
+      "path": "scripts/check-claude-plugin.py",
+      "description": "Repo script: scripts/check-claude-plugin.py.",
+      "source_of_truth": "scripts/check-claude-plugin.py",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "scripts/check-claude-plugin.py",
+          "kind": "script"
+        }
+      ]
+    },
+    {
+      "id": "script:check-claude-plugin-root-resolution",
+      "type": "script",
+      "name": "check-claude-plugin-root-resolution.py",
+      "path": "scripts/check-claude-plugin-root-resolution.py",
+      "description": "Repo script: scripts/check-claude-plugin-root-resolution.py.",
+      "source_of_truth": "scripts/check-claude-plugin-root-resolution.py",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "scripts/check-claude-plugin-root-resolution.py",
+          "kind": "script"
+        }
+      ]
+    },
+    {
+      "id": "script:check-mcp-portability",
+      "type": "script",
+      "name": "check-mcp-portability.py",
+      "path": "scripts/check-mcp-portability.py",
+      "description": "Repo script: scripts/check-mcp-portability.py.",
+      "source_of_truth": "scripts/check-mcp-portability.py",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "scripts/check-mcp-portability.py",
+          "kind": "script"
+        }
+      ]
+    },
+    {
+      "id": "script:generate-agent-context-spine",
+      "type": "script",
+      "name": "generate-agent-context-spine.py",
+      "path": "scripts/generate-agent-context-spine.py",
+      "description": "Repo script: scripts/generate-agent-context-spine.py.",
+      "source_of_truth": "scripts/generate-agent-context-spine.py",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "scripts/generate-agent-context-spine.py",
+          "kind": "script"
+        }
+      ]
+    },
+    {
+      "id": "script:generate_repo_record",
+      "type": "script",
+      "name": "generate_repo_record.py",
+      "path": "scripts/generate_repo_record.py",
+      "description": "Repo script: scripts/generate_repo_record.py.",
+      "source_of_truth": "scripts/generate_repo_record.py",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "scripts/generate_repo_record.py",
+          "kind": "script"
+        }
+      ]
+    },
+    {
+      "id": "script:route_inventory",
+      "type": "script",
+      "name": "route_inventory.py",
+      "path": "docs/scripts/route_inventory.py",
+      "description": "Repo script: docs/scripts/route_inventory.py.",
+      "source_of_truth": "docs/scripts/route_inventory.py",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "docs/scripts/route_inventory.py",
+          "kind": "script"
+        }
+      ]
+    },
+    {
+      "id": "skill:authority-spine",
+      "type": "skill",
+      "name": "authority-spine",
+      "path": "tools/claude-code/plugins/icn-agent-pack/skills/authority-spine/SKILL.md",
+      "description": "ICN authority-spine work. This skill should be used when the user explicitly invokes \"/icn-agent-pack:authority-spine\", or asks to work on \"entity-aware auth\", \"trusted token authority / trusted issuance\", \"coop_id to EntityId mapping\", \"CoopEntityMap\", or \"treasury observe/cutover readiness\". Orients the agent on the entity-authority spine, requires a written plan before any edit, and surfaces files, risks, verification commands, and required truth/doc updates.",
+      "source_of_truth": "tools/claude-code/plugins/icn-agent-pack/skills/authority-spine/SKILL.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack/skills/authority-spine/SKILL.md",
+          "kind": "skill"
+        }
+      ]
+    },
+    {
+      "id": "skill:doctor",
+      "type": "skill",
+      "name": "doctor",
+      "path": "tools/claude-code/plugins/icn-agent-pack/skills/doctor/SKILL.md",
+      "description": "ICN Agent Pack self-diagnosis. This skill should be used when the user explicitly invokes \"/icn-agent-pack:doctor\", or asks to \"diagnose the plugin\", \"is the icn-agent-pack plugin loaded\", \"why can't the plugin reach the repo/MCP\", or \"check icn-ops MCP startability\". Runs read-only checks on plugin load, ICN root resolution, the icn-ops MCP launcher, and the repo/Node prerequisites.",
+      "source_of_truth": "tools/claude-code/plugins/icn-agent-pack/skills/doctor/SKILL.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack/skills/doctor/SKILL.md",
+          "kind": "skill"
+        }
+      ]
+    },
+    {
+      "id": "skill:navigator",
+      "type": "skill",
+      "name": "navigator",
+      "path": "tools/claude-code/plugins/icn-agent-pack/skills/navigator/SKILL.md",
+      "description": "ICN repo navigator / knowledge graph. This skill should be used when the user explicitly invokes \"/icn-agent-pack:navigator\", or asks to \"map the repo\", \"build/refresh the knowledge graph\", \"trace this concept to its source\", or \"show the conceptual map / impact map\". Begins the living repository knowledge-graph and conceptual-map workflow, grounded in the icn-ops MCP tools and (future) generated graph artifacts.",
+      "source_of_truth": "tools/claude-code/plugins/icn-agent-pack/skills/navigator/SKILL.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack/skills/navigator/SKILL.md",
+          "kind": "skill"
+        }
+      ]
+    },
+    {
+      "id": "skill:preflight",
+      "type": "skill",
+      "name": "preflight",
+      "path": "tools/claude-code/plugins/icn-agent-pack/skills/preflight/SKILL.md",
+      "description": "ICN session preflight. This skill should be used when the user explicitly invokes \"/icn-agent-pack:preflight\", or asks to \"run preflight\", \"orient me on ICN\", or \"check the ICN session environment\". Loads canonical docs and the latest handoff, then verifies branch, gh auth, ports, toolchain, and a light cargo check. Read-only; reports, never fixes.",
+      "source_of_truth": "tools/claude-code/plugins/icn-agent-pack/skills/preflight/SKILL.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack/skills/preflight/SKILL.md",
+          "kind": "skill"
+        }
+      ]
+    },
+    {
+      "id": "skill:route-impact",
+      "type": "skill",
+      "name": "route-impact",
+      "path": "tools/claude-code/plugins/icn-agent-pack/skills/route-impact/SKILL.md",
+      "description": "ICN route/API impact analysis. This skill should be used when the user explicitly invokes \"/icn-agent-pack:route-impact\", or asks \"what does this route change affect\", \"do I need to regen OpenAPI / the TS SDK\", or \"route impact for <paths/PR>\". Given changed route/API files (or paths/PR context in arguments), determines whether OpenAPI, the route inventory, the TS SDK, runtime-surface-map, docs, or website claims need updates.",
+      "source_of_truth": "tools/claude-code/plugins/icn-agent-pack/skills/route-impact/SKILL.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack/skills/route-impact/SKILL.md",
+          "kind": "skill"
+        }
+      ]
+    },
+    {
+      "id": "skill:truth-sync",
+      "type": "skill",
+      "name": "truth-sync",
+      "path": "tools/claude-code/plugins/icn-agent-pack/skills/truth-sync/SKILL.md",
+      "description": "ICN public-claim truth sync. This skill should be used when the user explicitly invokes \"/icn-agent-pack:truth-sync\", or asks to \"truth-sync\", \"check public claims against truth\", \"is this docs/website/API claim safe to publish\", or \"verify readiness claims\". Compares public, docs, and API claims against the repository's canonical truth sources and classifies each claim safe / partial / unsafe / needs-local-verification.",
+      "source_of_truth": "tools/claude-code/plugins/icn-agent-pack/skills/truth-sync/SKILL.md",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "tools/claude-code/plugins/icn-agent-pack/skills/truth-sync/SKILL.md",
+          "kind": "skill"
+        }
+      ]
+    },
+    {
+      "id": "subsystem:compute",
+      "type": "subsystem",
+      "name": "compute",
+      "description": "Trust-gated distributed task execution feeding a Policy Oracle.",
+      "boundary": "policy-oracle",
+      "source_of_truth": "CLAUDE.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "CLAUDE.md",
+          "kind": "core-subsystems-section"
+        }
+      ]
+    },
+    {
+      "id": "subsystem:contracts",
+      "type": "subsystem",
+      "name": "contracts",
+      "description": "CCL (Cooperative Contract Language) execution feeding a Policy Oracle.",
+      "boundary": "policy-oracle",
+      "source_of_truth": "CLAUDE.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "CLAUDE.md",
+          "kind": "core-subsystems-section"
+        }
+      ]
+    },
+    {
+      "id": "subsystem:gossip",
+      "type": "subsystem",
+      "name": "gossip",
+      "description": "Topic-based replication with causal ordering.",
+      "boundary": "kernel",
+      "source_of_truth": "CLAUDE.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "CLAUDE.md",
+          "kind": "core-subsystems-section"
+        }
+      ]
+    },
+    {
+      "id": "subsystem:governance",
+      "type": "subsystem",
+      "name": "governance",
+      "description": "Democratic proposals and voting feeding a Policy Oracle.",
+      "boundary": "policy-oracle",
+      "source_of_truth": "CLAUDE.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "CLAUDE.md",
+          "kind": "core-subsystems-section"
+        }
+      ]
+    },
+    {
+      "id": "subsystem:identity",
+      "type": "subsystem",
+      "name": "identity",
+      "description": "Decentralized identifiers (DIDs) with Ed25519 cryptography.",
+      "boundary": "foundational",
+      "source_of_truth": "CLAUDE.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "CLAUDE.md",
+          "kind": "core-subsystems-section"
+        }
+      ]
+    },
+    {
+      "id": "subsystem:ledger",
+      "type": "subsystem",
+      "name": "ledger",
+      "description": "Mutual credit with double-entry accounting feeding a Policy Oracle.",
+      "boundary": "policy-oracle",
+      "source_of_truth": "CLAUDE.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "CLAUDE.md",
+          "kind": "core-subsystems-section"
+        }
+      ]
+    },
+    {
+      "id": "subsystem:networking",
+      "type": "subsystem",
+      "name": "networking",
+      "description": "QUIC/TLS secure sessions with mDNS discovery.",
+      "boundary": "kernel",
+      "source_of_truth": "CLAUDE.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "CLAUDE.md",
+          "kind": "core-subsystems-section"
+        }
+      ]
+    },
+    {
+      "id": "subsystem:trust",
+      "type": "subsystem",
+      "name": "trust",
+      "description": "Web-of-participation trust computation feeding a Policy Oracle.",
+      "boundary": "policy-oracle",
+      "source_of_truth": "CLAUDE.md",
+      "status": "curated-seed",
+      "evidence": [
+        {
+          "source": "CLAUDE.md",
+          "kind": "core-subsystems-section"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:adr_decisions",
+      "type": "truth_source",
+      "name": "adr_decisions",
+      "owner": "docs/adr/",
+      "description": "Architecture Decision Records. Canonical under docs/adr/. Naming: ADR-NNNN-kebab-case-title.md. Never delete; use status: superseded.",
+      "stability": "slow-changing",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "docs/adr/",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:agent_registry",
+      "type": "truth_source",
+      "name": "agent_registry",
+      "owner": "ops/state/truth/agents.json",
+      "description": "All available agents, their paths, and routing triggers",
+      "stability": "slow-changing",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "ops/state/truth/agents.json",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:ci_exceptions",
+      "type": "truth_source",
+      "name": "ci_exceptions",
+      "owner": "ops/state/ci-exceptions.md",
+      "description": "Documented CI exemptions with rationale and expiry",
+      "stability": "slow-changing",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "ops/state/ci-exceptions.md",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:cluster_topology",
+      "type": "truth_source",
+      "name": "cluster_topology",
+      "owner": "ops/state/config/repo-map.json#infrastructure",
+      "description": "K3s node IPs, service ports. Source: repo-map.json .infrastructure.k3s",
+      "stability": "slow-changing",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "ops/state/config/repo-map.json",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:ecosystem_index",
+      "type": "truth_source",
+      "name": "ecosystem_index",
+      "owner": "docs/ATLAS.md",
+      "description": "Cross-repo ecosystem map + read-first ordering + boundary/claims guardrail. INDEX ONLY: it points to the per-domain owners below and does NOT own any fact. If the atlas disagrees with a domain owner here, the owner wins.",
+      "stability": "slow-changing",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "docs/ATLAS.md",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:invariants",
+      "type": "truth_source",
+      "name": "invariants",
+      "owner": "AGENTS.md",
+      "description": "The 5 non-negotiable protocol invariants. Never override.",
+      "stability": "constant",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "AGENTS.md",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:live_branch_state",
+      "type": "truth_source",
+      "name": "live_branch_state",
+      "owner": "git",
+      "description": "Current branch, dirty files, uncommitted changes. NEVER hardcode.",
+      "stability": "volatile",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:live_ci_state",
+      "type": "truth_source",
+      "name": "live_ci_state",
+      "owner": "github-api",
+      "description": "CI run state. NEVER hardcode.",
+      "stability": "volatile",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:live_pr_state",
+      "type": "truth_source",
+      "name": "live_pr_state",
+      "owner": "github-api",
+      "description": "Open PRs and their CI state. NEVER hardcode.",
+      "stability": "volatile",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:merge_policy",
+      "type": "truth_source",
+      "name": "merge_policy",
+      "owner": "ops/state/truth/policy.json",
+      "description": "Required CI checks, merge strategy, readiness definition, admin bypass rules",
+      "stability": "slow-changing",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "ops/state/truth/policy.json",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:repo_topology",
+      "type": "truth_source",
+      "name": "repo_topology",
+      "owner": "ops/state/config/repo-map.json",
+      "description": "Monorepo layout, subdirectory purposes, worktree root, K3s cluster IPs",
+      "stability": "slow-changing",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "ops/state/config/repo-map.json",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:skill_registry",
+      "type": "truth_source",
+      "name": "skill_registry",
+      "owner": "ops/state/truth/skills.json",
+      "description": "All available skills, their canonical paths, and ownership",
+      "stability": "slow-changing",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "ops/state/truth/skills.json",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:sprint_state",
+      "type": "truth_source",
+      "name": "sprint_state",
+      "owner": "ops/state/sprint/current.json",
+      "description": "Active sprint number, tasks, status, blockers. Changes every 1-2 weeks.",
+      "stability": "volatile",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "ops/state/sprint/current.json",
+          "kind": "truth-owner"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "invariant:adversarial-by-default",
+      "to": "truth_source:invariants",
+      "type": "canonical_source",
+      "evidence": {
+        "source": "ops/state/truth/sources.json"
+      }
+    },
+    {
+      "from": "invariant:canonical-encodings",
+      "to": "truth_source:invariants",
+      "type": "canonical_source",
+      "evidence": {
+        "source": "ops/state/truth/sources.json"
+      }
+    },
+    {
+      "from": "invariant:determinism",
+      "to": "truth_source:invariants",
+      "type": "canonical_source",
+      "evidence": {
+        "source": "ops/state/truth/sources.json"
+      }
+    },
+    {
+      "from": "invariant:kernel-app-boundaries",
+      "to": "truth_source:invariants",
+      "type": "canonical_source",
+      "evidence": {
+        "source": "ops/state/truth/sources.json"
+      }
+    },
+    {
+      "from": "invariant:no-panics-in-protocol-paths",
+      "to": "truth_source:invariants",
+      "type": "canonical_source",
+      "evidence": {
+        "source": "ops/state/truth/sources.json"
+      }
+    },
+    {
+      "from": "crate:charter",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/apps/charter/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:governance",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/apps/governance/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:governance-app",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/apps/governance-app/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-api",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-api/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-authz",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-authz/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-baseline-lock",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-baseline-lock/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-ccl",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-ccl/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-compute",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-compute/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-core",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-core/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-federation",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-federation/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-gateway",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-gateway/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-gossip",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-gossip/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-governance",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-governance/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-ledger",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-ledger/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-naming",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-naming/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-net",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-net/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-rpc",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-rpc/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-security",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-security/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-store",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-store/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icn-testkit",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/crates/icn-testkit/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:icnd",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/bins/icnd/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:ledger",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/apps/ledger/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:ledger-app",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/apps/ledger-app/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:membership",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/apps/membership/Cargo.toml"
+      }
+    },
+    {
+      "from": "crate:trust-app",
+      "to": "crate:icn-kernel-api",
+      "type": "depends_on",
+      "evidence": {
+        "source": "icn/apps/trust-app/Cargo.toml"
+      }
+    },
+    {
+      "from": "doc:agents",
+      "to": "invariant:adversarial-by-default",
+      "type": "documents",
+      "evidence": {
+        "source": "AGENTS.md"
+      }
+    },
+    {
+      "from": "doc:agents",
+      "to": "invariant:canonical-encodings",
+      "type": "documents",
+      "evidence": {
+        "source": "AGENTS.md"
+      }
+    },
+    {
+      "from": "doc:agents",
+      "to": "invariant:determinism",
+      "type": "documents",
+      "evidence": {
+        "source": "AGENTS.md"
+      }
+    },
+    {
+      "from": "doc:agents",
+      "to": "invariant:kernel-app-boundaries",
+      "type": "documents",
+      "evidence": {
+        "source": "AGENTS.md"
+      }
+    },
+    {
+      "from": "doc:agents",
+      "to": "invariant:no-panics-in-protocol-paths",
+      "type": "documents",
+      "evidence": {
+        "source": "AGENTS.md"
+      }
+    },
+    {
+      "from": "doc:claude",
+      "to": "subsystem:compute",
+      "type": "documents",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "doc:claude",
+      "to": "subsystem:contracts",
+      "type": "documents",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "doc:claude",
+      "to": "subsystem:gossip",
+      "type": "documents",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "doc:claude",
+      "to": "subsystem:governance",
+      "type": "documents",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "doc:claude",
+      "to": "subsystem:identity",
+      "type": "documents",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "doc:claude",
+      "to": "subsystem:ledger",
+      "type": "documents",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "doc:claude",
+      "to": "subsystem:networking",
+      "type": "documents",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "doc:claude",
+      "to": "subsystem:trust",
+      "type": "documents",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "crate:icn-gateway",
+      "to": "route_surface:gateway",
+      "type": "exposes",
+      "evidence": {
+        "source": "docs/reference/project-index/generated/route-inventory.md"
+      }
+    },
+    {
+      "from": "script:generate-agent-context-spine",
+      "to": "generated_artifact:agent-context-spine",
+      "type": "generates",
+      "evidence": {
+        "source": "scripts/generate-agent-context-spine.py"
+      }
+    },
+    {
+      "from": "script:generate_repo_record",
+      "to": "generated_artifact:icn-file-record",
+      "type": "generates",
+      "evidence": {
+        "source": "scripts/generate_repo_record.py"
+      }
+    },
+    {
+      "from": "script:route_inventory",
+      "to": "generated_artifact:route-inventory",
+      "type": "generates",
+      "evidence": {
+        "source": "docs/scripts/route_inventory.py"
+      }
+    },
+    {
+      "from": "crate:icn-ccl",
+      "to": "subsystem:contracts",
+      "type": "owned_by_subsystem",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "crate:icn-community",
+      "to": "subsystem:governance",
+      "type": "owned_by_subsystem",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "crate:icn-compute",
+      "to": "subsystem:compute",
+      "type": "owned_by_subsystem",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "crate:icn-coop",
+      "to": "subsystem:governance",
+      "type": "owned_by_subsystem",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "crate:icn-entity",
+      "to": "subsystem:governance",
+      "type": "owned_by_subsystem",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "crate:icn-gossip",
+      "to": "subsystem:gossip",
+      "type": "owned_by_subsystem",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "crate:icn-governance",
+      "to": "subsystem:governance",
+      "type": "owned_by_subsystem",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "crate:icn-identity",
+      "to": "subsystem:identity",
+      "type": "owned_by_subsystem",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "crate:icn-ledger",
+      "to": "subsystem:ledger",
+      "type": "owned_by_subsystem",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "crate:icn-naming",
+      "to": "subsystem:identity",
+      "type": "owned_by_subsystem",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "crate:icn-net",
+      "to": "subsystem:networking",
+      "type": "owned_by_subsystem",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "crate:icn-protocol",
+      "to": "subsystem:networking",
+      "type": "owned_by_subsystem",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "crate:icn-trust",
+      "to": "subsystem:trust",
+      "type": "owned_by_subsystem",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "claim_surface:live-federation",
+      "to": "skill:truth-sync",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "tools/claude-code/plugins/icn-agent-pack/skills/truth-sync/SKILL.md"
+      }
+    },
+    {
+      "from": "claim_surface:pilot-readiness",
+      "to": "skill:truth-sync",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "tools/claude-code/plugins/icn-agent-pack/skills/truth-sync/SKILL.md"
+      }
+    },
+    {
+      "from": "claim_surface:production-readiness",
+      "to": "skill:truth-sync",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "tools/claude-code/plugins/icn-agent-pack/skills/truth-sync/SKILL.md"
+      }
+    },
+    {
+      "from": "claim_surface:public-website-claims",
+      "to": "skill:truth-sync",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "tools/claude-code/plugins/icn-agent-pack/skills/truth-sync/SKILL.md"
+      }
+    },
+    {
+      "from": "claim_surface:route-api-docs-drift",
+      "to": "skill:route-impact",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "tools/claude-code/plugins/icn-agent-pack/skills/route-impact/SKILL.md"
+      }
+    },
+    {
+      "from": "guidance:docs",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "docs/"
+      }
+    },
+    {
+      "from": "guidance:docs",
+      "to": "skill:truth-sync",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "docs/"
+      }
+    },
+    {
+      "from": "guidance:docs-scripts",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "docs/scripts/"
+      }
+    },
+    {
+      "from": "guidance:gateway",
+      "to": "skill:route-impact",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "icn/crates/icn-gateway/"
+      }
+    },
+    {
+      "from": "guidance:gateway",
+      "to": "skill:truth-sync",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "icn/crates/icn-gateway/"
+      }
+    },
+    {
+      "from": "guidance:generated",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "docs/reference/project-index/generated/"
+      }
+    },
+    {
+      "from": "guidance:generated",
+      "to": "skill:truth-sync",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "docs/reference/project-index/generated/"
+      }
+    },
+    {
+      "from": "guidance:ledger",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "icn/crates/icn-ledger/"
+      }
+    },
+    {
+      "from": "guidance:mcp",
+      "to": "skill:doctor",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "ops/mcp/"
+      }
+    },
+    {
+      "from": "guidance:mcp",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "ops/mcp/"
+      }
+    },
+    {
+      "from": "guidance:plugin",
+      "to": "skill:doctor",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "tools/claude-code/plugins/icn-agent-pack/"
+      }
+    },
+    {
+      "from": "guidance:rust-workspace",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "icn/"
+      }
+    },
+    {
+      "from": "guidance:scripts",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "scripts/"
+      }
+    },
+    {
+      "from": "guidance:sdk-ts",
+      "to": "skill:route-impact",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "sdk/typescript/"
+      }
+    },
+    {
+      "from": "guidance:truth-spine",
+      "to": "skill:navigator",
+      "type": "requires_skill",
+      "evidence": {
+        "source": "ops/state/truth/"
+      }
+    },
+    {
+      "from": "crate:icn-federation",
+      "to": "claim_surface:live-federation",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "CLAUDE.md"
+      }
+    },
+    {
+      "from": "crate:icn-gateway",
+      "to": "claim_surface:route-api-docs-drift",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "docs/reference/project-index/generated/route-inventory.md"
+      }
+    },
+    {
+      "from": "guidance:docs",
+      "to": "claim_surface:live-federation",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "docs/"
+      }
+    },
+    {
+      "from": "guidance:docs",
+      "to": "claim_surface:pilot-readiness",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "docs/"
+      }
+    },
+    {
+      "from": "guidance:docs",
+      "to": "claim_surface:production-readiness",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "docs/"
+      }
+    },
+    {
+      "from": "guidance:docs",
+      "to": "claim_surface:public-website-claims",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "docs/"
+      }
+    },
+    {
+      "from": "guidance:gateway",
+      "to": "claim_surface:public-website-claims",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "icn/crates/icn-gateway/"
+      }
+    },
+    {
+      "from": "guidance:gateway",
+      "to": "claim_surface:route-api-docs-drift",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "icn/crates/icn-gateway/"
+      }
+    },
+    {
+      "from": "guidance:generated",
+      "to": "claim_surface:public-website-claims",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "docs/reference/project-index/generated/"
+      }
+    },
+    {
+      "from": "guidance:sdk-ts",
+      "to": "claim_surface:route-api-docs-drift",
+      "type": "touches_claim_surface",
+      "evidence": {
+        "source": "sdk/typescript/"
+      }
+    },
+    {
+      "from": "script:check-agent-context-spine",
+      "to": "generated_artifact:agent-context-spine",
+      "type": "verifies",
+      "evidence": {
+        "source": "scripts/check-agent-context-spine.py"
+      }
+    },
+    {
+      "from": "script:route_inventory",
+      "to": "claim_surface:route-api-docs-drift",
+      "type": "verifies",
+      "evidence": {
+        "source": "docs/scripts/route_inventory.py"
+      }
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+#!/bin/sh
+# icn-agent-pack :: PostToolUse route/API impact hint (advisory, non-blocking)
+#
+# When an Edit/Write touches a gateway route, the OpenAPI spec, or a shared API
+# handler, print the route-impact follow-up command. Reads the hook input JSON
+# from stdin. Never blocks (always exits 0). No network, no mutation. Robust if
+# run outside the repo: it only inspects the reported file path string.
+
+INPUT=$(cat 2>/dev/null)
+
+# Extract tool_input.file_path: prefer jq, fall back to a POSIX sed match.
+FILE_PATH=""
+if command -v jq >/dev/null 2>&1; then
+  FILE_PATH=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
+fi
+if [ -z "$FILE_PATH" ]; then
+  FILE_PATH=$(printf '%s' "$INPUT" | sed -n 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
+fi
+
+[ -z "$FILE_PATH" ] && exit 0
+
+case "$FILE_PATH" in
+  *icn-gateway/src/routes/*|*icn-gateway/src/api/*|*icn-api/src/*handler*|*docs/api/openapi.generated.yaml)
+    echo "[icn-agent-pack] Route/API surface changed: $FILE_PATH"
+    echo "  Run /icn-agent-pack:route-impact to check downstream artifacts. Likely needed:"
+    echo "    python3 docs/scripts/route_inventory.py --check"
+    echo "    # if a gateway route changed: regen OpenAPI, then the TS SDK types"
+    echo "    #   cd icn && cargo build -p icnctl && ./target/debug/icnctl api export-openapi > ../docs/api/openapi.generated.yaml"
+    echo "    #   cd sdk/typescript && npm run generate-types && npm run build"
+    echo "  (A declared route is evidence-limited: not proof of auth/correctness/live production.)"
+    ;;
+esac
+
+exit 0

@@ -37,6 +37,8 @@ fn init_logging() {
 /// Create test claims with specified scopes (bypasses actual JWT auth)
 fn create_test_claims(did: &str, scopes: Vec<&str>) -> TokenClaims {
     TokenClaims {
+        entity_id: None,
+        entity_type: None,
         sub: did.to_string(),
         iat: 1000000000,
         coop_id: "test-coop".to_string(),

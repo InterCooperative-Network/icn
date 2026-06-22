@@ -682,7 +682,7 @@ category = "status"
 status = "living"
 title = "ICN State (living doc)"
 description = "Living snapshot of repo layout, decisions, constraints, and current engineering status"
-last_updated = "2026-06-14"
+last_updated = "2026-06-21"
 owner = "matt"
 audiences = ["developers", "agents"]
 truth_class = "descriptive"
@@ -691,7 +691,7 @@ canonical = "yes"
 freshness = "current"
 domain_tags = ["status", "project"]
 recommended_action = "keep"
-last_reviewed = "2026-06-14"
+last_reviewed = "2026-06-21"
 
 [docs."docs/DOCUMENTATION_CONTROL_SYSTEM.md"]
 category = "reference"
@@ -714,7 +714,7 @@ category = "reference"
 status = "living"
 title = "ICN Document Registry (human summary)"
 description = "Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh"
-last_updated = "2026-06-09"
+last_updated = "2026-06-22"
 owner = "matt"
 audiences = ["contributors", "agents"]
 truth_class = "descriptive"
@@ -723,7 +723,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["registry", "documentation-control"]
 recommended_action = "keep"
-last_reviewed = "2026-06-09"
+last_reviewed = "2026-06-22"
 
 [docs."docs/planning/documentation-namespace-resolution.md"]
 category = "strategy"
@@ -2348,8 +2348,8 @@ audiences = ["operators"]
 category = "reference"
 status = "living"
 title = "ICN Project Index"
-description = "Show-ready orientation layer — routes outside readers, contributors, and agents to the right canonical doc, source tree, or external URL. Defers to STATE.md and PHASE_PROGRESS.md for current truth."
-last_updated = "2026-05-11"
+description = "Show-ready orientation layer — routes outside readers, contributors, and agents to the right canonical doc, source tree, or external URL. Defers to STATE.md and PHASE_PROGRESS.md for current truth. Includes the Truth Layer / Claim Discipline section cross-linking the existing truth systems."
+last_updated = "2026-06-20"
 owner = "matt"
 audiences = ["all"]
 truth_class = "operational"
@@ -2358,7 +2358,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation"]
 recommended_action = "keep"
-last_reviewed = "2026-05-11"
+last_reviewed = "2026-06-20"
 
 [docs."docs/reference/project-index/current-truth-map.md"]
 category = "reference"
@@ -2519,6 +2519,22 @@ freshness = "current"
 domain_tags = ["project-index", "navigation", "proof-level", "rehearsal", "show-readiness"]
 recommended_action = "keep"
 last_reviewed = "2026-06-09"
+
+[docs."docs/reference/project-index/invariants-catalog.md"]
+category = "reference"
+status = "living"
+title = "ICN Invariants Catalog"
+description = "Source-linked index of the four canonical ICN invariant families (5 operational / 6 firewall-contract / 10 frozen-core / 7 regulatory = 28), each linked to its canonical source with a stable anchor. Indexes only; it does not define invariants, and the canonical sources remain authoritative. Machine-readable companion: invariants-catalog.toml. Implements the #2114 deliverable."
+last_updated = "2026-06-22"
+owner = "matt"
+audiences = ["all", "team"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "invariants", "architecture"]
+recommended_action = "keep"
+last_reviewed = "2026-06-22"
 
 [docs."docs/glossary.md"]
 category = "reference"

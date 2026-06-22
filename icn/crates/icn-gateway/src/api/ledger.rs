@@ -740,6 +740,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -759,6 +761,8 @@ mod tests {
         // Get Alice's balance with authorization
         let uri = format!("/ledger/test-coop/position/{}", alice.did());
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -804,6 +808,8 @@ mod tests {
 
         // Get history with authorization (uses default pagination)
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -891,6 +897,8 @@ mod tests {
         .await;
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -956,6 +964,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -975,6 +985,8 @@ mod tests {
         // Try to read balance with "ledger:write" scope (should fail)
         let uri = format!("/ledger/test-coop/position/{}", alice.did());
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -1029,6 +1041,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(), // Alice authenticated
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -1103,6 +1117,8 @@ mod tests {
         };
 
         let claims_write = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "coop-food".to_string(), // Token for coop-food
@@ -1121,6 +1137,8 @@ mod tests {
 
         // Alice tries to read balance in coop-tech using coop-food token (should fail)
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "coop-food".to_string(), // Token for coop-food
@@ -1183,6 +1201,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -1232,6 +1252,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -1280,6 +1302,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -1329,6 +1353,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -1366,6 +1392,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -1416,6 +1444,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(), // Alice authenticated
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -1470,6 +1500,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -1530,6 +1562,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -1621,6 +1655,8 @@ mod tests {
         // JWT-shaped token so the extraction path fires.
         // The third segment ("fakesig") is what must appear in stored provenance.
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),
@@ -1704,6 +1740,8 @@ mod tests {
         };
 
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: alice.did().to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),

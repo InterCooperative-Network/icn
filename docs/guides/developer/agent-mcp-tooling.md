@@ -98,8 +98,16 @@ timeout 5 npm --prefix ./ops/mcp run start:stdio   # exit 124 while server runs 
 
 **Warnings vs blockers:** missing `kubectl` / `gh` / dirty tree → usually **warn**. Missing `ops/mcp/node_modules`, failed `better-sqlite3` load, portability script failure → treat as **blockers** for MCP until fixed.
 
+## Plugin packaging
+
+The same `icn-ops` launch is also bundled, with the highest-value skills/agents/hooks, into the
+`icn-agent-pack` Claude Code plugin at `tools/claude-code/plugins/icn-agent-pack/` (a portable,
+additive packaging path that does not replace this repo's project-local `.claude/` config). See
+[claude-code-plugin.md](./claude-code-plugin.md).
+
 ## Related docs
 
+- [claude-code-plugin.md](./claude-code-plugin.md) — the icn-agent-pack plugin (packaging path)
 - [cursor-mcp-setup.md](./cursor-mcp-setup.md) — Cursor vs Claude wiring and smoke-test commands
 - `AGENTS.md` (repo root) — invariants and verification matrix
 - `ops/CLAUDE.md` — orchestration plane layout
