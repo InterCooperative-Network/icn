@@ -29,6 +29,7 @@ This directory contains in-depth architectural documentation for the ICN system,
 
 | Document | Description |
 |----------|-------------|
+| [ICN_OPERATING_MODEL.md](ICN_OPERATING_MODEL.md) | Vocabulary, placement, and operating-model doctrine — the grammar map (doctrine; not a current-state truth root) |
 | [CANONICAL_ENCODING.md](CANONICAL_ENCODING.md) | Wire format and encoding specifications (critical) |
 | [KERNEL_APP_SEPARATION.md](KERNEL_APP_SEPARATION.md) | Kernel/application boundary design (53KB) |
 | [INSTITUTION_PACKAGE_BOUNDARY.md](INSTITUTION_PACKAGE_BOUNDARY.md) | ICN platform vs institution package boundary (normative) |
