@@ -315,8 +315,9 @@ impl ComputeTask {
         // class that can hold canonical output. Enforced through the generic
         // kernel helper `validate_storage_access`. We only check when a
         // storage_class is explicitly declared; an unset (None) class is left
-        // to placement-time defaulting, preserving prior behavior. The task
-        // validates its own declared storage, so the locality check is the
+        // unchecked here, preserving prior behavior (no enforcement on the
+        // None case). The task validates its own declared storage, so the
+        // locality check is the
         // degenerate equal-spec case here — only the canonical-output rule
         // can fire (cross-locality data access is validated where a task spec
         // is compared against a distinct data spec).
