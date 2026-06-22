@@ -714,7 +714,7 @@ category = "reference"
 status = "living"
 title = "ICN Document Registry (human summary)"
 description = "Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh"
-last_updated = "2026-06-09"
+last_updated = "2026-06-22"
 owner = "matt"
 audiences = ["contributors", "agents"]
 truth_class = "descriptive"
@@ -723,7 +723,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["registry", "documentation-control"]
 recommended_action = "keep"
-last_reviewed = "2026-06-09"
+last_reviewed = "2026-06-22"
 
 [docs."docs/planning/documentation-namespace-resolution.md"]
 category = "strategy"
