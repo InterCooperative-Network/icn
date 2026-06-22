@@ -1,0 +1,29 @@
+#!/bin/sh
+# icn-agent-pack :: PostToolUse public-claim hint (advisory, non-blocking)
+#
+# When an Edit/Write touches a website or public-claim doc surface, recommend a
+# truth-sync pass. Reads the hook input JSON from stdin. Never blocks (always
+# exits 0). No network, no mutation. Robust if run outside the repo: it only
+# inspects the reported file path string.
+
+INPUT=$(cat 2>/dev/null)
+
+FILE_PATH=""
+if command -v jq >/dev/null 2>&1; then
+  FILE_PATH=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null)
+fi
+if [ -z "$FILE_PATH" ]; then
+  FILE_PATH=$(printf '%s' "$INPUT" | sed -n 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n1)
+fi
+
+[ -z "$FILE_PATH" ] && exit 0
+
+case "$FILE_PATH" in
+  *website/*|*/web/*|*docs/reference/project-index/*|*docs/status/*|*docs/strategy/*|*README.md|*landing*)
+    echo "[icn-agent-pack] Public-claim surface changed: $FILE_PATH"
+    echo "  Run /icn-agent-pack:truth-sync to classify any new claims (safe / partial / unsafe / needs-local-verification)."
+    echo "  Do not assert production/live/pilot readiness unless docs/STATE.md + docs/PHASE_PROGRESS.md support it."
+    ;;
+esac
+
+exit 0

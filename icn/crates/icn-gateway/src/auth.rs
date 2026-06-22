@@ -119,6 +119,23 @@ pub struct TokenClaims {
     pub exp: u64,            // Expiration (timestamp)
     pub coop_id: String,     // Cooperative namespace
     pub scopes: Vec<String>, // Capabilities (e.g., "ledger:read", "ledger:write")
+
+    /// Optional canonical entity context (#2080 PR1, RFC-0018 migration rail).
+    ///
+    /// The typed `EntityId` string (`entity:icn:<type>:<slug>`) the token is bound
+    /// to. **NON-ENFORCING in this PR**: no request guard consults it yet —
+    /// `require_coop_access` still decides solely on `coop_id`. It may be populated
+    /// only by a TRUSTED issuance path; the dev/self-asserted path never sets it.
+    /// Optional + skipped-when-absent so pre-#2080 tokens still decode and minted
+    /// tokens stay byte-compatible with the old shape.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_id: Option<String>,
+
+    /// Optional entity type (`individual`/`cooperative`/`community`/`federation`)
+    /// derived from [`TokenClaims::entity_id`] at mint time. Same non-enforcing,
+    /// back-compatible contract as `entity_id`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_type: Option<String>,
 }
 
 /// Authentication manager
@@ -289,15 +306,47 @@ impl AuthManager {
         self.issue_token(did, coop_id, scopes)
     }
 
-    /// Issue a JWT capability token
+    /// Issue a JWT capability token (legacy shape: no typed entity context).
+    ///
+    /// Exactly equivalent to [`AuthManager::issue_entity_token`] with
+    /// `entity_id = None`: the minted token omits the `entity_id`/`entity_type`
+    /// claims entirely. Existing callers keep their behavior unchanged.
     pub fn issue_token(&self, did: &Did, coop_id: &str, scopes: Vec<String>) -> Result<String> {
+        self.issue_entity_token(did, coop_id, None, scopes)
+    }
+
+    /// Issue a JWT capability token, optionally carrying typed entity context.
+    ///
+    /// #2080 PR1 (RFC-0018 migration rail). When `entity_id` is `Some`, the minted
+    /// token also carries the canonical `EntityId` string and a derived
+    /// `entity_type`, ALONGSIDE the legacy `coop_id`.
+    ///
+    /// SECURITY: this context is **non-enforcing** — no request guard consults it
+    /// yet (`require_coop_access` still decides on `coop_id`). It must be populated
+    /// only from a TRUSTED issuance path. This PR wires no production caller to
+    /// pass `Some(..)`; in particular the dev/self-asserted path
+    /// (`verify_challenge` → `issue_token`) always passes `None`, so a
+    /// self-asserting DID can never fabricate typed entity authority that later
+    /// enforcement work would trust.
+    pub fn issue_entity_token(
+        &self,
+        did: &Did,
+        coop_id: &str,
+        entity_id: Option<icn_entity::EntityId>,
+        scopes: Vec<String>,
+    ) -> Result<String> {
         let now = Self::current_timestamp();
+        // Derive the entity type from the (canonical) EntityId so the two claims
+        // can never disagree; both are absent together when entity_id is None.
+        let entity_type = entity_id.as_ref().map(|id| id.entity_type().to_string());
         let claims = TokenClaims {
             sub: did.to_string(),
             iat: now,
             exp: now + self.token_ttl.as_secs(),
             coop_id: coop_id.to_string(),
             scopes,
+            entity_id: entity_id.map(|id| id.to_string()),
+            entity_type,
         };
 
         let token = encode(
@@ -572,5 +621,132 @@ mod tests {
             .expect("dev mode permits self-service issuance");
         let claims = auth.verify_token(&token).unwrap();
         assert_eq!(claims.coop_id, "some-coop");
+    }
+
+    // ------------------------------------------------------------------------
+    // #2080 PR1 — optional typed entity context on the token claim.
+    //
+    // Non-enforcing migration rail (RFC-0018). These tests pin: back-compat (old
+    // tokens decode), the legacy mint carries no entity context, the new typed
+    // mint round-trips, and the dev/self-asserted path can NEVER mint typed
+    // entity authority.
+    // ------------------------------------------------------------------------
+
+    /// Back-compat: a token minted before the entity-context fields existed (no
+    /// `entity_id`/`entity_type` keys) must still deserialize, both fields
+    /// defaulting to `None`. Pins the `#[serde(default)]` contract.
+    #[test]
+    fn token_claims_without_entity_fields_deserialize_as_none() {
+        let legacy_json = r#"{
+            "sub": "did:icn:zlegacy",
+            "iat": 1000000000,
+            "exp": 9999999999,
+            "coop_id": "food-coop",
+            "scopes": ["ledger:read"]
+        }"#;
+        let claims: TokenClaims = serde_json::from_str(legacy_json).unwrap();
+        assert_eq!(claims.entity_id, None);
+        assert_eq!(claims.entity_type, None);
+    }
+
+    /// The legacy `issue_token` mint carries no typed entity context: the verified
+    /// claims have `entity_id`/`entity_type` == `None`, and (via
+    /// `skip_serializing_if`) the encoded claim omits the keys entirely, so minted
+    /// tokens stay byte-compatible with the pre-#2080 shape.
+    #[test]
+    fn issue_token_mints_without_entity_context() {
+        let auth = AuthManager::new(b"test_secret".to_vec());
+        let bundle = IdentityBundle::generate().unwrap();
+        let token = auth
+            .issue_token(bundle.did(), "food-coop", vec!["ledger:read".to_string()])
+            .unwrap();
+        let claims = auth.verify_token(&token).unwrap();
+        assert_eq!(claims.entity_id, None);
+        assert_eq!(claims.entity_type, None);
+        // skip_serializing_if: a None-context claim omits the keys entirely.
+        let serialized = serde_json::to_string(&claims).unwrap();
+        assert!(!serialized.contains("entity_id"));
+        assert!(!serialized.contains("entity_type"));
+    }
+
+    /// The typed mint round-trips: `issue_entity_token` with `Some(EntityId)` binds
+    /// the canonical `entity_id` string and a derived `entity_type`, while leaving
+    /// the legacy `coop_id` and `sub` untouched.
+    #[test]
+    fn issue_entity_token_round_trips_typed_entity_context() {
+        let auth = AuthManager::new(b"test_secret".to_vec());
+        let bundle = IdentityBundle::generate().unwrap();
+        let entity = icn_entity::EntityId::cooperative("food-coop").unwrap();
+        let token = auth
+            .issue_entity_token(
+                bundle.did(),
+                "food-coop",
+                Some(entity),
+                vec!["ledger:read".to_string()],
+            )
+            .unwrap();
+        let claims = auth.verify_token(&token).unwrap();
+        assert_eq!(
+            claims.entity_id.as_deref(),
+            Some("entity:icn:cooperative:food-coop")
+        );
+        assert_eq!(claims.entity_type.as_deref(), Some("cooperative"));
+        // Legacy context is preserved unchanged alongside the typed context.
+        assert_eq!(claims.coop_id, "food-coop");
+        assert_eq!(claims.sub, bundle.did().to_string());
+    }
+
+    /// `issue_entity_token` with `None` is exactly the legacy mint (no entity
+    /// context), so `issue_token` can delegate to it with no behavior change.
+    #[test]
+    fn issue_entity_token_with_none_matches_legacy_mint() {
+        let auth = AuthManager::new(b"test_secret".to_vec());
+        let bundle = IdentityBundle::generate().unwrap();
+        let token = auth
+            .issue_entity_token(
+                bundle.did(),
+                "food-coop",
+                None,
+                vec!["ledger:read".to_string()],
+            )
+            .unwrap();
+        let claims = auth.verify_token(&token).unwrap();
+        assert_eq!(claims.entity_id, None);
+        assert_eq!(claims.entity_type, None);
+        assert_eq!(claims.coop_id, "food-coop");
+    }
+
+    /// Safety rule (#2080 PR1): the dev/self-asserted issuance path may still mint a
+    /// flat `coop_id` token where enabled, but it must NEVER mint typed entity
+    /// authority. `verify_challenge` routes through `issue_token`, so the entity
+    /// context is always `None` — a self-asserting DID cannot fabricate an
+    /// `entity_id` the later enforcement work would trust.
+    #[test]
+    fn dev_self_asserted_path_never_mints_entity_context() {
+        let auth = AuthManager::new(b"test_secret".to_vec()).with_self_asserted_coop(true);
+        let bundle = IdentityBundle::generate().unwrap();
+        let nonce = auth.create_challenge(bundle.did()).unwrap();
+        let nonce_bytes = hex::decode(&nonce).unwrap();
+        let signature = bundle
+            .sign(&nonce_bytes)
+            .expect("test setup: bundle must be able to sign nonce");
+        let token = auth
+            .verify_challenge(
+                bundle.did(),
+                &signature.to_bytes(),
+                "some-coop",
+                vec!["ledger:write".to_string()],
+            )
+            .expect("dev mode permits self-service issuance");
+        let claims = auth.verify_token(&token).unwrap();
+        assert_eq!(claims.coop_id, "some-coop");
+        assert_eq!(
+            claims.entity_id, None,
+            "dev/self-asserted path must not mint typed entity authority"
+        );
+        assert_eq!(
+            claims.entity_type, None,
+            "dev/self-asserted path must not mint typed entity authority"
+        );
     }
 }

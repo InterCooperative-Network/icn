@@ -240,6 +240,7 @@ Show-ready orientation layer — routes outside readers, contributors, and agent
 - [ci-ops-deploy-map.md](reference/project-index/ci-ops-deploy-map.md) - Workflows, deploy paths, K3s smoke runbooks
 - [show-readiness-map.md](reference/project-index/show-readiness-map.md) - What can be shown now, what should not be shown as finished, red lines
 - [proof-level-taxonomy-capability-matrix.md](reference/project-index/proof-level-taxonomy-capability-matrix.md) - Proof-level taxonomy (L0-L8) and a capability matrix for the organizer-rehearsal path
+- [invariants-catalog.md](reference/project-index/invariants-catalog.md) - Source-linked index of the four canonical invariant families (index only; canonical sources authoritative); machine-readable companion `invariants-catalog.toml`
 
 ---
 
@@ -265,6 +266,9 @@ End-user documentation:
 Technical guides for contributors:
 
 - [README.md](guides/developer/README.md) - Developer guide index
+- [claude-code-plugin.md](guides/developer/claude-code-plugin.md) - ICN Agent Pack Claude Code plugin (portable MCP launch, skills/agents, validation)
+- [agent-context-spine.md](guides/developer/agent-context-spine.md) - Agent Context Spine v0: generated, non-canonical, evidence-grounded repo orientation map (+ `icn_ops_agent_context_spine` MCP tool)
+- [agent-context-spine-plan.md](guides/developer/agent-context-spine-plan.md) - Agent Context Spine design, node/edge model, and PR sequence
 - [DEV_ENVIRONMENT.md](guides/developer/DEV_ENVIRONMENT.md) - Development environment setup
 - [DOCUMENTATION_STYLE.md](guides/developer/DOCUMENTATION_STYLE.md) - Documentation conventions
 - [i18n-guide.md](guides/developer/i18n-guide.md) - Internationalization guide

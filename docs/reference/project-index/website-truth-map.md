@@ -29,7 +29,7 @@ When the website and repo disagree, defer to the source-of-truth hierarchy, then
 |---|---|
 | Website source | `website/` |
 | Main public pages | `website/src/pages/` |
-| Website docs mirror/content | `website/src/content/docs/` |
+| Website docs (rendered from repo-root) | repo-root `docs/` via `website/src/pages/docs/` (see `website/src/lib/paths.ts`) |
 | Website truth boundary ADR | `docs/adr/ADR-0032-website-truth-boundary.md` |
 | Show-readiness rules | `docs/reference/project-index/show-readiness-map.md` |
 | Current truth | `docs/STATE.md`, `docs/PHASE_PROGRESS.md`, `docs/reference/project-index/current-truth-map.md` |
@@ -43,7 +43,6 @@ When the website and repo disagree, defer to the source-of-truth hierarchy, then
 | `for-cooperatives.astro` | Adoption framing. | high: can imply readiness or formal pilots. |
 | `for-developers.astro` | Contributor/developer framing. | medium: can point to stale commands or surfaces. |
 | `get-involved.astro` | Participation path. | medium: can overpromise. |
-| `src/content/docs/` | Website docs mirror/content. | high: can become stale duplicate documentation. |
 
 ## Public claim checklist
 

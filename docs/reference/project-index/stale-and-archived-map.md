@@ -40,7 +40,6 @@ Current truth comes from code/tests, STATE.md, PHASE_PROGRESS.md, accepted ADR/R
 
 | Surface | Risk | Current handling |
 |---|---|---|
-| `website/src/content/docs/README.md` | can become stale second README | should route to canonical docs, not duplicate them |
 | `web/pilot-ui/README.md` | old demo/product framing can persist | should describe current organizer/member demo only |
 | `website/src/pages/whats-real-now.astro` | public freshness anchor can lag runtime progress | must be checked against STATE/PHASE docs before date bump |
 | historical architecture maps | detailed but sometimes old | use as archaeology only |

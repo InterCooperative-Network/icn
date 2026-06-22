@@ -72,10 +72,16 @@ any endpoint is converted — "architecture, not a sweep."
 | Entity / role (**already live**) | `require_entity_write_access(entity_mgr, entity_id, caller_id)` → `get_members` → gate on `Founder \| BoardMember` | `EntityId` = `entity:icn:<type>:<slug>` | `icn/crates/icn-gateway/src/api/entity.rs:260-294` |
 | Commons / jurisdiction | `require_office_in_jurisdiction` / `require_membership_in_jurisdiction` | `JurisdictionId` (commons holder) | `icn/crates/icn-gateway/src/authority.rs:22-100` |
 
-The token (`TokenClaims`, `icn/crates/icn-gateway/src/auth.rs:109-116`) is
-`{ sub (DID), iat, exp, coop_id (flat slug), scopes[] }`. **There is no `EntityId` or
-entity-type claim today.** The authz subject is therefore split: a DID (`sub`) *and* a flat coop
-slug (`coop_id`), with no typed entity binding.
+The token (`TokenClaims`, `icn/crates/icn-gateway/src/auth.rs`) is
+`{ sub (DID), iat, exp, coop_id (flat slug), scopes[] }`, plus — since PR #2111 (#2080
+lane PR1) — **optional, non-enforcing** `entity_id` / `entity_type` claims. Those optional
+claims are migration groundwork only: they are never set by the self-asserted path
+(`verify_challenge` → `issue_token` mints `None`), read by no guard, and **not yet populated
+by any trusted issuance path** — so there is **no _trusted, enforced_ typed entity binding
+today**. The authz subject is therefore still split: a DID (`sub`) *and* a flat coop slug
+(`coop_id`), with no enforced typed entity binding. Distinguish the now-present optional claim
+*shape* (`issue_entity_token` mint seam) from the still-missing trusted *population* and
+*enforcement* (RFC migration steps below).
 
 ### The entity model already available (Regime B)
 

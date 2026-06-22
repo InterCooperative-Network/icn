@@ -1332,6 +1332,8 @@ mod tests {
 
     fn test_claims(coop_id: &str) -> TokenClaims {
         TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test123".to_string(),
             iat: 1000000000,
             coop_id: coop_id.to_string(),
@@ -1615,6 +1617,8 @@ mod tests {
 
         // Claims with only read scope
         let claims = TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: "did:icn:test123".to_string(),
             iat: 1000000000,
             coop_id: "test-coop".to_string(),
@@ -1719,6 +1723,8 @@ mod tests {
             }))
             .to_request();
         req.extensions_mut().insert(TokenClaims {
+            entity_id: None,
+            entity_type: None,
             sub: proposer.did().to_string(),
             iat: 1_000_000_000,
             coop_id: "test-coop".to_string(),

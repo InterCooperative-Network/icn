@@ -262,6 +262,8 @@ mod tests {
             exp: 9_999_999_999,
             coop_id: "test-coop".to_string(),
             scopes: scopes.iter().map(|s| s.to_string()).collect(),
+            entity_id: None,
+            entity_type: None,
         });
         req
     }
@@ -482,8 +484,36 @@ mod tests {
             exp: 9_999_999_999,
             coop_id: "coop-a".to_string(),
             scopes: vec!["ledger:write".to_string()],
+            entity_id: None,
+            entity_type: None,
         });
 
+        assert!(matches!(
+            require_coop_access(&req, "coop-b"),
+            Err(GatewayError::AuthorizationFailed(_))
+        ));
+    }
+
+    /// #2080 PR1: the optional `entity_id` claim is NON-AUTHORITATIVE.
+    /// `require_coop_access` still decides solely on `coop_id` equality. Here the
+    /// token carries an `entity_id` for a *different* coop than its `coop_id`; the
+    /// guard must follow `coop_id` (allow coop-a, deny coop-b) and ignore the
+    /// entity context entirely. This PR does not make `entity_id` authoritative.
+    #[actix_web::test]
+    async fn require_coop_access_ignores_entity_id_claim() {
+        let req = TestRequest::default().to_http_request();
+        req.extensions_mut().insert(TokenClaims {
+            sub: "did:icn:test-user".to_string(),
+            iat: 1_000_000_000,
+            exp: 9_999_999_999,
+            coop_id: "coop-a".to_string(),
+            scopes: vec!["ledger:write".to_string()],
+            entity_id: Some("entity:icn:cooperative:coop-b".to_string()),
+            entity_type: Some("cooperative".to_string()),
+        });
+
+        // Decision follows coop_id, not the (mismatched) entity_id.
+        assert!(require_coop_access(&req, "coop-a").is_ok());
         assert!(matches!(
             require_coop_access(&req, "coop-b"),
             Err(GatewayError::AuthorizationFailed(_))

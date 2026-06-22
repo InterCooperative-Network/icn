@@ -281,6 +281,54 @@ impl FederationServiceImpl {
         hasher.update(request.decision_receipt_id.as_bytes());
         format!("{:x}", hasher.finalize())
     }
+
+    /// Compute a state change hash for a clearing-termination operation.
+    ///
+    /// Binds the authorizing decision's `decision_hash` in addition to the
+    /// `decision_receipt_id`, so the provenance hash distinguishes two
+    /// decisions that share a receipt id. An empty `decision_hash` is tolerated
+    /// and folded as empty bytes — this hash is an audit/verification artifact,
+    /// not an authorization gate, so absence weakens provenance entropy rather
+    /// than denying the operation.
+    ///
+    /// On the main `KernelEffect::Federation` path the bound value is now
+    /// non-empty for governance-authorized terminations:
+    /// `FederationEffect::TerminateClearing` carries a `decision_hash` field,
+    /// `federation_effect_to_operation` forwards it as `Some(..)`, and the
+    /// executor threads it into this request — completing the canonical-path
+    /// propagation that the #2093 binding (above) depended on. An empty
+    /// `decision_hash` (legacy/unset) still folds as empty bytes per the policy
+    /// above; it is tolerated, not rejected.
+    fn compute_terminate_clearing_hash(
+        request: &FederationTerminateClearingRequest,
+        agreement_id: &str,
+    ) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"federation:terminate_clearing:");
+        hasher.update(agreement_id.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.decision_receipt_id.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.decision_hash.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
+
+    /// Compute a state change hash for a vouch-revocation operation.
+    ///
+    /// Binds `decision_hash` alongside `decision_receipt_id` (see
+    /// [`Self::compute_terminate_clearing_hash`] for the empty-hash policy).
+    fn compute_revoke_vouch_hash(request: &FederationRevokeVouchRequest) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(b"federation:revoke_vouch:");
+        hasher.update(request.revoker_did.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.target_coop_did.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.decision_receipt_id.as_bytes());
+        hasher.update(b":");
+        hasher.update(request.decision_hash.as_bytes());
+        format!("{:x}", hasher.finalize())
+    }
 }
 
 impl FederationService for FederationServiceImpl {
@@ -816,18 +864,15 @@ impl FederationService for FederationServiceImpl {
             partner_coop = %request.partner_coop_did,
             reason = %request.reason,
             decision_receipt_id = %request.decision_receipt_id,
+            decision_hash = %request.decision_hash,
             "Terminating bilateral clearing agreement via governance"
         );
 
         match clearing.terminate_agreement(&request.initiating_coop_did, &request.partner_coop_did)
         {
             Ok(agreement_id) => {
-                let mut hasher = Sha256::new();
-                hasher.update(b"federation:terminate_clearing:");
-                hasher.update(agreement_id.as_bytes());
-                hasher.update(b":");
-                hasher.update(request.decision_receipt_id.as_bytes());
-                let state_change_hash = format!("{:x}", hasher.finalize());
+                let state_change_hash =
+                    Self::compute_terminate_clearing_hash(&request, &agreement_id);
 
                 info!(
                     agreement_id = %agreement_id,
@@ -868,6 +913,7 @@ impl FederationService for FederationServiceImpl {
             target = %request.target_coop_did,
             reason = %request.reason,
             decision_receipt_id = %request.decision_receipt_id,
+            decision_hash = %request.decision_hash,
             "Revoking vouch via governance"
         );
 
@@ -876,14 +922,7 @@ impl FederationService for FederationServiceImpl {
             .remove_vouch(&request.revoker_did, &request.target_coop_did)
         {
             Ok(()) => {
-                let mut hasher = Sha256::new();
-                hasher.update(b"federation:revoke_vouch:");
-                hasher.update(request.revoker_did.as_bytes());
-                hasher.update(b":");
-                hasher.update(request.target_coop_did.as_bytes());
-                hasher.update(b":");
-                hasher.update(request.decision_receipt_id.as_bytes());
-                let state_change_hash = format!("{:x}", hasher.finalize());
+                let state_change_hash = Self::compute_revoke_vouch_hash(&request);
 
                 info!(
                     revoker = %request.revoker_did,
@@ -1142,6 +1181,72 @@ mod tests {
         let (receipt_id, hash) = prov.unwrap();
         assert_eq!(receipt_id, request.decision_receipt_id);
         assert_eq!(hash, request.decision_hash);
+    }
+
+    fn terminate_request(decision_hash: &str) -> FederationTerminateClearingRequest {
+        FederationTerminateClearingRequest {
+            initiating_coop_did: "did:icn:initiator".to_string(),
+            partner_coop_did: "did:icn:partner".to_string(),
+            reason: "governance decision".to_string(),
+            decision_receipt_id: "gov:proposal:terminate:receipt:1".to_string(),
+            decision_hash: decision_hash.to_string(),
+        }
+    }
+
+    fn revoke_request(decision_hash: &str) -> FederationRevokeVouchRequest {
+        FederationRevokeVouchRequest {
+            revoker_did: "did:icn:revoker".to_string(),
+            target_coop_did: "did:icn:target".to_string(),
+            reason: "governance decision".to_string(),
+            decision_receipt_id: "gov:proposal:revoke:receipt:1".to_string(),
+            decision_hash: decision_hash.to_string(),
+        }
+    }
+
+    #[test]
+    fn terminate_clearing_hash_is_deterministic() {
+        let req = terminate_request("sha256:decision-a");
+        let h1 = FederationServiceImpl::compute_terminate_clearing_hash(&req, "agreement-1");
+        let h2 = FederationServiceImpl::compute_terminate_clearing_hash(&req, "agreement-1");
+        assert_eq!(h1, h2);
+    }
+
+    /// Two decisions with the *same* receipt id but different `decision_hash`
+    /// must yield distinct state-change hashes — provenance binds the decision,
+    /// not just the receipt id.
+    #[test]
+    fn terminate_clearing_hash_binds_decision_hash() {
+        let req_a = terminate_request("sha256:decision-a");
+        let req_b = terminate_request("sha256:decision-b");
+        assert_eq!(req_a.decision_receipt_id, req_b.decision_receipt_id);
+        let h_a = FederationServiceImpl::compute_terminate_clearing_hash(&req_a, "agreement-1");
+        let h_b = FederationServiceImpl::compute_terminate_clearing_hash(&req_b, "agreement-1");
+        assert_ne!(
+            h_a, h_b,
+            "terminate_clearing state_change_hash must bind decision_hash"
+        );
+    }
+
+    #[test]
+    fn revoke_vouch_hash_is_deterministic() {
+        let req = revoke_request("sha256:decision-a");
+        let h1 = FederationServiceImpl::compute_revoke_vouch_hash(&req);
+        let h2 = FederationServiceImpl::compute_revoke_vouch_hash(&req);
+        assert_eq!(h1, h2);
+    }
+
+    /// Same receipt id, different `decision_hash` -> distinct hashes.
+    #[test]
+    fn revoke_vouch_hash_binds_decision_hash() {
+        let req_a = revoke_request("sha256:decision-a");
+        let req_b = revoke_request("sha256:decision-b");
+        assert_eq!(req_a.decision_receipt_id, req_b.decision_receipt_id);
+        let h_a = FederationServiceImpl::compute_revoke_vouch_hash(&req_a);
+        let h_b = FederationServiceImpl::compute_revoke_vouch_hash(&req_b);
+        assert_ne!(
+            h_a, h_b,
+            "revoke_vouch state_change_hash must bind decision_hash"
+        );
     }
 
     /// Two-phase durability test: write, close, reopen, verify record survives

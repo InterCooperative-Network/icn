@@ -65,6 +65,7 @@ pub mod server;
 pub mod service_discovery_mgr;
 pub mod session;
 pub mod steward_mgr;
+pub mod token_authority;
 pub mod treasury_mgr;
 pub mod trust_mgr;
 pub mod validation;

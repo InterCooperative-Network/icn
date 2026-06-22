@@ -15,10 +15,16 @@
 [metadata]
 version = "0.2.0"
 last_updated = "2026-02-20"
-total_crates = 29
-clean_crates = 9
-infected_crates = 11
-needs_review_crates = 9
+# Summary counts recomputed 2026-06-20 directly from the per-crate [crates.*] `status`
+# fields below (PR docs/truth-layer-index). The per-crate classifications themselves were
+# NOT re-audited this pass — that is a separate meaning-firewall review.
+# Reproduce: awk '/^\[crates\./{inc=1} inc&&/^status =/{gsub(/"/,"",$3);print $3;inc=0}' kernel_surface.toml | sort | uniq -c
+summary_recomputed = "2026-06-20"
+total_crates = 28
+clean_crates = 13
+infected_crates = 14
+needs_review_crates = 1
+extracted_apps = 1
 
 # Extraction Progress (updated 2026-02-10):
 # - icn-governance-actor: NEW - Governance actor extracted to apps/governance

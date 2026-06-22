@@ -18,6 +18,9 @@ env:
   # Use environment variable for duration to avoid injection risk
   FUZZ_DURATION: ${{ github.event.inputs.duration || '300' }}
 
+permissions:
+  contents: read
+
 jobs:
   fuzz:
     name: CCL Fuzz Testing

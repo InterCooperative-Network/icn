@@ -158,6 +158,7 @@ icn-steward = { path = "crates/icn-steward" }
 icn-zkp = { path = "crates/icn-zkp" }
 icn-encoding = { path = "crates/icn-encoding" }
 icn-coop = { path = "crates/icn-coop" }
+icn-entity = { path = "crates/icn-entity" }
 icn-api = { path = "crates/icn-api" }
 icn-naming = { path = "crates/icn-naming" }
 icn-authz = { path = "crates/icn-authz" }

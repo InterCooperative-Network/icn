@@ -21,10 +21,13 @@ without review.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import datetime as dt
 import hashlib
 import json
 import subprocess
+import sys
+import tempfile
 from collections import Counter, defaultdict
 from dataclasses import asdict, dataclass
 from pathlib import Path
@@ -469,6 +472,24 @@ def generate_for_repo(
     if include_untracked:
         all_paths.extend((path, False) for path in git_untracked(resolved_path))
 
+    # Exclude THIS generator's own committed outputs from the inventory (and
+    # therefore from SHA/size, directory size rollups, file_count, and
+    # total_size_bytes). The file-record is committed at the canonical
+    # project-index location; if it inventoried itself it would have to record
+    # its own post-write SHA/size — an impossible fixed point — so
+    # `--check` would report drift forever, even immediately after a clean
+    # regeneration. The exclusion is keyed to the CANONICAL committed paths, not
+    # `out_dir` (which is a temp dir during `--check`), so a temp-dir
+    # regeneration and the committed artifact exclude the same entries and thus
+    # converge. This is specific to this generator's own `<repo>-file-record.*`
+    # outputs; other generated artifacts (route-inventory, agent-context-spine,
+    # live-state overlay, etc.) are intentionally NOT excluded.
+    self_outputs = {
+        f"docs/reference/project-index/generated/{repo_name}-file-record.json",
+        f"docs/reference/project-index/generated/{repo_name}-file-record.md",
+    }
+    all_paths = [(path, tracked) for path, tracked in all_paths if path not in self_outputs]
+
     files: list[FileRecord] = []
     skipped: list[str] = []
     for path, tracked in all_paths:
@@ -539,6 +560,133 @@ def parse_repo_arg(value: str) -> tuple[str, Path]:
     return name, Path(path)
 
 
+def _normalize_record(text: str, ext: str) -> str:
+    """Strip generation-moment metadata so --check compares the snapshot's
+    repository inventory (file paths, SHAs, sizes, counts, directory rollups)
+    rather than metadata that records WHEN/WHERE/HOW the snapshot was taken.
+
+    A committed file-record can never satisfy a naive equality check on its own
+    generation metadata. The artifact records the commit it was generated at
+    (`head`), but the commit that *contains* the committed artifact is
+    necessarily a later commit — so a committed artifact can never record its own
+    containing commit SHA. `head` is therefore structurally unmatchable for any
+    committed snapshot, exactly like the self-inventory fixed point the
+    self-output exclusion solves in `generate_for_repo`. The same holds for
+    `generated_at` (a fresh run is a new instant), `branch` (a refresh on any
+    branch is equivalent), and `working_tree_dirty` (it reports the porcelain
+    state at generation time, not repository content).
+
+    Normalized out (generation-moment metadata only):
+      - JSON: `generated_at`, `branch`, `head`, `working_tree_dirty`.
+      - Markdown: `Generated:` front-matter, `- Branch:`, `- HEAD:`, and the
+        `- Working tree:` clean/dirty line.
+    Everything that encodes repository CONTENT is intentionally KEPT and fully
+    compared: the per-file inventory (paths, SHA256, sizes, kinds), directory
+    rollups, `file_count`, `total_size_bytes`, `include_untracked`, and the
+    role/extension/kind summaries. Real content drift is still detected. The only
+    inventory adjustment is the self-output exclusion applied during generation
+    (see `generate_for_repo`), not a comparison-time filter here.
+    """
+    if ext == "json":
+        data = json.loads(text)
+        for key in ("generated_at", "branch", "head", "working_tree_dirty"):
+            data.pop(key, None)
+        return json.dumps(data, indent=2, sort_keys=True)
+    # markdown
+    kept = [
+        line
+        for line in text.splitlines()
+        if not line.startswith("Generated:")
+        and not line.startswith("- Branch:")
+        and not line.startswith("- HEAD:")
+        and not line.startswith("- Working tree:")
+    ]
+    return "\n".join(kept)
+
+
+def check_repos(
+    repos: list[tuple[str, Path]],
+    out_dir: Path,
+    include_untracked: bool,
+) -> int:
+    """Regenerate each repo record into a temp dir and compare it against the
+    committed artifact under `out_dir`, ignoring the volatile fields above.
+
+    Exit contract:
+      0  every committed record matches the working tree (modulo generation-moment metadata)
+      1  drift — a committed record is stale or missing
+      2  checker error — regeneration or comparison itself failed (e.g. a repo
+         path is not a git checkout, git failed, or a committed artifact is
+         unreadable/invalid JSON/MD). Kept distinct from drift (1) so a caller
+         can map the two codes differently. This function always RETURNS the
+         exit code; it never warns or suppresses on its own. The observational
+         generated-truth workflow is what treats a checker error (>=2) as a hard
+         CI failure while only emitting a warning on staleness (1).
+    Never writes to `out_dir`.
+    """
+
+    def _regenerate_command() -> str:
+        # Reconstruct the actual command (every --repo entry + the real --out),
+        # not just the first repo / a hard-coded path.
+        repo_args = " ".join(f"--repo {name}={path}" for name, path in repos)
+        return f"python3 scripts/generate_repo_record.py {repo_args} --out {out_dir}"
+
+    drift = False
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            tmp_dir = Path(tmp)
+            for repo_name, repo_path in repos:
+                # allow_dirty=True: --check compares against the current working
+                # tree (it must not refuse on a dirty checkout); it never persists
+                # a misleading artifact because it only writes into the temp dir.
+                with contextlib.redirect_stdout(sys.stderr):
+                    generate_for_repo(repo_name, repo_path, tmp_dir, include_untracked, True)
+                for ext in ("json", "md"):
+                    committed = out_dir / f"{repo_name}-file-record.{ext}"
+                    fresh = tmp_dir / f"{repo_name}-file-record.{ext}"
+                    if not committed.exists():
+                        print(f"DRIFT: committed artifact missing: {committed}")
+                        drift = True
+                        continue
+                    if _normalize_record(committed.read_text(encoding="utf-8"), ext) != _normalize_record(
+                        fresh.read_text(encoding="utf-8"), ext
+                    ):
+                        drift = True
+                        print(f"DRIFT: {committed} differs from a fresh generation.")
+                        if ext == "json":
+                            # `head` is generation-moment metadata and is NOT
+                            # compared (see _normalize_record), so report the
+                            # content signals that actually drive drift instead.
+                            c = json.loads(committed.read_text(encoding="utf-8")).get("summary", {})
+                            f = json.loads(fresh.read_text(encoding="utf-8")).get("summary", {})
+                            print(
+                                f"  committed file_count={c.get('file_count')} "
+                                f"total_size_bytes={c.get('total_size_bytes')}"
+                            )
+                            print(
+                                f"  working   file_count={f.get('file_count')} "
+                                f"total_size_bytes={f.get('total_size_bytes')}"
+                            )
+    except SystemExit as exc:
+        # generate_for_repo raises SystemExit (with a message) on a real
+        # regeneration failure (path is not a git repo, git failure, etc.).
+        # Map it to a checker error (>=2) so CI fails rather than mistaking it
+        # for drift (rc=1).
+        print(f"CHECKER ERROR: repo file-record regeneration failed: {exc}", file=sys.stderr)
+        return 2
+    except Exception as exc:
+        # Any other unexpected failure (e.g. an unreadable/invalid committed
+        # JSON/MD artifact) is a checker error (>=2), not staleness (rc=1).
+        print(f"CHECKER ERROR: {type(exc).__name__}: {exc}", file=sys.stderr)
+        return 2
+
+    if drift:
+        print(f"\nRegenerate with:\n  {_regenerate_command()}", file=sys.stderr)
+        return 1
+    print("OK: repo file-record matches the working tree (generation-moment metadata ignored).")
+    return 0
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -553,6 +701,17 @@ def main() -> None:
         type=Path,
         default=Path("docs/reference/project-index/generated"),
         help="Output directory for generated JSON and Markdown records.",
+    )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help=(
+            "Do not write. Regenerate each record into a temp dir and compare "
+            "it against the committed artifact under --out, ignoring "
+            "generation-moment metadata (timestamp, branch, head, "
+            "working-tree-dirty state). Exit 0 if current, 1 on drift "
+            "(stale or missing snapshot), 2 on checker error."
+        ),
     )
     parser.add_argument(
         "--include-untracked",
@@ -570,6 +729,9 @@ def main() -> None:
         ),
     )
     args = parser.parse_args()
+
+    if args.check:
+        raise SystemExit(check_repos(args.repo, args.out, args.include_untracked))
 
     for repo_name, repo_path in args.repo:
         generate_for_repo(

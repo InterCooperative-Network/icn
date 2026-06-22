@@ -58,6 +58,8 @@ icn-governance.workspace = true
 icn-federation.workspace = true
 icn-steward.workspace = true
 icn-gateway.workspace = true
+icn-coop.workspace = true
+icn-entity.workspace = true
 
 # OpenAPI
 utoipa = { version = "5.4.0", features = ["yaml"] }

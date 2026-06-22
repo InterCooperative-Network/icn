@@ -391,6 +391,75 @@ impl DecisionExecutor {
         decision_hash: &str,
         proposal_id: &str,
     ) -> Result<Vec<EffectResult>> {
+        // Backward-compatibility across the #2094->#2096 upgrade window. Before
+        // federation effects carried an extractable `decision_hash`, a
+        // federation-only decision produced no hash, so the callback keyed its
+        // `ExecutionRecord` under `decision_receipt_id`. Now that the propagated
+        // federation hash is the primary idempotency key, a replay of that same
+        // accepted event would key a fresh record under `decision_hash` and miss
+        // the legacy receipt-keyed record — re-running a completed operation, or
+        // orphaning an in-flight one and resetting its retry count.
+        //
+        // Adopt the legacy receipt key ONLY when the stored record is the *same*
+        // decision — i.e. its own effects carry the same `decision_hash`. A
+        // receipt id is not unique to one decision (distinct federation decisions
+        // can share it; that is exactly the #2095 same-receipt/different-hash
+        // case), so adopting on mere key existence would let one legacy row
+        // collapse an unrelated decision. Matching on the stored effects' hash
+        // ties adoption to decision identity. Read-only key selection — no record
+        // migration — and a no-op when the key never moved (empty-hash fallback
+        // sets `decision_hash == decision_receipt_id`; treasury was always
+        // hash-keyed, so no receipt-keyed record exists for it).
+        //
+        // When BOTH rows exist for the same decision (reachable only if a node
+        // ran an intermediate hash-keying build before this compat fix landed),
+        // the canonical hash-keyed record wins if it is already terminal: never
+        // re-dispatch under a stale legacy row when the canonical decision is done.
+        let canonical_is_terminal = self
+            .store
+            .get(decision_hash)?
+            .map(|r| r.is_terminal())
+            .unwrap_or(false);
+        let decision_hash: &str = if decision_hash != decision_receipt_id && !canonical_is_terminal
+        {
+            match self.store.get(decision_receipt_id)? {
+                Some(legacy)
+                    if extract_decision_hash(&legacy.effects).as_deref() == Some(decision_hash) =>
+                {
+                    decision_receipt_id
+                }
+                _ => decision_hash,
+            }
+        } else {
+            decision_hash
+        };
+
+        // Recovery-path canonical-terminal guard. The shadow above keys on the
+        // INPUT decision_hash; on the startup recovery path (`recover_in_flight`)
+        // a legacy receipt-keyed row is re-executed under its stored key, which
+        // equals the receipt id (`decision_hash == decision_receipt_id`), so the
+        // shadow is skipped. If that row's stored effects carry a federation
+        // decision_hash whose canonical record is already terminal, the canonical
+        // record still wins — dedupe instead of re-dispatching the stale row.
+        if decision_hash == decision_receipt_id {
+            if let Some(canonical_hash) = extract_decision_hash(&effects) {
+                if canonical_hash != decision_receipt_id
+                    && self
+                        .store
+                        .get(&canonical_hash)?
+                        .map(|r| r.is_terminal())
+                        .unwrap_or(false)
+                {
+                    debug!(
+                        decision_hash = %canonical_hash,
+                        receipt_id = %decision_receipt_id,
+                        "Canonical terminal record exists for recovered legacy row, skipping"
+                    );
+                    return Ok(vec![]);
+                }
+            }
+        }
+
         // 1. Idempotency check
         if let Some(existing) = self.store.get(decision_hash)? {
             if existing.is_terminal() {
@@ -818,19 +887,37 @@ pub fn create_decision_executor_callback_with_sink(
     })
 }
 
-/// Extract `decision_hash` from the first effect that carries one.
+/// Extract the governance `decision_hash` to use as the executor idempotency
+/// key, taking it from the first *supported* effect variant (scanning in order)
+/// that carries a non-empty hash.
+///
+/// "Supported" is a deliberately narrow allow-list, not every variant that has
+/// a `decision_hash` field: only `TreasuryEffect::{Spend, CreateBudget,
+/// ReleaseEscrow}` and `FederationEffect::{SettleClearing, TerminateClearing,
+/// RevokeVouch}` (the latter carried since #2093/#2094). Other variants and
+/// effect families that also embed `decision_hash` (e.g. the remaining Treasury
+/// variants, or Membership effects) are intentionally not consulted here;
+/// widening the allow-list is a deliberate change, not an oversight. Empty/legacy
+/// hashes are skipped so the caller falls back to `decision_receipt_id`,
+/// preserving backward compatibility for pre-#2094 serialized effects.
 fn extract_decision_hash(effects: &[KernelEffect]) -> Option<String> {
-    use icn_kernel_api::effects::TreasuryEffect;
+    use icn_kernel_api::effects::{FederationEffect, TreasuryEffect};
     for effect in effects {
-        if let KernelEffect::Treasury(
-            TreasuryEffect::Spend { decision_hash, .. }
-            | TreasuryEffect::CreateBudget { decision_hash, .. }
-            | TreasuryEffect::ReleaseEscrow { decision_hash, .. },
-        ) = effect
-        {
-            if !decision_hash.is_empty() {
-                return Some(decision_hash.clone());
-            }
+        let decision_hash = match effect {
+            KernelEffect::Treasury(
+                TreasuryEffect::Spend { decision_hash, .. }
+                | TreasuryEffect::CreateBudget { decision_hash, .. }
+                | TreasuryEffect::ReleaseEscrow { decision_hash, .. },
+            ) => decision_hash,
+            KernelEffect::Federation(
+                FederationEffect::SettleClearing { decision_hash, .. }
+                | FederationEffect::TerminateClearing { decision_hash, .. }
+                | FederationEffect::RevokeVouch { decision_hash, .. },
+            ) => decision_hash,
+            _ => continue,
+        };
+        if !decision_hash.is_empty() {
+            return Some(decision_hash.clone());
         }
     }
     None
@@ -839,7 +926,9 @@ fn extract_decision_hash(effects: &[KernelEffect]) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_kernel_api::effects::{EffectResult, KernelEffect, ResourceEffect, TreasuryEffect};
+    use icn_kernel_api::effects::{
+        EffectResult, FederationEffect, KernelEffect, ResourceEffect, TreasuryEffect,
+    };
     use icn_kernel_api::escrow::{EscrowRecord, EscrowStatus, EscrowStore};
     use icn_kernel_api::execution::ExecutionRecord;
     use icn_kernel_api::services::{LedgerEvent, TreasuryEntryRequest, TreasuryEntryResult};
@@ -1258,6 +1347,152 @@ mod tests {
             reason: "only".to_string(),
         }];
         assert_eq!(extract_decision_hash(&no_hash), None);
+    }
+
+    // ---- #2095: federation effects carry decision_hash since #2094 -----------
+    // The executor idempotency key must reflect the propagated federation
+    // decision_hash, not fall back to decision_receipt_id for federation-only
+    // batches. Empty/legacy hashes still yield None (receipt-id fallback).
+
+    #[test]
+    fn test_extract_decision_hash_federation_terminate_clearing() {
+        let effects = vec![KernelEffect::Federation(
+            FederationEffect::TerminateClearing {
+                initiating_coop_did: "coop-a".to_string(),
+                partner_coop_did: "coop-b".to_string(),
+                reason: "governance terminate".to_string(),
+                decision_hash: "sha256:fed-terminate-1".to_string(),
+            },
+        )];
+        assert_eq!(
+            extract_decision_hash(&effects),
+            Some("sha256:fed-terminate-1".to_string())
+        );
+
+        // Empty/legacy hash → None (caller falls back to decision_receipt_id).
+        let legacy = vec![KernelEffect::Federation(
+            FederationEffect::TerminateClearing {
+                initiating_coop_did: "coop-a".to_string(),
+                partner_coop_did: "coop-b".to_string(),
+                reason: "legacy".to_string(),
+                decision_hash: String::new(),
+            },
+        )];
+        assert_eq!(extract_decision_hash(&legacy), None);
+    }
+
+    #[test]
+    fn test_extract_decision_hash_federation_revoke_vouch() {
+        let effects = vec![KernelEffect::Federation(FederationEffect::RevokeVouch {
+            revoker_did: "coop-a".to_string(),
+            target_coop_did: "coop-b".to_string(),
+            reason: "governance revoke".to_string(),
+            decision_hash: "sha256:fed-revoke-1".to_string(),
+        })];
+        assert_eq!(
+            extract_decision_hash(&effects),
+            Some("sha256:fed-revoke-1".to_string())
+        );
+
+        let legacy = vec![KernelEffect::Federation(FederationEffect::RevokeVouch {
+            revoker_did: "coop-a".to_string(),
+            target_coop_did: "coop-b".to_string(),
+            reason: "legacy".to_string(),
+            decision_hash: String::new(),
+        })];
+        assert_eq!(extract_decision_hash(&legacy), None);
+    }
+
+    #[test]
+    fn test_extract_decision_hash_federation_settle_clearing() {
+        let effects = vec![KernelEffect::Federation(FederationEffect::SettleClearing {
+            agreement_id: "agreement-1".to_string(),
+            currency: "HOURS".to_string(),
+            decision_receipt_id: "receipt-1".to_string(),
+            decision_hash: "sha256:fed-settle-1".to_string(),
+        })];
+        assert_eq!(
+            extract_decision_hash(&effects),
+            Some("sha256:fed-settle-1".to_string())
+        );
+
+        let legacy = vec![KernelEffect::Federation(FederationEffect::SettleClearing {
+            agreement_id: "agreement-1".to_string(),
+            currency: "HOURS".to_string(),
+            decision_receipt_id: "receipt-1".to_string(),
+            decision_hash: String::new(),
+        })];
+        assert_eq!(extract_decision_hash(&legacy), None);
+    }
+
+    /// Same federation decision → same key (dedupe-preserving); distinct
+    /// federation decisions → distinct keys (no false dedupe). This underpins
+    /// the executor-level replay-safety behavior.
+    #[test]
+    fn test_extract_decision_hash_federation_distinct_and_deterministic() {
+        let mk = |hash: &str| {
+            vec![KernelEffect::Federation(
+                FederationEffect::TerminateClearing {
+                    initiating_coop_did: "coop-a".to_string(),
+                    partner_coop_did: "coop-b".to_string(),
+                    reason: "r".to_string(),
+                    decision_hash: hash.to_string(),
+                },
+            )]
+        };
+        assert_eq!(
+            extract_decision_hash(&mk("sha256:fed-x")),
+            extract_decision_hash(&mk("sha256:fed-x")),
+            "identical federation decision_hash must produce the same idempotency key"
+        );
+        assert_ne!(
+            extract_decision_hash(&mk("sha256:fed-a")),
+            extract_decision_hash(&mk("sha256:fed-b")),
+            "distinct federation decision_hash must produce distinct idempotency keys"
+        );
+    }
+
+    /// Treasury extraction is unchanged and retains precedence within a mixed
+    /// batch (first non-empty hash wins, scanning in order); a federation-only
+    /// batch — the #2095 gap — now yields the federation hash instead of None.
+    #[test]
+    fn test_extract_decision_hash_treasury_precedence_unchanged() {
+        let treasury_first = vec![
+            KernelEffect::Treasury(TreasuryEffect::Spend {
+                treasury_did: "t".to_string(),
+                recipient_did: "r".to_string(),
+                amount: 1,
+                currency: "ICN".to_string(),
+                memo: "m".to_string(),
+                budget_id: None,
+                expected_nonce: 0,
+                decision_receipt_id: "rid".to_string(),
+                decision_hash: "sha256:treasury-first".to_string(),
+            }),
+            KernelEffect::Federation(FederationEffect::TerminateClearing {
+                initiating_coop_did: "coop-a".to_string(),
+                partner_coop_did: "coop-b".to_string(),
+                reason: "r".to_string(),
+                decision_hash: "sha256:fed-second".to_string(),
+            }),
+        ];
+        assert_eq!(
+            extract_decision_hash(&treasury_first),
+            Some("sha256:treasury-first".to_string())
+        );
+
+        let federation_only = vec![KernelEffect::Federation(
+            FederationEffect::TerminateClearing {
+                initiating_coop_did: "coop-a".to_string(),
+                partner_coop_did: "coop-b".to_string(),
+                reason: "r".to_string(),
+                decision_hash: "sha256:fed-only".to_string(),
+            },
+        )];
+        assert_eq!(
+            extract_decision_hash(&federation_only),
+            Some("sha256:fed-only".to_string())
+        );
     }
 
     #[tokio::test]

@@ -1246,7 +1246,7 @@ Release notes and version history
 
 Guidance for Claude Code sessions working with ICN codebase
 
-**For:** `agents`, `developers` | **Updated:** 2026-03-21
+**For:** `agents`, `developers` | **Updated:** 2026-06-17
 
 ### 🔒 **Canonical** [Code of Conduct](/CODE_OF_CONDUCT.md)
 
@@ -1260,6 +1260,12 @@ Main project README with overview, quick start, and CI/CD status badge
 
 **For:** `contributors`, `public` | **Updated:** 2026-03-10
 
+### 📝 **Living** [ICN Ecosystem Atlas](/docs/ATLAS.md)
+
+Top-level front door composing the project-index map family and the truth spine; cross-repo map (incl. private ops/provider repos), boundary/claims guardrail, and agent preflight. Index, not a source of truth.
+
+**For:** `all`, `agents` | **Updated:** 2026-06-16
+
 ### 🔒 **Canonical** [ICN Documentation Control System](/docs/DOCUMENTATION_CONTROL_SYSTEM.md)
 
 Normative development control plane: discovery vs delivery, artifact routing, and documentation governance
@@ -1270,7 +1276,7 @@ Normative development control plane: discovery vs delivery, artifact routing, an
 
 Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh
 
-**For:** `contributors`, `agents` | **Updated:** 2026-06-09
+**For:** `contributors`, `agents` | **Updated:** 2026-06-22
 
 ### 📝 **Living** [ICN Golden Development Prompt](/docs/GOLDEN_PROMPT.md)
 
@@ -1574,9 +1580,9 @@ Trust score threshold configuration guide
 
 ### 📝 **Living** [ICN Project Index](/docs/reference/project-index/README.md)
 
-Show-ready orientation layer — routes outside readers, contributors, and agents to the right canonical doc, source tree, or external URL. Defers to STATE.md and PHASE_PROGRESS.md for current truth.
+Show-ready orientation layer — routes outside readers, contributors, and agents to the right canonical doc, source tree, or external URL. Defers to STATE.md and PHASE_PROGRESS.md for current truth. Includes the Truth Layer / Claim Discipline section cross-linking the existing truth systems.
 
-**For:** `all` | **Updated:** 2026-05-11
+**For:** `all` | **Updated:** 2026-06-20
 
 ### 📝 **Living** [CI / Ops / Deploy Map](/docs/reference/project-index/ci-ops-deploy-map.md)
 
@@ -1601,6 +1607,12 @@ How INDEX.md, registry.toml, DOCUMENT_REGISTRY.md, and doc_control_check.py rela
 Protocol for recording every tracked file and directory across InterCooperative-Network/icn (and adjacent repos) as a mechanical record plus an interpretive atlas. Defines outputs, generator, classification vocabulary, and privacy boundary.
 
 **For:** `contributors`, `architects` | **Updated:** 2026-05-01
+
+### 📝 **Living** [ICN Invariants Catalog](/docs/reference/project-index/invariants-catalog.md)
+
+Source-linked index of the four canonical ICN invariant families (5 operational / 6 firewall-contract / 10 frozen-core / 7 regulatory = 28), each linked to its canonical source with a stable anchor. Indexes only; it does not define invariants, and the canonical sources remain authoritative. Machine-readable companion: invariants-catalog.toml. Implements the #2114 deliverable.
+
+**For:** `all`, `team` | **Updated:** 2026-06-22
 
 ### 📝 **Living** [Proof-Level Taxonomy and Capability Matrix](/docs/reference/project-index/proof-level-taxonomy-capability-matrix.md)
 
@@ -1738,7 +1750,7 @@ Comprehensive threat model covering attack vectors, adversary capabilities, and 
 
 Living snapshot of repo layout, decisions, constraints, and current engineering status
 
-**For:** `developers`, `agents` | **Updated:** 2026-06-10
+**For:** `developers`, `agents` | **Updated:** 2026-06-21
 
 
 ## Strategy
@@ -1898,9 +1910,9 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 309
+**Total documents:** 311
 
 **By status:**
 - Canonical: 40
 - Draft: 72
-- Living: 197
+- Living: 199
