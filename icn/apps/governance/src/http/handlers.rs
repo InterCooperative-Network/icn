@@ -3077,6 +3077,66 @@ pub async fn get_action_item_completion_receipt<E: GovernanceEventEmitter + Clon
     Ok(HttpResponse::Ok().json(receipt))
 }
 
+/// POST /gov/domains/{domain_id}/process-sessions/{session_id}/gate-results
+/// — Record one process-gate result and return its persisted
+/// [`icn_governance::ProcessGateResultReceipt`] (issue #2144).
+///
+/// Mounts the existing `GovernanceManager::record_process_gate_result`
+/// runtime slice — the first `ProcessTransitionReceipt` class for the
+/// `idea-0019` Institutional Process Substrate (ADR-0026 Layer 2) — over
+/// HTTP. The manager constructs a deterministic blake3 receipt and persists
+/// it through the receipt backend *before* returning, so the response body
+/// carries the persisted receipt and its `record_hash` is the verification
+/// evidence. This adds no new receipt type and no process runtime.
+///
+/// Authorization mirrors the action-item write surface: the existing
+/// `governance:write` scope plus domain membership for the caller. This
+/// handler composes those existing gates and changes no authorization
+/// decision. The manager performs no authority check itself — charter
+/// enforcement of "who may record a gate result for this domain/session"
+/// is upstream of this slice.
+///
+/// Returns:
+/// - 200 with the persisted `ProcessGateResultReceipt` JSON.
+/// - 400 when `result`/`gate_kind` is outside its closed taxonomy
+///   (deserialization) or `session_id` is empty/whitespace.
+/// - 401 when the bearer token is missing/invalid.
+/// - 403 when the token lacks `governance:write` or the caller is not a
+///   member of the domain.
+/// - 404 when the domain does not exist.
+pub async fn record_process_gate_result<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    path: web::Path<(String, String)>,
+    req: web::Json<RecordProcessGateResultRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let recorded_by = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    let (domain_id, session_id) = path.into_inner();
+    if session_id.trim().is_empty() {
+        return Err(err_bad("session_id must be a non-empty path segment"));
+    }
+    let domain = GovernanceDomainId(domain_id);
+
+    // Reuse the existing domain-membership gate; do not introduce a new
+    // authorization regime.
+    check_domain_membership(&ctx, &domain, &recorded_by).await?;
+
+    let receipt = ctx
+        .manager
+        .record_process_gate_result(
+            &domain,
+            &session_id,
+            req.gate_kind,
+            req.result,
+            &recorded_by,
+        )
+        .map_err(anyhow_to_api)?;
+
+    Ok(HttpResponse::Ok().json(receipt))
+}
+
 // ============================================================================
 // Notification digest handler
 // ============================================================================
