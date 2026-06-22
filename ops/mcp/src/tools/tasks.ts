@@ -46,13 +46,15 @@ export function computeNextSprint(
   startedDate: string
 ): SprintState {
   const carriedOver = current.tasks.filter((t) => t.status !== "done");
+  // Copy goals/epics so the returned state shares no mutable references with
+  // the input — mutating the result must never leak back into `current`.
   return {
     sprint: current.sprint + 1,
     name: nextName,
     started: startedDate,
-    goals: nextGoals,
+    goals: [...nextGoals],
     tasks: carriedOver.map((t) => ({ ...t, assignee: null })),
-    epics: current.epics,
+    epics: { ...current.epics },
   };
 }
 

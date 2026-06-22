@@ -96,4 +96,16 @@ describe("computeNextSprint", () => {
     computeNextSprint(base, "Sprint 27", [], "2026-07-01");
     expect(base).toEqual(snapshot);
   });
+
+  it("returns state that shares no mutable references with the input", () => {
+    const goals = ["ship"];
+    const next = computeNextSprint(base, "Sprint 27", goals, "2026-07-01");
+    expect(next.epics).not.toBe(base.epics);
+    expect(next.goals).not.toBe(goals);
+    // Mutating the result must not leak back into the inputs via aliasing.
+    next.epics.devops = "MUTATED";
+    next.goals.push("leaked");
+    expect(base.epics).toEqual({ devops: "DevOps" });
+    expect(goals).toEqual(["ship"]);
+  });
 });
