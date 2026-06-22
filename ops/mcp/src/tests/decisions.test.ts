@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { initDb } from "../state/db.js";
-import { parseAdrMetadata } from "../tools/decisions.js";
+import { parseAdrMetadata, searchDecisionRows, nextAdrNumber } from "../tools/decisions.js";
 import type Database from "better-sqlite3";
+import { mkdtempSync, writeFileSync, rmSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
 
 let db: Database.Database;
 
@@ -235,5 +238,79 @@ date: "2026-04-26"
 `;
     const m = parseAdrMetadata(content);
     expect(m.title).toBe("Heading-Derived Title");
+  });
+});
+
+describe("searchDecisionRows", () => {
+  function seed() {
+    const ins = db.prepare(
+      "INSERT INTO decision_index (id, title, tags, file_path, created_at) VALUES (?, ?, ?, ?, ?)"
+    );
+    ins.run("0001", "Orchestration Plane", "orchestration,mcp", "a.md", "2026-02-19");
+    ins.run("0002", "Kernel App Separation", "kernel,architecture", "b.md", "2026-03-01");
+    ins.run("0003", "Mutual Credit Settlement", "kernel,economics", "c.md", "2026-03-05");
+  }
+
+  it("returns the full index for an empty query instead of throwing", () => {
+    seed();
+    const rows = searchDecisionRows(db, "") as Array<{ id: string }>;
+    expect(rows).toHaveLength(3);
+    expect(rows[0].id).toBe("0003"); // ORDER BY id DESC
+  });
+
+  it("treats a whitespace-only query as empty", () => {
+    seed();
+    expect(searchDecisionRows(db, "   ")).toHaveLength(3);
+  });
+
+  it("filters by a single term across title and tags", () => {
+    seed();
+    const rows = searchDecisionRows(db, "kernel") as Array<{ id: string }>;
+    expect(rows.map((r) => r.id).sort()).toEqual(["0002", "0003"]);
+  });
+
+  it("requires every term to match (AND semantics)", () => {
+    seed();
+    const rows = searchDecisionRows(db, "kernel economics") as Array<{ id: string }>;
+    expect(rows).toHaveLength(1);
+    expect(rows[0].id).toBe("0003");
+  });
+
+  it("returns an empty list when nothing matches", () => {
+    seed();
+    expect(searchDecisionRows(db, "nonexistent")).toHaveLength(0);
+  });
+});
+
+describe("nextAdrNumber", () => {
+  let dir: string;
+  beforeEach(() => {
+    dir = mkdtempSync(join(tmpdir(), "adr-"));
+  });
+  afterEach(() => {
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("returns 0001 for an empty directory", () => {
+    expect(nextAdrNumber(dir)).toBe("0001");
+  });
+
+  it("increments past the highest existing ADR, zero-padded", () => {
+    writeFileSync(join(dir, "ADR-0001-a.md"), "");
+    writeFileSync(join(dir, "ADR-0009-b.md"), "");
+    expect(nextAdrNumber(dir)).toBe("0010");
+  });
+
+  it("recognizes legacy NNNN-slug.md filenames alongside ADR-NNNN", () => {
+    writeFileSync(join(dir, "0007-legacy.md"), "");
+    writeFileSync(join(dir, "ADR-0003-new.md"), "");
+    expect(nextAdrNumber(dir)).toBe("0008");
+  });
+
+  it("ignores non-ADR files", () => {
+    writeFileSync(join(dir, "README.md"), "");
+    writeFileSync(join(dir, "template.md"), "");
+    writeFileSync(join(dir, "ADR-0002-x.md"), "");
+    expect(nextAdrNumber(dir)).toBe("0003");
   });
 });

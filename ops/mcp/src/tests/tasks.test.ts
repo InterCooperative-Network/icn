@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { readFileSync, writeFileSync, copyFileSync, mkdirSync, rmSync } from "fs";
 import { join, dirname } from "path";
 import { fileURLToPath } from "url";
+import { computeNextSprint, type SprintState } from "../tools/tasks.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const FIXTURE = join(__dirname, "fixtures/sprint.json");
@@ -55,5 +56,44 @@ describe("sprint state (file operations)", () => {
     );
     expect(updated.status).toBe("in-progress");
     expect(updated.assignee).toBe("test-agent");
+  });
+});
+
+describe("computeNextSprint", () => {
+  const base: SprintState = {
+    sprint: 26,
+    name: "Sprint 26",
+    started: "2026-06-01",
+    goals: ["ship demo"],
+    epics: { devops: "DevOps" },
+    tasks: [
+      { id: "t1", title: "done", status: "done", pr: 1, assignee: "matt", epic: "devops" },
+      { id: "t2", title: "wip", status: "in-progress", pr: null, assignee: "matt", epic: "devops" },
+      { id: "t3", title: "todo", status: "pending", pr: null, assignee: null, epic: null },
+    ],
+  };
+
+  it("increments the sprint number", () => {
+    expect(computeNextSprint(base, "Sprint 27", [], "2026-07-01").sprint).toBe(27);
+  });
+
+  it("carries over only non-done tasks and clears their assignee", () => {
+    const next = computeNextSprint(base, "Sprint 27", [], "2026-07-01");
+    expect(next.tasks.map((t) => t.id)).toEqual(["t2", "t3"]);
+    expect(next.tasks.every((t) => t.assignee === null)).toBe(true);
+  });
+
+  it("applies the new name, goals, and start date; preserves epics", () => {
+    const next = computeNextSprint(base, "Sprint 27", ["land pilot"], "2026-07-01");
+    expect(next.name).toBe("Sprint 27");
+    expect(next.goals).toEqual(["land pilot"]);
+    expect(next.started).toBe("2026-07-01");
+    expect(next.epics).toEqual({ devops: "DevOps" });
+  });
+
+  it("does not mutate the input sprint", () => {
+    const snapshot = JSON.parse(JSON.stringify(base));
+    computeNextSprint(base, "Sprint 27", [], "2026-07-01");
+    expect(base).toEqual(snapshot);
   });
 });

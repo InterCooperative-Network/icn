@@ -7,7 +7,7 @@ import { resolveOpsStatePath } from "../paths.js";
 
 const SPRINT_FILE = resolveOpsStatePath("sprint", "current.json");
 
-interface Task {
+export interface Task {
   id: string;
   title: string;
   status: string;
@@ -16,7 +16,7 @@ interface Task {
   epic: string | null;
 }
 
-interface SprintState {
+export interface SprintState {
   sprint: number;
   name: string;
   started: string;
@@ -31,6 +31,29 @@ function loadSprint(): SprintState {
 
 function saveSprint(state: SprintState): void {
   writeFileSync(SPRINT_FILE, JSON.stringify(state, null, 2) + "\n");
+}
+
+/**
+ * Compute the next sprint from the current one: carry over every task that
+ * isn't done (clearing its assignee), increment the sprint number, and apply
+ * the new name/goals. Pure — the caller supplies the start date and handles
+ * archiving/persistence — so the carry-over invariant is unit-testable.
+ */
+export function computeNextSprint(
+  current: SprintState,
+  nextName: string,
+  nextGoals: string[],
+  startedDate: string
+): SprintState {
+  const carriedOver = current.tasks.filter((t) => t.status !== "done");
+  return {
+    sprint: current.sprint + 1,
+    name: nextName,
+    started: startedDate,
+    goals: nextGoals,
+    tasks: carriedOver.map((t) => ({ ...t, assignee: null })),
+    epics: current.epics,
+  };
 }
 
 export function registerTaskTools(
@@ -176,23 +199,21 @@ export function registerTaskTools(
       const historyPath = join(historyDir, `sprint-${sprint.sprint}-${sprint.started}.json`);
       writeFileSync(historyPath, JSON.stringify(sprint, null, 2) + "\n");
 
-      const carriedOver = sprint.tasks.filter((t) => t.status !== "done");
-      const next: SprintState = {
-        sprint: sprint.sprint + 1,
-        name: next_name,
-        started: new Date().toISOString().split("T")[0]!,
-        goals: next_goals ?? [],
-        tasks: carriedOver.map((t) => ({ ...t, assignee: null })),
-        epics: sprint.epics,
-      };
+      const startedDate = new Date().toISOString().split("T")[0]!;
+      const next = computeNextSprint(
+        sprint,
+        next_name,
+        next_goals ?? [],
+        startedDate
+      );
       saveSprint(next);
 
-      const doneCount = sprint.tasks.length - carriedOver.length;
+      const doneCount = sprint.tasks.length - next.tasks.length;
       return {
         content: [
           {
             type: "text",
-            text: `Sprint ${sprint.sprint} archived to ${historyPath}.\n${doneCount} tasks done, ${carriedOver.length} carried to Sprint ${next.sprint}.`,
+            text: `Sprint ${sprint.sprint} archived to ${historyPath}.\n${doneCount} tasks done, ${next.tasks.length} carried to Sprint ${next.sprint}.`,
           },
         ],
       };
