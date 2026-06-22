@@ -1,0 +1,489 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ICN Operating Model | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ICN OPERATING MODEL</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/ICN_OPERATING_MODEL.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Operating Model</h1>
+<blockquote>
+<p><strong>Status: doctrine.</strong> This document is the <em>grammar map</em> of ICN. It is <strong>canonical for vocabulary,
+placement, and operating-model doctrine</strong> — it fixes what each layer means, what belongs where, who
+authorizes what, and what receipt proves it. It is <strong>not</strong> a current-state truth root and must not be
+read as one. <strong>This document explains what each layer means. It does not assert that every layer is
+implemented.</strong> For current implementation status, read <a href="/docs/STATE">`../STATE.md`</a> and
+<a href="/docs/PHASE_PROGRESS">`../PHASE_PROGRESS.md`</a> — those remain the only canonical state roots.</p>
+</blockquote>
+<h2>Purpose</h2>
+<p>ICN&#39;s architecture is real and coherent, but its explanation is spread across many architecture and spec
+documents. New work — and new agents — keep re-deriving the same questions and occasionally drift into
+stale or false claims. This document gives one durable place to answer four questions about any feature,
+type, file, route, or service:</p>
+<ol>
+<li><strong>What kind of thing is this?</strong></li>
+<li><strong>Where does it belong?</strong></li>
+<li><strong>Who authorizes it?</strong></li>
+<li><strong>What receipt proves it?</strong></li>
+</ol>
+<p>It standardizes vocabulary, fixes a placement grammar, and preserves the meaning firewall. It <strong>cross-links
+the canonical definitions rather than redefining them</strong> — where a concept already has a home doc, this
+document points there and stays the thin unifying layer above it. It is intentionally generic: it pins no
+institution-specific vocabulary inside ICN core.</p>
+<p>It is narrower in scope than the integrating narrative in
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_INTEGRATED_SYSTEM_MODEL">`ICN_INTEGRATED_SYSTEM_MODEL.md`</a> and the living repo atlas (#1689): those
+explain how the pieces fit and where they live in the tree; this document fixes the <em>words and placement
+rules</em> used to talk about them.</p>
+<h2>What ICN is (and is not)</h2>
+<p>ICN is a <strong>governed institutional substrate</strong> — a cooperative operating substrate where democratic
+institutions define authority, bind tools/services/policies to that authority, execute bounded actions,
+prove what happened with receipts, and remain able to export and exit without platform capture.</p>
+<p>ICN is <strong>not</strong> an app, a blockchain, a payment system, a SaaS tenant platform, or a federation server. It
+hard-codes the institutional <em>grammar</em>, not the institution. Institutions compose that grammar through
+packages, CCL, templates, tools, services, and surfaces.</p>
+<p>The guiding thesis: <em>make it possible for a cooperative, community, or federation to govern itself through
+infrastructure it can understand, inspect, export, repair, and leave — without becoming a tenant inside
+someone else&#39;s platform.</em></p>
+<h2>The whole-system stack</h2>
+<pre><code>Infrastructure
+  → Node
+    → Runtime
+      → Engines
+        → Domain
+          → Package
+            → Policy / CCL
+              → Binding
+                → Tool / Service / Workload
+                  → Surface
+                    → Receipt / Proof / Sync / Federation
+</code></pre>
+<p>In plain language:</p>
+<pre><code>Nodes run the substrate.
+Domains hold authority.
+Packages provide local meaning.
+Policies define adopted rules.
+CCL makes adopted rules executable.
+Bindings authorize tools, services, policies, routes, workloads, and package activations.
+Runtime engines execute bounded transitions.
+Surfaces make participation accessible.
+Receipts make truth auditable.
+Federation connects domains without swallowing them.
+</code></pre>
+<h2>The central civic loop</h2>
+<p>Every object in the repository should locate somewhere on this loop. If you cannot place a thing on it,
+that is a signal the thing is mis-scoped.</p>
+<pre><code>identity
+  → standing
+  → authority
+  → action card
+  → authorized action
+  → CCL / runtime evaluation
+  → storage / compute / governance / economic transition
+  → receipt
+  → sync / federation / replication
+  → member shell + steward cockpit
+  → challenge / repair / next action
+</code></pre>
+<h2>Standardized vocabulary</h2>
+<p>These are the words ICN uses. Each term has a canonical home; this table fixes the meaning and points to it.
+<strong>Use these words; do not coin synonyms.</strong> &quot;App&quot; is deliberately retired in favor of the precise terms below.</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Meaning</th>
+<th>Canonical home</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Substrate / Kernel</strong></td>
+<td>Meaning-blind mechanism and constraint enforcement. Identity, network, gossip, store, encoding, runtime, dispatch.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">`KERNEL_APP_SEPARATION.md`</a></td>
+</tr>
+<tr>
+<td><strong>Engine</strong></td>
+<td>Generic institutional runtime logic inside ICN — governance, ledger, federation, process, policy, identity. Translates meaning into generic effects.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_INTEGRATED_SYSTEM_MODEL">`ICN_INTEGRATED_SYSTEM_MODEL.md`</a></td>
+</tr>
+<tr>
+<td><strong>Domain</strong></td>
+<td>The governed jurisdiction that holds authority. Not a DNS name, node, repo, tool, member account, bucket, or CCL document.</td>
+<td><a href="/docs/spec/institutional-domain">`../spec/institutional-domain.md`</a></td>
+</tr>
+<tr>
+<td><strong>Policy</strong></td>
+<td>Adopted rule state, often expressed through CCL. Inert until a domain adopts it.</td>
+<td><a href="/docs/spec/ccl-policy-registry">`../spec/ccl-policy-registry.md`</a></td>
+</tr>
+<tr>
+<td><strong>CCL</strong></td>
+<td>Deterministic, fuel-metered, versioned executable policy language. Inert until adopted; does not adopt itself; does not mutate state directly.</td>
+<td><a href="/docs/spec/ccl-policy-registry">`../spec/ccl-policy-registry.md`</a></td>
+</tr>
+<tr>
+<td><strong>Tool</strong></td>
+<td>Replaceable/forkable functionality operating on institution-owned state. Never owns institutional truth.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_TOOL_COMMONS">`COOPERATIVE_TOOL_COMMONS.md`</a></td>
+</tr>
+<tr>
+<td><strong>Service</strong></td>
+<td>Running operational dependency with identity, custody, backup, exit, and receipts. Reachable ≠ native.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/SERVICE_HOSTING_MODEL">`SERVICE_HOSTING_MODEL.md`</a></td>
+</tr>
+<tr>
+<td><strong>Surface</strong></td>
+<td>Human-facing rendering: member shell, steward cockpit, public site, organizer shell. Renders receipts/evidence; is never the source of authority.</td>
+<td><a href="/docs/spec/member-shell-v0">`../spec/member-shell-v0.md`</a>, <a href="/docs/spec/steward-cockpit-v0">`../spec/steward-cockpit-v0.md`</a></td>
+</tr>
+<tr>
+<td><strong>Package</strong></td>
+<td>Institution-specific meaning, templates, seeds, workflows (e.g. NYCN). Owns its own roadmap; bound to ICN by agreement.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/INSTITUTION_PACKAGE_BOUNDARY">`INSTITUTION_PACKAGE_BOUNDARY.md`</a></td>
+</tr>
+<tr>
+<td><strong>Binding</strong></td>
+<td>A domain-authorized relationship between a domain and a policy/tool/service/route/workload/package.</td>
+<td><a href="/docs/spec/governed-service-binding">`../spec/governed-service-binding.md`</a></td>
+</tr>
+<tr>
+<td><strong>Manifest</strong></td>
+<td>Declared shape of a tool/service/workload: capabilities, data touched, storage, privacy, receipts emitted.</td>
+<td><a href="/docs/spec/governed-service-binding">`../spec/governed-service-binding.md`</a>, <a href="/docs/rfcs/RFC-0017-tool-install-infrastructure">`RFC-0017`</a></td>
+</tr>
+<tr>
+<td><strong>Provider</strong></td>
+<td>Substrate-side counterpart that knows how to run a manifest under a binding&#39;s constraints.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/DEBIAN_APPLIANCE_MODEL">`DEBIAN_APPLIANCE_MODEL.md`</a></td>
+</tr>
+<tr>
+<td><strong>Instance</strong></td>
+<td>A live concrete object created from a definition/template.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_INTEGRATED_SYSTEM_MODEL">`ICN_INTEGRATED_SYSTEM_MODEL.md`</a></td>
+</tr>
+<tr>
+<td><strong>Receipt</strong></td>
+<td>Durable proof that a transition occurred, under the receipt-and-provenance envelope.</td>
+<td><a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">`../adr/ADR-0026-receipt-and-provenance-proof-envelope.md`</a></td>
+</tr>
+<tr>
+<td><strong>Bridge</strong></td>
+<td>Connection to external / non-ICN systems. Translates; emits import/translation receipts.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_TOOL_COMMONS">`COOPERATIVE_TOOL_COMMONS.md`</a></td>
+</tr>
+<tr>
+<td><strong>Artifact</strong></td>
+<td>Content-addressed institutional memory.</td>
+<td><a href="/docs/spec/artifact-registry-and-scoped-vault">`../spec/artifact-registry-and-scoped-vault.md`</a></td>
+</tr>
+<tr>
+<td><strong>Vault</strong></td>
+<td>Governed private custody for restricted objects; disclosure requires authority and leaves a receipt.</td>
+<td><a href="/docs/spec/artifact-registry-and-scoped-vault">`../spec/artifact-registry-and-scoped-vault.md`</a></td>
+</tr>
+<tr>
+<td><strong>Agreement</strong></td>
+<td>A cross-domain commitment / federation relation. Coordinates domains without subsuming them.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_DOMAIN_INFRASTRUCTURE">`COOPERATIVE_DOMAIN_INFRASTRUCTURE.md`</a></td>
+</tr>
+<tr>
+<td><strong>Node</strong></td>
+<td>Hardware/instance that runs the substrate. Roles are capacity, not authority.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/DEBIAN_APPLIANCE_MODEL">`DEBIAN_APPLIANCE_MODEL.md`</a></td>
+</tr>
+</tbody></table>
+<p>The one-line rule that governs them all:</p>
+<pre><code>Substrate enforces.
+Engines transition.
+Policies decide conditions.
+CCL evaluates adopted rules.
+Tools perform functions.
+Services run.
+Surfaces render.
+Packages localize.
+Bindings authorize.
+Instances live.
+Bridges translate.
+Receipts prove.
+</code></pre>
+<h2>The definition / binding / instance / receipt pattern</h2>
+<p>This four-part shape recurs across tools, services, policies, processes, packages, agreements, routes,
+compute workloads, and artifacts. When you add anything to that list, you should be able to name all four:</p>
+<pre><code>Definition = reusable declared shape.
+Binding    = this domain authorized it.
+Instance   = concrete live object.
+Receipt    = proof a transition happened.
+</code></pre>
+<p>If a thing has a definition but no binding, it is not authorized. If it runs without producing a receipt
+for an institutional state change, it is not auditable. Both are smells.</p>
+<h2>Layer model</h2>
+<p>ICN is a stack of responsibility tiers. Meaning flows <em>down</em> only as constraints; authority flows <em>up</em>
+only through governance. (Full treatment: <a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">`KERNEL_APP_SEPARATION.md`</a>,
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/INSTITUTION_PACKAGE_BOUNDARY">`INSTITUTION_PACKAGE_BOUNDARY.md`</a>.)</p>
+<pre><code>Teaching layer (icn-learn) — explains the system; does not define it.
+Institution package layer — first-party vocabulary, workflows, partner policy, fixtures.
+App / tool / service layer — engines and tools acting on institution-owned state under bindings.
+Substrate / kernel layer — identity, network, gossip, store, encoding, runtime, dispatch.
+Hardware / infrastructure — nodes, networks, operators, custodians.
+</code></pre>
+<h3>The meaning firewall (load-bearing; CI-enforced)</h3>
+<p>The most important architectural principle:</p>
+<ul>
+<li><strong>Packages and tools</strong> may understand institutional meaning.</li>
+<li><strong>Runtime engines</strong> translate meaning into generic effects.</li>
+<li><strong>The kernel/substrate</strong> enforces primitive constraints without understanding domain meaning.</li>
+<li><strong>Kernel crates must not import domain/package semantics.</strong> Package-specific nouns must not leak into ICN core.</li>
+<li><strong>ICN core owns generic institutional grammar; packages own local vocabulary.</strong></li>
+</ul>
+<p>ICN core may know: <code>Proposal</code>, <code>Vote</code>, <code>ProcessSession</code>, <code>ActionCard</code>, <code>Meeting</code>, <code>ActionItem</code>, <code>Program</code>,
+<code>Milestone</code>, <code>RoleAssignment</code>, <code>Standing</code>, <code>Mandate</code>, <code>AuthorityGrant</code>, <code>Obligation</code>, <code>Allocation</code>,
+<code>Settlement</code>, <code>Artifact</code>, <code>Vault</code>, <code>Receipt</code>, <code>Agreement</code>, <code>BoundaryOutcomeReceipt</code>.</p>
+<p>A <strong>package</strong> (e.g. NYCN) may know: summit, sponsor packet, sponsor pipeline, speaker intake, venue
+walkthrough, accessibility intake, organizer role labels, summit stage gates, package-specific
+dashboards/playbooks/templates.</p>
+<p>If you are about to put <code>AnnualSummit</code>, <code>SponsorPacket</code>, <code>VenueLocked</code>, <code>PlatinumSponsor</code>, or any
+institution-ceremony word into generic ICN runtime — <strong>stop.</strong> That belongs in the institution package.
+These names appear in this document only as examples of what <em>does not</em> belong in core. The firewall is
+enforced mechanically (<code>.github/scripts/firewall_denylist.py</code>); this doctrine is the human-readable form.</p>
+<h2>Placement table</h2>
+<p>Where a feature belongs, by what it is:</p>
+<table>
+<thead>
+<tr>
+<th>If it is…</th>
+<th>It belongs in…</th>
+<th>Authorized by</th>
+<th>Proven by</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>A generic institutional noun (proposal, milestone, meeting, receipt, agreement)</td>
+<td><strong>ICN core</strong> (governance/kernel-api engines)</td>
+<td>charter/role/standing in the domain</td>
+<td>the matching receipt class</td>
+</tr>
+<tr>
+<td>Generic runtime logic that transitions state</td>
+<td><strong>an engine</strong> (governance, ledger, federation, process, policy)</td>
+<td>a mandate derived from a decision</td>
+<td>effect dispatch evidence + receipt</td>
+</tr>
+<tr>
+<td>An adopted rule / decision condition</td>
+<td><strong>policy / CCL</strong> (a rule version adopted into a DomainPolicy)</td>
+<td>a governance adoption act; inert until adopted</td>
+<td>policy-version binding + deterministic effect-plan preview</td>
+</tr>
+<tr>
+<td>Institution-specific meaning, templates, seeds, workflows</td>
+<td><strong>an institution package</strong></td>
+<td>the package&#39;s binding to a domain</td>
+<td>activation/process receipts exported as evidence</td>
+</tr>
+<tr>
+<td>Replaceable functionality over institution-owned state</td>
+<td><strong>a tool</strong> (Tool Commons)</td>
+<td>a ToolBinding under domain authority</td>
+<td>tool-action receipts; clean export path</td>
+</tr>
+<tr>
+<td>A running operational dependency (forge, auth, status)</td>
+<td><strong>a service</strong></td>
+<td>a GovernedServiceBinding</td>
+<td>service lifecycle/backup/exit receipts</td>
+</tr>
+<tr>
+<td>A connection to an external / non-ICN system</td>
+<td><strong>a bridge</strong></td>
+<td>an explicit policy granting the external connection</td>
+<td>import/translation receipts</td>
+</tr>
+<tr>
+<td>A cross-domain commitment / federation relation</td>
+<td><strong>the federation / agreement layer</strong> (never a super-domain)</td>
+<td>a counter-signed agreement between domains</td>
+<td>boundary-outcome receipts; dispute/exit window</td>
+</tr>
+<tr>
+<td>Human-facing rendering of standing/actions/receipts</td>
+<td><strong>a surface</strong> (member shell, steward cockpit)</td>
+<td>nothing — surfaces never hold authority</td>
+<td>it renders receipts/evidence honestly</td>
+</tr>
+<tr>
+<td>Constraint enforcement with no semantic meaning</td>
+<td><strong>the kernel/substrate</strong></td>
+<td>pure data (ConstraintSet, capability)</td>
+<td>enforced bound; opaque receipt storage</td>
+</tr>
+</tbody></table>
+<h2>Transition grammar</h2>
+<p>The verbs an institution applies to the nouns above. A thing moves through these states; each
+institution-relevant move should be able to point at a receipt.</p>
+<pre><code>declare → review → adopt → bind → run → observe → amend → suspend → repair → export → exit → archive
+</code></pre>
+<p>Notes that are easy to get wrong:</p>
+<ul>
+<li><strong>Adopt</strong> is a governance act; an unadopted policy is inert.</li>
+<li><strong>Bind</strong> is authorization, separate from <em>run</em> (capacity). A node profiled as <code>service-host</code> gains
+capacity, not authority.</li>
+<li><strong>Repair</strong> is not deletion. Reversal/challenge appends new receipts/counter-effects; it never erases.</li>
+<li><strong>Export / exit</strong> are first-class and governed — a thing that cannot answer &quot;how does the institution
+leave cleanly?&quot; should not be installable.</li>
+</ul>
+<h2>Feature-placement checklist</h2>
+<p>Before adding a type, route, tool, service, or surface, answer all six. If any answer is unclear, the
+feature is not ready to land.</p>
+<ol>
+<li><strong>What kind of thing is this?</strong> (engine logic / core noun / package meaning / tool / service / surface / kernel constraint)</li>
+<li><strong>Where does it belong?</strong> (core vs engine vs package vs tool vs service vs surface — use the placement table)</li>
+<li><strong>Who authorizes it?</strong> (which domain, which policy, which binding, which mandate)</li>
+<li><strong>What receipt proves it?</strong> (which receipt class records the transition; if none, why is that safe?)</li>
+<li><strong>Which surface shows it?</strong> (member shell, steward cockpit, public site — or intentionally none)</li>
+<li><strong>What custody / privacy / exit policy applies?</strong> (storage class, locality, disclosure, backup, export path)</li>
+</ol>
+<h2>Known vocabulary debt</h2>
+<p>The codebase uses <code>CoopReplicated</code> / <code>Coop(coop_id)</code> for what is structurally a <em>generic local-domain</em>
+scope. A community-owned or federation-owned domain should use the same structural vocabulary without
+conflation. This is named as compatibility-aware future work in
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/INSTITUTION_PACKAGE_BOUNDARY">`INSTITUTION_PACKAGE_BOUNDARY.md`</a> §C3 and is <strong>not</strong> renamed here. The
+correct generic vocabulary is &quot;local-domain-scoped&quot; / <code>LocalDomain(domain_id)</code>; the rename is deferred.</p>
+<h2>Development direction (how to move)</h2>
+<p>Move by <strong>vertical slices</strong>, not horizontal mega-builds. A good slice cuts thinly through every layer and
+ends in a receipt plus an evidence export. A bad slice is &quot;implement all of X.&quot;</p>
+<p>The immediate vertical spine the project is making runtime-real:</p>
+<pre><code>package → domain → policy → binding → process/action → receipt → surface → evidence/export
+</code></pre>
+<p>The near-term objective is to activate <strong>one</strong> institution package into <strong>one</strong> governed domain, bind
+<strong>one–two</strong> policies/tools/services, walk <strong>one</strong> human-facing process, emit receipts, surface them in
+member/steward views, and export repo-safe evidence — without claiming production, pilot, or
+live-federation readiness. NYCN is the intended first reference package/rehearsal target; its nouns stay
+in the package, never in ICN core. The issue-side mirror of this spine is the vertical-spine control issue
+(see Related work).</p>
+<h3>Parked zero-coverage gaps (named so restraint is visible)</h3>
+<p>These layer concepts are spec-level with no dedicated runtime-implementation issue yet. They are
+intentionally <strong>not</strong> filed as a batch; each depends on the operating model and/or the <code>DomainPolicy</code>
+spine becoming real enough first:</p>
+<ul>
+<li>CCL evaluator-selection runtime (the <code>(domain, proposal_kind, policy snapshot) → exactly one evaluator</code>
+selector; fails closed on zero or multiple).</li>
+<li><code>GovernedServiceBinding</code> runtime (the abstract binding above the existing <code>ToolBinding</code> / <code>ComputeTask</code>
+/ <code>Executor</code> projections).</li>
+<li><code>BoundaryOutcomeReceipt</code> / <code>AgreementRegistry</code> federation runtime.</li>
+</ul>
+<h2>Claims this doctrine does not make</h2>
+<p>This document is doctrine for vocabulary and placement. It makes <strong>no</strong> current-state claim. In particular,
+naming a layer, primitive, or receipt class here is <strong>not</strong> evidence it is implemented. Do not read into
+this document — or write into any doc that cites it — any of: Phase 2 completion · production readiness ·
+live federation · formal NYCN pilot or activation · entity-aware authorization <em>enforced</em> · trusted positive
+auth issuance in production · OpenAPI/API completeness · member-shell or steward-cockpit organizer/pilot
+readiness (the human assistive-technology pass, #2041, is owed) · service hosting or Tool Commons as
+runtime-real · CCL policy registry as implemented · live anti-entropy emission/repair (wire-stable schema
+is not live behavior).
+Current implementation status lives only in <a href="/docs/STATE">`../STATE.md`</a> and
+<a href="/docs/PHASE_PROGRESS">`../PHASE_PROGRESS.md`</a>.</p>
+<p>Use safe, regulatory-aligned vocabulary for ICN-native participation — obligation, allocation, settlement,
+unit, position, receipt, provenance, evidence, identity, standing, action card, domain, policy, binding,
+custody, exit. Never wallet, token, balance, payment, currency, or blockchain framing.</p>
+<h2>Related work</h2>
+<ul>
+<li>Integrating narrative: <a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_INTEGRATED_SYSTEM_MODEL">`ICN_INTEGRATED_SYSTEM_MODEL.md`</a></li>
+<li>Boundaries: <a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">`KERNEL_APP_SEPARATION.md`</a> · <a href="https://github.com/InterCooperative-Network/icn/blob/main/INSTITUTION_PACKAGE_BOUNDARY">`INSTITUTION_PACKAGE_BOUNDARY.md`</a></li>
+<li>Domain infrastructure: <a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_DOMAIN_INFRASTRUCTURE">`COOPERATIVE_DOMAIN_INFRASTRUCTURE.md`</a></li>
+<li>Tools &amp; services: <a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_TOOL_COMMONS">`COOPERATIVE_TOOL_COMMONS.md`</a> · <a href="https://github.com/InterCooperative-Network/icn/blob/main/SERVICE_HOSTING_MODEL">`SERVICE_HOSTING_MODEL.md`</a></li>
+<li>Nodes/appliance: <a href="https://github.com/InterCooperative-Network/icn/blob/main/DEBIAN_APPLIANCE_MODEL">`DEBIAN_APPLIANCE_MODEL.md`</a></li>
+<li>Spine specs: <a href="/docs/spec/institutional-domain">`../spec/institutional-domain.md`</a> · <a href="/docs/spec/effect-dispatch-contract">`../spec/effect-dispatch-contract.md`</a> · <a href="/docs/spec/ccl-policy-registry">`../spec/ccl-policy-registry.md`</a> · <a href="/docs/spec/governed-service-binding">`../spec/governed-service-binding.md`</a> · <a href="/docs/spec/artifact-registry-and-scoped-vault">`../spec/artifact-registry-and-scoped-vault.md`</a> · <a href="/docs/spec/storage-durability-policies">`../spec/storage-durability-policies.md`</a> · <a href="/docs/state/storage-governance-spec">`../state/storage-governance-spec.md`</a> · <a href="/docs/spec/compute-placement-policy">`../spec/compute-placement-policy.md`</a> · <a href="/docs/spec/network-anti-entropy-proof-loops">`../spec/network-anti-entropy-proof-loops.md`</a> · <a href="/docs/spec/member-shell-v0">`../spec/member-shell-v0.md`</a> · <a href="/docs/spec/steward-cockpit-v0">`../spec/steward-cockpit-v0.md`</a></li>
+<li>Foundational ADRs: <a href="/docs/adr/ADR-0014-constitutional-object-model">`../adr/ADR-0014-constitutional-object-model.md`</a> · <a href="/docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam">`../adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md`</a> · <a href="/docs/adr/ADR-0025-institutional-effect-record-canonical-schema">`../adr/ADR-0025-institutional-effect-record-canonical-schema.md`</a> · <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">`../adr/ADR-0026-receipt-and-provenance-proof-envelope.md`</a> · <a href="/docs/adr/ADR-0027-action-card-contract">`../adr/ADR-0027-action-card-contract.md`</a></li>
+<li>Current state (canonical): <a href="/docs/STATE">`../STATE.md`</a> · <a href="/docs/PHASE_PROGRESS">`../PHASE_PROGRESS.md`</a></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
