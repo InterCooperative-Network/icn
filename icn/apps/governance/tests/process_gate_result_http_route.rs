@@ -328,3 +328,57 @@ async fn record_process_gate_result_route_rejects_unknown_result() {
     let _ = to_bytes(resp.into_body()).await.unwrap();
     assert_eq!(h.receipts.total_count(), 0);
 }
+
+#[actix_web::test]
+async fn record_process_gate_result_route_rejects_whitespace_session_id() {
+    // The handler's `session_id.trim().is_empty()` guard must reject a
+    // whitespace-only session id (`%20`, which actix percent-decodes to a
+    // single space) with 400 and persist nothing.
+    let h = make_harness();
+    let caller = fresh_did();
+    let domain = seed_domain_with_member(&h.ctx.manager, &caller, "test-coop").await;
+
+    let app = gate_app!(h.ctx.clone(), &caller);
+    let req = test::TestRequest::post()
+        .uri(&gate_results_uri(&domain.0, "%20"))
+        .set_json(serde_json::json!({
+            "gate_kind": "privacy_review",
+            "result": "pass",
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::BAD_REQUEST,
+        "a whitespace-only session_id must be rejected with 400"
+    );
+    let _ = to_bytes(resp.into_body()).await.unwrap();
+    assert_eq!(h.receipts.total_count(), 0);
+}
+
+#[actix_web::test]
+async fn record_process_gate_result_route_rejects_unknown_gate_kind() {
+    // Symmetric to the unknown-`result` case: an out-of-taxonomy
+    // `gate_kind` must be rejected by JSON deserialization (400), never
+    // coerced -- the gate-kind taxonomy is closed.
+    let h = make_harness();
+    let caller = fresh_did();
+    let domain = seed_domain_with_member(&h.ctx.manager, &caller, "test-coop").await;
+
+    let app = gate_app!(h.ctx.clone(), &caller);
+    let req = test::TestRequest::post()
+        .uri(&gate_results_uri(&domain.0, "session-http-400-gate"))
+        .set_json(serde_json::json!({
+            "gate_kind": "not_a_real_gate",
+            "result": "pass",
+        }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::BAD_REQUEST,
+        "an out-of-taxonomy gate_kind must be a 400, not silently accepted"
+    );
+    let _ = to_bytes(resp.into_body()).await.unwrap();
+    assert_eq!(h.receipts.total_count(), 0);
+}
