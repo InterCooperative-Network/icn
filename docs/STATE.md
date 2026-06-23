@@ -1,10 +1,23 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-06-21
+Last Reviewed: 2026-06-23
 ---
 
 # ICN State (living doc)
+
+<!-- [sync edit] 2026-06-23 (post-merge truth-sync for two runtime slices — main HEAD `6acb666a`: #2158 ProcessGateResultReceipt HTTP route + #2159 storage access validation — NARROW scope, branch `docs/sync-storage-process-slices`):
+     Records two runtime slices merged to `origin/main` since the post-#2129 block below. This is a **narrow** sync covering only #2158 and #2159; it deliberately does NOT reconcile the intervening #2134–#2157 truth-layer/ops window (invariants catalog, document-registry refresh, ops-MCP fixes, the `ICN_OPERATING_MODEL.md` doctrine #2139), which remains for a separate sync.
+
+     WHAT LANDED (squash tips on `origin/main`, oldest→newest):
+       - #2158 (`839a93b4`) feat(process): **mount `ProcessGateResultReceipt` over HTTP** — adds ONE governance route `POST /gov/domains/{domain_id}/process-sessions/{session_id}/gate-results` that records a typed process-gate result through the pre-existing `GovernanceManager::record_process_gate_result` and returns the persisted receipt (deterministic blake3 `record_hash`). The receipt class, manager method, and receipt-store record kind already existed (#1755/#1759); this PR adds only the HTTP surface, reusing the existing `governance:write` scope + domain-membership gate. **No new receipt type, no process runtime, no auth-decision change.** The PR body used `Refs #2144`; **#2144 is independently verified `CLOSED` (`COMPLETED`) in the issue tracker** (closed at the #2158 merge, 2026-06-22).
+       - #2159 (`6acb666a` = current tip) feat(kernel-api): **wire storage access validation** — adds `StorageSpec { class, locality }` and `validate_storage_access(task, data, canonical_output) -> Result<(), StorageValidationError>` to `icn-kernel-api` (re-exported from the crate root), making the previously-decorative `StorageValidationError` taxonomy callable. `ComputeTask::validate()` now enforces the canonical-output rule via the helper — a Canonical-determinism task that declares a non-Canonical `storage_class` is rejected, reached live through `ComputeActor::handle_submit` — replacing a prior SHOULD-only no-op. Fires only when `storage_class` is explicitly declared (the `None`-default behavior is preserved). All three `StorageValidationError` variants are reachable through the helper in kernel unit tests. **Closes #2143** (the issue #1131 enforcement gap; `docs/state/storage-governance-spec.md` status updated in the same PR). This is a **storage-governance enforcement slice, NOT a storage backend redesign.**
+
+     MEANING FIREWALL (verified): `canonical_output` is caller-supplied; no domain types or thresholds enter `icn-kernel-api`. The required `Kernel Forbidden Dependencies` + `Meaning Firewall Check` gates passed on #2159.
+
+     ISSUE EFFECTS (verified against the issue tracker, not inferred from PR keywords): **#2143 CLOSED `COMPLETED`** (by #2159's `Closes #2143`). **#2144 CLOSED `COMPLETED`** (verified; the underlying runtime is the #1755/#1759 receipt emission/persistence plus the #2158 HTTP surface).
+
+     This sync explicitly does NOT claim: production / pilot / organizer / federation readiness; a complete storage system or storage backend redesign; encrypted/distributed storage; a workflow engine or complete Institutional Process Substrate; CCL runtime; InstitutionalDomain/DomainPolicy; any auth-model change or entity-aware auth cutover. Phase 2 status remains ⏳ (partner-bound); phase model unchanged; the #1703 human gate is unchanged. The non-required `Security Audit` (cargo-audit dependency backlog) and `Compare Against Base` (benchmark variance) checks were red on #2159 and did NOT block merge — neither is in the branch-protection required set, and #2159 changed no dependency manifest/lock. -->
 
 <!-- [sync edit] 2026-06-21 (post-#2129 truth-layer/control-plane window — main HEAD `b63dc13c`: agent context spine + live-state overlay + generated-truth drift gate + convergent file-record check — docs/control-plane + generated-orientation + CI tooling only, branch `docs/state-truth-refresh-2128-2133`):
      Records the five PRs merged on `origin/main` after the #2129 sync tip (`git log d444f945..b63dc13c`, exclusive): #2128, #2130, #2131, #2132, #2133. **No runtime Rust in this window** — every change is a generated orientation artifact, its on-demand generator, a CI drift gate, or a docs note. No schema, no contract URN, no ADR, no RFC, no ADR-0026 receipt class, no kernel/gateway API change, no auth-decision change, no K3s/DNS/Forgejo/GitHub-settings mutation, no NYCN partner data; no production-readiness / live-federation / formal-NYCN-pilot / Phase-2-completion claim.
