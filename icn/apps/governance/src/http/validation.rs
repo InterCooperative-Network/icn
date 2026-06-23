@@ -21,6 +21,10 @@ pub const MAX_CHARTER_ID_LEN: usize = 128;
 ///
 /// If the gateway-wide JSON limit ever moves, this constant must move with it.
 pub const MAX_CHARTER_YAML_BYTES: usize = 262_144;
+/// Upper bound on a domain-policy adoption candidate's content. The adoption
+/// route content-addresses (blake3-hashes) the whole body, so an unbounded
+/// payload is a DoS vector; this caps it like the charter YAML payload above.
+pub const MAX_DOMAIN_POLICY_CONTENT_BYTES: usize = 262_144;
 pub const MAX_DOMAIN_NAME_LEN: usize = 256;
 pub const MAX_GOVERNANCE_MODEL_LEN: usize = 64;
 pub const MAX_PROPOSAL_TITLE_LEN: usize = 256;
@@ -97,6 +101,23 @@ pub fn validate_charter_yaml(yaml: &str) -> Result<(), ApiError> {
     if yaml.len() > MAX_CHARTER_YAML_BYTES {
         return Err(ApiError::BadRequest(format!(
             "Charter YAML exceeds maximum size of {MAX_CHARTER_YAML_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
+/// Bound a domain-policy adoption candidate's content. Empty/whitespace input
+/// is rejected with a clear message; oversize input is rejected as a DoS guard
+/// before the handler content-addresses (blake3-hashes) it.
+pub fn validate_domain_policy_content(content: &str) -> Result<(), ApiError> {
+    if content.is_empty() || content.trim().is_empty() {
+        return Err(ApiError::BadRequest(
+            "policy_content cannot be empty or whitespace-only".into(),
+        ));
+    }
+    if content.len() > MAX_DOMAIN_POLICY_CONTENT_BYTES {
+        return Err(ApiError::BadRequest(format!(
+            "policy_content exceeds maximum size of {MAX_DOMAIN_POLICY_CONTENT_BYTES} bytes"
         )));
     }
     Ok(())

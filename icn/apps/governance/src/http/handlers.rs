@@ -9,7 +9,7 @@ use icn_federation::SettlementInterval;
 use icn_governance::{
     ActionItemFilter, ActionItemId, ActionItemPriority, ActionItemStatus, ActivityId, ActivityKind,
     ActivityStatus, AttendanceStatus, DataSharingLevel, Delegation, DelegationId, DelegationScope,
-    DisputeResolutionMethod, FederationProposal, FederationTerms, GovernanceDomain,
+    DisputeResolutionMethod, DomainPolicy, FederationProposal, FederationTerms, GovernanceDomain,
     GovernanceDomainId, GovernanceParams, MeetingId, MeetingRole, MeetingStatus, MembershipAction,
     MembershipConfig, MilestoneId, MilestoneStatus, ProgramId, ProgramKind, ProposalId,
     ProposalPayload, ProposalScope, StructureId, StructureKind, StructureStatus, VoteChoice,
@@ -24,6 +24,9 @@ use icn_identity::Did;
 use super::configure::{DispatchEvidenceSpec, GovernanceContext, GovernanceEffect};
 use super::models::*;
 use super::validation as val;
+use crate::domain_policy_adoption::{
+    AdoptDomainPolicyError, DomainPolicyAdoptionError, InstitutionalDomainStoreError,
+};
 use crate::events::GovernanceEventEmitter;
 
 // ============================================================================
@@ -3135,6 +3138,105 @@ pub async fn record_process_gate_result<E: GovernanceEventEmitter + Clone + 'sta
         .map_err(anyhow_to_api)?;
 
     Ok(HttpResponse::Ok().json(receipt))
+}
+
+/// Map the persisted domain-policy adoption seam error onto the governance
+/// HTTP error taxonomy. Fail-closed: only a clearly-authorization or
+/// clearly-client problem maps to 403/404; everything else (missing store,
+/// backend read/write failure, unreachable `AlreadyDeclared`) surfaces as 500.
+fn institutional_domain_store_err_to_api(e: InstitutionalDomainStoreError) -> ApiError {
+    use AdoptDomainPolicyError as Gate;
+    use DomainPolicyAdoptionError as Adopt;
+    use InstitutionalDomainStoreError as Store;
+    let msg = e.to_string();
+    match e {
+        // No `InstitutionalDomain` declared for this domain id.
+        Store::NotDeclared => err_not_found(msg),
+        // Authority refusal — the gate denied the actor/domain/act/lifecycle,
+        // or the pure-core structural commit rejected the adoption.
+        Store::Adopt(Adopt::Gated(Gate::Unauthorized(_) | Gate::Core(_))) => err_forbidden(msg),
+        // Misconfiguration or backend failure. `AlreadyDeclared` is unreachable
+        // on the adopt path; fail closed to 500 if it ever surfaces.
+        Store::MissingDomainStore
+        | Store::AlreadyDeclared
+        | Store::Store(_)
+        | Store::Adopt(Adopt::MissingReceiptBackend)
+        | Store::Adopt(Adopt::Gated(Gate::Backend(_))) => err_internal(msg),
+    }
+}
+
+/// POST /gov/domains/{domain_id}/domain-policy/adopt
+/// — Adopt a `DomainPolicy` as the persisted `InstitutionalDomain`'s current
+/// policy, gated by the app-side `DefaultMandateGate` (issue #2142).
+///
+/// Drives the existing persisted adoption seam end-to-end over HTTP:
+///
+/// ```text
+/// POST → governance:write scope + domain-membership gate
+///      → GovernanceManager::adopt_domain_policy_persisted
+///        → load InstitutionalDomain
+///        → DefaultMandateGate authority resolution (actor → active grants →
+///          domain-scoped Execution `domain_policy:adopt` grant + live mandate)
+///        → pure-core InstitutionalDomain::adopt_policy() (defense-in-depth)
+///        → save InstitutionalDomain
+///      → adopted DomainPolicyRef
+/// ```
+///
+/// The adopting actor is the authenticated caller (`sub`), never a body field.
+/// The candidate policy is content-addressed server-side from `policy_content`
+/// and bound to the path `domain_id`, so the policy↔domain identity is correct
+/// by construction (the pure-core `PolicyForOtherDomain` rejection is therefore
+/// unreachable from this route). The manager seam serializes concurrent
+/// same-domain adoptions through a per-domain critical section.
+///
+/// This adds **no** declare/create route — declaring a governed domain is not
+/// mandate-gated yet, so exposing it would be an authority bypass — and no CCL
+/// runtime, policy registry, service-binding runtime, or auth-model change.
+///
+/// Returns:
+/// - 200 with the adopted policy ref projection (`{policy_id, domain_id}`).
+/// - 400 when `policy_content` is empty/whitespace or exceeds
+///   `MAX_DOMAIN_POLICY_CONTENT_BYTES`, or the body/DID is malformed.
+/// - 401 when the bearer token is missing/invalid.
+/// - 403 when the token lacks `governance:write`, the caller is not a domain
+///   member, or the `DefaultMandateGate` refuses adoption authority.
+/// - 404 when no `InstitutionalDomain` is declared for `domain_id` (or the
+///   `GovernanceDomain` membership target does not exist).
+/// - 500 when no domain/receipt store is wired, or a backend read/write fails.
+pub async fn adopt_domain_policy<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    path: web::Path<String>,
+    req: web::Json<AdoptDomainPolicyRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let actor = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    // Reject empty/whitespace and oversize bodies before content-addressing
+    // (blake3-hashing) the candidate — an unbounded body is a DoS vector.
+    val::validate_domain_policy_content(&req.policy_content)?;
+    let domain = GovernanceDomainId(path.into_inner());
+
+    // Reuse the existing coarse domain-membership gate (the same gate the rest
+    // of the domain-scoped write surface uses). The authoritative adopt check
+    // is the DefaultMandateGate inside the manager seam below; membership is
+    // strictly additive and fail-closed, not a substitute for it.
+    check_domain_membership(&ctx, &domain, &actor).await?;
+
+    // Content-address the candidate policy server-side and bind it to the path
+    // domain, so the adopted ref can neither mismatch its id nor target a
+    // foreign domain.
+    let policy = DomainPolicy::new(domain.clone(), req.policy_content.as_bytes());
+
+    let policy_ref = ctx
+        .manager
+        .adopt_domain_policy_persisted(&domain, &policy, &actor, current_time_secs())
+        .map_err(institutional_domain_store_err_to_api)?;
+
+    Ok(HttpResponse::Ok().json(AdoptDomainPolicyResponse {
+        policy_id: policy_ref.id.to_hex(),
+        domain_id: policy_ref.domain_id.0,
+    }))
 }
 
 // ============================================================================

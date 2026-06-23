@@ -69,6 +69,41 @@ pub struct RecordProcessGateResultRequest {
 }
 
 // ============================================================================
+// Institutional domain policy adoption (#2142 — gated DomainPolicy adoption)
+// ============================================================================
+
+/// Request body for `POST /gov/domains/{domain_id}/domain-policy/adopt`.
+///
+/// Carries only the policy *content* to adopt. The server content-addresses it
+/// (blake3) into a `DomainPolicyId` and binds it to the path `domain_id`, so the
+/// adopted `DomainPolicyRef` is correct by construction: a client cannot assert
+/// a mismatched id or author the policy for a foreign domain. The adopting
+/// actor is the authenticated caller (token `sub`) — never a body field — and
+/// the authority to adopt is resolved server-side through the
+/// `DefaultMandateGate`, not asserted here.
+///
+/// The MVP `DomainPolicy` stores no CCL text (#1817); `policy_content` is the
+/// opaque bytes the content-addressed id commits to. Only the adopted
+/// `DomainPolicyRef` is persisted in the `InstitutionalDomain`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdoptDomainPolicyRequest {
+    /// Opaque policy content the adopted `DomainPolicyId` is the blake3 hash of.
+    pub policy_content: String,
+}
+
+/// Response body for a successful domain-policy adoption.
+///
+/// The legible projection of the adopted [`icn_governance::DomainPolicyRef`]:
+/// the content-addressed policy id (hex) and the domain it was adopted for.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AdoptDomainPolicyResponse {
+    /// Hex-encoded content-addressed id of the adopted policy version.
+    pub policy_id: String,
+    /// The governance domain the policy was adopted for.
+    pub domain_id: String,
+}
+
+// ============================================================================
 // Charter activation
 // ============================================================================
 
