@@ -281,17 +281,19 @@ impl crate::manager::GovernanceManager {
     ///
     /// # Concurrency
     ///
-    /// The `load → mutate → save` sequence is **not atomic** and has no
-    /// per-domain serialization. With the current callers (in-process tests;
-    /// **no HTTP route or concurrent caller exists yet** — that is the deferred
-    /// next lane, see `docs/spec/institutional-domain.md`) there is no
-    /// concurrent access, so no update can be lost. **Before** this seam is
-    /// exposed to concurrent callers (an HTTP adoption route), the route lane
-    /// must add per-domain serialization (an in-process lock keyed by
-    /// `GovernanceDomainId`) and/or an atomic store primitive
-    /// (e.g. a transactional `get`+`put`), or two concurrent adoptions could
-    /// last-writer-win and drop an intervening `current_policy` update. This is
-    /// recorded as a prerequisite for the route lane, not fixed here.
+    /// The `load → mutate → save` sequence is serialized **per domain** by an
+    /// in-process lock keyed by `GovernanceDomainId`
+    /// ([`crate::manager::GovernanceManager::domain_adoption_lock`]), so two
+    /// concurrent adoptions for the same domain cannot interleave their
+    /// load→save and last-writer-win, dropping an intervening `current_policy`
+    /// update. Adoptions for *different* domains take distinct locks and run
+    /// concurrently. The guarded section is fully synchronous, so the lock is
+    /// never held across an `.await`.
+    ///
+    /// This is the in-process (single-node) guarantee the #2142 HTTP adoption
+    /// route relies on. It is **not** a cross-process / multi-writer guarantee:
+    /// a transactional store primitive (atomic compare-and-swap `get`+`put`)
+    /// for multi-writer deployments remains later work.
     pub fn adopt_domain_policy_persisted(
         &self,
         domain_id: &GovernanceDomainId,
@@ -302,6 +304,17 @@ impl crate::manager::GovernanceManager {
         let store = self
             .domain_state_store()
             .ok_or(InstitutionalDomainStoreError::MissingDomainStore)?;
+
+        // Serialize the load→adopt→save critical section per domain so two
+        // concurrent adoptions for the *same* domain cannot interleave and
+        // last-writer-win, dropping an intervening `current_policy` update.
+        // Different domains take distinct locks and proceed concurrently. The
+        // whole section below is synchronous (no `.await`), so holding this
+        // guard across it never blocks an async executor on a held lock.
+        let domain_lock = self.domain_adoption_lock(domain_id);
+        let _adopt_guard = domain_lock
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
 
         let mut domain = store
             .get_institutional_domain(domain_id)
@@ -963,5 +976,65 @@ mod tests {
                 AdoptDomainPolicyError::Core(InstitutionalDomainError::PolicyForOtherDomain)
             ))
         ));
+    }
+
+    #[test]
+    fn adopt_persisted_serializes_concurrent_same_domain_adoptions() {
+        // Eight threads race the same per-domain `load → adopt → save` critical
+        // section. The per-domain lock must serialize them: every contending
+        // adoption succeeds with the same ref, and the final persisted state is
+        // exactly that policy — no panic, no torn read/modify/write, no lost
+        // update. This exercises the lock path under real contention.
+        use std::thread;
+
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = Arc::new(manager_with_stores(backend));
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
+        let expected = policy.policy_ref();
+
+        let handles: Vec<_> = (0..8)
+            .map(|_| {
+                let mgr = Arc::clone(&mgr);
+                let policy = policy.clone();
+                let actor = actor.clone();
+                thread::spawn(move || {
+                    mgr.adopt_domain_policy_persisted(
+                        &domain_id("coop-alpha"),
+                        &policy,
+                        &actor,
+                        100,
+                    )
+                })
+            })
+            .collect();
+
+        let results: Vec<_> = handles
+            .into_iter()
+            .map(|h| h.join().expect("adoption thread did not panic"))
+            .collect();
+
+        assert_eq!(results.len(), 8);
+        for r in &results {
+            assert_eq!(
+                r.as_ref().expect("each concurrent adoption succeeds"),
+                &expected
+            );
+        }
+
+        // Final persisted state is exactly the adopted policy (no lost update).
+        let store = mgr.domain_state_store().unwrap();
+        let reloaded = store
+            .get_institutional_domain(&domain_id("coop-alpha"))
+            .unwrap()
+            .expect("persisted");
+        assert_eq!(reloaded.current_policy(), Some(&expected));
     }
 }

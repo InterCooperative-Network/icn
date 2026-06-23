@@ -686,6 +686,11 @@ where
             web::resource("/domains/{domain_id}/process-sessions/{session_id}/gate-results")
                 .route(web::post().to(handlers::record_process_gate_result::<E>)),
         )
+        // ── Institutional domain policy adoption (#2142 — gated adoption) ──
+        .service(
+            web::resource("/domains/{domain_id}/domain-policy/adopt")
+                .route(web::post().to(handlers::adopt_domain_policy::<E>)),
+        )
         // ── Structure endpoints ──────────────────────────────────────────
         .service(
             web::resource("/entities/{entity_id}/structures")

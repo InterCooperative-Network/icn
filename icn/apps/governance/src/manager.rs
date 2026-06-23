@@ -33,7 +33,7 @@ use icn_identity::Did;
 use icn_kernel_api::{AllocationReceipt, ScopeLevel, SettlementIntent};
 use icn_store::SledStore;
 use std::collections::{HashMap, HashSet};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 use tracing::debug;
 
 // ============================================================================
@@ -2756,6 +2756,20 @@ pub struct GovernanceManager {
     /// `None` in tests and standalone mode. Set by sled-backed constructors so
     /// production deployments record every status change.
     program_event_log: Option<Arc<dyn ProgramEventLogBackend>>,
+    /// Per-`GovernanceDomainId` serialization for the persisted
+    /// `InstitutionalDomain` `load → adopt → save` critical section
+    /// (`adopt_domain_policy_persisted`, #2142 route lane).
+    ///
+    /// That seam is a read-modify-write on a single domain record. Two
+    /// concurrent adoptions for the *same* domain (the #2142 HTTP adoption
+    /// route admits concurrent callers) could otherwise interleave their
+    /// load→save and last-writer-win, dropping an intervening `current_policy`
+    /// update. This map hands out one `Arc<Mutex<()>>` per domain id so same-
+    /// domain adoptions serialize while different domains stay concurrent. The
+    /// outer mutex is held only to look up / create the per-domain lock, never
+    /// across the critical section. In-process only (single-node); a
+    /// multi-writer / transactional store remains later work.
+    domain_adoption_locks: Mutex<HashMap<GovernanceDomainId, Arc<Mutex<()>>>>,
 }
 
 impl GovernanceManager {
@@ -2782,6 +2796,7 @@ impl GovernanceManager {
             receipt_store: None,
             milestone_event_log: None,
             program_event_log: None,
+            domain_adoption_locks: Mutex::new(HashMap::new()),
         }
     }
 
@@ -2821,6 +2836,7 @@ impl GovernanceManager {
             receipt_store: None,
             milestone_event_log: None,
             program_event_log: None,
+            domain_adoption_locks: Mutex::new(HashMap::new()),
         }
     }
 
@@ -2871,6 +2887,26 @@ impl GovernanceManager {
     /// callers must fail closed in that case.
     pub(crate) fn domain_state_store(&self) -> Option<Arc<dyn GovernanceStateStore>> {
         self.domain_store.clone()
+    }
+
+    /// Acquire (creating on first use) the per-domain serialization lock for
+    /// `domain_id`'s `InstitutionalDomain` `load → adopt → save` critical
+    /// section. See [`Self::domain_adoption_locks`].
+    ///
+    /// The returned `Arc<Mutex<()>>` is the serialization point: same-domain
+    /// adoptions contend on it, different domains get distinct locks. The outer
+    /// map mutex is held only for the lookup/insert here, never across the
+    /// critical section. Recovers from a poisoned lock rather than panicking —
+    /// a poisoned `()` guard carries no state to corrupt.
+    pub(crate) fn domain_adoption_lock(&self, domain_id: &GovernanceDomainId) -> Arc<Mutex<()>> {
+        let mut locks = self
+            .domain_adoption_locks
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        locks
+            .entry(domain_id.clone())
+            .or_insert_with(|| Arc::new(Mutex::new(())))
+            .clone()
     }
 
     /// Replace the structure store backend.
@@ -2961,6 +2997,7 @@ impl GovernanceManager {
             domain_store: None,
             milestone_event_log: Some(Arc::new(SledMilestoneEventLog::new(db.clone()))),
             program_event_log: Some(Arc::new(SledProgramEventLog::new(db))),
+            domain_adoption_locks: Mutex::new(HashMap::new()),
         }
     }
 
@@ -3020,6 +3057,7 @@ impl GovernanceManager {
             receipt_store: None,
             milestone_event_log: Some(Arc::new(SledMilestoneEventLog::new(db.clone()))),
             program_event_log: Some(Arc::new(SledProgramEventLog::new(db))),
+            domain_adoption_locks: Mutex::new(HashMap::new()),
         }
     }
 
