@@ -270,12 +270,12 @@ The #2142 lane has landed the adoption path up to the governance **application b
 - **Open Q4 (`DomainPolicy`: stored object vs derived view):** whether the adopted policy is a stored record or a view over adoption receipts. A store commits to "stored object."
 - **Open Q1 (identifier):** the MVP keys on `GovernanceDomainId` (a string); a persistence layer is where a distinct DID-style `InstitutionalDomainId` would (or would not) be introduced.
 
-**Required sequence to unblock the HTTP route** (each a separate, reviewable lane; none started):
+**Required sequence to unblock the HTTP route** (each a separate, reviewable lane):
 
-1. **Decide the persistence model** (ADR-0083 addendum or a focused ADR): resolve open Q1/Q2/Q4 enough to justify an `InstitutionalDomain` persistence shape — durable (sled-backed, like `GovernanceStateStore`) vs in-memory; standalone store vs folded into the existing domain store; identifier choice.
-2. **Add the `InstitutionalDomain` persistence seam** per that decision (store trait + impl + `GovernanceManager` wiring + a persisted load→adopt→save method).
-3. **Add a declare/create path** so a domain exists to adopt into (a governance act in its own right).
-4. **Then** add the thin governance HTTP route, which calls `GovernanceManager::adopt_domain_policy` (it must not bypass the seam) over the persisted domain.
+1. **Decide the persistence model** — **RESOLVED BY DESIGN** (not yet in code) in the **ADR-0083 Addendum (2026-06-23): InstitutionalDomain persistence model**. Decisions: persist `InstitutionalDomain` keyed by the existing `GovernanceDomainId` (Q1 — no parallel id); store it as a **separate sibling record**, no `GovernanceDomain` consolidation (Q2); persist only the adopted `current_policy: DomainPolicyRef` pointer, deferring the `DomainPolicy` body to #1817 (Q4); and **extend the existing `GovernanceStateStore`** with default-implemented `get_institutional_domain` / `save_institutional_domain` rather than adding a new store.
+2. **Add the `InstitutionalDomain` persistence seam** per that decision (extend `GovernanceStateStore` + `GovernanceManager` persisted load→adopt→save method). *Not started.*
+3. **Add a declare/create path** so a domain exists to adopt into (a governance act in its own right; declare-authority gating is a flagged sub-question in the addendum). *Not started.*
+4. **Then** add the thin governance HTTP route, which calls `GovernanceManager::adopt_domain_policy` (it must not bypass the seam) over the persisted domain. *Not started.*
 
 Until step 1 is decided, the adoption capability is **complete and tested up to the manager seam** and reachable in-process; no network surface is claimed. #2142 remains open.
 
