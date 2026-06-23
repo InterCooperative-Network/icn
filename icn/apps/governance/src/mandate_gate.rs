@@ -1244,6 +1244,8 @@ mod tests {
         // map to a unique snake_case token. Adding a MandateAct variant
         // without updating as_wire_token() is the failure mode this
         // guards.
+        // Every MandateAct variant must be listed here — this is the manual
+        // enumeration that guards `as_wire_token()` coverage.
         let acts = [
             MandateAct::ActivateCharter,
             MandateAct::AddDomainMember,
@@ -1254,6 +1256,8 @@ mod tests {
             MandateAct::RemoveSteward,
             MandateAct::JoinFederation,
             MandateAct::LeaveFederation,
+            MandateAct::AdoptDomainPolicy,
+            MandateAct::DeclareInstitutionalDomain,
         ];
         let mut seen = std::collections::HashSet::new();
         for act in acts {

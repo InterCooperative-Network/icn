@@ -37,7 +37,8 @@ use icn_governance::{
 use icn_identity::Did;
 
 use crate::mandate_gate::{
-    DefaultMandateGate, MandateAct, MandateGate, MandateGateError, MandateRequest, MandateTarget,
+    DefaultMandateGate, MandateAct, MandateGate, MandateGateError, MandateRejection,
+    MandateRequest, MandateTarget,
 };
 use crate::receipt_backend::GovernanceReceiptBackend;
 
@@ -211,10 +212,16 @@ pub enum DeclareInstitutionalDomainError {
     /// cannot be resolved. Fail closed — a manager that cannot resolve authority
     /// must never declare a governed domain.
     MissingReceiptBackend,
-    /// The app-side [`MandateGate`] refused authority: no authorizing grant, or
-    /// a wrong actor / domain / act / class, or an expired or revoked grant or
-    /// mandate.
-    Unauthorized(MandateGateError),
+    /// The app-side [`MandateGate`] **refused** authority: no authorizing grant,
+    /// or a wrong actor / domain / act / class, or an expired or revoked grant
+    /// or mandate. An authorization denial (→ 403), kept distinct from a backend
+    /// fault so a surface never renders an infra error as "unauthorized".
+    Unauthorized(MandateRejection),
+    /// A backend read failed while the gate resolved authority; the gate fails
+    /// closed. An **infrastructure** failure (→ 5xx), not an authorization
+    /// denial — separated from [`Self::Unauthorized`] at the type level so the
+    /// gate's `Rejected`/`Backend` split survives into this seam's error.
+    Backend(String),
     /// Authority resolved, but the underlying persisted declaration failed (no
     /// domain store wired, already declared, or a backend write error).
     Store(InstitutionalDomainStoreError),
@@ -229,6 +236,9 @@ impl std::fmt::Display for DeclareInstitutionalDomainError {
             ),
             Self::Unauthorized(e) => {
                 write!(f, "institutional domain declaration unauthorized: {e}")
+            }
+            Self::Backend(e) => {
+                write!(f, "institutional domain declaration backend error: {e}")
             }
             Self::Store(e) => write!(f, "{e}"),
         }
@@ -325,12 +335,14 @@ impl crate::manager::GovernanceManager {
     /// resolver logic is duplicated and no new authority primitive is added.
     ///
     /// Fails closed: [`DeclareInstitutionalDomainError::MissingReceiptBackend`]
-    /// (no backend wired), [`DeclareInstitutionalDomainError::Unauthorized`] on
-    /// any gate rejection (wrong actor / domain / act / class, expired or revoked
-    /// authority), and [`DeclareInstitutionalDomainError::Store`] when authority
-    /// resolves but the persisted declaration fails (no domain store, already
-    /// declared, or a backend write error). Authority is resolved **before** any
-    /// store write, so an unauthorized caller never mutates state.
+    /// (no backend wired), [`DeclareInstitutionalDomainError::Unauthorized`] on a
+    /// gate **rejection** (wrong actor / domain / act / class, expired or revoked
+    /// authority — a 403-class denial), [`DeclareInstitutionalDomainError::Backend`]
+    /// when the gate's own backend read fails (a 5xx-class infrastructure fault,
+    /// kept distinct from a denial), and [`DeclareInstitutionalDomainError::Store`]
+    /// when authority resolves but the persisted declaration fails (no domain
+    /// store, already declared, or a backend write error). Authority is resolved
+    /// **before** any store write, so an unauthorized caller never mutates state.
     ///
     /// [`Execution`]: icn_governance::AuthorityClass::Execution
     pub fn declare_institutional_domain_gated(
@@ -357,8 +369,15 @@ impl crate::manager::GovernanceManager {
             target: MandateTarget::Domain(domain_id.clone()),
             at: now,
         };
-        gate.require(&req)
-            .map_err(DeclareInstitutionalDomainError::Unauthorized)?;
+        // Preserve the gate's Rejected/Backend split: an authorization denial is
+        // a 403-class `Unauthorized`, a backend read failure is a 5xx-class
+        // `Backend` — never conflated.
+        gate.require(&req).map_err(|e| match e {
+            MandateGateError::Rejected(rejection) => {
+                DeclareInstitutionalDomainError::Unauthorized(rejection)
+            }
+            MandateGateError::Backend(msg) => DeclareInstitutionalDomainError::Backend(msg),
+        })?;
 
         self.declare_institutional_domain(domain_id, owning_entity_class, charter_ref)
             .map_err(DeclareInstitutionalDomainError::Store)
@@ -437,7 +456,6 @@ mod tests {
 
     use super::*;
     use crate::manager::GovernanceManager;
-    use crate::mandate_gate::MandateRejection;
     use icn_governance::{
         AuthorityClass, AuthorityGrant, AuthorityGrantId, BootstrapEntityType, DecisionProvenance,
         GovernanceDecisionReceipt, GovernanceDomainId, Grantee, GrantorEntityId, Mandate,
@@ -1226,9 +1244,7 @@ mod tests {
             .expect_err("an actor with no authorizing grant must be refused");
         assert!(matches!(
             err,
-            DeclareInstitutionalDomainError::Unauthorized(MandateGateError::Rejected(
-                MandateRejection::NoMandate
-            ))
+            DeclareInstitutionalDomainError::Unauthorized(MandateRejection::NoMandate)
         ));
         // Nothing persisted on a gate rejection.
         let store = mgr.domain_state_store().unwrap();
@@ -1254,9 +1270,7 @@ mod tests {
             .expect_err("a grant scoped to another domain must be refused");
         assert!(matches!(
             err,
-            DeclareInstitutionalDomainError::Unauthorized(MandateGateError::Rejected(
-                MandateRejection::WrongTarget
-            ))
+            DeclareInstitutionalDomainError::Unauthorized(MandateRejection::WrongTarget)
         ));
     }
 
@@ -1278,9 +1292,7 @@ mod tests {
             .expect_err("a grant that does not bind the declare act must be refused");
         assert!(matches!(
             err,
-            DeclareInstitutionalDomainError::Unauthorized(MandateGateError::Rejected(
-                MandateRejection::WrongTarget
-            ))
+            DeclareInstitutionalDomainError::Unauthorized(MandateRejection::WrongTarget)
         ));
     }
 
@@ -1303,9 +1315,7 @@ mod tests {
             .expect_err("an expired grant must be refused");
         assert!(matches!(
             err,
-            DeclareInstitutionalDomainError::Unauthorized(MandateGateError::Rejected(
-                MandateRejection::NoMandate
-            ))
+            DeclareInstitutionalDomainError::Unauthorized(MandateRejection::NoMandate)
         ));
     }
 
@@ -1328,9 +1338,7 @@ mod tests {
             .expect_err("a revoked backing mandate must be refused");
         assert!(matches!(
             err,
-            DeclareInstitutionalDomainError::Unauthorized(MandateGateError::Rejected(
-                MandateRejection::Revoked
-            ))
+            DeclareInstitutionalDomainError::Unauthorized(MandateRejection::Revoked)
         ));
     }
 
@@ -1361,6 +1369,73 @@ mod tests {
             err,
             DeclareInstitutionalDomainError::Store(InstitutionalDomainStoreError::AlreadyDeclared)
         ));
+    }
+
+    /// A receipt backend whose grant lookup always fails — drives the gate's
+    /// `MandateGateError::Backend` path (infrastructure failure, fail-closed).
+    struct FailingGrantBackend;
+
+    impl GovernanceReceiptBackend for FailingGrantBackend {
+        fn put_governance(&self, _: &GovernanceDecisionReceipt) -> Result<(), String> {
+            Ok(())
+        }
+        fn get_governance_by_proposal(
+            &self,
+            _: &str,
+        ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+            Ok(None)
+        }
+        fn put_allocation(&self, _: &AllocationReceipt) -> Result<Hash, String> {
+            Ok([0u8; 32])
+        }
+        fn get_governance_by_decision(
+            &self,
+            _: &Hash,
+        ) -> Result<Option<GovernanceDecisionReceipt>, String> {
+            Ok(None)
+        }
+        fn list_allocations_by_decision(&self, _: &Hash) -> Result<Vec<AllocationReceipt>, String> {
+            Ok(vec![])
+        }
+        fn list_active_authority_grants_by_grantee(
+            &self,
+            _: &Grantee,
+            _: Timestamp,
+        ) -> Result<Vec<AuthorityGrant>, String> {
+            Err("backend offline".into())
+        }
+    }
+
+    #[test]
+    fn gated_declare_surfaces_gate_backend_failure_as_backend_not_unauthorized() {
+        // A backend read failure during gate resolution is infrastructure, not a
+        // denial: it must surface as `Backend` (5xx-class), never `Unauthorized`
+        // (403). This pins the Rejected/Backend split through the seam.
+        let domain_store = Arc::new(SledGovernanceStateStore::new(Arc::new(
+            icn_store::SledStore::temporary().expect("temp sled"),
+        )));
+        let mgr = GovernanceManager::new()
+            .with_receipt_store(Arc::new(FailingGrantBackend) as Arc<dyn GovernanceReceiptBackend>)
+            .with_domain_store(domain_store);
+        let err = mgr
+            .declare_institutional_domain_gated(
+                domain_id("coop-alpha"),
+                BootstrapEntityType::Cooperative,
+                None,
+                &did(1),
+                100,
+            )
+            .expect_err("a gate backend read failure must not be silently authorized");
+        assert!(
+            matches!(err, DeclareInstitutionalDomainError::Backend(_)),
+            "gate backend failure must be Backend, not Unauthorized: {err:?}"
+        );
+        // Nothing persisted when authority could not be resolved.
+        let store = mgr.domain_state_store().unwrap();
+        assert!(store
+            .get_institutional_domain(&domain_id("coop-alpha"))
+            .unwrap()
+            .is_none());
     }
 
     #[test]
