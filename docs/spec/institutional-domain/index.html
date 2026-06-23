@@ -400,7 +400,7 @@ View source on GitHub →
 </tr>
 <tr>
 <td>Minimal runtime root for <code>InstitutionalDomain</code> / <code>DomainPolicy</code> (Declare + Adopt slice)</td>
-<td><code>ADR-0083</code> (#2142). Declare + Adopt-policy slice <strong>landed</strong> in <code>icn-governance</code> (<code>institutional_domain</code> module: <code>InstitutionalDomain</code>, <code>DomainPolicy</code> / <code>DomainPolicyRef</code>, fail-closed <code>adopt_policy</code>; tests cover declare, adopt, structural inertness, and missing/ambiguous/unbound/inactive authority). Full lifecycle (standing, services, routing, federation, exit) and CCL evaluation remain forward work.</td>
+<td><code>ADR-0083</code> (#2142). Declare + Adopt-policy slice <strong>landed</strong> in <code>icn-governance</code> (<code>institutional_domain</code> module: <code>InstitutionalDomain</code>, <code>DomainPolicy</code> / <code>DomainPolicyRef</code>, fail-closed <code>adopt_policy</code>; tests cover declare, adopt, structural inertness, and missing/ambiguous/unbound/inactive authority). App-side adoption is now <strong>gate-resolved</strong>: <code>apps/governance::domain_policy_adoption::adopt_domain_policy_gated</code> runs the existing <code>DefaultMandateGate::require()</code> (actor → active grants → <code>TypedScope.domain</code> + Execution class + <code>domain_policy:adopt</code> act token + mandate lifecycle) before the pure-core structural commit (#2142 follow-up). Full lifecycle (standing, services, routing, federation, exit), CCL evaluation, and a domain-policy HTTP surface remain forward work.</td>
 </tr>
 <tr>
 <td>Accepted-proposal effect dispatch contract</td>
