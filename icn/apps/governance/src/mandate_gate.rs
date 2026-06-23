@@ -112,6 +112,8 @@ pub enum MandateAct {
     LeaveFederation,
     /// Adopt (or change) a governed domain's current `DomainPolicy`.
     AdoptDomainPolicy,
+    /// Declare (create) a governed `InstitutionalDomain`.
+    DeclareInstitutionalDomain,
 }
 
 /// The subject an act operates on.
@@ -196,6 +198,7 @@ impl MandateAct {
             MandateAct::JoinFederation => "join_federation",
             MandateAct::LeaveFederation => "leave_federation",
             MandateAct::AdoptDomainPolicy => "adopt_domain_policy",
+            MandateAct::DeclareInstitutionalDomain => "declare_institutional_domain",
         }
     }
 }
@@ -348,7 +351,8 @@ fn expected_class(act: &MandateAct) -> AuthorityClass {
         | MandateAct::RemoveSteward
         | MandateAct::JoinFederation
         | MandateAct::LeaveFederation
-        | MandateAct::AdoptDomainPolicy => AuthorityClass::Execution,
+        | MandateAct::AdoptDomainPolicy
+        | MandateAct::DeclareInstitutionalDomain => AuthorityClass::Execution,
     }
 }
 
@@ -376,6 +380,10 @@ fn expected_act_tokens(act: &MandateAct) -> (Option<&'static str>, Option<&'stat
         MandateAct::JoinFederation => (Some("federation:join"), Some("Federation")),
         MandateAct::LeaveFederation => (Some("federation:leave"), Some("Federation")),
         MandateAct::AdoptDomainPolicy => (Some("domain_policy:adopt"), Some("DomainPolicy")),
+        MandateAct::DeclareInstitutionalDomain => (
+            Some("institutional_domain:declare"),
+            Some("InstitutionalDomain"),
+        ),
     }
 }
 
@@ -1236,6 +1244,8 @@ mod tests {
         // map to a unique snake_case token. Adding a MandateAct variant
         // without updating as_wire_token() is the failure mode this
         // guards.
+        // Every MandateAct variant must be listed here — this is the manual
+        // enumeration that guards `as_wire_token()` coverage.
         let acts = [
             MandateAct::ActivateCharter,
             MandateAct::AddDomainMember,
@@ -1246,6 +1256,8 @@ mod tests {
             MandateAct::RemoveSteward,
             MandateAct::JoinFederation,
             MandateAct::LeaveFederation,
+            MandateAct::AdoptDomainPolicy,
+            MandateAct::DeclareInstitutionalDomain,
         ];
         let mut seen = std::collections::HashSet::new();
         for act in acts {
