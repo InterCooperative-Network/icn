@@ -1,7 +1,8 @@
 //! Gate-wired domain-policy adoption (#2142 follow-up to #2162).
 //!
 //! [`icn_governance::InstitutionalDomain::adopt_policy`] is a pure, storage-
-//! agnostic **structural** check: it proves a presented [`Mandate`] is single,
+//! agnostic **structural** check: it proves a presented
+//! [`Mandate`](icn_governance::Mandate) is single,
 //! live, and grant-bearing, but it does not resolve a grant's
 //! [`TypedScope`](icn_governance::TypedScope)`.domain` against the target
 //! domain, learn who the actor is, or consult the grant store. Authority
