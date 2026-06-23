@@ -48,6 +48,7 @@ pub mod effect_manifest;
 pub mod error;
 pub mod gate;
 pub mod handle;
+pub mod institutional_domain;
 #[allow(missing_docs)]
 pub mod invariant_gate;
 pub mod membership;
@@ -132,6 +133,9 @@ pub use domain::{GovernanceDomain, GovernanceDomainId};
 pub use error::{GovernanceError, Result};
 pub use gate::{check_execution_gate, GateError};
 pub use handle::GovernanceOps;
+pub use institutional_domain::{
+    DomainPolicy, DomainPolicyId, DomainPolicyRef, InstitutionalDomain, InstitutionalDomainError,
+};
 pub use membership::{MembershipConfig, MembershipSource};
 pub use message::{GovernanceMessage, ProposalOutcome, TallySnapshot};
 pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, GovernanceRule};
