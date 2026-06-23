@@ -6,6 +6,20 @@ Last Reviewed: 2026-06-23
 
 # ICN State (living doc)
 
+<!-- [sync edit] 2026-06-23 (post-merge: DomainPolicy adoption gate-wired to MandateGate — `origin/main` HEAD `8594cd98`: #2164 — NARROW scope, branch `docs/sync-domain-policy-gate`):
+     Records the #2142 follow-up that wires `DomainPolicy` adoption to the existing app-side authority resolver, merged to `origin/main` after the #2162 block below. NARROW sync covering only #2164. **#2142 advances but is NOT complete and remains OPEN.**
+
+     WHAT LANDED (squash tip `8594cd98` on `origin/main`):
+       - #2164 (`8594cd98` = current tip) feat(governance): **gate domain policy adoption** — app-side only (`apps/governance` = `icn-governance-actor`); `icn-governance` pure-core unchanged. Adds `MandateAct::AdoptDomainPolicy` (Execution class; act token `domain_policy:adopt` / proposal-class `DomainPolicy`; wire token `adopt_domain_policy`), reusing the existing `MandateTarget::Domain` resolver path — no resolver logic duplicated. Adds `apps/governance::domain_policy_adoption::adopt_domain_policy_gated(backend, domain, policy, actor, at)` + `AdoptDomainPolicyError { Unauthorized, Backend, Core }`: it builds a `MandateRequest` and runs the **real** `DefaultMandateGate::require()` (actor → active grants → `TypedScope.domain` + Execution class + act-token + mandate lifecycle) against the existing `GovernanceReceiptBackend`, then commits through the pure-core `InstitutionalDomain::adopt_policy` as **defense-in-depth**. Adoption is no longer shape-only — it now requires real authority resolution against the receipt/grant store. Fails closed on any gate rejection, backend read failure, or structural rejection, leaving policy state unchanged. 7 unit tests over the real `DefaultMandateGate` (success; wrong domain/actor/act/expired-grant/revoked-mandate; pure-core defense-in-depth). A follow-up doc-only commit (`be70269e`) qualified one module-doc intra-doc link to `Mandate` (to a fully-qualified `icn_governance::Mandate` path) per Copilot review.
+
+     MEANING FIREWALL (verified): authority resolution lives in `apps/governance`; `icn-governance` stays pure types + structural validation and never imports the gate. No new authority primitive (reuses `Mandate` / `AuthorityGrant` / `TypedScope` / `MandateGate` / `GovernanceReceiptBackend`). No NYCN/Summit nouns. The required `Meaning Firewall Check` + `Kernel Forbidden Dependencies` gates passed.
+
+     ISSUE EFFECTS (verified against the tracker): **#2142 remains OPEN** — #2164 used `Refs #2142` (not a close keyword); `closingIssuesReferences` is empty. This is the authority-resolution wiring rung, not issue closure.
+
+     STILL OPEN / FORWARD WORK (#2142): no HTTP/route surface for domain-policy adoption; no `GovernanceManager` adoption seam (the gated function is standalone, not yet wired into the manager); no full `InstitutionalDomain`/`DomainPolicy` lifecycle (standing, services, routing, federation, exit); no CCL policy registry / evaluator selection / CCL evaluation; no service-binding runtime; no package activation.
+
+     This sync explicitly does NOT claim: #2142 complete; full InstitutionalDomain/DomainPolicy lifecycle; CCL runtime or policy-evaluator selection; a domain-policy HTTP/route surface; GovernanceManager integration for adoption; package activation; any auth-model change or entity-aware auth cutover; production / pilot / organizer / federation readiness. Phase 2 status remains ⏳ (partner-bound); phase model unchanged; the #1703 human gate is unchanged. The non-required `Security Audit` (cargo-audit dependency backlog) check was red on #2164 and did NOT block merge — it is not in the branch-protection required set, and #2164 changed no dependency manifest/lock. -->
+
 <!-- [sync edit] 2026-06-23 (post-merge: InstitutionalDomain / DomainPolicy minimal runtime root — `origin/main` HEAD `e9e87f3c`: #2162 — NARROW scope, branch `docs/sync-institutional-domain-runtime`):
      Records the minimal runtime root from ADR-0083 (#2161) / issue #2142, merged to `origin/main` after the #2158/#2159 block below. NARROW sync covering only #2162.
 
