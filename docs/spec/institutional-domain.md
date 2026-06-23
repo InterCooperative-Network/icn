@@ -248,9 +248,36 @@ This spec cross-links existing canon and forward issues rather than duplicating 
 | Steward cockpit v0 | `#1795`. |
 | Tool install lifecycle | `RFC-0017`. |
 | Constitutional object model (AuthorityClass, AuthorityGrant, TypedScope, Mandate) | `ADR-0014`. |
-| Minimal runtime root for `InstitutionalDomain` / `DomainPolicy` (Declare + Adopt slice) | `ADR-0083` (#2142). Declare + Adopt-policy slice **landed** in `icn-governance` (`institutional_domain` module: `InstitutionalDomain`, `DomainPolicy` / `DomainPolicyRef`, fail-closed `adopt_policy`; tests cover declare, adopt, structural inertness, and missing/ambiguous/unbound/inactive authority). App-side adoption is now **gate-resolved**: `apps/governance::domain_policy_adoption::adopt_domain_policy_gated` runs the existing `DefaultMandateGate::require()` (actor → active grants → `TypedScope.domain` + Execution class + `domain_policy:adopt` act token + mandate lifecycle) before the pure-core structural commit (#2142 follow-up). Full lifecycle (standing, services, routing, federation, exit), CCL evaluation, and a domain-policy HTTP surface remain forward work. |
+| Minimal runtime root for `InstitutionalDomain` / `DomainPolicy` (Declare + Adopt slice) | `ADR-0083` (#2142). Declare + Adopt-policy slice **landed** in `icn-governance` (`institutional_domain` module: `InstitutionalDomain`, `DomainPolicy` / `DomainPolicyRef`, fail-closed `adopt_policy`; tests cover declare, adopt, structural inertness, and missing/ambiguous/unbound/inactive authority). App-side adoption is now **gate-resolved**: `apps/governance::domain_policy_adoption::adopt_domain_policy_gated` runs the existing `DefaultMandateGate::require()` (actor → active grants → `TypedScope.domain` + Execution class + `domain_policy:adopt` act token + mandate lifecycle) before the pure-core structural commit (#2142 follow-up). The adoption seam is now reachable at the governance app boundary via `GovernanceManager::adopt_domain_policy` (#2166), which fails closed (`DomainPolicyAdoptionError::MissingReceiptBackend`) when no receipt backend is wired and otherwise delegates to the gated helper. Full lifecycle (standing, services, routing, federation, exit) and CCL evaluation remain forward work; a domain-policy **HTTP surface is deferred and blocked** — see "Domain-policy adoption: app boundary and HTTP-surface sequencing" below. |
 | Accepted-proposal effect dispatch contract | `docs/spec/effect-dispatch-contract.md` (`#1797`, merged). |
 | Integrated cooperative operating model | `docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md` (`#1793`, merged). |
+
+## Domain-policy adoption: app boundary and HTTP-surface sequencing
+
+> **Status: blocker / sequencing note (#2142).** Records why a domain-policy adoption HTTP route is **not** added yet, and what must be decided and built first. No HTTP route exists for domain-policy adoption.
+
+The #2142 lane has landed the adoption path up to the governance **application boundary**:
+
+- **Runtime root (#2162).** `icn-governance::institutional_domain` — `InstitutionalDomain` (keyed by the existing `GovernanceDomainId`), `DomainPolicy` / `DomainPolicyRef` (content-addressed), and a fail-closed structural `InstitutionalDomain::adopt_policy`.
+- **Gate-resolved adoption (#2164).** `apps/governance::domain_policy_adoption::adopt_domain_policy_gated` runs the real `DefaultMandateGate::require()` (actor → active grants → `TypedScope.domain` + Execution class + `domain_policy:adopt` act token + mandate lifecycle), then commits through the pure-core structural check as defense-in-depth.
+- **Manager seam (#2166).** `GovernanceManager::adopt_domain_policy(&self, &mut InstitutionalDomain, &DomainPolicy, &Did, now)` — fail-closed (`DomainPolicyAdoptionError::MissingReceiptBackend`) without a wired receipt backend; otherwise delegates to the gated helper.
+
+**Why the HTTP route is blocked.** The manager seam takes a **caller-held `&mut InstitutionalDomain`**, because there is **no `InstitutionalDomain` persistence** in the workspace today: no store, no load/save path, and no declare/create path (`InstitutionalDomain::declare` is exercised only in tests). The existing `GovernanceStateStore` persists `GovernanceDomain` (the decision-space config object), **not** `InstitutionalDomain` (the standing authority wrapper) — they remain sibling references per ADR-0083. An HTTP route, by contrast, must **load** the target domain, **mutate** it, and **persist** the result. With no load/save/declare path, any route would either operate on a transient, discarded domain (fake persistence) or accept whole `InstitutionalDomain` / `DomainPolicy` blobs over the wire (a fake boundary). Neither is honest, so the route is deferred.
+
+**This blocker intersects ADR-0083's open questions** — it should not be resolved by silently introducing a store:
+
+- **Open Q2 (Domain vs decision space):** whether `GovernanceDomain` becomes a sub-part of `InstitutionalDomain` or they stay sibling references. An `InstitutionalDomain` store commits to a representation here.
+- **Open Q4 (`DomainPolicy`: stored object vs derived view):** whether the adopted policy is a stored record or a view over adoption receipts. A store commits to "stored object."
+- **Open Q1 (identifier):** the MVP keys on `GovernanceDomainId` (a string); a persistence layer is where a distinct DID-style `InstitutionalDomainId` would (or would not) be introduced.
+
+**Required sequence to unblock the HTTP route** (each a separate, reviewable lane; none started):
+
+1. **Decide the persistence model** (ADR-0083 addendum or a focused ADR): resolve open Q1/Q2/Q4 enough to justify an `InstitutionalDomain` persistence shape — durable (sled-backed, like `GovernanceStateStore`) vs in-memory; standalone store vs folded into the existing domain store; identifier choice.
+2. **Add the `InstitutionalDomain` persistence seam** per that decision (store trait + impl + `GovernanceManager` wiring + a persisted load→adopt→save method).
+3. **Add a declare/create path** so a domain exists to adopt into (a governance act in its own right).
+4. **Then** add the thin governance HTTP route, which calls `GovernanceManager::adopt_domain_policy` (it must not bypass the seam) over the persisted domain.
+
+Until step 1 is decided, the adoption capability is **complete and tested up to the manager seam** and reachable in-process; no network surface is claimed. #2142 remains open.
 
 ## Adjacent concepts (named, not specified here)
 
