@@ -8,8 +8,8 @@ use anyhow::Result;
 use std::sync::Arc;
 
 use icn_governance::{
-    Delegation, DelegationId, GovernanceDomain, GovernanceDomainId, InstitutionalDomain, Proposal,
-    ProposalId, Timestamp, Vote,
+    Delegation, DelegationId, DomainPolicyId, GovernanceDomain, GovernanceDomainId,
+    InstitutionalDomain, Proposal, ProposalId, Timestamp, Vote,
 };
 use icn_identity::Did;
 use icn_store::Store;
@@ -154,6 +154,37 @@ pub trait GovernanceStateStore: Send + Sync {
             "institutional_domain persistence not implemented by this GovernanceStateStore"
         )
     }
+
+    // --- DomainPolicy bodies (content-addressed; #2178, after #2142) ---
+
+    /// Load the raw `DomainPolicy` body bytes whose blake3 hash is `id`, if a
+    /// body has been persisted. `DomainPolicyId` is content-addressed
+    /// (`DomainPolicyId::from_content`), so the key *is* the content hash; a
+    /// stored body must re-hash to its key or the implementor MUST fail closed.
+    ///
+    /// `#2142` persists only the adopted `current_policy: DomainPolicyRef`
+    /// pointer on the `InstitutionalDomain` record and drops the body after
+    /// hashing; this seam lets an adopted ref be resolved back to the bytes that
+    /// produced it. The adoption route is not yet wired to persist bodies, and
+    /// the full CCL policy registry (#1817) remains future work.
+    ///
+    /// **Default impl FAILS CLOSED** (returns `Err`): a store that does not
+    /// implement body persistence must not masquerade as "no body stored".
+    /// The sled-backed store overrides this.
+    fn get_domain_policy_body(&self, _id: &DomainPolicyId) -> Result<Option<Vec<u8>>> {
+        anyhow::bail!("domain policy body storage is not implemented by this GovernanceStateStore")
+    }
+
+    /// Persist the raw `DomainPolicy` body `content` under its content-addressed
+    /// `id`. The implementor MUST verify `DomainPolicyId::from_content(content)`
+    /// equals `id` and fail closed on mismatch, so a body can never be filed
+    /// under a key it does not hash to. Idempotent by construction (identical
+    /// content → identical key). **Default impl FAILS CLOSED** for the same
+    /// reason as [`Self::get_domain_policy_body`]; the sled-backed store
+    /// overrides this.
+    fn save_domain_policy_body(&self, _id: &DomainPolicyId, _content: &[u8]) -> Result<()> {
+        anyhow::bail!("domain policy body storage is not implemented by this GovernanceStateStore")
+    }
 }
 
 // ---- Key helpers ----
@@ -170,6 +201,14 @@ fn institutional_domain_key(id: &GovernanceDomainId) -> Vec<u8> {
     // Distinct key space from `gov:domain:` (GovernanceDomain) — the
     // InstitutionalDomain authority record is a sibling, not a replacement.
     format!("gov:institutional-domain:{}", id.0).into_bytes()
+}
+
+fn domain_policy_body_key(id: &DomainPolicyId) -> Vec<u8> {
+    // Content-addressed key space, sibling to `gov:institutional-domain:`.
+    // Keyed by the policy's content hash (`DomainPolicyId`, hex via Display),
+    // not by a domain id — identical policy text dedupes across domains by
+    // construction, and the key doubles as an integrity tag on read.
+    format!("gov:domain-policy-body:{id}").into_bytes()
 }
 
 fn proposal_key(id: &ProposalId) -> Vec<u8> {
@@ -276,6 +315,38 @@ impl GovernanceStateStore for SledGovernanceStateStore {
             &institutional_domain_key(&domain.domain_id),
             &serde_json::to_vec(domain)?,
         )
+    }
+
+    // --- DomainPolicy bodies ---
+
+    fn get_domain_policy_body(&self, id: &DomainPolicyId) -> Result<Option<Vec<u8>>> {
+        match self.store.get(&domain_policy_body_key(id))? {
+            Some(bytes) => {
+                // The key IS the content hash, so a stored body that no longer
+                // re-hashes to its key is corruption. Fail closed rather than
+                // hand back mismatched bytes.
+                let actual = DomainPolicyId::from_content(&bytes);
+                if &actual != id {
+                    anyhow::bail!(
+                        "domain policy body integrity check failed: body under {id} hashes to {actual}"
+                    );
+                }
+                Ok(Some(bytes))
+            }
+            None => Ok(None),
+        }
+    }
+
+    fn save_domain_policy_body(&self, id: &DomainPolicyId, content: &[u8]) -> Result<()> {
+        // Refuse to file a body under a key it does not hash to, so the keyspace
+        // stays an honest content address.
+        let actual = DomainPolicyId::from_content(content);
+        if &actual != id {
+            anyhow::bail!(
+                "domain policy body integrity check failed: content hashes to {actual}, not the claimed {id}"
+            );
+        }
+        self.store.put(&domain_policy_body_key(id), content)
     }
 
     // --- Proposals ---
@@ -489,6 +560,97 @@ mod tests {
         let domain = InstitutionalDomain::declare(id, BootstrapEntityType::Cooperative);
         assert!(
             store.save_institutional_domain(&domain).is_err(),
+            "default save must fail closed, not silently succeed"
+        );
+    }
+
+    #[test]
+    fn domain_policy_body_round_trips() {
+        let store = temp_store();
+        let content: &[u8] = b"charter: { quorum: 0.5 }";
+        let id = DomainPolicyId::from_content(content);
+        assert!(store.get_domain_policy_body(&id).unwrap().is_none());
+
+        store.save_domain_policy_body(&id, content).unwrap();
+
+        let loaded = store
+            .get_domain_policy_body(&id)
+            .unwrap()
+            .expect("present after save");
+        assert_eq!(loaded.as_slice(), content);
+    }
+
+    #[test]
+    fn domain_policy_body_missing_returns_none() {
+        let store = temp_store();
+        let id = DomainPolicyId::from_content(b"never stored");
+        assert!(store.get_domain_policy_body(&id).unwrap().is_none());
+    }
+
+    #[test]
+    fn domain_policy_body_key_is_content_addressed() {
+        // The key is derived from the content, so identical bytes land on the
+        // same key (natural dedup) and re-saving is idempotent.
+        let store = temp_store();
+        let content: &[u8] = b"identical policy text";
+        let id_a = DomainPolicyId::from_content(content);
+        let id_b = DomainPolicyId::from_content(content);
+        assert_eq!(id_a, id_b, "content addressing is deterministic");
+
+        store.save_domain_policy_body(&id_a, content).unwrap();
+        store.save_domain_policy_body(&id_b, content).unwrap();
+
+        let loaded = store
+            .get_domain_policy_body(&id_a)
+            .unwrap()
+            .expect("present after save");
+        assert_eq!(loaded.as_slice(), content);
+    }
+
+    #[test]
+    fn domain_policy_body_corrupted_fails_closed() {
+        // A stored body whose bytes do not hash to its key is corruption; the
+        // read must fail closed, never hand back mismatched bytes.
+        let store = temp_store();
+        let id = DomainPolicyId::from_content(b"the real policy");
+        store
+            .as_store()
+            .put(&domain_policy_body_key(&id), b"tampered bytes")
+            .unwrap();
+        assert!(
+            store.get_domain_policy_body(&id).is_err(),
+            "stored body that does not re-hash to its key must fail closed"
+        );
+    }
+
+    #[test]
+    fn domain_policy_body_save_rejects_id_content_mismatch() {
+        // A caller-supplied id that does not hash the content is rejected, so a
+        // body can never be filed under a key it does not hash to.
+        let store = temp_store();
+        let wrong_id = DomainPolicyId::from_content(b"some other policy");
+        assert!(
+            store
+                .save_domain_policy_body(&wrong_id, b"the actual policy")
+                .is_err(),
+            "saving content under an id it does not hash to must fail closed"
+        );
+        assert!(
+            store.get_domain_policy_body(&wrong_id).unwrap().is_none(),
+            "the rejected save must not have written anything"
+        );
+    }
+
+    #[test]
+    fn domain_policy_body_default_impl_fails_closed() {
+        let store = NoInstitutionalDomainStore;
+        let id = DomainPolicyId::from_content(b"anything");
+        assert!(
+            store.get_domain_policy_body(&id).is_err(),
+            "default get must fail closed, not return Ok(None)"
+        );
+        assert!(
+            store.save_domain_policy_body(&id, b"anything").is_err(),
             "default save must fail closed, not silently succeed"
         );
     }
