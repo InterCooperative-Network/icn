@@ -8,11 +8,12 @@ use actix_web::{web, HttpRequest, HttpResponse};
 use icn_federation::SettlementInterval;
 use icn_governance::{
     ActionItemFilter, ActionItemId, ActionItemPriority, ActionItemStatus, ActivityId, ActivityKind,
-    ActivityStatus, AttendanceStatus, DataSharingLevel, Delegation, DelegationId, DelegationScope,
-    DisputeResolutionMethod, DomainPolicy, FederationProposal, FederationTerms, GovernanceDomain,
-    GovernanceDomainId, GovernanceParams, MeetingId, MeetingRole, MeetingStatus, MembershipAction,
-    MembershipConfig, MilestoneId, MilestoneStatus, ProgramId, ProgramKind, ProposalId,
-    ProposalPayload, ProposalScope, StructureId, StructureKind, StructureStatus, VoteChoice,
+    ActivityStatus, AttendanceStatus, CharterId, DataSharingLevel, Delegation, DelegationId,
+    DelegationScope, DisputeResolutionMethod, DomainPolicy, FederationProposal, FederationTerms,
+    GovernanceDomain, GovernanceDomainId, GovernanceParams, MeetingId, MeetingRole, MeetingStatus,
+    MembershipAction, MembershipConfig, MilestoneId, MilestoneStatus, ProgramId, ProgramKind,
+    ProposalId, ProposalPayload, ProposalScope, StructureId, StructureKind, StructureStatus,
+    VoteChoice,
 };
 use icn_http_kit::{
     auth::{require_any_scope, require_any_scope_matched, require_scope, BasicClaims},
@@ -25,7 +26,8 @@ use super::configure::{DispatchEvidenceSpec, GovernanceContext, GovernanceEffect
 use super::models::*;
 use super::validation as val;
 use crate::domain_policy_adoption::{
-    AdoptDomainPolicyError, DomainPolicyAdoptionError, InstitutionalDomainStoreError,
+    AdoptDomainPolicyError, DeclareInstitutionalDomainError, DomainPolicyAdoptionError,
+    InstitutionalDomainStoreError,
 };
 use crate::events::GovernanceEventEmitter;
 
@@ -3236,6 +3238,122 @@ pub async fn adopt_domain_policy<E: GovernanceEventEmitter + Clone + 'static>(
     Ok(HttpResponse::Ok().json(AdoptDomainPolicyResponse {
         policy_id: policy_ref.id.to_hex(),
         domain_id: policy_ref.domain_id.0,
+    }))
+}
+
+/// Parse the optional hex `charter_id` request field into a [`CharterId`].
+/// `None` stays `None`; a present value must be exactly 32 bytes (64 hex chars).
+fn parse_optional_charter_id(charter_id: &Option<String>) -> Result<Option<CharterId>, ApiError> {
+    let Some(s) = charter_id.as_ref() else {
+        return Ok(None);
+    };
+    let bytes = hex::decode(s.trim())
+        .map_err(|e| err_bad(format!("charter_id must be hex-encoded: {e}")))?;
+    let arr: [u8; 32] = bytes
+        .as_slice()
+        .try_into()
+        .map_err(|_| err_bad("charter_id must be 32 bytes (64 hex characters)"))?;
+    Ok(Some(CharterId::new(arr)))
+}
+
+/// Map the gated-declaration seam error onto the governance HTTP error
+/// taxonomy. Fail-closed: only a clearly-authorization or already-declared
+/// problem maps to 403/409; everything else (missing backend/store, gate
+/// backend fault, unreachable variants) surfaces as 500.
+fn declare_institutional_domain_err_to_api(e: DeclareInstitutionalDomainError) -> ApiError {
+    use DeclareInstitutionalDomainError as D;
+    use InstitutionalDomainStoreError as S;
+    let msg = e.to_string();
+    match e {
+        // Gate denial (wrong actor/domain/act/class, expired/revoked) → 403.
+        D::Unauthorized(_) => err_forbidden(msg),
+        // A record already exists for this domain id → conflict.
+        D::Store(S::AlreadyDeclared) => ApiError::Conflict(msg),
+        // Misconfiguration / infrastructure faults → 500. `NotDeclared` and
+        // `Adopt(_)` are unreachable on the declare path; fail closed to 500.
+        D::MissingReceiptBackend
+        | D::Backend(_)
+        | D::Store(S::MissingDomainStore)
+        | D::Store(S::Store(_))
+        | D::Store(S::NotDeclared)
+        | D::Store(S::Adopt(_)) => err_internal(msg),
+    }
+}
+
+/// POST /gov/domains/{domain_id}/institutional-domain/declare
+/// — Declare the `InstitutionalDomain` authority record for an existing
+/// `GovernanceDomainId`, gated by the app-side `DefaultMandateGate` (issue
+/// #2142).
+///
+/// Drives the mandate-gated declaration seam end-to-end over HTTP:
+///
+/// ```text
+/// POST → governance:write scope
+///      → GovernanceManager::declare_institutional_domain_gated
+///        → DefaultMandateGate authority resolution (actor → active grants →
+///          domain-scoped Execution `institutional_domain:declare` grant +
+///          live mandate)
+///        → (only on pass) persist a freshly-declared InstitutionalDomain
+///      → declared-domain projection
+/// ```
+///
+/// The declaring actor is the authenticated caller (`sub`), never a body field.
+/// The route calls the **gated** seam, never the ungated bootstrap
+/// `declare_institutional_domain` — authority is resolved before any store
+/// write, so an unauthorized caller persists nothing and cannot learn whether a
+/// domain already exists (the gate refuses before the duplicate check).
+///
+/// **Membership gate intentionally omitted.** Unlike the domain-scoped *write*
+/// surface (which reuses `check_domain_membership`), declaration must not
+/// require prior membership: the actor authorized to *establish* a governed
+/// domain (by a domain-scoped declare grant) may not yet be a member of it, so a
+/// membership precondition could wrongly block the first authorized declaration.
+/// The `DefaultMandateGate` declare grant is the authoritative — and strictly
+/// stronger — authority check here.
+///
+/// This adds no new authority primitive, no CCL runtime, no policy registry, and
+/// no auth-model change.
+///
+/// Returns:
+/// - 200 with the declared-domain projection.
+/// - 400 when `entity_type` is out of taxonomy, `charter_id` is malformed, or
+///   the body/DID is malformed.
+/// - 401 when the bearer token is missing/invalid.
+/// - 403 when the token lacks `governance:write` or the `DefaultMandateGate`
+///   refuses declaration authority.
+/// - 409 when an `InstitutionalDomain` is already declared for `domain_id`.
+/// - 500 when no receipt/domain store is wired, or a backend read/write fails.
+pub async fn declare_institutional_domain<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    path: web::Path<String>,
+    req: web::Json<DeclareInstitutionalDomainRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let actor = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    let domain = GovernanceDomainId(path.into_inner());
+    let charter_ref = parse_optional_charter_id(&req.charter_id)?;
+
+    // Authoritative check is the DefaultMandateGate inside the gated seam, which
+    // resolves authority BEFORE any store write. The ungated bootstrap seam is
+    // never reached from this route.
+    let declared = ctx
+        .manager
+        .declare_institutional_domain_gated(
+            domain,
+            req.entity_type,
+            charter_ref,
+            &actor,
+            current_time_secs(),
+        )
+        .map_err(declare_institutional_domain_err_to_api)?;
+
+    Ok(HttpResponse::Ok().json(DeclareInstitutionalDomainResponse {
+        domain_id: declared.domain_id.0,
+        owning_entity_class: declared.owning_entity_class,
+        charter_id: declared.charter_ref.map(|c| c.to_hex()),
+        current_policy_id: declared.current_policy.map(|p| p.id.to_hex()),
     }))
 }
 
