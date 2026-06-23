@@ -200,15 +200,21 @@ services, routing, federation, exit, or the full reference set.
    The spec wants a DID-style canonical identifier surviving node/route changes
    (`institutional-domain.md:64`). Whether to introduce a distinct `InstitutionalDomainId`
    (and migrate `TypedScope.domain`) is deferred to a follow-up.
+   **Resolved for the persistence MVP — see the Addendum below (keep keying on
+   `GovernanceDomainId`; the DID-style identifier stays deferred).**
 2. **Domain vs decision space:** long-term, does `GovernanceDomain` become a sub-part of
    `InstitutionalDomain`, or do they stay sibling references? The MVP chooses references to
    avoid churn; the consolidation decision is deferred.
+   **Resolved for the persistence MVP — see the Addendum below (stay sibling references;
+   no consolidation).**
 3. **One adoption act or two:** charter `ratify` vs per-policy `adopt` are separate in the
    MVP. Whether founding should atomically adopt an initial policy
    (`institutional-domain.md:203`) is deferred.
 4. **DomainPolicy: stored object vs derived view:** the MVP stores a minimal ref; whether
    the full object is a stored record or a view over adoption receipts lands with the CCL
    policy registry (#1817).
+   **Resolved for the persistence MVP — see the Addendum below (persist only the adopted
+   `DomainPolicyRef` on the domain record; the `DomainPolicy` body stays with #1817).**
 5. **`Coop`-prefixed vocabulary debt** (`DataLocality::CoopReplicated`, etc.,
    `ICN_OPERATING_MODEL.md:247`) is **not** renamed here; deferred.
 6. **Entity-class type:** which existing governance enum the MVP reuses for
@@ -229,8 +235,100 @@ services, routing, federation, exit, or the full reference set.
   adds a third domain-adjacent object. The migration section and open questions bound that
   risk by choosing references over renames and by deferring consolidation explicitly.
 
+## Addendum (2026-06-23): InstitutionalDomain persistence model
+
+> **Status: design decision, not yet implemented.** Resolves open questions Q1, Q2,
+> and Q4 *enough to unblock the next implementation lane* (a persisted adoption path).
+> This addendum amends ADR-0083 in place (the ADR is still `proposed`); it adds **no
+> code**. The HTTP adoption route remains blocked until the seam below lands — see
+> `docs/spec/institutional-domain.md` §"Domain-policy adoption: app boundary and
+> HTTP-surface sequencing" (#2168).
+
+### Why this is needed
+
+The #2142 adoption path is complete and tested up to the governance app boundary:
+the runtime root (#2162), gate-resolved adoption (#2164), and the
+`GovernanceManager::adopt_domain_policy` seam (#2166). That seam takes a **caller-held
+`&mut InstitutionalDomain`** because no durable `InstitutionalDomain` persistence
+exists: there is no store, no load/save path, and no declare/create path
+(`InstitutionalDomain::declare` is exercised only in tests). An HTTP route must
+load → mutate → persist a domain, so it cannot be added honestly until a persistence
+seam exists. Settling the seam touches the three open questions below, so they are
+resolved here rather than implicitly in code.
+
+### Decisions
+
+1. **Identity / keying (Q1).** Persist `InstitutionalDomain` keyed by the **existing
+   `GovernanceDomainId`**. Do **not** introduce a parallel `InstitutionalDomainId` for
+   this lane. Rationale: the runtime root already keys on it, and
+   `TypedScope.domain: Option<GovernanceDomainId>` already binds to the same identifier,
+   so no identifier migration is needed. The spec's DID-style canonical identifier
+   (`institutional-domain.md:64`) stays **deferred** — it becomes relevant only when a
+   domain needs an identity that survives independently of its governance domain.
+
+2. **Relationship to `GovernanceDomain` (Q2).** Store `InstitutionalDomain` as a
+   **separate, sibling state record** keyed by `GovernanceDomainId`. Do **not** embed it
+   into, or collapse, `GovernanceDomain` (the decision-space config object). They remain
+   sibling references, exactly as the ADR's "Relationship to existing types" section
+   already states. Rationale: preserves compatibility, avoids a broad migration, and
+   keeps the authority wrapper separable from the decision-space config.
+
+3. **`DomainPolicy` storage (Q4).** The persisted `InstitutionalDomain` record carries
+   only its **adopted `current_policy: Option<DomainPolicyRef>`** (a content-addressed
+   pointer) — exactly the runtime-root shape. Whether the full `DomainPolicy` **body** is
+   a stored record or a view derived from adoption receipts stays **deferred to the CCL
+   policy registry (#1817)**. This lane persists the domain's adopted *pointer*, not a
+   policy registry.
+
+   Q3 (one adoption act vs two) and Q5 (`Coop`-prefixed vocabulary debt) are **unaffected
+   and remain deferred**.
+
+### Smallest store seam (for the implementation lane, not this PR)
+
+Prefer **extending the existing `GovernanceStateStore`** over a new store, because it is
+already sled-backed and already wired into `GovernanceManager` as the `domain_store`
+field — no new store, trait, manager field, or builder:
+
+- Add two methods, mirroring how `save_close_intent` / `flush` were added as
+  **default-implemented** trait methods (so the single existing implementor —
+  `SledGovernanceStateStore`, the only `GovernanceStateStore` impl today, exercised in
+  tests via a temporary sled store — keeps compiling and overrides only as needed):
+  - `get_institutional_domain(&self, id: &GovernanceDomainId) -> Result<Option<InstitutionalDomain>>`
+  - `save_institutional_domain(&self, domain: &InstitutionalDomain) -> Result<()>`
+  - The default impls fail **closed** (return an `Err("institutional_domain persistence not implemented")`-style result), never silently succeed; `SledGovernanceStateStore` provides the real implementation (serde — `InstitutionalDomain` already derives `Serialize`/`Deserialize`). If a lighter in-memory `GovernanceStateStore` is wanted for unit tests, it would be added by the implementation lane — none exists today.
+
+### Declare / create path (for the implementation lane)
+
+- `GovernanceManager::declare_institutional_domain(domain_id, owning_entity_class, charter_ref)`:
+  refuse if a record already exists for `domain_id`; persist a freshly `declare`d
+  `InstitutionalDomain`. **Flagged sub-question (decide in the implementation lane):**
+  declaring a governed domain is itself an authority-bearing act — whether `declare` must
+  be mandate-gated (like adoption) or may be a bootstrap-time seam should be settled when
+  the path lands; it must not silently permit unauthorized domain creation on a routable
+  surface.
+
+### Persisted adoption flow (for the implementation lane)
+
+`GovernanceManager` gains a persisted variant that composes the existing pieces:
+`load InstitutionalDomain by GovernanceDomainId` → existing
+`adopt_domain_policy(&mut domain, policy, actor, now)` (real `DefaultMandateGate`
+resolution + pure-core structural commit) → `save_institutional_domain` on success.
+Returns the adopted `DomainPolicyRef`. Only **after** this lands is a thin HTTP route
+honest (route → persisted manager method, never bypassing the seam).
+
+### Non-goals (unchanged)
+
+No broad CRUD subsystem; no `GovernanceDomain` migration/collapse; no CCL runtime or
+policy-evaluator selection; no full policy registry; no service-binding runtime; no
+package activation; **no HTTP route and no persistence code in this PR**; no auth-model
+change; no entity-aware auth cutover; no production / pilot / organizer / federation
+readiness.
+
 ## References
 
 See frontmatter. Primary: `docs/spec/institutional-domain.md` (#1794),
 `docs/architecture/ICN_OPERATING_MODEL.md`, ADR-0014, and the existing
-`icn-governance` authority/domain/charter types cited inline above.
+`icn-governance` authority/domain/charter types cited inline above. Addendum context:
+`apps/governance/src/state_store.rs` (`GovernanceStateStore`),
+`apps/governance/src/domain_policy_adoption.rs` (the manager seam, #2166), and the
+HTTP-surface sequencing note in `docs/spec/institutional-domain.md` (#2168).
