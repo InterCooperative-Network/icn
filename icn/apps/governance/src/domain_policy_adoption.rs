@@ -155,7 +155,7 @@ impl std::error::Error for DomainPolicyAdoptionError {}
 /// (`declare_institutional_domain` / `adopt_domain_policy_persisted`).
 #[derive(Debug)]
 pub enum InstitutionalDomainStoreError {
-    /// No [`GovernanceStateStore`] is wired, so the `InstitutionalDomain` record
+    /// No [`crate::GovernanceStateStore`] is wired, so the `InstitutionalDomain` record
     /// cannot be loaded or persisted. Fail closed.
     MissingDomainStore,
     /// `declare`: an `InstitutionalDomain` is already declared for this
@@ -227,7 +227,7 @@ impl crate::manager::GovernanceManager {
     }
 
     /// Declare and persist a new [`InstitutionalDomain`] authority record for an
-    /// existing `GovernanceDomainId`, via the wired [`GovernanceStateStore`].
+    /// existing `GovernanceDomainId`, via the wired [`crate::GovernanceStateStore`].
     ///
     /// Fails closed with [`InstitutionalDomainStoreError::MissingDomainStore`]
     /// when no store is wired, and with [`InstitutionalDomainStoreError::AlreadyDeclared`]
@@ -278,6 +278,20 @@ impl crate::manager::GovernanceManager {
     /// declared), [`InstitutionalDomainStoreError::Adopt`] (gate/structural
     /// rejection — state left unchanged, nothing saved), or
     /// [`InstitutionalDomainStoreError::Store`] (backend read/write error).
+    ///
+    /// # Concurrency
+    ///
+    /// The `load → mutate → save` sequence is **not atomic** and has no
+    /// per-domain serialization. With the current callers (in-process tests;
+    /// **no HTTP route or concurrent caller exists yet** — that is the deferred
+    /// next lane, see `docs/spec/institutional-domain.md`) there is no
+    /// concurrent access, so no update can be lost. **Before** this seam is
+    /// exposed to concurrent callers (an HTTP adoption route), the route lane
+    /// must add per-domain serialization (an in-process lock keyed by
+    /// `GovernanceDomainId`) and/or an atomic store primitive
+    /// (e.g. a transactional `get`+`put`), or two concurrent adoptions could
+    /// last-writer-win and drop an intervening `current_policy` update. This is
+    /// recorded as a prerequisite for the route lane, not fixed here.
     pub fn adopt_domain_policy_persisted(
         &self,
         domain_id: &GovernanceDomainId,
