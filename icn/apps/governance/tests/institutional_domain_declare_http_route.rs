@@ -436,23 +436,55 @@ async fn declare_route_unauthorized_on_existing_is_forbidden_not_conflict() {
 }
 
 #[actix_web::test]
-async fn declare_route_rejects_malformed_charter_id() {
+async fn declare_route_rejects_non_hex_charter_id() {
+    // Correct length (64 chars) but non-hex content → rejected by hex decoding,
+    // after the length check, with a 400.
     let caller = fresh_did();
     let gid = AuthorityGrantId::new();
     let grant = declare_grant(caller.clone(), "coop-alpha", gid.clone());
     let mandate = backing_mandate(gid);
     let h = make_harness(TestBackend::new(vec![mandate], vec![grant]));
 
+    let non_hex = "z".repeat(64); // 64 chars, but 'z' is not a hex digit
     let app = gov_app!(h.ctx.clone(), &caller, write_scope());
     let req = test::TestRequest::post()
         .uri(&declare_uri("coop-alpha"))
-        .set_json(serde_json::json!({ "entity_type": "cooperative", "charter_id": "not-hex!!" }))
+        .set_json(serde_json::json!({ "entity_type": "cooperative", "charter_id": non_hex }))
         .to_request();
     let resp = test::call_service(&app, req).await;
     assert_eq!(
         resp.status(),
         StatusCode::BAD_REQUEST,
         "a non-hex charter_id must be a 400"
+    );
+    assert!(h
+        .store
+        .get_institutional_domain(&GovernanceDomainId::new("coop-alpha"))
+        .unwrap()
+        .is_none());
+}
+
+#[actix_web::test]
+async fn declare_route_rejects_wrong_length_charter_id() {
+    // Valid hex but the wrong length → rejected by the length check BEFORE any
+    // hex decoding (an oversize body is never decoded), with a 400.
+    let caller = fresh_did();
+    let gid = AuthorityGrantId::new();
+    let grant = declare_grant(caller.clone(), "coop-alpha", gid.clone());
+    let mandate = backing_mandate(gid);
+    let h = make_harness(TestBackend::new(vec![mandate], vec![grant]));
+
+    let short_hex = "ab".repeat(20); // 40 hex chars = 20 bytes, not 32
+    let app = gov_app!(h.ctx.clone(), &caller, write_scope());
+    let req = test::TestRequest::post()
+        .uri(&declare_uri("coop-alpha"))
+        .set_json(serde_json::json!({ "entity_type": "cooperative", "charter_id": short_hex }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::BAD_REQUEST,
+        "a wrong-length charter_id must be a 400"
     );
     assert!(h
         .store

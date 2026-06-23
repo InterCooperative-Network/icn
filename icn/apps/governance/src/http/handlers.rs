@@ -3247,7 +3247,16 @@ fn parse_optional_charter_id(charter_id: &Option<String>) -> Result<Option<Chart
     let Some(s) = charter_id.as_ref() else {
         return Ok(None);
     };
-    let bytes = hex::decode(s.trim())
+    let trimmed = s.trim();
+    // A `CharterId` is exactly 32 bytes (64 hex chars). Validate length BEFORE
+    // decoding so an oversize body is never hex-decoded, and a wrong-length
+    // value gets a precise 400 rather than a generic decode error.
+    if trimmed.len() != 64 {
+        return Err(err_bad(
+            "charter_id must be exactly 64 hex characters (32 bytes)",
+        ));
+    }
+    let bytes = hex::decode(trimmed)
         .map_err(|e| err_bad(format!("charter_id must be hex-encoded: {e}")))?;
     let arr: [u8; 32] = bytes
         .as_slice()
