@@ -290,11 +290,12 @@ already sled-backed and already wired into `GovernanceManager` as the `domain_st
 field — no new store, trait, manager field, or builder:
 
 - Add two methods, mirroring how `save_close_intent` / `flush` were added as
-  **default-implemented** trait methods (so existing impls — sled, in-memory, and the
-  `cfg(test)` doubles — keep compiling and only the real backends override):
+  **default-implemented** trait methods (so the single existing implementor —
+  `SledGovernanceStateStore`, the only `GovernanceStateStore` impl today, exercised in
+  tests via a temporary sled store — keeps compiling and overrides only as needed):
   - `get_institutional_domain(&self, id: &GovernanceDomainId) -> Result<Option<InstitutionalDomain>>`
   - `save_institutional_domain(&self, domain: &InstitutionalDomain) -> Result<()>`
-  - The default impls fail **closed** (return an `Err("institutional_domain persistence not implemented")`-style result), never silently succeed; the sled + in-memory stores provide real implementations (serde — `InstitutionalDomain` already derives `Serialize`/`Deserialize`).
+  - The default impls fail **closed** (return an `Err("institutional_domain persistence not implemented")`-style result), never silently succeed; `SledGovernanceStateStore` provides the real implementation (serde — `InstitutionalDomain` already derives `Serialize`/`Deserialize`). If a lighter in-memory `GovernanceStateStore` is wanted for unit tests, it would be added by the implementation lane — none exists today.
 
 ### Declare / create path (for the implementation lane)
 
