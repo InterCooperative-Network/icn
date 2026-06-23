@@ -197,6 +197,46 @@ impl std::fmt::Display for InstitutionalDomainStoreError {
 
 impl std::error::Error for InstitutionalDomainStoreError {}
 
+/// Error from the **gated** `InstitutionalDomain` declaration seam
+/// ([`crate::manager::GovernanceManager::declare_institutional_domain_gated`]).
+///
+/// Declaring a governed domain is an authority-bearing act (ADR-0083): this
+/// seam resolves that authority through the app-side [`DefaultMandateGate`]
+/// before delegating to the bootstrap/in-process
+/// [`crate::manager::GovernanceManager::declare_institutional_domain`]. Every
+/// variant is fail-closed — nothing is persisted unless authority resolves.
+#[derive(Debug)]
+pub enum DeclareInstitutionalDomainError {
+    /// The manager has no receipt/grant backend wired, so declaration authority
+    /// cannot be resolved. Fail closed — a manager that cannot resolve authority
+    /// must never declare a governed domain.
+    MissingReceiptBackend,
+    /// The app-side [`MandateGate`] refused authority: no authorizing grant, or
+    /// a wrong actor / domain / act / class, or an expired or revoked grant or
+    /// mandate.
+    Unauthorized(MandateGateError),
+    /// Authority resolved, but the underlying persisted declaration failed (no
+    /// domain store wired, already declared, or a backend write error).
+    Store(InstitutionalDomainStoreError),
+}
+
+impl std::fmt::Display for DeclareInstitutionalDomainError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingReceiptBackend => write!(
+                f,
+                "institutional domain declaration fail-closed: no receipt backend wired"
+            ),
+            Self::Unauthorized(e) => {
+                write!(f, "institutional domain declaration unauthorized: {e}")
+            }
+            Self::Store(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for DeclareInstitutionalDomainError {}
+
 impl crate::manager::GovernanceManager {
     /// Adopt `policy` as `domain`'s current policy, resolving authority through
     /// this manager's wired [`GovernanceReceiptBackend`] and the app-side
@@ -234,11 +274,14 @@ impl crate::manager::GovernanceManager {
     /// when a record already exists for `domain_id`. The declared domain is
     /// unbound (`current_policy == None`) until a later adoption.
     ///
-    /// **Authority note:** declaring a governed domain is itself an
-    /// authority-bearing act. This MVP seam does **not** yet mandate-gate
-    /// `declare` (a flagged sub-question in the ADR-0083 persistence addendum);
-    /// it must not be exposed on a routable surface until that gate lands. No
-    /// HTTP route is added here.
+    /// **Authority note — bootstrap / in-process only.** Declaring a governed
+    /// domain is itself an authority-bearing act, and this seam does **not**
+    /// resolve that authority: it persists unconditionally. It must **never** be
+    /// wired to a routable surface. Any HTTP/network declare path must call the
+    /// gate-resolving [`Self::declare_institutional_domain_gated`] instead;
+    /// this ungated form is for bootstrap and in-process callers (including
+    /// tests) where authority is established out of band. No HTTP route is added
+    /// here.
     pub fn declare_institutional_domain(
         &self,
         domain_id: GovernanceDomainId,
@@ -265,6 +308,60 @@ impl crate::manager::GovernanceManager {
             .save_institutional_domain(&domain)
             .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?;
         Ok(domain)
+    }
+
+    /// Declare and persist a new [`InstitutionalDomain`], **gated** by the
+    /// app-side [`DefaultMandateGate`] over this manager's wired
+    /// [`GovernanceReceiptBackend`].
+    ///
+    /// Declaring a governed domain is an authority-bearing act (ADR-0083): this
+    /// is the authorization-resolving wrapper a routable surface (a future
+    /// declare/create HTTP route) must call instead of the bootstrap-only
+    /// [`Self::declare_institutional_domain`]. It resolves whether `actor` holds
+    /// an active, domain-scoped [`Execution`] grant binding the
+    /// `institutional_domain:declare` act — via the **real** gate resolver, the
+    /// same machinery [`Self::adopt_domain_policy`] uses — then delegates to
+    /// [`Self::declare_institutional_domain`] for the persisted create. No
+    /// resolver logic is duplicated and no new authority primitive is added.
+    ///
+    /// Fails closed: [`DeclareInstitutionalDomainError::MissingReceiptBackend`]
+    /// (no backend wired), [`DeclareInstitutionalDomainError::Unauthorized`] on
+    /// any gate rejection (wrong actor / domain / act / class, expired or revoked
+    /// authority), and [`DeclareInstitutionalDomainError::Store`] when authority
+    /// resolves but the persisted declaration fails (no domain store, already
+    /// declared, or a backend write error). Authority is resolved **before** any
+    /// store write, so an unauthorized caller never mutates state.
+    ///
+    /// [`Execution`]: icn_governance::AuthorityClass::Execution
+    pub fn declare_institutional_domain_gated(
+        &self,
+        domain_id: GovernanceDomainId,
+        owning_entity_class: BootstrapEntityType,
+        charter_ref: Option<CharterId>,
+        actor: &Did,
+        now: Timestamp,
+    ) -> Result<InstitutionalDomain, DeclareInstitutionalDomainError> {
+        let backend = self
+            .receipt_backend()
+            .ok_or(DeclareInstitutionalDomainError::MissingReceiptBackend)?;
+
+        // Resolve declaration authority through the real gate BEFORE any store
+        // write, so an unauthorized caller never creates a domain. Mirrors the
+        // adoption seam: actor → active grants → TypedScope.domain + Execution
+        // class + `institutional_domain:declare` act token + mandate lifecycle.
+        let gate = DefaultMandateGate::new(backend);
+        let req = MandateRequest {
+            actor: actor.clone(),
+            domain: domain_id.clone(),
+            act: MandateAct::DeclareInstitutionalDomain,
+            target: MandateTarget::Domain(domain_id.clone()),
+            at: now,
+        };
+        gate.require(&req)
+            .map_err(DeclareInstitutionalDomainError::Unauthorized)?;
+
+        self.declare_institutional_domain(domain_id, owning_entity_class, charter_ref)
+            .map_err(DeclareInstitutionalDomainError::Store)
     }
 
     /// Adopt `policy` as the current policy of a **persisted**
@@ -1036,5 +1133,253 @@ mod tests {
             .unwrap()
             .expect("persisted");
         assert_eq!(reloaded.current_policy(), Some(&expected));
+    }
+
+    // ----- gated declaration tests (#2142 declare-gate lane) ----------------
+
+    /// An Execution grant for `actor`, bound to `dom`, carrying the
+    /// `institutional_domain:declare` act token — the declare analogue of
+    /// [`adopt_grant`].
+    fn declare_grant(actor: Did, dom: &str, grant_id: AuthorityGrantId) -> AuthorityGrant {
+        AuthorityGrant {
+            id: grant_id,
+            class: AuthorityClass::Execution,
+            grantor: GrantorEntityId("coop:alpha".into()),
+            grantee: Grantee::Person(actor),
+            scope: TypedScope {
+                domain: Some(domain_id(dom)),
+                action_kind: vec!["institutional_domain:declare".into()],
+                ..TypedScope::default()
+            },
+            granted_by: Some(decision()),
+            valid_from: 0,
+            valid_until: Some(1000),
+            revoked_at: None,
+        }
+    }
+
+    fn live_declare_fixture(actor: &Did, dom: &str) -> Arc<TestBackend> {
+        let gid = AuthorityGrantId::new();
+        let grant = declare_grant(actor.clone(), dom, gid.clone());
+        let mandate = backing_mandate(gid);
+        TestBackend::new(vec![mandate], vec![grant])
+    }
+
+    #[test]
+    fn gated_declare_succeeds_with_active_declare_grant() {
+        let actor = did(1);
+        let mgr = manager_with_stores(live_declare_fixture(&actor, "coop-alpha"));
+        let declared = mgr
+            .declare_institutional_domain_gated(
+                domain_id("coop-alpha"),
+                BootstrapEntityType::Cooperative,
+                None,
+                &actor,
+                100,
+            )
+            .expect("an active domain-scoped declare grant authorizes declaration");
+        assert_eq!(declared.domain_id, domain_id("coop-alpha"));
+        assert!(declared.current_policy().is_none());
+
+        // The gated declaration is persisted, identical to the ungated path.
+        let store = mgr.domain_state_store().unwrap();
+        let loaded = store
+            .get_institutional_domain(&domain_id("coop-alpha"))
+            .unwrap()
+            .expect("persisted");
+        assert_eq!(loaded, declared);
+    }
+
+    #[test]
+    fn gated_declare_fails_closed_without_receipt_backend() {
+        // No receipt backend → declaration authority cannot be resolved. The
+        // backend check precedes any store access, so this fails closed even
+        // with no domain store wired.
+        let mgr = GovernanceManager::new();
+        let err = mgr
+            .declare_institutional_domain_gated(
+                domain_id("coop-alpha"),
+                BootstrapEntityType::Cooperative,
+                None,
+                &did(1),
+                100,
+            )
+            .expect_err("a manager with no receipt backend must fail closed");
+        assert!(matches!(
+            err,
+            DeclareInstitutionalDomainError::MissingReceiptBackend
+        ));
+    }
+
+    #[test]
+    fn gated_declare_rejects_wrong_actor() {
+        // Grant is for did(1); did(2) attempts the declaration with no grant.
+        let mgr = manager_with_stores(live_declare_fixture(&did(1), "coop-alpha"));
+        let err = mgr
+            .declare_institutional_domain_gated(
+                domain_id("coop-alpha"),
+                BootstrapEntityType::Cooperative,
+                None,
+                &did(2),
+                100,
+            )
+            .expect_err("an actor with no authorizing grant must be refused");
+        assert!(matches!(
+            err,
+            DeclareInstitutionalDomainError::Unauthorized(MandateGateError::Rejected(
+                MandateRejection::NoMandate
+            ))
+        ));
+        // Nothing persisted on a gate rejection.
+        let store = mgr.domain_state_store().unwrap();
+        assert!(store
+            .get_institutional_domain(&domain_id("coop-alpha"))
+            .unwrap()
+            .is_none());
+    }
+
+    #[test]
+    fn gated_declare_rejects_wrong_domain() {
+        // Grant scoped to coop-beta; the declaration target is coop-alpha.
+        let actor = did(1);
+        let mgr = manager_with_stores(live_declare_fixture(&actor, "coop-beta"));
+        let err = mgr
+            .declare_institutional_domain_gated(
+                domain_id("coop-alpha"),
+                BootstrapEntityType::Cooperative,
+                None,
+                &actor,
+                100,
+            )
+            .expect_err("a grant scoped to another domain must be refused");
+        assert!(matches!(
+            err,
+            DeclareInstitutionalDomainError::Unauthorized(MandateGateError::Rejected(
+                MandateRejection::WrongTarget
+            ))
+        ));
+    }
+
+    #[test]
+    fn gated_declare_rejects_wrong_act_token() {
+        // Right actor / domain / Execution class, but the grant authorizes
+        // adoption (`domain_policy:adopt`), not declaration — the declare act
+        // token / class is absent, so the gate refuses.
+        let actor = did(1);
+        let mgr = manager_with_stores(live_adopt_fixture(&actor, "coop-alpha").0);
+        let err = mgr
+            .declare_institutional_domain_gated(
+                domain_id("coop-alpha"),
+                BootstrapEntityType::Cooperative,
+                None,
+                &actor,
+                100,
+            )
+            .expect_err("a grant that does not bind the declare act must be refused");
+        assert!(matches!(
+            err,
+            DeclareInstitutionalDomainError::Unauthorized(MandateGateError::Rejected(
+                MandateRejection::WrongTarget
+            ))
+        ));
+    }
+
+    #[test]
+    fn gated_declare_rejects_expired_grant() {
+        let actor = did(1);
+        let gid = AuthorityGrantId::new();
+        let mut grant = declare_grant(actor.clone(), "coop-alpha", gid.clone());
+        grant.valid_until = Some(50); // expired well before `at = 100`
+        let mandate = backing_mandate(gid);
+        let mgr = manager_with_stores(TestBackend::new(vec![mandate], vec![grant]));
+        let err = mgr
+            .declare_institutional_domain_gated(
+                domain_id("coop-alpha"),
+                BootstrapEntityType::Cooperative,
+                None,
+                &actor,
+                100,
+            )
+            .expect_err("an expired grant must be refused");
+        assert!(matches!(
+            err,
+            DeclareInstitutionalDomainError::Unauthorized(MandateGateError::Rejected(
+                MandateRejection::NoMandate
+            ))
+        ));
+    }
+
+    #[test]
+    fn gated_declare_rejects_revoked_mandate() {
+        let actor = did(1);
+        let gid = AuthorityGrantId::new();
+        let grant = declare_grant(actor.clone(), "coop-alpha", gid.clone());
+        let mut mandate = backing_mandate(gid);
+        mandate.status = MandateStatus::Revoked; // grant active, mandate dead
+        let mgr = manager_with_stores(TestBackend::new(vec![mandate], vec![grant]));
+        let err = mgr
+            .declare_institutional_domain_gated(
+                domain_id("coop-alpha"),
+                BootstrapEntityType::Cooperative,
+                None,
+                &actor,
+                100,
+            )
+            .expect_err("a revoked backing mandate must be refused");
+        assert!(matches!(
+            err,
+            DeclareInstitutionalDomainError::Unauthorized(MandateGateError::Rejected(
+                MandateRejection::Revoked
+            ))
+        ));
+    }
+
+    #[test]
+    fn gated_declare_still_refuses_duplicate() {
+        // Authority resolves, but a record already exists → the underlying
+        // store refusal surfaces as Store(AlreadyDeclared).
+        let actor = did(1);
+        let mgr = manager_with_stores(live_declare_fixture(&actor, "coop-alpha"));
+        mgr.declare_institutional_domain_gated(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+            &actor,
+            100,
+        )
+        .expect("first gated declare succeeds");
+        let err = mgr
+            .declare_institutional_domain_gated(
+                domain_id("coop-alpha"),
+                BootstrapEntityType::Cooperative,
+                None,
+                &actor,
+                100,
+            )
+            .expect_err("a second gated declare must fail");
+        assert!(matches!(
+            err,
+            DeclareInstitutionalDomainError::Store(InstitutionalDomainStoreError::AlreadyDeclared)
+        ));
+    }
+
+    #[test]
+    fn ungated_declare_works_without_receipt_backend() {
+        // The bootstrap/in-process seam needs no authority resolver: it persists
+        // with only a domain store wired (no receipt backend), proving it is a
+        // distinct, deliberately-ungated path from the gated seam above.
+        let domain_store = Arc::new(SledGovernanceStateStore::new(Arc::new(
+            icn_store::SledStore::temporary().expect("temp sled"),
+        )));
+        let mgr = GovernanceManager::new().with_domain_store(domain_store);
+        let declared = mgr
+            .declare_institutional_domain(
+                domain_id("coop-alpha"),
+                BootstrapEntityType::Cooperative,
+                None,
+            )
+            .expect("ungated declare persists without any authority resolution");
+        assert_eq!(declared.domain_id, domain_id("coop-alpha"));
+        assert!(declared.current_policy().is_none());
     }
 }
