@@ -3230,9 +3230,20 @@ pub async fn adopt_domain_policy<E: GovernanceEventEmitter + Clone + 'static>(
     // foreign domain.
     let policy = DomainPolicy::new(domain.clone(), req.policy_content.as_bytes());
 
+    // Persist the policy body alongside the adopted ref (#2180), passing the
+    // same bytes the id was content-addressed from, so the adopted ref can be
+    // resolved back to its text. The manager stores the body only after the gate
+    // resolves and before the current_policy update, so a rejection persists
+    // neither.
     let policy_ref = ctx
         .manager
-        .adopt_domain_policy_persisted(&domain, &policy, &actor, current_time_secs())
+        .adopt_domain_policy_persisted_with_body(
+            &domain,
+            &policy,
+            Some(req.policy_content.as_bytes()),
+            &actor,
+            current_time_secs(),
+        )
         .map_err(institutional_domain_store_err_to_api)?;
 
     Ok(HttpResponse::Ok().json(AdoptDomainPolicyResponse {

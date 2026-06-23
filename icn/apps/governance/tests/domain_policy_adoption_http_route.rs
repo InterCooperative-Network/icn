@@ -300,6 +300,186 @@ async fn adopt_route_persists_current_policy_and_survives_reload() {
 }
 
 #[actix_web::test]
+async fn adopt_route_stores_policy_body_and_resolves() {
+    // #2180: adoption now persists the raw policy_content body by DomainPolicyId,
+    // so an adopted ref can be resolved back to the bytes that produced it.
+    let caller = fresh_did();
+    let gid = AuthorityGrantId::new();
+    let grant = adopt_grant(caller.clone(), "coop-alpha", gid.clone());
+    let mandate = backing_mandate(gid);
+    let h = make_harness(TestBackend::new(vec![mandate], vec![grant]));
+    seed_governance_domain(&h.ctx.manager, &caller, "coop-alpha").await;
+    h.ctx
+        .manager
+        .declare_institutional_domain(
+            GovernanceDomainId::new("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .expect("declare");
+
+    let app = gov_app!(h.ctx.clone(), &caller, Some("governance:write".to_string()));
+    let req = test::TestRequest::post()
+        .uri(&adopt_uri("coop-alpha"))
+        .set_json(serde_json::json!({ "policy_content": "policy v1 body" }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::OK, "adopt must succeed");
+
+    let expected = DomainPolicy::new(GovernanceDomainId::new("coop-alpha"), b"policy v1 body");
+
+    // The body is persisted under the adopted DomainPolicyId, retrievable
+    // directly from the store...
+    assert_eq!(
+        h.store
+            .get_domain_policy_body(&expected.id)
+            .expect("get body"),
+        Some(b"policy v1 body".to_vec()),
+        "adoption must persist the policy_content body by DomainPolicyId"
+    );
+    // ...and via the manager-level resolve path.
+    assert_eq!(
+        h.ctx
+            .manager
+            .get_domain_policy_body(&expected.id)
+            .expect("resolve body"),
+        Some(b"policy v1 body".to_vec()),
+        "the adopted ref must resolve to its body via the manager"
+    );
+}
+
+#[actix_web::test]
+async fn adopt_route_oversize_does_not_store_body() {
+    use icn_governance_actor::http::validation::MAX_DOMAIN_POLICY_CONTENT_BYTES;
+    let caller = fresh_did();
+    let gid = AuthorityGrantId::new();
+    let grant = adopt_grant(caller.clone(), "coop-alpha", gid.clone());
+    let mandate = backing_mandate(gid);
+    let h = make_harness(TestBackend::new(vec![mandate], vec![grant]));
+    seed_governance_domain(&h.ctx.manager, &caller, "coop-alpha").await;
+    h.ctx
+        .manager
+        .declare_institutional_domain(
+            GovernanceDomainId::new("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .expect("declare");
+
+    let oversize = "a".repeat(MAX_DOMAIN_POLICY_CONTENT_BYTES + 1);
+    let app = gov_app!(h.ctx.clone(), &caller, Some("governance:write".to_string()));
+    let req = test::TestRequest::post()
+        .uri(&adopt_uri("coop-alpha"))
+        .set_json(serde_json::json!({ "policy_content": oversize }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::BAD_REQUEST,
+        "oversize must be 400"
+    );
+
+    let rejected = DomainPolicy::new(GovernanceDomainId::new("coop-alpha"), oversize.as_bytes());
+    assert!(
+        h.store
+            .get_domain_policy_body(&rejected.id)
+            .expect("get body")
+            .is_none(),
+        "a rejected oversize body must not be persisted"
+    );
+}
+
+#[actix_web::test]
+async fn adopt_route_empty_does_not_store_body() {
+    let caller = fresh_did();
+    let gid = AuthorityGrantId::new();
+    let grant = adopt_grant(caller.clone(), "coop-alpha", gid.clone());
+    let mandate = backing_mandate(gid);
+    let h = make_harness(TestBackend::new(vec![mandate], vec![grant]));
+    seed_governance_domain(&h.ctx.manager, &caller, "coop-alpha").await;
+    h.ctx
+        .manager
+        .declare_institutional_domain(
+            GovernanceDomainId::new("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .expect("declare");
+
+    let app = gov_app!(h.ctx.clone(), &caller, Some("governance:write".to_string()));
+    let req = test::TestRequest::post()
+        .uri(&adopt_uri("coop-alpha"))
+        .set_json(serde_json::json!({ "policy_content": "   " }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::BAD_REQUEST, "empty must be 400");
+
+    let rejected = DomainPolicy::new(GovernanceDomainId::new("coop-alpha"), b"   ");
+    assert!(
+        h.store
+            .get_domain_policy_body(&rejected.id)
+            .expect("get body")
+            .is_none(),
+        "a rejected empty/whitespace body must not be persisted"
+    );
+}
+
+#[actix_web::test]
+async fn adopt_route_unauthorized_does_not_store_body() {
+    // An actor with no authorizing grant is rejected by the gate (403); the
+    // body must not be persisted, mirroring the unchanged current_policy.
+    let member_a = fresh_did();
+    let member_b = fresh_did();
+    assert_ne!(member_a, member_b);
+    let gid = AuthorityGrantId::new();
+    let grant = adopt_grant(member_a.clone(), "coop-alpha", gid.clone());
+    let mandate = backing_mandate(gid);
+    let h = make_harness(TestBackend::new(vec![mandate], vec![grant]));
+    h.ctx
+        .manager
+        .create_domain(
+            GovernanceDomainId::new("coop-alpha"),
+            "Test Coop".to_string(),
+            "default".to_string(),
+            GovernanceParams::default(),
+            MembershipConfig {
+                source: MembershipSource::StaticList(vec![member_a.clone(), member_b.clone()]),
+            },
+        )
+        .await
+        .expect("create_domain");
+    h.ctx
+        .manager
+        .declare_institutional_domain(
+            GovernanceDomainId::new("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .expect("declare");
+
+    let app = gov_app!(
+        h.ctx.clone(),
+        &member_b,
+        Some("governance:write".to_string())
+    );
+    let req = test::TestRequest::post()
+        .uri(&adopt_uri("coop-alpha"))
+        .set_json(serde_json::json!({ "policy_content": "policy v1 body" }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(resp.status(), StatusCode::FORBIDDEN, "no grant -> 403");
+
+    let rejected = DomainPolicy::new(GovernanceDomainId::new("coop-alpha"), b"policy v1 body");
+    assert!(
+        h.store
+            .get_domain_policy_body(&rejected.id)
+            .expect("get body")
+            .is_none(),
+        "a gate-rejected adoption must not persist the body"
+    );
+}
+
+#[actix_web::test]
 async fn adopt_route_requires_governance_write_scope() {
     let caller = fresh_did();
     let gid = AuthorityGrantId::new();

@@ -31,8 +31,8 @@ use std::sync::Arc;
 
 use icn_governance::Timestamp;
 use icn_governance::{
-    BootstrapEntityType, CharterId, DomainPolicy, DomainPolicyRef, GovernanceDomainId,
-    InstitutionalDomain, InstitutionalDomainError,
+    BootstrapEntityType, CharterId, DomainPolicy, DomainPolicyId, DomainPolicyRef,
+    GovernanceDomainId, InstitutionalDomain, InstitutionalDomainError,
 };
 use icn_identity::Did;
 
@@ -387,13 +387,49 @@ impl crate::manager::GovernanceManager {
     /// [`InstitutionalDomain`], loading it by `domain_id`, resolving authority
     /// through the existing gate, and saving the mutated record on success.
     ///
+    /// Thin body-less wrapper over
+    /// [`Self::adopt_domain_policy_persisted_with_body`] (delegates with
+    /// `policy_content: None`) — it adopts the ref without persisting the policy
+    /// body. Used by in-process callers and tests that do not carry the raw
+    /// `policy_content`; the HTTP adoption route uses the `_with_body` form so an
+    /// adopted ref can be resolved back to its text.
+    pub fn adopt_domain_policy_persisted(
+        &self,
+        domain_id: &GovernanceDomainId,
+        policy: &DomainPolicy,
+        actor: &Did,
+        now: Timestamp,
+    ) -> Result<DomainPolicyRef, InstitutionalDomainStoreError> {
+        self.adopt_domain_policy_persisted_with_body(domain_id, policy, None, actor, now)
+    }
+
+    /// Like [`Self::adopt_domain_policy_persisted`], but also persists the raw
+    /// `DomainPolicy` body bytes through the #2179 body store when
+    /// `policy_content` is `Some`, so the adopted [`DomainPolicyRef`] can later
+    /// be resolved back to the text that produced it (the #2180 adoption wiring).
+    ///
     /// Composes the existing pieces — it does **not** bypass the gate:
     /// `load → adopt_domain_policy (real DefaultMandateGate + pure-core commit)
-    /// → save`. Fails closed with [`InstitutionalDomainStoreError::MissingDomainStore`]
-    /// (no store), [`InstitutionalDomainStoreError::NotDeclared`] (domain never
-    /// declared), [`InstitutionalDomainStoreError::Adopt`] (gate/structural
-    /// rejection — state left unchanged, nothing saved), or
-    /// [`InstitutionalDomainStoreError::Store`] (backend read/write error).
+    /// → save body → save domain`. Fails closed with
+    /// [`InstitutionalDomainStoreError::MissingDomainStore`] (no store),
+    /// [`InstitutionalDomainStoreError::NotDeclared`] (domain never declared),
+    /// [`InstitutionalDomainStoreError::Adopt`] (gate/structural rejection —
+    /// state left unchanged, nothing saved), or
+    /// [`InstitutionalDomainStoreError::Store`] (backend read/write error, **or**
+    /// a fail-closed content/`DomainPolicyId` hash mismatch from the body store).
+    ///
+    /// `policy_content`, when present, MUST be the bytes `policy.id` was
+    /// content-addressed from; the body store re-hashes and fails closed
+    /// otherwise.
+    ///
+    /// # Ordering and failure isolation
+    ///
+    /// Inside the per-domain critical section the order is load → gate-adopt →
+    /// **save body** → save domain, so a gate/structural rejection returns
+    /// before any body is written, and a body-store failure returns before
+    /// `current_policy` is persisted (the domain record is left unchanged). The
+    /// body write is idempotent (content-addressed), so a retry after a later
+    /// failure cannot corrupt it.
     ///
     /// # Concurrency
     ///
@@ -410,10 +446,11 @@ impl crate::manager::GovernanceManager {
     /// route relies on. It is **not** a cross-process / multi-writer guarantee:
     /// a transactional store primitive (atomic compare-and-swap `get`+`put`)
     /// for multi-writer deployments remains later work.
-    pub fn adopt_domain_policy_persisted(
+    pub fn adopt_domain_policy_persisted_with_body(
         &self,
         domain_id: &GovernanceDomainId,
         policy: &DomainPolicy,
+        policy_content: Option<&[u8]>,
         actor: &Did,
         now: Timestamp,
     ) -> Result<DomainPolicyRef, InstitutionalDomainStoreError> {
@@ -438,15 +475,43 @@ impl crate::manager::GovernanceManager {
             .ok_or(InstitutionalDomainStoreError::NotDeclared)?;
 
         // Real gate resolution + pure-core structural commit. On rejection the
-        // in-memory `domain` is left unchanged and nothing is persisted.
+        // in-memory `domain` is left unchanged and nothing is persisted, so a
+        // gate failure never reaches the body write below.
         let policy_ref = self
             .adopt_domain_policy(&mut domain, policy, actor, now)
             .map_err(InstitutionalDomainStoreError::Adopt)?;
+
+        // Persist the body BEFORE the current_policy update: a body-store
+        // failure (including a fail-closed content/id hash mismatch) returns
+        // here, leaving the domain record's current_policy unchanged.
+        if let Some(content) = policy_content {
+            store
+                .save_domain_policy_body(&policy_ref.id, content)
+                .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?;
+        }
 
         store
             .save_institutional_domain(&domain)
             .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?;
         Ok(policy_ref)
+    }
+
+    /// Resolve the raw `DomainPolicy` body bytes for a content-addressed
+    /// [`DomainPolicyId`] (e.g. an adopted `current_policy` ref's id), via the
+    /// wired body store. Fails closed with
+    /// [`InstitutionalDomainStoreError::MissingDomainStore`] when no store is
+    /// wired; returns `Ok(None)` when no body has been persisted for `id`. The
+    /// store re-hashes the stored bytes and fails closed on a key/body mismatch.
+    pub fn get_domain_policy_body(
+        &self,
+        id: &DomainPolicyId,
+    ) -> Result<Option<Vec<u8>>, InstitutionalDomainStoreError> {
+        let store = self
+            .domain_state_store()
+            .ok_or(InstitutionalDomainStoreError::MissingDomainStore)?;
+        store
+            .get_domain_policy_body(id)
+            .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))
     }
 }
 
@@ -963,6 +1028,84 @@ mod tests {
             .unwrap()
             .expect("persisted");
         assert_eq!(reloaded.current_policy(), Some(&policy.policy_ref()));
+    }
+
+    #[test]
+    fn adopt_persisted_with_body_stores_and_resolves() {
+        // #2180 happy path: a body matching the policy id is persisted during
+        // adoption and resolvable by DomainPolicyId via the manager.
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = manager_with_stores(backend);
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy body v1");
+        let adopted = mgr
+            .adopt_domain_policy_persisted_with_body(
+                &domain_id("coop-alpha"),
+                &policy,
+                Some(b"policy body v1"),
+                &actor,
+                100,
+            )
+            .expect("adoption with a matching body succeeds");
+        assert_eq!(adopted, policy.policy_ref());
+        assert_eq!(
+            mgr.get_domain_policy_body(&policy.id).unwrap(),
+            Some(b"policy body v1".to_vec()),
+            "the adopted body resolves by DomainPolicyId"
+        );
+    }
+
+    #[test]
+    fn adopt_persisted_with_body_hash_mismatch_fails_closed() {
+        // A body whose bytes do not hash to the adopted policy's DomainPolicyId
+        // is rejected by the body store's content-address check. Because the
+        // body save runs AFTER the gate resolves but BEFORE the current_policy
+        // update, the rejection leaves current_policy unchanged and persists no
+        // body — this is the ordering guarantee the adoption route relies on.
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = manager_with_stores(backend);
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        // policy.id is content-addressed from b"real policy"; hand the adoption a
+        // DIFFERENT body so the store's re-hash check fails closed.
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"real policy");
+        let err = mgr
+            .adopt_domain_policy_persisted_with_body(
+                &domain_id("coop-alpha"),
+                &policy,
+                Some(b"tampered body"),
+                &actor,
+                100,
+            )
+            .expect_err("a content/id hash mismatch must fail closed");
+        assert!(matches!(err, InstitutionalDomainStoreError::Store(_)));
+
+        let store = mgr.domain_state_store().unwrap();
+        let reloaded = store
+            .get_institutional_domain(&domain_id("coop-alpha"))
+            .unwrap()
+            .expect("declared domain still present");
+        assert!(
+            reloaded.current_policy().is_none(),
+            "a body-store failure must leave current_policy unchanged"
+        );
+        assert!(
+            store.get_domain_policy_body(&policy.id).unwrap().is_none(),
+            "no body may be persisted when the adoption fails closed"
+        );
     }
 
     #[test]
