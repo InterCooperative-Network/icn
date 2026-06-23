@@ -123,11 +123,69 @@ pub fn adopt_domain_policy_gated(
         .map_err(AdoptDomainPolicyError::Core)
 }
 
+/// Error from the [`GovernanceManager`](crate::manager::GovernanceManager)
+/// domain-policy adoption seam.
+#[derive(Debug)]
+pub enum DomainPolicyAdoptionError {
+    /// The manager has no receipt/grant backend wired, so authority cannot be
+    /// resolved. Fail closed — a manager that cannot resolve authority must
+    /// never allow adoption.
+    MissingReceiptBackend,
+    /// The gated adoption was refused (unauthorized, backend read failure, or
+    /// pure-core structural rejection).
+    Gated(AdoptDomainPolicyError),
+}
+
+impl std::fmt::Display for DomainPolicyAdoptionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingReceiptBackend => write!(
+                f,
+                "domain policy adoption fail-closed: no receipt backend wired"
+            ),
+            Self::Gated(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for DomainPolicyAdoptionError {}
+
+impl crate::manager::GovernanceManager {
+    /// Adopt `policy` as `domain`'s current policy, resolving authority through
+    /// this manager's wired [`GovernanceReceiptBackend`] and the app-side
+    /// [`DefaultMandateGate`].
+    ///
+    /// Fails closed with [`DomainPolicyAdoptionError::MissingReceiptBackend`]
+    /// when no backend is wired; otherwise delegates to
+    /// [`adopt_domain_policy_gated`], mutating the caller-held `domain` only on
+    /// success and returning the adopted [`DomainPolicyRef`].
+    ///
+    /// **Persistence note:** there is no `InstitutionalDomain` store yet, so
+    /// this seam operates on a caller-held domain; durable persistence of the
+    /// adopted policy is a later manager/domain-store lane. This method adds no
+    /// HTTP surface and changes no auth model — it composes the existing gate
+    /// and the pure-core structural commit behind the governance-app boundary.
+    pub fn adopt_domain_policy(
+        &self,
+        domain: &mut InstitutionalDomain,
+        policy: &DomainPolicy,
+        actor: &Did,
+        now: Timestamp,
+    ) -> Result<DomainPolicyRef, DomainPolicyAdoptionError> {
+        let backend = self
+            .receipt_backend()
+            .ok_or(DomainPolicyAdoptionError::MissingReceiptBackend)?;
+        adopt_domain_policy_gated(backend, domain, policy, actor, now)
+            .map_err(DomainPolicyAdoptionError::Gated)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
+    use crate::manager::GovernanceManager;
     use crate::mandate_gate::MandateRejection;
     use icn_governance::{
         AuthorityClass, AuthorityGrant, AuthorityGrantId, BootstrapEntityType, DecisionProvenance,
@@ -405,6 +463,142 @@ mod tests {
         assert!(matches!(
             err,
             AdoptDomainPolicyError::Core(InstitutionalDomainError::PolicyForOtherDomain)
+        ));
+        assert!(domain.current_policy().is_none());
+    }
+
+    // ----- GovernanceManager seam tests -------------------------------------
+
+    fn manager_with(backend: Arc<TestBackend>) -> GovernanceManager {
+        GovernanceManager::new().with_receipt_store(backend)
+    }
+
+    #[test]
+    fn manager_adoption_succeeds_with_active_grant() {
+        let actor = did(1);
+        let gid = AuthorityGrantId::new();
+        let grant = adopt_grant(actor.clone(), "coop-alpha", gid.clone());
+        let mandate = backing_mandate(gid);
+        let manager = manager_with(TestBackend::new(vec![mandate], vec![grant]));
+
+        let mut domain = coop_alpha();
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
+
+        let adopted = manager
+            .adopt_domain_policy(&mut domain, &policy, &actor, 100)
+            .expect("an active domain-scoped grant authorizes adoption via the manager");
+        assert_eq!(adopted, policy.policy_ref());
+        assert_eq!(domain.current_policy(), Some(&policy.policy_ref()));
+    }
+
+    #[test]
+    fn manager_adoption_fails_closed_without_receipt_backend() {
+        // A manager that cannot resolve authority must never silently allow.
+        let manager = GovernanceManager::new();
+        let mut domain = coop_alpha();
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
+
+        let err = manager
+            .adopt_domain_policy(&mut domain, &policy, &did(1), 100)
+            .expect_err("a manager with no receipt backend must fail closed");
+        assert!(matches!(
+            err,
+            DomainPolicyAdoptionError::MissingReceiptBackend
+        ));
+        assert!(domain.current_policy().is_none());
+    }
+
+    #[test]
+    fn manager_adoption_rejects_wrong_actor() {
+        let gid = AuthorityGrantId::new();
+        let grant = adopt_grant(did(1), "coop-alpha", gid.clone());
+        let mandate = backing_mandate(gid);
+        let manager = manager_with(TestBackend::new(vec![mandate], vec![grant]));
+
+        let mut domain = coop_alpha();
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
+
+        let err = manager
+            .adopt_domain_policy(&mut domain, &policy, &did(2), 100)
+            .expect_err("an actor with no authorizing grant must be refused");
+        assert!(matches!(
+            err,
+            DomainPolicyAdoptionError::Gated(AdoptDomainPolicyError::Unauthorized(
+                MandateGateError::Rejected(MandateRejection::NoMandate)
+            ))
+        ));
+        assert!(domain.current_policy().is_none());
+    }
+
+    #[test]
+    fn manager_adoption_rejects_wrong_domain() {
+        let actor = did(1);
+        let gid = AuthorityGrantId::new();
+        // Grant bound to coop-beta; adoption target is coop-alpha.
+        let grant = adopt_grant(actor.clone(), "coop-beta", gid.clone());
+        let mandate = backing_mandate(gid);
+        let manager = manager_with(TestBackend::new(vec![mandate], vec![grant]));
+
+        let mut domain = coop_alpha();
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
+
+        let err = manager
+            .adopt_domain_policy(&mut domain, &policy, &actor, 100)
+            .expect_err("a grant scoped to another domain must be refused");
+        assert!(matches!(
+            err,
+            DomainPolicyAdoptionError::Gated(AdoptDomainPolicyError::Unauthorized(
+                MandateGateError::Rejected(MandateRejection::WrongTarget)
+            ))
+        ));
+        assert!(domain.current_policy().is_none());
+    }
+
+    #[test]
+    fn manager_adoption_rejects_revoked_authority() {
+        let actor = did(1);
+        let gid = AuthorityGrantId::new();
+        let grant = adopt_grant(actor.clone(), "coop-alpha", gid.clone());
+        let mut mandate = backing_mandate(gid);
+        mandate.status = MandateStatus::Revoked;
+        let manager = manager_with(TestBackend::new(vec![mandate], vec![grant]));
+
+        let mut domain = coop_alpha();
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
+
+        let err = manager
+            .adopt_domain_policy(&mut domain, &policy, &actor, 100)
+            .expect_err("a revoked backing mandate must be refused");
+        assert!(matches!(
+            err,
+            DomainPolicyAdoptionError::Gated(AdoptDomainPolicyError::Unauthorized(
+                MandateGateError::Rejected(MandateRejection::Revoked)
+            ))
+        ));
+        assert!(domain.current_policy().is_none());
+    }
+
+    #[test]
+    fn manager_adoption_preserves_pure_core_defense_in_depth() {
+        // Gate authorizes the actor for coop-alpha, but the policy is authored
+        // for coop-beta: the pure-core structural check must still reject it.
+        let actor = did(1);
+        let gid = AuthorityGrantId::new();
+        let grant = adopt_grant(actor.clone(), "coop-alpha", gid.clone());
+        let mandate = backing_mandate(gid);
+        let manager = manager_with(TestBackend::new(vec![mandate], vec![grant]));
+
+        let mut domain = coop_alpha();
+        let foreign_policy = DomainPolicy::new(domain_id("coop-beta"), b"policy v1");
+
+        let err = manager
+            .adopt_domain_policy(&mut domain, &foreign_policy, &actor, 100)
+            .expect_err("a policy authored for another domain must be refused by the core check");
+        assert!(matches!(
+            err,
+            DomainPolicyAdoptionError::Gated(AdoptDomainPolicyError::Core(
+                InstitutionalDomainError::PolicyForOtherDomain
+            ))
         ));
         assert!(domain.current_policy().is_none());
     }
