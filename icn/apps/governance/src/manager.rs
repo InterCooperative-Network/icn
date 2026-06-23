@@ -2851,6 +2851,28 @@ impl GovernanceManager {
         self.receipt_store.clone()
     }
 
+    /// Attach a [`GovernanceStateStore`] for governance-domain and
+    /// `InstitutionalDomain` persistence.
+    ///
+    /// Symmetric with [`Self::with_receipt_store`]. Used by the persisted
+    /// domain-policy adoption path ([`crate::domain_policy_adoption`]) to
+    /// load/save `InstitutionalDomain` records. Unlike [`Self::new_with_sled`],
+    /// this does **not** seed the in-memory `GovernanceDomain` cache — it only
+    /// wires the store (the institutional-domain key space is separate).
+    pub fn with_domain_store(mut self, store: Arc<dyn GovernanceStateStore>) -> Self {
+        self.domain_store = Some(store);
+        self
+    }
+
+    /// Clone the attached [`GovernanceStateStore`], if one is wired.
+    ///
+    /// Used by the persisted domain-policy adoption seam to load/save
+    /// `InstitutionalDomain` records. Returns `None` when no store is wired —
+    /// callers must fail closed in that case.
+    pub(crate) fn domain_state_store(&self) -> Option<Arc<dyn GovernanceStateStore>> {
+        self.domain_store.clone()
+    }
+
     /// Replace the structure store backend.
     ///
     /// Use this to configure Sled-backed persistent storage for structures.

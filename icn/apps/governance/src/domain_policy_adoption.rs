@@ -31,7 +31,8 @@ use std::sync::Arc;
 
 use icn_governance::Timestamp;
 use icn_governance::{
-    DomainPolicy, DomainPolicyRef, InstitutionalDomain, InstitutionalDomainError,
+    BootstrapEntityType, CharterId, DomainPolicy, DomainPolicyRef, GovernanceDomainId,
+    InstitutionalDomain, InstitutionalDomainError,
 };
 use icn_identity::Did;
 
@@ -150,6 +151,52 @@ impl std::fmt::Display for DomainPolicyAdoptionError {
 
 impl std::error::Error for DomainPolicyAdoptionError {}
 
+/// Error from the persisted `InstitutionalDomain` manager operations
+/// (`declare_institutional_domain` / `adopt_domain_policy_persisted`).
+#[derive(Debug)]
+pub enum InstitutionalDomainStoreError {
+    /// No [`GovernanceStateStore`] is wired, so the `InstitutionalDomain` record
+    /// cannot be loaded or persisted. Fail closed.
+    MissingDomainStore,
+    /// `declare`: an `InstitutionalDomain` is already declared for this
+    /// `GovernanceDomainId`.
+    AlreadyDeclared,
+    /// `adopt`: no `InstitutionalDomain` has been declared for this
+    /// `GovernanceDomainId`.
+    NotDeclared,
+    /// The backing store returned an error — including the fail-closed default
+    /// for a `GovernanceStateStore` that does not implement institutional-domain
+    /// persistence.
+    Store(String),
+    /// The gated adoption itself was refused (delegated to
+    /// [`crate::manager::GovernanceManager::adopt_domain_policy`]).
+    Adopt(DomainPolicyAdoptionError),
+}
+
+impl std::fmt::Display for InstitutionalDomainStoreError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::MissingDomainStore => write!(
+                f,
+                "institutional domain persistence fail-closed: no governance state store wired"
+            ),
+            Self::AlreadyDeclared => {
+                write!(
+                    f,
+                    "institutional domain already declared for this domain id"
+                )
+            }
+            Self::NotDeclared => {
+                write!(f, "no institutional domain declared for this domain id")
+            }
+            Self::Store(e) => write!(f, "institutional domain store error: {e}"),
+            Self::Adopt(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for InstitutionalDomainStoreError {}
+
 impl crate::manager::GovernanceManager {
     /// Adopt `policy` as `domain`'s current policy, resolving authority through
     /// this manager's wired [`GovernanceReceiptBackend`] and the app-side
@@ -177,6 +224,86 @@ impl crate::manager::GovernanceManager {
             .ok_or(DomainPolicyAdoptionError::MissingReceiptBackend)?;
         adopt_domain_policy_gated(backend, domain, policy, actor, now)
             .map_err(DomainPolicyAdoptionError::Gated)
+    }
+
+    /// Declare and persist a new [`InstitutionalDomain`] authority record for an
+    /// existing `GovernanceDomainId`, via the wired [`GovernanceStateStore`].
+    ///
+    /// Fails closed with [`InstitutionalDomainStoreError::MissingDomainStore`]
+    /// when no store is wired, and with [`InstitutionalDomainStoreError::AlreadyDeclared`]
+    /// when a record already exists for `domain_id`. The declared domain is
+    /// unbound (`current_policy == None`) until a later adoption.
+    ///
+    /// **Authority note:** declaring a governed domain is itself an
+    /// authority-bearing act. This MVP seam does **not** yet mandate-gate
+    /// `declare` (a flagged sub-question in the ADR-0083 persistence addendum);
+    /// it must not be exposed on a routable surface until that gate lands. No
+    /// HTTP route is added here.
+    pub fn declare_institutional_domain(
+        &self,
+        domain_id: GovernanceDomainId,
+        owning_entity_class: BootstrapEntityType,
+        charter_ref: Option<CharterId>,
+    ) -> Result<InstitutionalDomain, InstitutionalDomainStoreError> {
+        let store = self
+            .domain_state_store()
+            .ok_or(InstitutionalDomainStoreError::MissingDomainStore)?;
+
+        if store
+            .get_institutional_domain(&domain_id)
+            .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?
+            .is_some()
+        {
+            return Err(InstitutionalDomainStoreError::AlreadyDeclared);
+        }
+
+        let mut domain = InstitutionalDomain::declare(domain_id, owning_entity_class);
+        if let Some(charter) = charter_ref {
+            domain = domain.with_charter(charter);
+        }
+        store
+            .save_institutional_domain(&domain)
+            .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?;
+        Ok(domain)
+    }
+
+    /// Adopt `policy` as the current policy of a **persisted**
+    /// [`InstitutionalDomain`], loading it by `domain_id`, resolving authority
+    /// through the existing gate, and saving the mutated record on success.
+    ///
+    /// Composes the existing pieces — it does **not** bypass the gate:
+    /// `load → adopt_domain_policy (real DefaultMandateGate + pure-core commit)
+    /// → save`. Fails closed with [`InstitutionalDomainStoreError::MissingDomainStore`]
+    /// (no store), [`InstitutionalDomainStoreError::NotDeclared`] (domain never
+    /// declared), [`InstitutionalDomainStoreError::Adopt`] (gate/structural
+    /// rejection — state left unchanged, nothing saved), or
+    /// [`InstitutionalDomainStoreError::Store`] (backend read/write error).
+    pub fn adopt_domain_policy_persisted(
+        &self,
+        domain_id: &GovernanceDomainId,
+        policy: &DomainPolicy,
+        actor: &Did,
+        now: Timestamp,
+    ) -> Result<DomainPolicyRef, InstitutionalDomainStoreError> {
+        let store = self
+            .domain_state_store()
+            .ok_or(InstitutionalDomainStoreError::MissingDomainStore)?;
+
+        let mut domain = store
+            .get_institutional_domain(domain_id)
+            .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?
+            .ok_or(InstitutionalDomainStoreError::NotDeclared)?;
+
+        // Real gate resolution + pure-core structural commit. On rejection the
+        // in-memory `domain` is left unchanged and nothing is persisted.
+        let policy_ref = self
+            .adopt_domain_policy(&mut domain, policy, actor, now)
+            .map_err(InstitutionalDomainStoreError::Adopt)?;
+
+        store
+            .save_institutional_domain(&domain)
+            .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?;
+        Ok(policy_ref)
     }
 }
 
@@ -601,5 +728,226 @@ mod tests {
             ))
         ));
         assert!(domain.current_policy().is_none());
+    }
+
+    // ----- persisted (store-backed) manager tests --------------------------
+
+    use crate::state_store::SledGovernanceStateStore;
+
+    /// A manager wired with both a receipt backend (for the gate) and a
+    /// temporary sled-backed `GovernanceStateStore` (for InstitutionalDomain
+    /// persistence — exercises the real `SledGovernanceStateStore` impl).
+    fn manager_with_stores(backend: Arc<TestBackend>) -> GovernanceManager {
+        let domain_store = Arc::new(SledGovernanceStateStore::new(Arc::new(
+            icn_store::SledStore::temporary().expect("temp sled"),
+        )));
+        GovernanceManager::new()
+            .with_receipt_store(backend)
+            .with_domain_store(domain_store)
+    }
+
+    fn live_adopt_fixture(actor: &Did, dom: &str) -> (Arc<TestBackend>,) {
+        let gid = AuthorityGrantId::new();
+        let grant = adopt_grant(actor.clone(), dom, gid.clone());
+        let mandate = backing_mandate(gid);
+        (TestBackend::new(vec![mandate], vec![grant]),)
+    }
+
+    #[test]
+    fn declare_persists_and_round_trips() {
+        let mgr = manager_with_stores(TestBackend::new(vec![], vec![]));
+        let declared = mgr
+            .declare_institutional_domain(
+                domain_id("coop-alpha"),
+                BootstrapEntityType::Cooperative,
+                None,
+            )
+            .expect("declare succeeds");
+        assert_eq!(declared.domain_id, domain_id("coop-alpha"));
+        assert!(declared.current_policy().is_none());
+
+        let store = mgr.domain_state_store().unwrap();
+        let loaded = store
+            .get_institutional_domain(&domain_id("coop-alpha"))
+            .unwrap()
+            .expect("persisted");
+        assert_eq!(loaded, declared);
+    }
+
+    #[test]
+    fn declare_twice_fails() {
+        let mgr = manager_with_stores(TestBackend::new(vec![], vec![]));
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+        let err = mgr
+            .declare_institutional_domain(
+                domain_id("coop-alpha"),
+                BootstrapEntityType::Cooperative,
+                None,
+            )
+            .expect_err("second declare must fail");
+        assert!(matches!(
+            err,
+            InstitutionalDomainStoreError::AlreadyDeclared
+        ));
+    }
+
+    #[test]
+    fn adopt_persisted_loads_adopts_saves_and_survives_reload() {
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = manager_with_stores(backend);
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
+        let adopted = mgr
+            .adopt_domain_policy_persisted(&domain_id("coop-alpha"), &policy, &actor, 100)
+            .expect("persisted adoption succeeds");
+        assert_eq!(adopted, policy.policy_ref());
+
+        // current_policy survives reload from the store.
+        let store = mgr.domain_state_store().unwrap();
+        let reloaded = store
+            .get_institutional_domain(&domain_id("coop-alpha"))
+            .unwrap()
+            .expect("persisted");
+        assert_eq!(reloaded.current_policy(), Some(&policy.policy_ref()));
+    }
+
+    #[test]
+    fn adopt_persisted_fails_when_not_declared() {
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = manager_with_stores(backend);
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
+        let err = mgr
+            .adopt_domain_policy_persisted(&domain_id("coop-alpha"), &policy, &actor, 100)
+            .expect_err("adoption on an undeclared domain must fail");
+        assert!(matches!(err, InstitutionalDomainStoreError::NotDeclared));
+    }
+
+    #[test]
+    fn persisted_ops_fail_closed_without_domain_store() {
+        // Receipt store wired, but NO domain store.
+        let mgr = GovernanceManager::new().with_receipt_store(TestBackend::new(vec![], vec![]));
+        let declare_err = mgr
+            .declare_institutional_domain(
+                domain_id("coop-alpha"),
+                BootstrapEntityType::Cooperative,
+                None,
+            )
+            .expect_err("declare must fail closed without a store");
+        assert!(matches!(
+            declare_err,
+            InstitutionalDomainStoreError::MissingDomainStore
+        ));
+
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
+        let adopt_err = mgr
+            .adopt_domain_policy_persisted(&domain_id("coop-alpha"), &policy, &did(1), 100)
+            .expect_err("persisted adoption must fail closed without a store");
+        assert!(matches!(
+            adopt_err,
+            InstitutionalDomainStoreError::MissingDomainStore
+        ));
+    }
+
+    #[test]
+    fn adopt_persisted_rejects_wrong_actor_via_gate() {
+        // Grant is for did(1); the actor attempting adoption is did(2).
+        let (backend,) = live_adopt_fixture(&did(1), "coop-alpha");
+        let mgr = manager_with_stores(backend);
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
+        let err = mgr
+            .adopt_domain_policy_persisted(&domain_id("coop-alpha"), &policy, &did(2), 100)
+            .expect_err("wrong actor must be refused by the gate");
+        assert!(matches!(
+            err,
+            InstitutionalDomainStoreError::Adopt(DomainPolicyAdoptionError::Gated(
+                AdoptDomainPolicyError::Unauthorized(MandateGateError::Rejected(
+                    MandateRejection::NoMandate
+                ))
+            ))
+        ));
+
+        // State unchanged on rejection: current_policy stays None after reload.
+        let store = mgr.domain_state_store().unwrap();
+        assert!(store
+            .get_institutional_domain(&domain_id("coop-alpha"))
+            .unwrap()
+            .unwrap()
+            .current_policy()
+            .is_none());
+    }
+
+    #[test]
+    fn adopt_persisted_rejects_revoked_authority_via_gate() {
+        let actor = did(1);
+        let gid = AuthorityGrantId::new();
+        let grant = adopt_grant(actor.clone(), "coop-alpha", gid.clone());
+        let mut mandate = backing_mandate(gid);
+        mandate.status = MandateStatus::Revoked;
+        let mgr = manager_with_stores(TestBackend::new(vec![mandate], vec![grant]));
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
+        let err = mgr
+            .adopt_domain_policy_persisted(&domain_id("coop-alpha"), &policy, &actor, 100)
+            .expect_err("a revoked backing mandate must be refused by the gate");
+        assert!(matches!(
+            err,
+            InstitutionalDomainStoreError::Adopt(DomainPolicyAdoptionError::Gated(
+                AdoptDomainPolicyError::Unauthorized(MandateGateError::Rejected(
+                    MandateRejection::Revoked
+                ))
+            ))
+        ));
+    }
+
+    #[test]
+    fn adopt_persisted_preserves_pure_core_defense_in_depth() {
+        // Gate authorizes the actor for coop-alpha, but the policy is authored
+        // for coop-beta: the pure-core structural check must still reject it.
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = manager_with_stores(backend);
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        let foreign = DomainPolicy::new(domain_id("coop-beta"), b"policy v1");
+        let err = mgr
+            .adopt_domain_policy_persisted(&domain_id("coop-alpha"), &foreign, &actor, 100)
+            .expect_err("a policy for another domain must be refused by the core check");
+        assert!(matches!(
+            err,
+            InstitutionalDomainStoreError::Adopt(DomainPolicyAdoptionError::Gated(
+                AdoptDomainPolicyError::Core(InstitutionalDomainError::PolicyForOtherDomain)
+            ))
+        ));
     }
 }

@@ -8,8 +8,8 @@ use anyhow::Result;
 use std::sync::Arc;
 
 use icn_governance::{
-    Delegation, DelegationId, GovernanceDomain, GovernanceDomainId, Proposal, ProposalId,
-    Timestamp, Vote,
+    Delegation, DelegationId, GovernanceDomain, GovernanceDomainId, InstitutionalDomain, Proposal,
+    ProposalId, Timestamp, Vote,
 };
 use icn_identity::Did;
 use icn_store::Store;
@@ -123,6 +123,37 @@ pub trait GovernanceStateStore: Send + Sync {
     fn flush(&self) -> Result<()> {
         Ok(())
     }
+
+    // --- Institutional domains (ADR-0083 persistence addendum, #2142) ---
+
+    /// Load the [`InstitutionalDomain`] authority record for `id`, if one has
+    /// been declared. Keyed by the **existing** `GovernanceDomainId` and stored
+    /// as a **separate sibling record** from `GovernanceDomain` (a distinct key
+    /// space); it carries only the adopted `current_policy: DomainPolicyRef`
+    /// pointer, never the `DomainPolicy` body (#1817).
+    ///
+    /// **Default impl FAILS CLOSED** (returns `Err`): a store that does not
+    /// implement institutional-domain persistence must not masquerade as
+    /// "no domain declared". Callers (declare / persisted-adopt) treat the error
+    /// as a wiring fault, not as absence. The sled-backed store overrides this.
+    fn get_institutional_domain(
+        &self,
+        _id: &GovernanceDomainId,
+    ) -> Result<Option<InstitutionalDomain>> {
+        anyhow::bail!(
+            "institutional_domain persistence not implemented by this GovernanceStateStore"
+        )
+    }
+
+    /// Persist an [`InstitutionalDomain`] authority record (insert or overwrite),
+    /// keyed by its `domain_id`. **Default impl FAILS CLOSED** for the same
+    /// reason as [`Self::get_institutional_domain`]; the sled-backed store
+    /// overrides this.
+    fn save_institutional_domain(&self, _domain: &InstitutionalDomain) -> Result<()> {
+        anyhow::bail!(
+            "institutional_domain persistence not implemented by this GovernanceStateStore"
+        )
+    }
 }
 
 // ---- Key helpers ----
@@ -133,6 +164,12 @@ fn domain_key(id: &GovernanceDomainId) -> Vec<u8> {
 
 fn domain_key_prefix() -> &'static [u8] {
     b"gov:domain:"
+}
+
+fn institutional_domain_key(id: &GovernanceDomainId) -> Vec<u8> {
+    // Distinct key space from `gov:domain:` (GovernanceDomain) — the
+    // InstitutionalDomain authority record is a sibling, not a replacement.
+    format!("gov:institutional-domain:{}", id.0).into_bytes()
 }
 
 fn proposal_key(id: &ProposalId) -> Vec<u8> {
@@ -223,6 +260,22 @@ impl GovernanceStateStore for SledGovernanceStateStore {
         rows.into_iter()
             .map(|(_k, v)| Ok(serde_json::from_slice::<GovernanceDomain>(&v)?))
             .collect()
+    }
+
+    // --- Institutional domains ---
+
+    fn get_institutional_domain(
+        &self,
+        id: &GovernanceDomainId,
+    ) -> Result<Option<InstitutionalDomain>> {
+        load_json(self.store.as_ref(), &institutional_domain_key(id))
+    }
+
+    fn save_institutional_domain(&self, domain: &InstitutionalDomain) -> Result<()> {
+        self.store.put(
+            &institutional_domain_key(&domain.domain_id),
+            &serde_json::to_vec(domain)?,
+        )
     }
 
     // --- Proposals ---
@@ -337,5 +390,106 @@ impl GovernanceStateStore for SledGovernanceStateStore {
             Some(bytes) => Ok(Some(serde_json::from_slice::<CloseJournalEntry>(&bytes)?)),
             None => Ok(None),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use super::*;
+    use icn_governance::BootstrapEntityType;
+    use icn_store::SledStore;
+
+    fn temp_store() -> SledGovernanceStateStore {
+        SledGovernanceStateStore::new(Arc::new(SledStore::temporary().expect("temp sled")))
+    }
+
+    #[test]
+    fn institutional_domain_round_trips() {
+        let store = temp_store();
+        let id = GovernanceDomainId::new("coop-alpha");
+        assert!(store.get_institutional_domain(&id).unwrap().is_none());
+
+        let domain = InstitutionalDomain::declare(id.clone(), BootstrapEntityType::Cooperative);
+        store.save_institutional_domain(&domain).unwrap();
+
+        let loaded = store
+            .get_institutional_domain(&id)
+            .unwrap()
+            .expect("present after save");
+        assert_eq!(loaded, domain);
+
+        // Distinct key space: the GovernanceDomain get for the same id is
+        // unaffected by the institutional-domain write.
+        assert!(store.get_domain(&id).unwrap().is_none());
+    }
+
+    /// A `GovernanceStateStore` that does NOT override the institutional-domain
+    /// methods must hit the fail-closed defaults (`Err`), never silent
+    /// `Ok`/`None`. All other (required) methods are unreachable in this test.
+    struct NoInstitutionalDomainStore;
+
+    impl GovernanceStateStore for NoInstitutionalDomainStore {
+        fn get_domain(&self, _: &GovernanceDomainId) -> Result<Option<GovernanceDomain>> {
+            unimplemented!()
+        }
+        fn save_domain(&self, _: &GovernanceDomain) -> Result<()> {
+            unimplemented!()
+        }
+        fn list_domains(&self) -> Result<Vec<GovernanceDomain>> {
+            unimplemented!()
+        }
+        fn get_proposal(&self, _: &ProposalId) -> Result<Option<Proposal>> {
+            unimplemented!()
+        }
+        fn save_proposal(&self, _: &Proposal) -> Result<()> {
+            unimplemented!()
+        }
+        fn list_proposals(&self) -> Result<Vec<Proposal>> {
+            unimplemented!()
+        }
+        fn get_vote(&self, _: &ProposalId, _: &Did) -> Result<Option<Vote>> {
+            unimplemented!()
+        }
+        fn save_vote(&self, _: &ProposalId, _: &Vote) -> Result<()> {
+            unimplemented!()
+        }
+        fn list_votes(&self, _: &ProposalId) -> Result<Vec<Vote>> {
+            unimplemented!()
+        }
+        fn get_delegation(&self, _: &DelegationId) -> Result<Option<Delegation>> {
+            unimplemented!()
+        }
+        fn save_delegation(&self, _: &Delegation) -> Result<()> {
+            unimplemented!()
+        }
+        fn list_all_delegations(&self) -> Result<Vec<(Vec<u8>, Vec<u8>)>> {
+            unimplemented!()
+        }
+        fn save_revoked_delegation(&self, _: &Delegation, _: Timestamp) -> Result<()> {
+            unimplemented!()
+        }
+        fn get_proof_bytes(&self, _: &ProposalId) -> Result<Option<Vec<u8>>> {
+            unimplemented!()
+        }
+        fn save_proof_bytes(&self, _: &ProposalId, _: &[u8]) -> Result<()> {
+            unimplemented!()
+        }
+    }
+
+    #[test]
+    fn default_institutional_domain_methods_fail_closed() {
+        let store = NoInstitutionalDomainStore;
+        let id = GovernanceDomainId::new("coop-alpha");
+        assert!(
+            store.get_institutional_domain(&id).is_err(),
+            "default get must fail closed, not return Ok(None)"
+        );
+        let domain = InstitutionalDomain::declare(id, BootstrapEntityType::Cooperative);
+        assert!(
+            store.save_institutional_domain(&domain).is_err(),
+            "default save must fail closed, not silently succeed"
+        );
     }
 }
