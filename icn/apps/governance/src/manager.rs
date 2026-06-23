@@ -2841,6 +2841,16 @@ impl GovernanceManager {
         self
     }
 
+    /// Clone the attached receipt/grant backend, if one is wired.
+    ///
+    /// Used by the domain-policy adoption seam
+    /// ([`crate::domain_policy_adoption`]) to resolve authority through
+    /// `DefaultMandateGate`. Returns `None` when no backend is wired — callers
+    /// that resolve authority must fail closed in that case.
+    pub(crate) fn receipt_backend(&self) -> Option<Arc<dyn GovernanceReceiptBackend>> {
+        self.receipt_store.clone()
+    }
+
     /// Replace the structure store backend.
     ///
     /// Use this to configure Sled-backed persistent storage for structures.
