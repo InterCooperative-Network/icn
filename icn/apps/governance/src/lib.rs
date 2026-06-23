@@ -28,6 +28,7 @@ pub mod actor;
 pub mod close_journal;
 pub mod dispatch_evidence;
 pub mod dispatch_evidence_sink;
+pub mod domain_policy_adoption;
 pub mod events;
 pub mod executor;
 pub mod grant_minting;
