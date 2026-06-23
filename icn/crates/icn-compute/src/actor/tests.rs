@@ -86,6 +86,30 @@ async fn test_submit_low_trust_rejected() {
 }
 
 #[tokio::test]
+async fn test_submit_rejects_canonical_task_with_non_canonical_storage() {
+    use icn_kernel_api::storage::StorageClass;
+    // Trust is above the submit threshold, so the only rejection reason is
+    // storage validation at the live handle_submit chokepoint (#2143).
+    let trust_cb: TrustCallback = Arc::new(|_| 0.5);
+    let actor = ComputeActor::new("did:icn:executor".into(), trust_cb);
+    let handle = actor.spawn();
+
+    let mut task = make_task("task-storage-canonical", "did:icn:alice");
+    // Canonical determinism (default) writing outputs to non-Canonical storage.
+    task.storage_class = Some(StorageClass::ServiceState);
+
+    let err = handle.submit(task).await.unwrap_err();
+    assert!(
+        matches!(err, ComputeError::InvalidCode(_)),
+        "expected InvalidCode, got {err:?}"
+    );
+    assert!(
+        err.to_string().contains("Canonical"),
+        "submit must reject with the canonical-storage rule: {err}"
+    );
+}
+
+#[tokio::test]
 async fn test_gossip_message_handling() {
     let trust_cb: TrustCallback = Arc::new(|_| 0.5);
     let mut actor = ComputeActor::new("did:icn:executor".into(), trust_cb);

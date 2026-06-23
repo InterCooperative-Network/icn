@@ -292,6 +292,77 @@ pub enum StorageValidationError {
 }
 
 // ============================================================================
+// Storage Specification + Access Validation (E4 / #2143)
+// ============================================================================
+
+/// A unit of storage's class and data locality, paired.
+///
+/// `StorageSpec` is the generic custody/runtime policy shape the kernel
+/// enforces. It carries no domain meaning: an app decides *why* a given
+/// class/locality applies (regulatory tier, sensitivity, replication
+/// budget); the kernel only checks the resulting generic constraints.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub struct StorageSpec {
+    /// Storage class — mutability and replication requirements.
+    pub class: StorageClass,
+    /// Data locality — placement and access scope.
+    pub locality: DataLocality,
+}
+
+impl StorageSpec {
+    /// Construct a spec from a class and locality.
+    pub const fn new(class: StorageClass, locality: DataLocality) -> Self {
+        Self { class, locality }
+    }
+}
+
+/// Validate that a task with storage spec `task` may produce/access data
+/// with storage spec `data`.
+///
+/// Enforces the two generic storage-governance rules:
+///
+/// 1. **Canonical output ⇒ canonical storage.** A task that produces
+///    canonical output (`canonical_output == true`) must use a storage
+///    class that can hold it (`StorageClass::can_hold_canonical_output`),
+///    else [`StorageValidationError::CanonicalTaskNonCanonicalStorage`].
+/// 2. **Locality access.** A task may only access data at its own locality
+///    or wider (`task.locality.can_access(data.locality)`). The
+///    `FederationMirrored`-task / `CellLocal`-data case is reported with
+///    the dedicated [`StorageValidationError::CellLocalFederationViolation`];
+///    every other access violation is
+///    [`StorageValidationError::LocalityAccessViolation`].
+///
+/// `canonical_output` is supplied by the caller — the kernel does not infer
+/// it from any domain concept. When `task` and `data` are the same spec
+/// (a task validating its own declared storage), the locality check is the
+/// degenerate `can_access(self) == true` case and only rule 1 can fire.
+pub fn validate_storage_access(
+    task: StorageSpec,
+    data: StorageSpec,
+    canonical_output: bool,
+) -> Result<(), StorageValidationError> {
+    if canonical_output && !task.class.can_hold_canonical_output() {
+        return Err(StorageValidationError::CanonicalTaskNonCanonicalStorage {
+            actual: task.class,
+        });
+    }
+
+    if !task.locality.can_access(data.locality) {
+        if task.locality == DataLocality::FederationMirrored
+            && data.locality == DataLocality::CellLocal
+        {
+            return Err(StorageValidationError::CellLocalFederationViolation);
+        }
+        return Err(StorageValidationError::LocalityAccessViolation {
+            task_locality: task.locality,
+            data_locality: data.locality,
+        });
+    }
+
+    Ok(())
+}
+
+// ============================================================================
 // Tests
 // ============================================================================
 
@@ -559,5 +630,71 @@ mod tests {
         let err = StorageValidationError::CellLocalFederationViolation;
         assert!(err.to_string().contains("CellLocal"));
         assert!(err.to_string().contains("FederationMirrored"));
+    }
+
+    // --- StorageSpec + validate_storage_access tests (#2143) ---
+
+    #[test]
+    fn test_storage_spec_default() {
+        let spec = StorageSpec::default();
+        assert_eq!(spec.class, StorageClass::ServiceState);
+        assert_eq!(spec.locality, DataLocality::CellLocal);
+    }
+
+    #[test]
+    fn test_storage_spec_serde_roundtrip() {
+        let spec = StorageSpec::new(StorageClass::Canonical, DataLocality::CoopReplicated);
+        let json = serde_json::to_string(&spec).unwrap();
+        let parsed: StorageSpec = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed, spec);
+    }
+
+    #[test]
+    fn test_validate_storage_access_ok() {
+        // Canonical output into Canonical storage, equal locality -> ok.
+        let spec = StorageSpec::new(StorageClass::Canonical, DataLocality::CellLocal);
+        assert_eq!(validate_storage_access(spec, spec, true), Ok(()));
+
+        // Non-canonical output; a narrower task may access wider data -> ok.
+        let task = StorageSpec::new(StorageClass::ServiceState, DataLocality::CellLocal);
+        let data = StorageSpec::new(StorageClass::ServiceState, DataLocality::CommonsPublic);
+        assert_eq!(validate_storage_access(task, data, false), Ok(()));
+    }
+
+    #[test]
+    fn test_validate_storage_access_rejects_canonical_output_non_canonical_storage() {
+        let task = StorageSpec::new(StorageClass::ServiceState, DataLocality::CellLocal);
+        let err = validate_storage_access(task, task, true).unwrap_err();
+        assert_eq!(
+            err,
+            StorageValidationError::CanonicalTaskNonCanonicalStorage {
+                actual: StorageClass::ServiceState,
+            }
+        );
+    }
+
+    #[test]
+    fn test_validate_storage_access_rejects_locality_access_violation() {
+        // A CoopReplicated task cannot access narrower CellLocal data.
+        let task = StorageSpec::new(StorageClass::ServiceState, DataLocality::CoopReplicated);
+        let data = StorageSpec::new(StorageClass::ServiceState, DataLocality::CellLocal);
+        let err = validate_storage_access(task, data, false).unwrap_err();
+        assert_eq!(
+            err,
+            StorageValidationError::LocalityAccessViolation {
+                task_locality: DataLocality::CoopReplicated,
+                data_locality: DataLocality::CellLocal,
+            }
+        );
+    }
+
+    #[test]
+    fn test_validate_storage_access_federation_task_cell_local_data_is_specific_variant() {
+        // A FederationMirrored task accessing CellLocal data uses the
+        // dedicated variant, not the generic LocalityAccessViolation.
+        let task = StorageSpec::new(StorageClass::ServiceState, DataLocality::FederationMirrored);
+        let data = StorageSpec::new(StorageClass::ServiceState, DataLocality::CellLocal);
+        let err = validate_storage_access(task, data, false).unwrap_err();
+        assert_eq!(err, StorageValidationError::CellLocalFederationViolation);
     }
 }
