@@ -248,6 +248,7 @@ This spec cross-links existing canon and forward issues rather than duplicating 
 | Steward cockpit v0 | `#1795`. |
 | Tool install lifecycle | `RFC-0017`. |
 | Constitutional object model (AuthorityClass, AuthorityGrant, TypedScope, Mandate) | `ADR-0014`. |
+| Minimal runtime root for `InstitutionalDomain` / `DomainPolicy` (Declare + Adopt slice) | `ADR-0036` (#2142). |
 | Accepted-proposal effect dispatch contract | `docs/spec/effect-dispatch-contract.md` (`#1797`, merged). |
 | Integrated cooperative operating model | `docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md` (`#1793`, merged). |
 
