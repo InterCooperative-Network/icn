@@ -1,0 +1,305 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR-0083: Institutional Domain and Domain Policy runtime root | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0083 institutional domain and domain policy runtime root</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0083-institutional-domain-and-domain-policy-runtime-root.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ADR-0083: Institutional Domain and Domain Policy runtime root</h1>
+<blockquote>
+<p><strong>Note on ADR id:</strong> numbered <code>0083</code> (next free id) because <code>ADR-0036</code> is reserved
+in the constitutional roadmap candidate registry for &quot;federation agreement support&quot;
+(<code>docs/strategy/ICN_CONSTITUTIONAL_ROADMAP.md</code>). The maintainer may reassign per the
+ADR-candidate-registry doctrine (ADR-0034).</p>
+</blockquote>
+<h2>Status</h2>
+<p><code>proposed</code>. <code>implementation_status: not-started</code> — this ADR pins the model, the
+minimal runtime slice, and the migration boundary <strong>before</strong> any runtime type lands.
+The follow-up implementation PR (acceptance criteria below) carries the code and is
+what satisfies #2142. This ADR PR uses <code>Refs #2142</code>, not <code>Closes</code>.</p>
+<h2>Context</h2>
+<p>The operating model (<code>docs/architecture/ICN_OPERATING_MODEL.md:113</code>) names <strong>Domain</strong>
+as <em>&quot;the governed jurisdiction that holds authority,&quot;</em> and <strong>Policy</strong> (<code>:114</code>) as
+<em>&quot;adopted rule state … inert until a domain adopts it.&quot;</em> The spec
+<code>docs/spec/institutional-domain.md</code> (status: spec, WIP; #1794) details
+<code>InstitutionalDomain</code> as the governed jurisdiction (a ref-carrying object: canonical
+identifier, owning entity class, charter refs, adopted CCL policy refs, membership /
+service / storage / routing policy refs, receipts) and <code>DomainPolicy</code> as <em>&quot;the
+persistent shape of the rules a domain has adopted … An unadopted <code>DomainPolicy</code> is
+inert&quot;</em> (<code>institutional-domain.md:169</code>).</p>
+<p>Today neither object exists in runtime code (verified: no <code>struct/enum InstitutionalDomain</code> or <code>DomainPolicy</code> anywhere under <code>icn/crates</code> or <code>icn/apps</code>; the
+only <code>DomainPolicy*</code> token is the unrelated kernel <code>AuthorityBasis::DomainPolicyClause</code>
+in <code>icn-kernel-api/src/proofs.rs</code>). What does exist:</p>
+<ul>
+<li><strong><code>GovernanceDomain</code> / <code>GovernanceDomainId</code></strong> (<code>icn-governance/src/domain.rs:9,33</code>) —
+doc-commented as <em>&quot;the decision space for a community&quot;</em> (<code>:1</code>). Fields: <code>id</code>, <code>name</code>,
+<code>description</code>, <code>config: GovernanceConfig</code>, timestamps. It is a <strong>config holder with no
+lifecycle flag</strong>, created via <code>GovernanceManager::create_domain</code> (<code>apps/governance/src/manager.rs:3000</code>).
+It is <strong>not</strong> the governed jurisdiction; it is the decision space inside one.</li>
+<li><strong><code>Charter</code></strong> (<code>icn-governance/src/charter.rs:97</code>) — <em>&quot;Founding document for
+jurisdictions&quot;</em> (<code>:1</code>). Carries <code>charter_id</code> (sha256 of content), <code>org_type</code>
+(<code>Cooperative|Community|Federation</code>), a <code>domain_id: String</code>, <code>status: CharterStatus</code>
+(<code>Draft|Active|Suspended|Dissolved</code>), founders, policies, amendments. Adoption is one
+step: <code>ratify()</code> moves <code>Draft → Active</code> (<code>charter.rs:308</code>). This is the closest
+existing object to a &quot;jurisdiction,&quot; but it is a <em>founding document</em>, not the standing
+authority root, and it does not carry an adopted-policy <em>pointer</em>.</li>
+<li><strong>Authority basis (ADR-0014)</strong> — <code>AuthorityClass</code> (<code>Representation|Execution|Attestation</code>),
+<code>AuthorityGrant</code> (<code>authority.rs:269</code>: class, grantor, grantee, <code>scope: TypedScope</code>,
+validity), <code>TypedScope</code> (<code>authority.rs:135</code>: optional <code>domain: Option&lt;GovernanceDomainId&gt;</code><ul>
+<li>proposal_class / action_kind / amount_ceiling / time_window), and <code>Mandate</code>
+(<code>mandate.rs:175</code>, per-decision composition of grant ids). <code>MandateGate::require()</code>
+(<code>apps/governance/src/mandate_gate.rs:419</code>) is the <strong>existing, synchronous, fail-closed</strong>
+authority gate (rejects bad status / past-deadline / empty-grants before the actor check).</li>
+</ul>
+</li>
+</ul>
+<p>So ICN already has authority primitives and a decision space, but no object that
+<em>holds</em> a domain&#39;s authority and <em>points at its currently-adopted policy</em>. #2142 asks
+for the smallest runtime slice that closes that gap for one domain adopting one policy.</p>
+<h2>Decision</h2>
+<p>Introduce two minimal <strong>governance-app-layer</strong> runtime objects and one adoption act.
+All of this lives in <code>icn-governance</code> (and/or <code>apps/governance</code>); <strong>none of it enters
+any kernel crate</strong> (<code>.claude/rules/kernel-boundary.md</code>).</p>
+<ol>
+<li><p><strong><code>InstitutionalDomain</code></strong> — a thin standing authority object for a governed
+jurisdiction. For the MVP it is keyed by the <strong>existing</strong> <code>GovernanceDomainId</code> (no
+rename, no fork of <code>GovernanceDomain</code>) and carries only:</p>
+<ul>
+<li>the <strong>owning entity class</strong> — the governed entity taxonomy (<code>Individual</code> /
+<code>Cooperative</code> / <code>Community</code> / <code>Federation</code>). The implementation reuses an
+existing governance-layer enum rather than introducing a new one:
+<code>BootstrapEntityType</code> (<code>icn-governance/src/bootstrap.rs:139</code>, exactly these
+four) or <code>Charter</code>&#39;s <code>OrgType</code> (<code>charter.rs:60</code>, three — omits <code>Individual</code>).
+Note <code>icn-entity::EntityType</code> is broader (it carries additional variants such
+as <code>Unknown</code>) and is <strong>not</strong> the intended shape. Exact type chosen at
+implementation (see Open questions),</li>
+<li>an optional <strong>adopted charter reference</strong> (<code>CharterId</code>),</li>
+<li>a single <strong><code>current_policy: Option&lt;DomainPolicyRef&gt;</code></strong> — the adopted-policy pointer.</li>
+</ul>
+<p>It embeds no charter text, no policy text, no membership rolls — only references and
+the adoption record, exactly as the spec requires (<code>institutional-domain.md:117</code>).
+<code>GovernanceDomain</code> stays the decision space; <code>InstitutionalDomain</code> is the authority
+wrapper that references it. A domain with no <code>current_policy</code> is a valid, declared-but-
+unbound domain.</p>
+</li>
+<li><p><strong><code>DomainPolicy</code> / <code>DomainPolicyRef</code></strong> — a minimal, content-addressed reference to a
+policy version. The MVP stores a <code>DomainPolicyRef</code> (a stable, content-addressed
+identifier for a policy version) plus the minimal metadata needed to assert adoption;
+it does <strong>not</strong> store or interpret CCL text. <strong>Inertness is structural:</strong> a
+<code>DomainPolicyRef</code> confers authority/constraint <strong>only</strong> when it is the
+<code>InstitutionalDomain.current_policy</code>. Any other policy ref — never adopted, or
+superseded — is inert: referencing it yields no authority, no constraint, no effect.
+There is at most one current policy per domain; prior versions are history.</p>
+</li>
+<li><p><strong>Adoption is a governance act gated by the existing authority basis.</strong> Setting or
+changing <code>current_policy</code> (and creating/activating the domain) is a transition that
+<strong>requires an authority basis</strong> expressed through the existing ADR-0014 objects
+(<code>AuthorityGrant</code> / <code>Mandate</code> / <code>TypedScope</code>) and checked through the existing
+<code>MandateGate::require()</code>. We do <strong>not</strong> invent a new authority primitive. The rule is
+<strong>fail-closed</strong>: a transition presented with a missing, empty, or ambiguous authority
+basis is rejected (the <code>MandateGate</code> already rejects empty-grants and bad status), and
+the domain&#39;s policy state is left unchanged. Capability scope is not a mandate
+(ADR-0035 / ABUSE_CASE_HARDENING) — adoption authority is a mandate check, not merely a
+<code>governance:write</code> token.</p>
+</li>
+<li><p><strong>Meaning firewall.</strong> <code>InstitutionalDomain</code> and <code>DomainPolicy</code> carry only generic ICN
+vocabulary. No NYCN/Summit package nouns (sponsor, session catalog, summit track, …)
+appear in these core types — those stay in the package repo
+(<code>INSTITUTION_PACKAGE_BOUNDARY.md:21,217</code>). The types never enter kernel crates; the
+kernel continues to see only <code>ConstraintSet</code>/<code>KernelEffect</code>. Policy <strong>evaluation</strong>
+(CCL) stays outside the kernel and outside this MVP (<code>institutional-domain.md:175</code>).</p>
+</li>
+</ol>
+<h2>Minimal runtime MVP (the follow-up PR, not this ADR)</h2>
+<p>The smallest honest slice — TDD, in <code>icn-governance</code> / <code>apps/governance</code> only:</p>
+<ul>
+<li>Add <code>InstitutionalDomain { domain_id: GovernanceDomainId, owning_entity_class: &lt;governed entity class — e.g. BootstrapEntityType&gt;, charter_ref: Option&lt;CharterId&gt;, current_policy: Option&lt;DomainPolicyRef&gt; }</code>
+and <code>DomainPolicyRef</code> (content-addressed id + minimal metadata). Names/fields may be
+refined in review; the shape is what matters.</li>
+<li>Add the adoption act on <code>GovernanceManager</code> (e.g. <code>declare_institutional_domain</code> and
+<code>adopt_domain_policy</code>) that (a) requires an authority basis via the existing
+<code>MandateGate</code>/<code>AuthorityGrant</code> path and (b) sets <code>current_policy</code> only on success.</li>
+<li>Persist through the existing governance store; surface nothing new over HTTP in this
+slice (a <code>/me</code>-style read surface is a separate follow-up).</li>
+</ul>
+<p>This MVP deliberately implements <strong>only</strong> the <code>Declare</code> and <code>Adopt charter/policy</code>
+stages of the spec&#39;s domain lifecycle (<code>institutional-domain.md:200-210</code>) — not standing,
+services, routing, federation, exit, or the full reference set.</p>
+<h2>Relationship to existing types / migration</h2>
+<ul>
+<li><strong><code>GovernanceDomain</code></strong> — kept as-is (the decision space). <code>InstitutionalDomain</code>
+references it by <code>GovernanceDomainId</code>; we do <strong>not</strong> rename or merge it in this lane.</li>
+<li><strong><code>Charter</code></strong> — referenced (<code>charter_ref: Option&lt;CharterId&gt;</code>), not absorbed. Charter
+<code>ratify</code> (<code>Draft→Active</code>) remains the charter&#39;s own lifecycle; domain-policy adoption is
+a <strong>separate</strong> act so a domain can re-adopt/amend policy without re-ratifying a charter.</li>
+<li><strong><code>Mandate</code> / <code>AuthorityGrant</code> / <code>TypedScope</code> / <code>MandateGate</code></strong> — reused unchanged as
+the authority basis and fail-closed gate. <code>TypedScope.domain: Option&lt;GovernanceDomainId&gt;</code>
+already keys on the same identifier, so no identifier migration is required for the MVP.</li>
+<li><strong><code>GovernedServiceBinding</code></strong> — out of scope; remains spec-only (#1815). <code>current_policy</code>
+is the only binding this MVP models.</li>
+<li><strong><code>InstitutionPackage</code></strong> — remains a docs/boundary concept; the MVP adds no package
+runtime. Package vocabulary is supplied externally, never embedded in these core types.</li>
+<li><strong>Kernel <code>AuthorityBasis::DomainPolicyClause</code></strong> (<code>icn-kernel-api</code>) — unrelated repair-
+authority basis; this ADR does not touch it and must not be confused with <code>DomainPolicy</code>.</li>
+</ul>
+<h2>Non-goals</h2>
+<ul>
+<li>No full <strong>CCL policy registry</strong>, versioning, or evaluator-selection runtime (#1817).</li>
+<li>No CCL <strong>evaluation</strong> of policy (policy stays an inert reference in the MVP).</li>
+<li>No auth-model change; no entity-aware auth enforcement cutover (ADR-0035 lane).</li>
+<li>No standing/membership, service/tool/route/DNS bindings, federation, or exit runtime.</li>
+<li>No new receipt class and no kernel change.</li>
+<li>No NYCN/Summit-specific nouns in ICN core; no package-activation completion.</li>
+<li>No production / pilot / organizer / federation readiness; no live federation; no
+workflow engine.</li>
+</ul>
+<h2>Acceptance criteria for the follow-up runtime PR</h2>
+<ul>
+<li>Minimal generic <code>InstitutionalDomain</code> and <code>DomainPolicy</code>/<code>DomainPolicyRef</code> types exist
+in <code>icn-governance</code> (app layer), re-exported as needed; <strong>not</strong> in any kernel crate.</li>
+<li>A domain can be <strong>declared</strong> and can <strong>adopt one</strong> <code>DomainPolicyRef</code>, with the adopted
+ref retrievable as the domain&#39;s <code>current_policy</code>.</li>
+<li><strong>Unadopted policy is inert:</strong> a <code>DomainPolicyRef</code> that is not <code>current_policy</code> yields no
+authority/constraint/effect (proven by test).</li>
+<li><strong>Ambiguous/missing authority fails closed:</strong> an adoption attempt with no/empty/ambiguous
+authority basis is rejected and leaves policy state unchanged (proven by test, reusing
+the existing <code>MandateGate</code> fail-closed behavior).</li>
+<li>Existing <code>Mandate</code> / <code>AuthorityGrant</code> / <code>TypedScope</code> semantics are respected (reused, not
+reinvented).</li>
+<li>Tests are <strong>generic</strong> — no NYCN/Summit nouns; the <code>Meaning Firewall Check</code> +
+<code>Kernel Forbidden Dependencies</code> required CI gates stay green.</li>
+<li>A documented <code>GovernanceDomain</code> ↔ <code>InstitutionalDomain</code> relationship (this ADR) is linked
+from <code>docs/spec/institutional-domain.md</code>.</li>
+</ul>
+<h2>Open questions (flagged, not decided here)</h2>
+<ol>
+<li><strong>Identifier:</strong> the MVP keys <code>InstitutionalDomain</code> on <code>GovernanceDomainId</code> (a string).
+The spec wants a DID-style canonical identifier surviving node/route changes
+(<code>institutional-domain.md:64</code>). Whether to introduce a distinct <code>InstitutionalDomainId</code>
+(and migrate <code>TypedScope.domain</code>) is deferred to a follow-up.</li>
+<li><strong>Domain vs decision space:</strong> long-term, does <code>GovernanceDomain</code> become a sub-part of
+<code>InstitutionalDomain</code>, or do they stay sibling references? The MVP chooses references to
+avoid churn; the consolidation decision is deferred.</li>
+<li><strong>One adoption act or two:</strong> charter <code>ratify</code> vs per-policy <code>adopt</code> are separate in the
+MVP. Whether founding should atomically adopt an initial policy
+(<code>institutional-domain.md:203</code>) is deferred.</li>
+<li><strong>DomainPolicy: stored object vs derived view:</strong> the MVP stores a minimal ref; whether
+the full object is a stored record or a view over adoption receipts lands with the CCL
+policy registry (#1817).</li>
+<li><strong><code>Coop</code>-prefixed vocabulary debt</strong> (<code>DataLocality::CoopReplicated</code>, etc.,
+<code>ICN_OPERATING_MODEL.md:247</code>) is <strong>not</strong> renamed here; deferred.</li>
+<li><strong>Entity-class type:</strong> which existing governance enum the MVP reuses for
+<code>owning_entity_class</code> — <code>BootstrapEntityType</code> (four variants) or <code>Charter</code>&#39;s
+<code>OrgType</code> (three) — and whether to unify them; deferred to implementation.</li>
+</ol>
+<h2>Consequences</h2>
+<ul>
+<li><strong>Easier:</strong> one package can declare a governed domain and adopt one policy reference
+with a real, fail-closed authority check — the first runtime rung of
+<code>package → domain → policy</code> on the institutional spine. The model is pinned before code,
+so the follow-up PR is a small, reviewable slice rather than an open-ended build.</li>
+<li><strong>Harder / deferred:</strong> the full jurisdiction object (standing, services, routing,
+federation, exit) and CCL policy <em>evaluation</em> remain spec-only; this ADR explicitly does
+not deliver them. The identifier and <code>GovernanceDomain</code>-consolidation questions are left
+open, which a later ADR must close before the model is considered stable.</li>
+<li><strong>Risk:</strong> introducing <code>InstitutionalDomain</code> alongside <code>GovernanceDomain</code> and <code>Charter</code>
+adds a third domain-adjacent object. The migration section and open questions bound that
+risk by choosing references over renames and by deferring consolidation explicitly.</li>
+</ul>
+<h2>References</h2>
+<p>See frontmatter. Primary: <code>docs/spec/institutional-domain.md</code> (#1794),
+<code>docs/architecture/ICN_OPERATING_MODEL.md</code>, ADR-0014, and the existing
+<code>icn-governance</code> authority/domain/charter types cited inline above.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
