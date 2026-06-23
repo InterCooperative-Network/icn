@@ -1,5 +1,5 @@
 ---
-id: "0036"
+id: "0083"
 title: "Institutional Domain and Domain Policy runtime root"
 status: "proposed"
 date: "2026-06-23"
@@ -21,7 +21,12 @@ references:
   - "GitHub #2142 (this runtime MVP), #1794 (spec), #1748 (process substrate), #1817 (CCL policy registry)"
 ---
 
-# ADR-0036: Institutional Domain and Domain Policy runtime root
+# ADR-0083: Institutional Domain and Domain Policy runtime root
+
+> **Note on ADR id:** numbered `0083` (next free id) because `ADR-0036` is reserved
+> in the constitutional roadmap candidate registry for "federation agreement support"
+> (`docs/strategy/ICN_CONSTITUTIONAL_ROADMAP.md`). The maintainer may reassign per the
+> ADR-candidate-registry doctrine (ADR-0034).
 
 ## Status
 
@@ -80,8 +85,14 @@ any kernel crate** (`.claude/rules/kernel-boundary.md`).
 1. **`InstitutionalDomain`** — a thin standing authority object for a governed
    jurisdiction. For the MVP it is keyed by the **existing** `GovernanceDomainId` (no
    rename, no fork of `GovernanceDomain`) and carries only:
-   - the **owning entity class** (the four-primitive `EntityType`:
-     `Individual|Cooperative|Community|Federation`),
+   - the **owning entity class** — the governed entity taxonomy (`Individual` /
+     `Cooperative` / `Community` / `Federation`). The implementation reuses an
+     existing governance-layer enum rather than introducing a new one:
+     `BootstrapEntityType` (`icn-governance/src/bootstrap.rs:139`, exactly these
+     four) or `Charter`'s `OrgType` (`charter.rs:60`, three — omits `Individual`).
+     Note `icn-entity::EntityType` is broader (it carries additional variants such
+     as `Unknown`) and is **not** the intended shape. Exact type chosen at
+     implementation (see Open questions),
    - an optional **adopted charter reference** (`CharterId`),
    - a single **`current_policy: Option<DomainPolicyRef>`** — the adopted-policy pointer.
 
@@ -123,7 +134,8 @@ any kernel crate** (`.claude/rules/kernel-boundary.md`).
 The smallest honest slice — TDD, in `icn-governance` / `apps/governance` only:
 
 - Add `InstitutionalDomain { domain_id: GovernanceDomainId, owning_entity_class:
-  EntityType, charter_ref: Option<CharterId>, current_policy: Option<DomainPolicyRef> }`
+  <governed entity class — e.g. BootstrapEntityType>, charter_ref: Option<CharterId>,
+  current_policy: Option<DomainPolicyRef> }`
   and `DomainPolicyRef` (content-addressed id + minimal metadata). Names/fields may be
   refined in review; the shape is what matters.
 - Add the adoption act on `GovernanceManager` (e.g. `declare_institutional_domain` and
@@ -199,6 +211,9 @@ services, routing, federation, exit, or the full reference set.
    policy registry (#1817).
 5. **`Coop`-prefixed vocabulary debt** (`DataLocality::CoopReplicated`, etc.,
    `ICN_OPERATING_MODEL.md:247`) is **not** renamed here; deferred.
+6. **Entity-class type:** which existing governance enum the MVP reuses for
+   `owning_entity_class` — `BootstrapEntityType` (four variants) or `Charter`'s
+   `OrgType` (three) — and whether to unify them; deferred to implementation.
 
 ## Consequences
 
