@@ -533,3 +533,48 @@ async fn adopt_route_rejects_empty_policy_content() {
         "an empty/whitespace policy_content must be a 400"
     );
 }
+
+#[actix_web::test]
+async fn adopt_route_rejects_oversize_policy_content() {
+    // The handler content-addresses (blake3-hashes) the whole body, so an
+    // unbounded payload is a DoS vector. A body over the configured cap must be
+    // rejected with 400 before any hashing/persistence, and nothing adopted.
+    use icn_governance_actor::http::validation::MAX_DOMAIN_POLICY_CONTENT_BYTES;
+
+    let caller = fresh_did();
+    let gid = AuthorityGrantId::new();
+    let grant = adopt_grant(caller.clone(), "coop-alpha", gid.clone());
+    let mandate = backing_mandate(gid);
+    let h = make_harness(TestBackend::new(vec![mandate], vec![grant]));
+    seed_governance_domain(&h.ctx.manager, &caller, "coop-alpha").await;
+    h.ctx
+        .manager
+        .declare_institutional_domain(
+            GovernanceDomainId::new("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .expect("declare");
+
+    let oversize = "a".repeat(MAX_DOMAIN_POLICY_CONTENT_BYTES + 1);
+    let app = gov_app!(h.ctx.clone(), &caller, Some("governance:write".to_string()));
+    let req = test::TestRequest::post()
+        .uri(&adopt_uri("coop-alpha"))
+        .set_json(serde_json::json!({ "policy_content": oversize }))
+        .to_request();
+    let resp = test::call_service(&app, req).await;
+    assert_eq!(
+        resp.status(),
+        StatusCode::BAD_REQUEST,
+        "a policy_content over the byte cap must be a 400"
+    );
+    let reloaded = h
+        .store
+        .get_institutional_domain(&GovernanceDomainId::new("coop-alpha"))
+        .unwrap()
+        .unwrap();
+    assert!(
+        reloaded.current_policy().is_none(),
+        "nothing may be adopted when the body is rejected"
+    );
+}

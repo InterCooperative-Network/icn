@@ -3195,7 +3195,8 @@ fn institutional_domain_store_err_to_api(e: InstitutionalDomainStoreError) -> Ap
 ///
 /// Returns:
 /// - 200 with the adopted policy ref projection (`{policy_id, domain_id}`).
-/// - 400 when `policy_content` is empty/whitespace, or the body/DID is malformed.
+/// - 400 when `policy_content` is empty/whitespace or exceeds
+///   `MAX_DOMAIN_POLICY_CONTENT_BYTES`, or the body/DID is malformed.
 /// - 401 when the bearer token is missing/invalid.
 /// - 403 when the token lacks `governance:write`, the caller is not a domain
 ///   member, or the `DefaultMandateGate` refuses adoption authority.
@@ -3211,9 +3212,9 @@ pub async fn adopt_domain_policy<E: GovernanceEventEmitter + Clone + 'static>(
     let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
     let actor = parse_did(&claims.sub, "Invalid DID in token")?;
 
-    if req.policy_content.trim().is_empty() {
-        return Err(err_bad("policy_content must be a non-empty string"));
-    }
+    // Reject empty/whitespace and oversize bodies before content-addressing
+    // (blake3-hashing) the candidate — an unbounded body is a DoS vector.
+    val::validate_domain_policy_content(&req.policy_content)?;
     let domain = GovernanceDomainId(path.into_inner());
 
     // Reuse the existing coarse domain-membership gate (the same gate the rest
