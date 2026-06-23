@@ -250,14 +250,16 @@ impl InstitutionalDomain {
     /// - the policy must target this domain ([`InstitutionalDomainError::PolicyForOtherDomain`]);
     /// - an empty basis is missing authority ([`InstitutionalDomainError::MissingAuthority`]);
     /// - more than one candidate is ambiguous ([`InstitutionalDomainError::AmbiguousAuthority`]);
-    /// - a sole mandate with no grants is unbound ([`InstitutionalDomainError::UnboundAuthority`]);
-    /// - a sole mandate that is not live is inactive ([`InstitutionalDomainError::InactiveAuthority`]).
+    /// - a sole mandate that is not live is inactive ([`InstitutionalDomainError::InactiveAuthority`]);
+    /// - a sole mandate with no grants is unbound ([`InstitutionalDomainError::UnboundAuthority`]).
     ///
     /// The liveness checks reuse the same primitives the apps-layer
-    /// `MandateGate` uses ([`Mandate::has_no_grants`], [`MandateStatus`]
-    /// liveness, [`Mandate::is_past_deadline`]). Resolving a grant's
-    /// `TypedScope.domain` against this domain (which needs the grant store) is
-    /// deferred to the gate-wired follow-up.
+    /// `MandateGate` uses, in the same invariant order as
+    /// `DefaultMandateGate::validate_mandate_lifecycle` (status -> deadline ->
+    /// empty-grant): [`MandateStatus`] liveness, then
+    /// [`Mandate::is_past_deadline`], then [`Mandate::has_no_grants`]. Resolving
+    /// a grant's `TypedScope.domain` against this domain (which needs the grant
+    /// store) is deferred to the gate-wired follow-up.
     pub fn adopt_policy(
         &mut self,
         policy: &DomainPolicy,
@@ -274,9 +276,10 @@ impl InstitutionalDomain {
             _ => return Err(InstitutionalDomainError::AmbiguousAuthority),
         };
 
-        if mandate.has_no_grants() {
-            return Err(InstitutionalDomainError::UnboundAuthority);
-        }
+        // Liveness before boundedness, matching the apps-layer
+        // `DefaultMandateGate::validate_mandate_lifecycle` invariant order
+        // (status -> deadline -> empty-grant). A non-live mandate must not be
+        // masked behind the unbound check even when it also has no grants.
         if !matches!(
             mandate.status,
             MandateStatus::Pending | MandateStatus::InProgress
@@ -285,6 +288,9 @@ impl InstitutionalDomain {
         }
         if mandate.is_past_deadline(now) {
             return Err(InstitutionalDomainError::InactiveAuthority);
+        }
+        if mandate.has_no_grants() {
+            return Err(InstitutionalDomainError::UnboundAuthority);
         }
 
         let policy_ref = policy.policy_ref();
@@ -474,6 +480,32 @@ mod tests {
         let err = d
             .adopt_policy(&policy, &[revoked], 200)
             .expect_err("a non-live mandate must fail closed");
+        assert_eq!(err, InstitutionalDomainError::InactiveAuthority);
+        assert!(
+            d.current_policy().is_none(),
+            "state is unchanged on rejection"
+        );
+    }
+
+    #[test]
+    fn inactive_status_takes_precedence_over_unbound_grants() {
+        // A mandate that is *both* non-live and empty-grant must be classified
+        // by liveness first (`InactiveAuthority`), matching the apps-layer
+        // `DefaultMandateGate::validate_mandate_lifecycle` invariant order
+        // (status -> deadline -> empty-grant). Liveness must not be masked by
+        // the unbound check.
+        let mut d =
+            InstitutionalDomain::declare(domain_id("coop-alpha"), BootstrapEntityType::Cooperative);
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy v1");
+
+        let mut revoked_and_unbound =
+            Mandate::new_pending_grants(decision(), [9u8; 32], None, None, 100);
+        revoked_and_unbound.status = MandateStatus::Revoked;
+        assert!(revoked_and_unbound.has_no_grants());
+
+        let err = d
+            .adopt_policy(&policy, &[revoked_and_unbound], 200)
+            .expect_err("a non-live, empty-grant mandate must fail closed");
         assert_eq!(err, InstitutionalDomainError::InactiveAuthority);
         assert!(
             d.current_policy().is_none(),
