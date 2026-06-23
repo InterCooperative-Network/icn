@@ -209,16 +209,22 @@ from <code>docs/spec/institutional-domain.md</code>.</li>
 <li><strong>Identifier:</strong> the MVP keys <code>InstitutionalDomain</code> on <code>GovernanceDomainId</code> (a string).
 The spec wants a DID-style canonical identifier surviving node/route changes
 (<code>institutional-domain.md:64</code>). Whether to introduce a distinct <code>InstitutionalDomainId</code>
-(and migrate <code>TypedScope.domain</code>) is deferred to a follow-up.</li>
+(and migrate <code>TypedScope.domain</code>) is deferred to a follow-up.
+<strong>Resolved for the persistence MVP — see the Addendum below (keep keying on
+<code>GovernanceDomainId</code>; the DID-style identifier stays deferred).</strong></li>
 <li><strong>Domain vs decision space:</strong> long-term, does <code>GovernanceDomain</code> become a sub-part of
 <code>InstitutionalDomain</code>, or do they stay sibling references? The MVP chooses references to
-avoid churn; the consolidation decision is deferred.</li>
+avoid churn; the consolidation decision is deferred.
+<strong>Resolved for the persistence MVP — see the Addendum below (stay sibling references;
+no consolidation).</strong></li>
 <li><strong>One adoption act or two:</strong> charter <code>ratify</code> vs per-policy <code>adopt</code> are separate in the
 MVP. Whether founding should atomically adopt an initial policy
 (<code>institutional-domain.md:203</code>) is deferred.</li>
 <li><strong>DomainPolicy: stored object vs derived view:</strong> the MVP stores a minimal ref; whether
 the full object is a stored record or a view over adoption receipts lands with the CCL
-policy registry (#1817).</li>
+policy registry (#1817).
+<strong>Resolved for the persistence MVP — see the Addendum below (persist only the adopted
+<code>DomainPolicyRef</code> on the domain record; the <code>DomainPolicy</code> body stays with #1817).</strong></li>
 <li><strong><code>Coop</code>-prefixed vocabulary debt</strong> (<code>DataLocality::CoopReplicated</code>, etc.,
 <code>ICN_OPERATING_MODEL.md:247</code>) is <strong>not</strong> renamed here; deferred.</li>
 <li><strong>Entity-class type:</strong> which existing governance enum the MVP reuses for
@@ -239,10 +245,97 @@ open, which a later ADR must close before the model is considered stable.</li>
 adds a third domain-adjacent object. The migration section and open questions bound that
 risk by choosing references over renames and by deferring consolidation explicitly.</li>
 </ul>
+<h2>Addendum (2026-06-23): InstitutionalDomain persistence model</h2>
+<blockquote>
+<p><strong>Status: design decision, not yet implemented.</strong> Resolves open questions Q1, Q2,
+and Q4 <em>enough to unblock the next implementation lane</em> (a persisted adoption path).
+This addendum amends ADR-0083 in place (the ADR is still <code>proposed</code>); it adds <strong>no
+code</strong>. The HTTP adoption route remains blocked until the seam below lands — see
+<code>docs/spec/institutional-domain.md</code> §&quot;Domain-policy adoption: app boundary and
+HTTP-surface sequencing&quot; (#2168).</p>
+</blockquote>
+<h3>Why this is needed</h3>
+<p>The #2142 adoption path is complete and tested up to the governance app boundary:
+the runtime root (#2162), gate-resolved adoption (#2164), and the
+<code>GovernanceManager::adopt_domain_policy</code> seam (#2166). That seam takes a <strong>caller-held
+<code>&amp;mut InstitutionalDomain</code></strong> because no durable <code>InstitutionalDomain</code> persistence
+exists: there is no store, no load/save path, and no declare/create path
+(<code>InstitutionalDomain::declare</code> is exercised only in tests). An HTTP route must
+load → mutate → persist a domain, so it cannot be added honestly until a persistence
+seam exists. Settling the seam touches the three open questions below, so they are
+resolved here rather than implicitly in code.</p>
+<h3>Decisions</h3>
+<ol>
+<li><p><strong>Identity / keying (Q1).</strong> Persist <code>InstitutionalDomain</code> keyed by the <strong>existing
+<code>GovernanceDomainId</code></strong>. Do <strong>not</strong> introduce a parallel <code>InstitutionalDomainId</code> for
+this lane. Rationale: the runtime root already keys on it, and
+<code>TypedScope.domain: Option&lt;GovernanceDomainId&gt;</code> already binds to the same identifier,
+so no identifier migration is needed. The spec&#39;s DID-style canonical identifier
+(<code>institutional-domain.md:64</code>) stays <strong>deferred</strong> — it becomes relevant only when a
+domain needs an identity that survives independently of its governance domain.</p>
+</li>
+<li><p><strong>Relationship to <code>GovernanceDomain</code> (Q2).</strong> Store <code>InstitutionalDomain</code> as a
+<strong>separate, sibling state record</strong> keyed by <code>GovernanceDomainId</code>. Do <strong>not</strong> embed it
+into, or collapse, <code>GovernanceDomain</code> (the decision-space config object). They remain
+sibling references, exactly as the ADR&#39;s &quot;Relationship to existing types&quot; section
+already states. Rationale: preserves compatibility, avoids a broad migration, and
+keeps the authority wrapper separable from the decision-space config.</p>
+</li>
+<li><p><strong><code>DomainPolicy</code> storage (Q4).</strong> The persisted <code>InstitutionalDomain</code> record carries
+only its <strong>adopted <code>current_policy: Option&lt;DomainPolicyRef&gt;</code></strong> (a content-addressed
+pointer) — exactly the runtime-root shape. Whether the full <code>DomainPolicy</code> <strong>body</strong> is
+a stored record or a view derived from adoption receipts stays <strong>deferred to the CCL
+policy registry (#1817)</strong>. This lane persists the domain&#39;s adopted <em>pointer</em>, not a
+policy registry.</p>
+<p>Q3 (one adoption act vs two) and Q5 (<code>Coop</code>-prefixed vocabulary debt) are <strong>unaffected
+and remain deferred</strong>.</p>
+</li>
+</ol>
+<h3>Smallest store seam (for the implementation lane, not this PR)</h3>
+<p>Prefer <strong>extending the existing <code>GovernanceStateStore</code></strong> over a new store, because it is
+already sled-backed and already wired into <code>GovernanceManager</code> as the <code>domain_store</code>
+field — no new store, trait, manager field, or builder:</p>
+<ul>
+<li>Add two methods, mirroring how <code>save_close_intent</code> / <code>flush</code> were added as
+<strong>default-implemented</strong> trait methods (so the single existing implementor —
+<code>SledGovernanceStateStore</code>, the only <code>GovernanceStateStore</code> impl today, exercised in
+tests via a temporary sled store — keeps compiling and overrides only as needed):<ul>
+<li><code>get_institutional_domain(&amp;self, id: &amp;GovernanceDomainId) -&gt; Result&lt;Option&lt;InstitutionalDomain&gt;&gt;</code></li>
+<li><code>save_institutional_domain(&amp;self, domain: &amp;InstitutionalDomain) -&gt; Result&lt;()&gt;</code></li>
+<li>The default impls fail <strong>closed</strong> (return an <code>Err(&quot;institutional_domain persistence not implemented&quot;)</code>-style result), never silently succeed; <code>SledGovernanceStateStore</code> provides the real implementation (serde — <code>InstitutionalDomain</code> already derives <code>Serialize</code>/<code>Deserialize</code>). If a lighter in-memory <code>GovernanceStateStore</code> is wanted for unit tests, it would be added by the implementation lane — none exists today.</li>
+</ul>
+</li>
+</ul>
+<h3>Declare / create path (for the implementation lane)</h3>
+<ul>
+<li><code>GovernanceManager::declare_institutional_domain(domain_id, owning_entity_class, charter_ref)</code>:
+refuse if a record already exists for <code>domain_id</code>; persist a freshly <code>declare</code>d
+<code>InstitutionalDomain</code>. <strong>Flagged sub-question (decide in the implementation lane):</strong>
+declaring a governed domain is itself an authority-bearing act — whether <code>declare</code> must
+be mandate-gated (like adoption) or may be a bootstrap-time seam should be settled when
+the path lands; it must not silently permit unauthorized domain creation on a routable
+surface.</li>
+</ul>
+<h3>Persisted adoption flow (for the implementation lane)</h3>
+<p><code>GovernanceManager</code> gains a persisted variant that composes the existing pieces:
+<code>load InstitutionalDomain by GovernanceDomainId</code> → existing
+<code>adopt_domain_policy(&amp;mut domain, policy, actor, now)</code> (real <code>DefaultMandateGate</code>
+resolution + pure-core structural commit) → <code>save_institutional_domain</code> on success.
+Returns the adopted <code>DomainPolicyRef</code>. Only <strong>after</strong> this lands is a thin HTTP route
+honest (route → persisted manager method, never bypassing the seam).</p>
+<h3>Non-goals (unchanged)</h3>
+<p>No broad CRUD subsystem; no <code>GovernanceDomain</code> migration/collapse; no CCL runtime or
+policy-evaluator selection; no full policy registry; no service-binding runtime; no
+package activation; <strong>no HTTP route and no persistence code in this PR</strong>; no auth-model
+change; no entity-aware auth cutover; no production / pilot / organizer / federation
+readiness.</p>
 <h2>References</h2>
 <p>See frontmatter. Primary: <code>docs/spec/institutional-domain.md</code> (#1794),
 <code>docs/architecture/ICN_OPERATING_MODEL.md</code>, ADR-0014, and the existing
-<code>icn-governance</code> authority/domain/charter types cited inline above.</p>
+<code>icn-governance</code> authority/domain/charter types cited inline above. Addendum context:
+<code>apps/governance/src/state_store.rs</code> (<code>GovernanceStateStore</code>),
+<code>apps/governance/src/domain_policy_adoption.rs</code> (the manager seam, #2166), and the
+HTTP-surface sequencing note in <code>docs/spec/institutional-domain.md</code> (#2168).</p>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
