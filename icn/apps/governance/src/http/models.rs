@@ -7,7 +7,7 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use icn_governance::{ProcessGateKind, ProcessGateResult};
+use icn_governance::{BootstrapEntityType, ProcessGateKind, ProcessGateResult};
 
 // ============================================================================
 // Domain
@@ -101,6 +101,47 @@ pub struct AdoptDomainPolicyResponse {
     pub policy_id: String,
     /// The governance domain the policy was adopted for.
     pub domain_id: String,
+}
+
+// ============================================================================
+// Institutional domain declaration (#2142 — gated declare/create)
+// ============================================================================
+
+/// Request body for `POST /gov/domains/{domain_id}/institutional-domain/declare`.
+///
+/// Declares the `InstitutionalDomain` authority record for the existing
+/// `GovernanceDomainId` carried in the path. The declaring actor is the
+/// authenticated caller (token `sub`), never a body field, and the authority to
+/// declare is resolved server-side through the `DefaultMandateGate` — not
+/// asserted here. `entity_type` is the closed [`BootstrapEntityType`] taxonomy
+/// (`"federation"` | `"cooperative"` | `"community"` | `"individual"`); an
+/// out-of-taxonomy value is rejected by JSON deserialization (400). `charter_id`
+/// is the optional hex (64-char) id of the domain's founding charter; omit it
+/// to declare a charter-less domain.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeclareInstitutionalDomainRequest {
+    /// The governed entity taxonomy the domain is owned by.
+    pub entity_type: BootstrapEntityType,
+    /// Optional hex (64-char) id of the domain's founding `CharterId`.
+    #[serde(default)]
+    pub charter_id: Option<String>,
+}
+
+/// Response body for a successful `InstitutionalDomain` declaration.
+///
+/// A legible projection of the freshly-declared
+/// [`icn_governance::InstitutionalDomain`]. A freshly-declared domain is
+/// unbound, so `current_policy_id` is always `null` here.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeclareInstitutionalDomainResponse {
+    /// The governance domain the institutional-domain record is keyed by.
+    pub domain_id: String,
+    /// The owning entity taxonomy.
+    pub owning_entity_class: BootstrapEntityType,
+    /// Hex id of the adopted founding charter, if any.
+    pub charter_id: Option<String>,
+    /// Hex id of the current adopted policy — `null` for a fresh declaration.
+    pub current_policy_id: Option<String>,
 }
 
 // ============================================================================

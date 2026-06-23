@@ -691,6 +691,11 @@ where
             web::resource("/domains/{domain_id}/domain-policy/adopt")
                 .route(web::post().to(handlers::adopt_domain_policy::<E>)),
         )
+        // ── Institutional domain declaration (#2142 — gated declare) ──────
+        .service(
+            web::resource("/domains/{domain_id}/institutional-domain/declare")
+                .route(web::post().to(handlers::declare_institutional_domain::<E>)),
+        )
         // ── Structure endpoints ──────────────────────────────────────────
         .service(
             web::resource("/entities/{entity_id}/structures")
