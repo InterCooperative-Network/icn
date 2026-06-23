@@ -110,6 +110,8 @@ pub enum MandateAct {
     JoinFederation,
     /// Leave a federation network.
     LeaveFederation,
+    /// Adopt (or change) a governed domain's current `DomainPolicy`.
+    AdoptDomainPolicy,
 }
 
 /// The subject an act operates on.
@@ -193,6 +195,7 @@ impl MandateAct {
             MandateAct::RemoveSteward => "remove_steward",
             MandateAct::JoinFederation => "join_federation",
             MandateAct::LeaveFederation => "leave_federation",
+            MandateAct::AdoptDomainPolicy => "adopt_domain_policy",
         }
     }
 }
@@ -344,7 +347,8 @@ fn expected_class(act: &MandateAct) -> AuthorityClass {
         | MandateAct::AppointSteward
         | MandateAct::RemoveSteward
         | MandateAct::JoinFederation
-        | MandateAct::LeaveFederation => AuthorityClass::Execution,
+        | MandateAct::LeaveFederation
+        | MandateAct::AdoptDomainPolicy => AuthorityClass::Execution,
     }
 }
 
@@ -371,6 +375,7 @@ fn expected_act_tokens(act: &MandateAct) -> (Option<&'static str>, Option<&'stat
         MandateAct::RemoveSteward => (Some("sdis:remove_steward"), Some("Sdis")),
         MandateAct::JoinFederation => (Some("federation:join"), Some("Federation")),
         MandateAct::LeaveFederation => (Some("federation:leave"), Some("Federation")),
+        MandateAct::AdoptDomainPolicy => (Some("domain_policy:adopt"), Some("DomainPolicy")),
     }
 }
 
