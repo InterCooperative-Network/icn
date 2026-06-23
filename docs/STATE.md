@@ -6,6 +6,20 @@ Last Reviewed: 2026-06-23
 
 # ICN State (living doc)
 
+<!-- [sync edit] 2026-06-23 (post-merge: DomainPolicy adoption GovernanceManager seam — `origin/main` HEAD `fe956146`: #2166 — NARROW scope, branch `docs/sync-domain-policy-manager-seam`):
+     Records the #2142 follow-up that exposes the #2164 gated adoption helper through the governance app boundary, merged to `origin/main` after the #2164 block below. NARROW sync covering only #2166. **#2142 advances but is NOT complete and remains OPEN.**
+
+     WHAT LANDED (squash tip `fe956146` on `origin/main`):
+       - #2166 (`fe956146` = current tip) feat(governance): **add domain policy adoption manager seam** — app-side only (`apps/governance` = `icn-governance-actor`); `icn-governance` pure-core unchanged; no HTTP route. Adds `GovernanceManager::adopt_domain_policy(&self, &mut InstitutionalDomain, &DomainPolicy, &Did, now)` (in the `domain_policy_adoption` module via `impl GovernanceManager`): it resolves authority through this manager's wired `GovernanceReceiptBackend` + the real `DefaultMandateGate` by delegating to `adopt_domain_policy_gated(...)`, then commits through pure-core `InstitutionalDomain::adopt_policy` as **defense-in-depth**. **Fails closed** with `DomainPolicyAdoptionError::MissingReceiptBackend` when no backend is wired (a manager that cannot resolve authority must never allow adoption); other failures wrap as `DomainPolicyAdoptionError::Gated(AdoptDomainPolicyError)`. Adds a tiny `pub(crate) GovernanceManager::receipt_backend()` accessor. **Option B (honest):** there is no durable `InstitutionalDomain` store yet, so the seam operates on a caller-held `&mut InstitutionalDomain` and returns the adopted `DomainPolicyRef`; persistence is a later domain-store lane. 6 manager-seam tests over the real `DefaultMandateGate` (success; missing-backend fail-closed; wrong actor/domain; revoked authority; pure-core defense-in-depth) — `domain_policy_adoption` now 13 tests total.
+
+     MEANING FIREWALL (verified): authority resolution stays in `apps/governance`; `icn-governance` pure-core is untouched and never imports the gate. No new authority primitive (reuses `Mandate` / `AuthorityGrant` / `TypedScope` / `MandateGate` / `GovernanceReceiptBackend`). No NYCN/Summit nouns. The required `Meaning Firewall Check` + `Kernel Forbidden Dependencies` gates passed.
+
+     ISSUE EFFECTS (verified against the tracker): **#2142 remains OPEN** — #2166 used `Refs #2142` (not a close keyword); `closingIssuesReferences` is empty. This is the app-boundary seam rung, not issue closure.
+
+     STILL OPEN / FORWARD WORK (#2142): no HTTP/route surface for domain-policy adoption (the next lane: a thin governance route that calls `GovernanceManager::adopt_domain_policy`, not bypassing it); no durable `InstitutionalDomain` persistence; no full `InstitutionalDomain`/`DomainPolicy` lifecycle (standing, services, routing, federation, exit); no CCL policy registry / evaluator selection / CCL evaluation; no service-binding runtime; no package activation.
+
+     This sync explicitly does NOT claim: #2142 complete; full InstitutionalDomain/DomainPolicy lifecycle; durable InstitutionalDomain persistence; a domain-policy HTTP/route surface; CCL runtime or policy-evaluator selection; package activation; any auth-model change or entity-aware auth cutover; production / pilot / organizer / federation readiness. Phase 2 status remains ⏳ (partner-bound); phase model unchanged; the #1703 human gate is unchanged. The non-required `Security Audit` (cargo-audit dependency backlog) check was red on #2166 and did NOT block merge — it is not in the branch-protection required set, and #2166 changed no dependency manifest/lock. -->
+
 <!-- [sync edit] 2026-06-23 (post-merge: DomainPolicy adoption gate-wired to MandateGate — `origin/main` HEAD `8594cd98`: #2164 — NARROW scope, branch `docs/sync-domain-policy-gate`):
      Records the #2142 follow-up that wires `DomainPolicy` adoption to the existing app-side authority resolver, merged to `origin/main` after the #2162 block below. NARROW sync covering only #2164. **#2142 advances but is NOT complete and remains OPEN.**
 
