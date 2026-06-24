@@ -1226,6 +1226,57 @@ impl Ledger {
         self.append_entry_internal(entry, false).await
     }
 
+    /// Append multiple journal entries, pre-validating all of them before appending any.
+    ///
+    /// Every entry is validated against the current (pre-batch) ledger state *before any
+    /// entry is appended*. If any entry fails that up-front validation, none are appended.
+    /// This closes the **validation-rejection** one-sided-entry window for a settlement
+    /// expressed as independent legs (e.g. the commons earn + spend pair, which touch
+    /// different accounts): a later leg that validation would reject can no longer leave an
+    /// earlier leg committed. Entries are appended in input order once all pass; the
+    /// returned hashes are in the same order.
+    ///
+    /// # This is NOT a full transaction
+    ///
+    /// Up-front validation prevents the *validation-rejection* partial commit, but two
+    /// residuals remain — callers must treat a returned `Err` as "may need reconciliation",
+    /// not "nothing was written":
+    ///
+    /// 1. **Re-validation against mutated state.** Each entry is re-validated inside
+    ///    `append_entry_internal` as it is applied, against state already mutated by
+    ///    earlier entries in the same batch. Entries that each pass the up-front check
+    ///    against the pre-batch state but *interact* (e.g. two debits that individually fit
+    ///    a credit limit but collectively exceed it) can still fail mid-batch, after an
+    ///    earlier entry was appended. The intended caller (the commons earn/spend pair)
+    ///    touches independent accounts, so its legs do not interact this way.
+    /// 2. **Store I/O between writes.** The durable writes are not wrapped in one storage
+    ///    transaction, so a store I/O failure *between* per-entry appends can leave a
+    ///    partial journal — inherent to the ledger's non-transactional append (an
+    ///    individual [`append_entry`] already performs its journal write and cached-balance
+    ///    save as separate operations).
+    ///
+    /// In both residual cases the journal is the authoritative source and balances are
+    /// recomputable from it, so the state is reconcilable rather than silently wrong. A
+    /// fully transactional batch append is tracked as a follow-up.
+    ///
+    /// [`append_entry`]: Self::append_entry
+    pub async fn append_entries(&mut self, entries: Vec<JournalEntry>) -> Result<Vec<ContentHash>> {
+        // Phase 1 — validate every entry up front (read-only; no durable mutation).
+        // Returning here, before any append, prevents a one-sided commit when a later
+        // entry fails validation against the pre-batch state. (It does not cover the
+        // re-validation / store-I/O residuals documented on this method.)
+        for entry in &entries {
+            self.validate_entry(entry)?;
+        }
+
+        // Phase 2 — all entries validated; append them in order.
+        let mut hashes = Vec::with_capacity(entries.len());
+        for entry in entries {
+            hashes.push(self.append_entry_internal(entry, true).await?);
+        }
+        Ok(hashes)
+    }
+
     /// Append a witnessed entry with signature validation
     ///
     /// This method validates witness signatures before appending. Use this when
@@ -3184,6 +3235,90 @@ mod tests {
 
         assert_eq!(ledger.get_balance(&alice, "hours"), 15);
         assert_eq!(ledger.get_balance(&bob, "hours"), -15);
+    }
+
+    #[tokio::test]
+    async fn test_append_entries_commits_all_on_success() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+
+        let earn = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .with_system_provenance("test-earn")
+            .build()
+            .unwrap();
+        let spend = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 4)
+            .credit(bob.clone(), "hours".to_string(), 4)
+            .with_system_provenance("test-spend")
+            .build()
+            .unwrap();
+
+        let hashes = ledger
+            .append_entries(vec![earn, spend])
+            .await
+            .expect("both valid entries should commit");
+
+        assert_eq!(hashes.len(), 2, "both entries should be appended");
+        assert_eq!(ledger.get_all_entries().unwrap().len(), 2);
+        assert_eq!(ledger.get_balance(&alice, "hours"), 14);
+        assert_eq!(ledger.get_balance(&bob, "hours"), -14);
+    }
+
+    /// B2 regression: a settlement expressed as multiple legs must be all-or-nothing on
+    /// validation. If a later leg is invalid (here: its author is frozen), the earlier
+    /// leg must NOT be left committed one-sidedly.
+    #[tokio::test]
+    async fn test_append_entries_rejects_all_when_a_later_entry_is_invalid() {
+        let (mut ledger, _temp) = create_test_ledger();
+
+        let alice = KeyPair::generate().unwrap().did().clone();
+        let bob = KeyPair::generate().unwrap().did().clone();
+        let frozen = KeyPair::generate().unwrap().did().clone();
+
+        // First leg is valid on its own.
+        let good = JournalEntryBuilder::new(alice.clone())
+            .debit(alice.clone(), "hours".to_string(), 10)
+            .credit(bob.clone(), "hours".to_string(), 10)
+            .with_system_provenance("good-leg")
+            .build()
+            .unwrap();
+
+        // Second leg is balanced but authored by a frozen DID, so `validate_entry`
+        // rejects it. `freeze_member` records a freeze (not a journal entry).
+        ledger.freeze_member(frozen.clone(), "test freeze".to_string(), None);
+        let bad = JournalEntryBuilder::new(frozen.clone())
+            .debit(frozen.clone(), "hours".to_string(), 5)
+            .credit(bob.clone(), "hours".to_string(), 5)
+            .with_system_provenance("bad-leg")
+            .build()
+            .unwrap();
+
+        let result = ledger.append_entries(vec![good, bad]).await;
+        assert!(
+            result.is_err(),
+            "a batch containing an invalid leg must be rejected"
+        );
+
+        // The valid first leg must NOT have been committed — no one-sided state.
+        assert_eq!(
+            ledger.get_all_entries().unwrap().len(),
+            0,
+            "no entry may be committed when a later leg fails validation"
+        );
+        assert_eq!(
+            ledger.get_balance(&alice, "hours"),
+            0,
+            "first leg must not have been applied"
+        );
+        assert_eq!(
+            ledger.get_balance(&bob, "hours"),
+            0,
+            "first leg must not have been applied"
+        );
     }
 
     #[tokio::test]
