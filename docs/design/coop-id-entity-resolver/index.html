@@ -1,0 +1,395 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governed `coop_id → EntityId` Resolver — Design Seam | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>coop id entity resolver</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/coop-id-entity-resolver.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Governed <code>coop_id → EntityId</code> Resolver — Design Seam</h1>
+<p><strong>Status</strong>: draft — design / seam definition (migration orientation, not implementation)
+<strong>Truth class</strong>: descriptive
+<strong>Canonical</strong>: no — current implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last Reviewed</strong>: 2026-06-24
+<strong>Source basis</strong>: read against <code>main</code> @ <code>a77c3324</code> (#2183). Code anchors re-verified with <code>rg</code>; re-verify before relying on exact line numbers.
+<strong>Related</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/entity-aware-auth-control-map">entity-aware-auth-control-map.md</a> (the keystone this extends) · <a href="/docs/rfcs/RFC-0018-entity-aware-request-authorization">RFC-0018</a> (active) · <a href="/docs/adr/ADR-0035-entity-aware-request-authorization">ADR-0035</a> (accepted, partial) · <a href="/docs/architecture/ABUSE_CASE_HARDENING_STRATEGY">ABUSE_CASE_HARDENING_STRATEGY.md</a> · issues #2061, #2080, #1868, #2082</p>
+<blockquote>
+<p><strong>This document defines a seam — a contract, its invariants, failure modes, and migration
+posture — for the governed <code>coop_id → EntityId</code> resolver named as the keystone in the
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/entity-aware-auth-control-map">entity-aware authorization control map</a>. It implements
+nothing, changes no runtime authorization, and authorizes no behavior change. It exists so
+the resolver is designed once, fail-closed, before any code reads from it.</strong></p>
+</blockquote>
+<hr>
+<h2>Purpose</h2>
+<p>The <a href="https://github.com/InterCooperative-Network/icn/blob/main/entity-aware-auth-control-map">control map</a> established that three in-flight seams —
+route enforcement, trusted token issuance, and the token <code>entity_id</code> claim — all converge on a
+single missing piece: a <strong>trusted, governed resolver from the legacy flat <code>coop_id</code> namespace
+to the typed <code>EntityId</code> model</strong>. This document specifies that resolver as a seam.</p>
+<p>The load-bearing finding that shapes the whole design: the <em>mapping store already exists</em>. What
+is missing is not a store but a <strong>governed, provenance-aware, fail-closed read path</strong> that the
+authorization and issuance code can trust. The resolver is the route/observe-side analogue of
+the issuance-side <a href="#3-authority-and-governance">`TokenAuthoritySource`</a> seam, and is designed to
+read the <strong>same</strong> membership-grounded authority once wired.</p>
+<h2>What already exists (do not reinvent)</h2>
+<table>
+<thead>
+<tr>
+<th>Piece</th>
+<th>Where</th>
+<th>What it is</th>
+<th>What it is <strong>not</strong></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>CoopEntityMap</code> (store)</td>
+<td><code>icn-entity/src/coop_entity_map.rs</code> (#2082)</td>
+<td>canonical, persisted, <strong>reversible</strong> <code>coop_id ↔ EntityId</code> name binding; conflict-detecting both directions; <code>bind_resolved</code> / <code>bind_exact</code> / <code>bind_projected</code> / <code>entity_for_coop</code> / <code>coop_for_entity</code></td>
+<td><strong>not authority</strong> — its own module doc states a binding &quot;grants zero standing, role, capability, membership, mandate, or permission&quot;</td>
+</tr>
+<tr>
+<td><code>project_coop_id</code></td>
+<td><code>coop_entity_map.rs</code></td>
+<td>pure, reject-not-normalize projection (valid cooperative slug only)</td>
+<td>not a governed source; rejects non-mappable ids</td>
+</tr>
+<tr>
+<td><code>propose_surrogate_entity_id</code></td>
+<td><code>icn-entity/src/coop_entity_surrogate.rs</code></td>
+<td>deterministic <code>coop-legacy-&lt;20 hex&gt;</code> surrogate for non-mappable ids (domain <code>icn:coop-entity-surrogate:v1</code>)</td>
+<td>not a binding; a <em>proposal</em></td>
+</tr>
+<tr>
+<td>activation-time wiring</td>
+<td><code>icn-core/src/supervisor/init_notifications.rs</code> + <code>coop_entity_map_wiring</code> test</td>
+<td>binds through the wired map at activation</td>
+<td>not consulted by the gateway</td>
+</tr>
+<tr>
+<td><code>legacy_coop_id_to_entity_id_fallback</code></td>
+<td><code>icn-gateway/src/entity_map.rs</code></td>
+<td>best-effort observe-only projection bridge</td>
+<td>explicitly <strong>not</strong> a governed authority source</td>
+</tr>
+</tbody></table>
+<p>The decisive gap: <strong><code>icn-gateway</code> does not consume <code>CoopEntityMap</code> at all.</strong> The store lives in
+<code>icn-entity</code>; the gateway&#39;s only bridge is the lossy, observe-only fallback. Nothing carries the
+persisted binding into <code>require_entity_access</code>, the treasury observation, or token issuance with
+provenance and fail-closed authority semantics. That bridge is the resolver seam.</p>
+<h2>1. Problem statement</h2>
+<ul>
+<li><strong>Flat <code>coop_id</code> guards are the current enforced baseline.</strong> <code>require_coop_access</code>
+(<code>icn-gateway/src/middleware.rs:138</code>) is the sole authorization gate on the bulk of mutation
+routes. It is coarse but real, and must remain in force until a measured typed replacement exists.</li>
+<li><strong>Entity-aware authorization exists conceptually but cannot cut over.</strong> <code>require_entity_access</code>
+(<code>icn-gateway/src/authority.rs:160</code>) is enforced only on entity routes and observe-only on
+treasury. Extending it requires a <strong>trustworthy</strong> mapping from a request&#39;s legacy <code>coop_id</code>
+context to a governed <code>EntityId</code> — one that carries <em>where the binding came from</em>, not just
+<em>what it denotes</em>.</li>
+<li><strong>A DID proves key control, not membership.</strong> <code>TokenClaims.sub</code> proves the caller controls a
+DID. It says nothing institutional.</li>
+<li><strong>Token scope is not authority.</strong> <code>scopes</code> (e.g. <code>governance:write</code>) is technical/capability
+permission, not a mandate or standing.</li>
+<li><strong><code>coop_id</code> is not an entity-authority primitive by itself.</strong> A flat namespace string match is
+not entity-aware authorization, and the optional <code>entity_id</code> / <code>entity_type</code> token claims
+(<code>icn-gateway/src/auth.rs</code>) are deliberately <strong>non-enforcing</strong> context that the flat guard ignores.</li>
+<li><strong>A mapping is not authority.</strong> Even the canonical <code>CoopEntityMap</code> binding is a name binding
+only. Resolving <code>coop_id → EntityId</code> says <em>which</em> entity an identifier denotes — never <em>what the
+caller may do</em>. Authority still flows from memberships, standing, charters, mandates, and
+decision receipts.</li>
+</ul>
+<p>The resolver&#39;s job is to turn an <em>untrusted</em> legacy <code>coop_id</code> context into a <em>trusted, typed,
+provenance-tagged</em> <code>EntityId</code> resolution — or to fail closed — so the authority layers above it
+can reason in the typed model without inheriting the legacy namespace&#39;s ambiguity.</p>
+<h2>2. Resolver contract</h2>
+<p>A single seam, shaped after the by-value, <code>#[must_use]</code> decision discipline already used by
+<code>TokenAuthoritySource</code> (<code>icn-gateway/src/token_authority.rs:147</code>).</p>
+<p><strong>Inputs</strong></p>
+<ul>
+<li>the request&#39;s flat <code>coop_id</code> context (route <code>coop_id</code> and/or <code>TokenClaims.coop_id</code>);</li>
+<li>the subject <code>Did</code> (<code>TokenClaims.sub</code>);</li>
+<li>the optional, non-enforcing <code>entity_id</code> / <code>entity_type</code> claim, used only as a <strong>cross-check</strong>, never as the source of truth;</li>
+<li>the <strong>purpose</strong> of the call: <code>Observe</code>, <code>Enforce</code>, or <code>Issue</code> (the trust bar rises across these).</li>
+</ul>
+<p><strong>Output</strong> — a by-value resolution decision (no <code>Result</code> the caller can paper over), e.g.:</p>
+<ul>
+<li><code>Resolved { entity_id, provenance }</code> — a trusted binding, tagged with <em>how</em> it was established;</li>
+<li><code>NotMapped</code> — no binding exists for this <code>coop_id</code>;</li>
+<li><code>Ambiguous { detail }</code> — more than one candidate, or a forward/reverse conflict;</li>
+<li><code>Untrusted { reason }</code> — a binding exists but its provenance is not trusted for this purpose (stale, surrogate-only, revoked, subject/type mismatch);</li>
+<li><code>Error { detail }</code> — the backing store could not answer.</li>
+</ul>
+<p><strong>Trusted data sources</strong> — the governed <code>CoopEntityMap</code> (<code>entity_for_coop</code> / <code>coop_for_entity</code>)
+plus per-binding provenance metadata, and (in later slices) the same <code>icn-entity</code> membership /
+<code>icn-governance</code> standing surfaces that issuance will read. <strong>Never</strong> client-supplied.</p>
+<p><strong>Required / optional / observe-only during migration</strong> — <strong>observe-only</strong>. During migration the
+resolver result is <em>data</em>, never a <code>Result</code> that denies a request (the same structural property
+the treasury <code>EntityAccessObservation</code> already has at <code>authority.rs:263</code>). It becomes decisive
+only at the enforce/issue cutover, and only behind a wired trusted source.</p>
+<p><strong>Ambiguity</strong> is represented explicitly as <code>Ambiguous</code>, never silently resolved to a &quot;best&quot;
+candidate. <strong>Missing mappings</strong> are <code>NotMapped</code>, never a fabricated or projected identity at the
+authority layer. <strong>Stale / conflicting</strong> bindings resolve to <code>Untrusted</code> / <code>Ambiguous</code> and <strong>fail
+closed</strong> — they never widen access.</p>
+<h2>3. Authority and governance</h2>
+<ul>
+<li><strong>Who may create, update, or retire a mapping.</strong> Writes go through the governed binding path
+only — <code>CoopEntityMap::bind_resolved</code> / <code>bind_exact</code> (which already enforce both-direction
+conflict detection and cooperative-type validation, refusing one-sided writes). Permitted
+origins: activation-time binding, operator-run backfill with recorded provenance, and
+(eventually) a binding carrying a governance <strong>decision receipt</strong>. Retirement is an explicit
+governed transition, not a silent overwrite.</li>
+<li><strong>What evidence / receipt / provenance is required.</strong> Every binding the resolver will <em>trust</em>
+must carry a provenance class (e.g. <code>activation</code>, <code>operator-backfill</code>, <code>surrogate</code>,
+<code>governance-receipt</code>). The resolver trusts only the provenance classes appropriate to the
+purpose — e.g. a <code>surrogate</code>-only binding may be observable but is not, by itself, an authority
+basis for <code>Enforce</code> / <code>Issue</code>.</li>
+<li><strong>Why this cannot be client-supplied.</strong> The token <code>entity_id</code> claim is non-enforcing context set
+only by a trusted issuance path; a caller asserting its own <code>coop_id → EntityId</code> binding is
+self-asserted authority — the exact pattern the <code>/auth/verify</code> fail-closed doctrine (#2075,
+RFC-0018) forbids. DID key control alone never authorizes a cooperative.</li>
+<li><strong>Why this cannot be inferred from token claims alone.</strong> Scope is permission, not authority; the
+<code>entity_id</code> claim is a cross-check, not a source. Inference from claims would let a token mint its
+own institutional meaning.</li>
+<li><strong>Relationship to <code>TokenAuthoritySource</code> / <code>DenyUntilWired</code>.</strong> The resolver mirrors that seam
+exactly. Issuance asks &quot;may this subject receive a token binding <code>coop_id</code>/<code>entity_id</code>?&quot; and the
+shipped <code>DenyUntilWired</code> (<code>token_authority.rs:166</code>) answers <code>Deny { NoTrustedSourceWired }</code>,
+reading none of its inputs. The resolver asks &quot;what trusted <code>EntityId</code> does this <code>coop_id</code>
+context denote, for this purpose?&quot; and its shipped default must <strong>resolve nothing</strong> until wired.
+Both are fail-closed-by-value, and both are designed to read the <strong>same</strong> membership-grounded
+source once it exists — so the route side and the issuance side converge rather than fork. The
+<code>IssuanceAuthorityBasis::Membership</code> variant (<code>token_authority.rs:83</code>) names that shared source.</li>
+</ul>
+<h2>4. Migration posture</h2>
+<ol>
+<li><strong>Current baseline — <code>require_coop_access</code>.</strong> The flat guard stays the enforced gate. The
+resolver does not touch it.</li>
+<li><strong>Observe mode.</strong> The resolver runs <em>alongside</em> the flat guard and records, per request, what a
+trusted typed resolution <em>would</em> yield vs the flat decision — extending the proven treasury
+observe pattern (<code>observe_treasury_entity_access</code>, <code>authority.rs:301</code>) from the membership check
+to the <em>resolution</em> step. It emits a metric + log line and denies nothing. This measures
+<code>NotMapped</code> / <code>Ambiguous</code> / <code>Untrusted</code> rates on real traffic before any enforcement.</li>
+<li><strong>Later enforcing mode.</strong> <code>require_entity_access</code> can become decisive for a route family only
+after (a) the resolver&#39;s trusted source is wired, and (b) observe-mode divergence for that
+family is understood and acceptable. One route family at a time.</li>
+<li><strong>Compatibility with <code>governance:write</code> decomposition (#1868).</strong> Orthogonal and complementary:
+decomposing a broad scope into per-action capabilities shrinks blast radius but is a <em>scope</em>
+concern, not an <em>authority-resolution</em> concern. The resolver neither blocks nor depends on it.</li>
+</ol>
+<h2>5. Fail-closed rules</h2>
+<p>The resolver never fails open. In <code>Observe</code> a non-<code>Resolved</code> outcome is recorded and the flat
+guard decides; in <code>Enforce</code> / <code>Issue</code> a non-<code>Resolved</code> outcome <strong>denies</strong>.</p>
+<table>
+<thead>
+<tr>
+<th>Condition</th>
+<th>Resolution</th>
+<th>Enforce/Issue effect</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>No mapping for <code>coop_id</code></td>
+<td><code>NotMapped</code></td>
+<td>deny (no typed target → no entity authority)</td>
+</tr>
+<tr>
+<td>Multiple / forward-reverse-conflicting mappings</td>
+<td><code>Ambiguous</code></td>
+<td>deny (never pick a &quot;best&quot; candidate)</td>
+</tr>
+<tr>
+<td>Revoked / retired entity</td>
+<td><code>Untrusted { revoked }</code></td>
+<td>deny</td>
+</tr>
+<tr>
+<td>Store / backend failure</td>
+<td><code>Error</code></td>
+<td>deny (an unreachable source is not an allow)</td>
+</tr>
+<tr>
+<td>Token subject ↔ binding mismatch</td>
+<td><code>Untrusted { subject_mismatch }</code></td>
+<td>deny</td>
+</tr>
+<tr>
+<td>Entity-type mismatch (binding not cooperative)</td>
+<td>rejected at bind (<code>CoopEntityMapError::InvalidEntityType</code>); resolver treats any non-cooperative read as <code>Untrusted</code></td>
+<td>deny</td>
+</tr>
+<tr>
+<td>Stale cache or unverifiable provenance</td>
+<td><code>Untrusted { stale_or_unverifiable }</code></td>
+<td>deny</td>
+</tr>
+</tbody></table>
+<p>These mirror the existing observation vocabulary (<code>DenyReason</code>, <code>IndeterminateReason</code> in
+<code>authority.rs</code>) and the issuance denial reasons (<code>IssuanceDenialReason</code>, <code>token_authority.rs:101</code>)
+so logs/metrics stay coherent across the three seams.</p>
+<h2>6. Non-claims</h2>
+<p>This document explicitly does <strong>not</strong>:</p>
+<ul>
+<li>implement the resolver, any trait, or any wiring;</li>
+<li>change runtime authorization, gateway behavior, or any route guard;</li>
+<li>issue positive trusted entity claims, or alter token issuance / minting;</li>
+<li>remove or weaken <code>require_coop_access</code> (it remains the enforced baseline);</li>
+<li>enforce <code>require_entity_access</code> on any new route family;</li>
+<li>complete or close #2061, #2080, #1868, or #2082;</li>
+<li>claim production, pilot, live-federation, NYCN, or complete-API readiness.</li>
+</ul>
+<p>It is a seam definition for migration, not an implementation.</p>
+<h2>7. Follow-up implementation slices</h2>
+<p>Narrow and sequenced; each is its own PR, behind the fail-closed default until explicitly cut over.</p>
+<ul>
+<li><strong>A2a — resolver trait + fail-closed default.</strong> Define the <code>CoopEntityResolver</code> trait and its
+by-value resolution type in the gateway, with a <code>DenyUntilWired</code>-equivalent default that resolves
+nothing and reads none of its inputs. No route consumes it yet. (Mirrors the <code>TokenAuthoritySource</code>
+PR shape.)</li>
+<li><strong>A2b — observe-mode wiring + discrepancy logging.</strong> Consult the resolver alongside the flat
+guard on one already-observed family (treasury), record <code>Resolved</code>/<code>NotMapped</code>/<code>Ambiguous</code>/
+<code>Untrusted</code> rates. Still denies nothing.</li>
+<li><strong>A2c — trusted, store-backed source with provenance.</strong> Back the resolver with the governed
+<code>CoopEntityMap</code> (#2082) read path. <strong>Prerequisite — provenance must be retrievable first:</strong> the
+current <code>CoopEntityMap</code> read API (<code>entity_for_coop</code> / <code>coop_for_entity</code>) returns only the bound
+<code>coop_id ↔ EntityId</code> pair; it carries <strong>no provenance</strong> (activation vs operator-backfill vs
+surrogate vs governance receipt). Because this design makes provenance <em>decisive</em> for
+<code>Enforce</code> / <code>Issue</code> (§3 Authority and governance, §5 fail-closed rules), A2c must <strong>first</strong> add
+per-binding provenance persistence and retrieval — extend the store with a provenance field, or
+add a parallel provenance source keyed by the binding — before a store-backed resolver can be
+trusted. Until provenance is retrievable, a store-backed resolver cannot fail closed <em>by
+provenance</em> and would be forced to treat every existing binding as equally (un)authoritative,
+which violates this design&#39;s intent. Only after that prerequisite lands does A2c replace the
+lossy <code>legacy_coop_id_to_entity_id_fallback</code> bridge for observe.</li>
+<li><strong>A2d — route-family migration gates.</strong> Per-family, observe → measure → (only then) enforce,
+gated on wired trust and acceptable divergence.</li>
+<li><strong>A2e — enforcement cutover criteria.</strong> Define and document the explicit, measurable conditions
+under which <code>require_entity_access</code> becomes decisive for a family and the flat guard is retired
+for it.</li>
+</ul>
+<h2>Relationship to #2061, #2080, #1868, #2082</h2>
+<ul>
+<li><strong>#2061 (route side)</strong> — migrate route families off the flat guard. The resolver is the
+prerequisite for any <em>enforce</em> step; A2b/A2d are its observe→enforce rungs.</li>
+<li><strong>#2080 (issuance side)</strong> — replace <code>DenyUntilWired</code> with a positive <code>TokenAuthoritySource</code>. Reads
+the <strong>same</strong> membership-grounded source the resolver targets; A2c aligns their trust source.</li>
+<li><strong>#1868 (scope side)</strong> — decompose <code>governance:write</code>. Orthogonal; interacts only in that scopes
+are permission, not authority.</li>
+<li><strong>#2082 (store side)</strong> — the canonical persisted <code>coop_id ↔ EntityId</code> mapping/backfill. The
+resolver is the <strong>governed read/authority layer that consumes #2082&#39;s store</strong>; it does not
+duplicate it. A2c is the join.</li>
+</ul>
+<h2>Source references (verified at <code>a77c3324</code>)</h2>
+<ul>
+<li><code>icn/crates/icn-gateway/src/middleware.rs:138</code> — <code>require_coop_access</code> (flat baseline).</li>
+<li><code>icn/crates/icn-gateway/src/authority.rs:160,263,301</code> — <code>require_entity_access</code>,
+<code>EntityAccessObservation</code>, <code>observe_treasury_entity_access</code> (observe pattern).</li>
+<li><code>icn/crates/icn-gateway/src/token_authority.rs:55,83,101,147,166</code> — <code>IssuanceAuthorityDecision</code>
+/ <code>IssuanceAuthorityBasis</code> / <code>IssuanceDenialReason</code> / <code>TokenAuthoritySource</code> / <code>DenyUntilWired</code>
+(the issuance-side seam the resolver mirrors).</li>
+<li><code>icn/crates/icn-gateway/src/auth.rs</code> — <code>TokenClaims</code> (non-enforcing <code>entity_id</code> / <code>entity_type</code>).</li>
+<li><code>icn/crates/icn-gateway/src/entity_map.rs:33</code> — <code>legacy_coop_id_to_entity_id_fallback</code>
+(observe-only bridge to be replaced).</li>
+<li><code>icn/crates/icn-entity/src/coop_entity_map.rs:53,93,127</code> — <code>CoopEntityMapError</code>, <code>project_coop_id</code>,
+<code>CoopEntityMap</code> trait (the store, #2082).</li>
+<li><code>icn/crates/icn-entity/src/coop_entity_surrogate.rs:78</code> — <code>propose_surrogate_entity_id</code>.</li>
+<li><code>icn/crates/icn-core/src/supervisor/init_notifications.rs</code> — activation-time map wiring.</li>
+</ul>
+<h2>Validation</h2>
+<p>Docs-only change. The applicable gate is the documentation control plane:</p>
+<pre><code class="language-bash">python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict
+ops/scripts/drift-check.sh
+</code></pre>
+<p>No Rust is touched, so no Rust build/test is required. <code>compliance_linter.py</code> scans gateway
+<code>api/**</code> / <code>models.rs</code> / SDK/UI (not <code>docs/</code>); <code>lint-arch.py</code> targets <code>docs/ARCHITECTURE.md</code> only —
+neither applies to this doc.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
