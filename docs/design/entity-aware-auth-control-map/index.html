@@ -1,0 +1,389 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Entity-Aware Authorization Control Map | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>entity aware auth control map</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/entity-aware-auth-control-map.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Entity-Aware Authorization Control Map</h1>
+<p><strong>Status</strong>: draft — design / control map (migration orientation, not implementation)
+<strong>Truth class</strong>: descriptive
+<strong>Canonical</strong>: no — current implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last Reviewed</strong>: 2026-06-24
+<strong>Source basis</strong>: read against <code>main</code> @ <code>e7f3fc02</code> (#2181). Counts re-verified with <code>rg</code>; re-verify before relying on exact numbers.
+<strong>Related</strong>: <a href="/docs/rfcs/RFC-0018-entity-aware-request-authorization">RFC-0018</a> · <a href="/docs/adr/ADR-0035-entity-aware-request-authorization">ADR-0035</a> · <a href="/docs/architecture/ABUSE_CASE_HARDENING_STRATEGY">ABUSE_CASE_HARDENING_STRATEGY.md</a> · issues #2061, #2080, #1868</p>
+<blockquote>
+<p><strong>This document is a control map for an in-progress migration, not a description of a finished
+system. It explains where authorization is enforced today, what is observe-only, and what is not yet
+wired. It does not authorize any behavior change.</strong></p>
+</blockquote>
+<hr>
+<h2>Purpose</h2>
+<p>ICN&#39;s request authorization currently spans four moving parts: a flat <code>coop_id</code> guard, an entity-aware
+guard, optional token claims, and a trusted-issuance seam. Each is at a different stage of a single
+migration, and the surface is easy to misread — both as &quot;more enforced than it is&quot; and as &quot;broken.&quot;
+This map fixes one durable picture of:</p>
+<ul>
+<li>what each authorization input actually proves today,</li>
+<li>the two coexisting authorization regimes (flat vs entity-aware),</li>
+<li>the observe-mode pattern being used to migrate safely,</li>
+<li>the fail-closed trusted-issuance seam,</li>
+<li>the single missing <strong><code>coop_id → EntityId</code> resolver</strong> that gates further progress, and</li>
+<li>how <code>#2061</code>, <code>#2080</code>, and <code>#1868</code> relate.</li>
+</ul>
+<p>It makes the migration surface explicit <strong>before</strong> any enforcement or code change.</p>
+<h2>Current authorization reality</h2>
+<p>A gateway request is authorized today by two things: an authenticated bearer token (the caller proves
+key control of a DID) and a per-route guard. On the <strong>bulk</strong> of mutation routes that guard is a flat
+<code>coop_id</code> string match. On entity routes it is an entity-aware membership check. On treasury routes the
+entity-aware check runs <strong>alongside</strong> the flat guard but only as an observation. That is the whole
+picture; everything below is detail.</p>
+<p>The current system is <strong>not broken</strong> because it still uses flat <code>coop_id</code> guards. Those guards are the
+current enforced safety baseline. The risk is treating flat <code>coop_id</code> as the <em>final</em> authority model.</p>
+<h2>DID, token, <code>coop_id</code>, <code>EntityId</code>: what each proves</h2>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>Where</th>
+<th>Enforced today?</th>
+<th>What it proves</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>sub</code> (DID)</td>
+<td><code>TokenClaims.sub</code> (<code>icn-gateway/src/auth.rs</code>)</td>
+<td>yes (authentication)</td>
+<td><strong>key control</strong> of a DID. Nothing institutional.</td>
+</tr>
+<tr>
+<td><code>coop_id</code></td>
+<td><code>TokenClaims.coop_id</code></td>
+<td><strong>yes — the sole authZ gate on most routes</strong></td>
+<td>a flat namespace string. <code>require_coop_access</code> checks <code>claims.coop_id == &lt;route coop_id&gt;</code>.</td>
+</tr>
+<tr>
+<td><code>scopes</code></td>
+<td><code>TokenClaims.scopes</code></td>
+<td>yes</td>
+<td>technical/capability permission (<code>ledger:write</code>, <code>governance:write</code>, …). <strong>Not</strong> institutional authority.</td>
+</tr>
+<tr>
+<td><code>entity_id</code> / <code>entity_type</code></td>
+<td><code>TokenClaims.entity_id?</code> / <code>entity_type?</code></td>
+<td><strong>no — non-enforcing context</strong></td>
+<td>a typed <code>EntityId</code> context, settable only by a <em>trusted</em> issuance path. The dev / self-asserted path never sets it; the flat guard ignores it.</td>
+</tr>
+<tr>
+<td><code>EntityId</code> + membership</td>
+<td><code>icn-entity</code> (<code>entity.rs</code>, <code>membership.rs</code>, <code>registry.rs</code>)</td>
+<td>enforced <strong>only on entity routes</strong></td>
+<td>the typed institutional model: entity kind, membership, role, standing, capability.</td>
+</tr>
+</tbody></table>
+<p>The load-bearing distinctions this map preserves:</p>
+<pre><code>A DID proves key control.
+A DID is not membership.
+A token is not voting power.
+A capability scope is not a mandate.
+A flat coop_id match is not entity-aware authorization.
+Mapping is not authority.
+</code></pre>
+<p>Entity-aware authorization, even once enforced, remains <strong>subordinate to the mandate/authority spine</strong>
+where an institutional <em>effect</em> is involved (governance acts gate separately; see the operating model).</p>
+<h2>Regime A — flat <code>coop_id</code> authorization</h2>
+<ul>
+<li>Guard: <code>require_coop_access(req, coop_id)</code> in <code>icn-gateway/src/middleware.rs</code>.</li>
+<li>Mechanism: string equality between the token&#39;s <code>coop_id</code> claim and the route&#39;s <code>coop_id</code>.</li>
+<li>Status: <strong>authoritative</strong> — this is the enforced gate on the bulk of mutation routes.</li>
+<li>Blind to: entity kind, membership graph, hierarchy, delegation, role, and standing.</li>
+<li>Deliberately ignores the optional <code>entity_id</code> claim (a regression test pins this: a token&#39;s
+<code>entity_id</code> must not influence the flat decision).</li>
+</ul>
+<p>This is the safety baseline. It is coarse but real, and it must remain in force until a typed
+replacement is both available and measured.</p>
+<h2>Regime B — entity-aware authorization</h2>
+<ul>
+<li>Guard: <code>require_entity_access(entity_mgr, caller, target, action)</code> in <code>icn-gateway/src/authority.rs</code>
+(RFC-0018 / ADR-0035).</li>
+<li>Mechanism: resolve the caller&#39;s membership in the target <code>EntityId</code>, then check an <code>EntityAction</code>
+against role / active-standing / capability. The current action triad is <code>ModifyEntity</code>,
+<code>TreasuryRead</code>, <code>TreasuryWrite</code>.</li>
+<li>Status:<ul>
+<li><strong>Enforced</strong> on entity routes (<code>icn-gateway/src/api/entity.rs</code>, via <code>require_entity_write_access</code>).</li>
+<li><strong>Observe-only</strong> on treasury routes (see next section).</li>
+<li>Absent on all other route families.</li>
+</ul>
+</li>
+<li>This is the migration target: typed, membership-grounded authorization that the kernel never has to
+understand (meaning stays in the app; the kernel sees only the allow/deny).</li>
+</ul>
+<h2>Observe-mode migration pattern</h2>
+<p>Treasury routes are the migration frontier. There, the entity-aware decision is computed <strong>alongside</strong>
+the authoritative flat guard and recorded — never acted on:</p>
+<ul>
+<li><code>observe_treasury_entity_access(...)</code> in <code>icn-gateway/src/authority.rs</code> returns an
+<code>EntityAccessObservation</code> (<code>AgreesAllow</code> / <code>EntityDeny(reason)</code> / <code>Indeterminate(reason)</code> / <code>Error</code>).</li>
+<li>The observation is <strong>data, not a <code>Result</code></strong> the caller propagates — it is structurally incapable of
+denying a request. It emits a metric and a log line; the flat guard remains the sole enforced gate.</li>
+<li>It records exactly the signal a future enforcement flip needs: where the entity-aware path <em>would</em>
+deny (<code>NonMember</code> / <code>InactiveMember</code> / <code>MissingCapability</code>) or <em>cannot decide</em> (data gaps such as a
+missing <code>entity_id</code> or unregistered entity).</li>
+</ul>
+<p>The migration discipline this encodes:</p>
+<pre><code>Keep the flat guard as the enforced baseline.
+Compute the entity-aware decision in observe mode and measure divergence.
+Move one route family at a time to enforcement — and only after trusted
+EntityId resolution and trusted token issuance exist.
+</code></pre>
+<h2>Trusted issuance seam</h2>
+<p>Whether a token may carry typed entity context is a separate, fail-closed boundary:</p>
+<ul>
+<li><code>TokenAuthoritySource</code> (trait) in <code>icn-gateway/src/token_authority.rs</code> answers, by value, whether a
+subject DID may receive a token binding a <code>coop_id</code>/<code>EntityId</code> with given scopes
+(<code>IssuanceAuthorityDecision::{Allow{basis}, Deny{reason}}</code>).</li>
+<li>The only source shipped is <code>DenyUntilWired</code>: it <strong>denies every request</strong> and reads none of its inputs
+— no DID, <code>coop_id</code>, <code>EntityId</code>, or scope can produce an allow. Denial is a decision value, not an
+error, so a caller can never mistake an unwired/unhealthy source for an allow.</li>
+<li><code>IssuanceAuthorityBasis</code> names the future positive sources (<code>Membership</code>, <code>Standing</code>, <code>Bootstrap</code>,
+<code>AuthorityGrant</code>); only a test-only basis is ever constructed today. <strong>No</strong> production issuance path
+(<code>/auth/verify</code>, invites, sessions, SDIS enrollment, bootstrap) consults a <code>TokenAuthoritySource</code>
+yet, and <code>entity_id</code> minting remains a raw primitive.</li>
+</ul>
+<p>Self-asserted <code>coop_id</code> issuance at <code>/auth/verify</code> is <strong>fail-closed</strong> (RFC-0018, #2075): DID key control
+alone never authorizes a cooperative.</p>
+<h2>The <code>coop_id → EntityId</code> resolver keystone</h2>
+<p>All three seams above — route enforcement, trusted issuance, and the token <code>entity_id</code> claim — converge
+on the same missing piece: a <strong>trusted, governed resolver from the legacy flat <code>coop_id</code> namespace to
+the typed <code>EntityId</code> model</strong>.</p>
+<p>Today the only bridge is <code>legacy_coop_id_to_entity_id_fallback</code> in <code>icn-gateway/src/entity_map.rs</code>, a
+best-effort <em>reject-not-normalize</em> projection used only inside observe-mode. It is not a governed
+authority source.</p>
+<pre><code>The coop_id → EntityId resolver is the keystone because it joins the legacy route
+namespace to the typed institutional entity model. Without it:
+  - #2061 cannot safely flip treasury observe → enforce (nor add observe elsewhere), and
+  - #2080 cannot safely mint positive entity-scoped authority.
+</code></pre>
+<p>It is the keystone precisely because both the enforcement side and the issuance side are designed to
+read from the <em>same</em> membership-grounded source once it exists.</p>
+<h2>Route-family enforcement map</h2>
+<p>Mechanically counted at <code>e7f3fc02</code> (<code>rg</code> over <code>icn-gateway/src</code>); treat as a snapshot, not a contract.</p>
+<table>
+<thead>
+<tr>
+<th>Route family (file)</th>
+<th>Flat <code>require_coop_access</code> sites</th>
+<th>Entity-aware (Regime B)</th>
+<th>Net state</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>api/entity.rs</code></td>
+<td>0</td>
+<td><strong>enforced</strong> (<code>require_entity_write_access</code> → <code>require_entity_access</code>, <code>ModifyEntity</code>)</td>
+<td>migrated</td>
+</tr>
+<tr>
+<td><code>api/treasury.rs</code></td>
+<td>10 (enforced)</td>
+<td><strong>observe-only</strong> ×2 (<code>TreasuryRead</code> / <code>TreasuryWrite</code>)</td>
+<td>migration frontier</td>
+</tr>
+<tr>
+<td><code>api/ledger.rs</code></td>
+<td>6</td>
+<td>none</td>
+<td>flat-only</td>
+</tr>
+<tr>
+<td><code>api/coops.rs</code></td>
+<td>6</td>
+<td>none</td>
+<td>flat-only</td>
+</tr>
+<tr>
+<td><code>api/registry.rs</code></td>
+<td>2</td>
+<td>none</td>
+<td>flat-only</td>
+</tr>
+<tr>
+<td><code>api/invites.rs</code></td>
+<td>2</td>
+<td>none</td>
+<td>flat-only</td>
+</tr>
+<tr>
+<td><code>api/escrow.rs</code></td>
+<td>2</td>
+<td>none</td>
+<td>flat-only</td>
+</tr>
+<tr>
+<td><code>api/recurring_settlements.rs</code></td>
+<td>1</td>
+<td>none</td>
+<td>flat-only</td>
+</tr>
+<tr>
+<td><code>middleware.rs</code></td>
+<td>guard definition + helpers + tests</td>
+<td>—</td>
+<td>the guard itself</td>
+</tr>
+</tbody></table>
+<h2>Relationship to #2061, #2080, and #1868</h2>
+<ul>
+<li><strong>#2061 — entity-aware request authorization (route side).</strong> Migrate route families off the flat
+<code>coop_id</code> guard onto entity-aware checks. The next safe rung is to extend the <strong>observe</strong> pattern
+(already proven on treasury) to a flat-only family and measure divergence <em>before</em> any enforcement
+flip. Blocked on the resolver keystone for the enforce step.</li>
+<li><strong>#2080 — trusted positive token issuance (issuance side).</strong> Replace <code>DenyUntilWired</code> with a positive
+<code>TokenAuthoritySource</code> (likely <code>Membership</code>-backed) plus a first-admin bootstrap path. Blocked on the
+same resolver; until then, fail-closed <code>DenyUntilWired</code> is the correct shipped state.</li>
+<li><strong>#1868 — decompose broad <code>governance:write</code> (scope side).</strong> Orthogonal but complementary: breaking a
+single broad scope into per-action capabilities / mandate-bundles shrinks the blast radius of any one
+token. It interacts with this map only in that scopes are technical permission, not authority.</li>
+</ul>
+<p>These are three sides of one migration: <strong>routes</strong> (who is checked), <strong>issuance</strong> (what a token may
+claim), and <strong>scopes</strong> (how coarse the permission is). The resolver is the joint that lets the route
+and issuance sides converge on one membership-grounded authority source.</p>
+<h2>Migration principles</h2>
+<ol>
+<li>The flat <code>coop_id</code> guard is the <strong>current enforced safety baseline</strong>; do not remove it ahead of a
+measured, typed replacement.</li>
+<li>Frame entity-aware authorization as a <strong>migration target</strong>, not a finished state.</li>
+<li>Migrate by <strong>observe → measure → enforce</strong>, one route family at a time.</li>
+<li>Trusted issuance stays <strong>fail-closed</strong> (<code>DenyUntilWired</code>) until a governed source is wired.</li>
+<li>Entity-aware authorization remains <strong>subordinate to the mandate/authority spine</strong> for institutional
+effects.</li>
+<li>Land the <strong><code>coop_id → EntityId</code> resolver</strong> as the shared keystone before flipping enforcement or
+minting positive entity-scoped authority.</li>
+</ol>
+<h2>Non-claims</h2>
+<p>This document explicitly does <strong>not</strong> claim:</p>
+<ul>
+<li>that entity-aware authorization is fully enforced (it is enforced only on entity routes; observe-only
+on treasury; absent elsewhere);</li>
+<li>that trusted positive token issuance is live (only <code>DenyUntilWired</code> ships);</li>
+<li>that flat <code>coop_id</code> guards are removed (they remain the enforced baseline);</li>
+<li>that the <code>coop_id → EntityId</code> resolver exists as a governed authority source;</li>
+<li>production readiness, live federation, formal NYCN pilot status, or complete API coverage.</li>
+</ul>
+<p>This is a control map for migration, not an implementation.</p>
+<h2>Out of scope</h2>
+<p>This document covers the authorization-migration surface only. It does not address route/OpenAPI
+inventory (#2112), governance-scope decomposition implementation (#1868), or any non-auth findings; and
+it intentionally introduces no runtime change.</p>
+<h2>Validation</h2>
+<p>Docs-only change. The applicable gate is the documentation control plane:</p>
+<pre><code class="language-bash">python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml --strict
+</code></pre>
+<p>Not applicable to this doc: <code>compliance_linter.py</code> scans gateway <code>api/**</code>, <code>models.rs</code>, and SDK/UI only
+(not <code>docs/</code>); <code>lint-arch.py</code> targets <code>docs/ARCHITECTURE.md</code> only. No Rust build/test is required for a
+docs-only change.</p>
+<h2>Source references (verified at <code>e7f3fc02</code>)</h2>
+<ul>
+<li><code>icn/crates/icn-gateway/src/middleware.rs</code> — <code>require_coop_access</code> (flat guard) + tests.</li>
+<li><code>icn/crates/icn-gateway/src/authority.rs</code> — <code>require_entity_access</code>, <code>EntityAction</code>, observe-mode
+(<code>observe_treasury_entity_access</code>, <code>EntityAccessObservation</code>, <code>DenyReason</code>, <code>IndeterminateReason</code>).</li>
+<li><code>icn/crates/icn-gateway/src/token_authority.rs</code> — <code>TokenAuthoritySource</code>, <code>DenyUntilWired</code>,
+<code>IssuanceAuthorityDecision</code> / <code>IssuanceAuthorityBasis</code> / <code>IssuanceDenialReason</code>.</li>
+<li><code>icn/crates/icn-gateway/src/auth.rs</code> — <code>TokenClaims</code> (incl. non-enforcing <code>entity_id</code> / <code>entity_type</code>).</li>
+<li><code>icn/crates/icn-gateway/src/entity_map.rs</code> — <code>legacy_coop_id_to_entity_id_fallback</code> (bridge).</li>
+<li><code>icn/crates/icn-gateway/src/api/{entity,treasury,ledger,coops,registry,invites,escrow,recurring_settlements}.rs</code> — route guards.</li>
+<li><code>icn/crates/icn-entity/src/{entity,membership,registry}.rs</code> — typed entity / membership model.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
