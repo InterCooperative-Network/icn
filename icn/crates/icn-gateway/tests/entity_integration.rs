@@ -1081,3 +1081,69 @@ async fn test_audit_stats_admin_only() {
     let resp = test::call_service(&app, req).await;
     assert_eq!(resp.status(), 403);
 }
+
+// ============================================================================
+// Read-path fail-closed regression (C2)
+// ============================================================================
+
+/// Regression: a membership-lookup error on the entity read path must FAIL CLOSED
+/// (return a server error), not silently degrade to a successful zero-member response.
+///
+/// The handler is backed by an `EntityManager` whose actor answers `Get` (so the
+/// handler gets past entity resolution and reaches the member read) but returns an
+/// error for `GetMembers`. Before the fix, `get_members(..).await.unwrap_or_default()`
+/// swallowed that error and returned `200 OK` with `member_count = 0`; now it
+/// propagates as a `GatewayError::InternalError` (5xx).
+#[actix_web::test]
+async fn get_entity_fails_closed_when_member_lookup_errors() {
+    use icn_entity::actor::EntityMessage;
+    use icn_entity::{CooperativeEntity, EntityError, EntityHandle};
+    use tokio::sync::mpsc;
+
+    init_logging();
+
+    // Mock entity actor: `Get` -> Ok(entity); `GetMembers` -> Err (simulated lookup failure).
+    let (tx, mut rx) = mpsc::channel::<EntityMessage>(16);
+    tokio::spawn(async move {
+        while let Some(msg) = rx.recv().await {
+            match msg {
+                EntityMessage::Get { reply, .. } => {
+                    let entity = CooperativeEntity::cooperative("lookup-fail", "Lookup Fail Coop")
+                        .expect("valid test coop");
+                    let _ = reply.send(Ok(Some(entity)));
+                }
+                EntityMessage::GetMembers { reply, .. } => {
+                    let _ = reply.send(Err(EntityError::MembershipError(
+                        "simulated membership lookup failure".to_string(),
+                    )));
+                }
+                // get_entity only issues Get + GetMembers; other variants are unused here.
+                _ => {}
+            }
+        }
+    });
+
+    let entity_mgr = Arc::new(EntityManager::with_handle(EntityHandle::new(tx)));
+    let store = Arc::new(SledStore::temporary().unwrap());
+    let audit_mgr = Arc::new(EntityAuditManager::new(store));
+    let app = test::init_service(
+        App::new()
+            .app_data(web::Data::new(entity_mgr.clone()))
+            .app_data(web::Data::new(audit_mgr.clone()))
+            .service(web::scope("/entities").configure(entity::configure)),
+    )
+    .await;
+
+    let claims = create_test_claims("did:icn:c2tester", vec!["entity:read"]);
+    let req = test::TestRequest::get()
+        .uri("/entities/entity:icn:cooperative:lookup-fail")
+        .to_request();
+    req.extensions_mut().insert(claims);
+
+    let resp = test::call_service(&app, req).await;
+    assert!(
+        resp.status().is_server_error(),
+        "member lookup error must fail closed (5xx), got {}",
+        resp.status()
+    );
+}
