@@ -323,7 +323,8 @@ async fn build_services(
     let settlement_dedup_path = config.store_path().join("settlement_dedup");
     let settlement_engine = compute_wiring::build_settlement_engine(settlement_dedup_path);
     let balance_callback = compute_wiring::create_balance_callback(ledger_handle.clone());
-    let payment_callback = compute_wiring::create_payment_callback(ledger_handle.clone());
+    let payment_callback =
+        compute_wiring::create_payment_callback(ledger_handle.clone(), settlement_engine.clone());
     let commons_settlement_callback = compute_wiring::create_commons_settlement_callback(
         ledger_handle.clone(),
         settlement_engine.clone(),
