@@ -1,6 +1,6 @@
 # Entity-Aware Authorization Control Map
 
-**Status**: Design / control map (migration orientation, not implementation)
+**Status**: draft — design / control map (migration orientation, not implementation)
 **Truth class**: descriptive
 **Canonical**: no — current implementation truth lives in [docs/STATE.md](../STATE.md) and [docs/PHASE_PROGRESS.md](../PHASE_PROGRESS.md)
 **Last Reviewed**: 2026-06-24
