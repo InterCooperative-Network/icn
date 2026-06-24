@@ -191,8 +191,17 @@ Narrow and sequenced; each is its own PR, behind the fail-closed default until e
   guard on one already-observed family (treasury), record `Resolved`/`NotMapped`/`Ambiguous`/
   `Untrusted` rates. Still denies nothing.
 - **A2c — trusted, store-backed source with provenance.** Back the resolver with the governed
-  `CoopEntityMap` (#2082) read path plus provenance classification. Replaces the lossy
-  `legacy_coop_id_to_entity_id_fallback` bridge for observe.
+  `CoopEntityMap` (#2082) read path. **Prerequisite — provenance must be retrievable first:** the
+  current `CoopEntityMap` read API (`entity_for_coop` / `coop_for_entity`) returns only the bound
+  `coop_id ↔ EntityId` pair; it carries **no provenance** (activation vs operator-backfill vs
+  surrogate vs governance receipt). Because this design makes provenance *decisive* for
+  `Enforce` / `Issue` (§3 Authority and governance, §5 fail-closed rules), A2c must **first** add
+  per-binding provenance persistence and retrieval — extend the store with a provenance field, or
+  add a parallel provenance source keyed by the binding — before a store-backed resolver can be
+  trusted. Until provenance is retrievable, a store-backed resolver cannot fail closed *by
+  provenance* and would be forced to treat every existing binding as equally (un)authoritative,
+  which violates this design's intent. Only after that prerequisite lands does A2c replace the
+  lossy `legacy_coop_id_to_entity_id_fallback` bridge for observe.
 - **A2d — route-family migration gates.** Per-family, observe → measure → (only then) enforce,
   gated on wired trust and acceptable divergence.
 - **A2e — enforcement cutover criteria.** Define and document the explicit, measurable conditions
