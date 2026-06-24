@@ -472,7 +472,10 @@ pub async fn register_entity(
         )));
     }
 
-    let members = entity_mgr.get_members(&entity_id).await.unwrap_or_default();
+    let members = entity_mgr
+        .get_members(&entity_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
     let response = entity_to_response(&entity, members.len());
 
     Ok(HttpResponse::Created().json(response))
@@ -503,7 +506,10 @@ pub async fn get_entity(
         )));
     };
 
-    let members = entity_mgr.get_members(&entity_id).await.unwrap_or_default();
+    let members = entity_mgr
+        .get_members(&entity_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
     let response = entity_to_response(&entity, members.len());
 
     Ok(HttpResponse::Ok().json(response))
@@ -571,7 +577,10 @@ pub async fn update_entity(
 
     // Skip no-op updates - return early if no changes were requested
     if changed_fields.is_empty() {
-        let members = entity_mgr.get_members(&entity_id).await.unwrap_or_default();
+        let members = entity_mgr
+            .get_members(&entity_id)
+            .await
+            .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
         let response = entity_to_response(&entity, members.len());
         return Ok(HttpResponse::Ok().json(response));
     }
@@ -622,7 +631,10 @@ pub async fn update_entity(
         )));
     }
 
-    let members = entity_mgr.get_members(&entity_id).await.unwrap_or_default();
+    let members = entity_mgr
+        .get_members(&entity_id)
+        .await
+        .map_err(|e| GatewayError::InternalError(format!("Failed to get members: {e}")))?;
     let response = entity_to_response(&entity, members.len());
 
     Ok(HttpResponse::Ok().json(response))

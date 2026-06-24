@@ -41,6 +41,7 @@ icn-rpc.workspace = true
 icn-obs.workspace = true
 hex = "0.4"
 serde_json.workspace = true
+sha2.workspace = true
 
 # App crates (domain logic - lives outside kernel)
 icn-trust-app = { path = "../../apps/trust-app" }
