@@ -8,6 +8,7 @@
 //! into the kernel via `BootstrapHandles`. The meaning firewall stays intact.
 
 use icn_identity::Did;
+use sha2::{Digest, Sha256};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, warn};
@@ -92,21 +93,50 @@ pub fn create_balance_callback(ledger: LedgerHandle) -> icn_compute::BalanceCall
     })
 }
 
-/// Create the payment callback for settling compute payments via ledger.
+/// Derive a stable 32-byte dedup key for a bilateral compute payment.
+///
+/// The compute `PaymentRequest` carries no receipt hash, but a task settles exactly once,
+/// so the task id is the natural idempotency key: re-delivery of the same task's payment
+/// (e.g. gossip redelivery) must not double-settle. Domain-separated so it cannot collide
+/// with hashes minted elsewhere.
+fn payment_dedup_hash(task_id: &str) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(b"icn:compute-payment-dedup:v1:");
+    hasher.update(task_id.as_bytes());
+    let digest = hasher.finalize();
+    let mut out = [0u8; 32];
+    out.copy_from_slice(&digest);
+    out
+}
+
+/// Create the payment callback for settling bilateral (non-commons) compute payments.
+///
+/// Routes through [`icn_ledger::SettlementEngine::settle_receipt`] so the payment gets the
+/// same guarantees as every other settlement — scope validation (Local/Cell/Org only;
+/// Federation/Commons rejected), positive-amount and no-self-dealing invariants, and
+/// receipt deduplication — instead of building a `JournalEntry` and appending it directly.
+/// The engine returns a balanced entry (debit submitter / credit executor) which the caller
+/// appends, mirroring the commons settlement path.
+///
+/// `engine` must be pre-created by the caller (the same engine used for commons settlement;
+/// see `build_settlement_engine()`).
 ///
 /// # Security (#1342)
-/// `req.from` originates from `claimed_task.submitter`, which is set by the task submitter
-/// at submission time. When tasks arrive via the gateway REST API the submitter DID is
-/// extracted from the JWT (authenticated). However, when a TaskSubmitted message is received
-/// via gossip, the submitter field comes from the gossip payload and could be spoofed by a
-/// malicious peer to name a victim DID as payer.
-///
-/// Full fix requires the gossip layer to verify `entry.author == task.submitter` before
-/// calling `on_task_submitted` (tracked in #1342). Until that is in place, we record the
-/// payer DID in the provenance reason so audit logs can detect mismatches.
-pub fn create_payment_callback(ledger: LedgerHandle) -> icn_compute::PaymentCallback {
+/// `req.from` originates from `claimed_task.submitter`, set by the task submitter at
+/// submission time. Over the gateway REST API the submitter DID is extracted from the JWT
+/// (authenticated); when a TaskSubmitted message arrives via gossip the submitter field comes
+/// from the gossip payload and could be spoofed to name a victim DID as payer. Full fix
+/// requires the gossip layer to verify `entry.author == task.submitter` (tracked in #1342);
+/// this change does not alter that exposure — the payer DID remains recorded as the debit
+/// account/author of the settlement entry. `executor_verified` is asserted here to preserve
+/// the prior unconditional-settle behavior pending the #1342 gossip-author verification.
+pub fn create_payment_callback(
+    ledger: LedgerHandle,
+    engine: Arc<icn_ledger::SettlementEngine>,
+) -> icn_compute::PaymentCallback {
     Arc::new(move |req| {
         let ledger = ledger.clone();
+        let engine = engine.clone();
         tokio::spawn(async move {
             let from_did: Did =
                 match serde_json::from_value(serde_json::Value::String(req.from.clone())) {
@@ -136,16 +166,31 @@ pub fn create_payment_callback(ledger: LedgerHandle) -> icn_compute::PaymentCall
                     return;
                 }
             };
-            let provenance_reason = format!("compute-payment:payer={}", req.from);
-            let entry = match icn_ledger::entry::JournalEntryBuilder::new(from_did.clone())
-                .debit(from_did, req.currency.clone(), amount_i64)
-                .credit(to_did, req.currency.clone(), amount_i64)
-                .with_system_provenance(provenance_reason)
-                .build()
-            {
-                Ok(e) => e,
+
+            // Bilateral compute payments are local-domain settlements; `settle_receipt`
+            // treats Local/Cell/Org identically (only Federation/Commons are rejected).
+            let settlement_req = icn_ledger::SettlementRequest {
+                receipt_hash: payment_dedup_hash(&req.task_id),
+                executor: to_did,
+                submitter: from_did,
+                attester: None,
+                scope: icn_kernel_api::ScopeLevel::Local,
+                amount: amount_i64,
+                currency: req.currency.clone(),
+                executor_verified: true,
+            };
+
+            let entry = match engine.settle_receipt(&settlement_req) {
+                Ok(entry) => entry,
+                Err(icn_ledger::LedgerError::DuplicateEntry(_)) => {
+                    // Idempotent — this task's payment was already settled.
+                    return;
+                }
                 Err(e) => {
-                    warn!("Failed to build payment entry: {}", e);
+                    warn!(
+                        "Failed to settle compute payment for task {}: {}",
+                        req.task_id, e
+                    );
                     return;
                 }
             };
@@ -428,6 +473,77 @@ mod tests {
         assert_eq!(
             executor_raw_after_dupe, executor_raw,
             "duplicate receipt must not double-settle the executor balance"
+        );
+    }
+
+    /// Regression (B1): the non-commons payment callback must route through
+    /// `SettlementEngine`, gaining its dedup/idempotency guarantee instead of appending a
+    /// `JournalEntry` directly. Firing the same task's payment twice must settle exactly once.
+    ///
+    /// Flow exercised:
+    ///   PaymentRequest → create_payment_callback → SettlementEngine::settle_receipt
+    ///   → balanced entry (debit submitter / credit executor) → Ledger::append_entry
+    #[tokio::test]
+    #[allow(clippy::unwrap_used, clippy::expect_used)]
+    async fn test_payment_callback_settles_through_engine_and_dedupes() {
+        use icn_identity::KeyPair;
+        use std::time::Duration;
+
+        let tmpdir = tempfile::tempdir().unwrap();
+        let store = Arc::new(icn_store::SledStore::open(tmpdir.path()).unwrap());
+        let ledger = Arc::new(RwLock::new(icn_ledger::Ledger::new(store).unwrap()));
+
+        let payer_kp = KeyPair::generate().unwrap(); // submitter (debited)
+        let payee_kp = KeyPair::generate().unwrap(); // executor (credited)
+        let payer_did = payer_kp.did().clone();
+        let payee_did = payee_kp.did().clone();
+
+        // Same engine instance the daemon shares between commons and bilateral callbacks.
+        let engine = Arc::new(icn_ledger::SettlementEngine::new());
+        let cb = create_payment_callback(ledger.clone(), engine.clone());
+
+        let amount = 500_u64;
+        let make_req = || icn_compute::PaymentRequest {
+            from: payer_did.to_string(),
+            to: payee_did.to_string(),
+            amount,
+            currency: "credits".to_string(),
+            task_id: "pay-task-001".to_string(),
+        };
+
+        // Fire once: payment settles through the engine.
+        cb(make_req());
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        // Mutual-credit convention: debit(submitter) → +amount raw; credit(executor) → -amount raw.
+        let payee_raw = ledger.read().await.get_balance(&payee_did, "credits");
+        let payer_raw = ledger.read().await.get_balance(&payer_did, "credits");
+        assert_eq!(payee_raw, -(amount as i64), "executor credited once");
+        assert_eq!(payer_raw, amount as i64, "submitter debited once");
+        assert_eq!(
+            engine.settled_count(),
+            1,
+            "one receipt settled via the engine"
+        );
+
+        // Fire the same task's payment again: the engine's dedup must prevent a second settlement.
+        cb(make_req());
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        let payee_raw_after = ledger.read().await.get_balance(&payee_did, "credits");
+        let payer_raw_after = ledger.read().await.get_balance(&payer_did, "credits");
+        assert_eq!(
+            payee_raw_after, payee_raw,
+            "duplicate task payment must not double-credit the executor"
+        );
+        assert_eq!(
+            payer_raw_after, payer_raw,
+            "duplicate task payment must not double-debit the submitter"
+        );
+        assert_eq!(
+            engine.settled_count(),
+            1,
+            "still one receipt settled (deduped)"
         );
     }
 }

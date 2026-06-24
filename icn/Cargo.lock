@@ -3981,6 +3981,7 @@ dependencies = [
  "rpassword",
  "rustls",
  "serde_json",
+ "sha2",
  "sled",
  "tempfile",
  "tokio",
