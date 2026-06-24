@@ -251,16 +251,15 @@ pub fn create_commons_settlement_callback(
 
             // 6. Run through settlement engine (dedup + invariant checks).
             //
-            // KNOWN LIMITATION: dedup is recorded inside settle_commons_receipt() before
-            // the ledger appends below complete. If append_entry() fails after this point,
-            // the receipt is permanently marked settled and retries will return DuplicateEntry.
-            // True atomicity requires batch-append support in the ledger (not yet available).
-            // On partial failure (earn ok, spend fails), manual recovery is required.
+            // Dedup is recorded inside settle_commons_receipt() before the ledger append
+            // below. If the append is rejected the receipt is already marked settled and
+            // retries return DuplicateEntry — but the append is now all-or-nothing on
+            // validation (step 7), so a rejected settlement leaves NO ledger effect rather
+            // than a one-sided one.
             let (earn_entry, spend_entry) = match engine.settle_commons_receipt(&settlement_req) {
                 Ok(entries) => entries,
                 Err(icn_ledger::LedgerError::DuplicateEntry(_)) => {
-                    // Idempotent — receipt already settled (or a prior partial settlement
-                    // recorded dedup before ledger appends completed — check audit logs).
+                    // Idempotent — receipt already settled.
                     return;
                 }
                 Err(e) => {
@@ -273,19 +272,14 @@ pub fn create_commons_settlement_callback(
                 }
             };
 
-            // 7. Append both entries to the ledger (double-entry: earn + spend).
-            //    These two appends are NOT atomic. If spend fails after earn succeeds,
-            //    the ledger has a one-sided entry and the receipt dedup is already committed.
-            //    This constitutes a partial settlement requiring manual operator intervention.
+            // 7. Append both legs (earn + spend) via the ledger's all-or-nothing
+            //    validation batch. Both entries are validated before either is written, so
+            //    an invalid spend leg can no longer leave the earn leg committed one-sidedly.
+            //    Residual: a store I/O failure *between* the two journal writes (inherent to
+            //    the ledger's non-transactional append) — reconcilable, since the journal is
+            //    authoritative and balances are recomputable from it.
             let mut ledger = ledger.write().await;
-            if let Err(e) = ledger.append_entry(earn_entry).await {
-                warn!(
-                    "commons_settlement: failed to append earn entry for task {}: {}",
-                    req.task_id, e
-                );
-                return;
-            }
-            match ledger.append_entry(spend_entry).await {
+            match ledger.append_entries(vec![earn_entry, spend_entry]).await {
                 Ok(_) => {
                     info!(
                         "commons_settlement: settled {} credits, consumer='{}', \
@@ -294,14 +288,12 @@ pub fn create_commons_settlement_callback(
                     );
                 }
                 Err(e) => {
-                    // Earn entry committed but spend entry failed — PARTIAL SETTLEMENT.
-                    // Dedup is already recorded; retries will be silently ignored.
-                    // Manual operator recovery required: inspect receipt {} and
-                    // task {} in audit logs.
+                    // Settlement rejected at validation — neither leg committed (no partial
+                    // state). Dedup is already recorded, so this receipt will not retry;
+                    // surface loudly for audit.
                     warn!(
-                        "commons_settlement: PARTIAL SETTLEMENT for task {} \
-                         (earn committed, spend failed): {} — receipt {} will not retry; \
-                         manual recovery required",
+                        "commons_settlement: settlement rejected for task {} \
+                         (no partial commit): {} — receipt {} will not retry; check audit logs",
                         req.task_id,
                         e,
                         hex::encode(req.receipt_hash),
