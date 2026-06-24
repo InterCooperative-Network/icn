@@ -1331,6 +1331,15 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["architects"]
 
+[docs."docs/design/entity-aware-auth-control-map.md"]
+category = "design"
+status = "draft"
+title = "Entity-Aware Authorization Control Map"
+description = "Migration control map for gateway authorization: flat coop_id guard vs entity-aware checks, observe-mode, fail-closed trusted issuance, and the coop_id to EntityId resolver keystone (#2061, #2080, #1868)"
+last_updated = "2026-06-24"
+owner = "matt"
+audiences = ["architects", "developers"]
+
 [docs."docs/design/README.md"]
 category = "reference"
 status = "canonical"
