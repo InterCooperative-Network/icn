@@ -253,9 +253,9 @@ pub fn create_commons_settlement_callback(
             //
             // Dedup is recorded inside settle_commons_receipt() before the ledger append
             // below. If the append is rejected the receipt is already marked settled and
-            // retries return DuplicateEntry — but the append is now all-or-nothing on
-            // validation (step 7), so a rejected settlement leaves NO ledger effect rather
-            // than a one-sided one.
+            // retries return DuplicateEntry. The append (step 7) pre-validates both legs
+            // before writing either, so a settlement rejected at validation leaves no
+            // ledger effect — but it is not a full transaction (see step 7 for residuals).
             let (earn_entry, spend_entry) = match engine.settle_commons_receipt(&settlement_req) {
                 Ok(entries) => entries,
                 Err(icn_ledger::LedgerError::DuplicateEntry(_)) => {
@@ -272,12 +272,12 @@ pub fn create_commons_settlement_callback(
                 }
             };
 
-            // 7. Append both legs (earn + spend) via the ledger's all-or-nothing
-            //    validation batch. Both entries are validated before either is written, so
-            //    an invalid spend leg can no longer leave the earn leg committed one-sidedly.
-            //    Residual: a store I/O failure *between* the two journal writes (inherent to
-            //    the ledger's non-transactional append) — reconcilable, since the journal is
-            //    authoritative and balances are recomputable from it.
+            // 7. Append both legs (earn + spend) via the ledger's pre-validating batch
+            //    append. Both entries are validated before either is written, so a leg that
+            //    fails validation can no longer leave the other leg committed one-sidedly.
+            //    This is NOT a full transaction: a lower-level append/store failure between
+            //    the two writes can still require reconciliation (the ledger is not fully
+            //    transactional; the journal is authoritative and balances are recomputable).
             let mut ledger = ledger.write().await;
             match ledger.append_entries(vec![earn_entry, spend_entry]).await {
                 Ok(_) => {
@@ -288,12 +288,15 @@ pub fn create_commons_settlement_callback(
                     );
                 }
                 Err(e) => {
-                    // Settlement rejected at validation — neither leg committed (no partial
-                    // state). Dedup is already recorded, so this receipt will not retry;
-                    // surface loudly for audit.
+                    // A validation rejection commits nothing; a mid-batch append/store
+                    // failure may instead leave a partial journal needing reconciliation.
+                    // Dedup is already recorded, so this receipt will not retry; surface
+                    // loudly for audit.
                     warn!(
-                        "commons_settlement: settlement rejected for task {} \
-                         (no partial commit): {} — receipt {} will not retry; check audit logs",
+                        "commons_settlement: settlement not fully committed for task {} \
+                         (validation rejection commits nothing; a mid-batch append failure \
+                         may need reconciliation): {} — receipt {} will not retry; \
+                         check audit logs",
                         req.task_id,
                         e,
                         hex::encode(req.receipt_hash),

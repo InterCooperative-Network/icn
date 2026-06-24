@@ -1226,32 +1226,45 @@ impl Ledger {
         self.append_entry_internal(entry, false).await
     }
 
-    /// Append multiple journal entries with all-or-nothing **validation**.
+    /// Append multiple journal entries, pre-validating all of them before appending any.
     ///
-    /// Every entry is validated against current ledger state *before any entry is
-    /// appended*. If any entry fails validation, none are appended. This is the
-    /// guarantee a settlement expressed as multiple legs relies on (e.g. the commons
-    /// earn + spend pair): if a later leg would be rejected, an earlier leg is never
-    /// committed one-sidedly. Entries are appended in input order once all pass; the
+    /// Every entry is validated against the current (pre-batch) ledger state *before any
+    /// entry is appended*. If any entry fails that up-front validation, none are appended.
+    /// This closes the **validation-rejection** one-sided-entry window for a settlement
+    /// expressed as independent legs (e.g. the commons earn + spend pair, which touch
+    /// different accounts): a later leg that validation would reject can no longer leave an
+    /// earlier leg committed. Entries are appended in input order once all pass; the
     /// returned hashes are in the same order.
     ///
-    /// # Atomicity scope
+    /// # This is NOT a full transaction
     ///
-    /// This closes the *validation*-induced partial-commit window — the realistic
-    /// failure mode, where a balance / credit-limit / freeze rejection on a later leg
-    /// previously left the earlier leg committed. It does **not** wrap the durable writes
-    /// in a single storage transaction, so a store I/O failure *between* the per-entry
-    /// appends could still leave a partial journal. That residual is inherent to the
-    /// ledger's current non-transactional append (an individual [`append_entry`] already
-    /// performs its journal write and cached-balance save as separate operations). The
-    /// journal is the authoritative source and balances are recomputable from it, so such
-    /// a state is reconcilable.
+    /// Up-front validation prevents the *validation-rejection* partial commit, but two
+    /// residuals remain — callers must treat a returned `Err` as "may need reconciliation",
+    /// not "nothing was written":
+    ///
+    /// 1. **Re-validation against mutated state.** Each entry is re-validated inside
+    ///    `append_entry_internal` as it is applied, against state already mutated by
+    ///    earlier entries in the same batch. Entries that each pass the up-front check
+    ///    against the pre-batch state but *interact* (e.g. two debits that individually fit
+    ///    a credit limit but collectively exceed it) can still fail mid-batch, after an
+    ///    earlier entry was appended. The intended caller (the commons earn/spend pair)
+    ///    touches independent accounts, so its legs do not interact this way.
+    /// 2. **Store I/O between writes.** The durable writes are not wrapped in one storage
+    ///    transaction, so a store I/O failure *between* per-entry appends can leave a
+    ///    partial journal — inherent to the ledger's non-transactional append (an
+    ///    individual [`append_entry`] already performs its journal write and cached-balance
+    ///    save as separate operations).
+    ///
+    /// In both residual cases the journal is the authoritative source and balances are
+    /// recomputable from it, so the state is reconcilable rather than silently wrong. A
+    /// fully transactional batch append is tracked as a follow-up.
     ///
     /// [`append_entry`]: Self::append_entry
     pub async fn append_entries(&mut self, entries: Vec<JournalEntry>) -> Result<Vec<ContentHash>> {
         // Phase 1 — validate every entry up front (read-only; no durable mutation).
-        // Returning here, before any append, guarantees no partial state lands when a
-        // later entry is invalid.
+        // Returning here, before any append, prevents a one-sided commit when a later
+        // entry fails validation against the pre-batch state. (It does not cover the
+        // re-validation / store-I/O residuals documented on this method.)
         for entry in &entries {
             self.validate_entry(entry)?;
         }
