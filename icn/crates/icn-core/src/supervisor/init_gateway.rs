@@ -45,6 +45,10 @@ pub struct GatewayHandles {
     pub ledger: Option<icn_gateway::LedgerHandle>,
     /// Entity handle for entity management
     pub entity: Option<icn_entity::EntityHandle>,
+    /// Canonical, provenance-aware coop_id↔EntityId name-binding store (#2082/#2190).
+    /// When present, the gateway builds a trusted, fail-closed
+    /// `StoreBackedCoopEntityResolver` for observe-mode treasury classification (A2c).
+    pub coop_entity_map: Option<icn_coop::CoopEntityMapHandle>,
     /// Steward handle for SDIS ceremonies
     pub steward: Option<icn_steward::StewardHandle>,
     /// Agreement manager for inter-cooperative agreements
@@ -138,6 +142,7 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let treasury_handle = handles.treasury;
     let ledger_handle = handles.ledger;
     let entity_handle = handles.entity;
+    let coop_entity_map_handle = handles.coop_entity_map;
     let steward_handle = handles.steward;
     let agreement_manager_handle = handles.agreement_manager;
     let service_discovery_manager = handles.service_discovery_manager;
@@ -214,6 +219,10 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
 
             if let Some(handle) = entity_handle {
                 gateway_server = gateway_server.with_entity_handle(handle);
+            }
+
+            if let Some(handle) = coop_entity_map_handle {
+                gateway_server = gateway_server.with_coop_entity_map_handle(handle);
             }
 
             if let Some(handle) = steward_handle {

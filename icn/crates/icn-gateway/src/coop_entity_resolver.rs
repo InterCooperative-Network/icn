@@ -204,6 +204,25 @@ impl StoreBackedCoopEntityResolver {
     }
 }
 
+/// App-state holder for the observe-mode `coop_id → EntityId` resolver (A2c wiring).
+///
+/// The gateway registers exactly one of these as shared `web::Data`. It defaults to
+/// the fail-closed [`UnwiredCoopEntityResolver`] (via [`Self::unwired`]); the gateway
+/// builder installs a [`StoreBackedCoopEntityResolver`] instead when a trusted,
+/// provenance-aware [`CoopEntityMap`] handle is wired
+/// (`GatewayServer::with_coop_entity_map_handle`). It is consulted only by the
+/// observe-mode treasury path: it changes no route outcome, denies nothing, and a
+/// resolved binding grants no authority.
+#[derive(Clone)]
+pub(crate) struct ObserveCoopEntityResolver(pub(crate) Arc<dyn CoopEntityResolver>);
+
+impl ObserveCoopEntityResolver {
+    /// The fail-closed default: resolves nothing until a trusted store is wired.
+    pub(crate) fn unwired() -> Self {
+        Self(Arc::new(UnwiredCoopEntityResolver))
+    }
+}
+
 /// Whether a binding's recorded provenance is trusted enough to resolve a *name*
 /// (never authority).
 ///

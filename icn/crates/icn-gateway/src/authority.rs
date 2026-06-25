@@ -17,7 +17,7 @@
 
 use crate::commons_mgr::CommonsManager;
 use crate::coop_entity_resolver::{
-    CoopEntityResolution, CoopEntityResolver, ResolutionUnavailable, UnwiredCoopEntityResolver,
+    CoopEntityResolution, CoopEntityResolver, ResolutionUnavailable,
 };
 use crate::entity_map::legacy_coop_id_to_entity_id_fallback;
 use crate::entity_mgr::EntityManager;
@@ -302,6 +302,7 @@ impl EntityAccessObservation {
 /// `treasury_entity_id` is the treasury's stored `EntityId` (`treasury.entity_id()`);
 /// `coop_id` is the path coop id used only as a best-effort fallback target.
 pub(crate) async fn observe_treasury_entity_access(
+    resolver: &dyn CoopEntityResolver,
     entity_mgr: &EntityManager,
     caller: &EntityId,
     treasury_entity_id: Option<&EntityId>,
@@ -356,13 +357,14 @@ pub(crate) async fn observe_treasury_entity_access(
         }
     }
 
-    // A2b: observe-only `coop_id → EntityId` resolution discrepancy. Consults the
-    // fail-closed resolver seam (#2188) and logs how it compares to the legacy
-    // projection the observe path already uses. Uses the default
-    // `UnwiredCoopEntityResolver` until a trusted source is wired (A2c), so today it
-    // reports "resolver unavailable" — it never affects this observation, the flat
-    // guard, or any authorization decision.
-    let _ = observe_coop_entity_resolution(&UnwiredCoopEntityResolver, coop_id).await;
+    // A2b/A2c: observe-only `coop_id → EntityId` resolution discrepancy. Consults the
+    // governed resolver seam (#2188) and logs how it compares to the legacy projection
+    // the observe path already uses. The resolver is injected by the caller (A2c): the
+    // gateway wires a trusted, provenance-gated `StoreBackedCoopEntityResolver` when a
+    // `CoopEntityMap` handle is configured, and otherwise the fail-closed
+    // `UnwiredCoopEntityResolver`. Either way this never affects this observation, the
+    // flat guard, or any authorization decision.
+    let _ = observe_coop_entity_resolution(resolver, coop_id).await;
 
     observation
 }
@@ -539,7 +541,11 @@ async fn compute_treasury_observation(
 #[allow(clippy::unwrap_used)]
 mod entity_access_tests {
     use super::*;
-    use icn_entity::{CooperativeEntity, MembershipCapability, MembershipStatus};
+    use crate::coop_entity_resolver::{StoreBackedCoopEntityResolver, UnwiredCoopEntityResolver};
+    use icn_entity::{
+        CoopEntityBindingProvenance, CoopEntityMap, CooperativeEntity, InMemoryCoopEntityMap,
+        MembershipCapability, MembershipStatus,
+    };
     use icn_identity::KeyPair;
 
     /// Register a fresh in-memory coop entity; return the manager and its EntityId.
@@ -705,6 +711,7 @@ mod entity_access_tests {
         let (mgr, target) = setup().await;
         let caller = add_active_member(&mgr, &target, MembershipRole::Founder).await;
         let obs = observe_treasury_entity_access(
+            &UnwiredCoopEntityResolver,
             &mgr,
             &caller,
             Some(&target),
@@ -726,6 +733,7 @@ mod entity_access_tests {
         let kp = KeyPair::generate().unwrap();
         let outsider = EntityId::from_did(kp.did());
         let obs = observe_treasury_entity_access(
+            &UnwiredCoopEntityResolver,
             &mgr,
             &outsider,
             Some(&target),
@@ -745,6 +753,7 @@ mod entity_access_tests {
         let kp = KeyPair::generate().unwrap();
         let caller = EntityId::from_did(kp.did());
         let obs = observe_treasury_entity_access(
+            &UnwiredCoopEntityResolver,
             &mgr,
             &caller,
             Some(&target),
@@ -765,6 +774,7 @@ mod entity_access_tests {
         let kp = KeyPair::generate().unwrap();
         let caller = EntityId::from_did(kp.did());
         let obs = observe_treasury_entity_access(
+            &UnwiredCoopEntityResolver,
             &mgr,
             &caller,
             None,
@@ -785,6 +795,7 @@ mod entity_access_tests {
         let (mgr, target) = setup().await;
         let caller = add_active_member(&mgr, &target, MembershipRole::Founder).await;
         let obs = observe_treasury_entity_access(
+            &UnwiredCoopEntityResolver,
             &mgr,
             &caller,
             None,
@@ -793,6 +804,66 @@ mod entity_access_tests {
         )
         .await;
         assert_eq!(obs, EntityAccessObservation::AgreesAllow);
+    }
+
+    // A2c: the KEY safety property — with a fully-resolving, trusted store-backed
+    // resolver wired, the treasury `EntityAccessObservation` (and therefore every
+    // route outcome) is computed purely from the entity-membership path: byte-
+    // identical to the unwired result. The resolver is observe-only and never an
+    // authorization input.
+    #[tokio::test]
+    async fn store_backed_resolver_does_not_change_treasury_observation() {
+        let (mgr, target) = setup().await;
+        let caller = add_active_member(&mgr, &target, MembershipRole::Founder).await;
+        let map = InMemoryCoopEntityMap::new();
+        let entity = EntityId::cooperative("treasury-coop").expect("valid coop slug");
+        map.bind_resolved_with_provenance(
+            "treasury-coop",
+            &entity,
+            CoopEntityBindingProvenance::Activation,
+        )
+        .expect("seed trusted binding");
+        let store_backed = StoreBackedCoopEntityResolver::new(std::sync::Arc::new(map));
+
+        // A founder is a member: AgreesAllow with EITHER resolver, byte-identical.
+        let with_store = observe_treasury_entity_access(
+            &store_backed,
+            &mgr,
+            &caller,
+            Some(&target),
+            "treasury-coop",
+            EntityAction::TreasuryWrite,
+        )
+        .await;
+        let with_unwired = observe_treasury_entity_access(
+            &UnwiredCoopEntityResolver,
+            &mgr,
+            &caller,
+            Some(&target),
+            "treasury-coop",
+            EntityAction::TreasuryWrite,
+        )
+        .await;
+        assert_eq!(with_store, EntityAccessObservation::AgreesAllow);
+        assert_eq!(with_store, with_unwired);
+
+        // A non-member still observes EntityDeny with the trusted resolver wired —
+        // resolving a coop_id→EntityId binding never upgrades a non-member to allow.
+        let kp = KeyPair::generate().unwrap();
+        let outsider = EntityId::from_did(kp.did());
+        let deny = observe_treasury_entity_access(
+            &store_backed,
+            &mgr,
+            &outsider,
+            Some(&target),
+            "treasury-coop",
+            EntityAction::TreasuryRead,
+        )
+        .await;
+        assert_eq!(
+            deny,
+            EntityAccessObservation::EntityDeny(DenyReason::NonMember)
+        );
     }
 }
 
@@ -1130,5 +1201,123 @@ mod coop_resolution_observe_tests {
                 "unwired resolver must never yield a resolver-trusting outcome for {coop_id:?}, got {out:?}"
             );
         }
+    }
+
+    // ----------------------------------------------------------------------
+    // A2c: observe-mode wiring of the trusted, store-backed resolver.
+    //
+    // These prove the observe path consults a real `StoreBackedCoopEntityResolver`
+    // when one is wired — producing genuine Agree / ResolverOnly / LegacyOnly
+    // classifications from trusted provenance — while the entity-membership
+    // observation (and therefore every treasury route outcome) is UNCHANGED.
+    // The default (no store) path is proven by the `default_resolver_*` tests above.
+    // ----------------------------------------------------------------------
+    use crate::coop_entity_resolver::{StoreBackedCoopEntityResolver, UnwiredCoopEntityResolver};
+    use icn_entity::{
+        CoopEntityBindingProvenance, CoopEntityMap, CoopEntityMapError, InMemoryCoopEntityMap,
+    };
+
+    fn store_backed_for(
+        map: impl CoopEntityMap + Send + Sync + 'static,
+    ) -> StoreBackedCoopEntityResolver {
+        StoreBackedCoopEntityResolver::new(std::sync::Arc::new(map))
+    }
+
+    // (B) Trusted Activation binding: `food-coop` legacy-projects to
+    // `EntityId::cooperative("food-coop")`, and a trusted binding records the same
+    // EntityId, so the observation agrees.
+    #[tokio::test]
+    async fn store_backed_observe_activation_binding_is_agree() {
+        let map = InMemoryCoopEntityMap::new();
+        let entity = EntityId::cooperative("food-coop").expect("valid coop slug");
+        map.bind_resolved_with_provenance(
+            "food-coop",
+            &entity,
+            CoopEntityBindingProvenance::Activation,
+        )
+        .expect("seed trusted activation binding");
+        let out = observe_coop_entity_resolution(&store_backed_for(map), "food-coop").await;
+        assert_eq!(out, CoopResolutionObservation::Agree);
+    }
+
+    // (C) Trusted OperatorBackfill surrogate: a non-mappable default `coop:<uuid>`
+    // (the legacy projection rejects it) bound to its cooperative surrogate with
+    // OperatorBackfill provenance resolves through the existing trust gate — so the
+    // resolver produces an EntityId the legacy path cannot: ResolverOnly.
+    #[tokio::test]
+    async fn store_backed_observe_operator_backfill_surrogate_is_resolver_only() {
+        let map = InMemoryCoopEntityMap::new();
+        let surrogate = EntityId::cooperative("coop-legacy-abc123").expect("valid coop slug");
+        map.bind_resolved_with_provenance(
+            "coop:7f3a2b",
+            &surrogate,
+            CoopEntityBindingProvenance::OperatorBackfill,
+        )
+        .expect("seed operator-backfill binding");
+        let out = observe_coop_entity_resolution(&store_backed_for(map), "coop:7f3a2b").await;
+        assert_eq!(out, CoopResolutionObservation::ResolverOnly);
+    }
+
+    // (D) UnknownLegacy: an unprovenanced binding (plain `bind_resolved`) is the
+    // fail-closed sentinel — it must never resolve. The observation is
+    // LegacyOnly(UnverifiedProvenance), never Agree.
+    #[tokio::test]
+    async fn store_backed_observe_unknown_legacy_is_not_trusted() {
+        let map = InMemoryCoopEntityMap::new();
+        let entity = EntityId::cooperative("food-coop").expect("valid coop slug");
+        map.bind_resolved("food-coop", &entity)
+            .expect("seed unprovenanced (UnknownLegacy) binding");
+        let out = observe_coop_entity_resolution(&store_backed_for(map), "food-coop").await;
+        assert_eq!(
+            out,
+            CoopResolutionObservation::LegacyOnly(ResolutionUnavailable::UnverifiedProvenance)
+        );
+        assert!(!matches!(out, CoopResolutionObservation::Agree));
+    }
+
+    /// A `CoopEntityMap` whose reads always fail — proves observe fails closed on a
+    /// backend error (never a trusted agreement).
+    struct FailingObserveMap;
+    // NOTE: `Result` in this module is the gateway's `crate::error::Result`
+    // (GatewayError) alias, so the `CoopEntityMap` trait methods are spelled with
+    // fully-qualified `std::result::Result<_, CoopEntityMapError>`.
+    impl CoopEntityMap for FailingObserveMap {
+        fn bind_resolved(
+            &self,
+            _c: &str,
+            _e: &EntityId,
+        ) -> std::result::Result<(), CoopEntityMapError> {
+            Ok(())
+        }
+        fn entity_for_coop(
+            &self,
+            _c: &str,
+        ) -> std::result::Result<Option<EntityId>, CoopEntityMapError> {
+            Err(CoopEntityMapError::Storage(
+                "simulated backend failure".into(),
+            ))
+        }
+        fn coop_for_entity(
+            &self,
+            _e: &EntityId,
+        ) -> std::result::Result<Option<String>, CoopEntityMapError> {
+            Err(CoopEntityMapError::Storage(
+                "simulated backend failure".into(),
+            ))
+        }
+    }
+
+    // (E) Backend error fails closed: `food-coop` legacy-projects, but the store
+    // errors, so the resolver is SourceUnavailable → LegacyOnly(SourceUnavailable),
+    // never a trusted Agree. (Ambiguous / entity-type-mismatch fail-closed cases are
+    // proven at the resolver layer in `coop_entity_resolver.rs`.)
+    #[tokio::test]
+    async fn store_backed_observe_backend_error_fails_closed() {
+        let out =
+            observe_coop_entity_resolution(&store_backed_for(FailingObserveMap), "food-coop").await;
+        assert_eq!(
+            out,
+            CoopResolutionObservation::LegacyOnly(ResolutionUnavailable::SourceUnavailable)
+        );
     }
 }

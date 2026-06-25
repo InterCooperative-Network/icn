@@ -167,6 +167,7 @@ pub async fn run_supervisor(
             treasury: gateway_handles.treasury,
             ledger: gateway_handles.ledger,
             entity: gateway_handles.entity,
+            coop_entity_map: gateway_handles.coop_entity_map,
             steward: gateway_handles.steward,
             agreement_manager: gateway_handles.agreement_manager,
             service_discovery_manager: gateway_handles.service_discovery_manager,
@@ -507,6 +508,10 @@ async fn spawn_actors_with_identity(
     gateway_handles.community = Some(community_services.community_handle);
     gateway_handles.trust_service = trust_service_from_registry.clone();
     gateway_handles.entity = Some(entity_services.entity_handle);
+    // A2c: hand the canonical, provenance-aware coop_id↔EntityId store to the gateway
+    // so observe-mode treasury classification can use a trusted, fail-closed
+    // StoreBackedCoopEntityResolver. Observe-only; no authorization change.
+    gateway_handles.coop_entity_map = Some(coop_entity_map.clone());
     gateway_handles.service_discovery_manager = service_discovery_mgr.clone();
     gateway_handles.naming_service = match super::init_naming::init_naming_service(config) {
         Ok(service) => Some(service),
