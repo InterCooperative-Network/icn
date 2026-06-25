@@ -13,7 +13,7 @@ use std::process::{Command, Output};
 use std::sync::Arc;
 
 use icn_coop::{CoopStore, CoopType, Cooperative};
-use icn_entity::{CoopEntityMap, SledCoopEntityMap};
+use icn_entity::{CoopEntityBindingProvenance, CoopEntityMap, SledCoopEntityMap};
 use icn_store::SledStore;
 use serde_json::Value;
 use tempfile::TempDir;
@@ -186,6 +186,31 @@ fn apply_binds_default_coop_to_deterministic_surrogate_and_preserves_coop_id() {
     );
     // The mappable coop was NOT bound by the surrogate path.
     assert_eq!(map.entity_for_coop("real-coop").unwrap(), None);
+}
+
+#[test]
+fn apply_records_operator_backfill_provenance_durably() {
+    // End-to-end: after `--apply`, the durable Sled binding carries the
+    // OperatorBackfill provenance (not the fail-closed UnknownLegacy a plain
+    // bind_resolved would leave), so a later store-backed resolver could trust it.
+    let temp = TempDir::new().unwrap();
+    let data_dir = temp.path().join("data");
+    let default_id = seed_two_cooperatives(&data_dir);
+
+    assert!(run(&data_dir, &["--apply", "--json"]).status.success());
+
+    let surrogate = icn_entity::propose_surrogate_entity_id(&default_id).unwrap();
+    let (_store, map) = open_map(&data_dir);
+    let binding = map
+        .binding_for_coop(&default_id)
+        .unwrap()
+        .expect("default coop is now bound");
+    assert_eq!(binding.coop_id, default_id);
+    assert_eq!(binding.entity_id, surrogate);
+    assert_eq!(
+        binding.provenance,
+        CoopEntityBindingProvenance::OperatorBackfill
+    );
 }
 
 #[test]

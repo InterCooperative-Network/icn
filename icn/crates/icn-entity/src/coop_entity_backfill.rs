@@ -11,16 +11,17 @@
 //!   PR3),
 //! - deterministic surrogate proposal
 //!   ([`propose_surrogate_entity_id`](crate::propose_surrogate_entity_id), PR4),
-//! - the reversible write primitive
-//!   ([`CoopEntityMap::bind_resolved`](crate::CoopEntityMap::bind_resolved),
-//!   PR5).
+//! - the reversible, provenance-recording write primitive
+//!   ([`CoopEntityMap::bind_resolved_with_provenance`](crate::CoopEntityMap::bind_resolved_with_provenance),
+//!   PR5 + A2c).
 //!
 //! Given a set of flat `coop_id`s and the canonical map, it selects the *safe,
 //! non-mappable* entries (a default `coop:<uuid>` cannot project to a valid
 //! cooperative slug), proposes each one's deterministic surrogate, and — only
 //! under an explicit [`SurrogateBackfillMode::Apply`] — binds the pair with
-//! `bind_resolved`. [`SurrogateBackfillMode::DryRun`] is the default and writes
-//! nothing.
+//! `bind_resolved_with_provenance`, recording
+//! [`CoopEntityBindingProvenance::OperatorBackfill`](crate::CoopEntityBindingProvenance::OperatorBackfill).
+//! [`SurrogateBackfillMode::DryRun`] is the default and writes nothing.
 //!
 //! # A mapping is NOT authority
 //!
@@ -48,7 +49,7 @@
 //!   leave an ambiguous partial result).
 
 use crate::coop_entity_inventory::{classify_coop_ids, CoopEntityClass, CoopEntityInventoryEntry};
-use crate::coop_entity_map::{CoopEntityMap, CoopEntityMapError};
+use crate::coop_entity_map::{CoopEntityBindingProvenance, CoopEntityMap, CoopEntityMapError};
 use crate::coop_entity_surrogate::propose_surrogate_entity_id;
 use crate::entity::EntityId;
 use serde::{Deserialize, Serialize};
@@ -64,7 +65,9 @@ pub enum SurrogateBackfillMode {
     /// Compute and report the plan; bind nothing.
     DryRun,
     /// Bind each eligible, collision-free non-mappable `coop_id` to its
-    /// deterministic surrogate via [`CoopEntityMap::bind_resolved`].
+    /// deterministic surrogate via
+    /// [`CoopEntityMap::bind_resolved_with_provenance`], recording
+    /// [`CoopEntityBindingProvenance::OperatorBackfill`].
     Apply,
 }
 
@@ -235,8 +238,9 @@ impl CoopSurrogateBackfill {
 /// performs only read operations and binds nothing; in
 /// [`SurrogateBackfillMode::Apply`] it binds each eligible, collision-free
 /// non-mappable `coop_id` to its deterministic surrogate via
-/// [`CoopEntityMap::bind_resolved`], preserving the original `coop_id`
-/// byte-for-byte. A binding confers no authority.
+/// [`CoopEntityMap::bind_resolved_with_provenance`] — recording
+/// [`CoopEntityBindingProvenance::OperatorBackfill`] — preserving the original
+/// `coop_id` byte-for-byte. A binding confers no authority.
 pub fn backfill_coop_surrogates(
     coop_ids: impl IntoIterator<Item = String>,
     map: &dyn CoopEntityMap,
@@ -284,10 +288,13 @@ pub fn backfill_coop_surrogates(
 }
 
 /// Decide the backfill action for one classified entry — and, in `Apply` mode,
-/// perform the `bind_resolved` write for a collision-free non-mappable entry.
+/// perform the `bind_resolved_with_provenance` write for a collision-free
+/// non-mappable entry.
 ///
 /// Pure for every non-`NonMappable` class and for collisions/storage errors; the
-/// only write is `bind_resolved` on an eligible entry in `Apply` mode.
+/// only write is `bind_resolved_with_provenance` (recording
+/// [`CoopEntityBindingProvenance::OperatorBackfill`]) on an eligible entry in
+/// `Apply` mode.
 fn plan_entry(
     entry: &CoopEntityInventoryEntry,
     surrogate: Option<EntityId>,
@@ -414,7 +421,19 @@ fn plan_entry(
                     None,
                 ),
                 SurrogateBackfillMode::Apply => {
-                    match map.bind_resolved(&entry.coop_id, &surrogate) {
+                    // Record OperatorBackfill provenance: this is an operator-run
+                    // backfill (the `OperatorBackfill` variant's doc names this exact
+                    // command). The surrogate nature of the target is already evident
+                    // from its `coop-legacy-<hash>` slug, so provenance records HOW the
+                    // binding was established. A recorded provenance is what lets the
+                    // store-backed A2c resolver treat the binding as trusted; absent it,
+                    // the row reads back as the fail-closed UnknownLegacy sentinel.
+                    // A binding still confers no authority (see the module docs).
+                    match map.bind_resolved_with_provenance(
+                        &entry.coop_id,
+                        &surrogate,
+                        CoopEntityBindingProvenance::OperatorBackfill,
+                    ) {
                         Ok(()) => make(
                             SurrogateBackfillAction::Bound,
                             Some(surrogate.clone()),
@@ -899,6 +918,100 @@ mod tests {
         assert_eq!(entry["action"].as_str(), Some("would_bind"));
         assert_eq!(entry["proposed_entity_id"].as_str(), Some(UUID_SURROGATE));
         assert!(entry["reason"].as_str().is_some());
+    }
+
+    // ------------------------------------------------------------------
+    // Provenance recording (A2c): apply records OperatorBackfill provenance on
+    // the surrogate name binding; dry-run and refused entries record nothing.
+    // ------------------------------------------------------------------
+
+    use crate::coop_entity_map::CoopEntityBindingProvenance;
+
+    #[test]
+    fn apply_records_operator_backfill_provenance_on_surrogate_binding() {
+        let map = InMemoryCoopEntityMap::new();
+        let report =
+            backfill_coop_surrogates(ids(&[UUID_COOP]), &map, SurrogateBackfillMode::Apply);
+        assert_eq!(report.applied, 1);
+
+        // The binding carries the operator-backfill provenance, not the
+        // fail-closed UnknownLegacy sentinel a plain bind_resolved would leave.
+        let binding = map.binding_for_coop(UUID_COOP).unwrap().unwrap();
+        assert_eq!(binding.entity_id.as_str(), UUID_SURROGATE);
+        assert_eq!(
+            binding.provenance,
+            CoopEntityBindingProvenance::OperatorBackfill
+        );
+        // The reverse binding records the same provenance.
+        let by_entity = map
+            .binding_for_entity(&coop_eid("coop-legacy-edf6152975301bd80c13"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            by_entity.provenance,
+            CoopEntityBindingProvenance::OperatorBackfill
+        );
+    }
+
+    #[test]
+    fn apply_rerun_keeps_operator_backfill_provenance() {
+        let map = InMemoryCoopEntityMap::new();
+        backfill_coop_surrogates(ids(&[UUID_COOP]), &map, SurrogateBackfillMode::Apply);
+        // Rerun: the id is AlreadyBound, so it is skipped (not re-bound) and the
+        // recorded provenance is unchanged.
+        let second =
+            backfill_coop_surrogates(ids(&[UUID_COOP]), &map, SurrogateBackfillMode::Apply);
+        assert_eq!(second.applied, 0);
+        assert_eq!(second.skipped_already_bound, 1);
+        assert_eq!(
+            map.binding_for_coop(UUID_COOP).unwrap().unwrap().provenance,
+            CoopEntityBindingProvenance::OperatorBackfill
+        );
+    }
+
+    #[test]
+    fn dry_run_records_no_binding_or_provenance() {
+        let map = InMemoryCoopEntityMap::new();
+        backfill_coop_surrogates(ids(&[UUID_COOP]), &map, SurrogateBackfillMode::DryRun);
+        // Dry-run writes nothing: no binding at all (and therefore no provenance).
+        assert_eq!(map.binding_for_coop(UUID_COOP).unwrap(), None);
+    }
+
+    #[test]
+    fn collision_records_no_provenance_and_leaves_occupant_untouched() {
+        // A different coop already occupies the surrogate target, so the
+        // non-mappable id collides and is never bound — no provenance is written
+        // for it, and the occupant's (provenance-less) binding is untouched.
+        let map = InMemoryCoopEntityMap::new();
+        let surrogate = propose_surrogate_entity_id(UUID_COOP).unwrap();
+        map.bind_exact("alpha-coop", &surrogate).unwrap();
+
+        let report =
+            backfill_coop_surrogates(ids(&[UUID_COOP]), &map, SurrogateBackfillMode::Apply);
+        assert_eq!(report.surrogate_collision, 1);
+        assert_eq!(report.applied, 0);
+
+        // The collided non-mappable id has no binding/provenance of its own.
+        assert_eq!(map.binding_for_coop(UUID_COOP).unwrap(), None);
+        // The occupant binding is unchanged (bind_exact records no provenance).
+        let occupant = map.binding_for_entity(&surrogate).unwrap().unwrap();
+        assert_eq!(occupant.coop_id, "alpha-coop");
+        assert_eq!(
+            occupant.provenance,
+            CoopEntityBindingProvenance::UnknownLegacy
+        );
+    }
+
+    #[test]
+    fn apply_leaves_mappable_unbound_id_without_binding_or_provenance() {
+        // A mappable coop resolves by projection; the surrogate backfill must not
+        // bind it, so it has no binding (and thus no provenance) afterward.
+        let map = InMemoryCoopEntityMap::new();
+        let report =
+            backfill_coop_surrogates(ids(&["food-coop"]), &map, SurrogateBackfillMode::Apply);
+        assert_eq!(report.skipped_mappable_unbound, 1);
+        assert_eq!(report.applied, 0);
+        assert_eq!(map.binding_for_coop("food-coop").unwrap(), None);
     }
 
     #[test]
