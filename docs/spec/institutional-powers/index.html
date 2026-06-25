@@ -1,0 +1,331 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Institutional Powers and Legitimacy Invariants | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>institutional powers</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/institutional-powers.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Institutional Powers and Legitimacy Invariants</h1>
+<blockquote>
+<p><strong>Status: spec, work-in-progress.</strong> This document names how ICN encodes <em>institutional
+power</em> so that law, governance, economics, justice, contribution, and protective
+authority cannot become unaccountable state or capital power in new clothes. It is
+design-level doctrine over primitives the canon already names — <code>InstitutionalDomain</code>,
+<code>DomainPolicy</code>, <code>AuthorityGrant</code>, <code>Mandate</code>, <code>TypedScope</code>, <code>EffectManifest</code>,
+<code>KernelEffect</code>, <code>GovernanceDecisionReceipt</code>, <code>InstitutionalEffectRecord</code>,
+<code>EffectDispatchEvidence</code> — and the <a href="https://github.com/InterCooperative-Network/icn/blob/main/effect-dispatch-contract">Effect Dispatch Contract</a>.
+It introduces <strong>no</strong> Rust types, schemas, wire formats, CCL grammar, routes, or runtime
+behavior. Clauses that depend on objects or kernel behavior not yet landed are named as
+forward-direction. The PR introducing this doc uses <code>Refs:</code>; it closes nothing.</p>
+</blockquote>
+<h2>Purpose</h2>
+<p>ICN must host real institutions — bodies that make binding collective decisions, collect
+and allocate shared contributions, interrupt active harm, and resolve injury. The danger is
+not that institutions exist; it is that institutional power tends to become <strong>sovereign</strong>:
+self-justifying, unbounded, invisible, and irreversible. State power and capital power both
+take that shape. ICN&#39;s wager is that the same legitimacy machinery the canon already uses
+for governed effects — authority, adopted policy, bounded execution, receipts — is exactly
+what keeps institutional power <em>accountable</em> rather than sovereign.</p>
+<p>This spec states that machinery as a single rule and four power classes, and maps each onto
+seams that already exist.</p>
+<blockquote>
+<p>The ICN does not reject institutions. It rejects <strong>sovereign, self-justifying</strong>
+institutions.</p>
+<p>The ICN does not make institutions harmless by trusting them. It makes them <strong>accountable</strong>
+by forcing every act of institutional power through visible authority, adopted policy,
+bounded execution, receipts, and repair.</p>
+</blockquote>
+<h2>The legitimacy circuit</h2>
+<p>Every binding institutional action in ICN must pass through the same circuit:</p>
+<pre><code>authority basis  -&gt;  adopted policy  -&gt;  bounded effect  -&gt;  receipt  -&gt;  challenge / repair path
+</code></pre>
+<p>No stage is optional, and the stages are ordered: an effect with no adopted policy behind it,
+or a policy with no authority basis, or an effect with no receipt, or a receipt with no
+challenge path, is <strong>not</strong> a legitimate institutional action. The circuit is the same one the
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/effect-dispatch-contract">Effect Dispatch Contract</a> already describes for turning an
+accepted decision into bounded effects with receipts; this spec adds that <strong>all</strong> institutional
+power — not only service/tool binding — must traverse it, and names the failure-closed
+invariants that hold at each stage.</p>
+<h2><code>InstitutionalPowerEvent</code></h2>
+<p><code>InstitutionalPowerEvent</code> is the abstract envelope every binding institutional act is an
+instance of. It is <strong>not</strong> a new kernel type; it is the doctrine-level shape that the existing
+record types already carry in pieces. An <code>InstitutionalPowerEvent</code> names, at design level:</p>
+<ul>
+<li>the <strong>power class</strong> exercised (<code>GovernancePower</code> / <code>ContributionPower</code> / <code>ProtectivePower</code> / <code>RepairPower</code>);</li>
+<li>the <strong>authority basis</strong> that legitimizes it (an <code>AuthorityGrant</code> / <code>Mandate</code> / standing, tied to a governing decision);</li>
+<li>the <strong>adopted policy</strong> under which it acts (a <code>DomainPolicy</code> clause / CCL policy selected from the registry);</li>
+<li>the <strong>bounded effect</strong> it produces (an <code>EffectManifest</code> resolving to one or more primitive <code>KernelEffect</code>s);</li>
+<li>the <strong>receipt(s)</strong> it emits (<code>GovernanceDecisionReceipt</code> + <code>InstitutionalEffectRecord</code> + <code>EffectDispatchEvidence</code>);</li>
+<li>the <strong>challenge / repair path</strong> by which it can be contested or reversed.</li>
+</ul>
+<p>Concretely, an <code>InstitutionalPowerEvent</code> is reconstructable from existing records, each stage
+anchored to the record that actually carries it:</p>
+<ul>
+<li><strong>decision anchor</strong> — the <code>GovernanceDecisionReceipt</code> (<code>proposal_id</code>, <code>domain_id</code>,
+<code>outcome</code>, <code>decision_hash</code>; <code>icn-governance/src/proof.rs</code>): that a decision occurred and
+which domain it binds.</li>
+<li><strong>authority basis + adopted policy</strong> — reached <em>through</em> that decision, not embedded in the
+v1 receipt: the proposal/domain&#39;s adopted <code>DomainPolicy</code> and the <code>Mandate</code> / <code>AuthorityGrant</code>
+that scope-attest the act (the v2/v3 attestation surfaces).</li>
+<li><strong>bounded effect</strong> — the <code>EffectManifest</code> / <code>InstitutionalEffectRecord</code>.</li>
+<li><strong>dispatch proof</strong> — <code>EffectDispatchEvidence</code> (that the effect actually dispatched).</li>
+</ul>
+<p><strong>Forward-direction:</strong> the v1 <code>GovernanceDecisionReceipt</code> carries only
+proposal/domain/outcome/tally/vote-hash/decision-hash — it does <strong>not</strong> embed the adopted
+policy or mandate, so for existing events the authority/policy stage is verified by joining the
+receipt to the proposal/domain <code>DomainPolicy</code> and <code>Mandate</code> records, not from the receipt
+alone. A future receipt/proof envelope (ADR-0026) that binds the policy/mandate references into
+the decision record is what would make the authority/policy stage verifiable from the receipt
+by itself. This spec asserts these records describe one accountable event and must not be
+separable in a way that hides any stage.</p>
+<h2>Power classes</h2>
+<p>The four classes partition <em>what kind</em> of binding institutional power is being exercised.
+Each is defined as the ICN reconciliation of a real-world power with the sovereign form ICN
+rejects.</p>
+<h3><code>GovernancePower</code></h3>
+<p>The authority to make binding collective decisions: adopt or amend policy, amend charters,
+bind tools / services / routes, join or leave federations, and change standing rules. It is
+the power that <em>creates the other powers&#39; authority bases</em> — it is how a domain decides what
+is legitimate. GovernancePower is exercised only through an adopted governance procedure and
+recorded as a <code>GovernanceDecisionReceipt</code>.</p>
+<h3><code>ContributionPower</code></h3>
+<p>The democratically adopted power to assess, collect, waive, allocate, refund, or redistribute
+<strong>shared contributions</strong> to the commons. This is the ICN reconciliation of <em>taxation without
+sovereign extraction</em>: a contribution is legitimate only when an adopted policy makes its
+basis visible and contestable, never because an institution can simply take. ICN-native
+vocabulary is <strong>contribution / obligation / allocation / settlement</strong>, never sovereign levy.</p>
+<h3><code>ProtectivePower</code></h3>
+<p>Temporary, reviewable authority to interrupt active or imminent harm. This is the ICN
+reconciliation of <em>force without police power or a permanent coercive class</em>: protective
+authority exists to stop a harm in progress, expires by construction, and is always
+reviewable and challengeable. There is no standing enforcement office; there is only scoped,
+time-bounded, receipted interruption that someone must answer for.</p>
+<h3><code>RepairPower</code></h3>
+<p>The authority to resolve harm: assign repair obligations, compensate affected parties,
+reverse invalid effects, restore standing, and produce accountable repair. This is the ICN
+reconciliation of <em>justice without punishment-first carceral logic</em>: the first move is
+repair and restoration of standing, surfaced to affected parties with a receipt and a
+challenge/reversal path — not punishment, and never a silent or retroactive rewrite.</p>
+<h2>Legitimacy invariants</h2>
+<p>These hold for every <code>InstitutionalPowerEvent</code>. Each is <strong>fail-closed</strong>: when the condition
+cannot be established, the action does not happen.</p>
+<ol>
+<li><strong>No institutional power without an authority basis.</strong> Every binding act references an
+<code>AuthorityGrant</code> / <code>Mandate</code> / standing that legitimizes it.</li>
+<li><strong>No authority basis without adopted policy.</strong> An authority basis is valid only under a
+<code>DomainPolicy</code> / CCL policy the domain has adopted.</li>
+<li><strong>Unadopted policy is inert.</strong> A drafted-but-unadopted policy authorizes nothing and
+produces no effect.</li>
+<li><strong>Ambiguous authority fails closed.</strong> If the authority basis cannot be resolved
+unambiguously, the action is denied — never granted on a guess.</li>
+<li><strong>Protective authority is temporary by construction.</strong> Emergency / protective authority
+must be scoped, time-bounded, receipted, reviewable, and challengeable. <strong>No protective
+action may be permanent at creation</strong> — an expiry/review obligation is part of the act.</li>
+<li><strong>Contributions are fully disclosed.</strong> No contribution may be collected without a visible
+assessment formula, a liable entity, an amount, a due date, an allocation target, a waiver
+path, and an appeal / challenge path.</li>
+<li><strong>Repair respects due process.</strong> No repair / justice effect may bypass due process,
+affected-party visibility, a receipt, and a challenge / reversal path.</li>
+<li><strong>No ledger / treasury bypass.</strong> Contribution and settlement effects flow only through
+adopted policy and receipts — never a direct ledger or treasury write that skips the
+circuit.</li>
+<li><strong>No silent mutation.</strong> No resource, standing, route, treasury, federation, membership, or
+policy mutation may be silent: each emits a receipt / <code>InstitutionalEffectRecord</code>.</li>
+<li><strong>Reversal is forward-only.</strong> A reversal is a new transition / counter-effect with its own
+receipt — never a retroactive edit of a prior record.</li>
+<li><strong>The right to exit remains constitutional</strong> wherever the domain model already defines it;
+no institutional power may revoke it.</li>
+<li><strong>The meaning firewall holds.</strong> The kernel must not import domain semantics; meaning stays
+in the governance / domain / package / CCL layers. The kernel receives primitive
+<code>KernelEffect</code>s only and enforces them blindly.</li>
+</ol>
+<h2>Mapping to existing seams</h2>
+<p>This spec is doctrine <em>over</em> the existing object model, not new machinery. Each stage of the
+circuit binds to seams that already exist:</p>
+<table>
+<thead>
+<tr>
+<th>Circuit stage</th>
+<th>Existing seam(s)</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>authority basis</td>
+<td><code>AuthorityGrant</code>, <code>TypedScope</code>, <code>Mandate</code>, standing</td>
+<td><code>icn-governance/src/authority.rs</code>, <code>icn-governance/src/mandate.rs</code>; ADR-0019</td>
+</tr>
+<tr>
+<td>adopted policy</td>
+<td><code>InstitutionalDomain</code>, <code>DomainPolicy</code>, CCL policy registry / evaluator selection</td>
+<td><code>icn-governance/src/institutional_domain.rs</code>; <a href="https://github.com/InterCooperative-Network/icn/blob/main/institutional-domain">institutional-domain.md</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/ccl-policy-registry">ccl-policy-registry.md</a></td>
+</tr>
+<tr>
+<td>bounded effect</td>
+<td><code>EffectManifest</code> → <code>KernelEffect</code></td>
+<td><code>icn-governance/src/effect_manifest.rs</code>, <code>icn-kernel-api/src/effects.rs</code>; <a href="https://github.com/InterCooperative-Network/icn/blob/main/effect-dispatch-contract">effect-dispatch-contract.md</a></td>
+</tr>
+<tr>
+<td>receipt</td>
+<td><code>GovernanceDecisionReceipt</code>, <code>InstitutionalEffectRecord</code>, <code>EffectDispatchEvidence</code></td>
+<td><code>icn-governance/src/proof.rs</code>, <code>apps/governance/src/institutional_effect.rs</code>, <code>apps/governance/src/dispatch_evidence.rs</code>; ADR-0025, ADR-0026</td>
+</tr>
+<tr>
+<td>challenge / repair path</td>
+<td>counter-effect / reversal / counter-receipt (RepairPower)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/effect-dispatch-contract">effect-dispatch-contract.md</a>; ADR-0027 (action-card contract: mandate + reversibility + receipt before confirm)</td>
+</tr>
+</tbody></table>
+<p>The constitutional object model (ADR-0014) and the authority-grant minting / mandate
+persistence seam (ADR-0019) anchor the authority side; the institutional effect record
+(ADR-0025) and receipt/provenance proof envelope (ADR-0026) anchor the receipt side. The
+<code>coop_id → EntityId</code> resolver lane (RFC-0018; #2187–#2190) is the prerequisite that lets the
+authority side name <em>which entity</em> an authority basis belongs to, fail-closed, with
+provenance.</p>
+<h2>Power class → effect family (design level only)</h2>
+<p>This mapping is descriptive: it says which existing effect families a power class <em>may</em>
+produce, and under what gate. It introduces no new effect types and changes no dispatch code.</p>
+<table>
+<thead>
+<tr>
+<th>Power class</th>
+<th>May produce (effect families)</th>
+<th>Only through</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GovernancePower</code></td>
+<td>policy / charter / binding / federation / config effects</td>
+<td>an adopted governance procedure recorded as a <code>GovernanceDecisionReceipt</code></td>
+</tr>
+<tr>
+<td><code>ContributionPower</code></td>
+<td>treasury / ledger / clearing effects</td>
+<td>an adopted contribution <code>DomainPolicy</code> + receipts (never a direct ledger/treasury bypass)</td>
+</tr>
+<tr>
+<td><code>ProtectivePower</code></td>
+<td>temporary membership / resource / control / dispute effects</td>
+<td>a scoped authority with an expiry and a review obligation at creation</td>
+</tr>
+<tr>
+<td><code>RepairPower</code></td>
+<td>dispute / reversal / compensation / standing effects</td>
+<td>a due-process path with affected-party visibility, a receipt, and a challenge / reversal path</td>
+</tr>
+</tbody></table>
+<p>Every row still traverses the full legitimacy circuit and obeys every invariant above. The
+table narrows <em>which</em> primitive effects are reachable; it does not loosen <em>how</em> they are
+authorized.</p>
+<h2>What this spec is not</h2>
+<ul>
+<li>Not runtime implementation. No code, no schemas, no wire formats, no CCL grammar changes.</li>
+<li>Not a route, auth-behavior, or token-issuance change.</li>
+<li>Not a redefinition of the meaning firewall, the policy-oracle pattern, the kernel/app
+boundary, or the effect dispatch chain; where this spec touches them, existing canon remains
+authoritative.</li>
+<li>Not a package-vocabulary surface: a specific institution&#39;s role names, ceremonies, and
+fixtures stay in their own repositories.</li>
+<li>Not a production, pilot, live-federation, NYCN, or complete-API readiness claim.</li>
+<li>Not closure of any implementation issue.</li>
+</ul>
+<h2>Relationship</h2>
+<ul>
+<li>Refs RFC-0018 (entity-aware request authorization) and the A2 resolver lane #2187, #2188, #2189, #2190.</li>
+<li>Refs ADR-0014 (constitutional object model), ADR-0019 (authority-grant minting + mandate persistence seam), ADR-0025 (institutional effect record canonical schema), ADR-0026 (receipt &amp; provenance proof envelope), ADR-0027 (action-card contract).</li>
+<li>Refs sibling specs: <a href="https://github.com/InterCooperative-Network/icn/blob/main/institutional-domain">institutional-domain.md</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/effect-dispatch-contract">effect-dispatch-contract.md</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/ccl-policy-registry">ccl-policy-registry.md</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/governed-service-binding">governed-service-binding.md</a>.</li>
+<li>Refs #2061, #2080, #1868, #2082 (entity-aware authorization / trusted issuance / scope decomposition / coop↔entity mapping — the authority-side work this doctrine governs).</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
