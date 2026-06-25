@@ -458,10 +458,16 @@ pub(crate) async fn observe_coop_entity_resolution(
 
     match observation {
         CoopResolutionObservation::Disagree => {
+            // Log both identifiers so the collision is actionable for diagnosing
+            // provenance/mapping issues once A2c wires a real resolver. An `EntityId`
+            // is an institutional identifier (slug), not a secret.
             warn!(
                 target: "coop_resolution_observe",
                 coop_id = %coop_id,
                 result = observation.result_label(),
+                legacy_entity_id = legacy_target.as_ref().map_or("<none>", |e| e.as_str()),
+                resolver_entity_id =
+                    resolver_outcome.resolved_entity_id().map_or("<none>", |e| e.as_str()),
                 "legacy projection and resolver DISAGREE on coop_id -> EntityId (observe-only; flat coop guard remains authoritative)"
             );
         }
