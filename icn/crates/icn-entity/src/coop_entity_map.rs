@@ -106,7 +106,13 @@ fn provenance_key(coop_id: &str) -> Vec<u8> {
 /// [`bind_resolved`](CoopEntityMap::bind_resolved)) carries no provenance record and
 /// reads back as `UnknownLegacy`. Missing provenance must never be treated as
 /// trusted.
+// Internally tagged (`{"kind": "..."}`) so that `UnknownLegacy` can be the
+// `#[serde(other)]` forward-compatibility catch-all: a record written by a future
+// binary with a variant this binary does not know deserializes to the fail-closed
+// `UnknownLegacy` sentinel instead of a hard `Storage` error on read. (Safe to set
+// the wire shape now — no provenance records are persisted yet.)
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "kind")]
 pub enum CoopEntityBindingProvenance {
     /// Bound at cooperative activation time.
     Activation,
@@ -120,8 +126,11 @@ pub enum CoopEntityBindingProvenance {
         /// Opaque identifier (hash or id) of the governing decision receipt.
         receipt_id: String,
     },
-    /// Provenance is unknown: a pre-provenance ("legacy") binding, or none recorded.
-    /// MUST be treated as untrusted for Enforce/Issue.
+    /// Provenance is unknown: a pre-provenance ("legacy") binding, none recorded, or
+    /// an unrecognized/future variant read by an older binary. MUST be treated as
+    /// untrusted for Enforce/Issue. Also the [`serde(other)`] catch-all so unknown
+    /// persisted variants fail closed to this rather than erroring.
+    #[serde(other)]
     UnknownLegacy,
 }
 
@@ -1706,5 +1715,21 @@ mod tests {
                 }
             );
         }
+    }
+
+    #[test]
+    fn test_provenance_unknown_future_variant_decodes_to_unknown_legacy() {
+        // Forward-compatibility: a record written by a future binary with a variant
+        // this binary does not know must fail closed to UnknownLegacy, not error.
+        let decoded =
+            decode_provenance(br#"{"kind":"SomeFutureVariantV9","extra":"ignored"}"#).unwrap();
+        assert_eq!(decoded, CoopEntityBindingProvenance::UnknownLegacy);
+
+        // Known variants still decode precisely (round-trip via the wire form).
+        let bytes = encode_provenance(&CoopEntityBindingProvenance::Activation).unwrap();
+        assert_eq!(
+            decode_provenance(&bytes).unwrap(),
+            CoopEntityBindingProvenance::Activation
+        );
     }
 }
