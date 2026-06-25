@@ -41,6 +41,7 @@
 //! backfill wiring are follow-up work.
 
 use crate::entity::EntityId;
+use serde::{Deserialize, Serialize};
 use sled::transaction::ConflictableTransactionError;
 use sled::Db;
 use std::collections::HashMap;
@@ -83,6 +84,71 @@ fn forward_key(coop_id: &str) -> Vec<u8> {
 /// Reverse index key: `entity_coop:{entity_id}` → original `coop_id`.
 fn reverse_key(entity_id: &EntityId) -> Vec<u8> {
     format!("entity_coop:{}", entity_id.as_str()).into_bytes()
+}
+
+/// Provenance index key: `coop_entity_provenance:{coop_id}` → serialized
+/// [`CoopEntityBindingProvenance`]. Keyed by `coop_id` (parallel to the forward
+/// index); the existing forward/reverse key schema is untouched.
+fn provenance_key(coop_id: &str) -> Vec<u8> {
+    format!("coop_entity_provenance:{coop_id}").into_bytes()
+}
+
+/// Where a `coop_id ↔ EntityId` binding came from.
+///
+/// A mapping is only a *name binding*, never authority (see the module docs).
+/// Provenance records **how** a binding was established so a future trusted
+/// resolver (A2c store-backed source) can decide whether the binding is
+/// authoritative enough for Enforce/Issue. This module only persists and retrieves
+/// provenance; it does **not** consume it for any authorization decision.
+///
+/// [`UnknownLegacy`](CoopEntityBindingProvenance::UnknownLegacy) is the fail-closed
+/// sentinel: a binding written before provenance existed (or by a plain
+/// [`bind_resolved`](CoopEntityMap::bind_resolved)) carries no provenance record and
+/// reads back as `UnknownLegacy`. Missing provenance must never be treated as
+/// trusted.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum CoopEntityBindingProvenance {
+    /// Bound at cooperative activation time.
+    Activation,
+    /// Bound by an operator-run backfill (e.g. `icnctl coop entity-backfill-surrogates`).
+    OperatorBackfill,
+    /// Bound to a generated surrogate `EntityId` for a non-mappable `coop_id`.
+    Surrogate,
+    /// Bound on the authority of a governance / decision receipt, identified by its
+    /// receipt hash or id (stored as an opaque string).
+    GovernanceReceipt {
+        /// Opaque identifier (hash or id) of the governing decision receipt.
+        receipt_id: String,
+    },
+    /// Provenance is unknown: a pre-provenance ("legacy") binding, or none recorded.
+    /// MUST be treated as untrusted for Enforce/Issue.
+    UnknownLegacy,
+}
+
+/// A `coop_id ↔ EntityId` binding together with its [`CoopEntityBindingProvenance`].
+///
+/// Returned by the provenance-aware reads. The `coop_id` is preserved byte-for-byte
+/// (as bound); a binding still confers no authority on its own.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CoopEntityBinding {
+    /// The original flat `coop_id`, byte-for-byte as bound.
+    pub coop_id: String,
+    /// The bound cooperative `EntityId`.
+    pub entity_id: EntityId,
+    /// How the binding was established (or [`CoopEntityBindingProvenance::UnknownLegacy`]).
+    pub provenance: CoopEntityBindingProvenance,
+}
+
+/// Serialize provenance for durable storage (stable serde_json bytes).
+fn encode_provenance(p: &CoopEntityBindingProvenance) -> Result<Vec<u8>, CoopEntityMapError> {
+    serde_json::to_vec(p)
+        .map_err(|e| CoopEntityMapError::Storage(format!("provenance encode error: {e}")))
+}
+
+/// Deserialize provenance from durable storage.
+fn decode_provenance(bytes: &[u8]) -> Result<CoopEntityBindingProvenance, CoopEntityMapError> {
+    serde_json::from_slice(bytes)
+        .map_err(|e| CoopEntityMapError::Storage(format!("provenance decode error: {e}")))
 }
 
 /// Project a flat `coop_id` to a cooperative [`EntityId`], reject-not-normalize.
@@ -181,6 +247,74 @@ pub trait CoopEntityMap {
     /// Returns the `coop_id` exactly as it was bound (byte-for-byte), which is
     /// what makes the mapping reversible.
     fn coop_for_entity(&self, entity_id: &EntityId) -> Result<Option<String>, CoopEntityMapError>;
+
+    // ------------------------------------------------------------------
+    // Provenance-aware extension (A2c prerequisite)
+    //
+    // Additive: these default impls keep every existing implementor working
+    // without change, and are fail-closed — an implementor without a provenance
+    // store reports `UnknownLegacy` (never a trusted value). The durable
+    // implementors (`InMemoryCoopEntityMap`, `SledCoopEntityMap`) override them to
+    // persist/retrieve real provenance. This module records provenance only; it
+    // does not consume it for authorization.
+    // ------------------------------------------------------------------
+
+    /// Bind `(coop_id, entity_id)` and record its [`CoopEntityBindingProvenance`].
+    ///
+    /// Same cooperative-type validation and both-direction pair-conflict rules as
+    /// [`bind_resolved`](CoopEntityMap::bind_resolved); like it, it does **not** run
+    /// the `project_coop_id` reject-not-normalize gate, so a non-mappable legacy
+    /// `coop_id` is preserved byte-for-byte. Rebinding the identical pair with the
+    /// identical provenance is idempotent; rebinding the same pair with **different**
+    /// recorded provenance is rejected with [`CoopEntityMapError::Conflict`].
+    ///
+    /// The default impl ignores provenance and delegates to
+    /// [`bind_resolved`](CoopEntityMap::bind_resolved) (implementors with a
+    /// provenance store override it); such a default implementor then reports
+    /// [`CoopEntityBindingProvenance::UnknownLegacy`] on read.
+    fn bind_resolved_with_provenance(
+        &self,
+        coop_id: &str,
+        entity_id: &EntityId,
+        _provenance: CoopEntityBindingProvenance,
+    ) -> Result<(), CoopEntityMapError> {
+        self.bind_resolved(coop_id, entity_id)
+    }
+
+    /// Read the binding for `coop_id` together with its provenance.
+    ///
+    /// Default impl composes [`entity_for_coop`](CoopEntityMap::entity_for_coop) with
+    /// [`CoopEntityBindingProvenance::UnknownLegacy`] — fail-closed: an implementor
+    /// without a provenance store never reports a trusted provenance.
+    fn binding_for_coop(
+        &self,
+        coop_id: &str,
+    ) -> Result<Option<CoopEntityBinding>, CoopEntityMapError> {
+        Ok(self
+            .entity_for_coop(coop_id)?
+            .map(|entity_id| CoopEntityBinding {
+                coop_id: coop_id.to_string(),
+                entity_id,
+                provenance: CoopEntityBindingProvenance::UnknownLegacy,
+            }))
+    }
+
+    /// Read the binding for `entity_id` together with its provenance.
+    ///
+    /// Default impl composes [`coop_for_entity`](CoopEntityMap::coop_for_entity) with
+    /// [`CoopEntityBindingProvenance::UnknownLegacy`] (fail-closed).
+    fn binding_for_entity(
+        &self,
+        entity_id: &EntityId,
+    ) -> Result<Option<CoopEntityBinding>, CoopEntityMapError> {
+        Ok(self
+            .coop_for_entity(entity_id)?
+            .map(|coop_id| CoopEntityBinding {
+                coop_id,
+                entity_id: entity_id.clone(),
+                provenance: CoopEntityBindingProvenance::UnknownLegacy,
+            }))
+    }
 }
 
 // ============================================================================
@@ -193,6 +327,8 @@ struct InMemoryInner {
     forward: HashMap<String, EntityId>,
     /// `entity_id.as_str()` → original `coop_id`
     reverse: HashMap<String, String>,
+    /// `coop_id` → binding provenance (absent ⇒ `UnknownLegacy` on read).
+    provenance: HashMap<String, CoopEntityBindingProvenance>,
 }
 
 /// In-memory `coop_id ↔ EntityId` map for testing and development.
@@ -264,6 +400,97 @@ impl CoopEntityMap for InMemoryCoopEntityMap {
             .map_err(|_| CoopEntityMapError::Storage("in-memory map lock poisoned".into()))?;
         Ok(inner.reverse.get(entity_id.as_str()).cloned())
     }
+
+    fn bind_resolved_with_provenance(
+        &self,
+        coop_id: &str,
+        entity_id: &EntityId,
+        provenance: CoopEntityBindingProvenance,
+    ) -> Result<(), CoopEntityMapError> {
+        // Same cooperative-type gate as bind_resolved, before touching any index.
+        validate_cooperative_entity_id(entity_id)?;
+
+        let mut inner = self
+            .inner
+            .write()
+            .map_err(|_| CoopEntityMapError::Storage("in-memory map lock poisoned".into()))?;
+
+        // Both-direction pair-conflict checks (identical to bind_resolved).
+        if let Some(bound) = inner.forward.get(coop_id) {
+            if bound != entity_id {
+                return Err(CoopEntityMapError::Conflict(format!(
+                    "coop_id {coop_id:?} is already bound to {bound}"
+                )));
+            }
+        }
+        if let Some(bound_coop) = inner.reverse.get(entity_id.as_str()) {
+            if bound_coop.as_str() != coop_id {
+                return Err(CoopEntityMapError::Conflict(format!(
+                    "entity {entity_id} is already bound to coop_id {bound_coop:?}"
+                )));
+            }
+        }
+        // Provenance conflict: a recorded, differing provenance is rejected
+        // (idempotent only when equal). No recorded provenance ⇒ record it now.
+        if let Some(existing) = inner.provenance.get(coop_id) {
+            if existing != &provenance {
+                return Err(CoopEntityMapError::Conflict(format!(
+                    "coop_id {coop_id:?} already has different provenance recorded"
+                )));
+            }
+        }
+
+        inner.forward.insert(coop_id.to_string(), entity_id.clone());
+        inner
+            .reverse
+            .insert(entity_id.as_str().to_string(), coop_id.to_string());
+        inner.provenance.insert(coop_id.to_string(), provenance);
+        Ok(())
+    }
+
+    fn binding_for_coop(
+        &self,
+        coop_id: &str,
+    ) -> Result<Option<CoopEntityBinding>, CoopEntityMapError> {
+        let inner = self
+            .inner
+            .read()
+            .map_err(|_| CoopEntityMapError::Storage("in-memory map lock poisoned".into()))?;
+        Ok(inner
+            .forward
+            .get(coop_id)
+            .map(|entity_id| CoopEntityBinding {
+                coop_id: coop_id.to_string(),
+                entity_id: entity_id.clone(),
+                provenance: inner
+                    .provenance
+                    .get(coop_id)
+                    .cloned()
+                    .unwrap_or(CoopEntityBindingProvenance::UnknownLegacy),
+            }))
+    }
+
+    fn binding_for_entity(
+        &self,
+        entity_id: &EntityId,
+    ) -> Result<Option<CoopEntityBinding>, CoopEntityMapError> {
+        let inner = self
+            .inner
+            .read()
+            .map_err(|_| CoopEntityMapError::Storage("in-memory map lock poisoned".into()))?;
+        Ok(inner
+            .reverse
+            .get(entity_id.as_str())
+            .map(|coop_id| CoopEntityBinding {
+                coop_id: coop_id.clone(),
+                entity_id: entity_id.clone(),
+                provenance: inner
+                    .provenance
+                    .get(coop_id)
+                    .cloned()
+                    .unwrap_or(CoopEntityBindingProvenance::UnknownLegacy),
+            }))
+    }
 }
 
 // ============================================================================
@@ -297,6 +524,23 @@ impl SledCoopEntityMap {
             .open()
             .map_err(|e| CoopEntityMapError::Storage(format!("failed to open temp db: {e}")))?;
         Ok(Self::new(Arc::new(db)))
+    }
+
+    /// Read the stored provenance for `coop_id`, defaulting to
+    /// [`CoopEntityBindingProvenance::UnknownLegacy`] when none is recorded
+    /// (fail-closed: a pre-provenance binding is never trusted).
+    fn read_provenance(
+        &self,
+        coop_id: &str,
+    ) -> Result<CoopEntityBindingProvenance, CoopEntityMapError> {
+        match self
+            .db
+            .get(provenance_key(coop_id))
+            .map_err(|e| CoopEntityMapError::Storage(format!("db get error: {e}")))?
+        {
+            Some(bytes) => decode_provenance(&bytes),
+            None => Ok(CoopEntityBindingProvenance::UnknownLegacy),
+        }
     }
 }
 
@@ -394,6 +638,100 @@ impl CoopEntityMap for SledCoopEntityMap {
             }
             None => Ok(None),
         }
+    }
+
+    fn bind_resolved_with_provenance(
+        &self,
+        coop_id: &str,
+        entity_id: &EntityId,
+        provenance: CoopEntityBindingProvenance,
+    ) -> Result<(), CoopEntityMapError> {
+        // Same cooperative-type gate as bind_resolved, before the transaction.
+        validate_cooperative_entity_id(entity_id)?;
+
+        let fkey = forward_key(coop_id);
+        let rkey = reverse_key(entity_id);
+        let pkey = provenance_key(coop_id);
+        let entity_str = entity_id.as_str().to_string();
+        let coop_string = coop_id.to_string();
+        let prov_bytes = encode_provenance(&provenance)?;
+
+        self.db
+            .transaction(|tx| {
+                let existing_fwd = tx.get(&fkey)?;
+                let existing_rev = tx.get(&rkey)?;
+
+                if let Some(bytes) = &existing_fwd {
+                    if bytes.as_ref() != entity_str.as_bytes() {
+                        return Err(ConflictableTransactionError::Abort(
+                            CoopEntityMapError::Conflict(format!(
+                                "coop_id {coop_string:?} is already bound to a different entity"
+                            )),
+                        ));
+                    }
+                }
+                if let Some(bytes) = &existing_rev {
+                    if bytes.as_ref() != coop_string.as_bytes() {
+                        return Err(ConflictableTransactionError::Abort(
+                            CoopEntityMapError::Conflict(format!(
+                                "entity {entity_str} is already bound to a different coop_id"
+                            )),
+                        ));
+                    }
+                }
+                // Provenance conflict: a recorded, differing provenance is rejected
+                // (idempotent only when equal). No record yet ⇒ record it now.
+                if let Some(bytes) = tx.get(&pkey)? {
+                    if bytes.as_ref() != prov_bytes.as_slice() {
+                        return Err(ConflictableTransactionError::Abort(
+                            CoopEntityMapError::Conflict(format!(
+                                "coop_id {coop_string:?} already has different provenance recorded"
+                            )),
+                        ));
+                    }
+                }
+
+                // Forward, reverse, and provenance are written in the same
+                // transaction: a binding's provenance is all-or-nothing with its
+                // indexes (an aborted conflict above leaves nothing written).
+                tx.insert(fkey.as_slice(), entity_str.as_bytes())?;
+                tx.insert(rkey.as_slice(), coop_string.as_bytes())?;
+                tx.insert(pkey.as_slice(), prov_bytes.as_slice())?;
+                Ok(())
+            })
+            .map_err(map_tx_err)
+    }
+
+    fn binding_for_coop(
+        &self,
+        coop_id: &str,
+    ) -> Result<Option<CoopEntityBinding>, CoopEntityMapError> {
+        let entity_id = match self.entity_for_coop(coop_id)? {
+            Some(id) => id,
+            None => return Ok(None),
+        };
+        let provenance = self.read_provenance(coop_id)?;
+        Ok(Some(CoopEntityBinding {
+            coop_id: coop_id.to_string(),
+            entity_id,
+            provenance,
+        }))
+    }
+
+    fn binding_for_entity(
+        &self,
+        entity_id: &EntityId,
+    ) -> Result<Option<CoopEntityBinding>, CoopEntityMapError> {
+        let coop_id = match self.coop_for_entity(entity_id)? {
+            Some(c) => c,
+            None => return Ok(None),
+        };
+        let provenance = self.read_provenance(&coop_id)?;
+        Ok(Some(CoopEntityBinding {
+            coop_id,
+            entity_id: entity_id.clone(),
+            provenance,
+        }))
     }
 }
 
@@ -1049,5 +1387,324 @@ mod tests {
             map.coop_for_entity(&surrogate).unwrap(),
             Some(UUID_COOP.to_string())
         );
+    }
+
+    // ================================================================
+    // Provenance (A2c prerequisite)
+    // ================================================================
+
+    #[test]
+    fn test_inmem_provenance_bind_round_trips_forward_and_reverse() {
+        let map = InMemoryCoopEntityMap::new();
+        let entity = coop_eid("food-coop");
+        map.bind_resolved_with_provenance(
+            "food-coop",
+            &entity,
+            CoopEntityBindingProvenance::Activation,
+        )
+        .unwrap();
+
+        let by_coop = map.binding_for_coop("food-coop").unwrap().unwrap();
+        assert_eq!(by_coop.coop_id, "food-coop");
+        assert_eq!(by_coop.entity_id, entity);
+        assert_eq!(by_coop.provenance, CoopEntityBindingProvenance::Activation);
+
+        let by_entity = map.binding_for_entity(&entity).unwrap().unwrap();
+        assert_eq!(by_entity.coop_id, "food-coop");
+        assert_eq!(by_entity.entity_id, entity);
+        assert_eq!(
+            by_entity.provenance,
+            CoopEntityBindingProvenance::Activation
+        );
+    }
+
+    #[test]
+    fn test_inmem_provenance_governance_receipt_round_trips() {
+        let map = InMemoryCoopEntityMap::new();
+        let entity = coop_eid("gov-coop");
+        let prov = CoopEntityBindingProvenance::GovernanceReceipt {
+            receipt_id: "receipt-abc123".to_string(),
+        };
+        map.bind_resolved_with_provenance("gov-coop", &entity, prov.clone())
+            .unwrap();
+        assert_eq!(
+            map.binding_for_coop("gov-coop")
+                .unwrap()
+                .unwrap()
+                .provenance,
+            prov
+        );
+    }
+
+    #[test]
+    fn test_inmem_missing_provenance_reads_unknown_legacy() {
+        // A plain bind_resolved records no provenance; provenance-aware reads must
+        // report UnknownLegacy (fail-closed: never trusted), not a real provenance.
+        let map = InMemoryCoopEntityMap::new();
+        map.bind_resolved("legacy-coop", &coop_eid("legacy-coop"))
+            .unwrap();
+        let b = map.binding_for_coop("legacy-coop").unwrap().unwrap();
+        assert_eq!(b.provenance, CoopEntityBindingProvenance::UnknownLegacy);
+        let b2 = map
+            .binding_for_entity(&coop_eid("legacy-coop"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(b2.provenance, CoopEntityBindingProvenance::UnknownLegacy);
+    }
+
+    #[test]
+    fn test_inmem_existing_apis_unchanged_alongside_provenance() {
+        // bind_exact / bind_projected / entity_for_coop / coop_for_entity keep
+        // working; their (provenance-less) rows read back as UnknownLegacy.
+        let map = InMemoryCoopEntityMap::new();
+        assert_eq!(
+            map.bind_projected("proj-coop").unwrap(),
+            coop_eid("proj-coop")
+        );
+        map.bind_exact("exact-coop", &coop_eid("exact-coop"))
+            .unwrap();
+        assert_eq!(
+            map.entity_for_coop("proj-coop").unwrap(),
+            Some(coop_eid("proj-coop"))
+        );
+        assert_eq!(
+            map.coop_for_entity(&coop_eid("exact-coop")).unwrap(),
+            Some("exact-coop".to_string())
+        );
+        assert_eq!(
+            map.binding_for_coop("proj-coop")
+                .unwrap()
+                .unwrap()
+                .provenance,
+            CoopEntityBindingProvenance::UnknownLegacy
+        );
+    }
+
+    #[test]
+    fn test_inmem_provenance_same_pair_same_provenance_idempotent() {
+        let map = InMemoryCoopEntityMap::new();
+        let entity = coop_eid("idem-coop");
+        map.bind_resolved_with_provenance(
+            "idem-coop",
+            &entity,
+            CoopEntityBindingProvenance::Surrogate,
+        )
+        .unwrap();
+        // Second identical bind is idempotent (Ok).
+        map.bind_resolved_with_provenance(
+            "idem-coop",
+            &entity,
+            CoopEntityBindingProvenance::Surrogate,
+        )
+        .unwrap();
+        assert_eq!(
+            map.binding_for_coop("idem-coop")
+                .unwrap()
+                .unwrap()
+                .provenance,
+            CoopEntityBindingProvenance::Surrogate
+        );
+    }
+
+    #[test]
+    fn test_inmem_provenance_same_pair_different_provenance_rejected() {
+        let map = InMemoryCoopEntityMap::new();
+        let entity = coop_eid("clash-coop");
+        map.bind_resolved_with_provenance(
+            "clash-coop",
+            &entity,
+            CoopEntityBindingProvenance::Activation,
+        )
+        .unwrap();
+        assert!(matches!(
+            map.bind_resolved_with_provenance(
+                "clash-coop",
+                &entity,
+                CoopEntityBindingProvenance::OperatorBackfill
+            ),
+            Err(CoopEntityMapError::Conflict(_))
+        ));
+        // Original provenance is preserved after the rejected rebind.
+        assert_eq!(
+            map.binding_for_coop("clash-coop")
+                .unwrap()
+                .unwrap()
+                .provenance,
+            CoopEntityBindingProvenance::Activation
+        );
+    }
+
+    #[test]
+    fn test_inmem_provenance_pair_conflicts_still_rejected() {
+        let map = InMemoryCoopEntityMap::new();
+        map.bind_resolved_with_provenance(
+            "coop-one",
+            &coop_eid("coop-one"),
+            CoopEntityBindingProvenance::Activation,
+        )
+        .unwrap();
+        // same coop_id → different entity
+        assert!(matches!(
+            map.bind_resolved_with_provenance(
+                "coop-one",
+                &coop_eid("coop-two"),
+                CoopEntityBindingProvenance::Activation
+            ),
+            Err(CoopEntityMapError::Conflict(_))
+        ));
+        // different coop_id → same entity
+        assert!(matches!(
+            map.bind_resolved_with_provenance(
+                "coop-three",
+                &coop_eid("coop-one"),
+                CoopEntityBindingProvenance::Activation
+            ),
+            Err(CoopEntityMapError::Conflict(_))
+        ));
+    }
+
+    #[test]
+    fn test_inmem_provenance_rejects_non_cooperative_before_write() {
+        let map = InMemoryCoopEntityMap::new();
+        let community = EntityId::community("some-community").unwrap();
+        assert!(matches!(
+            map.bind_resolved_with_provenance(
+                UUID_COOP,
+                &community,
+                CoopEntityBindingProvenance::Activation
+            ),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+        // No write happened, including provenance.
+        assert_eq!(map.entity_for_coop(UUID_COOP).unwrap(), None);
+        assert_eq!(map.binding_for_coop(UUID_COOP).unwrap(), None);
+    }
+
+    #[test]
+    fn test_inmem_provenance_bind_preserves_non_mappable_coop_id() {
+        // bind_resolved_with_provenance, like bind_resolved, skips the project gate
+        // and preserves a non-mappable legacy coop_id byte-for-byte.
+        let map = InMemoryCoopEntityMap::new();
+        let surrogate = coop_eid("coop-legacy-deadbeefdeadbeefdead");
+        map.bind_resolved_with_provenance(
+            UUID_COOP,
+            &surrogate,
+            CoopEntityBindingProvenance::Surrogate,
+        )
+        .unwrap();
+        let b = map.binding_for_coop(UUID_COOP).unwrap().unwrap();
+        assert_eq!(b.coop_id, UUID_COOP); // preserved byte-for-byte
+        assert_eq!(b.entity_id, surrogate);
+        assert_eq!(b.provenance, CoopEntityBindingProvenance::Surrogate);
+    }
+
+    #[test]
+    fn test_sled_provenance_round_trips() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        let entity = coop_eid("sled-coop");
+        map.bind_resolved_with_provenance(
+            "sled-coop",
+            &entity,
+            CoopEntityBindingProvenance::OperatorBackfill,
+        )
+        .unwrap();
+        let b = map.binding_for_coop("sled-coop").unwrap().unwrap();
+        assert_eq!(b.entity_id, entity);
+        assert_eq!(b.provenance, CoopEntityBindingProvenance::OperatorBackfill);
+        assert_eq!(
+            map.binding_for_entity(&entity).unwrap().unwrap().provenance,
+            CoopEntityBindingProvenance::OperatorBackfill
+        );
+    }
+
+    #[test]
+    fn test_sled_missing_provenance_reads_unknown_legacy() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        map.bind_resolved("sled-legacy", &coop_eid("sled-legacy"))
+            .unwrap();
+        assert_eq!(
+            map.binding_for_coop("sled-legacy")
+                .unwrap()
+                .unwrap()
+                .provenance,
+            CoopEntityBindingProvenance::UnknownLegacy
+        );
+    }
+
+    #[test]
+    fn test_sled_provenance_different_provenance_rejected() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        let entity = coop_eid("sled-clash");
+        map.bind_resolved_with_provenance(
+            "sled-clash",
+            &entity,
+            CoopEntityBindingProvenance::Activation,
+        )
+        .unwrap();
+        assert!(matches!(
+            map.bind_resolved_with_provenance(
+                "sled-clash",
+                &entity,
+                CoopEntityBindingProvenance::Surrogate
+            ),
+            Err(CoopEntityMapError::Conflict(_))
+        ));
+        // idempotent for identical provenance
+        map.bind_resolved_with_provenance(
+            "sled-clash",
+            &entity,
+            CoopEntityBindingProvenance::Activation,
+        )
+        .unwrap();
+    }
+
+    #[test]
+    fn test_sled_provenance_rejects_non_cooperative_before_write() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        let community = EntityId::community("some-community").unwrap();
+        assert!(matches!(
+            map.bind_resolved_with_provenance(
+                UUID_COOP,
+                &community,
+                CoopEntityBindingProvenance::Activation
+            ),
+            Err(CoopEntityMapError::InvalidEntityType(_))
+        ));
+        assert_eq!(map.entity_for_coop(UUID_COOP).unwrap(), None);
+        assert_eq!(map.binding_for_coop(UUID_COOP).unwrap(), None);
+    }
+
+    #[test]
+    fn test_sled_provenance_persists_across_reopen() {
+        let temp_dir = tempfile::tempdir().unwrap();
+        let db_path = temp_dir.path().join("provenance_persist_test");
+
+        // Session 1: provenance-aware bind (governance receipt carries a String).
+        {
+            let db = sled::open(&db_path).unwrap();
+            let map = SledCoopEntityMap::new(Arc::new(db));
+            map.bind_resolved_with_provenance(
+                UUID_COOP,
+                &coop_eid("persist-coop"),
+                CoopEntityBindingProvenance::GovernanceReceipt {
+                    receipt_id: "rcpt-9f".to_string(),
+                },
+            )
+            .unwrap();
+        }
+        // Session 2: reopen and verify the binding AND its provenance survived.
+        {
+            let db = sled::open(&db_path).unwrap();
+            let map = SledCoopEntityMap::new(Arc::new(db));
+            let b = map.binding_for_coop(UUID_COOP).unwrap().unwrap();
+            assert_eq!(b.coop_id, UUID_COOP);
+            assert_eq!(b.entity_id, coop_eid("persist-coop"));
+            assert_eq!(
+                b.provenance,
+                CoopEntityBindingProvenance::GovernanceReceipt {
+                    receipt_id: "rcpt-9f".to_string()
+                }
+            );
+        }
     }
 }
