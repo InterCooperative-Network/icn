@@ -712,9 +712,9 @@ mod tests {
         let resolver = store_backed(map);
         // The resolver resolves `food-coop` to the same EntityId the legacy
         // projection yields, so the observe-mode comparison classifies as `Agree`.
-        // `observe_coop_entity_resolution` returns a classification value and performs
-        // no authorization.
-        let observation = observe_coop_entity_resolution(&resolver, COOP_ID).await;
-        assert_eq!(observation, CoopResolutionObservation::Agree);
+        // `observe_coop_entity_resolution` returns evidence (a classification + the
+        // compared targets) and performs no authorization.
+        let evidence = observe_coop_entity_resolution(&resolver, COOP_ID).await;
+        assert_eq!(evidence.classification, CoopResolutionObservation::Agree);
     }
 }
