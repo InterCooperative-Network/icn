@@ -362,6 +362,15 @@ pub(crate) enum TreasuryGateDenyReason {
     /// target. Until a follow-up carries the resolved target into membership
     /// evaluation, `ResolverOnly` is measured but **not enforceable**; fail closed.
     ResolverOnlyTargetUnverified,
+    /// The legacy projection and the resolver AGREE on the path `coop_id`'s `EntityId`,
+    /// but that agreement does NOT prove the treasury's stored `entity_id` — the target
+    /// the entity-membership observation was actually computed against — equals that
+    /// agreed target. An affirmative-member allow would otherwise be granted against a
+    /// target the agreement never verified. Until a follow-up carries the agreed target
+    /// into membership evaluation, an `Agree`-based allow is measured but **not
+    /// enforceable**; fail closed. (Membership *denies* still surface via the existing
+    /// signal — denying never trusts an unverified target.)
+    AgreeTargetUnverified,
     /// A trusted basis exists but the entity-membership observation is indeterminate (a
     /// data gap); fail closed.
     IndeterminateMembership,
@@ -389,6 +398,7 @@ impl TreasuryGateDenyReason {
             TreasuryGateDenyReason::ResolverOnlyTargetUnverified => {
                 "resolver_only_target_unverified"
             }
+            TreasuryGateDenyReason::AgreeTargetUnverified => "agree_target_unverified",
             TreasuryGateDenyReason::IndeterminateMembership => "indeterminate_membership",
             TreasuryGateDenyReason::ObservationError => "observation_error",
         }
@@ -409,9 +419,10 @@ impl TreasuryGateDenyReason {
 /// - [`TreasuryEntityAuthMode::EnforceTrustedResolver`] (decision-only; not wired to any
 ///   route here) requires an *enforceable* trusted basis first, then defers to
 ///   membership:
-///   - `Agree` → enforceable basis: the legacy projection and the resolver agree on the
-///     SAME `EntityId`, which is also the target the membership observation was computed
-///     against;
+///   - `Agree` → strongest basis (the legacy projection and the resolver agree on the
+///     SAME `EntityId` for the path `coop_id`), but agreement does NOT prove the
+///     treasury's stored `entity_id` equals that target — so its would-allow path still
+///     fails closed (see below);
 ///   - `ResolverOnly` → `WouldDeny(ResolverOnlyTargetUnverified)`: the resolver produced
 ///     a target the legacy projection could not, so the membership observation
 ///     (`treasury.entity_id()` / legacy projection) was never checked against it.
@@ -421,9 +432,13 @@ impl TreasuryGateDenyReason {
 ///   - `LegacyOnly(_)` / `NeitherResolved(_)` → `WouldDeny(UntrustedResolution)` — covers
 ///     `UnknownLegacy`, gossip-originated/unprovenanced rows, ambiguous bindings,
 ///     entity-type mismatch, and backend/source errors (all fail closed);
-///   - with an enforceable basis (`Agree`): `AgreesAllow` → `ProceedUnchanged`;
-///     `EntityDeny` → `WouldDeny(NotMember)`; `Indeterminate` →
-///     `WouldDeny(IndeterminateMembership)`; `Error` → `WouldDeny(ObservationError)`.
+///   - with an `Agree` basis the membership signal decides, except the would-allow path:
+///     `AgreesAllow` → `WouldDeny(AgreeTargetUnverified)` (the agreed target was never
+///     verified against `treasury.entity_id()`; measured but not enforceable until a
+///     follow-up carries it through); `EntityDeny` → `WouldDeny(NotMember)`;
+///     `Indeterminate` → `WouldDeny(IndeterminateMembership)`; `Error` →
+///     `WouldDeny(ObservationError)`. No resolution yields `ProceedUnchanged` under
+///     enforcement today — every path is measured fail-closed pending that follow-up.
 pub(crate) fn decide_treasury_gate(
     mode: TreasuryEntityAuthMode,
     observation: &EntityAccessObservation,
@@ -439,9 +454,10 @@ pub(crate) fn decide_treasury_gate(
             //     enforce on a membership target whose coop→entity mapping you cannot
             //     trust, or that the observation never actually checked.
             match resolution {
-                // Only `Agree` is enforceable: legacy projection and resolver agree on
-                // the SAME `EntityId`, which is also the target the membership
-                // observation was computed against.
+                // `Agree` is the strongest basis (legacy projection and resolver agree on
+                // the SAME `EntityId` for the path `coop_id`), but agreement on the path
+                // does NOT prove the treasury's stored `entity_id` equals that target —
+                // see the would-allow handling in (2). Fall through to membership.
                 CoopResolutionObservation::Agree => {}
                 // `ResolverOnly` is a real, useful observation, but the resolver's target
                 // was never checked for membership (the observation used
@@ -465,9 +481,18 @@ pub(crate) fn decide_treasury_gate(
                     );
                 }
             }
-            // (2) With a trusted basis, the entity-membership observation decides.
+            // (2) With a trusted basis, the entity-membership observation decides — except
+            // the would-allow path. `Agree` (the only resolution reaching here) proves the
+            // resolver matches the legacy projection for the path `coop_id`, NOT that the
+            // treasury's stored `entity_id` — the target this observation was computed
+            // against — equals that agreed target. An allow would therefore trust an
+            // unverified target: fail closed until a follow-up carries the agreed target
+            // into membership evaluation. Membership DENIES still surface unchanged —
+            // denying never trusts an unverified target.
             match observation {
-                EntityAccessObservation::AgreesAllow => TreasuryGateDecision::ProceedUnchanged,
+                EntityAccessObservation::AgreesAllow => {
+                    TreasuryGateDecision::WouldDeny(TreasuryGateDenyReason::AgreeTargetUnverified)
+                }
                 EntityAccessObservation::EntityDeny(_) => {
                     TreasuryGateDecision::WouldDeny(TreasuryGateDenyReason::NotMember)
                 }
@@ -1581,8 +1606,8 @@ mod coop_resolution_observe_tests {
     use TreasuryEntityAuthMode::{EnforceTrustedResolver, ObserveOnly};
     use TreasuryGateDecision::{ProceedUnchanged, WouldDeny};
     use TreasuryGateDenyReason::{
-        IndeterminateMembership, NotMember, ObservationError, ResolverConflict,
-        ResolverOnlyTargetUnverified, UntrustedResolution,
+        AgreeTargetUnverified, IndeterminateMembership, NotMember, ObservationError,
+        ResolverConflict, ResolverOnlyTargetUnverified, UntrustedResolution,
     };
 
     fn allow() -> EntityAccessObservation {
@@ -1627,16 +1652,21 @@ mod coop_resolution_observe_tests {
         }
     }
 
-    // (B) Enforcement: trusted agreement allows.
+    // (B) Enforcement: `Agree` proves the resolver and legacy projection match on the
+    // path `coop_id`, but NOT that the treasury's stored `entity_id` (the target the
+    // membership observation was computed against) equals that agreed target. An
+    // affirmative-member ALLOW is therefore target-unverified and fails closed until a
+    // follow-up carries the agreed target into membership evaluation. (Membership denies
+    // still surface — see the non-member / gap tests below.)
     #[test]
-    fn gate_enforce_trusted_agreement_allows() {
+    fn gate_enforce_trusted_agreement_allow_is_target_unverified() {
         assert_eq!(
             decide_treasury_gate(
                 EnforceTrustedResolver,
                 &allow(),
                 &CoopResolutionObservation::Agree
             ),
-            ProceedUnchanged
+            WouldDeny(AgreeTargetUnverified)
         );
     }
 
