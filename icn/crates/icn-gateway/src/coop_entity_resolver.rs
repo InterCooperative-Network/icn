@@ -528,6 +528,33 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn store_backed_resolves_surrogate_written_by_operator_backfill() {
+        // Interop: a non-mappable default `coop:<uuid>` backfilled to its
+        // deterministic surrogate (recording OperatorBackfill provenance) resolves
+        // through the store-backed resolver — proving the provenance the backfill
+        // records passes the resolver's existing trust gate. No resolver-trust
+        // broadening: OperatorBackfill is already trusted.
+        use icn_entity::{
+            backfill_coop_surrogates, propose_surrogate_entity_id, SurrogateBackfillMode,
+        };
+        const UUID_COOP: &str = "coop:550e8400-e29b-41d4-a716-446655440000";
+
+        let map = InMemoryCoopEntityMap::new();
+        let report =
+            backfill_coop_surrogates([UUID_COOP.to_string()], &map, SurrogateBackfillMode::Apply);
+        assert_eq!(report.applied, 1, "backfill bound exactly one surrogate");
+        let surrogate = propose_surrogate_entity_id(UUID_COOP).unwrap();
+
+        let out = store_backed(map).resolve_coop_entity(UUID_COOP).await;
+        assert_eq!(
+            out,
+            CoopEntityResolution::Resolved {
+                entity_id: surrogate
+            }
+        );
+    }
+
+    #[tokio::test]
     async fn store_backed_resolves_governance_receipt_provenance() {
         let map = InMemoryCoopEntityMap::new();
         let entity = coop_entity();
