@@ -100,10 +100,11 @@ pub enum SurrogateBackfillAction {
     /// already reverse-bound to a different `coop_id`, or claimed by another
     /// `coop_id` in this same batch. Reported, never bound.
     SurrogateCollision,
-    /// Apply: `bind_resolved` rejected the surrogate as a forward/reverse
-    /// mapping conflict (a real concurrent-state change between plan and write).
+    /// Apply: `bind_resolved_with_provenance` rejected the surrogate as a
+    /// forward/reverse mapping conflict (a real concurrent-state change between
+    /// plan and write).
     BindConflict,
-    /// Apply: `bind_resolved` failed with a storage/other error.
+    /// Apply: `bind_resolved_with_provenance` failed with a storage/other error.
     BindError,
 }
 
@@ -162,11 +163,11 @@ pub struct CoopSurrogateBackfill {
     pub skipped_storage_error: usize,
     /// Non-mappable entries whose proposed surrogate would collide on bind.
     pub surrogate_collision: usize,
-    /// Eligible entries whose `bind_resolved` was rejected as a conflict
-    /// (`Apply` only).
+    /// Eligible entries whose `bind_resolved_with_provenance` was rejected as a
+    /// conflict (`Apply` only).
     pub bind_conflict: usize,
-    /// Eligible entries whose `bind_resolved` failed with a storage/other error
-    /// (`Apply` only).
+    /// Eligible entries whose `bind_resolved_with_provenance` failed with a
+    /// storage/other error (`Apply` only).
     pub bind_error: usize,
     /// Per-`coop_id` detail, in input order.
     pub entries: Vec<SurrogateBackfillEntry>,
@@ -443,14 +444,14 @@ fn plan_entry(
                         Err(CoopEntityMapError::Conflict(msg)) => make(
                             SurrogateBackfillAction::BindConflict,
                             Some(surrogate.clone()),
-                            "bind_resolved rejected the surrogate as a forward/reverse conflict"
+                            "bind_resolved_with_provenance rejected the surrogate as a forward/reverse conflict"
                                 .into(),
                             Some(msg),
                         ),
                         Err(e) => make(
                             SurrogateBackfillAction::BindError,
                             Some(surrogate.clone()),
-                            "bind_resolved failed".into(),
+                            "bind_resolved_with_provenance failed".into(),
                             Some(e.to_string()),
                         ),
                     }
