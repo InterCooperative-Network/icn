@@ -174,10 +174,15 @@ impl CoopEntityResolver for UnwiredCoopEntityResolver {
 ///
 /// | Store read for `coop_id`                       | Resolution                                   |
 /// |------------------------------------------------|----------------------------------------------|
-/// | binding present, **trusted** provenance        | [`CoopEntityResolution::Resolved`]           |
+/// | binding present, **trusted** provenance, cooperative target | [`CoopEntityResolution::Resolved`] |
+/// | binding present, trusted provenance, **non-cooperative** target | `Unavailable(`[`ResolutionUnavailable::EntityTypeMismatch`]`)` |
 /// | binding present, [`CoopEntityBindingProvenance::UnknownLegacy`] | `Unavailable(`[`ResolutionUnavailable::UnverifiedProvenance`]`)` |
 /// | no binding                                     | `Unavailable(`[`ResolutionUnavailable::Unmapped`]`)`            |
-/// | store/backend error                            | `Unavailable(`[`ResolutionUnavailable::SourceUnavailable`]`)`   |
+/// | store/backend error or join failure            | `Unavailable(`[`ResolutionUnavailable::SourceUnavailable`]`)`   |
+///
+/// The synchronous `CoopEntityMap` read is offloaded to `tokio::task::spawn_blocking`
+/// so a future persistent (e.g. Sled) store cannot block the async worker thread; a
+/// join failure fails closed to [`ResolutionUnavailable::SourceUnavailable`].
 ///
 /// A resolved binding is a *name binding only* and confers no authority (see the
 /// module docs and the `CoopEntityMap` docs). `UnknownLegacy` — a pre-provenance
@@ -213,34 +218,53 @@ fn provenance_is_trusted_for_resolution(provenance: &CoopEntityBindingProvenance
     }
 }
 
-/// Map a present binding to a [`CoopEntityResolution`], gating on provenance.
+/// Map a present binding to a [`CoopEntityResolution`], gating on provenance and
+/// target entity type.
+///
+/// Two fail-closed gates, in order:
+/// 1. provenance must be trusted (see [`provenance_is_trusted_for_resolution`]),
+///    else [`ResolutionUnavailable::UnverifiedProvenance`];
+/// 2. the bound [`EntityId`] must be a cooperative — a flat `coop_id` denotes a
+///    cooperative (RFC-0018). The substrate enforces this on write, but the resolver
+///    is a trust boundary: a corrupted store or alternate [`CoopEntityMap`] impl
+///    could surface a non-cooperative target, so fail closed with
+///    [`ResolutionUnavailable::EntityTypeMismatch`] rather than resolve a mistyped
+///    identity.
 fn resolution_from_binding(binding: CoopEntityBinding) -> CoopEntityResolution {
-    if provenance_is_trusted_for_resolution(&binding.provenance) {
-        CoopEntityResolution::Resolved {
-            entity_id: binding.entity_id,
-        }
-    } else {
-        CoopEntityResolution::Unavailable {
+    if !provenance_is_trusted_for_resolution(&binding.provenance) {
+        return CoopEntityResolution::Unavailable {
             reason: ResolutionUnavailable::UnverifiedProvenance,
-        }
+        };
+    }
+    if !binding.entity_id.is_cooperative() {
+        return CoopEntityResolution::Unavailable {
+            reason: ResolutionUnavailable::EntityTypeMismatch,
+        };
+    }
+    CoopEntityResolution::Resolved {
+        entity_id: binding.entity_id,
     }
 }
 
 #[async_trait::async_trait]
 impl CoopEntityResolver for StoreBackedCoopEntityResolver {
     async fn resolve_coop_entity(&self, coop_id: &str) -> CoopEntityResolution {
-        // Read the provenance-aware binding from the #2190 substrate. The store read
-        // is synchronous and fail-closed by construction; this resolver performs no
-        // authorization, denies nothing, and never fabricates or normalizes an
-        // identity. A present binding only resolves if its provenance is trusted
-        // (see `resolution_from_binding`); everything else is a first-class
-        // `Unavailable` value.
-        match self.map.binding_for_coop(coop_id) {
-            Ok(Some(binding)) => resolution_from_binding(binding),
-            Ok(None) => CoopEntityResolution::Unavailable {
+        // Read the provenance-aware binding from the #2190 substrate. The
+        // `CoopEntityMap` read is synchronous and may block (e.g. a Sled-backed
+        // store), so offload it to the blocking pool rather than running it on the
+        // async worker thread. This resolver performs no authorization, denies
+        // nothing, and never fabricates or normalizes an identity. A present binding
+        // only resolves if its provenance is trusted and its target is a cooperative
+        // (see `resolution_from_binding`); every other outcome — including a join
+        // failure — is a first-class fail-closed `Unavailable` value.
+        let map = Arc::clone(&self.map);
+        let coop_id = coop_id.to_owned();
+        match tokio::task::spawn_blocking(move || map.binding_for_coop(&coop_id)).await {
+            Ok(Ok(Some(binding))) => resolution_from_binding(binding),
+            Ok(Ok(None)) => CoopEntityResolution::Unavailable {
                 reason: ResolutionUnavailable::Unmapped,
             },
-            Err(_) => CoopEntityResolution::Unavailable {
+            Ok(Err(_)) | Err(_) => CoopEntityResolution::Unavailable {
                 reason: ResolutionUnavailable::SourceUnavailable,
             },
         }
@@ -382,6 +406,47 @@ mod tests {
         }
     }
 
+    /// A non-cooperative `EntityId` (a community), used to simulate a corrupted store
+    /// or alternate `CoopEntityMap` impl that surfaces a mistyped binding.
+    fn non_cooperative_entity() -> EntityId {
+        EntityId::community("river-commons").expect("test premise: valid community slug")
+    }
+
+    /// A `CoopEntityMap` that returns a binding whose `EntityId` is NOT a cooperative
+    /// (with otherwise-trusted provenance). The substrate refuses such a binding on
+    /// write, so this double surfaces it directly to exercise the resolver's
+    /// fail-closed `EntityTypeMismatch` defense-in-depth.
+    struct MistypedBindingMap;
+
+    impl CoopEntityMap for MistypedBindingMap {
+        fn bind_resolved(
+            &self,
+            _coop_id: &str,
+            _entity_id: &EntityId,
+        ) -> Result<(), CoopEntityMapError> {
+            Ok(())
+        }
+        fn entity_for_coop(&self, _coop_id: &str) -> Result<Option<EntityId>, CoopEntityMapError> {
+            Ok(Some(non_cooperative_entity()))
+        }
+        fn coop_for_entity(
+            &self,
+            _entity_id: &EntityId,
+        ) -> Result<Option<String>, CoopEntityMapError> {
+            Ok(None)
+        }
+        fn binding_for_coop(
+            &self,
+            coop_id: &str,
+        ) -> Result<Option<CoopEntityBinding>, CoopEntityMapError> {
+            Ok(Some(CoopEntityBinding {
+                coop_id: coop_id.to_string(),
+                entity_id: non_cooperative_entity(),
+                provenance: CoopEntityBindingProvenance::Activation,
+            }))
+        }
+    }
+
     #[tokio::test]
     async fn store_backed_resolves_binding_with_trusted_provenance() {
         let map = InMemoryCoopEntityMap::new();
@@ -476,6 +541,23 @@ mod tests {
             out,
             CoopEntityResolution::Unavailable {
                 reason: ResolutionUnavailable::SourceUnavailable
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn store_backed_fails_closed_on_non_cooperative_entity() {
+        // A flat coop_id denotes a cooperative (RFC-0018). Even with trusted
+        // provenance, a binding to a non-cooperative EntityId must fail closed rather
+        // than resolve a mistyped identity — defense-in-depth against a corrupted store.
+        let out = store_backed(MistypedBindingMap)
+            .resolve_coop_entity(COOP_ID)
+            .await;
+        assert!(!out.is_resolved());
+        assert_eq!(
+            out,
+            CoopEntityResolution::Unavailable {
+                reason: ResolutionUnavailable::EntityTypeMismatch
             }
         );
     }
