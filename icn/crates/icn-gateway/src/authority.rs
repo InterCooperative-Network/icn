@@ -574,19 +574,13 @@ pub(crate) fn decide_treasury_gate(
         // Default, shipped behavior: never alter the route.
         TreasuryEntityAuthMode::ObserveOnly => TreasuryGateDecision::ProceedUnchanged,
         TreasuryEntityAuthMode::EnforceTrustedResolver => {
-            // (1) A trusted coop→EntityId basis is required before any enforcement, and it
-            //     fixes which "target-unverified" reason a later unverified allow reports.
-            //     Untrusted / conflicting / unavailable bases fail closed BEFORE the
-            //     membership signal is consulted — you cannot enforce on a membership
-            //     target whose coop→entity mapping you cannot trust.
+            // (1) Hard failures on the resolution classification fail closed first: a
+            //     migration collision, or an unavailable/untrusted basis. `Agree` /
+            //     `ResolverOnly` only NAME a candidate trusted basis here — they merely fix
+            //     which "target-unverified" reason a later unverified would-allow reports;
+            //     whether a trusted basis actually exists is decided in (2).
             let target_unverified_reason = match evidence.resolution.classification {
-                // Strongest basis: legacy projection and resolver name the SAME EntityId
-                // for the path coop_id. An unverified would-allow is `AgreeTargetUnverified`.
                 CoopResolutionObservation::Agree => TreasuryGateDenyReason::AgreeTargetUnverified,
-                // The resolver produced a target the legacy projection could not — now a
-                // trusted basis, because the resolved target is carried in the evidence and
-                // can be checked against the membership target. An unverified would-allow
-                // is `ResolverOnlyTargetUnverified`.
                 CoopResolutionObservation::ResolverOnly => {
                     TreasuryGateDenyReason::ResolverOnlyTargetUnverified
                 }
@@ -602,14 +596,27 @@ pub(crate) fn decide_treasury_gate(
                     );
                 }
             };
-            // (2) With a trusted basis, the entity-membership observation decides. The
-            //     would-allow path additionally requires the membership target to equal the
-            //     trusted target — a resolver/agreed mapping *verifies the target*, it never
-            //     grants authority. Membership DENIES and gaps surface unchanged; denying
-            //     never trusts an unverified target.
+            // (2) A trusted basis is a CHECKED trusted target, not the classification label
+            //     alone. `trusted_target()` re-derives it from the carried evidence (for
+            //     `Agree`: legacy and resolver targets both present AND equal; for
+            //     `ResolverOnly`: a present resolver target). Malformed/inconsistent
+            //     evidence — a row mislabelled `Agree`/`ResolverOnly` with missing or unequal
+            //     targets — therefore has NO trusted basis and fails closed as
+            //     `UntrustedResolution`, BEFORE any target-verification or membership reason
+            //     is considered (defense in depth; keeps telemetry honest).
+            let Some(trusted_target) = evidence.resolution.trusted_target() else {
+                return TreasuryGateDecision::WouldDeny(
+                    TreasuryGateDenyReason::UntrustedResolution,
+                );
+            };
+            // (3) With a trusted target, the entity-membership observation decides. The
+            //     would-allow path additionally requires the membership observation to have
+            //     been evaluated against that exact trusted target — a resolver/agreed mapping
+            //     *verifies the target*, it never grants authority. Membership DENIES and gaps
+            //     surface unchanged; denying never trusts an unverified target.
             match &evidence.membership.observation {
                 EntityAccessObservation::AgreesAllow => {
-                    if evidence.membership_target_verified() {
+                    if evidence.membership.membership_target.as_ref() == Some(trusted_target) {
                         TreasuryGateDecision::ProceedUnchanged
                     } else {
                         TreasuryGateDecision::WouldDeny(target_unverified_reason)
@@ -921,7 +928,9 @@ async fn evaluate_membership(
     match entity_mgr.get(target).await {
         Err(e) => return EntityAccessObservation::Error(e.to_string()),
         Ok(None) => {
-            return EntityAccessObservation::Indeterminate(IndeterminateReason::MissingEntityRecord)
+            return EntityAccessObservation::Indeterminate(
+                IndeterminateReason::MissingEntityRecord,
+            );
         }
         Ok(Some(_)) => {}
     }
@@ -2214,6 +2223,89 @@ mod coop_resolution_observe_tests {
             decide_treasury_gate(EnforceTrustedResolver, &trusted_but_non_member),
             WouldDeny(NotMember)
         );
+    }
+
+    // (G) Defense-in-depth: a trusted basis is a CHECKED trusted target, not the
+    // classification label. Evidence mislabelled `Agree`/`ResolverOnly` but with missing or
+    // unequal targets (so `trusted_target()` is `None`) has no trusted basis and fails
+    // closed as `UntrustedResolution` — never a target-unverified reason.
+    #[test]
+    fn gate_enforce_malformed_trusted_basis_fails_closed_as_untrusted() {
+        let t = coop("food-coop");
+        let other = coop("other-coop");
+        let malformed = [
+            // `Agree` but the legacy target is missing.
+            evidence(
+                allow(),
+                Some(t.clone()),
+                CoopResolutionObservation::Agree,
+                None,
+                Some(t.clone()),
+            ),
+            // `Agree` but the resolver target is missing.
+            evidence(
+                allow(),
+                Some(t.clone()),
+                CoopResolutionObservation::Agree,
+                Some(t.clone()),
+                None,
+            ),
+            // `Agree` but legacy and resolver targets are UNEQUAL.
+            evidence(
+                allow(),
+                Some(t.clone()),
+                CoopResolutionObservation::Agree,
+                Some(t.clone()),
+                Some(other.clone()),
+            ),
+            // `Agree` with no targets at all.
+            evidence(
+                allow(),
+                Some(t.clone()),
+                CoopResolutionObservation::Agree,
+                None,
+                None,
+            ),
+            // `ResolverOnly` but the resolver target is missing.
+            evidence(
+                allow(),
+                Some(t.clone()),
+                CoopResolutionObservation::ResolverOnly,
+                None,
+                None,
+            ),
+        ];
+        for ev in &malformed {
+            assert_eq!(
+                decide_treasury_gate(EnforceTrustedResolver, ev),
+                WouldDeny(UntrustedResolution),
+                "malformed trusted-basis evidence must fail closed as UntrustedResolution: {ev:?}"
+            );
+        }
+    }
+
+    // (G) Malformed evidence fails closed as `UntrustedResolution` BEFORE the membership
+    // signal — for an affirmative member, a non-member, or a data gap alike. This is the
+    // precise defense the review asked for: a basis that was never trusted must not surface
+    // a target-unverified / NotMember reason (which would skew cutover telemetry).
+    #[test]
+    fn gate_enforce_malformed_basis_precedes_membership() {
+        let t = coop("food-coop");
+        for obs in [allow(), deny(), indeterminate(), errored()] {
+            // `Agree` with no carried targets => malformed => no trusted basis.
+            let ev = evidence(
+                obs.clone(),
+                Some(t.clone()),
+                CoopResolutionObservation::Agree,
+                None,
+                None,
+            );
+            assert_eq!(
+                decide_treasury_gate(EnforceTrustedResolver, &ev),
+                WouldDeny(UntrustedResolution),
+                "malformed Agree must fail closed before membership: {obs:?}"
+            );
+        }
     }
 
     // (Logging) `ResolverConflict` is the only high-signal would-deny → `warn!`; every
