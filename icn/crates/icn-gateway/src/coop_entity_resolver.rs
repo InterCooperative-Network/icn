@@ -33,7 +33,8 @@
 //!   `legacy_coop_id_to_entity_id_fallback` projection; an unwired source yields no
 //!   identity at all.
 
-use icn_entity::EntityId;
+use icn_entity::{CoopEntityBinding, CoopEntityBindingProvenance, CoopEntityMap, EntityId};
+use std::sync::Arc;
 
 /// Why a [`CoopEntityResolver`] could not return a trusted [`EntityId`].
 ///
@@ -158,6 +159,94 @@ impl CoopEntityResolver for UnwiredCoopEntityResolver {
     }
 }
 
+/// A trusted, store-backed [`CoopEntityResolver`] that reads the provenance-aware
+/// [`CoopEntityMap`] (#2190) and resolves **only** bindings whose recorded
+/// provenance is trusted.
+///
+/// This is the first real (non-`Unwired`) resolver source — the A2c store-backed
+/// slice. It is intentionally **read-only and non-enforcing**: it consumes the
+/// `coop_id → EntityId` binding plus its [`CoopEntityBindingProvenance`] and maps
+/// the outcome to a [`CoopEntityResolution`] *value*. It performs no authorization,
+/// denies nothing, changes no route, and is not yet wired into any handler — the
+/// observe-mode treasury path keeps using [`UnwiredCoopEntityResolver`].
+///
+/// ## Fail-closed mapping (the trust boundary)
+///
+/// | Store read for `coop_id`                       | Resolution                                   |
+/// |------------------------------------------------|----------------------------------------------|
+/// | binding present, **trusted** provenance        | [`CoopEntityResolution::Resolved`]           |
+/// | binding present, [`CoopEntityBindingProvenance::UnknownLegacy`] | `Unavailable(`[`ResolutionUnavailable::UnverifiedProvenance`]`)` |
+/// | no binding                                     | `Unavailable(`[`ResolutionUnavailable::Unmapped`]`)`            |
+/// | store/backend error                            | `Unavailable(`[`ResolutionUnavailable::SourceUnavailable`]`)`   |
+///
+/// A resolved binding is a *name binding only* and confers no authority (see the
+/// module docs and the `CoopEntityMap` docs). `UnknownLegacy` — a pre-provenance
+/// binding, a binding written with no provenance record, or an unknown future
+/// variant read by an older binary — is the substrate's fail-closed sentinel and is
+/// never trusted here.
+pub struct StoreBackedCoopEntityResolver {
+    map: Arc<dyn CoopEntityMap + Send + Sync>,
+}
+
+impl StoreBackedCoopEntityResolver {
+    /// Build a resolver over a shared provenance-aware [`CoopEntityMap`].
+    #[must_use]
+    pub fn new(map: Arc<dyn CoopEntityMap + Send + Sync>) -> Self {
+        Self { map }
+    }
+}
+
+/// Whether a binding's recorded provenance is trusted enough to resolve a *name*
+/// (never authority).
+///
+/// Exhaustive by construction: a future [`CoopEntityBindingProvenance`] variant
+/// forces a compile error here rather than being silently trusted. Only the
+/// fail-closed [`CoopEntityBindingProvenance::UnknownLegacy`] sentinel (missing or
+/// unverifiable provenance) is untrusted.
+fn provenance_is_trusted_for_resolution(provenance: &CoopEntityBindingProvenance) -> bool {
+    match provenance {
+        CoopEntityBindingProvenance::Activation
+        | CoopEntityBindingProvenance::OperatorBackfill
+        | CoopEntityBindingProvenance::Surrogate
+        | CoopEntityBindingProvenance::GovernanceReceipt { .. } => true,
+        CoopEntityBindingProvenance::UnknownLegacy => false,
+    }
+}
+
+/// Map a present binding to a [`CoopEntityResolution`], gating on provenance.
+fn resolution_from_binding(binding: CoopEntityBinding) -> CoopEntityResolution {
+    if provenance_is_trusted_for_resolution(&binding.provenance) {
+        CoopEntityResolution::Resolved {
+            entity_id: binding.entity_id,
+        }
+    } else {
+        CoopEntityResolution::Unavailable {
+            reason: ResolutionUnavailable::UnverifiedProvenance,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl CoopEntityResolver for StoreBackedCoopEntityResolver {
+    async fn resolve_coop_entity(&self, coop_id: &str) -> CoopEntityResolution {
+        // Read the provenance-aware binding from the #2190 substrate. The store read
+        // is synchronous and fail-closed by construction; this resolver performs no
+        // authorization, denies nothing, and never fabricates or normalizes an
+        // identity. A present binding only resolves if its provenance is trusted
+        // (see `resolution_from_binding`); everything else is a first-class
+        // `Unavailable` value.
+        match self.map.binding_for_coop(coop_id) {
+            Ok(Some(binding)) => resolution_from_binding(binding),
+            Ok(None) => CoopEntityResolution::Unavailable {
+                reason: ResolutionUnavailable::Unmapped,
+            },
+            Err(_) => CoopEntityResolution::Unavailable {
+                reason: ResolutionUnavailable::SourceUnavailable,
+            },
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,5 +333,176 @@ mod tests {
             ResolutionUnavailable::EntityTypeMismatch.label(),
             "entity_type_mismatch"
         );
+    }
+
+    // ------------------------------------------------------------------
+    // StoreBackedCoopEntityResolver (A2c): provenance-gated, fail-closed.
+    // ------------------------------------------------------------------
+
+    use icn_entity::{CoopEntityMapError, InMemoryCoopEntityMap};
+
+    /// `food-coop` is itself a valid cooperative slug, so the legacy projection
+    /// (`legacy_coop_id_to_entity_id_fallback`) yields `EntityId::cooperative("food-coop")`.
+    const COOP_ID: &str = "food-coop";
+
+    fn store_backed(
+        map: impl CoopEntityMap + Send + Sync + 'static,
+    ) -> StoreBackedCoopEntityResolver {
+        StoreBackedCoopEntityResolver::new(Arc::new(map))
+    }
+
+    fn coop_entity() -> EntityId {
+        EntityId::cooperative(COOP_ID).expect("test premise: valid cooperative slug")
+    }
+
+    /// A `CoopEntityMap` whose reads always fail — proves the resolver fails closed
+    /// to `SourceUnavailable` on a backend error and never resolves on error.
+    struct FailingCoopEntityMap;
+
+    impl CoopEntityMap for FailingCoopEntityMap {
+        fn bind_resolved(
+            &self,
+            _coop_id: &str,
+            _entity_id: &EntityId,
+        ) -> Result<(), CoopEntityMapError> {
+            Ok(())
+        }
+        fn entity_for_coop(&self, _coop_id: &str) -> Result<Option<EntityId>, CoopEntityMapError> {
+            Err(CoopEntityMapError::Storage(
+                "simulated backend failure".into(),
+            ))
+        }
+        fn coop_for_entity(
+            &self,
+            _entity_id: &EntityId,
+        ) -> Result<Option<String>, CoopEntityMapError> {
+            Err(CoopEntityMapError::Storage(
+                "simulated backend failure".into(),
+            ))
+        }
+    }
+
+    #[tokio::test]
+    async fn store_backed_resolves_binding_with_trusted_provenance() {
+        let map = InMemoryCoopEntityMap::new();
+        let entity = coop_entity();
+        map.bind_resolved_with_provenance(
+            COOP_ID,
+            &entity,
+            CoopEntityBindingProvenance::Activation,
+        )
+        .expect("bind with trusted provenance");
+        let out = store_backed(map).resolve_coop_entity(COOP_ID).await;
+        assert_eq!(out, CoopEntityResolution::Resolved { entity_id: entity });
+    }
+
+    #[tokio::test]
+    async fn store_backed_resolves_governance_receipt_provenance() {
+        let map = InMemoryCoopEntityMap::new();
+        let entity = coop_entity();
+        map.bind_resolved_with_provenance(
+            COOP_ID,
+            &entity,
+            CoopEntityBindingProvenance::GovernanceReceipt {
+                receipt_id: "rcpt-1".into(),
+            },
+        )
+        .expect("bind with trusted provenance");
+        let out = store_backed(map).resolve_coop_entity(COOP_ID).await;
+        assert!(out.is_resolved());
+        assert_eq!(out.resolved_entity_id(), Some(&entity));
+    }
+
+    #[tokio::test]
+    async fn store_backed_does_not_resolve_missing_provenance() {
+        // `bind_resolved` records no provenance, so the read returns the fail-closed
+        // `UnknownLegacy` sentinel. Missing provenance must never resolve.
+        let map = InMemoryCoopEntityMap::new();
+        let entity = coop_entity();
+        map.bind_resolved(COOP_ID, &entity)
+            .expect("bind without provenance");
+        let out = store_backed(map).resolve_coop_entity(COOP_ID).await;
+        assert_eq!(
+            out,
+            CoopEntityResolution::Unavailable {
+                reason: ResolutionUnavailable::UnverifiedProvenance
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn store_backed_does_not_resolve_unknown_legacy_provenance() {
+        // An explicit `UnknownLegacy` request is treated by the substrate as "no
+        // provenance recorded"; it reads back as `UnknownLegacy` and must not resolve.
+        let map = InMemoryCoopEntityMap::new();
+        let entity = coop_entity();
+        map.bind_resolved_with_provenance(
+            COOP_ID,
+            &entity,
+            CoopEntityBindingProvenance::UnknownLegacy,
+        )
+        .expect("bind unknown-legacy");
+        let out = store_backed(map).resolve_coop_entity(COOP_ID).await;
+        assert!(!out.is_resolved());
+        assert_eq!(out.resolved_entity_id(), None);
+        assert_eq!(
+            out,
+            CoopEntityResolution::Unavailable {
+                reason: ResolutionUnavailable::UnverifiedProvenance
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn store_backed_reports_unmapped_for_missing_binding() {
+        let out = store_backed(InMemoryCoopEntityMap::new())
+            .resolve_coop_entity(COOP_ID)
+            .await;
+        assert_eq!(
+            out,
+            CoopEntityResolution::Unavailable {
+                reason: ResolutionUnavailable::Unmapped
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn store_backed_fails_closed_on_store_error() {
+        let out = store_backed(FailingCoopEntityMap)
+            .resolve_coop_entity(COOP_ID)
+            .await;
+        assert!(!out.is_resolved());
+        assert_eq!(
+            out,
+            CoopEntityResolution::Unavailable {
+                reason: ResolutionUnavailable::SourceUnavailable
+            }
+        );
+    }
+
+    /// Guards the core non-enforcement invariant: even a fully-resolving store-backed
+    /// resolver, run through the exact observe path the treasury route uses, produces
+    /// only a migration-visibility *classification* — never an allow/deny. The
+    /// production call site is unchanged (still `UnwiredCoopEntityResolver`); this
+    /// proves wiring a real resolver later cannot, by this type's shape, alter route
+    /// authorization.
+    #[tokio::test]
+    async fn store_backed_resolver_in_observe_mode_only_classifies_never_authorizes() {
+        use crate::authority::{observe_coop_entity_resolution, CoopResolutionObservation};
+        let map = InMemoryCoopEntityMap::new();
+        let entity = coop_entity();
+        map.bind_resolved_with_provenance(
+            COOP_ID,
+            &entity,
+            CoopEntityBindingProvenance::Activation,
+        )
+        .expect("bind with trusted provenance");
+        let resolver = store_backed(map);
+        // The resolver resolves `food-coop` to the same EntityId the legacy
+        // projection yields, so the observe-mode comparison classifies as `Agree`.
+        // `observe_coop_entity_resolution` returns a classification value and performs
+        // no authorization.
+        let observation = observe_coop_entity_resolution(&resolver, COOP_ID).await;
+        assert_eq!(observation, CoopResolutionObservation::Agree);
     }
 }
