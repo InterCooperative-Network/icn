@@ -31,6 +31,7 @@ pub mod community_mgr;
 pub mod compute_events;
 pub mod compute_mgr;
 pub mod coop;
+pub mod coop_entity_resolver;
 mod dispatch_evidence_backfill;
 pub mod email_client;
 pub mod entity_audit;
