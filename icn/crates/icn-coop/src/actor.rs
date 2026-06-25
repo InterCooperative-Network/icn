@@ -52,30 +52,66 @@ pub enum EntityMapBindOutcome {
     StorageError(String),
 }
 
-/// Attempt a non-authoritative `coop_id → EntityId` name binding, recording
-/// [`CoopEntityBindingProvenance::Activation`] provenance.
+/// Map a `coop_id → EntityId` bind result to the non-fatal [`EntityMapBindOutcome`].
 ///
-/// Returns the [`EntityMapBindOutcome`] without ever propagating an error: a
-/// mapping bind is an observability side effect and must not fail activation.
-/// Used by both cooperative activation and the gossip coop-update sync path (which
-/// mirrors the origin node's activation-time bind for activated cooperatives only),
-/// so a binding is recorded deterministically on every node that accepts an
-/// activated cooperative.
+/// Shared by both bind entry points: a mapping bind never propagates an error
+/// (it is an observability side effect and must not fail activation), so every
+/// `Result` is folded into an outcome variant.
+fn bind_outcome(result: std::result::Result<EntityId, CoopEntityMapError>) -> EntityMapBindOutcome {
+    match result {
+        Ok(entity_id) => EntityMapBindOutcome::Mapped(entity_id),
+        Err(CoopEntityMapError::NotMappable(reason)) => EntityMapBindOutcome::NotMappable(reason),
+        Err(CoopEntityMapError::Conflict(reason)) => EntityMapBindOutcome::Conflict(reason),
+        Err(e) => EntityMapBindOutcome::StorageError(e.to_string()),
+    }
+}
+
+/// Record a non-authoritative `coop_id → EntityId` name binding with **no trusted
+/// provenance** (it reads back as the fail-closed
+/// [`CoopEntityBindingProvenance::UnknownLegacy`] sentinel).
 ///
-/// The write is reject-not-normalize: a non-mappable `coop_id` (e.g. the default
-/// `coop:<uuid>` shape) yields [`EntityMapBindOutcome::NotMappable`] and writes
-/// nothing. A mappable id is bound with `Activation` provenance via
-/// [`CoopEntityMap::bind_resolved_with_provenance`], so the row reads back as a
-/// trusted activation binding (not the fail-closed `UnknownLegacy` that a plain
-/// `bind_projected`/`bind_resolved` leaves). Re-binding the identical pair with the
-/// same provenance is idempotent; a pre-provenance (`UnknownLegacy`) row from an
-/// older binary is upgraded in place. A binding still grants no authority.
+/// This is the bind for **untrusted** sources — specifically the gossip
+/// coop-update mirror, which replicates an unauthenticated `coop:updates` payload
+/// (its `status` field is not an activation proof and the entry author is not
+/// verified). Recording trusted `Activation` provenance here would let any topic
+/// publisher poison the durable map with a row a future store-backed resolver
+/// would treat as trusted, so this path deliberately leaves the row untrusted.
+/// Use [`bind_coop_entity_map_activation`] only from a path that authoritatively
+/// performed the activation.
+///
+/// Reject-not-normalize: a non-mappable `coop_id` (e.g. the default `coop:<uuid>`
+/// shape) yields [`EntityMapBindOutcome::NotMappable`] and writes nothing. Idempotent
+/// for an identical pair. A binding grants no authority.
 pub fn bind_coop_entity_map(
     map: &(dyn CoopEntityMap + Send + Sync),
     coop_id: &str,
 ) -> EntityMapBindOutcome {
-    // Reject-not-normalize projection (the same gate the previous `bind_projected`
-    // applied) followed by a provenance-aware write recording `Activation`.
+    // `bind_projected` records no provenance, so the row reads back as
+    // `UnknownLegacy` (untrusted) — correct for an unverified gossip-sourced bind.
+    bind_outcome(map.bind_projected(coop_id))
+}
+
+/// Record a `coop_id → EntityId` name binding with trusted
+/// [`CoopEntityBindingProvenance::Activation`] provenance.
+///
+/// Call this **only** from a path that authoritatively performed (or witnessed)
+/// the cooperative's activation — i.e. the local activation handler. The trusted
+/// `Activation` provenance is what lets the merged `StoreBackedCoopEntityResolver`
+/// (#2192) resolve the row; it must never be written for a binding derived from an
+/// unauthenticated source (see [`bind_coop_entity_map`] for the gossip mirror).
+///
+/// Returns the [`EntityMapBindOutcome`] without ever propagating an error — a
+/// mapping bind must not fail activation. Reject-not-normalize: a non-mappable
+/// `coop_id` yields [`EntityMapBindOutcome::NotMappable`] and writes nothing.
+/// Re-binding the identical pair with `Activation` is idempotent; a pre-provenance
+/// (`UnknownLegacy`) row from an older binary or the gossip mirror is upgraded in
+/// place. A binding still grants no authority.
+pub fn bind_coop_entity_map_activation(
+    map: &(dyn CoopEntityMap + Send + Sync),
+    coop_id: &str,
+) -> EntityMapBindOutcome {
+    // Reject-not-normalize projection (the same gate `bind_projected` applies),
+    // then a provenance-aware write recording trusted `Activation`.
     let result = project_coop_id(coop_id).and_then(|entity_id| {
         map.bind_resolved_with_provenance(
             coop_id,
@@ -84,12 +120,7 @@ pub fn bind_coop_entity_map(
         )
         .map(|()| entity_id)
     });
-    match result {
-        Ok(entity_id) => EntityMapBindOutcome::Mapped(entity_id),
-        Err(CoopEntityMapError::NotMappable(reason)) => EntityMapBindOutcome::NotMappable(reason),
-        Err(CoopEntityMapError::Conflict(reason)) => EntityMapBindOutcome::Conflict(reason),
-        Err(e) => EntityMapBindOutcome::StorageError(e.to_string()),
-    }
+    bind_outcome(result)
 }
 
 pub struct CoopActor {
@@ -488,7 +519,7 @@ impl CoopActor {
         // authority, and a bind failure — including the common NotMappable case
         // for default `coop:<uuid>` ids — is reported but never fails activation.
         if let Some(ref map) = self.coop_entity_map {
-            match bind_coop_entity_map(map.as_ref(), &coop_id) {
+            match bind_coop_entity_map_activation(map.as_ref(), &coop_id) {
                 EntityMapBindOutcome::Mapped(entity_id) => tracing::info!(
                     target: "coop_entity_bind",
                     coop_id = %coop_id,
@@ -2166,7 +2197,7 @@ mod tests {
     #[test]
     fn test_bind_outcome_records_activation_provenance() {
         let map = InMemoryCoopEntityMap::new();
-        let outcome = bind_coop_entity_map(&map, "good-coop");
+        let outcome = bind_coop_entity_map_activation(&map, "good-coop");
         assert_eq!(
             outcome,
             EntityMapBindOutcome::Mapped(EntityId::cooperative("good-coop").unwrap())
@@ -2183,8 +2214,8 @@ mod tests {
     #[test]
     fn test_bind_outcome_idempotent_keeps_activation_provenance() {
         let map = InMemoryCoopEntityMap::new();
-        let first = bind_coop_entity_map(&map, "good-coop");
-        let second = bind_coop_entity_map(&map, "good-coop");
+        let first = bind_coop_entity_map_activation(&map, "good-coop");
+        let second = bind_coop_entity_map_activation(&map, "good-coop");
         assert_eq!(first, second);
         assert_eq!(
             second,
@@ -2203,7 +2234,7 @@ mod tests {
     // propagated — the activation contract (bind is non-fatal) is preserved.
     #[test]
     fn test_bind_outcome_storage_error_is_reported_not_propagated() {
-        let outcome = bind_coop_entity_map(&FailingCoopEntityMap, "good-coop");
+        let outcome = bind_coop_entity_map_activation(&FailingCoopEntityMap, "good-coop");
         assert!(
             matches!(outcome, EntityMapBindOutcome::StorageError(_)),
             "expected StorageError, got {outcome:?}"
@@ -2219,7 +2250,7 @@ mod tests {
     fn test_activation_binding_satisfies_resolver_trust_gates() {
         let map = InMemoryCoopEntityMap::new();
         assert!(matches!(
-            bind_coop_entity_map(&map, "good-coop"),
+            bind_coop_entity_map_activation(&map, "good-coop"),
             EntityMapBindOutcome::Mapped(_)
         ));
         let entity = EntityId::cooperative("good-coop").unwrap();
@@ -2232,6 +2263,30 @@ mod tests {
         assert_eq!(
             map.coop_for_entity(&entity).unwrap(),
             Some("good-coop".to_string())
+        );
+    }
+
+    // T6e: the gossip/untrusted bind (`bind_coop_entity_map`) records NO trusted
+    // provenance — it reads back as `UnknownLegacy`, never `Activation`. This guards
+    // the trust boundary: an unauthenticated `coop:updates` payload must not be able
+    // to write a row the store-backed resolver would treat as trusted. Only
+    // `bind_coop_entity_map_activation` (the local authoritative path) records trust.
+    #[test]
+    fn test_gossip_bind_records_untrusted_unknown_legacy_provenance() {
+        let map = InMemoryCoopEntityMap::new();
+        let outcome = bind_coop_entity_map(&map, "good-coop");
+        assert_eq!(
+            outcome,
+            EntityMapBindOutcome::Mapped(EntityId::cooperative("good-coop").unwrap())
+        );
+        let binding = map
+            .binding_for_coop("good-coop")
+            .unwrap()
+            .expect("name binding present after gossip-mirror bind");
+        assert_eq!(
+            binding.provenance,
+            CoopEntityBindingProvenance::UnknownLegacy,
+            "gossip-sourced bind must NOT record trusted Activation provenance"
         );
     }
 }
