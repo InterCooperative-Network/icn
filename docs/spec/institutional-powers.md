@@ -67,10 +67,25 @@ record types already carry in pieces. An `InstitutionalPowerEvent` names, at des
 - the **receipt(s)** it emits (`GovernanceDecisionReceipt` + `InstitutionalEffectRecord` + `EffectDispatchEvidence`);
 - the **challenge / repair path** by which it can be contested or reversed.
 
-Concretely, an `InstitutionalPowerEvent` is reconstructable from existing records: the
-`GovernanceDecisionReceipt` (authority + adopted policy), the `EffectManifest` /
-`InstitutionalEffectRecord` (bounded effect), and `EffectDispatchEvidence` (that the effect
-actually dispatched). This spec asserts they describe one accountable event and must not be
+Concretely, an `InstitutionalPowerEvent` is reconstructable from existing records, each stage
+anchored to the record that actually carries it:
+
+- **decision anchor** — the `GovernanceDecisionReceipt` (`proposal_id`, `domain_id`,
+  `outcome`, `decision_hash`; `icn-governance/src/proof.rs`): that a decision occurred and
+  which domain it binds.
+- **authority basis + adopted policy** — reached *through* that decision, not embedded in the
+  v1 receipt: the proposal/domain's adopted `DomainPolicy` and the `Mandate` / `AuthorityGrant`
+  that scope-attest the act (the v2/v3 attestation surfaces).
+- **bounded effect** — the `EffectManifest` / `InstitutionalEffectRecord`.
+- **dispatch proof** — `EffectDispatchEvidence` (that the effect actually dispatched).
+
+**Forward-direction:** the v1 `GovernanceDecisionReceipt` carries only
+proposal/domain/outcome/tally/vote-hash/decision-hash — it does **not** embed the adopted
+policy or mandate, so for existing events the authority/policy stage is verified by joining the
+receipt to the proposal/domain `DomainPolicy` and `Mandate` records, not from the receipt
+alone. A future receipt/proof envelope (ADR-0026) that binds the policy/mandate references into
+the decision record is what would make the authority/policy stage verifiable from the receipt
+by itself. This spec asserts these records describe one accountable event and must not be
 separable in a way that hides any stage.
 
 ## Power classes

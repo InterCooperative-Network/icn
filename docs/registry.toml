@@ -2019,7 +2019,7 @@ last_reviewed = "2026-06-25"
 owner = "matt"
 audiences = ["architects", "developers", "contributors"]
 domain_tags = ["governance", "institutional-power", "legitimacy", "effect-dispatch", "mandate", "receipts", "kernel-app-boundary", "spec"]
-depends_on = ["docs/spec/effect-dispatch-contract.md", "docs/spec/institutional-domain.md", "docs/spec/ccl-policy-registry.md", "docs/adr/ADR-0014-constitutional-object-model.md", "docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md", "docs/adr/ADR-0025-institutional-effect-record-canonical-schema.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/rfcs/RFC-0018-entity-aware-request-authorization.md"]
+depends_on = ["docs/spec/effect-dispatch-contract.md", "docs/spec/institutional-domain.md", "docs/spec/ccl-policy-registry.md", "docs/adr/ADR-0014-constitutional-object-model.md", "docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md", "docs/adr/ADR-0025-institutional-effect-record-canonical-schema.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/adr/ADR-0027-action-card-contract.md", "docs/rfcs/RFC-0018-entity-aware-request-authorization.md"]
 recommended_action = "keep"
 
 [docs."docs/spec/effect-dispatch-contract.md"]
