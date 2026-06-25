@@ -42,8 +42,8 @@ View source on GitHub →
 <p><strong>Status</strong>: draft — design / control map (migration orientation, not implementation)
 <strong>Truth class</strong>: descriptive
 <strong>Canonical</strong>: no — current implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
-<strong>Last Reviewed</strong>: 2026-06-24
-<strong>Source basis</strong>: read against <code>main</code> @ <code>e7f3fc02</code> (#2181). Counts re-verified with <code>rg</code>; re-verify before relying on exact numbers.
+<strong>Last Reviewed</strong>: 2026-06-25
+<strong>Source basis</strong>: map read against <code>main</code> @ <code>e7f3fc02</code> (#2181); the observe-mode &quot;Update (2026-06-25)&quot; note re-verified against <code>main</code> @ <code>0ef541c5</code> (#2197). Route-family counts were last verified at <code>e7f3fc02</code> — re-verify before relying on exact numbers.
 <strong>Related</strong>: <a href="/docs/rfcs/RFC-0018-entity-aware-request-authorization">RFC-0018</a> · <a href="/docs/adr/ADR-0035-entity-aware-request-authorization">ADR-0035</a> · <a href="/docs/architecture/ABUSE_CASE_HARDENING_STRATEGY">ABUSE_CASE_HARDENING_STRATEGY.md</a> · issues #2061, #2080, #1868</p>
 <blockquote>
 <p><strong>This document is a control map for an in-progress migration, not a description of a finished
@@ -169,6 +169,7 @@ Compute the entity-aware decision in observe mode and measure divergence.
 Move one route family at a time to enforcement — and only after trusted
 EntityId resolution and trusted token issuance exist.
 </code></pre>
+<p><strong>Update (2026-06-25, <code>0ef541c5</code>).</strong> The treasury observation now consults a <em>trusted, fail-closed</em> store-backed <code>coop_id → EntityId</code> resolver (#2196, resolver result discarded — route outcomes byte-identical), and an explicit <strong>observe → measure → gate</strong> seam now sits over it (#2197, &quot;A2d&quot;): <code>TreasuryEntityAuthMode { ObserveOnly (default), EnforceTrustedResolver }</code> plus a pure <code>decide_treasury_gate(...)</code> in <code>authority.rs</code>. This is the &quot;measure → gate-later&quot; rung, <strong>not</strong> enforcement — the active mode is <code>ObserveOnly</code>, default route outcomes are unchanged, and <code>EnforceTrustedResolver</code> is decision-only (wired to no route or config) and <strong>fails closed on every resolution today</strong> (<code>ResolverOnly</code> → <code>ResolverOnlyTargetUnverified</code>; the <code>Agree</code> would-allow path → <code>AgreeTargetUnverified</code>) because membership is evaluated against <code>treasury.entity_id()</code> / the legacy projection rather than the resolved/agreed target. The follow-up that would make any resolution enforceable is carrying the agreed/resolved <code>EntityId</code> target into membership evaluation. Canonical current-state record: <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>.</p>
 <h2>Trusted issuance seam</h2>
 <p>Whether a token may carry typed entity context is a separate, fail-closed boundary:</p>
 <ul>
