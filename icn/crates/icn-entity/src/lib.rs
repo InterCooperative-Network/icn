@@ -100,7 +100,8 @@ pub use coop_entity_inventory::{
     CoopEntityInventory, CoopEntityInventoryEntry,
 };
 pub use coop_entity_map::{
-    project_coop_id, CoopEntityMap, CoopEntityMapError, InMemoryCoopEntityMap, SledCoopEntityMap,
+    project_coop_id, CoopEntityBinding, CoopEntityBindingProvenance, CoopEntityMap,
+    CoopEntityMapError, InMemoryCoopEntityMap, SledCoopEntityMap,
 };
 pub use coop_entity_surrogate::{
     propose_surrogate_entity_id, SURROGATE_DOMAIN_V1, SURROGATE_PREFIX,
