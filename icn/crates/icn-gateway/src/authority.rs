@@ -294,6 +294,195 @@ impl EntityAccessObservation {
     }
 }
 
+// ===========================================================================
+// A2d: treasury entity-authorization gate scaffold (observe → measure → gate).
+//
+// This is the explicit, testable seam that decides what to do with the now-real
+// treasury resolver observation. The shipped mode is `ObserveOnly` — it NEVER alters
+// a route outcome. `EnforceTrustedResolver` is a decision-only mode exercised solely
+// by `decide_treasury_gate` and its tests; this slice wires it to NO route and NO
+// production config. A later, deliberate cutover would set the mode from an
+// operator-gated, off-by-default knob and consume the decision at the route layer.
+// ===========================================================================
+
+/// The treasury route family's entity-authorization **mode** (A2d).
+///
+/// `ObserveOnly` is the default and the only mode the gateway ships *wired* — it never
+/// changes a route outcome. `EnforceTrustedResolver` exists for the pure
+/// [`decide_treasury_gate`] decision function and its tests; it is **not** reachable
+/// from any production config in this slice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub(crate) enum TreasuryEntityAuthMode {
+    /// Record/measure only; the flat `require_coop_access` guard stays authoritative.
+    #[default]
+    ObserveOnly,
+    /// Trusted-resolver enforcement *semantics* (decision-only; never wired to a route
+    /// here).
+    EnforceTrustedResolver,
+}
+
+/// The active treasury entity-auth mode the gateway runs with. Hardcoded to the
+/// fail-safe default — this slice ships **no** path that sets it to enforcement.
+pub(crate) const ACTIVE_TREASURY_ENTITY_AUTH_MODE: TreasuryEntityAuthMode =
+    TreasuryEntityAuthMode::ObserveOnly;
+
+/// What the A2d gate decides for a treasury request that has ALREADY passed the flat
+/// `require_coop_access` guard.
+///
+/// `ProceedUnchanged` leaves the route outcome exactly as the flat guard decided.
+/// `WouldDeny` is produced **only** under
+/// [`TreasuryEntityAuthMode::EnforceTrustedResolver`] and is **not** acted on in this
+/// slice — it is measured/logged for a future cutover.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TreasuryGateDecision {
+    /// Route proceeds as the flat guard decided (every `ObserveOnly` decision, and the
+    /// allow case under enforcement).
+    ProceedUnchanged,
+    /// Under enforcement, this request would be denied (carries a stable reason). Never
+    /// produced under `ObserveOnly`.
+    WouldDeny(TreasuryGateDenyReason),
+}
+
+/// Stable reason a trusted-resolver enforcement decision would deny.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TreasuryGateDenyReason {
+    /// The entity-membership observation says the caller is not an (active) member.
+    NotMember,
+    /// No trusted `coop_id → EntityId` basis: the resolver was unavailable, the binding
+    /// was unprovenanced (`UnknownLegacy`, incl. gossip-originated rows), ambiguous,
+    /// entity-type-mismatched, or the store errored. A name binding is never authority,
+    /// and an untrusted one is never a basis for enforcement.
+    UntrustedResolution,
+    /// The legacy projection and the trusted resolver DISAGREE on the `EntityId` — a
+    /// migration collision; fail closed.
+    ResolverConflict,
+    /// A trusted basis exists but the entity-membership observation is indeterminate (a
+    /// data gap); fail closed.
+    IndeterminateMembership,
+    /// The entity-membership observation errored; fail closed.
+    ObservationError,
+}
+
+impl TreasuryGateDecision {
+    /// Stable, lowercase outcome label for logs / future metrics.
+    fn outcome_label(self) -> &'static str {
+        match self {
+            TreasuryGateDecision::ProceedUnchanged => "proceed_unchanged",
+            TreasuryGateDecision::WouldDeny(_) => "would_deny",
+        }
+    }
+}
+
+impl TreasuryGateDenyReason {
+    /// Stable, lowercase reason label for logs / future metrics.
+    fn label(self) -> &'static str {
+        match self {
+            TreasuryGateDenyReason::NotMember => "not_member",
+            TreasuryGateDenyReason::UntrustedResolution => "untrusted_resolution",
+            TreasuryGateDenyReason::ResolverConflict => "resolver_conflict",
+            TreasuryGateDenyReason::IndeterminateMembership => "indeterminate_membership",
+            TreasuryGateDenyReason::ObservationError => "observation_error",
+        }
+    }
+}
+
+/// Pure A2d gate decision for a treasury request (no side effects).
+///
+/// Inputs are the two already-computed observe-mode signals — the entity-membership
+/// `observation` and the `coop_id → EntityId` `resolution` classification — plus the
+/// `mode`. The function NEVER consults a mapping as authority: under enforcement the
+/// `resolution` is used only as a *trust qualifier* (is there a trusted basis at all?),
+/// and the actual allow/deny signal is the entity-membership `observation`.
+///
+/// - [`TreasuryEntityAuthMode::ObserveOnly`] (the shipped default) ALWAYS returns
+///   [`TreasuryGateDecision::ProceedUnchanged`]: byte-identical to the flat guard,
+///   regardless of the observation or resolution.
+/// - [`TreasuryEntityAuthMode::EnforceTrustedResolver`] (decision-only; not wired to any
+///   route here) requires a trusted basis first, then defers to membership:
+///   - `Agree` / `ResolverOnly` → trusted basis established;
+///   - `Disagree` → `WouldDeny(ResolverConflict)` (migration collision; fail closed);
+///   - `LegacyOnly(_)` / `NeitherResolved(_)` → `WouldDeny(UntrustedResolution)` — covers
+///     `UnknownLegacy`, gossip-originated/unprovenanced rows, ambiguous bindings,
+///     entity-type mismatch, and backend/source errors (all fail closed);
+///   - with a trusted basis: `AgreesAllow` → `ProceedUnchanged`; `EntityDeny` →
+///     `WouldDeny(NotMember)`; `Indeterminate` → `WouldDeny(IndeterminateMembership)`;
+///     `Error` → `WouldDeny(ObservationError)`.
+pub(crate) fn decide_treasury_gate(
+    mode: TreasuryEntityAuthMode,
+    observation: &EntityAccessObservation,
+    resolution: &CoopResolutionObservation,
+) -> TreasuryGateDecision {
+    match mode {
+        // Default, shipped behavior: never alter the route.
+        TreasuryEntityAuthMode::ObserveOnly => TreasuryGateDecision::ProceedUnchanged,
+        TreasuryEntityAuthMode::EnforceTrustedResolver => {
+            // (1) A trusted coop→EntityId basis is required before any enforcement.
+            //     An untrusted/unavailable/ambiguous mapping fails closed BEFORE the
+            //     membership signal is even consulted — you cannot trust the membership
+            //     target if you cannot trust the coop→entity mapping that named it.
+            match resolution {
+                CoopResolutionObservation::Agree | CoopResolutionObservation::ResolverOnly => {}
+                CoopResolutionObservation::Disagree => {
+                    return TreasuryGateDecision::WouldDeny(
+                        TreasuryGateDenyReason::ResolverConflict,
+                    );
+                }
+                CoopResolutionObservation::LegacyOnly(_)
+                | CoopResolutionObservation::NeitherResolved(_) => {
+                    return TreasuryGateDecision::WouldDeny(
+                        TreasuryGateDenyReason::UntrustedResolution,
+                    );
+                }
+            }
+            // (2) With a trusted basis, the entity-membership observation decides.
+            match observation {
+                EntityAccessObservation::AgreesAllow => TreasuryGateDecision::ProceedUnchanged,
+                EntityAccessObservation::EntityDeny(_) => {
+                    TreasuryGateDecision::WouldDeny(TreasuryGateDenyReason::NotMember)
+                }
+                EntityAccessObservation::Indeterminate(_) => {
+                    TreasuryGateDecision::WouldDeny(TreasuryGateDenyReason::IndeterminateMembership)
+                }
+                EntityAccessObservation::Error(_) => {
+                    TreasuryGateDecision::WouldDeny(TreasuryGateDenyReason::ObservationError)
+                }
+            }
+        }
+    }
+}
+
+/// Record (observe-only) the A2d treasury gate decision for cutover-readiness
+/// telemetry. `active` is the decision under the shipped
+/// [`ACTIVE_TREASURY_ENTITY_AUTH_MODE`] (always `ProceedUnchanged` today);
+/// `would_enforce` is the hypothetical [`TreasuryEntityAuthMode::EnforceTrustedResolver`]
+/// decision. Logging only — this denies nothing and changes no route outcome.
+fn record_treasury_gate(
+    caller: &EntityId,
+    action: EntityAction,
+    active: TreasuryGateDecision,
+    would_enforce: TreasuryGateDecision,
+) {
+    match would_enforce {
+        TreasuryGateDecision::WouldDeny(reason) => warn!(
+            target: "entity_authz_gate",
+            caller = %caller,
+            action = action.metric_label(),
+            active = active.outcome_label(),
+            would_enforce = would_enforce.outcome_label(),
+            reason = reason.label(),
+            "treasury entity gate WOULD DENY under enforcement (observe-only; flat coop guard remains authoritative)"
+        ),
+        TreasuryGateDecision::ProceedUnchanged => debug!(
+            target: "entity_authz_gate",
+            caller = %caller,
+            action = action.metric_label(),
+            active = active.outcome_label(),
+            would_enforce = would_enforce.outcome_label(),
+            "treasury entity gate would proceed under enforcement (observe-only)"
+        ),
+    }
+}
+
 /// Compute, record, and return the entity-aware authorization observation for a
 /// treasury request that has ALREADY passed the flat `require_coop_access` guard.
 ///
@@ -358,13 +547,28 @@ pub(crate) async fn observe_treasury_entity_access(
     }
 
     // A2b/A2c: observe-only `coop_id → EntityId` resolution discrepancy. Consults the
-    // governed resolver seam (#2188) and logs how it compares to the legacy projection
-    // the observe path already uses. The resolver is injected by the caller (A2c): the
-    // gateway wires a trusted, provenance-gated `StoreBackedCoopEntityResolver` when a
-    // `CoopEntityMap` handle is configured, and otherwise the fail-closed
+    // governed resolver seam (#2188) and classifies how it compares to the legacy
+    // projection the observe path already uses. The resolver is injected by the caller
+    // (A2c): the gateway wires a trusted, provenance-gated `StoreBackedCoopEntityResolver`
+    // when a `CoopEntityMap` handle is configured, and otherwise the fail-closed
     // `UnwiredCoopEntityResolver`. Either way this never affects this observation, the
     // flat guard, or any authorization decision.
-    let _ = observe_coop_entity_resolution(resolver, coop_id).await;
+    let resolution = observe_coop_entity_resolution(resolver, coop_id).await;
+
+    // A2d: observe → MEASURE the treasury entity-auth gate. The active gate runs under
+    // `ACTIVE_TREASURY_ENTITY_AUTH_MODE` (the shipped fail-safe default `ObserveOnly`),
+    // so its decision is always `ProceedUnchanged` and the route is NEVER altered here —
+    // this function stays observe-only and its return value is still discarded by the
+    // caller. We additionally evaluate what `EnforceTrustedResolver` WOULD decide and
+    // record it, so a future cutover can be measured first. Neither path denies anything.
+    let active_gate =
+        decide_treasury_gate(ACTIVE_TREASURY_ENTITY_AUTH_MODE, &observation, &resolution);
+    let would_enforce_gate = decide_treasury_gate(
+        TreasuryEntityAuthMode::EnforceTrustedResolver,
+        &observation,
+        &resolution,
+    );
+    record_treasury_gate(caller, action, active_gate, would_enforce_gate);
 
     observation
 }
@@ -1319,5 +1523,177 @@ mod coop_resolution_observe_tests {
             out,
             CoopResolutionObservation::LegacyOnly(ResolutionUnavailable::SourceUnavailable)
         );
+    }
+
+    // ----------------------------------------------------------------------
+    // A2d: treasury entity-auth gate decision (pure). The shipped default
+    // (ObserveOnly) never alters a route; EnforceTrustedResolver fails closed unless a
+    // TRUSTED coop→EntityId basis AND an affirmative membership both hold. Route safety
+    // (observe_treasury_entity_access returns the unchanged observation) is proven by
+    // `entity_access_tests::store_backed_resolver_does_not_change_treasury_observation`.
+    // ----------------------------------------------------------------------
+    use TreasuryEntityAuthMode::{EnforceTrustedResolver, ObserveOnly};
+    use TreasuryGateDecision::{ProceedUnchanged, WouldDeny};
+    use TreasuryGateDenyReason::{
+        IndeterminateMembership, NotMember, ObservationError, ResolverConflict, UntrustedResolution,
+    };
+
+    fn allow() -> EntityAccessObservation {
+        EntityAccessObservation::AgreesAllow
+    }
+    fn deny() -> EntityAccessObservation {
+        EntityAccessObservation::EntityDeny(DenyReason::NonMember)
+    }
+    fn indeterminate() -> EntityAccessObservation {
+        EntityAccessObservation::Indeterminate(IndeterminateReason::NoMemberships)
+    }
+    fn errored() -> EntityAccessObservation {
+        EntityAccessObservation::Error("entity manager unavailable".into())
+    }
+    /// UnknownLegacy / unprovenanced rows (incl. gossip-originated) read back as
+    /// `UnverifiedProvenance` → the resolver is unavailable → `LegacyOnly`.
+    fn untrusted() -> CoopResolutionObservation {
+        CoopResolutionObservation::LegacyOnly(ResolutionUnavailable::UnverifiedProvenance)
+    }
+
+    // (A) ObserveOnly (the shipped default) NEVER denies, for every observation ×
+    // resolution combination — byte-identical route behavior.
+    #[test]
+    fn gate_observe_only_always_proceeds_unchanged() {
+        let observations = [allow(), deny(), indeterminate(), errored()];
+        let resolutions = [
+            CoopResolutionObservation::Agree,
+            CoopResolutionObservation::Disagree,
+            CoopResolutionObservation::ResolverOnly,
+            untrusted(),
+            CoopResolutionObservation::LegacyOnly(ResolutionUnavailable::SourceUnavailable),
+            CoopResolutionObservation::NeitherResolved(ResolutionUnavailable::NoTrustedSourceWired),
+        ];
+        for o in &observations {
+            for r in &resolutions {
+                assert_eq!(
+                    decide_treasury_gate(ObserveOnly, o, r),
+                    ProceedUnchanged,
+                    "ObserveOnly must never deny: observation={o:?} resolution={r:?}"
+                );
+            }
+        }
+    }
+
+    // (B) Enforcement: trusted agreement allows.
+    #[test]
+    fn gate_enforce_trusted_agreement_allows() {
+        assert_eq!(
+            decide_treasury_gate(
+                EnforceTrustedResolver,
+                &allow(),
+                &CoopResolutionObservation::Agree
+            ),
+            ProceedUnchanged
+        );
+    }
+
+    // (B) Enforcement: a trusted resolver-only basis (an activation/backfill surrogate
+    // the legacy projection can't produce) still allows an affirmative member —
+    // intentionally-documented policy.
+    #[test]
+    fn gate_enforce_trusted_resolver_only_allows_member() {
+        assert_eq!(
+            decide_treasury_gate(
+                EnforceTrustedResolver,
+                &allow(),
+                &CoopResolutionObservation::ResolverOnly
+            ),
+            ProceedUnchanged
+        );
+    }
+
+    // (B,D) Enforcement: legacy-only / untrusted provenance (UnknownLegacy, gossip rows)
+    // is NOT a trusted basis — fail closed even for an affirmative member.
+    #[test]
+    fn gate_enforce_untrusted_resolution_denies_even_for_member() {
+        assert_eq!(
+            decide_treasury_gate(EnforceTrustedResolver, &allow(), &untrusted()),
+            WouldDeny(UntrustedResolution)
+        );
+    }
+
+    // (B) Enforcement: resolver/legacy DISAGREE (migration collision) fails closed.
+    #[test]
+    fn gate_enforce_disagreement_denies() {
+        assert_eq!(
+            decide_treasury_gate(
+                EnforceTrustedResolver,
+                &allow(),
+                &CoopResolutionObservation::Disagree
+            ),
+            WouldDeny(ResolverConflict)
+        );
+    }
+
+    // (B,E) Enforcement: source-unavailable / backend-error fails closed (both the
+    // LegacyOnly and NeitherResolved carriers).
+    #[test]
+    fn gate_enforce_source_unavailable_denies() {
+        for r in [
+            CoopResolutionObservation::LegacyOnly(ResolutionUnavailable::SourceUnavailable),
+            CoopResolutionObservation::NeitherResolved(ResolutionUnavailable::SourceUnavailable),
+        ] {
+            assert_eq!(
+                decide_treasury_gate(EnforceTrustedResolver, &allow(), &r),
+                WouldDeny(UntrustedResolution),
+                "source-unavailable must fail closed under enforcement: {r:?}"
+            );
+        }
+    }
+
+    // (C) Enforcement with a trusted basis: a non-member is denied via the EXISTING
+    // entity-membership signal (the gate adds no new allow path).
+    #[test]
+    fn gate_enforce_trusted_basis_non_member_denies() {
+        assert_eq!(
+            decide_treasury_gate(
+                EnforceTrustedResolver,
+                &deny(),
+                &CoopResolutionObservation::Agree
+            ),
+            WouldDeny(NotMember)
+        );
+    }
+
+    // (C) Enforcement with a trusted basis: indeterminate membership (data gap) and a
+    // membership error both fail closed.
+    #[test]
+    fn gate_enforce_trusted_basis_membership_gaps_fail_closed() {
+        assert_eq!(
+            decide_treasury_gate(
+                EnforceTrustedResolver,
+                &indeterminate(),
+                &CoopResolutionObservation::Agree
+            ),
+            WouldDeny(IndeterminateMembership)
+        );
+        assert_eq!(
+            decide_treasury_gate(
+                EnforceTrustedResolver,
+                &errored(),
+                &CoopResolutionObservation::ResolverOnly
+            ),
+            WouldDeny(ObservationError)
+        );
+    }
+
+    // (D) Trust precedence / no mapping-as-authority: an untrusted resolution fails
+    // closed REGARDLESS of the membership signal — the gate never treats a mapping as
+    // authority, and never lets an untrusted basis through on a member.
+    #[test]
+    fn gate_enforce_untrusted_resolution_precedes_membership() {
+        for obs in [allow(), deny(), indeterminate(), errored()] {
+            assert_eq!(
+                decide_treasury_gate(EnforceTrustedResolver, &obs, &untrusted()),
+                WouldDeny(UntrustedResolution),
+                "untrusted resolution must fail closed before membership: {obs:?}"
+            );
+        }
     }
 }
