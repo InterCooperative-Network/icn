@@ -2009,6 +2009,19 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/spec/institutional-powers.md"]
+category = "architecture"
+status = "draft"
+title = "Institutional Powers and Legitimacy Invariants"
+description = "Design-level doctrine defining how ICN encodes institutional power so it cannot become unaccountable state/capital power. Names the legitimacy circuit (authority basis -> adopted policy -> bounded effect -> receipt -> challenge/repair path), the InstitutionalPowerEvent envelope, and four power classes (GovernancePower, ContributionPower, ProtectivePower, RepairPower) as the ICN reconciliations of governance, contribution/taxation, protective force, and justice/repair without sovereign extraction, police power, or carceral logic. States fail-closed legitimacy invariants and maps each circuit stage to existing seams (InstitutionalDomain, DomainPolicy, CCL policy registry, AuthorityGrant, Mandate, TypedScope, EffectManifest, KernelEffect, GovernanceDecisionReceipt, InstitutionalEffectRecord, EffectDispatchEvidence, challenge/reversal/counter-receipt). Docs-only design layer over the Effect Dispatch Contract; introduces no code/schema/CCL/route/runtime change. Refs RFC-0018, ADR-0014/0019/0025/0026/0027, #2061, #2080, #1868, #2082."
+last_updated = "2026-06-25"
+last_reviewed = "2026-06-25"
+owner = "matt"
+audiences = ["architects", "developers", "contributors"]
+domain_tags = ["governance", "institutional-power", "legitimacy", "effect-dispatch", "mandate", "receipts", "kernel-app-boundary", "spec"]
+depends_on = ["docs/spec/effect-dispatch-contract.md", "docs/spec/institutional-domain.md", "docs/spec/ccl-policy-registry.md", "docs/adr/ADR-0014-constitutional-object-model.md", "docs/adr/ADR-0019-authority-grant-minting-and-mandate-persistence-seam.md", "docs/adr/ADR-0025-institutional-effect-record-canonical-schema.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md", "docs/adr/ADR-0027-action-card-contract.md", "docs/rfcs/RFC-0018-entity-aware-request-authorization.md"]
+recommended_action = "keep"
+
 [docs."docs/spec/effect-dispatch-contract.md"]
 category = "architecture"
 status = "draft"
