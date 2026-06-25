@@ -16,6 +16,9 @@
 //! propagation.
 
 use crate::commons_mgr::CommonsManager;
+use crate::coop_entity_resolver::{
+    CoopEntityResolution, CoopEntityResolver, ResolutionUnavailable, UnwiredCoopEntityResolver,
+};
 use crate::entity_map::legacy_coop_id_to_entity_id_fallback;
 use crate::entity_mgr::EntityManager;
 use crate::error::{GatewayError, Result};
@@ -349,6 +352,132 @@ pub(crate) async fn observe_treasury_entity_access(
                 action = action.metric_label(),
                 error = %err,
                 "entity-aware observation errored (observe-only)"
+            );
+        }
+    }
+
+    // A2b: observe-only `coop_id → EntityId` resolution discrepancy. Consults the
+    // fail-closed resolver seam (#2188) and logs how it compares to the legacy
+    // projection the observe path already uses. Uses the default
+    // `UnwiredCoopEntityResolver` until a trusted source is wired (A2c), so today it
+    // reports "resolver unavailable" — it never affects this observation, the flat
+    // guard, or any authorization decision.
+    let _ = observe_coop_entity_resolution(&UnwiredCoopEntityResolver, coop_id).await;
+
+    observation
+}
+
+/// Outcome of comparing the legacy `coop_id → EntityId` projection against the
+/// governed [`CoopEntityResolver`] seam, in observe mode.
+///
+/// This is data for migration visibility only (a discrepancy log). It is never an
+/// authorization input: the flat `require_coop_access` guard remains authoritative,
+/// and a mapping is not authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CoopResolutionObservation {
+    /// Legacy projection and the resolver produced the same cooperative `EntityId`.
+    Agree,
+    /// Both produced an `EntityId`, but they differ (a migration hazard — log loudly).
+    Disagree,
+    /// The resolver produced an `EntityId` but the legacy projection rejected the
+    /// `coop_id`. Not reachable from the unwired default; possible once A2c wires a
+    /// trusted source.
+    ResolverOnly,
+    /// The legacy projection produced an `EntityId` but the resolver was unavailable
+    /// (carries the machine-readable reason). The common case while the resolver is
+    /// unwired.
+    LegacyOnly(ResolutionUnavailable),
+    /// Neither path produced an `EntityId`: the `coop_id` is not a projectable slug
+    /// and the resolver was unavailable.
+    NeitherResolved(ResolutionUnavailable),
+}
+
+impl CoopResolutionObservation {
+    /// Stable, lowercase classification label for logs / future metrics.
+    fn result_label(self) -> &'static str {
+        match self {
+            CoopResolutionObservation::Agree => "agree",
+            CoopResolutionObservation::Disagree => "disagree",
+            CoopResolutionObservation::ResolverOnly => "resolver_only",
+            CoopResolutionObservation::LegacyOnly(_) => "legacy_only",
+            CoopResolutionObservation::NeitherResolved(_) => "neither_resolved",
+        }
+    }
+
+    /// Stable reason label (the resolver's unavailability reason where applicable).
+    fn reason_label(self) -> &'static str {
+        match self {
+            CoopResolutionObservation::Agree => "agree",
+            CoopResolutionObservation::Disagree => "disagree",
+            CoopResolutionObservation::ResolverOnly => "resolver_only",
+            CoopResolutionObservation::LegacyOnly(reason)
+            | CoopResolutionObservation::NeitherResolved(reason) => reason.label(),
+        }
+    }
+}
+
+/// Pure classification of legacy projection vs resolver outcome (no side effects).
+///
+/// `legacy_target` is the cooperative `EntityId` the legacy reject-not-normalize
+/// projection produced for the `coop_id` (`None` if the `coop_id` is not a
+/// projectable slug). It never fabricates an `EntityId`.
+fn classify_coop_resolution(
+    legacy_target: Option<&EntityId>,
+    resolver_outcome: &CoopEntityResolution,
+) -> CoopResolutionObservation {
+    match (legacy_target, resolver_outcome) {
+        (Some(legacy), CoopEntityResolution::Resolved { entity_id }) => {
+            if legacy == entity_id {
+                CoopResolutionObservation::Agree
+            } else {
+                CoopResolutionObservation::Disagree
+            }
+        }
+        (None, CoopEntityResolution::Resolved { .. }) => CoopResolutionObservation::ResolverOnly,
+        (Some(_), CoopEntityResolution::Unavailable { reason }) => {
+            CoopResolutionObservation::LegacyOnly(*reason)
+        }
+        (None, CoopEntityResolution::Unavailable { reason }) => {
+            CoopResolutionObservation::NeitherResolved(*reason)
+        }
+    }
+}
+
+/// Compute and log (observe-only) the `coop_id → EntityId` resolution discrepancy
+/// between the legacy projection and the governed resolver seam.
+///
+/// Returns the classification for testability; production callers discard it. It
+/// performs no authorization, denies nothing, and never fabricates an `EntityId`.
+pub(crate) async fn observe_coop_entity_resolution(
+    resolver: &dyn CoopEntityResolver,
+    coop_id: &str,
+) -> CoopResolutionObservation {
+    let resolver_outcome = resolver.resolve_coop_entity(coop_id).await;
+    let legacy_target = legacy_coop_id_to_entity_id_fallback(coop_id).ok();
+    let observation = classify_coop_resolution(legacy_target.as_ref(), &resolver_outcome);
+
+    match observation {
+        CoopResolutionObservation::Disagree => {
+            // Log both identifiers so the collision is actionable for diagnosing
+            // provenance/mapping issues once A2c wires a real resolver. An `EntityId`
+            // is an institutional identifier (slug), not a secret.
+            warn!(
+                target: "coop_resolution_observe",
+                coop_id = %coop_id,
+                result = observation.result_label(),
+                legacy_entity_id = legacy_target.as_ref().map_or("<none>", |e| e.as_str()),
+                resolver_entity_id =
+                    resolver_outcome.resolved_entity_id().map_or("<none>", |e| e.as_str()),
+                "legacy projection and resolver DISAGREE on coop_id -> EntityId (observe-only; flat coop guard remains authoritative)"
+            );
+        }
+        _ => {
+            debug!(
+                target: "coop_resolution_observe",
+                coop_id = %coop_id,
+                result = observation.result_label(),
+                reason = observation.reason_label(),
+                "coop_id -> EntityId resolution observation (observe-only)"
             );
         }
     }
@@ -875,6 +1004,130 @@ mod community_proof_spine {
                 base_hash,
                 tampered.record_hash(),
                 "tampering with `{field}` must change the receipt hash"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod coop_resolution_observe_tests {
+    use super::*;
+
+    fn coop(slug: &str) -> EntityId {
+        EntityId::cooperative(slug).unwrap()
+    }
+
+    #[test]
+    fn classify_agree_when_legacy_and_resolver_match() {
+        let id = coop("food-coop");
+        let out = classify_coop_resolution(
+            Some(&id),
+            &CoopEntityResolution::Resolved {
+                entity_id: id.clone(),
+            },
+        );
+        assert_eq!(out, CoopResolutionObservation::Agree);
+        assert_eq!(out.result_label(), "agree");
+    }
+
+    #[test]
+    fn classify_disagree_when_legacy_and_resolver_differ() {
+        let legacy = coop("food-coop");
+        let resolved = coop("other-coop");
+        let out = classify_coop_resolution(
+            Some(&legacy),
+            &CoopEntityResolution::Resolved {
+                entity_id: resolved,
+            },
+        );
+        assert_eq!(out, CoopResolutionObservation::Disagree);
+        assert_eq!(out.result_label(), "disagree");
+    }
+
+    #[test]
+    fn classify_resolver_only_when_legacy_not_mappable() {
+        let resolved = coop("food-coop");
+        let out = classify_coop_resolution(
+            None,
+            &CoopEntityResolution::Resolved {
+                entity_id: resolved,
+            },
+        );
+        assert_eq!(out, CoopResolutionObservation::ResolverOnly);
+    }
+
+    #[test]
+    fn classify_legacy_only_when_resolver_unavailable() {
+        let legacy = coop("food-coop");
+        let out = classify_coop_resolution(
+            Some(&legacy),
+            &CoopEntityResolution::Unavailable {
+                reason: ResolutionUnavailable::NoTrustedSourceWired,
+            },
+        );
+        assert_eq!(
+            out,
+            CoopResolutionObservation::LegacyOnly(ResolutionUnavailable::NoTrustedSourceWired)
+        );
+        assert_eq!(out.result_label(), "legacy_only");
+        assert_eq!(out.reason_label(), "no_trusted_source_wired");
+    }
+
+    #[test]
+    fn classify_neither_when_legacy_unmappable_and_resolver_unavailable() {
+        let out = classify_coop_resolution(
+            None,
+            &CoopEntityResolution::Unavailable {
+                reason: ResolutionUnavailable::NoTrustedSourceWired,
+            },
+        );
+        assert_eq!(
+            out,
+            CoopResolutionObservation::NeitherResolved(ResolutionUnavailable::NoTrustedSourceWired)
+        );
+        assert_eq!(out.result_label(), "neither_resolved");
+    }
+
+    // The default (unwired) resolver must never let the observation become a
+    // success-bearing one: with the fail-closed default, a mappable coop_id can only
+    // ever land on LegacyOnly (never Agree/ResolverOnly), because the resolver
+    // fabricates no EntityId.
+    #[tokio::test]
+    async fn default_resolver_observe_mappable_coop_is_legacy_only_never_fabricates() {
+        let out = observe_coop_entity_resolution(&UnwiredCoopEntityResolver, "food-coop").await;
+        assert_eq!(
+            out,
+            CoopResolutionObservation::LegacyOnly(ResolutionUnavailable::NoTrustedSourceWired)
+        );
+    }
+
+    #[tokio::test]
+    async fn default_resolver_observe_unmappable_coop_is_neither_resolved() {
+        // `coop_A` is not a valid cooperative slug (uppercase), so the legacy
+        // projection rejects it and the unwired resolver is unavailable.
+        let out = observe_coop_entity_resolution(&UnwiredCoopEntityResolver, "coop_A").await;
+        assert_eq!(
+            out,
+            CoopResolutionObservation::NeitherResolved(ResolutionUnavailable::NoTrustedSourceWired)
+        );
+    }
+
+    // The unwired default never produces a Resolved/Agree/ResolverOnly outcome for
+    // any coop_id, mappable or not — proving observe-mode consults the resolver but
+    // can never treat it as a trusted mapping in A2b.
+    #[tokio::test]
+    async fn default_resolver_observe_is_never_a_trusted_resolution() {
+        for coop_id in ["food-coop", "coop_A", "", "coop:7f3a2b", "x-coop"] {
+            let out = observe_coop_entity_resolution(&UnwiredCoopEntityResolver, coop_id).await;
+            assert!(
+                !matches!(
+                    out,
+                    CoopResolutionObservation::Agree
+                        | CoopResolutionObservation::ResolverOnly
+                        | CoopResolutionObservation::Disagree
+                ),
+                "unwired resolver must never yield a resolver-trusting outcome for {coop_id:?}, got {out:?}"
             );
         }
     }
