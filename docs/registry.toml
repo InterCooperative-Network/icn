@@ -1336,7 +1336,7 @@ category = "design"
 status = "draft"
 title = "Entity-Aware Authorization Control Map"
 description = "Migration control map for gateway authorization: flat coop_id guard vs entity-aware checks, observe-mode, fail-closed trusted issuance, and the coop_id to EntityId resolver keystone (#2061, #2080, #1868)"
-last_updated = "2026-06-24"
+last_updated = "2026-06-25"
 owner = "matt"
 audiences = ["architects", "developers"]
 
@@ -1345,7 +1345,7 @@ category = "design"
 status = "draft"
 title = "Governed coop_id to EntityId Resolver — Design Seam"
 description = "Seam definition for the governed coop_id to EntityId resolver named as the keystone in the entity-aware authorization control map: contract, authority/governance, migration posture, fail-closed rules, and sequenced follow-up slices (consumes the #2082 CoopEntityMap store; mirrors the TokenAuthoritySource/DenyUntilWired issuance seam). Design only — no runtime change (#2061, #2080, #1868, #2082)"
-last_updated = "2026-06-24"
+last_updated = "2026-06-25"
 owner = "matt"
 audiences = ["architects", "developers"]
 

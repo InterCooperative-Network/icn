@@ -3,8 +3,8 @@
 **Status**: draft — design / control map (migration orientation, not implementation)
 **Truth class**: descriptive
 **Canonical**: no — current implementation truth lives in [docs/STATE.md](../STATE.md) and [docs/PHASE_PROGRESS.md](../PHASE_PROGRESS.md)
-**Last Reviewed**: 2026-06-24
-**Source basis**: read against `main` @ `e7f3fc02` (#2181). Counts re-verified with `rg`; re-verify before relying on exact numbers.
+**Last Reviewed**: 2026-06-25
+**Source basis**: map read against `main` @ `e7f3fc02` (#2181); the observe-mode "Update (2026-06-25)" note re-verified against `main` @ `0ef541c5` (#2197). Route-family counts were last verified at `e7f3fc02` — re-verify before relying on exact numbers.
 **Related**: [RFC-0018](../rfcs/RFC-0018-entity-aware-request-authorization.md) · [ADR-0035](../adr/ADR-0035-entity-aware-request-authorization.md) · [ABUSE_CASE_HARDENING_STRATEGY.md](../architecture/ABUSE_CASE_HARDENING_STRATEGY.md) · issues #2061, #2080, #1868
 
 > **This document is a control map for an in-progress migration, not a description of a finished
@@ -111,6 +111,8 @@ Compute the entity-aware decision in observe mode and measure divergence.
 Move one route family at a time to enforcement — and only after trusted
 EntityId resolution and trusted token issuance exist.
 ```
+
+**Update (2026-06-25, `0ef541c5`).** The treasury observation now consults a *trusted, fail-closed* store-backed `coop_id → EntityId` resolver (#2196, resolver result discarded — route outcomes byte-identical), and an explicit **observe → measure → gate** seam now sits over it (#2197, "A2d"): `TreasuryEntityAuthMode { ObserveOnly (default), EnforceTrustedResolver }` plus a pure `decide_treasury_gate(...)` in `authority.rs`. This is the "measure → gate-later" rung, **not** enforcement — the active mode is `ObserveOnly`, default route outcomes are unchanged, and `EnforceTrustedResolver` is decision-only (wired to no route or config) and **fails closed on every resolution today** (`ResolverOnly` → `ResolverOnlyTargetUnverified`; the `Agree` would-allow path → `AgreeTargetUnverified`) because membership is evaluated against `treasury.entity_id()` / the legacy projection rather than the resolved/agreed target. The follow-up that would make any resolution enforceable is carrying the agreed/resolved `EntityId` target into membership evaluation. Canonical current-state record: [docs/STATE.md](../STATE.md) and [docs/PHASE_PROGRESS.md](../PHASE_PROGRESS.md).
 
 ## Trusted issuance seam
 

@@ -3,8 +3,8 @@
 **Status**: draft — design / seam definition (migration orientation, not implementation)
 **Truth class**: descriptive
 **Canonical**: no — current implementation truth lives in [docs/STATE.md](../STATE.md) and [docs/PHASE_PROGRESS.md](../PHASE_PROGRESS.md)
-**Last Reviewed**: 2026-06-24
-**Source basis**: read against `main` @ `a77c3324` (#2183). Code anchors re-verified with `rg`; re-verify before relying on exact line numbers.
+**Last Reviewed**: 2026-06-25
+**Source basis**: seam read against `main` @ `a77c3324` (#2183); §7 implementation-status note re-verified against `main` @ `0ef541c5` (#2197) on 2026-06-25. Code anchors/line numbers were last verified at `a77c3324` — re-verify before relying on exact numbers.
 **Related**: [entity-aware-auth-control-map.md](entity-aware-auth-control-map.md) (the keystone this extends) · [RFC-0018](../rfcs/RFC-0018-entity-aware-request-authorization.md) (active) · [ADR-0035](../adr/ADR-0035-entity-aware-request-authorization.md) (accepted, partial) · [ABUSE_CASE_HARDENING_STRATEGY.md](../architecture/ABUSE_CASE_HARDENING_STRATEGY.md) · issues #2061, #2080, #1868, #2082
 
 > **This document defines a seam — a contract, its invariants, failure modes, and migration
@@ -182,6 +182,13 @@ It is a seam definition for migration, not an implementation.
 ## 7. Follow-up implementation slices
 
 Narrow and sequenced; each is its own PR, behind the fail-closed default until explicitly cut over.
+
+> **Implementation status (as of 2026-06-25, `origin/main` `0ef541c5`).** A2a–A2d have landed, all **observe-only / fail-closed**; the canonical current-state record is [docs/STATE.md](../STATE.md) and [docs/PHASE_PROGRESS.md](../PHASE_PROGRESS.md), not this design doc.
+> - **A2a** ✅ — `CoopEntityResolver` trait + fail-closed `UnwiredCoopEntityResolver` default (#2188).
+> - **A2b** ✅ — observe-only treasury classification (#2189), no route outcome change.
+> - **A2c** ✅ — persisted provenance substrate (#2190) + fail-closed `StoreBackedCoopEntityResolver` source (#2192) + trusted provenance producers for local activation (#2193) and operator backfill (#2194), then wired into treasury observe-mode (#2196, resolver result discarded — no route outcome change). Trusts only `Activation`/`OperatorBackfill`/`Surrogate`/`GovernanceReceipt`; `UnknownLegacy`, gossip/unprovenanced, missing, ambiguous, entity-type-mismatch, and backend-error all fail closed.
+> - **A2d** ✅ — treasury **observe → measure → gate** scaffold (#2197): `TreasuryEntityAuthMode { ObserveOnly (default), EnforceTrustedResolver }` + pure `decide_treasury_gate(...)` in `icn-gateway/src/authority.rs`, shipped **observe-only** (active mode `ObserveOnly`; default route outcomes byte-identical to the flat guard). `EnforceTrustedResolver` is **decision-only, wired to no route or config**, and currently **fails closed on every resolution** (`ResolverOnly` → `ResolverOnlyTargetUnverified`; the `Agree` would-allow path → `AgreeTargetUnverified`) because membership is evaluated against `treasury.entity_id()` / the legacy projection, **not** the resolved/agreed target — so no resolution yields `ProceedUnchanged` today.
+> - **Not yet landed:** carrying the agreed/resolved `EntityId` target into membership evaluation (the prerequisite before `Agree`/`ResolverOnly` can enforce); per-family enforcement cutover; and **A2e** cutover criteria. **#2082 remains OPEN.** Nothing landed issues positive entity claims, treats any mapping as authority, trusts `UnknownLegacy` or gossip-originated mappings, or claims production / pilot / live-federation / Phase-2 readiness.
 
 - **A2a — resolver trait + fail-closed default.** Define the `CoopEntityResolver` trait and its
   by-value resolution type in the gateway, with a `DenyUntilWired`-equivalent default that resolves
