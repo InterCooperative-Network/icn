@@ -113,6 +113,12 @@ pub struct GatewayServer {
     ledger_handle: Option<LedgerHandle>,
     /// Optional handle to daemon's EntityRegistry (for entity management)
     entity_handle: Option<EntityHandle>,
+    /// Optional handle to the daemon's canonical, provenance-aware coop_id↔EntityId
+    /// name-binding store (#2082/#2190). When present, the gateway builds a trusted,
+    /// fail-closed `StoreBackedCoopEntityResolver` for observe-mode treasury
+    /// classification (A2c); when absent, the observe path uses the fail-closed
+    /// `UnwiredCoopEntityResolver`. Observe-only — never an authorization input.
+    coop_entity_map_handle: Option<icn_coop::CoopEntityMapHandle>,
     /// Optional handle to daemon's CommunityActor (for civic engine)
     community_handle: Option<icn_community::CommunityHandle>,
     /// Optional handle to daemon's StewardActor (for SDIS ceremonies)
@@ -200,6 +206,7 @@ impl GatewayServer {
             treasury_handle: None,
             ledger_handle: None,
             entity_handle: None,
+            coop_entity_map_handle: None,
             community_handle: None,
             steward_handle: None,
             agreement_manager_handle: None,
@@ -251,6 +258,7 @@ impl GatewayServer {
             treasury_handle: None,
             ledger_handle: None,
             entity_handle: None,
+            coop_entity_map_handle: None,
             community_handle: None,
             steward_handle: None,
             agreement_manager_handle: None,
@@ -303,6 +311,7 @@ impl GatewayServer {
             treasury_handle: None,
             ledger_handle: None,
             entity_handle: None,
+            coop_entity_map_handle: None,
             community_handle: None,
             steward_handle: None,
             agreement_manager_handle: None,
@@ -494,6 +503,20 @@ impl GatewayServer {
     /// EntityRegistry, ensuring persistence and consistent state.
     pub fn with_entity_handle(mut self, handle: EntityHandle) -> Self {
         self.entity_handle = Some(handle);
+        self
+    }
+
+    /// Set the canonical, provenance-aware coop_id↔EntityId name-binding store
+    /// handle (#2082/#2190).
+    ///
+    /// When set, the gateway builds a trusted, fail-closed
+    /// `StoreBackedCoopEntityResolver` over this store and consults it in
+    /// observe-mode treasury classification (A2c). It is observe-only: it resolves
+    /// only bindings with trusted provenance, never changes a route outcome, and a
+    /// resolved binding grants no authority. When unset, the observe path uses the
+    /// fail-closed `UnwiredCoopEntityResolver`.
+    pub fn with_coop_entity_map_handle(mut self, handle: icn_coop::CoopEntityMapHandle) -> Self {
+        self.coop_entity_map_handle = Some(handle);
         self
     }
 
@@ -1142,6 +1165,25 @@ impl GatewayServer {
         } else {
             warn!("Entity manager running standalone (in-memory only)");
             Arc::new(EntityManager::new())
+        };
+
+        // A2c observe-mode coop_id→EntityId resolver. When the daemon wires the
+        // canonical, provenance-aware CoopEntityMap, build a trusted, fail-closed
+        // StoreBackedCoopEntityResolver; otherwise fall back to the fail-closed
+        // UnwiredCoopEntityResolver. This resolver is consulted ONLY by observe-mode
+        // treasury classification (RFC-0018, ADR-0035): it resolves only bindings with
+        // trusted provenance, changes no route outcome, and grants no authority.
+        let observe_coop_entity_resolver = match self.coop_entity_map_handle {
+            Some(map) => {
+                info!("Coop-entity resolver: store-backed (trusted, observe-only) — A2c wired");
+                crate::coop_entity_resolver::ObserveCoopEntityResolver(std::sync::Arc::new(
+                    crate::coop_entity_resolver::StoreBackedCoopEntityResolver::new(map),
+                ))
+            }
+            None => {
+                info!("Coop-entity resolver: unwired (fail-closed default)");
+                crate::coop_entity_resolver::ObserveCoopEntityResolver::unwired()
+            }
         };
 
         // Create treasury manager (uses handle if available, otherwise in-memory)
@@ -1900,6 +1942,7 @@ impl GatewayServer {
                 .app_data(web::Data::new(federation_service_for_routes.clone()))
                 .app_data(web::Data::new(commons_manager.clone()))
                 .app_data(web::Data::new(entity_manager.clone()))
+                .app_data(web::Data::new(observe_coop_entity_resolver.clone()))
                 .app_data(web::Data::new(entity_audit_manager.clone()))
                 .app_data(web::Data::new(treasury_manager.clone()))
                 .app_data(web::Data::new(ledger_manager.clone()))

@@ -25,6 +25,9 @@ use tracing::info;
 
 use crate::auth::TokenClaims;
 use crate::authority::{observe_treasury_entity_access, EntityAction};
+use crate::coop_entity_resolver::{
+    CoopEntityResolver, ObserveCoopEntityResolver, UnwiredCoopEntityResolver,
+};
 use crate::entity_mgr::EntityManager;
 use crate::error::{GatewayError, Result};
 use crate::governance_mgr::GovernanceManager;
@@ -323,13 +326,35 @@ async fn observe_treasury(
     // strictly off the request path — it can affect neither the response nor its
     // latency. (RFC-0018 observe mode, ADR-0035.)
     let entity_mgr = entity_mgr.get_ref().clone();
+    let resolver = observe_coop_entity_resolver(req);
     let target = treasury_entity_id.cloned();
     let coop_id = coop_id.to_string();
     actix_web::rt::spawn(async move {
-        let _ =
-            observe_treasury_entity_access(&entity_mgr, &caller, target.as_ref(), &coop_id, action)
-                .await;
+        let _ = observe_treasury_entity_access(
+            resolver.as_ref(),
+            &entity_mgr,
+            &caller,
+            target.as_ref(),
+            &coop_id,
+            action,
+        )
+        .await;
     });
+}
+
+/// Fetch the observe-mode `coop_id → EntityId` resolver from gateway app state (A2c).
+///
+/// The gateway registers exactly one [`ObserveCoopEntityResolver`] as shared
+/// `web::Data` — a `StoreBackedCoopEntityResolver` when a trusted, provenance-aware
+/// `CoopEntityMap` handle is wired, otherwise the fail-closed
+/// [`UnwiredCoopEntityResolver`]. When none is registered (e.g. a standalone or test
+/// app), this falls back to the fail-closed default, so the observe path never trusts
+/// a resolution it cannot verify. The resolver is consulted observe-only and changes
+/// no authorization outcome.
+fn observe_coop_entity_resolver(req: &HttpRequest) -> Arc<dyn CoopEntityResolver> {
+    req.app_data::<web::Data<ObserveCoopEntityResolver>>()
+        .map(|d| d.get_ref().0.clone())
+        .unwrap_or_else(|| Arc::new(UnwiredCoopEntityResolver))
 }
 
 /// Like [`observe_treasury`], but keyed by the **owning treasury's `treasury_did`**
@@ -359,6 +384,7 @@ async fn observe_treasury_by_did(
     let entity_mgr = entity_mgr.get_ref().clone();
     let treasury_mgr = treasury_mgr.get_ref().clone();
     let treasury_did = treasury_did.clone();
+    let resolver = observe_coop_entity_resolver(req);
     actix_web::rt::spawn(async move {
         // Resolve the budget's owning treasury off the hot path; observe against
         // its stored entity_id (and its own coop_id for the fallback projection).
@@ -366,9 +392,15 @@ async fn observe_treasury_by_did(
             Ok(Some(t)) => (t.entity_id().cloned(), t.coop_id.clone()),
             _ => (None, String::new()),
         };
-        let _ =
-            observe_treasury_entity_access(&entity_mgr, &caller, target.as_ref(), &coop_id, action)
-                .await;
+        let _ = observe_treasury_entity_access(
+            resolver.as_ref(),
+            &entity_mgr,
+            &caller,
+            target.as_ref(),
+            &coop_id,
+            action,
+        )
+        .await;
     });
 }
 

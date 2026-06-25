@@ -26,6 +26,10 @@ pub struct GatewayActorHandles {
     pub treasury: Option<icn_gateway::TreasuryHandle>,
     pub ledger: Option<icn_gateway::LedgerHandle>,
     pub entity: Option<icn_entity::EntityHandle>,
+    /// Canonical, provenance-aware coop_id↔EntityId name-binding store (#2082/#2190).
+    /// Threaded to the gateway so observe-mode treasury classification can consult a
+    /// trusted, fail-closed `StoreBackedCoopEntityResolver` (A2c). Observe-only.
+    pub coop_entity_map: Option<icn_coop::CoopEntityMapHandle>,
     pub steward: Option<icn_steward::StewardHandle>,
     pub agreement_manager: Option<icn_federation::agreement::AgreementManagerHandle>,
     pub service_discovery_manager:
