@@ -33,7 +33,9 @@
 //!   `legacy_coop_id_to_entity_id_fallback` projection; an unwired source yields no
 //!   identity at all.
 
-use icn_entity::{CoopEntityBinding, CoopEntityBindingProvenance, CoopEntityMap, EntityId};
+use icn_entity::{
+    CoopEntityBinding, CoopEntityBindingProvenance, CoopEntityMap, CoopEntityMapError, EntityId,
+};
 use std::sync::Arc;
 
 /// Why a [`CoopEntityResolver`] could not return a trusted [`EntityId`].
@@ -174,8 +176,9 @@ impl CoopEntityResolver for UnwiredCoopEntityResolver {
 ///
 /// | Store read for `coop_id`                       | Resolution                                   |
 /// |------------------------------------------------|----------------------------------------------|
-/// | binding present, **trusted** provenance, cooperative target | [`CoopEntityResolution::Resolved`] |
+/// | binding present, **trusted** provenance, cooperative target, consistent reverse index | [`CoopEntityResolution::Resolved`] |
 /// | binding present, trusted provenance, **non-cooperative** target | `Unavailable(`[`ResolutionUnavailable::EntityTypeMismatch`]`)` |
+/// | binding present, trusted provenance, **reverse index missing/divergent** | `Unavailable(`[`ResolutionUnavailable::Ambiguous`]`)` |
 /// | binding present, [`CoopEntityBindingProvenance::UnknownLegacy`] | `Unavailable(`[`ResolutionUnavailable::UnverifiedProvenance`]`)` |
 /// | no binding                                     | `Unavailable(`[`ResolutionUnavailable::Unmapped`]`)`            |
 /// | store/backend error or join failure            | `Unavailable(`[`ResolutionUnavailable::SourceUnavailable`]`)`   |
@@ -218,19 +221,27 @@ fn provenance_is_trusted_for_resolution(provenance: &CoopEntityBindingProvenance
     }
 }
 
-/// Map a present binding to a [`CoopEntityResolution`], gating on provenance and
-/// target entity type.
+/// Map a present binding to a [`CoopEntityResolution`], gating on provenance, target
+/// entity type, and forward/reverse consistency.
 ///
-/// Two fail-closed gates, in order:
+/// `reverse_coop` is the `coop_id` the store's reverse index maps the bound entity
+/// back to (`None` if absent). Three fail-closed gates, in order:
 /// 1. provenance must be trusted (see [`provenance_is_trusted_for_resolution`]),
 ///    else [`ResolutionUnavailable::UnverifiedProvenance`];
 /// 2. the bound [`EntityId`] must be a cooperative — a flat `coop_id` denotes a
-///    cooperative (RFC-0018). The substrate enforces this on write, but the resolver
-///    is a trust boundary: a corrupted store or alternate [`CoopEntityMap`] impl
-///    could surface a non-cooperative target, so fail closed with
-///    [`ResolutionUnavailable::EntityTypeMismatch`] rather than resolve a mistyped
-///    identity.
-fn resolution_from_binding(binding: CoopEntityBinding) -> CoopEntityResolution {
+///    cooperative (RFC-0018), else [`ResolutionUnavailable::EntityTypeMismatch`];
+/// 3. the binding must be reversible — the reverse index must name this exact
+///    `coop_id`, else [`ResolutionUnavailable::Ambiguous`].
+///
+/// The substrate enforces (2) and (3) on write (it validates the entity type and
+/// writes both indexes atomically), but the resolver is the trust boundary: a
+/// corrupted store, a one-sided/manually-edited row, or an alternate
+/// [`CoopEntityMap`] impl could surface a mistyped or one-sided binding, and a name
+/// binding must never become a trusted resolution on bad store state.
+fn resolution_from_binding(
+    binding: CoopEntityBinding,
+    reverse_coop: Option<&str>,
+) -> CoopEntityResolution {
     if !provenance_is_trusted_for_resolution(&binding.provenance) {
         return CoopEntityResolution::Unavailable {
             reason: ResolutionUnavailable::UnverifiedProvenance,
@@ -241,6 +252,11 @@ fn resolution_from_binding(binding: CoopEntityBinding) -> CoopEntityResolution {
             reason: ResolutionUnavailable::EntityTypeMismatch,
         };
     }
+    if reverse_coop != Some(binding.coop_id.as_str()) {
+        return CoopEntityResolution::Unavailable {
+            reason: ResolutionUnavailable::Ambiguous,
+        };
+    }
     CoopEntityResolution::Resolved {
         entity_id: binding.entity_id,
     }
@@ -249,18 +265,32 @@ fn resolution_from_binding(binding: CoopEntityBinding) -> CoopEntityResolution {
 #[async_trait::async_trait]
 impl CoopEntityResolver for StoreBackedCoopEntityResolver {
     async fn resolve_coop_entity(&self, coop_id: &str) -> CoopEntityResolution {
-        // Read the provenance-aware binding from the #2190 substrate. The
-        // `CoopEntityMap` read is synchronous and may block (e.g. a Sled-backed
-        // store), so offload it to the blocking pool rather than running it on the
-        // async worker thread. This resolver performs no authorization, denies
-        // nothing, and never fabricates or normalizes an identity. A present binding
-        // only resolves if its provenance is trusted and its target is a cooperative
-        // (see `resolution_from_binding`); every other outcome — including a join
-        // failure — is a first-class fail-closed `Unavailable` value.
+        // Read the provenance-aware binding from the #2190 substrate, plus the reverse
+        // index for the bound entity so a one-sided/corrupt row is caught as a
+        // conflict. The `CoopEntityMap` reads are synchronous and may block (e.g. a
+        // Sled-backed store), so both are offloaded to the blocking pool in one hop
+        // rather than running on the async worker thread. This resolver performs no
+        // authorization, denies nothing, and never fabricates or normalizes an
+        // identity. A present binding only resolves if its provenance is trusted, its
+        // target is a cooperative, and its reverse index is consistent (see
+        // `resolution_from_binding`); every other outcome — including a join failure —
+        // is a first-class fail-closed `Unavailable` value.
         let map = Arc::clone(&self.map);
         let coop_id = coop_id.to_owned();
-        match tokio::task::spawn_blocking(move || map.binding_for_coop(&coop_id)).await {
-            Ok(Ok(Some(binding))) => resolution_from_binding(binding),
+        let read = tokio::task::spawn_blocking(
+            move || -> Result<Option<(CoopEntityBinding, Option<String>)>, CoopEntityMapError> {
+                let Some(binding) = map.binding_for_coop(&coop_id)? else {
+                    return Ok(None);
+                };
+                let reverse_coop = map.coop_for_entity(&binding.entity_id)?;
+                Ok(Some((binding, reverse_coop)))
+            },
+        )
+        .await;
+        match read {
+            Ok(Ok(Some((binding, reverse_coop)))) => {
+                resolution_from_binding(binding, reverse_coop.as_deref())
+            }
             Ok(Ok(None)) => CoopEntityResolution::Unavailable {
                 reason: ResolutionUnavailable::Unmapped,
             },
@@ -363,7 +393,7 @@ mod tests {
     // StoreBackedCoopEntityResolver (A2c): provenance-gated, fail-closed.
     // ------------------------------------------------------------------
 
-    use icn_entity::{CoopEntityMapError, InMemoryCoopEntityMap};
+    use icn_entity::InMemoryCoopEntityMap;
 
     /// `food-coop` is itself a valid cooperative slug, so the legacy projection
     /// (`legacy_coop_id_to_entity_id_fallback`) yields `EntityId::cooperative("food-coop")`.
@@ -442,6 +472,42 @@ mod tests {
             Ok(Some(CoopEntityBinding {
                 coop_id: coop_id.to_string(),
                 entity_id: non_cooperative_entity(),
+                provenance: CoopEntityBindingProvenance::Activation,
+            }))
+        }
+    }
+
+    /// A `CoopEntityMap` with a one-sided/corrupt row: `binding_for_coop` returns a
+    /// well-formed, trusted, cooperative binding, but the reverse index
+    /// (`coop_for_entity`) names no `coop_id`. Exercises the resolver's forward/reverse
+    /// consistency check (fail closed with `Ambiguous` rather than trust a one-sided row).
+    struct OneSidedBindingMap;
+
+    impl CoopEntityMap for OneSidedBindingMap {
+        fn bind_resolved(
+            &self,
+            _coop_id: &str,
+            _entity_id: &EntityId,
+        ) -> Result<(), CoopEntityMapError> {
+            Ok(())
+        }
+        fn entity_for_coop(&self, _coop_id: &str) -> Result<Option<EntityId>, CoopEntityMapError> {
+            Ok(Some(coop_entity()))
+        }
+        fn coop_for_entity(
+            &self,
+            _entity_id: &EntityId,
+        ) -> Result<Option<String>, CoopEntityMapError> {
+            // Reverse index missing for the bound entity: a one-sided forward row.
+            Ok(None)
+        }
+        fn binding_for_coop(
+            &self,
+            coop_id: &str,
+        ) -> Result<Option<CoopEntityBinding>, CoopEntityMapError> {
+            Ok(Some(CoopEntityBinding {
+                coop_id: coop_id.to_string(),
+                entity_id: coop_entity(),
                 provenance: CoopEntityBindingProvenance::Activation,
             }))
         }
@@ -558,6 +624,24 @@ mod tests {
             out,
             CoopEntityResolution::Unavailable {
                 reason: ResolutionUnavailable::EntityTypeMismatch
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn store_backed_fails_closed_on_reverse_index_conflict() {
+        // A binding must be reversible: the reverse index for the bound entity must
+        // name this coop_id. A one-sided/corrupt forward row (reverse missing or
+        // divergent) is a forward/reverse conflict and must fail closed with
+        // `Ambiguous`, not become a trusted resolution.
+        let out = store_backed(OneSidedBindingMap)
+            .resolve_coop_entity(COOP_ID)
+            .await;
+        assert!(!out.is_resolved());
+        assert_eq!(
+            out,
+            CoopEntityResolution::Unavailable {
+                reason: ResolutionUnavailable::Ambiguous
             }
         );
     }
