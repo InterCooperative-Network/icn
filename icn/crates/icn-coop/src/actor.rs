@@ -2,7 +2,9 @@ use crate::{
     AssetDistributionPlan, CoopStore, CoopType, Cooperative, FormationRequest, LifecycleEvent,
     LifecycleManager, Member, MemberRole, MembershipManager, Result,
 };
-use icn_entity::{CoopEntityMap, CoopEntityMapError, EntityId};
+use icn_entity::{
+    project_coop_id, CoopEntityBindingProvenance, CoopEntityMap, CoopEntityMapError, EntityId,
+};
 use icn_gossip::GossipActor;
 use icn_governance::charter::FounderSignature;
 use icn_identity::Did;
@@ -50,19 +52,39 @@ pub enum EntityMapBindOutcome {
     StorageError(String),
 }
 
-/// Attempt a non-authoritative `coop_id → EntityId` name binding.
+/// Attempt a non-authoritative `coop_id → EntityId` name binding, recording
+/// [`CoopEntityBindingProvenance::Activation`] provenance.
 ///
 /// Returns the [`EntityMapBindOutcome`] without ever propagating an error: a
 /// mapping bind is an observability side effect and must not fail activation.
-/// `bind_projected` is idempotent for an identical pair, so repeated binds are
-/// safe. Used by both cooperative activation and the gossip coop-update sync
-/// path so a binding is recorded deterministically on every node that accepts an
+/// Used by both cooperative activation and the gossip coop-update sync path (which
+/// mirrors the origin node's activation-time bind for activated cooperatives only),
+/// so a binding is recorded deterministically on every node that accepts an
 /// activated cooperative.
+///
+/// The write is reject-not-normalize: a non-mappable `coop_id` (e.g. the default
+/// `coop:<uuid>` shape) yields [`EntityMapBindOutcome::NotMappable`] and writes
+/// nothing. A mappable id is bound with `Activation` provenance via
+/// [`CoopEntityMap::bind_resolved_with_provenance`], so the row reads back as a
+/// trusted activation binding (not the fail-closed `UnknownLegacy` that a plain
+/// `bind_projected`/`bind_resolved` leaves). Re-binding the identical pair with the
+/// same provenance is idempotent; a pre-provenance (`UnknownLegacy`) row from an
+/// older binary is upgraded in place. A binding still grants no authority.
 pub fn bind_coop_entity_map(
     map: &(dyn CoopEntityMap + Send + Sync),
     coop_id: &str,
 ) -> EntityMapBindOutcome {
-    match map.bind_projected(coop_id) {
+    // Reject-not-normalize projection (the same gate the previous `bind_projected`
+    // applied) followed by a provenance-aware write recording `Activation`.
+    let result = project_coop_id(coop_id).and_then(|entity_id| {
+        map.bind_resolved_with_provenance(
+            coop_id,
+            &entity_id,
+            CoopEntityBindingProvenance::Activation,
+        )
+        .map(|()| entity_id)
+    });
+    match result {
         Ok(entity_id) => EntityMapBindOutcome::Mapped(entity_id),
         Err(CoopEntityMapError::NotMappable(reason)) => EntityMapBindOutcome::NotMappable(reason),
         Err(CoopEntityMapError::Conflict(reason)) => EntityMapBindOutcome::Conflict(reason),
@@ -2105,6 +2127,111 @@ mod tests {
             map.coop_for_entity(&EntityId::cooperative("good-coop").unwrap())
                 .unwrap(),
             None
+        );
+    }
+
+    // === A2c: activation bindings record real `Activation` provenance ===
+
+    /// A `CoopEntityMap` whose writes always fail, to prove a storage error during
+    /// the provenance-aware activation bind is reported (`StorageError`) and never
+    /// propagated — a mapping bind must not fail activation.
+    struct FailingCoopEntityMap;
+
+    impl CoopEntityMap for FailingCoopEntityMap {
+        fn bind_resolved(
+            &self,
+            _coop_id: &str,
+            _entity_id: &EntityId,
+        ) -> std::result::Result<(), CoopEntityMapError> {
+            Err(CoopEntityMapError::Storage(
+                "simulated backend failure".into(),
+            ))
+        }
+        fn entity_for_coop(
+            &self,
+            _coop_id: &str,
+        ) -> std::result::Result<Option<EntityId>, CoopEntityMapError> {
+            Ok(None)
+        }
+        fn coop_for_entity(
+            &self,
+            _entity_id: &EntityId,
+        ) -> std::result::Result<Option<String>, CoopEntityMapError> {
+            Ok(None)
+        }
+    }
+
+    // T6a: a mappable activation bind records `Activation` provenance (not the
+    // fail-closed `UnknownLegacy` that the old plain `bind_projected` left behind).
+    #[test]
+    fn test_bind_outcome_records_activation_provenance() {
+        let map = InMemoryCoopEntityMap::new();
+        let outcome = bind_coop_entity_map(&map, "good-coop");
+        assert_eq!(
+            outcome,
+            EntityMapBindOutcome::Mapped(EntityId::cooperative("good-coop").unwrap())
+        );
+        let binding = map
+            .binding_for_coop("good-coop")
+            .unwrap()
+            .expect("binding present after activation bind");
+        assert_eq!(binding.provenance, CoopEntityBindingProvenance::Activation);
+    }
+
+    // T6b: repeating the identical activation bind is idempotent and keeps the
+    // `Activation` provenance (re-recording the same provenance is not a Conflict).
+    #[test]
+    fn test_bind_outcome_idempotent_keeps_activation_provenance() {
+        let map = InMemoryCoopEntityMap::new();
+        let first = bind_coop_entity_map(&map, "good-coop");
+        let second = bind_coop_entity_map(&map, "good-coop");
+        assert_eq!(first, second);
+        assert_eq!(
+            second,
+            EntityMapBindOutcome::Mapped(EntityId::cooperative("good-coop").unwrap())
+        );
+        assert_eq!(
+            map.binding_for_coop("good-coop")
+                .unwrap()
+                .unwrap()
+                .provenance,
+            CoopEntityBindingProvenance::Activation
+        );
+    }
+
+    // T6c: a storage error during the bind is reported as `StorageError` and never
+    // propagated — the activation contract (bind is non-fatal) is preserved.
+    #[test]
+    fn test_bind_outcome_storage_error_is_reported_not_propagated() {
+        let outcome = bind_coop_entity_map(&FailingCoopEntityMap, "good-coop");
+        assert!(
+            matches!(outcome, EntityMapBindOutcome::StorageError(_)),
+            "expected StorageError, got {outcome:?}"
+        );
+    }
+
+    // T6d: the activation-written binding satisfies every trust gate the merged
+    // `StoreBackedCoopEntityResolver` (#2192) requires to resolve — trusted
+    // `Activation` provenance, a cooperative target, and a consistent reverse index.
+    // (The resolver actually resolving such a binding is covered by the icn-gateway
+    // test `store_backed_resolves_binding_with_trusted_provenance`.)
+    #[test]
+    fn test_activation_binding_satisfies_resolver_trust_gates() {
+        let map = InMemoryCoopEntityMap::new();
+        assert!(matches!(
+            bind_coop_entity_map(&map, "good-coop"),
+            EntityMapBindOutcome::Mapped(_)
+        ));
+        let entity = EntityId::cooperative("good-coop").unwrap();
+        let binding = map.binding_for_coop("good-coop").unwrap().unwrap();
+        // (1) trusted provenance
+        assert_eq!(binding.provenance, CoopEntityBindingProvenance::Activation);
+        // (2) cooperative target
+        assert!(binding.entity_id.is_cooperative());
+        // (3) reverse index consistent: entity -> good-coop
+        assert_eq!(
+            map.coop_for_entity(&entity).unwrap(),
+            Some("good-coop".to_string())
         );
     }
 }
