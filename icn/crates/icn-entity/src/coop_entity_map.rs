@@ -416,6 +416,15 @@ impl CoopEntityMap for InMemoryCoopEntityMap {
         entity_id: &EntityId,
         provenance: CoopEntityBindingProvenance,
     ) -> Result<(), CoopEntityMapError> {
+        // `UnknownLegacy` is a read-time sentinel, not a writable provenance:
+        // persisting it would lock the binding out of a later upgrade to real
+        // provenance (a recorded provenance is treated as immutable below). Treat it
+        // like no provenance record — exactly `bind_resolved` — so the binding stays
+        // upgradeable.
+        if matches!(provenance, CoopEntityBindingProvenance::UnknownLegacy) {
+            return self.bind_resolved(coop_id, entity_id);
+        }
+
         // Same cooperative-type gate as bind_resolved, before touching any index.
         validate_cooperative_entity_id(entity_id)?;
 
@@ -655,6 +664,15 @@ impl CoopEntityMap for SledCoopEntityMap {
         entity_id: &EntityId,
         provenance: CoopEntityBindingProvenance,
     ) -> Result<(), CoopEntityMapError> {
+        // `UnknownLegacy` is a read-time sentinel, not a writable provenance:
+        // persisting it would lock the binding out of a later upgrade to real
+        // provenance (a recorded provenance is treated as immutable below). Treat it
+        // like no provenance record — exactly `bind_resolved` — so the binding stays
+        // upgradeable.
+        if matches!(provenance, CoopEntityBindingProvenance::UnknownLegacy) {
+            return self.bind_resolved(coop_id, entity_id);
+        }
+
         // Same cooperative-type gate as bind_resolved, before the transaction.
         validate_cooperative_entity_id(entity_id)?;
 
@@ -1715,6 +1733,75 @@ mod tests {
                 }
             );
         }
+    }
+
+    #[test]
+    fn test_inmem_unknown_legacy_write_is_no_record_and_upgradeable() {
+        // Writing UnknownLegacy must NOT persist a real record (it reads back as
+        // UnknownLegacy via the "no record" path) and must leave the binding
+        // upgradeable to a real provenance later.
+        let map = InMemoryCoopEntityMap::new();
+        let entity = coop_eid("upgrade-coop");
+        map.bind_resolved_with_provenance(
+            "upgrade-coop",
+            &entity,
+            CoopEntityBindingProvenance::UnknownLegacy,
+        )
+        .unwrap();
+        assert_eq!(
+            map.binding_for_coop("upgrade-coop")
+                .unwrap()
+                .unwrap()
+                .provenance,
+            CoopEntityBindingProvenance::UnknownLegacy
+        );
+        // Upgrade to a real provenance succeeds (would be rejected if UnknownLegacy
+        // had been persisted as an immutable record).
+        map.bind_resolved_with_provenance(
+            "upgrade-coop",
+            &entity,
+            CoopEntityBindingProvenance::Activation,
+        )
+        .unwrap();
+        assert_eq!(
+            map.binding_for_coop("upgrade-coop")
+                .unwrap()
+                .unwrap()
+                .provenance,
+            CoopEntityBindingProvenance::Activation
+        );
+    }
+
+    #[test]
+    fn test_sled_unknown_legacy_write_is_no_record_and_upgradeable() {
+        let map = SledCoopEntityMap::temporary().unwrap();
+        let entity = coop_eid("sled-upgrade");
+        map.bind_resolved_with_provenance(
+            "sled-upgrade",
+            &entity,
+            CoopEntityBindingProvenance::UnknownLegacy,
+        )
+        .unwrap();
+        assert_eq!(
+            map.binding_for_coop("sled-upgrade")
+                .unwrap()
+                .unwrap()
+                .provenance,
+            CoopEntityBindingProvenance::UnknownLegacy
+        );
+        map.bind_resolved_with_provenance(
+            "sled-upgrade",
+            &entity,
+            CoopEntityBindingProvenance::OperatorBackfill,
+        )
+        .unwrap();
+        assert_eq!(
+            map.binding_for_coop("sled-upgrade")
+                .unwrap()
+                .unwrap()
+                .provenance,
+            CoopEntityBindingProvenance::OperatorBackfill
+        );
     }
 
     #[test]
