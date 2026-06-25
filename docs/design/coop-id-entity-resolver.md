@@ -190,6 +190,8 @@ Narrow and sequenced; each is its own PR, behind the fail-closed default until e
 > - **A2d** ✅ — treasury **observe → measure → gate** scaffold (#2197): `TreasuryEntityAuthMode { ObserveOnly (default), EnforceTrustedResolver }` + pure `decide_treasury_gate(...)` in `icn-gateway/src/authority.rs`, shipped **observe-only** (active mode `ObserveOnly`; default route outcomes byte-identical to the flat guard). `EnforceTrustedResolver` is **decision-only, wired to no route or config**, and currently **fails closed on every resolution** (`ResolverOnly` → `ResolverOnlyTargetUnverified`; the `Agree` would-allow path → `AgreeTargetUnverified`) because membership is evaluated against `treasury.entity_id()` / the legacy projection, **not** the resolved/agreed target — so no resolution yields `ProceedUnchanged` today.
 > - **Not yet landed:** carrying the agreed/resolved `EntityId` target into membership evaluation (the prerequisite before `Agree`/`ResolverOnly` can enforce); per-family enforcement cutover; and **A2e** cutover criteria. **#2082 remains OPEN.** Nothing landed issues positive entity claims, treats any mapping as authority, trusts `UnknownLegacy` or gossip-originated mappings, or claims production / pilot / live-federation / Phase-2 readiness.
 
+_Note: the slice definitions below are preserved as original design intent; current implementation status is recorded in the dated note above._
+
 - **A2a — resolver trait + fail-closed default.** Define the `CoopEntityResolver` trait and its
   by-value resolution type in the gateway, with a `DenyUntilWired`-equivalent default that resolves
   nothing and reads none of its inputs. No route consumes it yet. (Mirrors the `TokenAuthoritySource`
