@@ -3623,6 +3623,22 @@ domain_tags = ["pilot", "nycn", "summit", "action-cards", "fixture"]
 recommended_action = "keep"
 last_reviewed = "2026-06-26"
 
+[docs."docs/pilots/summit-ops-closeout-recap-fixture-shape.md"]
+category = "reference"
+status = "living"
+title = "Summit Ops Closeout Recap Fixture Shape (generic ICN)"
+description = "Fixture-shape map (spec + validation recipe) for the exact schema-valid (action_item/complete, scope structure, fictional ids) Public Recap Draft Handoff ActionCard a future contributor could append to web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json, plus the matching demo Communications role + public_recap scope that commit must add to standing.json. Leaves the lane fixture-ready, NOT fixture-backed: no runtime fixture is committed and no pilot-UI file is touched (#2099 gates pilot-UI surface). Becomes L2 only after the card + standing are committed and the validation path (per-card schema + validate-rehearsal-shell-fixtures.py + Playwright e2e + Rehearsal Fixture Bundle gate) passes; public-safe categorical/fictional only, no real event data."
+last_updated = "2026-06-26"
+owner = "matt"
+audiences = ["team", "organizers"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["pilot", "nycn", "summit", "closeout", "action-cards", "fixture"]
+recommended_action = "keep"
+last_reviewed = "2026-06-26"
+
 [docs."docs/contracts/institution-package/README.md"]
 category = "reference"
 status = "living"

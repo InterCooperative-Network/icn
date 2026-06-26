@@ -154,6 +154,7 @@ Bounded: this is a rehearsal-ready shape map, **not** runtime proof, **not** liv
 | The full event lifecycle map (parent) | [`summit-ops-lifecycle-package-map.md`](summit-ops-lifecycle-package-map.md) |
 | The run-stage facilitator path | [`summit-ops-run-stage-facilitator-path.md`](summit-ops-run-stage-facilitator-path.md) |
 | The registration proof loop + its L2 fixture | [`summit-ops-registration-action-card-proof-loop.md`](summit-ops-registration-action-card-proof-loop.md) |
+| The Public Recap Draft Handoff fixture shape (next-slice spec) | [`summit-ops-closeout-recap-fixture-shape.md`](summit-ops-closeout-recap-fixture-shape.md) |
 | Recorded proof per capability | [`proof-level-taxonomy-capability-matrix.md`](../reference/project-index/proof-level-taxonomy-capability-matrix.md) |
 | The ICN spine + meaning firewall | [`docs/architecture/ICN_OPERATING_MODEL.md`](../architecture/ICN_OPERATING_MODEL.md) |
 | The ICN ↔ NYCN ↔ public boundary | [`docs/ATLAS.md`](../ATLAS.md) |
