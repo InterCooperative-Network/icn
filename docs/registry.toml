@@ -3591,6 +3591,22 @@ domain_tags = ["pilot", "nycn", "summit", "action-cards", "proof-loop"]
 recommended_action = "keep"
 last_reviewed = "2026-06-26"
 
+[docs."docs/pilots/summit-ops-registration-fixture-shape.md"]
+category = "reference"
+status = "living"
+title = "Summit Ops Registration Fixture Shape (generic ICN)"
+description = "Docs-only fixture-shape map specifying the exact schema-valid (action_item/complete, scope structure, fictional ids) registration ActionCard JSON to commit later into web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json, plus the validation path (validate-rehearsal-shell-fixtures.py + the Playwright e2e + Rehearsal Fixture Bundle gate), so the Registration Desk lane can move from fixture-ready to fixture-backed. Commits no runtime fixture; no real attendee data; docs-only."
+last_updated = "2026-06-26"
+owner = "matt"
+audiences = ["team", "organizers"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["pilot", "nycn", "summit", "action-cards", "fixture"]
+recommended_action = "keep"
+last_reviewed = "2026-06-26"
+
 [docs."docs/contracts/institution-package/README.md"]
 category = "reference"
 status = "living"
