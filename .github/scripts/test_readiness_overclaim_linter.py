@@ -127,6 +127,14 @@ class TestNonclaimContext(unittest.TestCase):
         line = "Must not claim: that any of this is production-ready or live federation."
         self.assertEqual(linter.scan_lines("x.md", [line]), [])
 
+    def test_disclaimer_does_not_mask_separate_overclaim(self):
+        # A readiness disclaimer in one clause must NOT line-skip a separate
+        # affirmative overclaim in another clause: only the disclaimer's own clause
+        # is exempt (via clause-local NEGATION_RE), the other clause still warns.
+        v = linter.scan_lines("x.md", ["This is not production-ready; ICN is generally available."])
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].rule, "general availability")
+
     def test_line_under_nonclaims_heading_suppressed(self):
         lines = ["## Nonclaims", "- ICN is production-ready and runs a live federation."]
         self.assertEqual(linter.scan_lines("x.md", lines), [])

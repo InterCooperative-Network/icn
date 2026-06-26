@@ -188,19 +188,24 @@ NONCLAIM_SECTION_RE = re.compile(
     r")\b"
 )
 
-# Explicit line-level nonclaim framing: the whole line tells the reader NOT to
-# claim something (or negates the red-line phrase itself), so an overclaim phrase
-# inside it is being forbidden, not asserted. Catches enumerations the
-# clause-local negation guard splits apart, e.g.
-# "Must not claim: ...; that any of this is production or live federation."
-# Kept to unambiguous nonclaim objects ("claim"/"formal pilot"/"organizer-ready")
-# and direct negations of the patterns, so it cannot mask a genuine assertion.
+# Explicit line-level nonclaim FRAMING: the whole line tells the reader NOT to
+# claim something, so an overclaim phrase inside it is being forbidden, not
+# asserted. Catches enumerations the clause-local negation guard splits apart,
+# e.g. "Must not claim: ...; that any of this is production or live federation."
+#
+# Because a match exempts the WHOLE line, this is kept to unambiguous nonclaim
+# *objects* ("claim" / "formal pilot" / "organizer-ready") only. It deliberately
+# does NOT include direct readiness negations like "not production-ready" /
+# "no live federation": those are handled precisely, clause-by-clause, by
+# NEGATION_RE — putting them here would let a disclaimer in one clause silently
+# mask a separate affirmative overclaim in another clause on the same line, e.g.
+# "This is not production-ready; ICN is generally available." (see the regression
+# test test_disclaimer_does_not_mask_separate_overclaim).
 NONCLAIM_LINE_RE = re.compile(
     r"(?i)("
     r"do(?:es)? not claim|must not (?:be )?claim(?:ed)?|cannot claim|never claim|"
     r"must not be (?:presented|shown)|should not be (?:claimed|presented|shown)|"
-    r"not (?:a )?formal pilot|no formal pilot|not organi[sz]er-ready|"
-    r"not production-ready|not ready for production|not live federation|no live federation"
+    r"not (?:a )?formal pilot|no formal pilot|not organi[sz]er-ready"
     r")"
 )
 
