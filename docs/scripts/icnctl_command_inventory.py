@@ -129,27 +129,27 @@ STATUS_ORDER = [STATUS_LIVE, STATUS_PARTIAL, STATUS_FIXTURE_DEMO, STATUS_PLANNED
 STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     # live — concrete handler + integration test (binary spawned, success asserted) or a
     # local-only, no-network operation.
-    "id init": (STATUS_LIVE, "local keystore init; integration-tested (`bins/icnctl/tests/backup_restore_test.rs`, `qr_code_test.rs` spawn the binary, assert success)"),
-    "id show": (STATUS_LIVE, "local keystore read; integration-tested (`backup_restore_test.rs`, `qr_code_test.rs`)"),
-    "backup": (STATUS_LIVE, "local data-dir backup; integration-tested (`backup_restore_test.rs` asserts success + tarball created)"),
-    "restore": (STATUS_LIVE, "local data-dir restore; integration-tested (`backup_restore_test.rs`)"),
-    "verify-backup": (STATUS_LIVE, "local backup verification; integration-tested (`backup_restore_test.rs`)"),
-    "coop entity-report": (STATUS_LIVE, "read-only local coop-store report; integration-tested (`coop_entity_report_test.rs`, `coop_entity_backfill_test.rs` assert success + JSON)"),
-    "coop entity-backfill-surrogates": (STATUS_LIVE, "local coop-store surrogate backfill; integration-tested (`coop_entity_backfill_test.rs` asserts success)"),
-    "device add": (STATUS_LIVE, "local keystore device add; integration-tested (`qr_code_test.rs` asserts success)"),
-    "completions": (STATUS_LIVE, "shell-completion generation via `clap_complete::generate`; local-only, no network (`main.rs` Commands::Completions)"),
-    "api export-openapi": (STATUS_LIVE, "serializes the embedded `icn_gateway::openapi::ApiDoc` to file/stdout; local-only, no gateway (`main.rs` ApiCommands::ExportOpenapi)"),
+    "id init": (STATUS_LIVE, "local keystore init; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`, `icn/bins/icnctl/tests/qr_code_test.rs` spawn the binary, assert success)"),
+    "id show": (STATUS_LIVE, "local keystore read; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`, `icn/bins/icnctl/tests/qr_code_test.rs`)"),
+    "backup": (STATUS_LIVE, "local data-dir backup; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs` asserts success + tarball created)"),
+    "restore": (STATUS_LIVE, "local data-dir restore; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`)"),
+    "verify-backup": (STATUS_LIVE, "local backup verification; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`)"),
+    "coop entity-report": (STATUS_LIVE, "read-only local coop-store report; integration-tested (`icn/bins/icnctl/tests/coop_entity_report_test.rs`, `icn/bins/icnctl/tests/coop_entity_backfill_test.rs` assert success + JSON)"),
+    "coop entity-backfill-surrogates": (STATUS_LIVE, "local coop-store surrogate backfill; integration-tested (`icn/bins/icnctl/tests/coop_entity_backfill_test.rs` asserts success)"),
+    "device add": (STATUS_LIVE, "local keystore device add; integration-tested (`icn/bins/icnctl/tests/qr_code_test.rs` asserts success)"),
+    "completions": (STATUS_LIVE, "shell-completion generation via `clap_complete::generate`; local-only, no network (`icn/bins/icnctl/src/main.rs` Commands::Completions)"),
+    "api export-openapi": (STATUS_LIVE, "serializes the embedded `icn_gateway::openapi::ApiDoc` to file/stdout; local-only, no gateway (`icn/bins/icnctl/src/main.rs` ApiCommands::ExportOpenapi)"),
     # partial — real work, but depends on incomplete/unproven runtime; not integration-tested end-to-end.
-    "audit verify": (STATUS_PARTIAL, "concrete gateway client `GET /v1/receipts/chain/{hash}` (`main.rs` AuditCommands::Verify); chain-verification algorithm covered by `audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested"),
+    "audit verify": (STATUS_PARTIAL, "concrete gateway client `GET /v1/receipts/chain/{hash}` (`icn/bins/icnctl/src/main.rs` AuditCommands::Verify); chain-verification algorithm covered by `icn/bins/icnctl/tests/audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested"),
     "preflight": (STATUS_PARTIAL, "runs real local health checks (data-dir, keystore open via `AgeKeyStore`) in `handle_preflight_command`; the gateway-connectivity check requires a running gateway; not integration-tested"),
     # planned — handler is an explicit placeholder / prints "not yet implemented".
-    "charter deploy": (STATUS_PLANNED, "handler validates the CCL doc locally, then prints \"Not yet implemented — charter deployment requires gateway integration\" (`main.rs` CharterCommands::Deploy)"),
-    "steward check-vui": (STATUS_PLANNED, "placeholder; validates input then prints \"VUI registry check requires running steward daemon\" (`main.rs` StewardCommands::CheckVui)"),
-    "steward start-enrollment": (STATUS_PLANNED, "placeholder for the full SDIS enrollment flow; requires a running steward daemon (`main.rs` StewardCommands::StartEnrollment)"),
-    "steward enrollment-status": (STATUS_PLANNED, "placeholder; ceremony status check requires a running steward daemon (`main.rs` StewardCommands::EnrollmentStatus)"),
-    "steward start-recovery": (STATUS_PLANNED, "placeholder for the full SDIS recovery flow; requires a running steward daemon (`main.rs` StewardCommands::StartRecovery)"),
-    "steward recovery-status": (STATUS_PLANNED, "placeholder; ceremony status check requires a running steward daemon (`main.rs` StewardCommands::RecoveryStatus)"),
-    "steward issue-token": (STATUS_PLANNED, "placeholder for the full SDIS token issuance flow; requires a running steward daemon (`main.rs` StewardCommands::IssueToken)"),
+    "charter deploy": (STATUS_PLANNED, "handler validates the CCL doc locally, then prints \"Not yet implemented — charter deployment requires gateway integration\" (`icn/bins/icnctl/src/main.rs` CharterCommands::Deploy)"),
+    "steward check-vui": (STATUS_PLANNED, "placeholder; validates input then prints \"VUI registry check requires running steward daemon\" (`icn/bins/icnctl/src/main.rs` StewardCommands::CheckVui)"),
+    "steward start-enrollment": (STATUS_PLANNED, "placeholder for the full SDIS enrollment flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::StartEnrollment)"),
+    "steward enrollment-status": (STATUS_PLANNED, "placeholder; ceremony status check requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::EnrollmentStatus)"),
+    "steward start-recovery": (STATUS_PLANNED, "placeholder for the full SDIS recovery flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::StartRecovery)"),
+    "steward recovery-status": (STATUS_PLANNED, "placeholder; ceremony status check requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::RecoveryStatus)"),
+    "steward issue-token": (STATUS_PLANNED, "placeholder for the full SDIS token issuance flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::IssueToken)"),
 }
 
 CFG_RE = re.compile(r"^\s*#\[cfg\((.+)\)\]\s*$")
@@ -342,6 +342,20 @@ def render(leaves: list[dict], unparsed: list[str], commit: str) -> str:
             "STATUS_BY_COMMAND keys not found among default-build commands "
             f"(renamed/removed?): {stale_keys}"
         )
+    # Validate values too, so a typo'd status or empty basis fails explicitly here rather
+    # than later during rendering/sorting. Curated entries must use one of the non-default
+    # statuses and carry a non-empty evidence basis.
+    valid_statuses = {STATUS_LIVE, STATUS_PARTIAL, STATUS_FIXTURE_DEMO, STATUS_PLANNED}
+    bad_values = sorted(
+        f"{k} (status={status!r}, basis={'empty' if not basis.strip() else 'ok'})"
+        for k, (status, basis) in STATUS_BY_COMMAND.items()
+        if status not in valid_statuses or not basis.strip()
+    )
+    if bad_values:
+        raise ValueError(
+            f"STATUS_BY_COMMAND values invalid (status must be one of {sorted(valid_statuses)} "
+            f"and basis must be non-empty): {bad_values}"
+        )
 
     by_role: dict[str, list[dict]] = {}
     role_counts: dict[str, int] = {}
@@ -427,8 +441,10 @@ def render(leaves: list[dict], unparsed: list[str], commit: str) -> str:
     o.append("")
     o.append("## Commands by role")
     o.append("")
-    o.append("Role is the **curated** top-level-group heuristic (needs review). `status` and "
-             "`proof` are uniform by construction (see the note above).")
+    o.append("Role is the **curated** top-level-group heuristic (needs review). `status` is a "
+             "**curated, per-command** classification (see the "
+             "[Implementation status](#implementation-status-classification) section); `proof` "
+             "is uniform at `L1` (declaration scan).")
     o.append("")
     for role in role_order:
         cmds = sorted(by_role.get(role, []), key=lambda x: x["path"])
@@ -481,7 +497,7 @@ def render(leaves: list[dict], unparsed: list[str], commit: str) -> str:
     o.append("- **`fixture-demo`** — a demo / fixture / rehearsal-only path, exercisable "
              "without live network/service; must not be implied as live operational use.")
     o.append("- **`planned`** — declared but the handler is a placeholder / TODO / prints "
-             "\"not yet implemented\" (or the feature is unavailable in the default build).")
+             "\"not yet implemented\".")
     o.append(f"- **`{UNIFORM_STATUS}`** — status not established from source/tests/docs in "
              "this pass; the conservative default.")
     o.append("")

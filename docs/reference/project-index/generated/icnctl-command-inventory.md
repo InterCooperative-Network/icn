@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T13:17:35+00:00
+Generated: 2026-06-26T13:27:08+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -19,7 +19,7 @@ Generated: 2026-06-26T13:17:35+00:00
 
 ## Snapshot
 
-- Source commit: `f06d5b0305ddb22551e0ec07b97185601df559ce`
+- Source commit: `439d3b18053d77b6bf9a015b12bcf66d47055b09`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
@@ -34,7 +34,7 @@ Generated: 2026-06-26T13:17:35+00:00
 
 ## Commands by role
 
-Role is the **curated** top-level-group heuristic (needs review). `status` and `proof` are uniform by construction (see the note above).
+Role is the **curated** top-level-group heuristic (needs review). `status` is a **curated, per-command** classification (see the [Implementation status](#implementation-status-classification) section); `proof` is uniform at `L1` (declaration scan).
 
 ### organizer (53)
 
@@ -235,7 +235,7 @@ Status is a **curated** classification (issue #2113), defaulting to `unknown / n
 - **`live`** — compiled in the default build, calls a concrete client/runtime path, and has evidence it works: an integration test that spawns the binary and asserts success, OR a local-only operation with no network dependency. **Not** asserted because a clap subcommand exists; **not** a production-readiness claim.
 - **`partial`** — the handler does real work but depends on incomplete/unproven runtime support (e.g. a live gateway) and is not integration-tested end-to-end.
 - **`fixture-demo`** — a demo / fixture / rehearsal-only path, exercisable without live network/service; must not be implied as live operational use.
-- **`planned`** — declared but the handler is a placeholder / TODO / prints "not yet implemented" (or the feature is unavailable in the default build).
+- **`planned`** — declared but the handler is a placeholder / TODO / prints "not yet implemented".
 - **`unknown / needs local verification`** — status not established from source/tests/docs in this pass; the conservative default.
 
 ### Counts by status (default build)
@@ -254,25 +254,25 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 
 | Command | Status | Basis (source/test evidence) | Source |
 |---|---|---|---|
-| `icnctl api export-openapi` | live | serializes the embedded `icn_gateway::openapi::ApiDoc` to file/stdout; local-only, no gateway (`main.rs` ApiCommands::ExportOpenapi) | `icn/bins/icnctl/src/main.rs`:267 |
-| `icnctl backup` | live | local data-dir backup; integration-tested (`backup_restore_test.rs` asserts success + tarball created) | `icn/bins/icnctl/src/main.rs`:98 |
-| `icnctl completions` | live | shell-completion generation via `clap_complete::generate`; local-only, no network (`main.rs` Commands::Completions) | `icn/bins/icnctl/src/main.rs`:214 |
-| `icnctl coop entity-backfill-surrogates` | live | local coop-store surrogate backfill; integration-tested (`coop_entity_backfill_test.rs` asserts success) | `icn/bins/icnctl/src/main.rs`:249 |
-| `icnctl coop entity-report` | live | read-only local coop-store report; integration-tested (`coop_entity_report_test.rs`, `coop_entity_backfill_test.rs` assert success + JSON) | `icn/bins/icnctl/src/main.rs`:230 |
-| `icnctl device add` | live | local keystore device add; integration-tested (`qr_code_test.rs` asserts success) | `icn/bins/icnctl/src/main.rs`:600 |
-| `icnctl id init` | live | local keystore init; integration-tested (`bins/icnctl/tests/backup_restore_test.rs`, `qr_code_test.rs` spawn the binary, assert success) | `icn/bins/icnctl/src/main.rs`:565 |
-| `icnctl id show` | live | local keystore read; integration-tested (`backup_restore_test.rs`, `qr_code_test.rs`) | `icn/bins/icnctl/src/main.rs`:568 |
-| `icnctl restore` | live | local data-dir restore; integration-tested (`backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:104 |
-| `icnctl verify-backup` | live | local backup verification; integration-tested (`backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:114 |
-| `icnctl audit verify` | partial | concrete gateway client `GET /v1/receipts/chain/{hash}` (`main.rs` AuditCommands::Verify); chain-verification algorithm covered by `audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested | `icn/bins/icnctl/src/main.rs`:330 |
+| `icnctl api export-openapi` | live | serializes the embedded `icn_gateway::openapi::ApiDoc` to file/stdout; local-only, no gateway (`icn/bins/icnctl/src/main.rs` ApiCommands::ExportOpenapi) | `icn/bins/icnctl/src/main.rs`:267 |
+| `icnctl backup` | live | local data-dir backup; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs` asserts success + tarball created) | `icn/bins/icnctl/src/main.rs`:98 |
+| `icnctl completions` | live | shell-completion generation via `clap_complete::generate`; local-only, no network (`icn/bins/icnctl/src/main.rs` Commands::Completions) | `icn/bins/icnctl/src/main.rs`:214 |
+| `icnctl coop entity-backfill-surrogates` | live | local coop-store surrogate backfill; integration-tested (`icn/bins/icnctl/tests/coop_entity_backfill_test.rs` asserts success) | `icn/bins/icnctl/src/main.rs`:249 |
+| `icnctl coop entity-report` | live | read-only local coop-store report; integration-tested (`icn/bins/icnctl/tests/coop_entity_report_test.rs`, `icn/bins/icnctl/tests/coop_entity_backfill_test.rs` assert success + JSON) | `icn/bins/icnctl/src/main.rs`:230 |
+| `icnctl device add` | live | local keystore device add; integration-tested (`icn/bins/icnctl/tests/qr_code_test.rs` asserts success) | `icn/bins/icnctl/src/main.rs`:600 |
+| `icnctl id init` | live | local keystore init; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`, `icn/bins/icnctl/tests/qr_code_test.rs` spawn the binary, assert success) | `icn/bins/icnctl/src/main.rs`:565 |
+| `icnctl id show` | live | local keystore read; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`, `icn/bins/icnctl/tests/qr_code_test.rs`) | `icn/bins/icnctl/src/main.rs`:568 |
+| `icnctl restore` | live | local data-dir restore; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:104 |
+| `icnctl verify-backup` | live | local backup verification; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:114 |
+| `icnctl audit verify` | partial | concrete gateway client `GET /v1/receipts/chain/{hash}` (`icn/bins/icnctl/src/main.rs` AuditCommands::Verify); chain-verification algorithm covered by `icn/bins/icnctl/tests/audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested | `icn/bins/icnctl/src/main.rs`:330 |
 | `icnctl preflight` | partial | runs real local health checks (data-dir, keystore open via `AgeKeyStore`) in `handle_preflight_command`; the gateway-connectivity check requires a running gateway; not integration-tested | `icn/bins/icnctl/src/main.rs`:203 |
-| `icnctl charter deploy` | planned | handler validates the CCL doc locally, then prints "Not yet implemented — charter deployment requires gateway integration" (`main.rs` CharterCommands::Deploy) | `icn/bins/icnctl/src/main.rs`:1718 |
-| `icnctl steward check-vui` | planned | placeholder; validates input then prints "VUI registry check requires running steward daemon" (`main.rs` StewardCommands::CheckVui) | `icn/bins/icnctl/src/main.rs`:1496 |
-| `icnctl steward enrollment-status` | planned | placeholder; ceremony status check requires a running steward daemon (`main.rs` StewardCommands::EnrollmentStatus) | `icn/bins/icnctl/src/main.rs`:1513 |
-| `icnctl steward issue-token` | planned | placeholder for the full SDIS token issuance flow; requires a running steward daemon (`main.rs` StewardCommands::IssueToken) | `icn/bins/icnctl/src/main.rs`:1544 |
-| `icnctl steward recovery-status` | planned | placeholder; ceremony status check requires a running steward daemon (`main.rs` StewardCommands::RecoveryStatus) | `icn/bins/icnctl/src/main.rs`:1538 |
-| `icnctl steward start-enrollment` | planned | placeholder for the full SDIS enrollment flow; requires a running steward daemon (`main.rs` StewardCommands::StartEnrollment) | `icn/bins/icnctl/src/main.rs`:1502 |
-| `icnctl steward start-recovery` | planned | placeholder for the full SDIS recovery flow; requires a running steward daemon (`main.rs` StewardCommands::StartRecovery) | `icn/bins/icnctl/src/main.rs`:1519 |
+| `icnctl charter deploy` | planned | handler validates the CCL doc locally, then prints "Not yet implemented — charter deployment requires gateway integration" (`icn/bins/icnctl/src/main.rs` CharterCommands::Deploy) | `icn/bins/icnctl/src/main.rs`:1718 |
+| `icnctl steward check-vui` | planned | placeholder; validates input then prints "VUI registry check requires running steward daemon" (`icn/bins/icnctl/src/main.rs` StewardCommands::CheckVui) | `icn/bins/icnctl/src/main.rs`:1496 |
+| `icnctl steward enrollment-status` | planned | placeholder; ceremony status check requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::EnrollmentStatus) | `icn/bins/icnctl/src/main.rs`:1513 |
+| `icnctl steward issue-token` | planned | placeholder for the full SDIS token issuance flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::IssueToken) | `icn/bins/icnctl/src/main.rs`:1544 |
+| `icnctl steward recovery-status` | planned | placeholder; ceremony status check requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::RecoveryStatus) | `icn/bins/icnctl/src/main.rs`:1538 |
+| `icnctl steward start-enrollment` | planned | placeholder for the full SDIS enrollment flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::StartEnrollment) | `icn/bins/icnctl/src/main.rs`:1502 |
+| `icnctl steward start-recovery` | planned | placeholder for the full SDIS recovery flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::StartRecovery) | `icn/bins/icnctl/src/main.rs`:1519 |
 
 ### Status non-claims
 
