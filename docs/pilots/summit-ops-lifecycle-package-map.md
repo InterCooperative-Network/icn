@@ -27,7 +27,7 @@ The single most important thing this map protects is the boundary between three 
 | Plane | What it is | What it owns | What it is **not** |
 |---|---|---|---|
 | **Google organizing reality** (live, today) | Google Drive / Docs / Sheets / Groups, the public site + registration, newsletters, meetings, email, committee/steward work | The actual live summit coordination — drafts, rosters, sponsor pipeline, attendee data, decisions-in-progress | Not in the repo. Not synced. Not replaced by git. |
-| **NYCN package repository** (repo-safe shapes) | The `InterCooperative-Network/nycn` repo: schemas, fixtures, mappings, validators, templates, runbooks, bootstrap/export artifacts, private-overlay *hooks*, package-local Summit structure | Repo-safe **shapes** — names, relationships, stewardship, scope, privacy class, ICN object mappings — and the bootstrap/export logic | Not a live organizing workspace. Organizers do **not** coordinate the summit in git. No private planning data lives here. |
+| **NYCN package repository** (repo-safe shapes) | Primarily the standalone `InterCooperative-Network/nycn` repo (the active package home): schemas, fixtures, mappings, validators, templates, runbooks, bootstrap/export artifacts, private-overlay *hooks*, package-local Summit structure. The in-monorepo `institutions/nycn/` directory is boundary-sensitive package-local **scaffold** pending reconciliation — not current operational truth (see [`source-of-truth-map.md`](../reference/project-index/source-of-truth-map.md) and [`source-tree-map.md`](../reference/project-index/source-tree-map.md)). | Repo-safe **shapes** — names, relationships, stewardship, scope, privacy class, ICN object mappings — and the bootstrap/export logic | Not a live organizing workspace. Organizers do **not** coordinate the summit in git. No private planning data lives here. |
 | **Future ICN node** (live runtime) | A node that imports the NYCN bootstrap package and runs the substrate | Live state: standing, action cards, receipts, provenance, role/capability-aware surfaces, node-hosted Summit Ops workflows | Does **not** exist as a node-hosted Summit Ops cockpit today. Its arrival is future, not current. |
 
 **The correct pipeline** runs left-to-right; nothing skips the human in the middle:
@@ -56,7 +56,7 @@ Summit Ops is **package-level meaning** (`Package` in the ICN vocabulary). It lo
 
 ## The meaning firewall (what is package vs ICN core)
 
-The firewall is CI-enforced in ICN core (`.github/scripts/firewall_denylist.py`). It decides which words may appear where:
+The firewall is enforced mechanically as **crate-layering**: `.github/scripts/firewall_denylist.py` verifies that kernel crates do not depend (directly or transitively) on domain/app crates. The vocabulary placement below is the **doctrine** that layering protects — the human-readable form in [`ICN_OPERATING_MODEL.md`](../architecture/ICN_OPERATING_MODEL.md), not a literal word-scan:
 
 - **ICN core may know (generic grammar):** `Entity`, `Structure`, `Activity`, `Program`, `Milestone`, `Meeting`, `ActionItem`, `ActionCard`, `Proposal`, `Vote`, `RoleAssignment`, `Standing`, `AuthorityGrant`, `Obligation`, `Allocation`, `Settlement`, `Artifact`, `Vault`, `Receipt`, `Agreement`.
 - **The NYCN package may know (local vocabulary):** *summit*, *sponsor packet*, *sponsor pipeline*, *speaker / session intake*, *venue walkthrough*, *accessibility intake*, *run-of-show*, *day-of roles*, *tech list*, *content committee*, *summit stage gates*.

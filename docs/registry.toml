@@ -3543,6 +3543,22 @@ domain_tags = ["pilot", "nycn", "communications", "action-cards", "accessibility
 recommended_action = "keep"
 last_reviewed = "2026-06-09"
 
+[docs."docs/pilots/summit-ops-lifecycle-package-map.md"]
+category = "reference"
+status = "living"
+title = "Summit Ops Lifecycle Package Map (generic ICN)"
+description = "Generic ICN-side map of how an institution package (NYCN motivating example, 2026 Summit) carries an event's full lifecycle (plan/prepare/run/close) onto the ICN vertical spine, preserving the Google-live / NYCN-package / future-ICN-node boundary. Reuses existing status + proof-level vocabulary; docs-only; no live sync, no partner-repo mutation, no formal-pilot claim."
+last_updated = "2026-06-26"
+owner = "matt"
+audiences = ["team", "organizers"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["pilot", "nycn", "summit", "lifecycle", "package-boundary"]
+recommended_action = "keep"
+last_reviewed = "2026-06-26"
+
 [docs."docs/contracts/institution-package/README.md"]
 category = "reference"
 status = "living"
