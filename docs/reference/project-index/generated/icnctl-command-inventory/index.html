@@ -1,0 +1,1180 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>`icnctl` Command Inventory (generated) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>project index</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>generated</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>icnctl command inventory</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/project-index/generated/icnctl-command-inventory.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1><code>icnctl</code> Command Inventory (generated)</h1>
+<blockquote>
+<p>Generated mechanically by <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/scripts/icnctl_command_inventory.py">`docs/scripts/icnctl_command_inventory.py`</a>. <strong>Do not hand-edit</strong> — rerun the script.
+Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code>  ·  Check drift: <code>python3 docs/scripts/icnctl_command_inventory.py --check</code>  ·  Issue <a href="https://github.com/InterCooperative-Network/icn/issues/2113" target="_blank" rel="noopener">#2113</a></p>
+</blockquote>
+<h2>What this proves / does not prove</h2>
+<ul>
+<li><strong>Proves:</strong> these <code>icnctl</code> command declarations exist in the clap command tree under <code>icn/bins/icnctl/src/**</code> at the snapshot commit (proof level <strong>L1</strong>).</li>
+<li><strong>Does NOT prove:</strong> that a command works, is safe for organizers, is production-ready, is wired to a live gateway, has correct auth/permissions, is part of a supported pilot flow, or is appropriate for non-technical users.</li>
+<li><strong><code>role</code> is a curated navigation heuristic</strong> (top-level command group -&gt; role), <strong>not</strong> mechanically derived from clap and <strong>needs review</strong>. It says &quot;where might I look first&quot;, never &quot;this user may safely run this&quot;.</li>
+<li><strong><code>status</code> is uniformly <code>unknown / needs local verification</code></strong> by construction: a static clap scan proves a command is <em>declared</em>, not whether it is <code>implemented</code> / <code>implemented but partial</code> / <code>fixture-backed</code> / <code>gateway-backed</code> / <code>docs-only / design-direction</code> / <code>planned</code>. Assigning those per command is a human/runtime follow-up — so nothing here is presented as live.</li>
+<li>Defer to canonical truth/precedence: <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">`source-of-truth-map.md`</a> and proof levels in <a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">`proof-level-taxonomy-capability-matrix.md`</a>. Orientation artifact (<code>Canonical: no</code>); companion to <a href="https://github.com/InterCooperative-Network/icn/blob/main/route-inventory">`generated/route-inventory.md`</a>.</li>
+</ul>
+<h2>Snapshot</h2>
+<ul>
+<li>Source commit: <code>1b9576e06a74658a45242ac19c7a934149bf5c08</code></li>
+<li>Source scanned: <code>icn/bins/icnctl/src/**</code> (clap <code>#[derive(Subcommand)]</code> / <code>#[derive(Parser)]</code> tree)</li>
+</ul>
+<h2>Summary</h2>
+<ul>
+<li><strong>Total leaf commands (default build): 162</strong></li>
+<li>Top-level command groups: 33</li>
+<li>By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2</li>
+<li>By status: every default-build command is <code>unknown / needs local verification</code> (162) — see note above.</li>
+<li>Proof level: every command is <code>L1</code> (declaration exists in source).</li>
+<li><strong>Feature-gated commands (NOT in the default build, excluded from the counts above): 1</strong> (see section below).</li>
+<li>Unparsed / unresolved candidates: 0 (see section below).</li>
+</ul>
+<h2>Commands by role</h2>
+<p>Role is the <strong>curated</strong> top-level-group heuristic (needs review). <code>status</code> and <code>proof</code> are uniform by construction (see the note above).</p>
+<h3>organizer (53)</h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Status</th>
+<th>Proof</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icnctl amendment add-change</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1867</td>
+</tr>
+<tr>
+<td><code>icnctl amendment list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1766</td>
+</tr>
+<tr>
+<td><code>icnctl amendment open-voting</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1809</td>
+</tr>
+<tr>
+<td><code>icnctl amendment propose</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1731</td>
+</tr>
+<tr>
+<td><code>icnctl amendment show</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1785</td>
+</tr>
+<tr>
+<td><code>icnctl amendment submit</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1795</td>
+</tr>
+<tr>
+<td><code>icnctl amendment vote</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1823</td>
+</tr>
+<tr>
+<td><code>icnctl amendment withdraw</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1849</td>
+</tr>
+<tr>
+<td><code>icnctl appeal add-evidence</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1972</td>
+</tr>
+<tr>
+<td><code>icnctl appeal file</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1904</td>
+</tr>
+<tr>
+<td><code>icnctl appeal list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1943</td>
+</tr>
+<tr>
+<td><code>icnctl appeal respond</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:2002</td>
+</tr>
+<tr>
+<td><code>icnctl appeal show</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1962</td>
+</tr>
+<tr>
+<td><code>icnctl appeal withdraw</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:2024</td>
+</tr>
+<tr>
+<td><code>icnctl charter create</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1614</td>
+</tr>
+<tr>
+<td><code>icnctl charter deploy</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1718</td>
+</tr>
+<tr>
+<td><code>icnctl charter inspect</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1704</td>
+</tr>
+<tr>
+<td><code>icnctl charter list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1651</td>
+</tr>
+<tr>
+<td><code>icnctl charter ratify</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1684</td>
+</tr>
+<tr>
+<td><code>icnctl charter show</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1641</td>
+</tr>
+<tr>
+<td><code>icnctl charter sign</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1666</td>
+</tr>
+<tr>
+<td><code>icnctl charter validate</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1698</td>
+</tr>
+<tr>
+<td><code>icnctl commons affiliations</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1582</td>
+</tr>
+<tr>
+<td><code>icnctl commons anchor</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1575</td>
+</tr>
+<tr>
+<td><code>icnctl commons enroll</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1564</td>
+</tr>
+<tr>
+<td><code>icnctl commons join</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1589</td>
+</tr>
+<tr>
+<td><code>icnctl commons leave</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1600</td>
+</tr>
+<tr>
+<td><code>icnctl commons status</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1561</td>
+</tr>
+<tr>
+<td><code>icnctl dispute add-evidence</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1394</td>
+</tr>
+<tr>
+<td><code>icnctl dispute assign-mediator</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1405</td>
+</tr>
+<tr>
+<td><code>icnctl dispute file</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1366</td>
+</tr>
+<tr>
+<td><code>icnctl dispute get</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1388</td>
+</tr>
+<tr>
+<td><code>icnctl dispute list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1377</td>
+</tr>
+<tr>
+<td><code>icnctl dispute resolve</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1416</td>
+</tr>
+<tr>
+<td><code>icnctl gov domain add-member</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1168</td>
+</tr>
+<tr>
+<td><code>icnctl gov domain create</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1127</td>
+</tr>
+<tr>
+<td><code>icnctl gov domain list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1165</td>
+</tr>
+<tr>
+<td><code>icnctl gov domain show</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1158</td>
+</tr>
+<tr>
+<td><code>icnctl gov proposal cancel</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1278</td>
+</tr>
+<tr>
+<td><code>icnctl gov proposal close</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1271</td>
+</tr>
+<tr>
+<td><code>icnctl gov proposal create</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1191</td>
+</tr>
+<tr>
+<td><code>icnctl gov proposal list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1253</td>
+</tr>
+<tr>
+<td><code>icnctl gov proposal open</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1242</td>
+</tr>
+<tr>
+<td><code>icnctl gov proposal show</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1264</td>
+</tr>
+<tr>
+<td><code>icnctl gov vote cast</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1288</td>
+</tr>
+<tr>
+<td><code>icnctl gov vote delegate</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1310</td>
+</tr>
+<tr>
+<td><code>icnctl gov vote delegations</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1325</td>
+</tr>
+<tr>
+<td><code>icnctl gov vote revoke</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1328</td>
+</tr>
+<tr>
+<td><code>icnctl gov vote show</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1303</td>
+</tr>
+<tr>
+<td><code>icnctl init-coop</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:128</td>
+</tr>
+<tr>
+<td><code>icnctl institution bootstrap apply</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/institution_bootstrap.rs</code>:49</td>
+</tr>
+<tr>
+<td><code>icnctl institution bootstrap plan</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/institution_bootstrap.rs</code>:38</td>
+</tr>
+<tr>
+<td><code>icnctl institution bootstrap validate</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/institution_bootstrap.rs</code>:27</td>
+</tr>
+</tbody></table>
+<h3>operator (64)</h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Status</th>
+<th>Proof</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icnctl audit verify</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:330</td>
+</tr>
+<tr>
+<td><code>icnctl backup</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:98</td>
+</tr>
+<tr>
+<td><code>icnctl federation add</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:862</td>
+</tr>
+<tr>
+<td><code>icnctl federation attestation from</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1022</td>
+</tr>
+<tr>
+<td><code>icnctl federation attestation issue</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1028</td>
+</tr>
+<tr>
+<td><code>icnctl federation attestation list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1016</td>
+</tr>
+<tr>
+<td><code>icnctl federation clearing create</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1059</td>
+</tr>
+<tr>
+<td><code>icnctl federation clearing list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1050</td>
+</tr>
+<tr>
+<td><code>icnctl federation clearing position</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1097</td>
+</tr>
+<tr>
+<td><code>icnctl federation clearing rate</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1078</td>
+</tr>
+<tr>
+<td><code>icnctl federation clearing settle</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1103</td>
+</tr>
+<tr>
+<td><code>icnctl federation clearing show</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1053</td>
+</tr>
+<tr>
+<td><code>icnctl federation config</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:884</td>
+</tr>
+<tr>
+<td><code>icnctl federation connect</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:878</td>
+</tr>
+<tr>
+<td><code>icnctl federation coop list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:944</td>
+</tr>
+<tr>
+<td><code>icnctl federation coop register</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:953</td>
+</tr>
+<tr>
+<td><code>icnctl federation coop show</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:947</td>
+</tr>
+<tr>
+<td><code>icnctl federation coop update</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:972</td>
+</tr>
+<tr>
+<td><code>icnctl federation gateway-connect</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:899</td>
+</tr>
+<tr>
+<td><code>icnctl federation invite</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:896</td>
+</tr>
+<tr>
+<td><code>icnctl federation peers</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:859</td>
+</tr>
+<tr>
+<td><code>icnctl federation remove</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:872</td>
+</tr>
+<tr>
+<td><code>icnctl federation set</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:887</td>
+</tr>
+<tr>
+<td><code>icnctl federation status</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:856</td>
+</tr>
+<tr>
+<td><code>icnctl federation vouch issue</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:989</td>
+</tr>
+<tr>
+<td><code>icnctl federation vouch list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1004</td>
+</tr>
+<tr>
+<td><code>icnctl federation vouch revoke</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1007</td>
+</tr>
+<tr>
+<td><code>icnctl network dial</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:837</td>
+</tr>
+<tr>
+<td><code>icnctl network peers</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:834</td>
+</tr>
+<tr>
+<td><code>icnctl network stats</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:847</td>
+</tr>
+<tr>
+<td><code>icnctl network status</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:850</td>
+</tr>
+<tr>
+<td><code>icnctl policy list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:531</td>
+</tr>
+<tr>
+<td><code>icnctl policy remove</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:534</td>
+</tr>
+<tr>
+<td><code>icnctl policy set</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:513</td>
+</tr>
+<tr>
+<td><code>icnctl policy show</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:524</td>
+</tr>
+<tr>
+<td><code>icnctl preflight</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:203</td>
+</tr>
+<tr>
+<td><code>icnctl quota list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:555</td>
+</tr>
+<tr>
+<td><code>icnctl quota show</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:544</td>
+</tr>
+<tr>
+<td><code>icnctl restore</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:104</td>
+</tr>
+<tr>
+<td><code>icnctl snapshot cleanup</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1356</td>
+</tr>
+<tr>
+<td><code>icnctl snapshot create</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1338</td>
+</tr>
+<tr>
+<td><code>icnctl snapshot delete</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1350</td>
+</tr>
+<tr>
+<td><code>icnctl snapshot list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1341</td>
+</tr>
+<tr>
+<td><code>icnctl snapshot verify</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1344</td>
+</tr>
+<tr>
+<td><code>icnctl status</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:51</td>
+</tr>
+<tr>
+<td><code>icnctl steward attesters</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1458</td>
+</tr>
+<tr>
+<td><code>icnctl steward check-vui</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1496</td>
+</tr>
+<tr>
+<td><code>icnctl steward config</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1433</td>
+</tr>
+<tr>
+<td><code>icnctl steward enrollment-status</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1513</td>
+</tr>
+<tr>
+<td><code>icnctl steward info</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1436</td>
+</tr>
+<tr>
+<td><code>icnctl steward issue-token</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1544</td>
+</tr>
+<tr>
+<td><code>icnctl steward list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1445</td>
+</tr>
+<tr>
+<td><code>icnctl steward recovery-status</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1538</td>
+</tr>
+<tr>
+<td><code>icnctl steward register</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1465</td>
+</tr>
+<tr>
+<td><code>icnctl steward retire</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1487</td>
+</tr>
+<tr>
+<td><code>icnctl steward start-enrollment</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1502</td>
+</tr>
+<tr>
+<td><code>icnctl steward start-recovery</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1519</td>
+</tr>
+<tr>
+<td><code>icnctl steward status</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1430</td>
+</tr>
+<tr>
+<td><code>icnctl steward topics</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1555</td>
+</tr>
+<tr>
+<td><code>icnctl trust add</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:694</td>
+</tr>
+<tr>
+<td><code>icnctl trust list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:707</td>
+</tr>
+<tr>
+<td><code>icnctl trust remove</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:716</td>
+</tr>
+<tr>
+<td><code>icnctl trust show</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:710</td>
+</tr>
+<tr>
+<td><code>icnctl verify-backup</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:114</td>
+</tr>
+</tbody></table>
+<h3>developer (43)</h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Status</th>
+<th>Proof</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icnctl api export-openapi</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:267</td>
+</tr>
+<tr>
+<td><code>icnctl auth token</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:410</td>
+</tr>
+<tr>
+<td><code>icnctl completions</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:214</td>
+</tr>
+<tr>
+<td><code>icnctl compute cancel</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:500</td>
+</tr>
+<tr>
+<td><code>icnctl compute status</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:494</td>
+</tr>
+<tr>
+<td><code>icnctl compute submit</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:432</td>
+</tr>
+<tr>
+<td><code>icnctl compute submit-wasm</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:463</td>
+</tr>
+<tr>
+<td><code>icnctl contract call</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:812</td>
+</tr>
+<tr>
+<td><code>icnctl contract deploy</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:779</td>
+</tr>
+<tr>
+<td><code>icnctl contract deploy-signed</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:806</td>
+</tr>
+<tr>
+<td><code>icnctl contract list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:828</td>
+</tr>
+<tr>
+<td><code>icnctl contract prepare</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:786</td>
+</tr>
+<tr>
+<td><code>icnctl contract sign</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:796</td>
+</tr>
+<tr>
+<td><code>icnctl device add</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:600</td>
+</tr>
+<tr>
+<td><code>icnctl device approve</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:614</td>
+</tr>
+<tr>
+<td><code>icnctl device list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:597</td>
+</tr>
+<tr>
+<td><code>icnctl device revoke</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:620</td>
+</tr>
+<tr>
+<td><code>icnctl id export</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:582</td>
+</tr>
+<tr>
+<td><code>icnctl id import</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:588</td>
+</tr>
+<tr>
+<td><code>icnctl id init</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:565</td>
+</tr>
+<tr>
+<td><code>icnctl id rotate</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:571</td>
+</tr>
+<tr>
+<td><code>icnctl id show</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:568</td>
+</tr>
+<tr>
+<td><code>icnctl ledger balance</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:728</td>
+</tr>
+<tr>
+<td><code>icnctl ledger head</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:725</td>
+</tr>
+<tr>
+<td><code>icnctl ledger history</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:738</td>
+</tr>
+<tr>
+<td><code>icnctl ledger quarantine drop</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:767</td>
+</tr>
+<tr>
+<td><code>icnctl ledger quarantine get</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:755</td>
+</tr>
+<tr>
+<td><code>icnctl ledger quarantine list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:752</td>
+</tr>
+<tr>
+<td><code>icnctl ledger quarantine purge</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:773</td>
+</tr>
+<tr>
+<td><code>icnctl ledger quarantine release</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:761</td>
+</tr>
+<tr>
+<td><code>icnctl receipts allocation</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:299</td>
+</tr>
+<tr>
+<td><code>icnctl receipts chain</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:281</td>
+</tr>
+<tr>
+<td><code>icnctl receipts intent</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:313</td>
+</tr>
+<tr>
+<td><code>icnctl recovery attest</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:656</td>
+</tr>
+<tr>
+<td><code>icnctl recovery cancel</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:681</td>
+</tr>
+<tr>
+<td><code>icnctl recovery config</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:647</td>
+</tr>
+<tr>
+<td><code>icnctl recovery finalize</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:675</td>
+</tr>
+<tr>
+<td><code>icnctl recovery initiate</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:650</td>
+</tr>
+<tr>
+<td><code>icnctl recovery list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:666</td>
+</tr>
+<tr>
+<td><code>icnctl recovery setup</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:633</td>
+</tr>
+<tr>
+<td><code>icnctl recovery status</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:669</td>
+</tr>
+<tr>
+<td><code>icnctl registry list</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:366</td>
+</tr>
+<tr>
+<td><code>icnctl registry trace</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:389</td>
+</tr>
+</tbody></table>
+<h3>maintainer (2)</h3>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Status</th>
+<th>Proof</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icnctl coop entity-backfill-surrogates</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:249</td>
+</tr>
+<tr>
+<td><code>icnctl coop entity-report</code></td>
+<td>unknown / needs local verification</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:230</td>
+</tr>
+</tbody></table>
+<h2>Feature-gated commands (not in the default build)</h2>
+<p>These commands are guarded by a Cargo <code>#[cfg(feature = …)]</code> and are <strong>absent from the default <code>icnctl</code> build</strong> (<code>icn/bins/icnctl/Cargo.toml</code> has <code>default = []</code>). They are <strong>excluded</strong> from the counts and role tables above and only exist when the named feature is enabled at build time.</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Required cfg</th>
+<th>Role (curated)</th>
+<th>Proof</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icnctl id upgrade-pq</code></td>
+<td><code>cfg(feature = &quot;post-quantum&quot;)</code></td>
+<td>developer</td>
+<td>L1</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:579</td>
+</tr>
+</tbody></table>
+<h2>Commands by status</h2>
+<p>All 162 default-build commands carry the conservative status <code>unknown / needs local verification</code>. The static clap scan cannot mechanically distinguish <code>implemented</code> / <code>implemented but partial</code> / <code>fixture-backed</code> / <code>gateway-backed</code> / <code>docs-only / design-direction</code> / <code>planned</code>; that per-command classification is a human/runtime verification follow-up (so demo/dev-gated commands are never presented here as live).</p>
+<h2>Unparsed / unknown candidates</h2>
+<ul>
+<li>None: every top-level variant resolved to either a leaf command or a parsed <code>#[derive(Subcommand)]</code> enum.</li>
+</ul>
+<h2>Safe vs unsafe claims (examples)</h2>
+<ul>
+<li>✅ Safe: &quot;<code>icnctl api export-openapi</code> is declared in the CLI at this commit (L1).&quot;</li>
+<li>✅ Safe: &quot;<code>icnctl</code> declares 162 commands across these groups; role grouping is a curated navigation aid pending review.&quot;</li>
+<li>❌ Unsafe: &quot;<code>icnctl gov …</code> is organizer-ready&quot; / &quot;this command is live in production&quot; / &quot;this command is safe for non-technical organizers&quot; — none of that is established by a declaration scan.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
