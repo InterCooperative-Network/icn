@@ -209,9 +209,9 @@ NONCLAIM_LINE_RE = re.compile(
     # Caveat prefixes that PRESENT the phrase as a bad example / unsafe claim
     # (e.g. "Unsafe without more evidence: ICN is production-ready ...").
     r"unsafe (?:without[^:]*evidence|claim|to (?:claim|say))|do not say|don't say|avoid saying|"
-    # Meta-statements ABOUT making the claim, not the claim itself
-    # (e.g. "A live federation claim requires more than working code.").
-    r"claims? (?:require|requires|need|needs|would require)|"
+    # (NB: "<phrase> claim requires ..." meta-statements are handled per-match by
+    # _describes_a_claim, NOT here — a line-level skip would mask a separate
+    # affirmative overclaim in a later clause of the same line.)
     # A line that is itself enumerating nonclaims (e.g. a PR-checklist item
     # "Includes nonclaims for ... live federation").
     r"\bnonclaims?\b|"
@@ -252,6 +252,17 @@ def _labels_a_risk(line, end):
     return "overclaim" in line[end:end + 20].lower()
 
 
+_CLAIM_META_RE = re.compile(r"(?i)^\s*claims?\s+(?:require|requires|need|needs|would require)\b")
+
+
+def _describes_a_claim(line, end):
+    """True if the matched phrase is immediately followed by "claim requires/needs"
+    — a meta-statement ABOUT making the claim (e.g. "A live federation claim
+    requires evidence"), not the claim itself. Scoped to the text right after the
+    match so a separate affirmative overclaim later on the line still warns."""
+    return bool(_CLAIM_META_RE.match(line[end:end + 24]))
+
+
 def scan_lines(rel_path, lines):
     """Flag affirmative readiness claims; honour banner, nonclaim context,
     negation, and allowlist."""
@@ -276,9 +287,16 @@ def scan_lines(rel_path, lines):
             m = pattern.search(line)
             if not m:
                 continue
-            # Per-match precision: a quoted example phrase (`"production-ready"`) or
-            # a risk-labelled phrase ("live federation overclaim") is not a claim.
-            if _phrase_is_quoted(line, m.start(), m.end()) or _labels_a_risk(line, m.end()):
+            # Per-match precision: a quoted example phrase (`"production-ready"`), a
+            # risk-labelled phrase ("live federation overclaim"), or a phrase
+            # followed by "claim requires ..." (a meta-statement about the claim) is
+            # not itself an affirmative claim. All scoped to THIS match so a separate
+            # overclaim elsewhere on the line still warns.
+            if (
+                _phrase_is_quoted(line, m.start(), m.end())
+                or _labels_a_risk(line, m.end())
+                or _describes_a_claim(line, m.end())
+            ):
                 continue
             # Only the overclaim's own clause exempts it — not an unrelated
             # negation/conditional elsewhere on the same line.

@@ -211,6 +211,13 @@ class TestProjectIndexFP(unittest.TestCase):
         line = "A live federation claim requires a governed inter-institutional relationship and evidence."
         self.assertEqual(linter.scan_lines("x.md", [line]), [])
 
+    def test_claim_requires_does_not_mask_separate_overclaim(self):
+        # The "claim requires" exemption is per-match (scoped to the described
+        # phrase), so a separate affirmative overclaim in another clause still warns.
+        v = linter.scan_lines("x.md", ["A live federation claim requires evidence; ICN is production-ready."])
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].rule, "production-ready")
+
     def test_without_requiring_live_federation_suppressed(self):
         line = "The operator ladder walks drive content into proofs without requiring a live federation step."
         self.assertEqual(linter.scan_lines("x.md", [line]), [])
