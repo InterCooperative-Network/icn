@@ -167,4 +167,5 @@ The smallest claim-safe steps that move the rehearsal from "evidence exists" tow
 | Real runtime surfaces | [`runtime-surface-map.md`](runtime-surface-map.md) |
 | Generated route declarations | [`generated/route-inventory.md`](generated/route-inventory.md) |
 | Generated `icnctl` command declarations | [`generated/icnctl-command-inventory.md`](generated/icnctl-command-inventory.md) |
+| How an event's full lifecycle (plan/prepare/run/close) maps onto package + future runtime | [`docs/pilots/summit-ops-lifecycle-package-map.md`](../../pilots/summit-ops-lifecycle-package-map.md) |
 | The milestone | [#1746](https://github.com/InterCooperative-Network/icn/issues/1746) · [#2141](https://github.com/InterCooperative-Network/icn/issues/2141) |
