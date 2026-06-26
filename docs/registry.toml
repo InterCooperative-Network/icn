@@ -3587,7 +3587,7 @@ truth_class = "descriptive"
 role = "reference"
 canonical = "no"
 freshness = "current"
-domain_tags = ["pilot", "nycn", "summit", "action-card", "proof-loop"]
+domain_tags = ["pilot", "nycn", "summit", "action-cards", "proof-loop"]
 recommended_action = "keep"
 last_reviewed = "2026-06-26"
 

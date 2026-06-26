@@ -75,7 +75,7 @@ The candidate maps to the one **already-emitted, schema-valid** ActionCard pair 
 
 > **Schema-vs-package note.** The NYCN package's `complete-action-item` template (`institution/action-card-templates.example.yaml`) lists richer `source_kind`s (`program_milestone`, `committee_log`). Those are **not** in the current ICN-core emitted `source_kind` enum and are **not** reserved RFC-gated values — modeling this lane against them would point implementers at an invalid ActionCard. Treat any such richer source-kind as a **future schema / source-kind change** (a separate ADR/RFC + `action-card.schema.json` update), not as something emittable today.
 
-The card would surface on the holder's member shell via the declared `GET /gov/me/action-cards` route (declaration only — see proof discipline below).
+The card would surface on the holder's member shell via the declared `GET /v1/gov/me/action-cards` route (declaration only — see proof discipline below).
 
 ## Authorized completion action
 
@@ -109,12 +109,12 @@ This is a **shape and rehearsal path**, not running software. The closest existi
 
 ## ICN route / command touchpoints
 
-Declarations only — from the generated inventories, which prove **L1** (a declaration exists in source), not correctness, auth, live wiring, or readiness:
+Declarations only — from the generated inventories, which prove **L1** (a declaration exists in source), not correctness, auth, live wiring, or readiness. Paths are shown in their **served `/v1/gov/...` form** (matching [`runtime-surface-map.md`](../reference/project-index/runtime-surface-map.md) and the member shell); the governance app registers them under `/gov/...` and the gateway mounts them at `/v1/gov/...`:
 
 | Touchpoint | Source | Inventory proof | Stronger recorded proof |
 |---|---|---|---|
-| `GET /gov/me/action-cards` | governance app (`get_my_action_cards`) | L1 | L5 live for emitted source paths (matrix row 8) — generic, not this lane |
-| `GET /gov/domains/{domain_id}/action-items/{item_id}/completion-receipt` | governance app (`get_action_item_completion_receipt`) | L1 | L5 receipt-chain path (matrix rows 1, 8) — generic |
+| `GET /v1/gov/me/action-cards` | governance app (`get_my_action_cards`) | L1 | L5 live for emitted source paths (matrix row 8) — generic, not this lane |
+| `GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt` | governance app (`get_action_item_completion_receipt`) | L1 | L5 receipt-chain path (matrix rows 1, 8) — generic |
 | `icnctl audit verify` | `icnctl` (`main.rs:330`) | L1 | part of the L4/L5 receipt-chain path (matrix rows 1, 5) |
 | `icnctl receipts chain` | `icnctl` (`main.rs:281`) | L1 | part of the L4/L5 receipt-chain path |
 
