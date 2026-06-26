@@ -6,7 +6,9 @@ Last Reviewed: 2026-06-26
 
 # Summit Ops Registration Fixture Shape (generic ICN)
 
-> For current project truth, defer to [`docs/STATE.md`](../STATE.md) and [`docs/PHASE_PROGRESS.md`](../PHASE_PROGRESS.md). This is a **docs-only fixture-shape map**: it specifies the exact, schema-valid JSON a future contributor would commit so the [Registration Desk proof loop](summit-ops-registration-action-card-proof-loop.md) can move from **fixture-ready** to genuinely **fixture-backed**. It commits **no runtime fixture** itself, syncs no Google surface, mutates no partner repo, and uses no real attendee data.
+> **Status update:** the card this doc specifies has since been **committed** to `web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json` and validated (per-card schema + `demo-fixture-preload.spec.js` + `standing-action-cards.spec.js` + the rehearsal-shell bundle validator), so the Registration Desk lane is now **fixture-backed at L2** (committed fictional fixture; not a runtime proof). This doc remains the **spec / rationale** for that fixture.
+
+> For current project truth, defer to [`docs/STATE.md`](../STATE.md) and [`docs/PHASE_PROGRESS.md`](../PHASE_PROGRESS.md). This is a **fixture-shape map**: it specifies the exact, schema-valid JSON committed so the [Registration Desk proof loop](summit-ops-registration-action-card-proof-loop.md) moved from **fixture-ready** to genuinely **fixture-backed**. It syncs no Google surface, mutates no partner repo, and uses no real attendee data.
 
 ## Purpose
 
@@ -89,8 +91,8 @@ Fictional / categorical only. Never commit: real attendee names, registration li
 
 ## Next slices
 
-1. Commit the registration card above into `action-cards.json`; run the validators + e2e + Rehearsal Fixture Bundle gate; flip the lane to **fixture-backed** in the proof-loop map.
-2. Wire / confirm the shell renders the registration action register from the committed fixture.
+1. ~~Commit the registration card above into `action-cards.json`; run the validators + e2e + Rehearsal Fixture Bundle gate; flip the lane to **fixture-backed**.~~ **Done** — card committed + validated; lane is fixture-backed (L2).
+2. Wire / confirm the shell renders the full registration action register (not just the single card) from committed fixtures.
 3. Add a second lane's fixture shape (room monitors or closing/cleanup) the same way.
 
 ## Where to read deeper

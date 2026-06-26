@@ -6,7 +6,7 @@ Last Reviewed: 2026-06-26
 
 # Summit Ops Registration Action-Card Proof Loop (generic ICN)
 
-> For current project truth, defer to [`docs/STATE.md`](../STATE.md) and [`docs/PHASE_PROGRESS.md`](../PHASE_PROGRESS.md). This is a **generic ICN-side, fictional, fixture-ready proof-loop map** for one event-day lane — the Registration Desk — taken from the [run-stage facilitator path](summit-ops-run-stage-facilitator-path.md). (Fixture-ready, not fixture-backed: no registration-lane fixtures are committed yet — see "What is fixture-ready now" below.) It is a **proof-loop map / rehearsal-ready shape**, not a runtime proof: no action-card loop has been executed for this lane. It changes no code, syncs no Google surface, mutates no partner repo, and commits no real attendee data.
+> For current project truth, defer to [`docs/STATE.md`](../STATE.md) and [`docs/PHASE_PROGRESS.md`](../PHASE_PROGRESS.md). This is a **generic ICN-side, fictional proof-loop map** for one event-day lane — the Registration Desk — taken from the [run-stage facilitator path](summit-ops-run-stage-facilitator-path.md). The lane is now **fixture-backed at L2**: a committed fictional registration ActionCard in the organizer-demo bundle, loaded by the rehearsal shell and validated by the fixture-content e2e — see "What is fixture-backed now" below. It remains a **proof-loop map / rehearsal-ready shape**, **not a runtime proof**: no live daemon has executed an action-card→receipt loop for this lane. It changes no code, syncs no Google surface, mutates no partner repo, and commits no real attendee data.
 
 ## Purpose
 
@@ -36,7 +36,7 @@ The Registration Desk is operationally central (it gates arrival and touches eve
 ## What this path is for
 
 - Showing the minimal ICN proof loop for one lane, on fiction, so a steward can rehearse it.
-- Giving the run stage a concrete, fixture-ready shape that maps to future ICN action cards / receipts / evidence.
+- Giving the run stage a concrete, fixture-backed shape (a committed fictional ActionCard) that maps to future ICN action cards / receipts / evidence.
 
 ## What this path is not
 
@@ -93,7 +93,7 @@ A repo-safe evidence-export candidate: basenames + status categories only, e.g. 
 
 A fictional follow-up shape, e.g. "review walk-in escalation handling for next cycle" — a package-side close-stage item (the NYCN package may track these as committee-log / milestone categories; those are package vocabulary, not ICN-core ActionCard `source_kind`s). No person-identifying content.
 
-## Minimal walkthrough (fixture-ready shape)
+## Minimal walkthrough (fixture-backed)
 
 ```text
 fictional registration source packet
@@ -105,7 +105,7 @@ fictional registration source packet
   → a post-event follow-up item is produced
 ```
 
-This is a **shape and rehearsal path**, not running software, and **no registration-lane fixtures are committed yet** — the shell's current pack (`web/pilot-ui/fixtures/icn-organizer-demo/`) holds an accessibility/checklist `action_item/complete` card plus standing/preview fixtures, **not** registration-desk rows, so a steward cannot rehearse *this* lane from committed fixtures today. The closest existing surface is the fixture-backed rehearsal shell (`fixture-backed`, L2 — [capability matrix](../reference/project-index/proof-level-taxonomy-capability-matrix.md) row 7); adding the registration-lane fixtures and wiring the shell to render this lane's register is the open milestone ([#1746](https://github.com/InterCooperative-Network/icn/issues/1746)). Until then this lane is **fixture-ready, not fixture-backed**.
+This is a **shape and rehearsal path**, not running software. As of the registration-fixture slice, a committed fictional registration card (`demo-card-action-item-complete-registration-001`) lives in `web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json`, so the shell can load this lane's card from committed fixtures and the fixture-content e2e (`demo-fixture-preload.spec.js`) validates it. This lane is therefore **fixture-backed at L2** (a committed fictional fixture the rehearsal shell loads and the e2e validates — [capability matrix](../reference/project-index/proof-level-taxonomy-capability-matrix.md) row 7), **not** a runtime proof: no live daemon executed an action-card→receipt loop here, and it proves nothing about live NYCN action cards/receipts or a node-hosted Summit Ops cockpit. Wiring the shell to render the full lane register remains part of the open milestone ([#1746](https://github.com/InterCooperative-Network/icn/issues/1746)).
 
 ## ICN route / command touchpoints
 
@@ -123,22 +123,22 @@ Higher proof exists **only** where the [capability matrix](../reference/project-
 ## Proof level
 
 - This map: **L1** (a declared shape / mapping exists in source).
+- The committed registration-lane **fixture**: **L2** — a fictional `action_item/complete` ActionCard committed to the organizer-demo bundle, validated per-card against `action-card.schema.json` and by the fixture-content e2e (`demo-fixture-preload.spec.js`). Fixture/demo evidence, not runtime proof.
 - The generic `action_item/complete → ActionItemCompletionReceipt` loop: **L5** generic proof on fictional fixtures (matrix rows 1/8).
-- The NYCN registration-lane loop end-to-end: **`planned`** — *not exercised*. `icn_target_status: planned` (the action-card path is `partially-supported` only generically).
+- The NYCN registration-lane loop end-to-end (a live daemon emitting the card and recording the receipt): **`planned`** — *not exercised*. `icn_target_status: planned` (the action-card path is `partially-supported` only generically).
 
-Because this PR is docs-only, it is a **proof-loop map / rehearsal-ready shape**, not a runtime proof. No fixture/proof command was run for this lane.
+The lane is **fixture-backed (L2)** — a committed fictional fixture rendered/validated in the shell — which is **not** live runtime proof, not live NYCN action cards/receipts, and not a node-hosted Summit Ops cockpit.
 
 ## Privacy boundaries
 
 Never committed: real attendee names; real registration roll; real emails; phone numbers; accessibility/accommodation details; medical details; payment/settlement details; raw Google Docs/Sheets/Groups exports; credentials/tokens; private Drive URLs. Registration Desk is `attendee-restricted`. Rehearsal privacy is by **exclusion** (fictional fixtures), not enforced disclosure (`private-boundary`; enforcement is design-only, L1 — matrix row 9). Attendance is modeled as **count categories**, never a roll.
 
-## What is fixture-ready now (shapes only — no committed lane fixtures yet)
+## What is fixture-backed now
 
-- The fictional registration source packet + checklist **shape** (in this doc; not yet a committed JSON fixture the shell loads).
-- The action-card candidate **shape** (schema-valid `action_item`/`complete`), with fictional title and id-only payload.
-- The receipt/evidence candidate **shapes** (basenames + status categories).
+- A committed fictional registration ActionCard (`demo-card-action-item-complete-registration-001`, schema-valid `action_item`/`complete`, `scope: structure`, fictional ids) in `web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json` — loaded by the rehearsal shell and validated by `demo-fixture-preload.spec.js` (fetches `action-cards.json`; asserts wrapper + per-card required fields + `scope`/`risk_level` enums) and per-card against `action-card.schema.json`.
+- The fictional registration source packet + checklist **shape** and the receipt/evidence candidate **shapes** (basenames + status categories) — still doc-level shapes, not yet separate committed fixtures.
 
-**No registration-lane fixtures are committed yet.** The shell's current pack (`web/pilot-ui/fixtures/icn-organizer-demo/`) holds an accessibility/checklist `action_item/complete` card plus standing/preview fixtures — **not** registration-desk/badge-packet/walk-in rows — so a steward cannot today rehearse *this* lane from committed fixtures. Adding those lane fixtures so the shell can render this lane's source/action/evidence rows is a next slice; until then this lane is **fixture-ready, not fixture-backed**.
+What this **does not** mean: it is not a runtime proof (no live daemon executed an action-card→receipt loop), not live NYCN action cards/receipts, not a node-hosted Summit Ops cockpit, and uses no real registration data. The full source/action/evidence-register rendering is still part of the open milestone ([#1746](https://github.com/InterCooperative-Network/icn/issues/1746)).
 
 ## What remains planned / unknown
 
@@ -169,7 +169,7 @@ Never committed: real attendee names; real registration roll; real emails; phone
 | You want… | Read |
 |---|---|
 | The event-day run-stage facilitator path (parent) | [`summit-ops-run-stage-facilitator-path.md`](summit-ops-run-stage-facilitator-path.md) |
-| The exact fixture shape to commit so this lane becomes fixture-backed | [`summit-ops-registration-fixture-shape.md`](summit-ops-registration-fixture-shape.md) |
+| The fixture shape spec (the card it specifies is now committed — this lane is fixture-backed) | [`summit-ops-registration-fixture-shape.md`](summit-ops-registration-fixture-shape.md) |
 | The full event lifecycle map | [`summit-ops-lifecycle-package-map.md`](summit-ops-lifecycle-package-map.md) |
 | Recorded proof per capability | [`proof-level-taxonomy-capability-matrix.md`](../reference/project-index/proof-level-taxonomy-capability-matrix.md) |
 | Real runtime surfaces (action cards, receipts) | [`runtime-surface-map.md`](../reference/project-index/runtime-surface-map.md) |
