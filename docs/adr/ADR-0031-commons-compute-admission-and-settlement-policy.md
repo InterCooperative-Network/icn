@@ -28,7 +28,7 @@ references:
 
 ## Context
 
-ICN's commons compute is the shared-infrastructure layer: members and federated peers contribute compute capacity to a pool, and consumers draw from it under a trust-gated admission policy. Settlement runs on mutual credit, balanced earn/spend journal entries (ADR-0005), and is regulatory-safe in vocabulary (ADR-0004).
+ICN's commons compute is the shared-infrastructure layer: members and federated peers contribute compute capacity to a pool, and consumers draw from it under a trust-gated admission policy. Settlement runs on mutual credit, balanced contribution/allocation journal entries (ADR-0005), and is regulatory-safe in vocabulary (ADR-0004).
 
 The pool, admission policy, and settlement engine have been implemented and tested for some time. The pieces:
 

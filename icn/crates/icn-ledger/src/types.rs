@@ -112,11 +112,11 @@ pub struct JournalEntry {
     /// When present, the nonce is included in the content hash computation,
     /// ensuring that entries with identical amounts/accounts/timestamps
     /// produce distinct hashes. This prevents silent deduplication of
-    /// legitimate repeat transactions (e.g., two separate earn events
+    /// legitimate repeat transactions (e.g., two separate contribution events
     /// for the same amount).
     ///
     /// For commons credit entries, this should be set to the `receipt_id`
-    /// of the `ExecutionReceipt` that triggered the earn/spend.
+    /// of the `ExecutionReceipt` that triggered the contribution/allocation settlement.
     ///
     /// Note: Do NOT use `skip_serializing_if` here — while the ledger
     /// currently uses serde_json (which tolerates missing fields),

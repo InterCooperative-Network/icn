@@ -70,7 +70,7 @@ ICN's existing decisions about economic coordination:
 - [ADR-0007: Commons Resource Policy — CCL Formula Extraction](../adr/ADR-0007-commons-resource-policy-ccl-formula-extraction.md) — CCL bridge for resource-policy formulas.
 - [ADR-0013: Federation Clearing Adoption Contract](../adr/ADR-0013-federation-clearing-adoption-contract.md) — dual-path clearing model with store isolation now proven by `crates/icn-federation/tests/store_isolation_clearing_adoption.rs` (PR #1650).
 - [ADR-0026: Receipt and Provenance Proof Envelope](../adr/ADR-0026-receipt-and-provenance-proof-envelope.md) — the layered envelope this RFC's bridge receipts plug into.
-- [ADR-0031: Commons Compute Admission and Settlement Policy](../adr/ADR-0031-commons-compute-admission-and-settlement-policy.md) — back-fill of the settlement engine producing balanced earn/spend journal entries.
+- [ADR-0031: Commons Compute Admission and Settlement Policy](../adr/ADR-0031-commons-compute-admission-and-settlement-policy.md) — back-fill of the settlement engine producing balanced contribution/allocation journal entries.
 
 Open issues this RFC informs:
 

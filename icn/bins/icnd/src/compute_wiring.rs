@@ -71,9 +71,10 @@ pub fn create_balance_callback(ledger: LedgerHandle) -> icn_compute::BalanceCall
         match ledger.try_read() {
             Ok(guard) => {
                 // The ICN ledger uses net_change = debit - credit, so `credit` entries
-                // (which record earnings) produce a NEGATIVE raw balance. Negate to convert
-                // "earned credit balance" → "spendable capacity" (positive = can spend).
-                // Example: earn 1000 → raw balance = -1000 → capacity = +1000.
+                // (which record recognized contributions) produce a NEGATIVE raw balance.
+                // Negate to convert "recognized-contribution balance" → "drawable capacity"
+                // (positive = capacity available to draw).
+                // Example: recognize 1000 → raw balance = -1000 → capacity = +1000.
                 -guard.get_balance(&did, icn_ledger::commons_credits::COMMONS_CREDIT_CURRENCY)
             }
             Err(_) => {
@@ -219,7 +220,7 @@ pub fn create_payment_callback(
 /// 1. Fetches the consumer's current commons credit balance (for the balance-floor invariant).
 /// 2. Converts the compute-layer `CommonsPaymentRequest` into a ledger-layer
 ///    `CommonsSettlementRequest` and runs it through `SettlementEngine::settle_commons_receipt()`.
-/// 3. Appends the resulting `(earn_entry, spend_entry)` to the ledger.
+/// 3. Appends the resulting contribution/allocation pair (`earn_entry`, `spend_entry`) to the ledger.
 ///
 /// `engine` must be pre-created by the caller. Use `build_settlement_engine()` for
 /// restart-safe idempotence.
@@ -235,7 +236,7 @@ pub fn create_commons_settlement_callback(
         let engine = engine.clone();
 
         tokio::spawn(async move {
-            // 1. Parse contributor DID (executor — earns credits)
+            // 1. Parse contributor DID (executor — contribution recognized / credited)
             let contributor: icn_identity::Did = match req.contributor.parse() {
                 Ok(d) => d,
                 Err(e) => {
@@ -247,7 +248,7 @@ pub fn create_commons_settlement_callback(
                 }
             };
 
-            // 2. Parse consumer DID (submitter — spends credits)
+            // 2. Parse consumer DID (submitter — allocation drawn / debited)
             let consumer: icn_identity::Did = match req.consumer.parse() {
                 Ok(d) => d,
                 Err(e) => {
@@ -261,7 +262,7 @@ pub fn create_commons_settlement_callback(
 
             // 3. Fetch consumer balance for the balance-floor invariant.
             //    Negate: ledger credit entries give negative raw balance; negate to get
-            //    spendable capacity (positive = can spend). Matches BalanceCallback convention.
+            //    drawable capacity (positive = capacity available). Matches BalanceCallback convention.
             let consumer_balance = {
                 let guard = ledger.read().await;
                 -guard.get_balance(
@@ -317,7 +318,7 @@ pub fn create_commons_settlement_callback(
                 }
             };
 
-            // 7. Append both legs (earn + spend) via the ledger's pre-validating batch
+            // 7. Append both legs (contribution + allocation) via the ledger's pre-validating batch
             //    append. Both entries are validated before either is written, so a leg that
             //    fails validation can no longer leave the other leg committed one-sidedly.
             //    This is NOT a full transaction: a lower-level append/store failure between
@@ -361,8 +362,8 @@ mod tests {
     /// This test closes the durability gap identified in the settlement path trace:
     /// `CommonsSettlementCallback` was wired to `None` in the daemon, so completed commons
     /// tasks produced no ledger consequence. After this fix, the callback fires
-    /// `SettlementEngine::settle_commons_receipt()` and appends both earn/spend journal
-    /// entries to the ledger — making the economic consequence auditable.
+    /// `SettlementEngine::settle_commons_receipt()` and appends both contribution/allocation
+    /// journal entries to the ledger — making the economic consequence auditable.
     ///
     /// Flow exercised:
     ///   CommonsPaymentRequest → create_commons_settlement_callback → SettlementEngine

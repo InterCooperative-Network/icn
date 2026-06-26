@@ -184,9 +184,9 @@ pub type CommonsRequiredCreditsCallback =
 /// journal entries to the ledger.
 #[derive(Debug, Clone)]
 pub struct CommonsPaymentRequest {
-    /// DID of the contributor (executor — earns commons credits from the mint).
+    /// DID of the contributor (executor — contribution recognized; credited by the mint).
     pub contributor: String,
-    /// DID of the consumer (submitter — spends commons credits to the mint).
+    /// DID of the consumer (submitter — allocation drawn; debited by the mint).
     pub consumer: String,
     /// Amount of commons credits to settle (already computed by the actor).
     pub amount: u64,
@@ -202,7 +202,7 @@ pub struct CommonsPaymentRequest {
 /// `SettlementEngine`. The callback is responsible for:
 /// 1. Fetching the consumer's current commons credit balance.
 /// 2. Constructing a `CommonsSettlementRequest` and calling `settle_commons_receipt()`.
-/// 3. Appending the resulting earn/spend entries to the ledger.
+/// 3. Appending the resulting contribution/allocation entries to the ledger.
 ///
 /// **Settlement semantics change with reservation (#1404):** once `CommonsReserveCallback`
 /// is configured, the app-layer implementation of this callback must reconcile against

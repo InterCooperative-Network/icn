@@ -2,7 +2,7 @@
 //! Multi-node commons contribution integration test (issue #949).
 //!
 //! Proves that:
-//! 1. `settle_commons_receipt()` produces a balanced earn/spend pair for a
+//! 1. `settle_commons_receipt()` produces a balanced contribution/allocation pair for a
 //!    `ScopeLevel::Commons` task.
 //! 2. After the entries are appended to one node's ledger and replicated to a
 //!    second node via `handle_sync_message`, both nodes agree on the final
