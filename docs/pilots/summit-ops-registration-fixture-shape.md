@@ -16,7 +16,7 @@ The [registration proof-loop map](summit-ops-registration-action-card-proof-loop
 
 The fixture *schema* is unambiguous, but the **render/validation path is not fully runnable from a docs change**:
 
-- The action-cards fixture is loaded by the no-CLI rehearsal shell and exercised by a **Playwright e2e** (`web/pilot-ui/tests/e2e/standing-action-cards.spec.js`) and the **"Rehearsal Fixture Bundle"** CI gate. A committed fixture change should be verified against those, which need a browser/npm environment.
+- The action-cards fixture's **content** is exercised by a **Playwright e2e** — `web/pilot-ui/tests/e2e/demo-fixture-preload.spec.js`, which fetches `action-cards.json` and asserts the `{did, cards, generated_at}` wrapper plus **per-card required fields** and the `scope` / `risk_level` enums — and by the **"Rehearsal Fixture Bundle"** CI gate. (`standing-action-cards.spec.js` covers the Action-Cards-list **DOM wiring**, not fixture contents.) A committed fixture change should be verified against those, which need a browser/npm environment.
 - The Python bundle validator ([`docs/scripts/validate-rehearsal-shell-fixtures.py`](../scripts/validate-rehearsal-shell-fixtures.py)) checks the action-cards read-model **shape-only** (`did`, `cards`, `generated_at`) — it does **not** per-card schema-validate, so passing it is necessary but not sufficient.
 
 So this doc specifies the shape and the full validation path; **committing the fixture + running the e2e/bundle gate is the next slice** (and the moment the lane may be called fixture-backed).
@@ -28,7 +28,7 @@ The organizer-demo rehearsal-shell bundle:
 - **Fixture file to extend:** [`web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json`](../../web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json) — wrapper `{ "did": …, "cards": [ … ], "generated_at": … }`. A registration card is appended to `cards`.
 - **Manifest read-model:** `member_action_cards` in [`rehearsal-shell.manifest.json`](../../web/pilot-ui/fixtures/icn-organizer-demo/rehearsal-shell.manifest.json) (surface `GET /v1/gov/me/action-cards`, `validate: shape_only`). No manifest change is required to add a card.
 - **Per-card contract:** [`docs/contracts/institution-package/action-card.schema.json`](../contracts/institution-package/action-card.schema.json).
-- **Validators / tests:** `docs/scripts/validate-rehearsal-shell-fixtures.py` (shape), `web/pilot-ui/tests/e2e/standing-action-cards.spec.js` (render).
+- **Validators / tests:** `docs/scripts/validate-rehearsal-shell-fixtures.py` (bundle shape-only for action-cards), `web/pilot-ui/tests/e2e/demo-fixture-preload.spec.js` (fetches `action-cards.json`; asserts wrapper + per-card required fields + `scope`/`risk_level` enums), `web/pilot-ui/tests/e2e/standing-action-cards.spec.js` (Action-Cards-list DOM wiring).
 
 ## The exact registration card shape
 
@@ -68,7 +68,7 @@ From the monorepo root, after appending the card to `action-cards.json`:
 
 1. `python3 docs/scripts/validate-rehearsal-shell-fixtures.py` — must stay `PASS` (action-cards read-model is shape-only: wrapper keys unchanged).
 2. The **per-card schema check** against `action-card.schema.json` (e.g. validate the appended object with `jsonschema`).
-3. The **Playwright e2e** `web/pilot-ui/tests/e2e/standing-action-cards.spec.js` and the **"Rehearsal Fixture Bundle"** CI gate — confirm the shell still renders the Action Cards list (the current spec asserts structure, not a fixed card count, but re-run to be sure).
+3. The **fixture-content Playwright e2e** `web/pilot-ui/tests/e2e/demo-fixture-preload.spec.js` — it fetches `action-cards.json` and asserts the wrapper + per-card required fields + `scope`/`risk_level` enums (it checks `cards.length > 0`, not a fixed count, so appending a card is fine) — plus the **"Rehearsal Fixture Bundle"** CI gate; `standing-action-cards.spec.js` additionally covers the Action-Cards-list DOM wiring. Re-run these to be sure.
 4. `python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml`, `bash ops/scripts/drift-check.sh`, `python3 scripts/check-state-lag.py`, `git diff --check`.
 
 Only when the fixture is committed **and** those pass may the [registration proof-loop map](summit-ops-registration-action-card-proof-loop.md) be updated from *fixture-ready* to *fixture-backed*.
