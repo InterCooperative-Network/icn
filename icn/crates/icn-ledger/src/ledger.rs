@@ -1247,8 +1247,8 @@ impl Ledger {
     ///    earlier entries in the same batch. Entries that each pass the up-front check
     ///    against the pre-batch state but *interact* (e.g. two debits that individually fit
     ///    a credit limit but collectively exceed it) can still fail mid-batch, after an
-    ///    earlier entry was appended. The intended caller (the commons earn/spend pair)
-    ///    touches independent accounts, so its legs do not interact this way.
+    ///    earlier entry was appended. The intended caller (the commons contribution/allocation
+    ///    pair) touches independent accounts, so its legs do not interact this way.
     /// 2. **Store I/O between writes.** The durable writes are not wrapped in one storage
     ///    transaction, so a store I/O failure *between* per-entry appends can leave a
     ///    partial journal — inherent to the ledger's non-transactional append (an

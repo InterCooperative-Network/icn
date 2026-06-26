@@ -202,7 +202,7 @@ pub struct CommonsPaymentRequest {
 /// `SettlementEngine`. The callback is responsible for:
 /// 1. Fetching the consumer's current commons credit balance.
 /// 2. Constructing a `CommonsSettlementRequest` and calling `settle_commons_receipt()`.
-/// 3. Appending the resulting earn/spend entries to the ledger.
+/// 3. Appending the resulting contribution/allocation entries to the ledger.
 ///
 /// **Settlement semantics change with reservation (#1404):** once `CommonsReserveCallback`
 /// is configured, the app-layer implementation of this callback must reconcile against
