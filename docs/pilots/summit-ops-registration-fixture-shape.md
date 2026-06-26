@@ -12,16 +12,16 @@ Last Reviewed: 2026-06-26
 
 ## Purpose
 
-The [registration proof-loop map](summit-ops-registration-action-card-proof-loop.md) is **fixture-ready, not fixture-backed**: the shell's fixture pack has no registration-lane rows, so a steward cannot rehearse this lane from committed fixtures today. This doc closes that gap on paper — it pins the precise fixture shape, the file it belongs in, and the validation a contributor must pass — without committing the fixture here (so it can't break the shell's e2e bundle from an environment that can't run it).
+When this doc was written, the [registration proof-loop map](summit-ops-registration-action-card-proof-loop.md) was **fixture-ready, not fixture-backed**: the shell's fixture pack had no registration-lane rows. This doc pinned the precise fixture shape, the file it belongs in, and the validation to run. The fixture has **since been committed** (see the status note at the top), so the lane is now **fixture-backed (L2)** and this doc serves as the spec/rationale + validation recipe.
 
-## Why docs-only (Option A) rather than committing the fixture now
+## Why this was specified docs-only first (Option A), before committing the fixture
 
-The fixture *schema* is unambiguous, but the **render/validation path is not fully runnable from a docs change**:
+The fixture *schema* was unambiguous, but the **render/validation path was not fully runnable from a docs-only change** at the time, so the shape was pinned first and the fixture committed in a follow-up where the e2e could run:
 
 - The action-cards fixture's **content** is exercised by a **Playwright e2e** — `web/pilot-ui/tests/e2e/demo-fixture-preload.spec.js`, which fetches `action-cards.json` and asserts the `{did, cards, generated_at}` wrapper plus **per-card required fields** and the `scope` / `risk_level` enums — and by the **"Rehearsal Fixture Bundle"** CI gate. (`standing-action-cards.spec.js` covers the Action-Cards-list **DOM wiring**, not fixture contents.) A committed fixture change should be verified against those, which need a browser/npm environment.
 - The Python bundle validator ([`docs/scripts/validate-rehearsal-shell-fixtures.py`](../scripts/validate-rehearsal-shell-fixtures.py)) checks the action-cards read-model **shape-only** (`did`, `cards`, `generated_at`) — it does **not** per-card schema-validate, so passing it is necessary but not sufficient.
 
-So this doc specifies the shape and the full validation path; **committing the fixture + running the e2e/bundle gate is the next slice** (and the moment the lane may be called fixture-backed).
+So this doc specified the shape and the full validation path; **committing the fixture + running the e2e/bundle gate was the next slice — since done**, which is the moment the lane became fixture-backed.
 
 ## Where the fixture lives
 
@@ -64,16 +64,16 @@ Schema-valid (`source_kind: action_item`, `action_kind: complete`, `scope: struc
 
 The fictional, categorical registration steps the lane models (`registration-desk-opened`, `badge-packet-check-complete`, `walk-in-question-escalated`, `attendance-count-category-updated`, `late-arrival-support-needed`, `registration-desk-closed`) map onto one or more such `action_item/complete` cards — each a step a logistics role marks complete. Attendance stays a **count category**, never a roll.
 
-## Validation a contributor must pass before claiming fixture-backed
+## Validation that was run before claiming fixture-backed
 
-From the monorepo root, after appending the card to `action-cards.json`:
+This is the recipe that was run (and that any future change to the card must re-run). From the monorepo root, after appending the card to `action-cards.json`:
 
 1. `python3 docs/scripts/validate-rehearsal-shell-fixtures.py` — must stay `PASS` (action-cards read-model is shape-only: wrapper keys unchanged).
 2. The **per-card schema check** against `action-card.schema.json` (e.g. validate the appended object with `jsonschema`).
 3. The **fixture-content Playwright e2e** `web/pilot-ui/tests/e2e/demo-fixture-preload.spec.js` — it fetches `action-cards.json` and asserts the wrapper + per-card required fields + `scope`/`risk_level` enums (it checks `cards.length > 0`, not a fixed count, so appending a card is fine) — plus the **"Rehearsal Fixture Bundle"** CI gate; `standing-action-cards.spec.js` additionally covers the Action-Cards-list DOM wiring. Re-run these to be sure.
 4. `python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml`, `bash ops/scripts/drift-check.sh`, `python3 scripts/check-state-lag.py`, `git diff --check`.
 
-Only when the fixture is committed **and** those pass may the [registration proof-loop map](summit-ops-registration-action-card-proof-loop.md) be updated from *fixture-ready* to *fixture-backed*.
+These passed and the fixture is committed, so the [registration proof-loop map](summit-ops-registration-action-card-proof-loop.md) has been updated from *fixture-ready* to *fixture-backed* (L2). Note: the committed card requires `registration_desk`, so the paired `standing.json` also grants a demo Logistics Committee role with that scope — an ActionCard must be derivable from holder standing.
 
 ## Privacy boundaries
 
@@ -81,7 +81,7 @@ Fictional / categorical only. Never commit: real attendee names, registration li
 
 ## Nonclaims
 
-- Does not commit a runtime fixture (docs-only); does not make the lane fixture-backed yet.
+- The committed fixture is L2 (a fictional fixture the shell loads/validates), **not** a runtime proof; it does not make this a live action-card→receipt loop.
 - Does not claim live summit registration or a real attendee workflow exists.
 - Does not sync Google data; does not mutate the NYCN repo.
 - Does not commit private attendee, sponsor, accessibility, volunteer, incident, registration, or payment data.
