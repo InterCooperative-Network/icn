@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T17:17:33+00:00
+Generated: 2026-06-26T18:27:12+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -19,7 +19,7 @@ Generated: 2026-06-26T17:17:33+00:00
 
 ## Snapshot
 
-- Source commit: `17f0c0caf5fcd8a07f8f599bd3d912ae72502aef`
+- Source commit: `bba0435bfe338b43434e94b2349ee002f00259d7`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
@@ -27,7 +27,7 @@ Generated: 2026-06-26T17:17:33+00:00
 - **Total leaf commands (default build): 162**
 - Top-level command groups: 33
 - By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2
-- By status (curated, see section below): live 27 · partial 35 · planned 10 · unknown / needs local verification 90
+- By status (curated, see section below): live 27 · partial 49 · planned 10 · unknown / needs local verification 76
 - Proof level: every command is `L1` (declaration exists in source).
 - **Feature-gated commands (NOT in the default build, excluded from the counts above): 1** (see section below).
 - Unparsed / unresolved candidates: 0 (see section below).
@@ -40,20 +40,20 @@ Role is the **curated** top-level-group heuristic (needs review). `status` is a 
 
 | Command | Status | Proof | Source |
 |---|---|---|---|
-| `icnctl amendment add-change` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1867 |
-| `icnctl amendment list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1766 |
-| `icnctl amendment open-voting` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1809 |
-| `icnctl amendment propose` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1731 |
-| `icnctl amendment show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1785 |
-| `icnctl amendment submit` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1795 |
-| `icnctl amendment vote` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1823 |
-| `icnctl amendment withdraw` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1849 |
-| `icnctl appeal add-evidence` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1972 |
-| `icnctl appeal file` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1904 |
-| `icnctl appeal list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1943 |
-| `icnctl appeal respond` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:2002 |
-| `icnctl appeal show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1962 |
-| `icnctl appeal withdraw` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:2024 |
+| `icnctl amendment add-change` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1867 |
+| `icnctl amendment list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1766 |
+| `icnctl amendment open-voting` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1809 |
+| `icnctl amendment propose` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1731 |
+| `icnctl amendment show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1785 |
+| `icnctl amendment submit` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1795 |
+| `icnctl amendment vote` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1823 |
+| `icnctl amendment withdraw` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1849 |
+| `icnctl appeal add-evidence` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1972 |
+| `icnctl appeal file` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1904 |
+| `icnctl appeal list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1943 |
+| `icnctl appeal respond` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2002 |
+| `icnctl appeal show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1962 |
+| `icnctl appeal withdraw` | partial | L1 | `icn/bins/icnctl/src/main.rs`:2024 |
 | `icnctl charter create` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1614 |
 | `icnctl charter deploy` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1718 |
 | `icnctl charter inspect` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1704 |
@@ -243,12 +243,12 @@ Status is a **curated** classification (issue #2113), defaulting to `unknown / n
 | Status | Count |
 |---|---|
 | live | 27 |
-| partial | 35 |
+| partial | 49 |
 | fixture-demo | 0 |
 | planned | 10 |
-| unknown / needs local verification | 90 |
+| unknown / needs local verification | 76 |
 
-### Classified commands (72)
+### Classified commands (86)
 
 Every non-`unknown` command, with its evidence basis. (All other default-build commands carry `unknown / needs local verification`.)
 
@@ -281,6 +281,20 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl snapshot list` | live | local snapshot listing via `icn_snapshot` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::List) | `icn/bins/icnctl/src/main.rs`:1341 |
 | `icnctl snapshot verify` | live | local snapshot integrity check `icn_snapshot::verify_snapshot`/`verify_timestamped_snapshot` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Verify) | `icn/bins/icnctl/src/main.rs`:1344 |
 | `icnctl verify-backup` | live | local backup verification; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:114 |
+| `icnctl amendment add-change` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/changes` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::AddChange); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1867 |
+| `icnctl amendment list` | partial | gateway client `reqwest GET {gateway}/v1/constitutional/amendments` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1766 |
+| `icnctl amendment open-voting` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/vote` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::OpenVoting); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1809 |
+| `icnctl amendment propose` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments` (route in `docs/reference/project-index/generated/route-inventory.md`; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Propose); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1731 |
+| `icnctl amendment show` | partial | gateway client `reqwest GET {gateway}/v1/constitutional/amendments/{id}` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Show); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1785 |
+| `icnctl amendment submit` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/submit` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Submit); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1795 |
+| `icnctl amendment vote` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/ratify` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Vote); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1823 |
+| `icnctl amendment withdraw` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/amendments/{id}/withdraw` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AmendmentCommands::Withdraw); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1849 |
+| `icnctl appeal add-evidence` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/appeals/{id}/evidence` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AppealCommands::AddEvidence); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1972 |
+| `icnctl appeal file` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/appeals` (route in route-inventory; auth via get_gateway_token) (`icn/bins/icnctl/src/main.rs` AppealCommands::File); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1904 |
+| `icnctl appeal list` | partial | gateway client `reqwest GET {gateway}/v1/constitutional/appeals` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AppealCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1943 |
+| `icnctl appeal respond` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/appeals/{id}/respond` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AppealCommands::Respond); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2002 |
+| `icnctl appeal show` | partial | gateway client `reqwest GET {gateway}/v1/constitutional/appeals/{id}` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AppealCommands::Show); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1962 |
+| `icnctl appeal withdraw` | partial | gateway client `reqwest POST {gateway}/v1/constitutional/appeals/{id}/withdraw` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` AppealCommands::Withdraw); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:2024 |
 | `icnctl audit verify` | partial | concrete gateway client `GET /v1/receipts/chain/{hash}` (`icn/bins/icnctl/src/main.rs` AuditCommands::Verify); chain-verification algorithm covered by `icn/bins/icnctl/tests/audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested | `icn/bins/icnctl/src/main.rs`:330 |
 | `icnctl auth token` | partial | gateway auth client: signs a keystore challenge then `reqwest POST {gateway}/v1/auth/challenge` + `/v1/auth/verify` (routes in `docs/reference/project-index/generated/route-inventory.md`) in `handle_auth_command` (`icn/bins/icnctl/src/main.rs` AuthCommands::Token); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:410 |
 | `icnctl commons anchor` | partial | gateway client `reqwest GET {gateway}/v1/commons/anchor/by-did/{did}` (gateway from `ICN_GATEWAY` env) (`icn/bins/icnctl/src/main.rs` CommonsCommands::Anchor); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1575 |
