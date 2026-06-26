@@ -10,12 +10,16 @@ What is mechanical (drift-checked) vs curated:
   derived from the clap enums. Counts never hand-maintained.
 - **Curated (needs review):** the `role` column is a small, explicit top-level-group ->
   role map (a navigation heuristic, NOT derived from clap and asserting no usability or
-  safety). The `status` column is uniformly `unknown / needs local verification`: a
-  static scan proves a command is **declared**, not that it is implemented / wired to a
-  live gateway / fixture-only / production-ready. Distinguishing
-  live/partial/fixture/planned per command is a human/runtime follow-up.
+  safety). The `status` column is a curated, evidence-pointer classification
+  (`STATUS_BY_COMMAND`, issue #2113): live / partial / fixture-demo / planned, defaulting
+  to `unknown / needs local verification` for any command not explicitly classified. A
+  static scan proves a command is **declared**, not how far its handler is implemented, so
+  status is curated from source/test evidence — never mechanically inferred from clap, and
+  `live` is **never** asserted merely because a subcommand exists.
 - **Proof level** is capped at **L1** (a command declaration exists in source) per
-  `proof-level-taxonomy-capability-matrix.md`. A static scan cannot assert higher.
+  `proof-level-taxonomy-capability-matrix.md`. A static scan cannot assert higher; the
+  `status` column carries the implementation classification separately from proof level
+  (a `live` status is NOT a higher proof level and NOT a production-readiness claim).
 
 Usage:
     python3 docs/scripts/icnctl_command_inventory.py --write    # regenerate artifact
@@ -95,6 +99,58 @@ ROLE_BY_GROUP: dict[str, str] = {
 
 UNIFORM_STATUS = "unknown / needs local verification"
 PROOF_LEVEL = "L1"
+
+# Implementation-status vocabulary (issue #2113 acceptance criterion).
+STATUS_LIVE = "live"
+STATUS_PARTIAL = "partial"
+STATUS_FIXTURE_DEMO = "fixture-demo"
+STATUS_PLANNED = "planned"
+STATUS_ORDER = [STATUS_LIVE, STATUS_PARTIAL, STATUS_FIXTURE_DEMO, STATUS_PLANNED, UNIFORM_STATUS]
+
+# Curated implementation-status classification (issue #2113). Like ROLE_BY_GROUP this is
+# NOT mechanically derivable from the clap tree: a static scan proves a command is
+# *declared*, not how far its handler is implemented. Each entry is keyed by the EXACT
+# command path (as rendered, without the leading `icnctl `) and carries (status, basis),
+# where basis is a concise source/test evidence pointer. Every key is validated against the
+# default-build command set at generation time (a renamed/removed command fails generation
+# loudly), so the classification cannot silently rot. Any command NOT listed here defaults
+# to `unknown / needs local verification` — an honest "not yet verified", not a failure.
+#
+# Discipline (issue #2113 "do not present demo/dev-gated as live"):
+# - `live` is asserted ONLY with concrete-handler evidence AND either an integration test
+#   that spawns the binary and asserts success, or a local-only operation with no network
+#   dependency. It is never inferred from a clap declaration and is NOT a production claim.
+# - `partial` = the handler does real work but depends on incomplete/unproven runtime
+#   (e.g. a live gateway) and is not integration-tested end-to-end.
+# - `planned` = the handler is an explicit placeholder / prints "not yet implemented".
+# - `fixture-demo` = a demo/fixture/rehearsal-only path. (None today: `icnctl` has no
+#   demo-only commands; the Summit Ops demo fixtures live in `web/pilot-ui`, not the CLI.)
+# This is a deliberately NARROW, defensible first pass; most commands remain `unknown`.
+STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
+    # live — concrete handler + integration test (binary spawned, success asserted) or a
+    # local-only, no-network operation.
+    "id init": (STATUS_LIVE, "local keystore init; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`, `icn/bins/icnctl/tests/qr_code_test.rs` spawn the binary, assert success)"),
+    "id show": (STATUS_LIVE, "local keystore read; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`, `icn/bins/icnctl/tests/qr_code_test.rs`)"),
+    "backup": (STATUS_LIVE, "local data-dir backup; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs` asserts success + tarball created)"),
+    "restore": (STATUS_LIVE, "local data-dir restore; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`)"),
+    "verify-backup": (STATUS_LIVE, "local backup verification; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`)"),
+    "coop entity-report": (STATUS_LIVE, "read-only local coop-store report; integration-tested (`icn/bins/icnctl/tests/coop_entity_report_test.rs`, `icn/bins/icnctl/tests/coop_entity_backfill_test.rs` assert success + JSON)"),
+    "coop entity-backfill-surrogates": (STATUS_LIVE, "local coop-store surrogate backfill; integration-tested (`icn/bins/icnctl/tests/coop_entity_backfill_test.rs` asserts success)"),
+    "device add": (STATUS_LIVE, "local keystore device add; integration-tested (`icn/bins/icnctl/tests/qr_code_test.rs` asserts success)"),
+    "completions": (STATUS_LIVE, "shell-completion generation via `clap_complete::generate`; local-only, no network (`icn/bins/icnctl/src/main.rs` Commands::Completions)"),
+    "api export-openapi": (STATUS_LIVE, "serializes the embedded `icn_gateway::openapi::ApiDoc` to file/stdout; local-only, no gateway (`icn/bins/icnctl/src/main.rs` ApiCommands::ExportOpenapi)"),
+    # partial — real work, but depends on incomplete/unproven runtime; not integration-tested end-to-end.
+    "audit verify": (STATUS_PARTIAL, "concrete gateway client `GET /v1/receipts/chain/{hash}` (`icn/bins/icnctl/src/main.rs` AuditCommands::Verify); chain-verification algorithm covered by `icn/bins/icnctl/tests/audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested"),
+    "preflight": (STATUS_PARTIAL, "runs real local health checks (data-dir, keystore open via `AgeKeyStore`) in `handle_preflight_command`; the gateway-connectivity check requires a running gateway; not integration-tested"),
+    # planned — handler is an explicit placeholder / prints "not yet implemented".
+    "charter deploy": (STATUS_PLANNED, "handler validates the CCL doc locally, then prints \"Not yet implemented — charter deployment requires gateway integration\" (`icn/bins/icnctl/src/main.rs` CharterCommands::Deploy)"),
+    "steward check-vui": (STATUS_PLANNED, "placeholder; validates input then prints \"VUI registry check requires running steward daemon\" (`icn/bins/icnctl/src/main.rs` StewardCommands::CheckVui)"),
+    "steward start-enrollment": (STATUS_PLANNED, "placeholder for the full SDIS enrollment flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::StartEnrollment)"),
+    "steward enrollment-status": (STATUS_PLANNED, "placeholder; ceremony status check requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::EnrollmentStatus)"),
+    "steward start-recovery": (STATUS_PLANNED, "placeholder for the full SDIS recovery flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::StartRecovery)"),
+    "steward recovery-status": (STATUS_PLANNED, "placeholder; ceremony status check requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::RecoveryStatus)"),
+    "steward issue-token": (STATUS_PLANNED, "placeholder for the full SDIS token issuance flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::IssueToken)"),
+}
 
 CFG_RE = re.compile(r"^\s*#\[cfg\((.+)\)\]\s*$")
 ENUM_RE = re.compile(r"#\[derive\([^)]*\bSubcommand\b[^)]*\)\]")
@@ -277,17 +333,52 @@ def render(leaves: list[dict], unparsed: list[str], commit: str) -> str:
     default_cmds = [c for c in leaves if not c.get("cfg")]
     gated_cmds = [c for c in leaves if c.get("cfg")]
 
+    # Anti-drift: every curated status key must match a real default-build command path,
+    # else a rename/removal would silently drop the classification. Fail generation loudly.
+    default_paths = {c["path"] for c in default_cmds}
+    stale_keys = sorted(k for k in STATUS_BY_COMMAND if k not in default_paths)
+    if stale_keys:
+        raise ValueError(
+            "STATUS_BY_COMMAND keys not found among default-build commands "
+            f"(renamed/removed?): {stale_keys}"
+        )
+    # Validate values too, so a typo'd status or empty basis fails explicitly here rather
+    # than later during rendering/sorting. Curated entries must use one of the non-default
+    # statuses and carry a non-empty evidence basis.
+    valid_statuses = {STATUS_LIVE, STATUS_PARTIAL, STATUS_FIXTURE_DEMO, STATUS_PLANNED}
+    bad_values = sorted(
+        f"{k} (status={status!r}, basis={'empty' if not basis.strip() else 'ok'})"
+        for k, (status, basis) in STATUS_BY_COMMAND.items()
+        if status not in valid_statuses or not basis.strip()
+    )
+    if bad_values:
+        raise ValueError(
+            f"STATUS_BY_COMMAND values invalid (status must be one of {sorted(valid_statuses)} "
+            f"and basis must be non-empty): {bad_values}"
+        )
+
     by_role: dict[str, list[dict]] = {}
     role_counts: dict[str, int] = {}
+    status_counts: dict[str, int] = {}
+    classified: list[dict] = []
     group_set = set()
     for c in default_cmds:
         role = ROLE_BY_GROUP.get(c["group"], "unknown")
         c["role"] = role
+        status, basis = STATUS_BY_COMMAND.get(c["path"], (UNIFORM_STATUS, ""))
+        c["status"] = status
+        c["status_basis"] = basis
+        if status != UNIFORM_STATUS:
+            classified.append(c)
         by_role.setdefault(role, []).append(c)
         role_counts[role] = role_counts.get(role, 0) + 1
+        status_counts[status] = status_counts.get(status, 0) + 1
         group_set.add(c["group"])
     for c in gated_cmds:
         c["role"] = ROLE_BY_GROUP.get(c["group"], "unknown")
+        # Feature-gated commands stay unclassified (and excluded from default-build counts).
+        c["status"] = UNIFORM_STATUS
+        c["status_basis"] = ""
         group_set.add(c["group"])
 
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
@@ -317,11 +408,15 @@ def render(leaves: list[dict], unparsed: list[str], commit: str) -> str:
     o.append("- **`role` is a curated navigation heuristic** (top-level command group -> role), "
              "**not** mechanically derived from clap and **needs review**. It says \"where might I "
              "look first\", never \"this user may safely run this\".")
-    o.append("- **`status` is uniformly `" + UNIFORM_STATUS + "`** by construction: a static clap "
-             "scan proves a command is *declared*, not whether it is `implemented` / "
-             "`implemented but partial` / `fixture-backed` / `gateway-backed` / "
-             "`docs-only / design-direction` / `planned`. Assigning those per command is a "
-             "human/runtime follow-up — so nothing here is presented as live.")
+    o.append("- **`status` is a curated, evidence-pointer classification** (issue #2113): "
+             "`live` / `partial` / `fixture-demo` / `planned`, defaulting to "
+             f"`{UNIFORM_STATUS}` for any command not explicitly classified. It is curated "
+             "from source/test evidence (a static clap scan proves a command is *declared*, "
+             "not how far its handler is implemented), so it is **never** inferred from a "
+             "declaration. `live` is asserted only with concrete-handler + (integration "
+             "test | local-only no-network) evidence and is **not** a production-readiness "
+             "claim; demo/dev-gated commands are never presented as live. See the "
+             "[Implementation status](#implementation-status-classification) section.")
     o.append("- Defer to canonical truth/precedence: [`source-of-truth-map.md`](../source-of-truth-map.md) "
              "and proof levels in [`proof-level-taxonomy-capability-matrix.md`](../proof-level-taxonomy-capability-matrix.md). "
              "Orientation artifact (`Canonical: no`); companion to [`generated/route-inventory.md`](route-inventory.md).")
@@ -337,7 +432,8 @@ def render(leaves: list[dict], unparsed: list[str], commit: str) -> str:
     o.append(f"- Top-level command groups: {len(group_set)}")
     o.append("- By role (curated, needs review): "
              + " · ".join(f"{r} {role_counts.get(r, 0)}" for r in role_order if role_counts.get(r, 0)))
-    o.append(f"- By status: every default-build command is `{UNIFORM_STATUS}` ({total}) — see note above.")
+    o.append("- By status (curated, see section below): "
+             + " · ".join(f"{s} {status_counts.get(s, 0)}" for s in STATUS_ORDER if status_counts.get(s, 0)))
     o.append(f"- Proof level: every command is `{PROOF_LEVEL}` (declaration exists in source).")
     o.append(f"- **Feature-gated commands (NOT in the default build, excluded from the counts "
              f"above): {len(gated_cmds)}** (see section below).")
@@ -345,8 +441,10 @@ def render(leaves: list[dict], unparsed: list[str], commit: str) -> str:
     o.append("")
     o.append("## Commands by role")
     o.append("")
-    o.append("Role is the **curated** top-level-group heuristic (needs review). `status` and "
-             "`proof` are uniform by construction (see the note above).")
+    o.append("Role is the **curated** top-level-group heuristic (needs review). `status` is a "
+             "**curated, per-command** classification (see the "
+             "[Implementation status](#implementation-status-classification) section); `proof` "
+             "is uniform at `L1` (declaration scan).")
     o.append("")
     for role in role_order:
         cmds = sorted(by_role.get(role, []), key=lambda x: x["path"])
@@ -357,7 +455,7 @@ def render(leaves: list[dict], unparsed: list[str], commit: str) -> str:
         o.append("| Command | Status | Proof | Source |")
         o.append("|---|---|---|---|")
         for c in cmds:
-            o.append(f"| `icnctl {md_escape(c['path'])}` | {UNIFORM_STATUS} | {PROOF_LEVEL} | "
+            o.append(f"| `icnctl {md_escape(c['path'])}` | {md_escape(c['status'])} | {PROOF_LEVEL} | "
                      f"`{c['file']}`:{c['line']} |")
         o.append("")
 
@@ -379,14 +477,62 @@ def render(leaves: list[dict], unparsed: list[str], commit: str) -> str:
         o.append("- None: every discovered command is present in the default build.")
         o.append("")
 
-    o.append("## Commands by status")
+    o.append("## Implementation status classification")
     o.append("")
-    o.append(f"All {total} default-build commands carry the conservative status "
-             f"`{UNIFORM_STATUS}`. The static clap scan cannot mechanically distinguish "
-             "`implemented` / `implemented but partial` / `fixture-backed` / `gateway-backed` / "
-             "`docs-only / design-direction` / `planned`; that per-command classification is a "
-             "human/runtime verification follow-up (so demo/dev-gated commands are never "
-             "presented here as live).")
+    o.append("Status is a **curated** classification (issue #2113), defaulting to "
+             f"`{UNIFORM_STATUS}`. It is curated from source/test evidence — a static clap "
+             "scan proves a command is *declared*, not how far its handler is implemented — "
+             "so it is never inferred from a declaration. This is a deliberately **narrow, "
+             "defensible first pass**: only commands with clear evidence are classified; the "
+             "rest stay `unknown` (honest, not a failure).")
+    o.append("")
+    o.append("### Vocabulary")
+    o.append("")
+    o.append("- **`live`** — compiled in the default build, calls a concrete client/runtime "
+             "path, and has evidence it works: an integration test that spawns the binary and "
+             "asserts success, OR a local-only operation with no network dependency. **Not** "
+             "asserted because a clap subcommand exists; **not** a production-readiness claim.")
+    o.append("- **`partial`** — the handler does real work but depends on incomplete/unproven "
+             "runtime support (e.g. a live gateway) and is not integration-tested end-to-end.")
+    o.append("- **`fixture-demo`** — a demo / fixture / rehearsal-only path, exercisable "
+             "without live network/service; must not be implied as live operational use.")
+    o.append("- **`planned`** — declared but the handler is a placeholder / TODO / prints "
+             "\"not yet implemented\".")
+    o.append(f"- **`{UNIFORM_STATUS}`** — status not established from source/tests/docs in "
+             "this pass; the conservative default.")
+    o.append("")
+    o.append("### Counts by status (default build)")
+    o.append("")
+    o.append("| Status | Count |")
+    o.append("|---|---|")
+    for s in STATUS_ORDER:
+        o.append(f"| {s} | {status_counts.get(s, 0)} |")
+    o.append("")
+    o.append(f"### Classified commands ({len(classified)})")
+    o.append("")
+    o.append("Every non-`unknown` command, with its evidence basis. (All other default-build "
+             f"commands carry `{UNIFORM_STATUS}`.)")
+    o.append("")
+    if classified:
+        o.append("| Command | Status | Basis (source/test evidence) | Source |")
+        o.append("|---|---|---|---|")
+        for c in sorted(classified, key=lambda x: (STATUS_ORDER.index(x["status"]), x["path"])):
+            o.append(f"| `icnctl {md_escape(c['path'])}` | {md_escape(c['status'])} | "
+                     f"{md_escape(c['status_basis'])} | `{c['file']}`:{c['line']} |")
+        o.append("")
+    else:
+        o.append(f"- None classified yet — every command carries `{UNIFORM_STATUS}`.")
+        o.append("")
+    o.append("### Status non-claims")
+    o.append("")
+    o.append("- A command marked `live` is **not** a production-readiness claim — only that "
+             "it runs and does real work per the cited local/test evidence.")
+    o.append("- This generated static inventory is **not** runtime execution proof except "
+             "where a basis cites a test; proof level stays `L1` (declaration) regardless of status.")
+    o.append(f"- A default `{UNIFORM_STATUS}` is an honest \"not yet verified\", not a failure "
+             "or a defect.")
+    o.append("- Feature-gated commands remain **excluded** from the default-build counts and "
+             "are left unclassified.")
     o.append("")
 
     o.append("## Unparsed / unknown candidates")
