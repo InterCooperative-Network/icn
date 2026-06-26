@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T01:59:29+00:00
+Generated: 2026-06-26T02:06:21+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -19,7 +19,7 @@ Generated: 2026-06-26T01:59:29+00:00
 
 ## Snapshot
 
-- Source commit: `c6e9391b08b4091689fb45a3f028c6360d9df17a`
+- Source commit: `b5b3867033d8c652af9fa1c1fdd3e9787595a78f`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
@@ -229,6 +229,6 @@ All 163 discovered commands carry the conservative status `unknown / needs local
 ## Safe vs unsafe claims (examples)
 
 - ✅ Safe: "`icnctl api export-openapi` is declared in the CLI at this commit (L1)."
-- ✅ Safe: "`icnctl` declares N commands across these groups; role grouping is a curated navigation aid pending review."
+- ✅ Safe: "`icnctl` declares 163 commands across these groups; role grouping is a curated navigation aid pending review."
 - ❌ Unsafe: "`icnctl gov …` is organizer-ready" / "this command is live in production" / "this command is safe for non-technical organizers" — none of that is established by a declaration scan.
 

@@ -363,7 +363,7 @@ def render(leaves: list[dict], unparsed: list[str], commit: str) -> str:
     o.append("## Safe vs unsafe claims (examples)")
     o.append("")
     o.append("- ✅ Safe: \"`icnctl api export-openapi` is declared in the CLI at this commit (L1).\"")
-    o.append("- ✅ Safe: \"`icnctl` declares N commands across these groups; role grouping is a "
+    o.append(f"- ✅ Safe: \"`icnctl` declares {total} commands across these groups; role grouping is a "
              "curated navigation aid pending review.\"")
     o.append("- ❌ Unsafe: \"`icnctl gov …` is organizer-ready\" / \"this command is live in "
              "production\" / \"this command is safe for non-technical organizers\" — none of "
@@ -392,8 +392,10 @@ def main() -> int:
 
     leaves, unparsed = build_tree()
     if not leaves:
-        print(f"ERROR: no icnctl commands discovered under {ICNCTL_SRC} — wrong repo root?",
-              file=sys.stderr)
+        # Surface the diagnostic build_tree() produced (missing src dir / missing top-level
+        # enum) instead of a generic guess, so failures point at the real cause.
+        detail = "; ".join(unparsed) if unparsed else f"no clap commands found under {ICNCTL_SRC}"
+        print(f"ERROR: icnctl command inventory could not be built: {detail}", file=sys.stderr)
         return 2
     content = render(leaves, unparsed, commit)
 
