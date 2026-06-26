@@ -102,15 +102,24 @@ Owner: @core-arch
 #### Readiness Overclaim Check (`GATE_RATCHET_PHASE_READINESS`) — NEW (2026-05-31)
 Phase: WARNING (observational entry; non-blocking).
 
-Scans active deployment guidance (`docs/deployment/**`, `docs/operations/deployment/**`) for
-un-disclaimed, affirmative production / live-federation / governance-completion claims. A dated
-readiness claim is allowed when the file carries a stale/archive banner; negated/conditional lines
-and an explicit `ALLOWLIST` are honoured. Complements the Regulatory Compliance Linter (fintech
-vocabulary); does not replace it.
+Scans active claim-sensitive guidance (`docs/deployment/**`, `docs/operations/deployment/**`, and —
+added 2026-06-26 — `docs/pilots/**`) for un-disclaimed, affirmative production / live-federation /
+governance-completion claims. A dated readiness claim is allowed when the file carries a stale/archive
+banner; negated/conditional lines and an explicit `ALLOWLIST` are honoured. Generated artifacts and
+`archive`/`dev-journal` subtrees are pruned (`EXCLUDE_DIRS`). Complements the Regulatory Compliance
+Linter (fintech vocabulary); does not replace it. It is a narrow phrase-level guardrail — it does NOT
+enforce the whole claim-boundary firewall (see `docs/reference/project-index/claim-boundaries.md`).
 
-Scope (by design, to keep precision high): deployment guidance only. It deliberately does NOT yet
-cover the broader SDK / website / user-manual fintech-vocabulary debt — that is tracked separately.
-Widening scope is a later ratchet step, taken as each surface is cleaned.
+Scope (by design, allowlist-based, to keep precision high): deployment/ops guidance + `docs/pilots`.
+`docs/pilots` was measured low-noise (10 files, 1 bounded `ALLOWLIST` exception). Widening is a
+deliberate ratchet step taken as each surface is cleaned.
+
+NOT yet added (measured high-noise 2026-06-26): `docs/reference/project-index`, `docs/demo`,
+`docs/strategy`. These are claim-sensitive docs that *enumerate* the red-line phrases as
+nonclaim / "does not claim" lists, plus FAQ questions and roadmap targets — false positives the
+line-local negation guard cannot see. Adding them needs a precision step first (nonclaim-list /
+question / disclaimer-word handling), then a per-surface cleanup. This deliberately does NOT yet
+cover the broader SDK / website / user-manual fintech-vocabulary debt — tracked separately.
 
 Remediation on failure: banner the dated doc (point to `docs/ci/CI_CURRENT_STATUS.md`), or fix the
 claim, or add an `ALLOWLIST` entry with a reason. Never weaken the patterns. Self-test:
