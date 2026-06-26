@@ -44,12 +44,19 @@ from typing import List
 # docs/pilots (organizer-/partner-facing, claim-sensitive; measured low-noise —
 # 10 files, 1 bounded ALLOWLIST exception).
 #
-# NOT yet added (measured high-noise: claim-sensitive docs that *enumerate* the
-# red-line phrases as nonclaim / "does not claim" lists, FAQ questions, and
-# roadmap targets — false positives the line-local negation guard can't see).
-# Adding them needs a precision step first (nonclaim-list / question /
-# disclaimer-word handling). Tracked as a follow-up in GATE_RATCHET_PLAN.md:
-#   docs/reference/project-index, docs/demo, docs/strategy
+# NOT yet added. The nonclaim-context precision below (red-line/nonclaim section
+# headings, explicit "does not claim ..." lines, FAQ questions, "nothing/none"
+# disclaimers) was added 2026-06-26 and cut the measured noise substantially, but
+# these roots are still not clean enough to add without warnings:
+#   docs/reference/project-index : 18 -> 6 violations  (still deferred)
+#   docs/demo                    : 6  -> 4 violations
+#   docs/strategy                : 5  -> 4 violations
+# The residual hits are a different FP class (caveat-prefixed claims like
+# "Unsafe ...: <phrase>", quoted avoid-lists like `"production-ready"`, risk-column
+# table cells naming an overclaim, and checklist items describing nonclaims) that
+# narrow phrase rules can't suppress without risking real-claim masking. Adding a
+# root is a future ratchet step once its residual is bounded — see
+# docs/ci/GATE_RATCHET_PLAN.md.
 # ---------------------------------------------------------------------------
 SCAN_DIRS = [
     "docs/deployment",
@@ -84,12 +91,16 @@ OVERCLAIM_PATTERNS = [
 # in doubt we do NOT flag, because the repo deliberately uses many such non-claims.
 NEGATION_RE = re.compile(
     r"(?i)("
-    r"\bnot\b|n't|\bno\b|\bnever\b|not yet|\bwould\b|\bif\b|\bonce\b|\bwhen\b|"
+    r"\bnot\b|n't|\bno\b|\bnone\b|\bnothing\b|\bnever\b|not yet|\bwould\b|\bif\b|\bonce\b|\bwhen\b|"
     r"\btarget\b|\bgoal\b|aspir|roadmap|\bfuture\b|do not|don't|must not|\bavoid\b|"
     r"forbidden|prerequisite|before production|in a production deployment|in production:|"
     r"\U0001F7E1"  # yellow-circle status marker used for "assessed, not production-ready"
     r")"
 )
+# NOTE: the bare word "without" is deliberately NOT a negation here — it is too
+# broad (it would wrongly exempt a real claim like "production-ready without
+# caveats"). "nothing"/"none" are safe: a genuine claim's own clause never
+# carries them ("Nothing about ICN is production-ready" is a disclaimer).
 
 # A recognised stale/archive banner near the top of a file exempts the whole file
 # (the claim is then clearly labelled history, like the bannered deployment siblings).
@@ -161,13 +172,70 @@ def _clause_around(line, start, end):
     return line[lo:hi]
 
 
+# --- Nonclaim CONTEXT precision (line-local + nearest-heading; no parsing) ----
+# A markdown heading whose text matches this starts a block that is, by
+# construction, a list of things ICN does NOT claim. Every line until the next
+# heading is exempt. Narrow and explicit.
+NONCLAIM_SECTION_RE = re.compile(
+    r"(?i)\b("
+    r"non-?claims?|non-?goals?|red[\s-]?lines?|"
+    r"what (?:not to|must not be|should not be) claim(?:ed)?|"
+    r"what should not be shown(?: as finished)?|"
+    r"forbidden collapses?|"
+    r"claims? to avoid|"                            # "Claims to avoid", "Public/demo claims to avoid"
+    r"what is not\b|"                               # "What is not organizer-ready / included / working"
+    r"must not (?:imply|claim|be (?:shown|presented|claimed))"  # "What the website must not imply"
+    r")\b"
+)
+
+# Explicit line-level nonclaim framing: the whole line tells the reader NOT to
+# claim something (or negates the red-line phrase itself), so an overclaim phrase
+# inside it is being forbidden, not asserted. Catches enumerations the
+# clause-local negation guard splits apart, e.g.
+# "Must not claim: ...; that any of this is production or live federation."
+# Kept to unambiguous nonclaim objects ("claim"/"formal pilot"/"organizer-ready")
+# and direct negations of the patterns, so it cannot mask a genuine assertion.
+NONCLAIM_LINE_RE = re.compile(
+    r"(?i)("
+    r"do(?:es)? not claim|must not (?:be )?claim(?:ed)?|cannot claim|never claim|"
+    r"must not be (?:presented|shown)|should not be (?:claimed|presented|shown)|"
+    r"not (?:a )?formal pilot|no formal pilot|not organi[sz]er-ready|"
+    r"not production-ready|not ready for production|not live federation|no live federation"
+    r")"
+)
+
+_HEADING_RE = re.compile(r"^\s{0,3}#{1,6}\s+(.*)$")
+# Markdown decoration stripped from both ends before the interrogative test, so a
+# question is recognised even when wrapped in heading/bold/quote/list/quote marks.
+_MD_TRIM = " \t#>*_`-\"'"
+
+
+def _is_interrogative(line):
+    """True if the line, stripped of markdown decoration, is a question (an FAQ
+    prompt is not an assertion unless a later answer line asserts it)."""
+    return line.strip().strip(_MD_TRIM).strip().endswith("?")
+
+
 def scan_lines(rel_path, lines):
-    """Flag affirmative readiness claims; honour banner, negation, and allowlist."""
+    """Flag affirmative readiness claims; honour banner, nonclaim context,
+    negation, and allowlist."""
     if is_banner_exempt(lines):
         return []
 
     violations = []
+    in_nonclaim_section = False
     for line_num, line in enumerate(lines, start=1):
+        heading = _HEADING_RE.match(line)
+        if heading:
+            # Entering/leaving a nonclaim/red-line section toggles the context.
+            in_nonclaim_section = bool(NONCLAIM_SECTION_RE.search(heading.group(1)))
+
+        # Nonclaim-context exemptions (precision): lines under a nonclaim/red-line
+        # section, explicit "do/must not claim ..." lines, and interrogative/FAQ
+        # prompts are not affirmative claims.
+        if in_nonclaim_section or _is_interrogative(line) or NONCLAIM_LINE_RE.search(line):
+            continue
+
         for pattern, rule in OVERCLAIM_PATTERNS:
             m = pattern.search(line)
             if not m:

@@ -105,6 +105,64 @@ class TestScanLines(unittest.TestCase):
         self.assertEqual(linter.scan_lines("x.md", lines), [])
 
 
+class TestNonclaimContext(unittest.TestCase):
+    """Precision: explicit nonclaim / red-line / question contexts are not claims,
+    but direct affirmative assertions still warn."""
+
+    # --- true positives still warn ---
+    def test_direct_production_ready_still_warns(self):
+        v = linter.scan_lines("x.md", ["ICN is production-ready for cooperative deployments."])
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].rule, "production-ready")
+
+    def test_direct_live_federation_deployed_still_warns(self):
+        v = linter.scan_lines("x.md", ["ICN live federation is deployed across cooperatives today."])
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].rule, "live federation")
+
+    # --- false positives suppressed ---
+    def test_must_not_claim_enumeration_suppressed(self):
+        # The clause-local guard splits on ';'/':'; the line-level nonclaim rule
+        # must still recognise the whole bullet as a non-claim.
+        line = "Must not claim: that any of this is production-ready or live federation."
+        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+
+    def test_line_under_nonclaims_heading_suppressed(self):
+        lines = ["## Nonclaims", "- ICN is production-ready and runs a live federation."]
+        self.assertEqual(linter.scan_lines("x.md", lines), [])
+
+    def test_question_line_suppressed(self):
+        self.assertEqual(linter.scan_lines("x.md", ["### Is this ready for production?"]), [])
+        self.assertEqual(linter.scan_lines("x.md", ['**"Is this ready for production?"**']), [])
+
+    def test_not_a_formal_pilot_suppressed(self):
+        self.assertEqual(linter.scan_lines("x.md", ["This is not a formal pilot."]), [])
+
+    def test_nothing_disclaimer_suppressed(self):
+        self.assertEqual(linter.scan_lines("x.md", ["Nothing about ICN is production-ready."]), [])
+
+    # --- nonclaim section context resets at the next heading ---
+    def test_nonclaim_section_resets_at_next_heading(self):
+        lines = [
+            "## Nonclaims",
+            "- ICN is production-ready.",   # exempt (under Nonclaims)
+            "## Status",
+            "ICN is production-ready.",      # NOT exempt (new section)
+        ]
+        v = linter.scan_lines("x.md", lines)
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].line, 4)
+
+    # --- red-line section heading variants are recognised ---
+    def test_red_lines_section_suppressed(self):
+        lines = ["## Red lines", "- No live federation is deployed; production-ready is never claimed."]
+        self.assertEqual(linter.scan_lines("x.md", lines), [])
+
+    def test_forbidden_collapses_section_suppressed(self):
+        lines = ["## Forbidden collapses", "| federation command | live federation | production-ready |"]
+        self.assertEqual(linter.scan_lines("x.md", lines), [])
+
+
 class TestFixturesEndToEnd(unittest.TestCase):
     def test_bad_fixture_flagged(self):
         v = linter.scan_file("bad_unbannered.md", os.path.join(FIX, "bad_unbannered.md"))
