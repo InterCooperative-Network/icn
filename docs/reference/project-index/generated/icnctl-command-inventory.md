@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T13:58:19+00:00
+Generated: 2026-06-26T14:07:40+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -19,7 +19,7 @@ Generated: 2026-06-26T13:58:19+00:00
 
 ## Snapshot
 
-- Source commit: `300801c029480f5d6bf66d87568d929d7d1e7acf`
+- Source commit: `21314803cf6d9b254b90f39f119bff546eb3d84d`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
@@ -27,7 +27,7 @@ Generated: 2026-06-26T13:58:19+00:00
 - **Total leaf commands (default build): 162**
 - Top-level command groups: 33
 - By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2
-- By status (curated, see section below): live 10 · partial 14 · planned 7 · unknown / needs local verification 131
+- By status (curated, see section below): live 21 · partial 15 · planned 7 · unknown / needs local verification 119
 - Proof level: every command is `L1` (declaration exists in source).
 - **Feature-gated commands (NOT in the default build, excluded from the counts above): 1** (see section below).
 - Unparsed / unresolved candidates: 0 (see section below).
@@ -137,11 +137,11 @@ Role is the **curated** top-level-group heuristic (needs review). `status` is a 
 | `icnctl quota list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:555 |
 | `icnctl quota show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:544 |
 | `icnctl restore` | live | L1 | `icn/bins/icnctl/src/main.rs`:104 |
-| `icnctl snapshot cleanup` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1356 |
-| `icnctl snapshot create` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1338 |
-| `icnctl snapshot delete` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1350 |
-| `icnctl snapshot list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1341 |
-| `icnctl snapshot verify` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1344 |
+| `icnctl snapshot cleanup` | live | L1 | `icn/bins/icnctl/src/main.rs`:1356 |
+| `icnctl snapshot create` | live | L1 | `icn/bins/icnctl/src/main.rs`:1338 |
+| `icnctl snapshot delete` | live | L1 | `icn/bins/icnctl/src/main.rs`:1350 |
+| `icnctl snapshot list` | live | L1 | `icn/bins/icnctl/src/main.rs`:1341 |
+| `icnctl snapshot verify` | live | L1 | `icn/bins/icnctl/src/main.rs`:1344 |
 | `icnctl status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:51 |
 | `icnctl steward attesters` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1458 |
 | `icnctl steward check-vui` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1496 |
@@ -168,7 +168,7 @@ Role is the **curated** top-level-group heuristic (needs review). `status` is a 
 | Command | Status | Proof | Source |
 |---|---|---|---|
 | `icnctl api export-openapi` | live | L1 | `icn/bins/icnctl/src/main.rs`:267 |
-| `icnctl auth token` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:410 |
+| `icnctl auth token` | partial | L1 | `icn/bins/icnctl/src/main.rs`:410 |
 | `icnctl completions` | live | L1 | `icn/bins/icnctl/src/main.rs`:214 |
 | `icnctl compute cancel` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:500 |
 | `icnctl compute status` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:494 |
@@ -181,13 +181,13 @@ Role is the **curated** top-level-group heuristic (needs review). `status` is a 
 | `icnctl contract prepare` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:786 |
 | `icnctl contract sign` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:796 |
 | `icnctl device add` | live | L1 | `icn/bins/icnctl/src/main.rs`:600 |
-| `icnctl device approve` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:614 |
-| `icnctl device list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:597 |
-| `icnctl device revoke` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:620 |
-| `icnctl id export` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:582 |
-| `icnctl id import` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:588 |
+| `icnctl device approve` | live | L1 | `icn/bins/icnctl/src/main.rs`:614 |
+| `icnctl device list` | live | L1 | `icn/bins/icnctl/src/main.rs`:597 |
+| `icnctl device revoke` | live | L1 | `icn/bins/icnctl/src/main.rs`:620 |
+| `icnctl id export` | live | L1 | `icn/bins/icnctl/src/main.rs`:582 |
+| `icnctl id import` | live | L1 | `icn/bins/icnctl/src/main.rs`:588 |
 | `icnctl id init` | live | L1 | `icn/bins/icnctl/src/main.rs`:565 |
-| `icnctl id rotate` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:571 |
+| `icnctl id rotate` | live | L1 | `icn/bins/icnctl/src/main.rs`:571 |
 | `icnctl id show` | live | L1 | `icn/bins/icnctl/src/main.rs`:568 |
 | `icnctl ledger balance` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:728 |
 | `icnctl ledger head` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:725 |
@@ -242,13 +242,13 @@ Status is a **curated** classification (issue #2113), defaulting to `unknown / n
 
 | Status | Count |
 |---|---|
-| live | 10 |
-| partial | 14 |
+| live | 21 |
+| partial | 15 |
 | fixture-demo | 0 |
 | planned | 7 |
-| unknown / needs local verification | 131 |
+| unknown / needs local verification | 119 |
 
-### Classified commands (31)
+### Classified commands (43)
 
 Every non-`unknown` command, with its evidence basis. (All other default-build commands carry `unknown / needs local verification`.)
 
@@ -260,11 +260,23 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl coop entity-backfill-surrogates` | live | local coop-store surrogate backfill; integration-tested (`icn/bins/icnctl/tests/coop_entity_backfill_test.rs` asserts success) | `icn/bins/icnctl/src/main.rs`:249 |
 | `icnctl coop entity-report` | live | read-only local coop-store report; integration-tested (`icn/bins/icnctl/tests/coop_entity_report_test.rs`, `icn/bins/icnctl/tests/coop_entity_backfill_test.rs` assert success + JSON) | `icn/bins/icnctl/src/main.rs`:230 |
 | `icnctl device add` | live | local keystore device add; integration-tested (`icn/bins/icnctl/tests/qr_code_test.rs` asserts success) | `icn/bins/icnctl/src/main.rs`:600 |
+| `icnctl device approve` | live | local keystore device-approval from a request file via `AgeKeyStore` in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::Approve) | `icn/bins/icnctl/src/main.rs`:614 |
+| `icnctl device list` | live | local keystore device listing (`AgeKeyStore::get_did_document`/`get_device_id`) in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::List) | `icn/bins/icnctl/src/main.rs`:597 |
+| `icnctl device revoke` | live | local keystore device revocation via `AgeKeyStore` in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::Revoke) | `icn/bins/icnctl/src/main.rs`:620 |
+| `icnctl id export` | live | local passphrase-gated keystore export via `AgeKeyStore` in `handle_id_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` IdCommands::Export) | `icn/bins/icnctl/src/main.rs`:582 |
+| `icnctl id import` | live | local keystore import via `AgeKeyStore` in `handle_id_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` IdCommands::Import) | `icn/bins/icnctl/src/main.rs`:588 |
 | `icnctl id init` | live | local keystore init; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`, `icn/bins/icnctl/tests/qr_code_test.rs` spawn the binary, assert success) | `icn/bins/icnctl/src/main.rs`:565 |
+| `icnctl id rotate` | live | local keystore rotation `AgeKeyStore::rotate` in `handle_id_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` IdCommands::Rotate) | `icn/bins/icnctl/src/main.rs`:571 |
 | `icnctl id show` | live | local keystore read; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`, `icn/bins/icnctl/tests/qr_code_test.rs`) | `icn/bins/icnctl/src/main.rs`:568 |
 | `icnctl restore` | live | local data-dir restore; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:104 |
+| `icnctl snapshot cleanup` | live | local snapshot cleanup `icn_snapshot::cleanup_old_snapshots` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Cleanup) | `icn/bins/icnctl/src/main.rs`:1356 |
+| `icnctl snapshot create` | live | local snapshot creation via `icn_snapshot` on the store dir in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Create) | `icn/bins/icnctl/src/main.rs`:1338 |
+| `icnctl snapshot delete` | live | local snapshot deletion (`std::fs::remove_file`) in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Delete) | `icn/bins/icnctl/src/main.rs`:1350 |
+| `icnctl snapshot list` | live | local snapshot listing via `icn_snapshot` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::List) | `icn/bins/icnctl/src/main.rs`:1341 |
+| `icnctl snapshot verify` | live | local snapshot integrity check `icn_snapshot::verify_snapshot`/`verify_timestamped_snapshot` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Verify) | `icn/bins/icnctl/src/main.rs`:1344 |
 | `icnctl verify-backup` | live | local backup verification; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:114 |
 | `icnctl audit verify` | partial | concrete gateway client `GET /v1/receipts/chain/{hash}` (`icn/bins/icnctl/src/main.rs` AuditCommands::Verify); chain-verification algorithm covered by `icn/bins/icnctl/tests/audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested | `icn/bins/icnctl/src/main.rs`:330 |
+| `icnctl auth token` | partial | gateway auth client: signs a keystore challenge then `reqwest POST {gateway}/v1/auth/challenge` + `/v1/auth/verify` (routes in `docs/reference/project-index/generated/route-inventory.md`) in `handle_auth_command` (`icn/bins/icnctl/src/main.rs` AuthCommands::Token); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:410 |
 | `icnctl network dial` | partial | daemon RPC client `client.dial(did, addr)` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Dial); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:837 |
 | `icnctl network peers` | partial | daemon RPC client `client.get_peers()` via `create_rpc_client` in `handle_network_command` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Peers); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:834 |
 | `icnctl network stats` | partial | daemon RPC client `client.get_stats()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Stats); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:847 |

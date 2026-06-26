@@ -139,6 +139,23 @@ STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     "device add": (STATUS_LIVE, "local keystore device add; integration-tested (`icn/bins/icnctl/tests/qr_code_test.rs` asserts success)"),
     "completions": (STATUS_LIVE, "shell-completion generation via `clap_complete::generate`; local-only, no network (`icn/bins/icnctl/src/main.rs` Commands::Completions)"),
     "api export-openapi": (STATUS_LIVE, "serializes the embedded `icn_gateway::openapi::ApiDoc` to file/stdout; local-only, no gateway (`icn/bins/icnctl/src/main.rs` ApiCommands::ExportOpenapi)"),
+    # live (pass 4, issue #2113) — local-only `id` / `device` / `snapshot` ops. Each handler
+    # (handle_id_command / handle_device_command / handle_snapshot_command) is a SYNCHRONOUS fn
+    # that receives only `data_dir` (no endpoint) and contains zero network markers
+    # (reqwest / create_rpc_client / RpcClient), so it is structurally local-only with no
+    # network dependency — the published `live` criterion. Same local keystore/snapshot
+    # machinery as the integration-tested `id init`/`id show`/`device add`.
+    "id rotate": (STATUS_LIVE, "local keystore rotation `AgeKeyStore::rotate` in `handle_id_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` IdCommands::Rotate)"),
+    "id export": (STATUS_LIVE, "local passphrase-gated keystore export via `AgeKeyStore` in `handle_id_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` IdCommands::Export)"),
+    "id import": (STATUS_LIVE, "local keystore import via `AgeKeyStore` in `handle_id_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` IdCommands::Import)"),
+    "device list": (STATUS_LIVE, "local keystore device listing (`AgeKeyStore::get_did_document`/`get_device_id`) in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::List)"),
+    "device approve": (STATUS_LIVE, "local keystore device-approval from a request file via `AgeKeyStore` in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::Approve)"),
+    "device revoke": (STATUS_LIVE, "local keystore device revocation via `AgeKeyStore` in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::Revoke)"),
+    "snapshot create": (STATUS_LIVE, "local snapshot creation via `icn_snapshot` on the store dir in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Create)"),
+    "snapshot list": (STATUS_LIVE, "local snapshot listing via `icn_snapshot` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::List)"),
+    "snapshot verify": (STATUS_LIVE, "local snapshot integrity check `icn_snapshot::verify_snapshot`/`verify_timestamped_snapshot` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Verify)"),
+    "snapshot delete": (STATUS_LIVE, "local snapshot deletion (`std::fs::remove_file`) in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Delete)"),
+    "snapshot cleanup": (STATUS_LIVE, "local snapshot cleanup `icn_snapshot::cleanup_old_snapshots` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Cleanup)"),
     # partial — real work, but depends on incomplete/unproven runtime; not integration-tested end-to-end.
     "audit verify": (STATUS_PARTIAL, "concrete gateway client `GET /v1/receipts/chain/{hash}` (`icn/bins/icnctl/src/main.rs` AuditCommands::Verify); chain-verification algorithm covered by `icn/bins/icnctl/tests/audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested"),
     "preflight": (STATUS_PARTIAL, "runs real local health checks (data-dir, keystore open via `AgeKeyStore`) in `handle_preflight_command`; the gateway-connectivity check requires a running gateway; not integration-tested"),
@@ -161,6 +178,9 @@ STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     "quota list": (STATUS_PARTIAL, "authenticated daemon RPC `client.call(\"quota.list\", ...)` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` QuotaCommands::List); requires a running daemon, not integration-tested"),
     "registry list": (STATUS_PARTIAL, "concrete gateway client `reqwest GET {gateway}/v1/registry/decisions` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` RegistryCommands::List); requires a running gateway, not integration-tested"),
     "registry trace": (STATUS_PARTIAL, "concrete gateway client `reqwest GET {gateway}/v1/registry/decisions/{receipt_id}/trace` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` RegistryCommands::Trace); requires a running gateway, not integration-tested"),
+    # partial (pass 4, issue #2113) — `auth token` does local keystore work (open/unlock/sign)
+    # then a gateway challenge-response, so it depends on a running gateway.
+    "auth token": (STATUS_PARTIAL, "gateway auth client: signs a keystore challenge then `reqwest POST {gateway}/v1/auth/challenge` + `/v1/auth/verify` (routes in `docs/reference/project-index/generated/route-inventory.md`) in `handle_auth_command` (`icn/bins/icnctl/src/main.rs` AuthCommands::Token); requires a running gateway, not integration-tested"),
     # planned — handler is an explicit placeholder / prints "not yet implemented".
     "charter deploy": (STATUS_PLANNED, "handler validates the CCL doc locally, then prints \"Not yet implemented — charter deployment requires gateway integration\" (`icn/bins/icnctl/src/main.rs` CharterCommands::Deploy)"),
     "steward check-vui": (STATUS_PLANNED, "placeholder; validates input then prints \"VUI registry check requires running steward daemon\" (`icn/bins/icnctl/src/main.rs` StewardCommands::CheckVui)"),
