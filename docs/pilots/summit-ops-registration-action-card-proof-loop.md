@@ -169,6 +169,7 @@ Never committed: real attendee names; real registration roll; real emails; phone
 | You want… | Read |
 |---|---|
 | The event-day run-stage facilitator path (parent) | [`summit-ops-run-stage-facilitator-path.md`](summit-ops-run-stage-facilitator-path.md) |
+| The exact fixture shape to commit so this lane becomes fixture-backed | [`summit-ops-registration-fixture-shape.md`](summit-ops-registration-fixture-shape.md) |
 | The full event lifecycle map | [`summit-ops-lifecycle-package-map.md`](summit-ops-lifecycle-package-map.md) |
 | Recorded proof per capability | [`proof-level-taxonomy-capability-matrix.md`](../reference/project-index/proof-level-taxonomy-capability-matrix.md) |
 | Real runtime surfaces (action cards, receipts) | [`runtime-surface-map.md`](../reference/project-index/runtime-surface-map.md) |
