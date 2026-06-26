@@ -259,11 +259,18 @@ _QUOTE_CHARS = "\"'`"
 
 
 def _phrase_is_quoted(line, start, end):
-    """True if the matched phrase is wrapped in quotes/backticks — i.e. cited as a
-    banned/example phrase (e.g. an "Avoid" list `"production-ready"`), not asserted."""
+    """True if the matched phrase is a quoted item in an avoid/example LIST — wrapped
+    in a quote/backtick AND the line carries at least two segments of that same quote
+    char (an enumeration like `- "production-ready", "fully federated", ...`).
+
+    Requiring a list (>= 2 quoted segments) is deliberate: a single scare-quoted
+    phrase in an assertion (e.g. `ICN is "production-ready".`) is still a claim and
+    must NOT be exempted by quoting alone."""
     before = line[start - 1] if start > 0 else ""
     after = line[end] if end < len(line) else ""
-    return before in _QUOTE_CHARS and after in _QUOTE_CHARS
+    if before not in _QUOTE_CHARS or after != before:
+        return False
+    return line.count(before) >= 4  # >= 2 quoted segments of this quote char
 
 
 def _labels_a_risk(line, end):

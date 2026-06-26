@@ -199,6 +199,14 @@ class TestProjectIndexFP(unittest.TestCase):
         line = '- "production-ready", "fully federated", "live pilot", "secure by default"'
         self.assertEqual(linter.scan_lines("x.md", [line]), [])
 
+    def test_single_scare_quoted_claim_still_warns(self):
+        # A lone scare-quoted phrase in an assertion is still a claim — only a
+        # quoted-phrase LIST (>= 2 quoted segments) is treated as an avoid-list.
+        for line in ['ICN is "production-ready".', "The status is `production-ready`."]:
+            v = linter.scan_lines("x.md", [line])
+            self.assertEqual(len(v), 1, msg=line)
+            self.assertEqual(v[0].rule, "production-ready", msg=line)
+
     def test_risk_cell_overclaim_label_suppressed(self):
         line = "| Entity / federation / trust | implemented but partial | high: live federation overclaim |"
         self.assertEqual(linter.scan_lines("x.md", [line]), [])
