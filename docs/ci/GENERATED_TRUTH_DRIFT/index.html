@@ -124,7 +124,9 @@ on drift and <strong>succeeds</strong>; it only <strong>fails</strong> if a chec
 <code>generate_repo_record.py --check</code> exits ≥2, distinct from <code>1</code>=stale). The
 workflow is not a branch-protection–required check, so it does not block merge.</p>
 <p>This conservative start matches the repo convention for orientation artifacts
-(route-inventory is warn-only — issue #2112). See
+(both the route inventory and the <code>icnctl</code> command inventory are warn-only,
+gated in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/.github/workflows/docs-freshness.yml">`docs-freshness.yml`</a> —
+issues #2112 / #2113). See
 <a href="https://github.com/InterCooperative-Network/icn/blob/main/GATE_RATCHET_PLAN">`GATE_RATCHET_PLAN.md`</a> for how observational checks
 graduate to enforceable gates.</p>
 <h2>Regenerating artifacts</h2>
@@ -153,7 +155,10 @@ PR-stable deterministic checks — <code>check-agent-context-spine.py</code>,
 <code>generate-live-state-overlay.py --check</code>, and <code>docs/scripts/route_inventory.py --check</code> — all exit 0 on <code>main</code> as of 2026-06-21, so the clean baseline this
 doc asked for now holds. They are ready to graduate from observational to
 blocking. <strong>Promotion is a branch-protection (repo-settings) change and a
-cadence decision — deliberately NOT taken in this docs pass.</strong><ul>
+cadence decision — deliberately NOT taken in this docs pass.</strong>
+<code>docs/scripts/icnctl_command_inventory.py --check</code> joined this warn-only set
+in <code>docs-freshness.yml</code> (#2113 follow-up, alongside <code>route_inventory</code>) and is
+likewise a promotion candidate, not promoted here.<ul>
 <li><strong>NOT a promotion candidate:</strong> <code>generate_repo_record.py --check</code>. The
 file-record snapshot inventories per-file SHAs, so it drifts on <em>any</em> PR
 that touches an inventoried file and is refreshed by a separate
