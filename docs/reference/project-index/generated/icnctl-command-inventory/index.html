@@ -55,7 +55,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </ul>
 <h2>Snapshot</h2>
 <ul>
-<li>Source commit: <code>300801c029480f5d6bf66d87568d929d7d1e7acf</code></li>
+<li>Source commit: <code>21314803cf6d9b254b90f39f119bff546eb3d84d</code></li>
 <li>Source scanned: <code>icn/bins/icnctl/src/**</code> (clap <code>#[derive(Subcommand)]</code> / <code>#[derive(Parser)]</code> tree)</li>
 </ul>
 <h2>Summary</h2>
@@ -63,7 +63,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <li><strong>Total leaf commands (default build): 162</strong></li>
 <li>Top-level command groups: 33</li>
 <li>By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2</li>
-<li>By status (curated, see section below): live 10 · partial 14 · planned 7 · unknown / needs local verification 131</li>
+<li>By status (curated, see section below): live 21 · partial 15 · planned 7 · unknown / needs local verification 119</li>
 <li>Proof level: every command is <code>L1</code> (declaration exists in source).</li>
 <li><strong>Feature-gated commands (NOT in the default build, excluded from the counts above): 1</strong> (see section below).</li>
 <li>Unparsed / unresolved candidates: 0 (see section below).</li>
@@ -645,31 +645,31 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl snapshot cleanup</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1356</td>
 </tr>
 <tr>
 <td><code>icnctl snapshot create</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1338</td>
 </tr>
 <tr>
 <td><code>icnctl snapshot delete</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1350</td>
 </tr>
 <tr>
 <td><code>icnctl snapshot list</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1341</td>
 </tr>
 <tr>
 <td><code>icnctl snapshot verify</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1344</td>
 </tr>
@@ -812,7 +812,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl auth token</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:410</td>
 </tr>
@@ -890,31 +890,31 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl device approve</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:614</td>
 </tr>
 <tr>
 <td><code>icnctl device list</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:597</td>
 </tr>
 <tr>
 <td><code>icnctl device revoke</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:620</td>
 </tr>
 <tr>
 <td><code>icnctl id export</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:582</td>
 </tr>
 <tr>
 <td><code>icnctl id import</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:588</td>
 </tr>
@@ -926,7 +926,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl id rotate</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:571</td>
 </tr>
@@ -1126,11 +1126,11 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </thead>
 <tbody><tr>
 <td>live</td>
-<td>10</td>
+<td>21</td>
 </tr>
 <tr>
 <td>partial</td>
-<td>14</td>
+<td>15</td>
 </tr>
 <tr>
 <td>fixture-demo</td>
@@ -1142,10 +1142,10 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td>unknown / needs local verification</td>
-<td>131</td>
+<td>119</td>
 </tr>
 </tbody></table>
-<h3>Classified commands (31)</h3>
+<h3>Classified commands (43)</h3>
 <p>Every non-<code>unknown</code> command, with its evidence basis. (All other default-build commands carry <code>unknown / needs local verification</code>.)</p>
 <table>
 <thead>
@@ -1193,10 +1193,46 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td><code>icn/bins/icnctl/src/main.rs</code>:600</td>
 </tr>
 <tr>
+<td><code>icnctl device approve</code></td>
+<td>live</td>
+<td>local keystore device-approval from a request file via <code>AgeKeyStore</code> in <code>handle_device_command</code> (sync, no endpoint, no network) (<code>icn/bins/icnctl/src/main.rs</code> DeviceCommands::Approve)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:614</td>
+</tr>
+<tr>
+<td><code>icnctl device list</code></td>
+<td>live</td>
+<td>local keystore device listing (<code>AgeKeyStore::get_did_document</code>/<code>get_device_id</code>) in <code>handle_device_command</code> (sync, no endpoint, no network) (<code>icn/bins/icnctl/src/main.rs</code> DeviceCommands::List)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:597</td>
+</tr>
+<tr>
+<td><code>icnctl device revoke</code></td>
+<td>live</td>
+<td>local keystore device revocation via <code>AgeKeyStore</code> in <code>handle_device_command</code> (sync, no endpoint, no network) (<code>icn/bins/icnctl/src/main.rs</code> DeviceCommands::Revoke)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:620</td>
+</tr>
+<tr>
+<td><code>icnctl id export</code></td>
+<td>live</td>
+<td>local passphrase-gated keystore export via <code>AgeKeyStore</code> in <code>handle_id_command</code> (sync, no endpoint, no network) (<code>icn/bins/icnctl/src/main.rs</code> IdCommands::Export)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:582</td>
+</tr>
+<tr>
+<td><code>icnctl id import</code></td>
+<td>live</td>
+<td>local keystore import via <code>AgeKeyStore</code> in <code>handle_id_command</code> (sync, no endpoint, no network) (<code>icn/bins/icnctl/src/main.rs</code> IdCommands::Import)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:588</td>
+</tr>
+<tr>
 <td><code>icnctl id init</code></td>
 <td>live</td>
 <td>local keystore init; integration-tested (<code>icn/bins/icnctl/tests/backup_restore_test.rs</code>, <code>icn/bins/icnctl/tests/qr_code_test.rs</code> spawn the binary, assert success)</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:565</td>
+</tr>
+<tr>
+<td><code>icnctl id rotate</code></td>
+<td>live</td>
+<td>local keystore rotation <code>AgeKeyStore::rotate</code> in <code>handle_id_command</code> (sync, no endpoint, no network) (<code>icn/bins/icnctl/src/main.rs</code> IdCommands::Rotate)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:571</td>
 </tr>
 <tr>
 <td><code>icnctl id show</code></td>
@@ -1211,6 +1247,36 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td><code>icn/bins/icnctl/src/main.rs</code>:104</td>
 </tr>
 <tr>
+<td><code>icnctl snapshot cleanup</code></td>
+<td>live</td>
+<td>local snapshot cleanup <code>icn_snapshot::cleanup_old_snapshots</code> in <code>handle_snapshot_command</code> (sync, no endpoint, no network) (<code>icn/bins/icnctl/src/main.rs</code> SnapshotCommands::Cleanup)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1356</td>
+</tr>
+<tr>
+<td><code>icnctl snapshot create</code></td>
+<td>live</td>
+<td>local snapshot creation via <code>icn_snapshot</code> on the store dir in <code>handle_snapshot_command</code> (sync, no endpoint, no network) (<code>icn/bins/icnctl/src/main.rs</code> SnapshotCommands::Create)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1338</td>
+</tr>
+<tr>
+<td><code>icnctl snapshot delete</code></td>
+<td>live</td>
+<td>local snapshot deletion (<code>std::fs::remove_file</code>) in <code>handle_snapshot_command</code> (sync, no endpoint, no network) (<code>icn/bins/icnctl/src/main.rs</code> SnapshotCommands::Delete)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1350</td>
+</tr>
+<tr>
+<td><code>icnctl snapshot list</code></td>
+<td>live</td>
+<td>local snapshot listing via <code>icn_snapshot</code> in <code>handle_snapshot_command</code> (sync, no endpoint, no network) (<code>icn/bins/icnctl/src/main.rs</code> SnapshotCommands::List)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1341</td>
+</tr>
+<tr>
+<td><code>icnctl snapshot verify</code></td>
+<td>live</td>
+<td>local snapshot integrity check <code>icn_snapshot::verify_snapshot</code>/<code>verify_timestamped_snapshot</code> in <code>handle_snapshot_command</code> (sync, no endpoint, no network) (<code>icn/bins/icnctl/src/main.rs</code> SnapshotCommands::Verify)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1344</td>
+</tr>
+<tr>
 <td><code>icnctl verify-backup</code></td>
 <td>live</td>
 <td>local backup verification; integration-tested (<code>icn/bins/icnctl/tests/backup_restore_test.rs</code>)</td>
@@ -1221,6 +1287,12 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td>partial</td>
 <td>concrete gateway client <code>GET /v1/receipts/chain/{hash}</code> (<code>icn/bins/icnctl/src/main.rs</code> AuditCommands::Verify); chain-verification algorithm covered by <code>icn/bins/icnctl/tests/audit_verify_test.rs</code> (inlined copy); end-to-end against a live gateway not integration-tested</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:330</td>
+</tr>
+<tr>
+<td><code>icnctl auth token</code></td>
+<td>partial</td>
+<td>gateway auth client: signs a keystore challenge then <code>reqwest POST {gateway}/v1/auth/challenge</code> + <code>/v1/auth/verify</code> (routes in <code>docs/reference/project-index/generated/route-inventory.md</code>) in <code>handle_auth_command</code> (<code>icn/bins/icnctl/src/main.rs</code> AuthCommands::Token); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:410</td>
 </tr>
 <tr>
 <td><code>icnctl network dial</code></td>
