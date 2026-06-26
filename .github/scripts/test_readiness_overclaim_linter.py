@@ -240,6 +240,9 @@ class TestProjectIndexFP(unittest.TestCase):
             # narrow "without ... live federation" exempts clause 1, clause 2 warns
             ("Walks proofs without requiring a live federation step; ICN is generally available.",
              "general availability"),
+            # period (not just ';') also splits segments: framed example then a claim
+            ("Unsafe without more evidence: live federation. ICN is generally available.",
+             "general availability"),
         ]
         for line, expected_rule in cases:
             v = linter.scan_lines("x.md", [line])
