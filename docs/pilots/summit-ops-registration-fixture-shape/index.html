@@ -40,17 +40,20 @@
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Summit Ops Registration Fixture Shape (generic ICN)</h1>
 <blockquote>
-<p>For current project truth, defer to <a href="/docs/STATE">`docs/STATE.md`</a> and <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>. This is a <strong>docs-only fixture-shape map</strong>: it specifies the exact, schema-valid JSON a future contributor would commit so the <a href="https://github.com/InterCooperative-Network/icn/blob/main/summit-ops-registration-action-card-proof-loop">Registration Desk proof loop</a> can move from <strong>fixture-ready</strong> to genuinely <strong>fixture-backed</strong>. It commits <strong>no runtime fixture</strong> itself, syncs no Google surface, mutates no partner repo, and uses no real attendee data.</p>
+<p><strong>Status update:</strong> the card this doc specifies has since been <strong>committed</strong> to <code>web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json</code> and validated (per-card schema + <code>demo-fixture-preload.spec.js</code> + <code>standing-action-cards.spec.js</code> + the rehearsal-shell bundle validator), so the Registration Desk lane is now <strong>fixture-backed at L2</strong> (committed fictional fixture; not a runtime proof). This doc remains the <strong>spec / rationale</strong> for that fixture.</p>
+</blockquote>
+<blockquote>
+<p>For current project truth, defer to <a href="/docs/STATE">`docs/STATE.md`</a> and <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>. This is a <strong>fixture-shape map</strong>: it specifies the exact, schema-valid JSON committed so the <a href="https://github.com/InterCooperative-Network/icn/blob/main/summit-ops-registration-action-card-proof-loop">Registration Desk proof loop</a> moved from <strong>fixture-ready</strong> to genuinely <strong>fixture-backed</strong>. It syncs no Google surface, mutates no partner repo, and uses no real attendee data.</p>
 </blockquote>
 <h2>Purpose</h2>
-<p>The <a href="https://github.com/InterCooperative-Network/icn/blob/main/summit-ops-registration-action-card-proof-loop">registration proof-loop map</a> is <strong>fixture-ready, not fixture-backed</strong>: the shell&#39;s fixture pack has no registration-lane rows, so a steward cannot rehearse this lane from committed fixtures today. This doc closes that gap on paper — it pins the precise fixture shape, the file it belongs in, and the validation a contributor must pass — without committing the fixture here (so it can&#39;t break the shell&#39;s e2e bundle from an environment that can&#39;t run it).</p>
-<h2>Why docs-only (Option A) rather than committing the fixture now</h2>
-<p>The fixture <em>schema</em> is unambiguous, but the <strong>render/validation path is not fully runnable from a docs change</strong>:</p>
+<p>When this doc was written, the <a href="https://github.com/InterCooperative-Network/icn/blob/main/summit-ops-registration-action-card-proof-loop">registration proof-loop map</a> was <strong>fixture-ready, not fixture-backed</strong>: the shell&#39;s fixture pack had no registration-lane rows. This doc pinned the precise fixture shape, the file it belongs in, and the validation to run. The fixture has <strong>since been committed</strong> (see the status note at the top), so the lane is now <strong>fixture-backed (L2)</strong> and this doc serves as the spec/rationale + validation recipe.</p>
+<h2>Why this was specified docs-only first (Option A), before committing the fixture</h2>
+<p>The fixture <em>schema</em> was unambiguous, but the <strong>render/validation path was not fully runnable from a docs-only change</strong> at the time, so the shape was pinned first and the fixture committed in a follow-up where the e2e could run:</p>
 <ul>
 <li>The action-cards fixture&#39;s <strong>content</strong> is exercised by a <strong>Playwright e2e</strong> — <code>web/pilot-ui/tests/e2e/demo-fixture-preload.spec.js</code>, which fetches <code>action-cards.json</code> and asserts the <code>{did, cards, generated_at}</code> wrapper plus <strong>per-card required fields</strong> and the <code>scope</code> / <code>risk_level</code> enums — and by the <strong>&quot;Rehearsal Fixture Bundle&quot;</strong> CI gate. (<code>standing-action-cards.spec.js</code> covers the Action-Cards-list <strong>DOM wiring</strong>, not fixture contents.) A committed fixture change should be verified against those, which need a browser/npm environment.</li>
 <li>The Python bundle validator (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/scripts/validate-rehearsal-shell-fixtures.py">`docs/scripts/validate-rehearsal-shell-fixtures.py`</a>) checks the action-cards read-model <strong>shape-only</strong> (<code>did</code>, <code>cards</code>, <code>generated_at</code>) — it does <strong>not</strong> per-card schema-validate, so passing it is necessary but not sufficient.</li>
 </ul>
-<p>So this doc specifies the shape and the full validation path; <strong>committing the fixture + running the e2e/bundle gate is the next slice</strong> (and the moment the lane may be called fixture-backed).</p>
+<p>So this doc specified the shape and the full validation path; <strong>committing the fixture + running the e2e/bundle gate was the next slice — since done</strong>, which is the moment the lane became fixture-backed.</p>
 <h2>Where the fixture lives</h2>
 <p>The organizer-demo rehearsal-shell bundle:</p>
 <ul>
@@ -86,20 +89,20 @@ View source on GitHub →
 <li>All required fields present: <code>id, source_kind, action_kind, scope, title, summary, authority_basis, required_authority_scope, risk_level, accessibility_hint, receipt_expected, source_id</code> (<code>deadline</code>, <code>domain_id</code> optional).</li>
 </ul>
 <p>The fictional, categorical registration steps the lane models (<code>registration-desk-opened</code>, <code>badge-packet-check-complete</code>, <code>walk-in-question-escalated</code>, <code>attendance-count-category-updated</code>, <code>late-arrival-support-needed</code>, <code>registration-desk-closed</code>) map onto one or more such <code>action_item/complete</code> cards — each a step a logistics role marks complete. Attendance stays a <strong>count category</strong>, never a roll.</p>
-<h2>Validation a contributor must pass before claiming fixture-backed</h2>
-<p>From the monorepo root, after appending the card to <code>action-cards.json</code>:</p>
+<h2>Validation that was run before claiming fixture-backed</h2>
+<p>This is the recipe that was run (and that any future change to the card must re-run). From the monorepo root, after appending the card to <code>action-cards.json</code>:</p>
 <ol>
 <li><code>python3 docs/scripts/validate-rehearsal-shell-fixtures.py</code> — must stay <code>PASS</code> (action-cards read-model is shape-only: wrapper keys unchanged).</li>
 <li>The <strong>per-card schema check</strong> against <code>action-card.schema.json</code> (e.g. validate the appended object with <code>jsonschema</code>).</li>
 <li>The <strong>fixture-content Playwright e2e</strong> <code>web/pilot-ui/tests/e2e/demo-fixture-preload.spec.js</code> — it fetches <code>action-cards.json</code> and asserts the wrapper + per-card required fields + <code>scope</code>/<code>risk_level</code> enums (it checks <code>cards.length &gt; 0</code>, not a fixed count, so appending a card is fine) — plus the <strong>&quot;Rehearsal Fixture Bundle&quot;</strong> CI gate; <code>standing-action-cards.spec.js</code> additionally covers the Action-Cards-list DOM wiring. Re-run these to be sure.</li>
 <li><code>python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml</code>, <code>bash ops/scripts/drift-check.sh</code>, <code>python3 scripts/check-state-lag.py</code>, <code>git diff --check</code>.</li>
 </ol>
-<p>Only when the fixture is committed <strong>and</strong> those pass may the <a href="https://github.com/InterCooperative-Network/icn/blob/main/summit-ops-registration-action-card-proof-loop">registration proof-loop map</a> be updated from <em>fixture-ready</em> to <em>fixture-backed</em>.</p>
+<p>These passed and the fixture is committed, so the <a href="https://github.com/InterCooperative-Network/icn/blob/main/summit-ops-registration-action-card-proof-loop">registration proof-loop map</a> has been updated from <em>fixture-ready</em> to <em>fixture-backed</em> (L2). Note: the committed card requires <code>registration_desk</code>, so the paired <code>standing.json</code> also grants a demo Logistics Committee role with that scope — an ActionCard must be derivable from holder standing.</p>
 <h2>Privacy boundaries</h2>
 <p>Fictional / categorical only. Never commit: real attendee names, registration lists, emails, phone numbers, medical/accessibility details, actual attendance rolls, private Drive URLs, raw Google Sheet rows, or financial/payment details. Registration is <code>attendee-restricted</code>; rehearsal privacy is by exclusion.</p>
 <h2>Nonclaims</h2>
 <ul>
-<li>Does not commit a runtime fixture (docs-only); does not make the lane fixture-backed yet.</li>
+<li>The committed fixture is L2 (a fictional fixture the shell loads/validates), <strong>not</strong> a runtime proof; it does not make this a live action-card→receipt loop.</li>
 <li>Does not claim live summit registration or a real attendee workflow exists.</li>
 <li>Does not sync Google data; does not mutate the NYCN repo.</li>
 <li>Does not commit private attendee, sponsor, accessibility, volunteer, incident, registration, or payment data.</li>
@@ -109,8 +112,8 @@ View source on GitHub →
 </ul>
 <h2>Next slices</h2>
 <ol>
-<li>Commit the registration card above into <code>action-cards.json</code>; run the validators + e2e + Rehearsal Fixture Bundle gate; flip the lane to <strong>fixture-backed</strong> in the proof-loop map.</li>
-<li>Wire / confirm the shell renders the registration action register from the committed fixture.</li>
+<li><del>Commit the registration card above into <code>action-cards.json</code>; run the validators + e2e + Rehearsal Fixture Bundle gate; flip the lane to <strong>fixture-backed</strong>.</del> <strong>Done</strong> — card committed + validated; lane is fixture-backed (L2).</li>
+<li>Wire / confirm the shell renders the full registration action register (not just the single card) from committed fixtures.</li>
 <li>Add a second lane&#39;s fixture shape (room monitors or closing/cleanup) the same way.</li>
 </ol>
 <h2>Where to read deeper</h2>
