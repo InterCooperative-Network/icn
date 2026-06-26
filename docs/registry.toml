@@ -3559,6 +3559,22 @@ domain_tags = ["pilot", "nycn", "summit", "lifecycle", "package-boundary"]
 recommended_action = "keep"
 last_reviewed = "2026-06-26"
 
+[docs."docs/pilots/summit-ops-run-stage-facilitator-path.md"]
+category = "reference"
+status = "living"
+title = "Summit Ops Run-Stage Facilitator Path (generic ICN)"
+description = "First concrete child of the Summit Ops lifecycle map: a fixture-backed, no-terminal event-day facilitator path for the run stage, mapping ten generic event-day lanes onto future ICN action cards / receipts / evidence while keeping NYCN private operating detail at boundary level. Docs-only; no live sync, no partner-repo mutation, no node-hosted cockpit claim."
+last_updated = "2026-06-26"
+owner = "matt"
+audiences = ["team", "organizers"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["pilot", "nycn", "summit", "run-stage", "package-boundary"]
+recommended_action = "keep"
+last_reviewed = "2026-06-26"
+
 [docs."docs/contracts/institution-package/README.md"]
 category = "reference"
 status = "living"
