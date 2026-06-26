@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T19:52:06+00:00
+Generated: 2026-06-26T20:17:59+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -19,7 +19,7 @@ Generated: 2026-06-26T19:52:06+00:00
 
 ## Snapshot
 
-- Source commit: `5177e4918c55ba930f1a803a762752875d9fa01f`
+- Source commit: `a3cdd5ac46917504962209af17f117909542df2e`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
@@ -27,7 +27,7 @@ Generated: 2026-06-26T19:52:06+00:00
 - **Total leaf commands (default build): 162**
 - Top-level command groups: 33
 - By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2
-- By status (curated, see section below): live 34 · partial 83 · planned 12 · unknown / needs local verification 33
+- By status (curated, see section below): live 38 · partial 103 · planned 13 · unknown / needs local verification 8
 - Proof level: every command is `L1` (declaration exists in source).
 - **Feature-gated commands (NOT in the default build, excluded from the counts above): 1** (see section below).
 - Unparsed / unresolved candidates: 0 (see section below).
@@ -100,31 +100,31 @@ Role is the **curated** top-level-group heuristic (needs review). `status` is a 
 |---|---|---|---|
 | `icnctl audit verify` | partial | L1 | `icn/bins/icnctl/src/main.rs`:330 |
 | `icnctl backup` | live | L1 | `icn/bins/icnctl/src/main.rs`:98 |
-| `icnctl federation add` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:862 |
-| `icnctl federation attestation from` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1022 |
-| `icnctl federation attestation issue` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1028 |
-| `icnctl federation attestation list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1016 |
-| `icnctl federation clearing create` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1059 |
-| `icnctl federation clearing list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1050 |
-| `icnctl federation clearing position` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1097 |
-| `icnctl federation clearing rate` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1078 |
-| `icnctl federation clearing settle` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1103 |
-| `icnctl federation clearing show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1053 |
-| `icnctl federation config` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:884 |
-| `icnctl federation connect` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:878 |
-| `icnctl federation coop list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:944 |
-| `icnctl federation coop register` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:953 |
-| `icnctl federation coop show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:947 |
-| `icnctl federation coop update` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:972 |
-| `icnctl federation gateway-connect` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:899 |
-| `icnctl federation invite` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:896 |
-| `icnctl federation peers` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:859 |
-| `icnctl federation remove` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:872 |
-| `icnctl federation set` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:887 |
-| `icnctl federation status` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:856 |
-| `icnctl federation vouch issue` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:989 |
-| `icnctl federation vouch list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1004 |
-| `icnctl federation vouch revoke` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1007 |
+| `icnctl federation add` | live | L1 | `icn/bins/icnctl/src/main.rs`:862 |
+| `icnctl federation attestation from` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1022 |
+| `icnctl federation attestation issue` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1028 |
+| `icnctl federation attestation list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1016 |
+| `icnctl federation clearing create` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1059 |
+| `icnctl federation clearing list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1050 |
+| `icnctl federation clearing position` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1097 |
+| `icnctl federation clearing rate` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1078 |
+| `icnctl federation clearing settle` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1103 |
+| `icnctl federation clearing show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1053 |
+| `icnctl federation config` | live | L1 | `icn/bins/icnctl/src/main.rs`:884 |
+| `icnctl federation connect` | partial | L1 | `icn/bins/icnctl/src/main.rs`:878 |
+| `icnctl federation coop list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:944 |
+| `icnctl federation coop register` | partial | L1 | `icn/bins/icnctl/src/main.rs`:953 |
+| `icnctl federation coop show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:947 |
+| `icnctl federation coop update` | partial | L1 | `icn/bins/icnctl/src/main.rs`:972 |
+| `icnctl federation gateway-connect` | partial | L1 | `icn/bins/icnctl/src/main.rs`:899 |
+| `icnctl federation invite` | partial | L1 | `icn/bins/icnctl/src/main.rs`:896 |
+| `icnctl federation peers` | partial | L1 | `icn/bins/icnctl/src/main.rs`:859 |
+| `icnctl federation remove` | live | L1 | `icn/bins/icnctl/src/main.rs`:872 |
+| `icnctl federation set` | live | L1 | `icn/bins/icnctl/src/main.rs`:887 |
+| `icnctl federation status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:856 |
+| `icnctl federation vouch issue` | partial | L1 | `icn/bins/icnctl/src/main.rs`:989 |
+| `icnctl federation vouch list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1004 |
+| `icnctl federation vouch revoke` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1007 |
 | `icnctl network dial` | partial | L1 | `icn/bins/icnctl/src/main.rs`:837 |
 | `icnctl network peers` | partial | L1 | `icn/bins/icnctl/src/main.rs`:834 |
 | `icnctl network stats` | partial | L1 | `icn/bins/icnctl/src/main.rs`:847 |
@@ -242,13 +242,13 @@ Status is a **curated** classification (issue #2113), defaulting to `unknown / n
 
 | Status | Count |
 |---|---|
-| live | 34 |
-| partial | 83 |
+| live | 38 |
+| partial | 103 |
 | fixture-demo | 0 |
-| planned | 12 |
-| unknown / needs local verification | 33 |
+| planned | 13 |
+| unknown / needs local verification | 8 |
 
-### Classified commands (129)
+### Classified commands (154)
 
 Every non-`unknown` command, with its evidence basis. (All other default-build commands carry `unknown / needs local verification`.)
 
@@ -270,6 +270,10 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl device approve` | live | local keystore device-approval from a request file via `AgeKeyStore` in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::Approve) | `icn/bins/icnctl/src/main.rs`:614 |
 | `icnctl device list` | live | local keystore device listing (`AgeKeyStore::get_did_document`/`get_device_id`) in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::List) | `icn/bins/icnctl/src/main.rs`:597 |
 | `icnctl device revoke` | live | local keystore device revocation via `AgeKeyStore` in `handle_device_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` DeviceCommands::Revoke) | `icn/bins/icnctl/src/main.rs`:620 |
+| `icnctl federation add` | live | local-only: validates the `icn://` URL then appends the peer to `network.bootstrap_peers` and `config.to_file(icn.toml)` — no client/network (`icn/bins/icnctl/src/main.rs` FederationCommands::Add) | `icn/bins/icnctl/src/main.rs`:862 |
+| `icnctl federation config` | live | local-only: reads `icn.toml` and prints the `[federation]` config — no client/network (`icn/bins/icnctl/src/main.rs` FederationCommands::Config) | `icn/bins/icnctl/src/main.rs`:884 |
+| `icnctl federation remove` | live | local-only: removes matching bootstrap peers from `icn.toml` and `config.to_file` — no client/network (`icn/bins/icnctl/src/main.rs` FederationCommands::Remove) | `icn/bins/icnctl/src/main.rs`:872 |
+| `icnctl federation set` | live | local-only: sets a `federation.*` key in `icn.toml` and `config.to_file` — no client/network (`icn/bins/icnctl/src/main.rs` FederationCommands::Set) | `icn/bins/icnctl/src/main.rs`:887 |
 | `icnctl id export` | live | local passphrase-gated keystore export via `AgeKeyStore` in `handle_id_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` IdCommands::Export) | `icn/bins/icnctl/src/main.rs`:582 |
 | `icnctl id import` | live | local keystore import via `AgeKeyStore` in `handle_id_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` IdCommands::Import) | `icn/bins/icnctl/src/main.rs`:588 |
 | `icnctl id init` | live | local keystore init; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`, `icn/bins/icnctl/tests/qr_code_test.rs` spawn the binary, assert success) | `icn/bins/icnctl/src/main.rs`:565 |
@@ -323,6 +327,26 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl dispute get` | partial | daemon RPC `client.dispute_get()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::Get); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1388 |
 | `icnctl dispute list` | partial | daemon RPC `client.dispute_list()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1377 |
 | `icnctl dispute resolve` | partial | daemon RPC `client.dispute_resolve()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::Resolve); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1416 |
+| `icnctl federation attestation from` | partial | daemon RPC `client.federation_attestation_from()` -> `federation.attestation.from` (registered server.rs:884) (`icn/bins/icnctl/src/main.rs` AttestationCommands::From); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1022 |
+| `icnctl federation attestation issue` | partial | daemon RPC `client.federation_attestation_issue()` -> `federation.attestation.issue` (registered server.rs:888) (`icn/bins/icnctl/src/main.rs` AttestationCommands::Issue); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1028 |
+| `icnctl federation attestation list` | partial | daemon RPC `client.federation_attestation_list()` -> `federation.attestation.list` (registered server.rs:880) (`icn/bins/icnctl/src/main.rs` AttestationCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1016 |
+| `icnctl federation clearing create` | partial | daemon RPC `client.federation_clearing_create()` -> `federation.clearing.create` (registered server.rs:905) (`icn/bins/icnctl/src/main.rs` ClearingCommands::Create); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1059 |
+| `icnctl federation clearing list` | partial | daemon RPC `client.federation_clearing_list()` -> `federation.clearing.list` (registered server.rs:899) (`icn/bins/icnctl/src/main.rs` ClearingCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1050 |
+| `icnctl federation clearing position` | partial | daemon RPC `client.federation_clearing_position()` -> `federation.clearing.position` (registered server.rs:914) (`icn/bins/icnctl/src/main.rs` ClearingCommands::Position); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1097 |
+| `icnctl federation clearing settle` | partial | daemon RPC `client.federation_clearing_settle()` -> `federation.clearing.settle` (registered server.rs:918) (`icn/bins/icnctl/src/main.rs` ClearingCommands::Settle); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1103 |
+| `icnctl federation clearing show` | partial | daemon RPC `client.federation_clearing_show()` -> `federation.clearing.show` (registered server.rs:902) (`icn/bins/icnctl/src/main.rs` ClearingCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1053 |
+| `icnctl federation connect` | partial | daemon RPC `client.dial(did, addr)` -> `network.dial` (registered server.rs:640) (`icn/bins/icnctl/src/main.rs` FederationCommands::Connect); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:878 |
+| `icnctl federation coop list` | partial | daemon RPC `client.federation_coop_list()` -> `federation.coop.list` (registered server.rs:852) (`icn/bins/icnctl/src/main.rs` CoopCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:944 |
+| `icnctl federation coop register` | partial | daemon RPC `client.federation_coop_register()` -> `federation.coop.register` (registered server.rs:858) (`icn/bins/icnctl/src/main.rs` CoopCommands::Register); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:953 |
+| `icnctl federation coop show` | partial | daemon RPC `client.federation_coop_get()` -> `federation.coop.get` (registered server.rs:855) (`icn/bins/icnctl/src/main.rs` CoopCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:947 |
+| `icnctl federation coop update` | partial | daemon RPC `client.federation_own_update()` -> `federation.own.update` (registered server.rs:865) (`icn/bins/icnctl/src/main.rs` CoopCommands::Update); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:972 |
+| `icnctl federation gateway-connect` | partial | gateway client `reqwest POST {gateway}/v1/federation/connect` (bearer_auth; route `federation_connect` @ `icn/crates/icn-gateway/src/api/federation.rs`, in route-inventory) (`icn/bins/icnctl/src/main.rs` FederationCommands::GatewayConnect); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:899 |
+| `icnctl federation invite` | partial | derives DID from the local keystore, then best-effort daemon RPC `client.get_status()` -> `network.status` (registered server.rs:642) for the listen address (`icn/bins/icnctl/src/main.rs` FederationCommands::Invite); requires a running daemon for the full invite URL, not integration-tested | `icn/bins/icnctl/src/main.rs`:896 |
+| `icnctl federation peers` | partial | lists `icn.toml` bootstrap peers, then annotates connection state via daemon RPC `client.get_peers()` -> `network.peers` (server.rs:639, best-effort) (`icn/bins/icnctl/src/main.rs` FederationCommands::Peers); requires a running daemon for status, not integration-tested | `icn/bins/icnctl/src/main.rs`:859 |
+| `icnctl federation status` | partial | daemon RPC `client.get_peers()` -> `network.peers` (registered `icn/crates/icn-rpc/src/server.rs`:639); prints config-only status if the daemon is down (`icn/bins/icnctl/src/main.rs` FederationCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:856 |
+| `icnctl federation vouch issue` | partial | daemon RPC `client.federation_vouch_issue()` -> `federation.vouch.issue` (registered server.rs:871) (`icn/bins/icnctl/src/main.rs` VouchCommands::Issue); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:989 |
+| `icnctl federation vouch list` | partial | daemon RPC `client.federation_own_get()` -> `federation.own.get` (server.rs:864) + `federation_coop_list()` -> `federation.coop.list` (852) + `federation_vouch_list()` -> `federation.vouch.list` (registered server.rs:868) (`icn/bins/icnctl/src/main.rs` VouchCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1004 |
+| `icnctl federation vouch revoke` | partial | daemon RPC `client.federation_vouch_remove()` -> `federation.vouch.remove` (registered server.rs:875) (`icn/bins/icnctl/src/main.rs` VouchCommands::Revoke); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1007 |
 | `icnctl gov domain add-member` | partial | gateway client `reqwest POST {gateway}/v1/gov/domains/{domain_id}/members` (bearer_auth; route `add_domain_member` @ `icn/apps/governance/src/http/configure.rs`, in route-inventory) — does not use the RPC client (`icn/bins/icnctl/src/main.rs` DomainCommands::AddMember); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1168 |
 | `icnctl gov domain create` | partial | daemon RPC `client.call("governance.domain.create")` via `create_authenticated_rpc_client` in `handle_gov_command` (`icn/bins/icnctl/src/main.rs` DomainCommands::Create); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1127 |
 | `icnctl gov domain list` | partial | daemon RPC `client.call("governance.domain.list")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` DomainCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1165 |
@@ -375,6 +399,7 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl commons affiliations` | planned | prints "Affiliation lookup requires gateway integration. This feature is pending gateway API implementation." — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Affiliations) | `icn/bins/icnctl/src/main.rs`:1582 |
 | `icnctl commons join` | planned | prints "Join request requires gateway integration. This feature is pending gateway API implementation." — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Join) | `icn/bins/icnctl/src/main.rs`:1589 |
 | `icnctl commons leave` | planned | prints "Leave request requires gateway integration. This feature is pending gateway API implementation." — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Leave) | `icn/bins/icnctl/src/main.rs`:1600 |
+| `icnctl federation clearing rate` | planned | no client call — prints "Exchange rate noted..." + a note; in-source comment "Rate updates are not yet implemented via RPC" (`icn/bins/icnctl/src/main.rs` ClearingCommands::Rate) | `icn/bins/icnctl/src/main.rs`:1078 |
 | `icnctl gov proposal cancel` | planned | `bail!("Cancel command not yet supported via RPC. Use 'proposal close' instead, or stop the daemon and modify the store directly.")` before any client call (`icn/bins/icnctl/src/main.rs` ProposalCommands::Cancel) | `icn/bins/icnctl/src/main.rs`:1278 |
 | `icnctl gov vote show` | planned | `bail!("Vote show command not yet supported via RPC. Use 'proposal show {proposal_id}' to see the proposal.")` before any client call (`icn/bins/icnctl/src/main.rs` VoteCommands::Show) | `icn/bins/icnctl/src/main.rs`:1303 |
 | `icnctl steward check-vui` | planned | placeholder; validates input then prints "VUI registry check requires running steward daemon" (`icn/bins/icnctl/src/main.rs` StewardCommands::CheckVui) | `icn/bins/icnctl/src/main.rs`:1496 |
