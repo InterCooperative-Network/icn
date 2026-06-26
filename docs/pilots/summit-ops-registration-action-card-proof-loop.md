@@ -65,13 +65,15 @@ The facilitator reviews the registration-desk checklist (plain language, the ste
 
 ## Action-card candidate
 
-The candidate maps to an ICN `ActionCard` shaped like the NYCN package's `complete-action-item` template (package shape, **planned**, ICN #1608):
+The candidate maps to the one **already-emitted, schema-valid** ActionCard pair that fits a day-of task — `action_item` / `complete` — per the ICN-core contract [`docs/contracts/institution-package/action-card.schema.json`](../contracts/institution-package/action-card.schema.json). That schema's `source_kind` is a **closed taxonomy** (emitted: `proposal/vote`, `meeting/attend`, `action_item/complete`; RFC-gated forward-compat: `signal_rule`, `obligation_lifecycle`), and `scope` is limited to `entity` / `structure` / `individual`. The registration-desk candidate therefore stays inside the schema:
 
-- **source_kind:** `committee_log` / `program_milestone` (a logistics day-of task) · **action_kind:** `complete`
-- **scope:** the registration-desk `Activity` sub-step, owned by the logistics `Structure`
-- **authority_basis:** `role_assignment_in_owning_structure` — i.e. a `RoleAssignment` for the registration/welcome role
+- **source_kind:** `action_item` · **action_kind:** `complete` (the emitted, schema-valid pair)
+- **scope:** `structure` — the logistics `Structure` that owns the registration-desk work (a valid schema scope; the "registration desk" itself is package/event vocabulary for an `Activity` sub-step, but the card's schema `scope` field is `structure`)
+- **authority_basis:** `assigned_action_item` / role assignment in the owning `Structure` — i.e. a `RoleAssignment` for the registration/welcome role
 - **title (fictional):** "Complete registration-desk step: badge-packet check"
 - **carries ids, not contact info** — the delivery channel comes from the private overlay and never reaches this repo
+
+> **Schema-vs-package note.** The NYCN package's `complete-action-item` template (`institution/action-card-templates.example.yaml`) lists richer `source_kind`s (`program_milestone`, `committee_log`). Those are **not** in the current ICN-core emitted `source_kind` enum and are **not** reserved RFC-gated values — modeling this lane against them would point implementers at an invalid ActionCard. Treat any such richer source-kind as a **future schema / source-kind change** (a separate ADR/RFC + `action-card.schema.json` update), not as something emittable today.
 
 The card would surface on the holder's member shell via the declared `GET /gov/me/action-cards` route (declaration only — see proof discipline below).
 
@@ -89,7 +91,7 @@ A repo-safe evidence-export candidate: basenames + status categories only, e.g. 
 
 ## Post-event follow-up item
 
-A fictional follow-up shape, e.g. "review walk-in escalation handling for next cycle" — a `program_milestone`/`committee_log` item for the close stage. No person-identifying content.
+A fictional follow-up shape, e.g. "review walk-in escalation handling for next cycle" — a package-side close-stage item (the NYCN package may track these as committee-log / milestone categories; those are package vocabulary, not ICN-core ActionCard `source_kind`s). No person-identifying content.
 
 ## Minimal fixture-backed walkthrough
 
@@ -97,7 +99,7 @@ A fictional follow-up shape, e.g. "review walk-in escalation handling for next c
 fictional registration source packet
   → facilitator reviews the checklist (categorical steps, plain language)
   → steward/operator confirms fixture/example mode (nothing live)
-  → a registration action-card candidate is shown (complete-action-item shape)
+  → a registration action-card candidate is shown (schema-valid action_item/complete shape)
   → fictional lane lead marks completion or escalation
   → receipt/evidence candidate is described (ActionItemCompletionReceipt + repo-safe export)
   → a post-event follow-up item is produced
@@ -133,7 +135,7 @@ Never committed: real attendee names; real registration roll; real emails; phone
 ## What can be fixture-backed now
 
 - The fictional registration source packet + checklist shape.
-- The action-card candidate shape (`complete-action-item`), with fictional title and id-only payload.
+- The action-card candidate shape (schema-valid `action_item`/`complete`), with fictional title and id-only payload.
 - The receipt/evidence candidate shapes (basenames + status categories).
 - A no-terminal walkthrough driven by committed fixtures (the existing fixture-backed shell, L2).
 
