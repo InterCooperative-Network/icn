@@ -2,8 +2,9 @@
 """
 Readiness Overclaim Linter - CI Script
 
-Scans ACTIVE deployment/operations guidance for un-disclaimed, affirmative,
-present-tense readiness claims that misrepresent ICN's maturity:
+Scans ACTIVE, claim-sensitive guidance (deployment/operations guidance and the
+pilots surface — see SCAN_DIRS) for un-disclaimed, affirmative, present-tense
+readiness claims that misrepresent ICN's maturity:
 
   - production-readiness   ("PRODUCTION READY", "ready for production", ...)
   - live-federation        ("live federation")
@@ -36,15 +37,31 @@ from dataclasses import dataclass, field
 from typing import List
 
 # ---------------------------------------------------------------------------
-# Scan scope (directories, relative to repo root). Intentionally narrow for the
-# first ratchet iteration: the deployment/operations guidance surface, where
-# "PRODUCTION READY" headline claims are most dangerous and highest-precision.
-# Widening scope is a deliberate ratchet step (docs/ci/GATE_RATCHET_PLAN.md).
+# Scan scope (directories, relative to repo root). Allowlist-based and widened
+# deliberately, one cleaned surface at a time (a ratchet step — see
+# docs/ci/GATE_RATCHET_PLAN.md). Start: deployment/operations guidance, where
+# "PRODUCTION READY" headline claims are most dangerous. Added 2026-06-26:
+# docs/pilots (organizer-/partner-facing, claim-sensitive; measured low-noise —
+# 10 files, 1 bounded ALLOWLIST exception).
+#
+# NOT yet added (measured high-noise: claim-sensitive docs that *enumerate* the
+# red-line phrases as nonclaim / "does not claim" lists, FAQ questions, and
+# roadmap targets — false positives the line-local negation guard can't see).
+# Adding them needs a precision step first (nonclaim-list / question /
+# disclaimer-word handling). Tracked as a follow-up in GATE_RATCHET_PLAN.md:
+#   docs/reference/project-index, docs/demo, docs/strategy
 # ---------------------------------------------------------------------------
 SCAN_DIRS = [
     "docs/deployment",
     "docs/operations/deployment",
+    "docs/pilots",
 ]
+
+# Directory basenames pruned from every scan root: generated artifacts (they
+# legitimately *quote* red-line phrases in "does NOT prove ..." disclaimers) and
+# archival/historical trees (dated snapshots are exempt by design). Future-proofs
+# the widening so adding a root that contains these subtrees stays low-noise.
+EXCLUDE_DIRS = {"generated", "archive", "dev-journal"}
 
 # Affirmative readiness-claim patterns (case-insensitive).
 OVERCLAIM_PATTERNS = [
@@ -94,6 +111,11 @@ BANNER_SCAN_LINES = 15
 # docs/dev/language-guide.md. (Empty at baseline: banners cover every current hit.)
 ALLOWLIST = {
     # "docs/deployment/EXAMPLE.md:42": "why this affirmative line is genuinely fine",
+    "docs/pilots/summit-ops-lifecycle-package-map.md:89":
+        "Red-line non-claim: the line is a '**Must not claim:** ...' enumeration "
+        "('that any of this is production or live federation'). The leading "
+        "'Must not claim:' negates the whole bullet, but it sits in an earlier "
+        "clause than the matched phrase, so the line-local negation guard misses it.",
 }
 
 
@@ -180,7 +202,10 @@ def run_lint(repo_root):
         abs_dir = os.path.join(repo_root, scan_dir)
         if not os.path.isdir(abs_dir):
             continue
-        for dirpath, _dirnames, filenames in os.walk(abs_dir):
+        for dirpath, dirnames, filenames in os.walk(abs_dir):
+            # Prune excluded subtrees (generated artifacts, archive/dev-journal)
+            # in place so os.walk does not descend into them.
+            dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
             for name in sorted(filenames):
                 if not name.endswith(".md"):
                     continue
