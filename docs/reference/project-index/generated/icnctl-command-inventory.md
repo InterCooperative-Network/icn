@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T13:53:31+00:00
+Generated: 2026-06-26T13:58:19+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -19,7 +19,7 @@ Generated: 2026-06-26T13:53:31+00:00
 
 ## Snapshot
 
-- Source commit: `e3a4596cfb2bba8c56f5fada5aed15814cffffeb`
+- Source commit: `300801c029480f5d6bf66d87568d929d7d1e7acf`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
@@ -268,7 +268,7 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl network dial` | partial | daemon RPC client `client.dial(did, addr)` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Dial); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:837 |
 | `icnctl network peers` | partial | daemon RPC client `client.get_peers()` via `create_rpc_client` in `handle_network_command` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Peers); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:834 |
 | `icnctl network stats` | partial | daemon RPC client `client.get_stats()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Stats); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:847 |
-| `icnctl network status` | partial | daemon RPC client `client.get_nat_status()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:850 |
+| `icnctl network status` | partial | daemon RPC client `client.get_status()` then optionally `client.get_nat_status()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:850 |
 | `icnctl preflight` | partial | runs real local health checks (data-dir, keystore open via `AgeKeyStore`) in `handle_preflight_command`; the gateway-connectivity check requires a running gateway; not integration-tested | `icn/bins/icnctl/src/main.rs`:203 |
 | `icnctl quota list` | partial | authenticated daemon RPC `client.call("quota.list", ...)` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` QuotaCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:555 |
 | `icnctl quota show` | partial | authenticated daemon RPC `client.call("quota.usage", ...)` via `create_authenticated_rpc_client` in `handle_quota_command` (`icn/bins/icnctl/src/main.rs` QuotaCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:544 |
