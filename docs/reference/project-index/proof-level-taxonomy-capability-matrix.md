@@ -155,5 +155,6 @@ This map does not claim:
 | What is or isn't show-ready, red lines | [`show-readiness-map.md`](show-readiness-map.md) |
 | Subsystem coverage + status vocabulary | [`project-coverage-matrix.md`](project-coverage-matrix.md) |
 | Real runtime surfaces | [`runtime-surface-map.md`](runtime-surface-map.md) |
+| Which routes/`icnctl` commands back the rehearsal, and what is safe to show / steward-only / not-ready | [`organizer-rehearsal-operability-map.md`](organizer-rehearsal-operability-map.md) |
 | The phase model | [`docs/PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md) |
 | Run / narrate / hand off the Candidate 0.1 demo (Row 11 operator companion) | [`docs/demo/JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md`](../../demo/JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md) |
