@@ -156,6 +156,13 @@ STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     "snapshot verify": (STATUS_LIVE, "local snapshot integrity check `icn_snapshot::verify_snapshot`/`verify_timestamped_snapshot` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Verify)"),
     "snapshot delete": (STATUS_LIVE, "local snapshot deletion (`std::fs::remove_file`) in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Delete)"),
     "snapshot cleanup": (STATUS_LIVE, "local snapshot cleanup `icn_snapshot::cleanup_old_snapshots` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Cleanup)"),
+    # live (pass 5, issue #2113) — local-only `contract` build/sign helpers. `handle_contract_prepare`
+    # and `handle_contract_sign` are SYNCHRONOUS fns taking only file paths + data_dir (no client);
+    # they read a contract/deployment file, sign with the local keystore, and `std::fs::write` the
+    # output — no network/await (the RpcClient constructed in handle_contract_command is never used
+    # by these arms).
+    "contract prepare": (STATUS_LIVE, "local contract-deployment preparation `handle_contract_prepare` (reads contract JSON, signs with keystore, `std::fs::write`s the deployment file); sync, no client/network (`icn/bins/icnctl/src/main.rs` ContractCommands::Prepare)"),
+    "contract sign": (STATUS_LIVE, "local deployment-file co-signing `handle_contract_sign` (reads deployment file, signs with keystore, `std::fs::write`s output); sync, no client/network (`icn/bins/icnctl/src/main.rs` ContractCommands::Sign)"),
     # partial — real work, but depends on incomplete/unproven runtime; not integration-tested end-to-end.
     "audit verify": (STATUS_PARTIAL, "concrete gateway client `GET /v1/receipts/chain/{hash}` (`icn/bins/icnctl/src/main.rs` AuditCommands::Verify); chain-verification algorithm covered by `icn/bins/icnctl/tests/audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested"),
     "preflight": (STATUS_PARTIAL, "runs real local health checks (data-dir, keystore open via `AgeKeyStore`) in `handle_preflight_command`; the gateway-connectivity check requires a running gateway; not integration-tested"),
@@ -181,6 +188,21 @@ STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     # partial (pass 4, issue #2113) — `auth token` does local keystore work (open/unlock/sign)
     # then a gateway challenge-response, so it depends on a running gateway.
     "auth token": (STATUS_PARTIAL, "gateway auth client: signs a keystore challenge then `reqwest POST {gateway}/v1/auth/challenge` + `/v1/auth/verify` (routes in `docs/reference/project-index/generated/route-inventory.md`) in `handle_auth_command` (`icn/bins/icnctl/src/main.rs` AuthCommands::Token); requires a running gateway, not integration-tested"),
+    # partial (pass 5, issue #2113) — `trust` + `compute` (authenticated daemon RPC clients) and
+    # the daemon-client `contract` arms. Each handler makes a real RPC call but depends on a
+    # running daemon and has no binary-spawning e2e test.
+    "trust add": (STATUS_PARTIAL, "daemon RPC client `client.add_trust()` via `create_authenticated_rpc_client` in `handle_trust_command` (`icn/bins/icnctl/src/main.rs` TrustCommands::Add); \"Is icnd running?\"; requires a running daemon, not integration-tested"),
+    "trust list": (STATUS_PARTIAL, "daemon RPC client `client.list_trust()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` TrustCommands::List); requires a running daemon, not integration-tested"),
+    "trust show": (STATUS_PARTIAL, "daemon RPC client (compute-trust-score call) via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` TrustCommands::Show); \"Is icnd running?\"; requires a running daemon, not integration-tested"),
+    "trust remove": (STATUS_PARTIAL, "daemon RPC client `client.remove_trust()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` TrustCommands::Remove); requires a running daemon, not integration-tested"),
+    "compute submit": (STATUS_PARTIAL, "authenticated daemon RPC `client.call(\"compute.submit\", ...)` via `create_authenticated_rpc_client` in `handle_compute_command` (`icn/bins/icnctl/src/main.rs` ComputeCommands::Submit); requires a running daemon, not integration-tested"),
+    "compute submit-wasm": (STATUS_PARTIAL, "authenticated daemon RPC `client.call(\"compute.submit\", ...)` (reads a local wasm file) via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ComputeCommands::SubmitWasm); requires a running daemon, not integration-tested"),
+    "compute status": (STATUS_PARTIAL, "authenticated daemon RPC `client.call(\"compute.status\", ...)` (`icn/bins/icnctl/src/main.rs` ComputeCommands::Status); requires a running daemon, not integration-tested"),
+    "compute cancel": (STATUS_PARTIAL, "authenticated daemon RPC `client.call(\"compute.cancel\", ...)` (`icn/bins/icnctl/src/main.rs` ComputeCommands::Cancel); requires a running daemon, not integration-tested"),
+    "contract deploy": (STATUS_PARTIAL, "signs the deployment locally then daemon RPC `client.deploy_contract()` (`icn_rpc::RpcClient`) in `handle_contract_command` (`icn/bins/icnctl/src/main.rs` ContractCommands::Deploy); \"Is icnd running?\"; requires a running daemon, not integration-tested"),
+    "contract deploy-signed": (STATUS_PARTIAL, "daemon RPC deploy of a pre-signed deployment file via `handle_contract_deploy_signed(.., &mut client)` (`icn/bins/icnctl/src/main.rs` ContractCommands::DeploySigned); requires a running daemon, not integration-tested"),
+    "contract call": (STATUS_PARTIAL, "daemon RPC `client.call_contract()` (`icn/bins/icnctl/src/main.rs` ContractCommands::Call); \"Is icnd running?\"; requires a running daemon, not integration-tested"),
+    "contract list": (STATUS_PARTIAL, "daemon RPC `client.list_contracts()` (`icn/bins/icnctl/src/main.rs` ContractCommands::List); requires a running daemon, not integration-tested"),
     # planned — handler is an explicit placeholder / prints "not yet implemented".
     "charter deploy": (STATUS_PLANNED, "handler validates the CCL doc locally, then prints \"Not yet implemented — charter deployment requires gateway integration\" (`icn/bins/icnctl/src/main.rs` CharterCommands::Deploy)"),
     "steward check-vui": (STATUS_PLANNED, "placeholder; validates input then prints \"VUI registry check requires running steward daemon\" (`icn/bins/icnctl/src/main.rs` StewardCommands::CheckVui)"),
