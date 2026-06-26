@@ -3575,6 +3575,22 @@ domain_tags = ["pilot", "nycn", "summit", "run-stage", "package-boundary"]
 recommended_action = "keep"
 last_reviewed = "2026-06-26"
 
+[docs."docs/pilots/summit-ops-registration-action-card-proof-loop.md"]
+category = "reference"
+status = "living"
+title = "Summit Ops Registration Action-Card Proof Loop (generic ICN)"
+description = "First proof-loop child of the run-stage facilitator path: a fictional, fixture-backed Registration Desk lane walked end-to-end through the ICN proof loop (source packet -> reviewed candidate -> ActionCard candidate -> authorized completion -> receipt candidate -> evidence export -> follow-up). A proof-loop map / rehearsal-ready shape, not a runtime proof; fictional categorical examples only; no real attendee data; docs-only."
+last_updated = "2026-06-26"
+owner = "matt"
+audiences = ["team", "organizers"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["pilot", "nycn", "summit", "action-card", "proof-loop"]
+recommended_action = "keep"
+last_reviewed = "2026-06-26"
+
 [docs."docs/contracts/institution-package/README.md"]
 category = "reference"
 status = "living"
