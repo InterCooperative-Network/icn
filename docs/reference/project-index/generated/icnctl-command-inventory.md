@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T13:43:48+00:00
+Generated: 2026-06-26T13:53:31+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -19,7 +19,7 @@ Generated: 2026-06-26T13:43:48+00:00
 
 ## Snapshot
 
-- Source commit: `31c39e3ab8f8fd98ed283fc179995253adf5405c`
+- Source commit: `e3a4596cfb2bba8c56f5fada5aed15814cffffeb`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
@@ -27,7 +27,7 @@ Generated: 2026-06-26T13:43:48+00:00
 - **Total leaf commands (default build): 162**
 - Top-level command groups: 33
 - By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2
-- By status (curated, see section below): live 10 · partial 6 · planned 7 · unknown / needs local verification 139
+- By status (curated, see section below): live 10 · partial 14 · planned 7 · unknown / needs local verification 131
 - Proof level: every command is `L1` (declaration exists in source).
 - **Feature-gated commands (NOT in the default build, excluded from the counts above): 1** (see section below).
 - Unparsed / unresolved candidates: 0 (see section below).
@@ -125,17 +125,17 @@ Role is the **curated** top-level-group heuristic (needs review). `status` is a 
 | `icnctl federation vouch issue` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:989 |
 | `icnctl federation vouch list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1004 |
 | `icnctl federation vouch revoke` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1007 |
-| `icnctl network dial` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:837 |
-| `icnctl network peers` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:834 |
-| `icnctl network stats` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:847 |
-| `icnctl network status` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:850 |
+| `icnctl network dial` | partial | L1 | `icn/bins/icnctl/src/main.rs`:837 |
+| `icnctl network peers` | partial | L1 | `icn/bins/icnctl/src/main.rs`:834 |
+| `icnctl network stats` | partial | L1 | `icn/bins/icnctl/src/main.rs`:847 |
+| `icnctl network status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:850 |
 | `icnctl policy list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:531 |
 | `icnctl policy remove` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:534 |
 | `icnctl policy set` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:513 |
 | `icnctl policy show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:524 |
 | `icnctl preflight` | partial | L1 | `icn/bins/icnctl/src/main.rs`:203 |
-| `icnctl quota list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:555 |
-| `icnctl quota show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:544 |
+| `icnctl quota list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:555 |
+| `icnctl quota show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:544 |
 | `icnctl restore` | live | L1 | `icn/bins/icnctl/src/main.rs`:104 |
 | `icnctl snapshot cleanup` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1356 |
 | `icnctl snapshot create` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1338 |
@@ -208,8 +208,8 @@ Role is the **curated** top-level-group heuristic (needs review). `status` is a 
 | `icnctl recovery list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:666 |
 | `icnctl recovery setup` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:633 |
 | `icnctl recovery status` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:669 |
-| `icnctl registry list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:366 |
-| `icnctl registry trace` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:389 |
+| `icnctl registry list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:366 |
+| `icnctl registry trace` | partial | L1 | `icn/bins/icnctl/src/main.rs`:389 |
 
 ### maintainer (2)
 
@@ -243,12 +243,12 @@ Status is a **curated** classification (issue #2113), defaulting to `unknown / n
 | Status | Count |
 |---|---|
 | live | 10 |
-| partial | 6 |
+| partial | 14 |
 | fixture-demo | 0 |
 | planned | 7 |
-| unknown / needs local verification | 139 |
+| unknown / needs local verification | 131 |
 
-### Classified commands (23)
+### Classified commands (31)
 
 Every non-`unknown` command, with its evidence basis. (All other default-build commands carry `unknown / needs local verification`.)
 
@@ -265,10 +265,18 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl restore` | live | local data-dir restore; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:104 |
 | `icnctl verify-backup` | live | local backup verification; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:114 |
 | `icnctl audit verify` | partial | concrete gateway client `GET /v1/receipts/chain/{hash}` (`icn/bins/icnctl/src/main.rs` AuditCommands::Verify); chain-verification algorithm covered by `icn/bins/icnctl/tests/audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested | `icn/bins/icnctl/src/main.rs`:330 |
+| `icnctl network dial` | partial | daemon RPC client `client.dial(did, addr)` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Dial); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:837 |
+| `icnctl network peers` | partial | daemon RPC client `client.get_peers()` via `create_rpc_client` in `handle_network_command` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Peers); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:834 |
+| `icnctl network stats` | partial | daemon RPC client `client.get_stats()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Stats); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:847 |
+| `icnctl network status` | partial | daemon RPC client `client.get_nat_status()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:850 |
 | `icnctl preflight` | partial | runs real local health checks (data-dir, keystore open via `AgeKeyStore`) in `handle_preflight_command`; the gateway-connectivity check requires a running gateway; not integration-tested | `icn/bins/icnctl/src/main.rs`:203 |
+| `icnctl quota list` | partial | authenticated daemon RPC `client.call("quota.list", ...)` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` QuotaCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:555 |
+| `icnctl quota show` | partial | authenticated daemon RPC `client.call("quota.usage", ...)` via `create_authenticated_rpc_client` in `handle_quota_command` (`icn/bins/icnctl/src/main.rs` QuotaCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:544 |
 | `icnctl receipts allocation` | partial | concrete gateway client `reqwest GET {gateway}/v1/receipts/allocations/{hash}` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` ReceiptCommands::Allocation); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:299 |
 | `icnctl receipts chain` | partial | concrete gateway client `reqwest GET {gateway}/v1/receipts/chain/{decision_hash}` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` ReceiptCommands::Chain); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:281 |
 | `icnctl receipts intent` | partial | concrete gateway client `reqwest GET {gateway}/v1/receipts/intents/{hash}` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` ReceiptCommands::Intent); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:313 |
+| `icnctl registry list` | partial | concrete gateway client `reqwest GET {gateway}/v1/registry/decisions` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` RegistryCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:366 |
+| `icnctl registry trace` | partial | concrete gateway client `reqwest GET {gateway}/v1/registry/decisions/{receipt_id}/trace` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` RegistryCommands::Trace); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:389 |
 | `icnctl status` | partial | RPC client to the daemon (`create_rpc_client` + `client.get_status()`) in `handle_status_command` (`icn/bins/icnctl/src/main.rs` Commands::Status); prints local config and fails gracefully when no daemon; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:51 |
 | `icnctl charter deploy` | planned | handler validates the CCL doc locally, then prints "Not yet implemented — charter deployment requires gateway integration" (`icn/bins/icnctl/src/main.rs` CharterCommands::Deploy) | `icn/bins/icnctl/src/main.rs`:1718 |
 | `icnctl steward check-vui` | planned | placeholder; validates input then prints "VUI registry check requires running steward daemon" (`icn/bins/icnctl/src/main.rs` StewardCommands::CheckVui) | `icn/bins/icnctl/src/main.rs`:1496 |
