@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T19:16:01+00:00
+Generated: 2026-06-26T19:25:52+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -19,7 +19,7 @@ Generated: 2026-06-26T19:16:01+00:00
 
 ## Snapshot
 
-- Source commit: `4e9b0be4fdfd23547b11ee87478c08c35600e3df`
+- Source commit: `73cceb1c28dee9dde0d92476876e57a3c0842280`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
@@ -27,7 +27,7 @@ Generated: 2026-06-26T19:16:01+00:00
 - **Total leaf commands (default build): 162**
 - Top-level command groups: 33
 - By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2
-- By status (curated, see section below): live 32 · partial 59 · planned 10 · unknown / needs local verification 61
+- By status (curated, see section below): live 34 · partial 73 · planned 10 · unknown / needs local verification 45
 - Proof level: every command is `L1` (declaration exists in source).
 - **Feature-gated commands (NOT in the default build, excluded from the counts above): 1** (see section below).
 - Unparsed / unresolved candidates: 0 (see section below).
@@ -189,25 +189,25 @@ Role is the **curated** top-level-group heuristic (needs review). `status` is a 
 | `icnctl id init` | live | L1 | `icn/bins/icnctl/src/main.rs`:565 |
 | `icnctl id rotate` | live | L1 | `icn/bins/icnctl/src/main.rs`:571 |
 | `icnctl id show` | live | L1 | `icn/bins/icnctl/src/main.rs`:568 |
-| `icnctl ledger balance` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:728 |
-| `icnctl ledger head` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:725 |
-| `icnctl ledger history` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:738 |
-| `icnctl ledger quarantine drop` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:767 |
-| `icnctl ledger quarantine get` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:755 |
-| `icnctl ledger quarantine list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:752 |
-| `icnctl ledger quarantine purge` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:773 |
-| `icnctl ledger quarantine release` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:761 |
+| `icnctl ledger balance` | partial | L1 | `icn/bins/icnctl/src/main.rs`:728 |
+| `icnctl ledger head` | partial | L1 | `icn/bins/icnctl/src/main.rs`:725 |
+| `icnctl ledger history` | partial | L1 | `icn/bins/icnctl/src/main.rs`:738 |
+| `icnctl ledger quarantine drop` | partial | L1 | `icn/bins/icnctl/src/main.rs`:767 |
+| `icnctl ledger quarantine get` | partial | L1 | `icn/bins/icnctl/src/main.rs`:755 |
+| `icnctl ledger quarantine list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:752 |
+| `icnctl ledger quarantine purge` | partial | L1 | `icn/bins/icnctl/src/main.rs`:773 |
+| `icnctl ledger quarantine release` | partial | L1 | `icn/bins/icnctl/src/main.rs`:761 |
 | `icnctl receipts allocation` | partial | L1 | `icn/bins/icnctl/src/main.rs`:299 |
 | `icnctl receipts chain` | partial | L1 | `icn/bins/icnctl/src/main.rs`:281 |
 | `icnctl receipts intent` | partial | L1 | `icn/bins/icnctl/src/main.rs`:313 |
-| `icnctl recovery attest` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:656 |
-| `icnctl recovery cancel` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:681 |
-| `icnctl recovery config` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:647 |
-| `icnctl recovery finalize` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:675 |
-| `icnctl recovery initiate` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:650 |
-| `icnctl recovery list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:666 |
-| `icnctl recovery setup` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:633 |
-| `icnctl recovery status` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:669 |
+| `icnctl recovery attest` | partial | L1 | `icn/bins/icnctl/src/main.rs`:656 |
+| `icnctl recovery cancel` | partial | L1 | `icn/bins/icnctl/src/main.rs`:681 |
+| `icnctl recovery config` | live | L1 | `icn/bins/icnctl/src/main.rs`:647 |
+| `icnctl recovery finalize` | partial | L1 | `icn/bins/icnctl/src/main.rs`:675 |
+| `icnctl recovery initiate` | partial | L1 | `icn/bins/icnctl/src/main.rs`:650 |
+| `icnctl recovery list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:666 |
+| `icnctl recovery setup` | live | L1 | `icn/bins/icnctl/src/main.rs`:633 |
+| `icnctl recovery status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:669 |
 | `icnctl registry list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:366 |
 | `icnctl registry trace` | partial | L1 | `icn/bins/icnctl/src/main.rs`:389 |
 
@@ -242,13 +242,13 @@ Status is a **curated** classification (issue #2113), defaulting to `unknown / n
 
 | Status | Count |
 |---|---|
-| live | 32 |
-| partial | 59 |
+| live | 34 |
+| partial | 73 |
 | fixture-demo | 0 |
 | planned | 10 |
-| unknown / needs local verification | 61 |
+| unknown / needs local verification | 45 |
 
-### Classified commands (101)
+### Classified commands (117)
 
 Every non-`unknown` command, with its evidence basis. (All other default-build commands carry `unknown / needs local verification`.)
 
@@ -277,6 +277,8 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl id show` | live | local keystore read; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`, `icn/bins/icnctl/tests/qr_code_test.rs`) | `icn/bins/icnctl/src/main.rs`:568 |
 | `icnctl institution bootstrap plan` | live | local bootstrap plan report `build_plan_report` (sync `pub fn`, no network) (`icn/bins/icnctl/src/institution_bootstrap.rs` InstitutionCommands::Bootstrap -> InstitutionBootstrapCommands::Plan) | `icn/bins/icnctl/src/institution_bootstrap.rs`:38 |
 | `icnctl institution bootstrap validate` | live | local package validation `validate_package` (sync `pub fn`, reads the package dir, no network) (`icn/bins/icnctl/src/institution_bootstrap.rs` InstitutionCommands::Bootstrap -> InstitutionBootstrapCommands::Validate) | `icn/bins/icnctl/src/institution_bootstrap.rs`:27 |
+| `icnctl recovery config` | live | local keystore read: opens+unlocks `AgeKeyStore` and prints the DID document's recovery config; no client/network (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Config) | `icn/bins/icnctl/src/main.rs`:647 |
+| `icnctl recovery setup` | live | local keystore op: opens+unlocks `AgeKeyStore` and writes the social-recovery config into the DID document via `update_did_document`; no client/network (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Setup) | `icn/bins/icnctl/src/main.rs`:633 |
 | `icnctl restore` | live | local data-dir restore; integration-tested (`icn/bins/icnctl/tests/backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:104 |
 | `icnctl snapshot cleanup` | live | local snapshot cleanup `icn_snapshot::cleanup_old_snapshots` in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Cleanup) | `icn/bins/icnctl/src/main.rs`:1356 |
 | `icnctl snapshot create` | live | local snapshot creation via `icn_snapshot` on the store dir in `handle_snapshot_command` (sync, no endpoint, no network) (`icn/bins/icnctl/src/main.rs` SnapshotCommands::Create) | `icn/bins/icnctl/src/main.rs`:1338 |
@@ -322,6 +324,14 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl dispute list` | partial | daemon RPC `client.dispute_list()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1377 |
 | `icnctl dispute resolve` | partial | daemon RPC `client.dispute_resolve()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::Resolve); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1416 |
 | `icnctl institution bootstrap apply` | partial | async `apply_package` posts the package to the gateway via `reqwest::Client` (`icn/bins/icnctl/src/institution_bootstrap.rs` InstitutionCommands::Bootstrap -> InstitutionBootstrapCommands::Apply); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/institution_bootstrap.rs`:49 |
+| `icnctl ledger balance` | partial | daemon RPC client `client.get_ledger_balance()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Balance); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:728 |
+| `icnctl ledger head` | partial | daemon RPC client `client.get_ledger_head()` via `create_rpc_client` in `handle_ledger_command` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Head); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:725 |
+| `icnctl ledger history` | partial | daemon RPC client `client.get_ledger_history()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::History); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:738 |
+| `icnctl ledger quarantine drop` | partial | daemon RPC client `client.quarantine_drop()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Drop); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:767 |
+| `icnctl ledger quarantine get` | partial | daemon RPC client `client.quarantine_get()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Get); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:755 |
+| `icnctl ledger quarantine list` | partial | daemon RPC client `client.quarantine_list()` via `create_rpc_client` in `handle_quarantine_command` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:752 |
+| `icnctl ledger quarantine purge` | partial | daemon RPC client `client.quarantine_purge()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Purge); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:773 |
+| `icnctl ledger quarantine release` | partial | daemon RPC client `client.quarantine_release()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Release); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:761 |
 | `icnctl network dial` | partial | daemon RPC client `client.dial(did, addr)` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Dial); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:837 |
 | `icnctl network peers` | partial | daemon RPC client `client.get_peers()` via `create_rpc_client` in `handle_network_command` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Peers); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:834 |
 | `icnctl network stats` | partial | daemon RPC client `client.get_stats()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Stats); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:847 |
@@ -332,6 +342,12 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl receipts allocation` | partial | concrete gateway client `reqwest GET {gateway}/v1/receipts/allocations/{hash}` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` ReceiptCommands::Allocation); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:299 |
 | `icnctl receipts chain` | partial | concrete gateway client `reqwest GET {gateway}/v1/receipts/chain/{decision_hash}` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` ReceiptCommands::Chain); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:281 |
 | `icnctl receipts intent` | partial | concrete gateway client `reqwest GET {gateway}/v1/receipts/intents/{hash}` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` ReceiptCommands::Intent); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:313 |
+| `icnctl recovery attest` | partial | authenticated daemon RPC `client.attest_recovery()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Attest); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:656 |
+| `icnctl recovery cancel` | partial | authenticated daemon RPC `client.cancel_recovery()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Cancel); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:681 |
+| `icnctl recovery finalize` | partial | authenticated daemon RPC `client.finalize_recovery()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Finalize); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:675 |
+| `icnctl recovery initiate` | partial | authenticated daemon RPC `client.initiate_recovery()` via `create_authenticated_rpc_client` in `handle_recovery_command` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Initiate); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:650 |
+| `icnctl recovery list` | partial | authenticated daemon RPC `client.list_recoveries()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:666 |
+| `icnctl recovery status` | partial | authenticated daemon RPC `client.get_recovery_status()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:669 |
 | `icnctl registry list` | partial | concrete gateway client `reqwest GET {gateway}/v1/registry/decisions` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` RegistryCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:366 |
 | `icnctl registry trace` | partial | concrete gateway client `reqwest GET {gateway}/v1/registry/decisions/{receipt_id}/trace` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` RegistryCommands::Trace); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:389 |
 | `icnctl status` | partial | RPC client to the daemon (`create_rpc_client` + `client.get_status()`) in `handle_status_command` (`icn/bins/icnctl/src/main.rs` Commands::Status); prints local config and fails gracefully when no daemon; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:51 |

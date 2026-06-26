@@ -177,6 +177,11 @@ STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     "charter inspect": (STATUS_LIVE, "local CCL parse+print `icn_ccl::schema::CclDocument::from_yaml`; no client/network (`icn/bins/icnctl/src/main.rs` CharterCommands::Inspect)"),
     "steward config": (STATUS_LIVE, "local read+print of the `[steward]` section of `data_dir/config.toml`; no client/network (`icn/bins/icnctl/src/main.rs` StewardCommands::Config)"),
     "steward topics": (STATUS_LIVE, "prints static steward gossip-topic constants (`icn_steward::topics::*`); local-only, no network (`icn/bins/icnctl/src/main.rs` StewardCommands::Topics)"),
+    # live (pass 9, issue #2113) — local-only `recovery` keystore ops. `setup`/`config` open+unlock
+    # the local `AgeKeyStore` and read/update the DID document's recovery config; no client/network
+    # (the handler itself comments "Setup and Config are local-only operations").
+    "recovery setup": (STATUS_LIVE, "local keystore op: opens+unlocks `AgeKeyStore` and writes the social-recovery config into the DID document via `update_did_document`; no client/network (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Setup)"),
+    "recovery config": (STATUS_LIVE, "local keystore read: opens+unlocks `AgeKeyStore` and prints the DID document's recovery config; no client/network (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Config)"),
     # partial — real work, but depends on incomplete/unproven runtime; not integration-tested end-to-end.
     "audit verify": (STATUS_PARTIAL, "concrete gateway client `GET /v1/receipts/chain/{hash}` (`icn/bins/icnctl/src/main.rs` AuditCommands::Verify); chain-verification algorithm covered by `icn/bins/icnctl/tests/audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested"),
     "preflight": (STATUS_PARTIAL, "runs real local health checks (data-dir, keystore open via `AgeKeyStore`) in `handle_preflight_command`; the gateway-connectivity check requires a running gateway; not integration-tested"),
@@ -259,6 +264,24 @@ STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     "steward attesters": (STATUS_PARTIAL, "gateway client `reqwest GET {gateway}/v1/steward/attesters` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Attesters); requires a running gateway, not integration-tested"),
     "steward register": (STATUS_PARTIAL, "gateway client `reqwest POST {gateway}/v1/steward` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Register); requires a running gateway, not integration-tested"),
     "steward retire": (STATUS_PARTIAL, "gateway client `reqwest POST {gateway}/v1/steward/{id}/retire` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Retire); requires a running gateway, not integration-tested"),
+    # partial (pass 9, issue #2113) — `recovery` storage-based ops + the whole `ledger` group are
+    # daemon RPC clients: each arm calls a real `client.*().await` (via create_authenticated_rpc_client
+    # / create_rpc_client) that fails with "Is icnd running?" — real work, but requires a running
+    # daemon and has no binary-spawning e2e test (icnctl tests cover only i18n keys / backup-restore).
+    "recovery initiate": (STATUS_PARTIAL, "authenticated daemon RPC `client.initiate_recovery()` via `create_authenticated_rpc_client` in `handle_recovery_command` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Initiate); \"Is icnd running?\"; requires a running daemon, not integration-tested"),
+    "recovery attest": (STATUS_PARTIAL, "authenticated daemon RPC `client.attest_recovery()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Attest); requires a running daemon, not integration-tested"),
+    "recovery list": (STATUS_PARTIAL, "authenticated daemon RPC `client.list_recoveries()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::List); requires a running daemon, not integration-tested"),
+    "recovery status": (STATUS_PARTIAL, "authenticated daemon RPC `client.get_recovery_status()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Status); requires a running daemon, not integration-tested"),
+    "recovery finalize": (STATUS_PARTIAL, "authenticated daemon RPC `client.finalize_recovery()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Finalize); requires a running daemon, not integration-tested"),
+    "recovery cancel": (STATUS_PARTIAL, "authenticated daemon RPC `client.cancel_recovery()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Cancel); requires a running daemon, not integration-tested"),
+    "ledger head": (STATUS_PARTIAL, "daemon RPC client `client.get_ledger_head()` via `create_rpc_client` in `handle_ledger_command` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Head); \"Is icnd running?\"; requires a running daemon, not integration-tested"),
+    "ledger balance": (STATUS_PARTIAL, "daemon RPC client `client.get_ledger_balance()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Balance); requires a running daemon, not integration-tested"),
+    "ledger history": (STATUS_PARTIAL, "daemon RPC client `client.get_ledger_history()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::History); requires a running daemon, not integration-tested"),
+    "ledger quarantine list": (STATUS_PARTIAL, "daemon RPC client `client.quarantine_list()` via `create_rpc_client` in `handle_quarantine_command` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::List); requires a running daemon, not integration-tested"),
+    "ledger quarantine get": (STATUS_PARTIAL, "daemon RPC client `client.quarantine_get()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Get); requires a running daemon, not integration-tested"),
+    "ledger quarantine release": (STATUS_PARTIAL, "daemon RPC client `client.quarantine_release()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Release); requires a running daemon, not integration-tested"),
+    "ledger quarantine drop": (STATUS_PARTIAL, "daemon RPC client `client.quarantine_drop()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Drop); requires a running daemon, not integration-tested"),
+    "ledger quarantine purge": (STATUS_PARTIAL, "daemon RPC client `client.quarantine_purge()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Quarantine -> QuarantineCommands::Purge); requires a running daemon, not integration-tested"),
     # planned — handler is an explicit placeholder / prints "not yet implemented".
     "charter deploy": (STATUS_PLANNED, "handler validates the CCL doc locally, then prints \"Not yet implemented — charter deployment requires gateway integration\" (`icn/bins/icnctl/src/main.rs` CharterCommands::Deploy)"),
     "steward check-vui": (STATUS_PLANNED, "placeholder; validates input then prints \"VUI registry check requires running steward daemon\" (`icn/bins/icnctl/src/main.rs` StewardCommands::CheckVui)"),
