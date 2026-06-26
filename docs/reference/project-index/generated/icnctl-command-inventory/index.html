@@ -55,7 +55,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </ul>
 <h2>Snapshot</h2>
 <ul>
-<li>Source commit: <code>4e9b0be4fdfd23547b11ee87478c08c35600e3df</code></li>
+<li>Source commit: <code>73cceb1c28dee9dde0d92476876e57a3c0842280</code></li>
 <li>Source scanned: <code>icn/bins/icnctl/src/**</code> (clap <code>#[derive(Subcommand)]</code> / <code>#[derive(Parser)]</code> tree)</li>
 </ul>
 <h2>Summary</h2>
@@ -63,7 +63,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <li><strong>Total leaf commands (default build): 162</strong></li>
 <li>Top-level command groups: 33</li>
 <li>By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2</li>
-<li>By status (curated, see section below): live 32 · partial 59 · planned 10 · unknown / needs local verification 61</li>
+<li>By status (curated, see section below): live 34 · partial 73 · planned 10 · unknown / needs local verification 45</li>
 <li>Proof level: every command is <code>L1</code> (declaration exists in source).</li>
 <li><strong>Feature-gated commands (NOT in the default build, excluded from the counts above): 1</strong> (see section below).</li>
 <li>Unparsed / unresolved candidates: 0 (see section below).</li>
@@ -938,49 +938,49 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl ledger balance</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:728</td>
 </tr>
 <tr>
 <td><code>icnctl ledger head</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:725</td>
 </tr>
 <tr>
 <td><code>icnctl ledger history</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:738</td>
 </tr>
 <tr>
 <td><code>icnctl ledger quarantine drop</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:767</td>
 </tr>
 <tr>
 <td><code>icnctl ledger quarantine get</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:755</td>
 </tr>
 <tr>
 <td><code>icnctl ledger quarantine list</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:752</td>
 </tr>
 <tr>
 <td><code>icnctl ledger quarantine purge</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:773</td>
 </tr>
 <tr>
 <td><code>icnctl ledger quarantine release</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:761</td>
 </tr>
@@ -1004,49 +1004,49 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl recovery attest</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:656</td>
 </tr>
 <tr>
 <td><code>icnctl recovery cancel</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:681</td>
 </tr>
 <tr>
 <td><code>icnctl recovery config</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:647</td>
 </tr>
 <tr>
 <td><code>icnctl recovery finalize</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:675</td>
 </tr>
 <tr>
 <td><code>icnctl recovery initiate</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:650</td>
 </tr>
 <tr>
 <td><code>icnctl recovery list</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:666</td>
 </tr>
 <tr>
 <td><code>icnctl recovery setup</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:633</td>
 </tr>
 <tr>
 <td><code>icnctl recovery status</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:669</td>
 </tr>
@@ -1126,11 +1126,11 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </thead>
 <tbody><tr>
 <td>live</td>
-<td>32</td>
+<td>34</td>
 </tr>
 <tr>
 <td>partial</td>
-<td>59</td>
+<td>73</td>
 </tr>
 <tr>
 <td>fixture-demo</td>
@@ -1142,10 +1142,10 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td>unknown / needs local verification</td>
-<td>61</td>
+<td>45</td>
 </tr>
 </tbody></table>
-<h3>Classified commands (101)</h3>
+<h3>Classified commands (117)</h3>
 <p>Every non-<code>unknown</code> command, with its evidence basis. (All other default-build commands carry <code>unknown / needs local verification</code>.)</p>
 <table>
 <thead>
@@ -1293,6 +1293,18 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td>live</td>
 <td>local package validation <code>validate_package</code> (sync <code>pub fn</code>, reads the package dir, no network) (<code>icn/bins/icnctl/src/institution_bootstrap.rs</code> InstitutionCommands::Bootstrap -&gt; InstitutionBootstrapCommands::Validate)</td>
 <td><code>icn/bins/icnctl/src/institution_bootstrap.rs</code>:27</td>
+</tr>
+<tr>
+<td><code>icnctl recovery config</code></td>
+<td>live</td>
+<td>local keystore read: opens+unlocks <code>AgeKeyStore</code> and prints the DID document&#39;s recovery config; no client/network (<code>icn/bins/icnctl/src/main.rs</code> RecoveryCommands::Config)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:647</td>
+</tr>
+<tr>
+<td><code>icnctl recovery setup</code></td>
+<td>live</td>
+<td>local keystore op: opens+unlocks <code>AgeKeyStore</code> and writes the social-recovery config into the DID document via <code>update_did_document</code>; no client/network (<code>icn/bins/icnctl/src/main.rs</code> RecoveryCommands::Setup)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:633</td>
 </tr>
 <tr>
 <td><code>icnctl restore</code></td>
@@ -1565,6 +1577,54 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td><code>icn/bins/icnctl/src/institution_bootstrap.rs</code>:49</td>
 </tr>
 <tr>
+<td><code>icnctl ledger balance</code></td>
+<td>partial</td>
+<td>daemon RPC client <code>client.get_ledger_balance()</code> via <code>create_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> LedgerCommands::Balance); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:728</td>
+</tr>
+<tr>
+<td><code>icnctl ledger head</code></td>
+<td>partial</td>
+<td>daemon RPC client <code>client.get_ledger_head()</code> via <code>create_rpc_client</code> in <code>handle_ledger_command</code> (<code>icn/bins/icnctl/src/main.rs</code> LedgerCommands::Head); &quot;Is icnd running?&quot;; requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:725</td>
+</tr>
+<tr>
+<td><code>icnctl ledger history</code></td>
+<td>partial</td>
+<td>daemon RPC client <code>client.get_ledger_history()</code> via <code>create_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> LedgerCommands::History); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:738</td>
+</tr>
+<tr>
+<td><code>icnctl ledger quarantine drop</code></td>
+<td>partial</td>
+<td>daemon RPC client <code>client.quarantine_drop()</code> via <code>create_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> LedgerCommands::Quarantine -&gt; QuarantineCommands::Drop); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:767</td>
+</tr>
+<tr>
+<td><code>icnctl ledger quarantine get</code></td>
+<td>partial</td>
+<td>daemon RPC client <code>client.quarantine_get()</code> via <code>create_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> LedgerCommands::Quarantine -&gt; QuarantineCommands::Get); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:755</td>
+</tr>
+<tr>
+<td><code>icnctl ledger quarantine list</code></td>
+<td>partial</td>
+<td>daemon RPC client <code>client.quarantine_list()</code> via <code>create_rpc_client</code> in <code>handle_quarantine_command</code> (<code>icn/bins/icnctl/src/main.rs</code> LedgerCommands::Quarantine -&gt; QuarantineCommands::List); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:752</td>
+</tr>
+<tr>
+<td><code>icnctl ledger quarantine purge</code></td>
+<td>partial</td>
+<td>daemon RPC client <code>client.quarantine_purge()</code> via <code>create_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> LedgerCommands::Quarantine -&gt; QuarantineCommands::Purge); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:773</td>
+</tr>
+<tr>
+<td><code>icnctl ledger quarantine release</code></td>
+<td>partial</td>
+<td>daemon RPC client <code>client.quarantine_release()</code> via <code>create_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> LedgerCommands::Quarantine -&gt; QuarantineCommands::Release); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:761</td>
+</tr>
+<tr>
 <td><code>icnctl network dial</code></td>
 <td>partial</td>
 <td>daemon RPC client <code>client.dial(did, addr)</code> via <code>create_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> NetworkCommands::Dial); requires a running daemon, not integration-tested</td>
@@ -1623,6 +1683,42 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td>partial</td>
 <td>concrete gateway client <code>reqwest GET {gateway}/v1/receipts/intents/{hash}</code> (route in <code>docs/reference/project-index/generated/route-inventory.md</code>) (<code>icn/bins/icnctl/src/main.rs</code> ReceiptCommands::Intent); requires a running gateway, not integration-tested</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:313</td>
+</tr>
+<tr>
+<td><code>icnctl recovery attest</code></td>
+<td>partial</td>
+<td>authenticated daemon RPC <code>client.attest_recovery()</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> RecoveryCommands::Attest); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:656</td>
+</tr>
+<tr>
+<td><code>icnctl recovery cancel</code></td>
+<td>partial</td>
+<td>authenticated daemon RPC <code>client.cancel_recovery()</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> RecoveryCommands::Cancel); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:681</td>
+</tr>
+<tr>
+<td><code>icnctl recovery finalize</code></td>
+<td>partial</td>
+<td>authenticated daemon RPC <code>client.finalize_recovery()</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> RecoveryCommands::Finalize); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:675</td>
+</tr>
+<tr>
+<td><code>icnctl recovery initiate</code></td>
+<td>partial</td>
+<td>authenticated daemon RPC <code>client.initiate_recovery()</code> via <code>create_authenticated_rpc_client</code> in <code>handle_recovery_command</code> (<code>icn/bins/icnctl/src/main.rs</code> RecoveryCommands::Initiate); &quot;Is icnd running?&quot;; requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:650</td>
+</tr>
+<tr>
+<td><code>icnctl recovery list</code></td>
+<td>partial</td>
+<td>authenticated daemon RPC <code>client.list_recoveries()</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> RecoveryCommands::List); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:666</td>
+</tr>
+<tr>
+<td><code>icnctl recovery status</code></td>
+<td>partial</td>
+<td>authenticated daemon RPC <code>client.get_recovery_status()</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> RecoveryCommands::Status); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:669</td>
 </tr>
 <tr>
 <td><code>icnctl registry list</code></td>
