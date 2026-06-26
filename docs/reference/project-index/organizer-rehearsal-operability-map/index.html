@@ -1,0 +1,452 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Organizer Rehearsal Operability Map | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>project index</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>organizer rehearsal operability map</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/project-index/organizer-rehearsal-operability-map.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Organizer Rehearsal Operability Map</h1>
+<blockquote>
+<p>For current project truth, defer to <a href="/docs/STATE">`docs/STATE.md`</a> and <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>. This map is an <strong>orientation aid</strong>, not a source of truth: it reads the already-merged generated evidence surfaces (route inventory, <code>icnctl</code> command inventory) and the capability matrix, and translates them into &quot;what can safely be shown to an organizer, what is fixture-backed, what needs a steward/operator, and what must not be claimed yet.&quot; It changes no behavior and grants no readiness.</p>
+</blockquote>
+<h2>Purpose</h2>
+<p>The organizer-rehearsal milestone (<a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a>) frames the gap plainly: <em>the kernel can prove, the NYCN package can rehearse, and the missing piece is the participation surface between them.</em> The vertical institutional spine (<a href="https://github.com/InterCooperative-Network/icn/issues/2141" target="_blank" rel="noopener">#2141</a>) names the path that surface must eventually carry:</p>
+<pre><code class="language-text">package → domain → policy → binding → process/action → receipt → surface → evidence/export
+</code></pre>
+<p>This map does not build that surface. It uses the two mechanical evidence surfaces that landed in the route/CLI-inventory lane — the generated <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/generated/route-inventory">route inventory</a> (<a href="https://github.com/InterCooperative-Network/icn/issues/2112" target="_blank" rel="noopener">#2112</a>) and the generated <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/generated/icnctl-command-inventory">`icnctl` command inventory</a> (<a href="https://github.com/InterCooperative-Network/icn/issues/2113" target="_blank" rel="noopener">#2113</a>) — to answer, for an organizer rehearsal:</p>
+<ol>
+<li>What can be shown to organizers now?</li>
+<li>What is fixture-backed / demo-only?</li>
+<li>What requires a steward/operator rather than a non-technical organizer?</li>
+<li>Which routes support the surface at L1 only?</li>
+<li>Which <code>icnctl</code> commands are relevant but still <code>unknown / needs local verification</code>?</li>
+<li>What must not be claimed?</li>
+<li>What are the smallest next slices to make the rehearsal operable?</li>
+</ol>
+<p>It is deliberately conservative: where the generated inventories prove only that a declaration exists, this map says so and points at the <a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">capability matrix</a> for the places where stronger, recorded proof exists.</p>
+<h2>How to read the evidence (two layers, do not conflate)</h2>
+<p>This map draws on <strong>two different kinds of evidence</strong>, and keeping them apart is the whole point:</p>
+<ul>
+<li><strong>Generated inventories (declaration evidence, proof level <code>L1</code>).</strong> The <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/generated/route-inventory">route inventory</a> and <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/generated/icnctl-command-inventory">`icnctl` command inventory</a> are mechanically generated from source. They prove a route macro / registration site or a clap command <strong>declaration exists at a snapshot commit</strong> — nothing more. Every entry is uniformly <code>L1</code> / <code>unknown / needs local verification</code>. A declaration is <strong>not</strong> evidence of correctness, auth, mounting, live wiring, tests, or organizer-safety.</li>
+<li><strong>Capability matrix (recorded-proof evidence, <code>L0</code>–<code>L8</code>).</strong> The <a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">proof-level taxonomy and capability matrix</a> records, per rehearsal capability, the <strong>strongest honest proof</strong> that has actually been observed (e.g. an L4 one-command local proof loop, an L5 live daemon path), each tied to a merged PR.</li>
+</ul>
+<p><strong>Rule used throughout this map:</strong> a route or command is cited at <code>L1</code> (declaration only) <strong>unless</strong> the capability matrix records a higher proof level for that specific path, in which case the higher level is cited <em>with its matrix row</em>. When the two disagree, <a href="/docs/STATE">`docs/STATE.md`</a> wins (per the <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">source-of-truth map</a>).</p>
+<p>All status labels below come from the existing vocabulary in the <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">source-of-truth map</a> (<code>implemented</code>, <code>implemented but partial</code>, <code>feature-gated</code>, <code>fixture-backed</code>, <code>gateway-backed</code>, <code>docs-only / design-direction</code>, <code>package-local</code>, <code>private-boundary</code>, <code>unknown / needs local verification</code>). No new status vocabulary is introduced.</p>
+<h2>Current evidence surfaces</h2>
+<table>
+<thead>
+<tr>
+<th>Surface</th>
+<th>What it is</th>
+<th>Proof it carries</th>
+<th>Where</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Generated route inventory</td>
+<td>Gateway route-macro + governance-app registration declarations vs OpenAPI</td>
+<td><code>L1</code> declarations only; uniform <code>unknown / needs local verification</code></td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/generated/route-inventory">`generated/route-inventory.md`</a></td>
+</tr>
+<tr>
+<td>Generated <code>icnctl</code> command inventory</td>
+<td>clap command tree (162 default-build, 1 feature-gated, 0 unparsed), curated role grouping</td>
+<td><code>L1</code> declarations only; uniform <code>unknown / needs local verification</code></td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/generated/icnctl-command-inventory">`generated/icnctl-command-inventory.md`</a></td>
+</tr>
+<tr>
+<td>Proof-level capability matrix</td>
+<td>Per-capability recorded proof for the organizer-rehearsal path</td>
+<td><code>L0</code>–<code>L8</code>, tied to merged PRs</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">`proof-level-taxonomy-capability-matrix.md`</a></td>
+</tr>
+<tr>
+<td>Show-readiness map</td>
+<td>What is honest to demonstrate vs what must not be shown as finished; red lines</td>
+<td>claim boundaries</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">`show-readiness-map.md`</a></td>
+</tr>
+<tr>
+<td>Runtime surface map</td>
+<td>Member-facing read models, action-card proof loops, receipt retrieval</td>
+<td>routing layer</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/runtime-surface-map">`runtime-surface-map.md`</a></td>
+</tr>
+<tr>
+<td>Pilot-UI / member-shell fixtures</td>
+<td>Fixture-backed rehearsal shell and demo panes</td>
+<td><code>fixture-backed</code> (L2 per matrix row 7)</td>
+<td><code>web/pilot-ui/fixtures/icn-organizer-demo/</code>, <code>web/member-shell/</code></td>
+</tr>
+<tr>
+<td>DEV/DEMO appliance image</td>
+<td>Single-actor loop bootable VM image</td>
+<td><code>L5</code> stranger-runnable local proof (matrix row 11)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/demo/">`docs/demo/`</a>, <code>deploy/appliance/</code></td>
+</tr>
+</tbody></table>
+<h2>What is safe to show now</h2>
+<p>These are real and may be presented honestly to organizers, <strong>bounded to the recorded proof level</strong>. Each row pairs the organizer-facing thing with the generated declaration evidence and the recorded proof.</p>
+<table>
+<thead>
+<tr>
+<th>Show this</th>
+<th>Declaration evidence (L1)</th>
+<th>Recorded proof</th>
+<th>Honest framing</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Decision → action → receipt proof loop (proposal/vote, action_item/complete, meeting/attend)</td>
+<td>route <code>/gov/me/action-cards</code> (<code>get_my_action_cards</code> @ <code>icn/apps/governance/src/http/configure.rs:849</code>), completion-receipt route (<code>:682</code>); <code>icnctl audit verify</code> (<code>main.rs:330</code>), <code>icnctl receipts chain</code> (<code>:281</code>)</td>
+<td><code>L5</code> live single-node (matrix rows 1, 8); <code>L4</code> one-command local proof loop (matrix row 5)</td>
+<td>&quot;live daemon/gateway proof of the governed receipt chain on a local ephemeral node — proof of path, not deployment readiness; three of five action-card source paths.&quot;</td>
+</tr>
+<tr>
+<td>Member standing / action-card / scopes read models (the shapes)</td>
+<td>routes <code>/gov/me/standing</code> (<code>:845</code>), <code>/gov/me/scopes</code> (<code>:844</code>), <code>/gov/me/work</code> (<code>:846</code>) — <code>standing</code>/<code>action-cards</code> are OpenAPI-documented; <code>scopes</code>/<code>work</code> are not</td>
+<td><code>L5</code> live for the emitted action-card paths (matrix row 8)</td>
+<td>&quot;declared + (for standing/action-cards) OpenAPI-documented member-facing read models; fixture-backed in the shell&#39;s demo panes.&quot; Do not assert every <code>/gov/me/*</code> route is live.</td>
+</tr>
+<tr>
+<td>Fixture-backed organizer rehearsal shell</td>
+<td>n/a (UI fixtures, not routes/commands)</td>
+<td><code>L2</code> fixture-backed (matrix row 7); <code>web/pilot-ui/fixtures/icn-organizer-demo/</code></td>
+<td>&quot;a bounded rehearsal artifact in demo mode — no live daemon behind it; fictional fixtures only.&quot;</td>
+</tr>
+<tr>
+<td>DEV/DEMO appliance image — single-actor loop in one VM</td>
+<td>n/a (image/profile)</td>
+<td><code>L5</code> stranger-runnable local proof (matrix row 11)</td>
+<td>&quot;one local DEV/DEMO node instance proving the single-actor loop — unsigned image, fictional data, not production, not a pilot, not federation, not multi-person.&quot;</td>
+</tr>
+<tr>
+<td>The thesis + roadmap posture</td>
+<td>n/a</td>
+<td>per <a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">show-readiness-map</a></td>
+<td>Phase 2 in progress; NYCN the <em>intended</em> first partner; never a formal pilot / live federation.</td>
+</tr>
+</tbody></table>
+<h2>What is fixture-backed</h2>
+<p><code>fixture-backed</code> (matrix row 7, L2) — demonstrated through committed <strong>fictional</strong> fixtures only; no live daemon behind them. Show these as rehearsal artifacts, never as live participant state:</p>
+<ul>
+<li>The organizer rehearsal <strong>shell</strong> in demo mode (<code>web/pilot-ui/fixtures/icn-organizer-demo/</code>, <code>web/member-shell/</code>).</li>
+<li>The shell&#39;s <code>?mode=demo</code> standing / action-card panes.</li>
+<li>The fictional NYCN fixture institution used by the appliance image and the rehearsal packet.</li>
+<li>The pending-publish summary <strong>contract example</strong> (<code>urn:icn:contract:pending-publish-summary:v1</code>) — a read-model contract with a validating fictional example (matrix row 6, L2); no producing endpoint binds to it yet.</li>
+</ul>
+<p>Demo fixtures prove UI rendering and contract shape. They do <strong>not</strong> prove live participant state, live federation, production readiness, or formal pilot status (per the <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">source-of-truth map</a>, &quot;Demo fixtures vs live state&quot;).</p>
+<h2>What requires steward/operator handling</h2>
+<p>These are <strong>not</strong> for a non-technical organizer to run. They require a steward/operator with a local build and a terminal, and most are <code>gateway-backed</code> (need a running daemon/gateway) — a higher bar than the inventory&#39;s <code>L1</code> declaration. The commands below are cited at <code>L1</code> (declaration exists) from the <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/generated/icnctl-command-inventory">command inventory</a>; their <em>operation</em> is <code>unknown / needs local verification</code> except where the capability matrix records a proof loop.</p>
+<table>
+<thead>
+<tr>
+<th>Steward/operator capability</th>
+<th>Relevant <code>icnctl</code> declarations (L1)</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Run the local receipt-chain rehearsal + emit a repo-safe evidence packet</td>
+<td><code>icnctl audit verify</code> (<code>main.rs:330</code>), <code>icnctl receipts chain</code> (<code>:281</code>), <code>receipts intent</code> (<code>:313</code>), <code>receipts allocation</code> (<code>:299</code>)</td>
+<td>The <em>path</em> is recorded at <code>L4</code>/<code>L5</code> (matrix rows 1, 5); the individual command entries remain <code>L1</code>. Needs a local <code>icnd</code>/<code>icnctl</code> build.</td>
+</tr>
+<tr>
+<td>Stand up a governed domain + walk a proposal/vote</td>
+<td><code>icnctl gov domain create</code> (<code>:1127</code>), <code>gov proposal create</code> (<code>:1191</code>), <code>gov proposal open</code> (<code>:1242</code>), <code>gov vote cast</code> (<code>:1288</code>), <code>gov proposal close</code> (<code>:1271</code>)</td>
+<td><code>gateway-backed</code>; declaration-only proof. Steward-only — not an organizer terminal task.</td>
+</tr>
+<tr>
+<td>Charter / institution package operations</td>
+<td><code>icnctl charter create</code> (<code>:1614</code>), <code>charter validate</code> (<code>:1698</code>), <code>charter ratify</code> (<code>:1684</code>), <code>charter deploy</code> (<code>:1718</code>)</td>
+<td><code>gateway-backed</code>; declaration-only.</td>
+</tr>
+<tr>
+<td>Commons enrollment / affiliation</td>
+<td><code>icnctl commons enroll</code> (<code>:1564</code>), <code>commons join</code> (<code>:1589</code>), <code>commons status</code> (<code>:1561</code>)</td>
+<td><code>gateway-backed</code>; declaration-only.</td>
+</tr>
+</tbody></table>
+<p>The milestone&#39;s definition of done is explicit: a <strong>facilitator</strong> shows the workflow <strong>without</strong> asking organizers to run a terminal command, and a <strong>steward</strong> can reproduce the same path from fixtures with existing local commands (<a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a>). This map keeps the two roles separate by construction.</p>
+<h2>What is not organizer-ready</h2>
+<p>Per the <a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">show-readiness map</a> red lines and the capability matrix, the following must <strong>not</strong> be presented to organizers as finished or ready:</p>
+<ul>
+<li><strong>An operable, integrated organizer participation surface.</strong> The surface joining the live proof loop to the rehearsal shell is the open milestone (<a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a>); <code>L7</code> (partner/organizer rehearsal) is <strong>OPEN</strong> (matrix row 10). The shell is <code>L2</code>, not <code>L7</code>, precisely because the accessibility/privacy bar and the live participation surface are not yet met.</li>
+<li><strong>Private organizer/member/sponsor data handling.</strong> Disclosure enforcement is design-only (<code>L1</code>, matrix row 9). Rehearsal privacy today is by <strong>exclusion</strong> (fictional fixtures, repo-safe-by-construction packets), not by an enforced boundary — <code>private-boundary</code>.</li>
+<li><strong>Multi-person interaction.</strong> The appliance proves a <strong>single-actor</strong> loop (matrix row 11); two-member action flow and any QR node-claim ceremony are future lanes, not built.</li>
+<li><strong>The other two action-card source paths.</strong> <code>signal_rule</code> and <code>obligation_lifecycle</code> are RFC-gated (<a href="https://github.com/InterCooperative-Network/icn/issues/1646" target="_blank" rel="noopener">#1646</a>) and not emitted — show three of five, not five of five.</li>
+<li><strong>A formal NYCN pilot, live federation, or production readiness.</strong> None of these are claimable (red lines, <a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">show-readiness-map</a>).</li>
+</ul>
+<h2>Route evidence used (L1 declarations unless matrix cites higher)</h2>
+<p>From the generated <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/generated/route-inventory">route inventory</a>. Every entry is <code>L1</code> / <code>unknown / needs local verification</code> <strong>as proven by the inventory</strong>; the &quot;stronger proof&quot; column points to the capability matrix where a recorded proof exists.</p>
+<table>
+<thead>
+<tr>
+<th>Method + path</th>
+<th>Handler @ source</th>
+<th>OpenAPI</th>
+<th>Inventory proof</th>
+<th>Stronger recorded proof</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GET /gov/me/standing</code></td>
+<td><code>get_my_standing</code> @ <code>configure.rs:845</code></td>
+<td>yes</td>
+<td>L1</td>
+<td>L5 live (matrix row 8)</td>
+</tr>
+<tr>
+<td><code>GET /gov/me/action-cards</code></td>
+<td><code>get_my_action_cards</code> @ <code>configure.rs:849</code></td>
+<td>yes</td>
+<td>L1</td>
+<td>L5 live, L6 partial (matrix row 8)</td>
+</tr>
+<tr>
+<td><code>GET /gov/me/scopes</code></td>
+<td><code>get_my_scopes</code> @ <code>configure.rs:844</code></td>
+<td>no</td>
+<td>L1</td>
+<td>none recorded — <code>unknown / needs local verification</code></td>
+</tr>
+<tr>
+<td><code>GET /gov/me/work</code></td>
+<td><code>get_my_work</code> @ <code>configure.rs:846</code></td>
+<td>no</td>
+<td>L1</td>
+<td>none recorded — <code>unknown / needs local verification</code></td>
+</tr>
+<tr>
+<td><code>GET /gov/domains/{domain_id}/action-items/{item_id}/completion-receipt</code></td>
+<td><code>get_action_item_completion_receipt</code> @ <code>configure.rs:682</code></td>
+<td>yes</td>
+<td>L1</td>
+<td>L5 receipt-chain path (matrix rows 1, 8)</td>
+</tr>
+</tbody></table>
+<p>Reminder: OpenAPI presence proves a path is <strong>documented</strong>, not served; a served route does not prove it is public-safe (<a href="https://github.com/InterCooperative-Network/icn/blob/main/runtime-surface-map">runtime-surface-map</a>).</p>
+<h2>CLI evidence used (L1 declarations unless matrix cites higher)</h2>
+<p>From the generated <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/generated/icnctl-command-inventory">`icnctl` command inventory</a> (162 default-build commands; 1 feature-gated; 0 unparsed). All entries are <code>L1</code> / <code>unknown / needs local verification</code>; role is a <strong>curated</strong> navigation heuristic, not a safety assertion.</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Source</th>
+<th>Inventory proof</th>
+<th>Stronger recorded proof</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icnctl audit verify</code></td>
+<td><code>main.rs:330</code></td>
+<td>L1</td>
+<td>part of L4/L5 receipt-chain path (matrix rows 1, 5, 11)</td>
+</tr>
+<tr>
+<td><code>icnctl receipts chain</code></td>
+<td><code>main.rs:281</code></td>
+<td>L1</td>
+<td>part of L4/L5 receipt-chain path (matrix rows 1, 5)</td>
+</tr>
+<tr>
+<td><code>icnctl receipts intent</code></td>
+<td><code>main.rs:313</code></td>
+<td>L1</td>
+<td>none recorded for the command itself</td>
+</tr>
+<tr>
+<td><code>icnctl receipts allocation</code></td>
+<td><code>main.rs:299</code></td>
+<td>L1</td>
+<td>none recorded for the command itself</td>
+</tr>
+<tr>
+<td><code>icnctl gov proposal create / open / close</code></td>
+<td><code>main.rs:1191 / 1242 / 1271</code></td>
+<td>L1</td>
+<td>none recorded — steward-only, <code>gateway-backed</code></td>
+</tr>
+<tr>
+<td><code>icnctl gov vote cast</code></td>
+<td><code>main.rs:1288</code></td>
+<td>L1</td>
+<td>none recorded — steward-only, <code>gateway-backed</code></td>
+</tr>
+<tr>
+<td><code>icnctl gov domain create</code></td>
+<td><code>main.rs:1127</code></td>
+<td>L1</td>
+<td>none recorded — steward-only, <code>gateway-backed</code></td>
+</tr>
+<tr>
+<td><code>icnctl charter create / validate / ratify / deploy</code></td>
+<td><code>main.rs:1614 / 1698 / 1684 / 1718</code></td>
+<td>L1</td>
+<td>none recorded — steward-only, <code>gateway-backed</code></td>
+</tr>
+<tr>
+<td><code>icnctl commons enroll / join / status</code></td>
+<td><code>main.rs:1564 / 1589 / 1561</code></td>
+<td>L1</td>
+<td>none recorded — steward-only, <code>gateway-backed</code></td>
+</tr>
+</tbody></table>
+<p>The 1 feature-gated command (<code>icnctl id upgrade-pq</code>, <code>cfg(feature = &quot;post-quantum&quot;)</code>) is <strong>not in the default build</strong> and is not part of the rehearsal path.</p>
+<h2>Nonclaims</h2>
+<p>This map:</p>
+<ul>
+<li>Does <strong>not</strong> mark the organizer rehearsal ready (<code>L7</code> is OPEN, <a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a>).</li>
+<li>Does <strong>not</strong> claim a formal NYCN pilot.</li>
+<li>Does <strong>not</strong> claim production readiness.</li>
+<li>Does <strong>not</strong> claim live federation.</li>
+<li>Does <strong>not</strong> claim Phase 2 completion.</li>
+<li>Does <strong>not</strong> claim route runtime correctness from route declarations.</li>
+<li>Does <strong>not</strong> claim CLI runtime correctness from clap declarations.</li>
+<li>Does <strong>not</strong> ask non-technical organizers to run terminals.</li>
+<li>Does <strong>not</strong> introduce any private NYCN/organizer/member data (fictional fixtures only).</li>
+<li>Does <strong>not</strong> alter route behavior.</li>
+<li>Does <strong>not</strong> alter <code>icnctl</code> behavior.</li>
+<li>Does <strong>not</strong> start A2e enforcement cutover.</li>
+<li>Does <strong>not</strong> affect <a href="https://github.com/InterCooperative-Network/icn/issues/2082" target="_blank" rel="noopener">#2082</a>.</li>
+</ul>
+<h2>Next slices</h2>
+<p>The smallest claim-safe steps that move the rehearsal from &quot;evidence exists&quot; toward &quot;operable,&quot; each a candidate child of <a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a> / <a href="https://github.com/InterCooperative-Network/icn/issues/2141" target="_blank" rel="noopener">#2141</a>:</p>
+<ol>
+<li><strong>Identify the minimal rehearsal path</strong> — pin the single end-to-end story (standing → action card → discharge → receipt → evidence) to the specific routes/commands above, so facilitator and steward read from one path.</li>
+<li><strong>Map the steward/operator commands needed</strong> — promote the steward-only <code>icnctl</code> set above into a per-command status pass (the <a href="https://github.com/InterCooperative-Network/icn/issues/2113" target="_blank" rel="noopener">#2113</a> follow-up): which are <code>gateway-backed</code> and proven, which remain <code>unknown / needs local verification</code>.</li>
+<li><strong>Map the routes/surfaces rendered to the organizer</strong> — confirm which <code>/gov/me/*</code> read models the shell actually renders, and bound each to its recorded proof (not its L1 declaration).</li>
+<li><strong>Produce a plain-language preview/review packet</strong> — bind the pending-publish summary contract (matrix row 6) to a facilitator-readable preview, no jargon/URNs/hashes as primary labels (accessibility gate).</li>
+<li><strong>Produce a no-terminal facilitator path</strong> — a fixture-backed walkthrough a facilitator can show without a terminal, satisfying the <a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a> definition of done, with the accessibility/privacy checklist applied as a gate.</li>
+</ol>
+<h2>Where to read deeper</h2>
+<table>
+<thead>
+<tr>
+<th>You want…</th>
+<th>Read</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>What is real now (per-PR pointer)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/current-truth-map">`current-truth-map.md`</a>, <a href="/docs/STATE">`docs/STATE.md`</a></td>
+</tr>
+<tr>
+<td>What is show-ready / red lines</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">`show-readiness-map.md`</a></td>
+</tr>
+<tr>
+<td>Per-capability recorded proof</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">`proof-level-taxonomy-capability-matrix.md`</a></td>
+</tr>
+<tr>
+<td>Real runtime surfaces</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/runtime-surface-map">`runtime-surface-map.md`</a></td>
+</tr>
+<tr>
+<td>Generated route declarations</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/generated/route-inventory">`generated/route-inventory.md`</a></td>
+</tr>
+<tr>
+<td>Generated <code>icnctl</code> command declarations</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/generated/icnctl-command-inventory">`generated/icnctl-command-inventory.md`</a></td>
+</tr>
+<tr>
+<td>The milestone</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a> · <a href="https://github.com/InterCooperative-Network/icn/issues/2141" target="_blank" rel="noopener">#2141</a></td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
