@@ -55,7 +55,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </ul>
 <h2>Snapshot</h2>
 <ul>
-<li>Source commit: <code>503e9c7d20bb65fb4c3fe19c4252cbdea51bdcb0</code></li>
+<li>Source commit: <code>17f0c0caf5fcd8a07f8f599bd3d912ae72502aef</code></li>
 <li>Source scanned: <code>icn/bins/icnctl/src/**</code> (clap <code>#[derive(Subcommand)]</code> / <code>#[derive(Parser)]</code> tree)</li>
 </ul>
 <h2>Summary</h2>
@@ -63,7 +63,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <li><strong>Total leaf commands (default build): 162</strong></li>
 <li>Top-level command groups: 33</li>
 <li>By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2</li>
-<li>By status (curated, see section below): live 23 · partial 27 · planned 7 · unknown / needs local verification 105</li>
+<li>By status (curated, see section below): live 27 · partial 35 · planned 10 · unknown / needs local verification 90</li>
 <li>Proof level: every command is <code>L1</code> (declaration exists in source).</li>
 <li><strong>Feature-gated commands (NOT in the default build, excluded from the counts above): 1</strong> (see section below).</li>
 <li>Unparsed / unresolved candidates: 0 (see section below).</li>
@@ -214,73 +214,73 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl commons affiliations</code></td>
-<td>unknown / needs local verification</td>
+<td>planned</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1582</td>
 </tr>
 <tr>
 <td><code>icnctl commons anchor</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1575</td>
 </tr>
 <tr>
 <td><code>icnctl commons enroll</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1564</td>
 </tr>
 <tr>
 <td><code>icnctl commons join</code></td>
-<td>unknown / needs local verification</td>
+<td>planned</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1589</td>
 </tr>
 <tr>
 <td><code>icnctl commons leave</code></td>
-<td>unknown / needs local verification</td>
+<td>planned</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1600</td>
 </tr>
 <tr>
 <td><code>icnctl commons status</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1561</td>
 </tr>
 <tr>
 <td><code>icnctl dispute add-evidence</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1394</td>
 </tr>
 <tr>
 <td><code>icnctl dispute assign-mediator</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1405</td>
 </tr>
 <tr>
 <td><code>icnctl dispute file</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1366</td>
 </tr>
 <tr>
 <td><code>icnctl dispute get</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1388</td>
 </tr>
 <tr>
 <td><code>icnctl dispute list</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1377</td>
 </tr>
 <tr>
 <td><code>icnctl dispute resolve</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1416</td>
 </tr>
@@ -382,19 +382,19 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl institution bootstrap apply</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/institution_bootstrap.rs</code>:49</td>
 </tr>
 <tr>
 <td><code>icnctl institution bootstrap plan</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/institution_bootstrap.rs</code>:38</td>
 </tr>
 <tr>
 <td><code>icnctl institution bootstrap validate</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/institution_bootstrap.rs</code>:27</td>
 </tr>
@@ -1126,11 +1126,11 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </thead>
 <tbody><tr>
 <td>live</td>
-<td>23</td>
+<td>27</td>
 </tr>
 <tr>
 <td>partial</td>
-<td>27</td>
+<td>35</td>
 </tr>
 <tr>
 <td>fixture-demo</td>
@@ -1138,14 +1138,14 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td>planned</td>
-<td>7</td>
+<td>10</td>
 </tr>
 <tr>
 <td>unknown / needs local verification</td>
-<td>105</td>
+<td>90</td>
 </tr>
 </tbody></table>
-<h3>Classified commands (57)</h3>
+<h3>Classified commands (72)</h3>
 <p>Every non-<code>unknown</code> command, with its evidence basis. (All other default-build commands carry <code>unknown / needs local verification</code>.)</p>
 <table>
 <thead>
@@ -1167,6 +1167,18 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td>live</td>
 <td>local data-dir backup; integration-tested (<code>icn/bins/icnctl/tests/backup_restore_test.rs</code> asserts success + tarball created)</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:98</td>
+</tr>
+<tr>
+<td><code>icnctl commons enroll</code></td>
+<td>live</td>
+<td>local: reads the keystore for the DID and prints enrollment guidance (the actual enrollment is the out-of-band steward/in-person flow); no network (<code>icn/bins/icnctl/src/main.rs</code> CommonsCommands::Enroll)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1564</td>
+</tr>
+<tr>
+<td><code>icnctl commons status</code></td>
+<td>live</td>
+<td>local Commons-holder status: reads the keystore via <code>AgeKeyStore</code> and prints identity/enrollment status; no network (<code>icn/bins/icnctl/src/main.rs</code> CommonsCommands::Status)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1561</td>
 </tr>
 <tr>
 <td><code>icnctl completions</code></td>
@@ -1253,6 +1265,18 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td><code>icn/bins/icnctl/src/main.rs</code>:568</td>
 </tr>
 <tr>
+<td><code>icnctl institution bootstrap plan</code></td>
+<td>live</td>
+<td>local bootstrap plan report <code>build_plan_report</code> (sync <code>pub fn</code>, no network) (<code>icn/bins/icnctl/src/institution_bootstrap.rs</code> InstitutionCommands::Bootstrap -&gt; InstitutionBootstrapCommands::Plan)</td>
+<td><code>icn/bins/icnctl/src/institution_bootstrap.rs</code>:38</td>
+</tr>
+<tr>
+<td><code>icnctl institution bootstrap validate</code></td>
+<td>live</td>
+<td>local package validation <code>validate_package</code> (sync <code>pub fn</code>, reads the package dir, no network) (<code>icn/bins/icnctl/src/institution_bootstrap.rs</code> InstitutionCommands::Bootstrap -&gt; InstitutionBootstrapCommands::Validate)</td>
+<td><code>icn/bins/icnctl/src/institution_bootstrap.rs</code>:27</td>
+</tr>
+<tr>
 <td><code>icnctl restore</code></td>
 <td>live</td>
 <td>local data-dir restore; integration-tested (<code>icn/bins/icnctl/tests/backup_restore_test.rs</code>)</td>
@@ -1307,6 +1331,12 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td><code>icn/bins/icnctl/src/main.rs</code>:410</td>
 </tr>
 <tr>
+<td><code>icnctl commons anchor</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest GET {gateway}/v1/commons/anchor/by-did/{did}</code> (gateway from <code>ICN_GATEWAY</code> env) (<code>icn/bins/icnctl/src/main.rs</code> CommonsCommands::Anchor); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1575</td>
+</tr>
+<tr>
 <td><code>icnctl compute cancel</code></td>
 <td>partial</td>
 <td>authenticated daemon RPC <code>client.call(&quot;compute.cancel&quot;, ...)</code> (<code>icn/bins/icnctl/src/main.rs</code> ComputeCommands::Cancel); requires a running daemon, not integration-tested</td>
@@ -1353,6 +1383,48 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td>partial</td>
 <td>daemon RPC <code>client.list_contracts()</code> (<code>icn/bins/icnctl/src/main.rs</code> ContractCommands::List); requires a running daemon, not integration-tested</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:828</td>
+</tr>
+<tr>
+<td><code>icnctl dispute add-evidence</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.dispute_add_evidence()</code> (<code>icn/bins/icnctl/src/main.rs</code> DisputeCommands::AddEvidence); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1394</td>
+</tr>
+<tr>
+<td><code>icnctl dispute assign-mediator</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.dispute_assign_mediator()</code> (<code>icn/bins/icnctl/src/main.rs</code> DisputeCommands::AssignMediator); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1405</td>
+</tr>
+<tr>
+<td><code>icnctl dispute file</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.dispute_file()</code> (<code>icn_rpc::RpcClient</code>) (<code>icn/bins/icnctl/src/main.rs</code> DisputeCommands::File); &quot;Is icnd running?&quot;; requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1366</td>
+</tr>
+<tr>
+<td><code>icnctl dispute get</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.dispute_get()</code> (<code>icn/bins/icnctl/src/main.rs</code> DisputeCommands::Get); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1388</td>
+</tr>
+<tr>
+<td><code>icnctl dispute list</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.dispute_list()</code> (<code>icn/bins/icnctl/src/main.rs</code> DisputeCommands::List); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1377</td>
+</tr>
+<tr>
+<td><code>icnctl dispute resolve</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.dispute_resolve()</code> (<code>icn/bins/icnctl/src/main.rs</code> DisputeCommands::Resolve); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1416</td>
+</tr>
+<tr>
+<td><code>icnctl institution bootstrap apply</code></td>
+<td>partial</td>
+<td>async <code>apply_package</code> posts the package to the gateway via <code>reqwest::Client</code> (<code>icn/bins/icnctl/src/institution_bootstrap.rs</code> InstitutionCommands::Bootstrap -&gt; InstitutionBootstrapCommands::Apply); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/institution_bootstrap.rs</code>:49</td>
 </tr>
 <tr>
 <td><code>icnctl network dial</code></td>
@@ -1461,6 +1533,24 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td>planned</td>
 <td>handler validates the CCL doc locally, then prints &quot;Not yet implemented — charter deployment requires gateway integration&quot; (<code>icn/bins/icnctl/src/main.rs</code> CharterCommands::Deploy)</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1718</td>
+</tr>
+<tr>
+<td><code>icnctl commons affiliations</code></td>
+<td>planned</td>
+<td>prints &quot;Affiliation lookup requires gateway integration. This feature is pending gateway API implementation.&quot; — no client call (<code>icn/bins/icnctl/src/main.rs</code> CommonsCommands::Affiliations)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1582</td>
+</tr>
+<tr>
+<td><code>icnctl commons join</code></td>
+<td>planned</td>
+<td>prints &quot;Join request requires gateway integration. This feature is pending gateway API implementation.&quot; — no client call (<code>icn/bins/icnctl/src/main.rs</code> CommonsCommands::Join)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1589</td>
+</tr>
+<tr>
+<td><code>icnctl commons leave</code></td>
+<td>planned</td>
+<td>prints &quot;Leave request requires gateway integration. This feature is pending gateway API implementation.&quot; — no client call (<code>icn/bins/icnctl/src/main.rs</code> CommonsCommands::Leave)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1600</td>
 </tr>
 <tr>
 <td><code>icnctl steward check-vui</code></td>
