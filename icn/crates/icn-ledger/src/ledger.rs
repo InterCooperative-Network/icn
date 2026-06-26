@@ -1231,8 +1231,8 @@ impl Ledger {
     /// Every entry is validated against the current (pre-batch) ledger state *before any
     /// entry is appended*. If any entry fails that up-front validation, none are appended.
     /// This closes the **validation-rejection** one-sided-entry window for a settlement
-    /// expressed as independent legs (e.g. the commons earn + spend pair, which touch
-    /// different accounts): a later leg that validation would reject can no longer leave an
+    /// expressed as independent legs (e.g. the commons contribution/allocation pair, which
+    /// touch different accounts): a later leg that validation would reject can no longer leave an
     /// earlier leg committed. Entries are appended in input order once all pass; the
     /// returned hashes are in the same order.
     ///

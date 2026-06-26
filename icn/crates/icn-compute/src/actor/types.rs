@@ -184,9 +184,9 @@ pub type CommonsRequiredCreditsCallback =
 /// journal entries to the ledger.
 #[derive(Debug, Clone)]
 pub struct CommonsPaymentRequest {
-    /// DID of the contributor (executor — earns commons credits from the mint).
+    /// DID of the contributor (executor — contribution recognized; credited by the mint).
     pub contributor: String,
-    /// DID of the consumer (submitter — spends commons credits to the mint).
+    /// DID of the consumer (submitter — allocation drawn; debited by the mint).
     pub consumer: String,
     /// Amount of commons credits to settle (already computed by the actor).
     pub amount: u64,
