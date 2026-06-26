@@ -172,6 +172,26 @@ def _clause_around(line, start, end):
     return line[lo:hi]
 
 
+# Segment delimiters for nonclaim FRAMING — same as the clause delimiters but
+# WITHOUT ":" so a "framing:" prefix ("Must not claim: ...", "Unsafe ...:") stays
+# attached to the list/claim it introduces. ";"/"." still split, so framing in an
+# earlier sentence/clause cannot reach a separate overclaim after them.
+_NONCLAIM_DELIMS = set(".;|()") | {"—"}
+
+
+def _framing_segment(line, start, end):
+    """Return the framing segment (delimited by _NONCLAIM_DELIMS) containing the
+    [start, end) match — used to scope NONCLAIM_LINE_RE so it cannot mask a
+    separate overclaim in a later clause of the same line."""
+    lo = start
+    while lo > 0 and line[lo - 1] not in _NONCLAIM_DELIMS:
+        lo -= 1
+    hi = end
+    while hi < len(line) and line[hi] not in _NONCLAIM_DELIMS:
+        hi += 1
+    return line[lo:hi]
+
+
 # --- Nonclaim CONTEXT precision (line-local + nearest-heading; no parsing) ----
 # A markdown heading whose text matches this starts a block that is, by
 # construction, a list of things ICN does NOT claim. Every line until the next
@@ -188,19 +208,19 @@ NONCLAIM_SECTION_RE = re.compile(
     r")\b"
 )
 
-# Explicit line-level nonclaim FRAMING: the whole line tells the reader NOT to
-# claim something, so an overclaim phrase inside it is being forbidden, not
-# asserted. Catches enumerations the clause-local negation guard splits apart,
-# e.g. "Must not claim: ...; that any of this is production or live federation."
+# Explicit nonclaim FRAMING: the framing tells the reader NOT to claim something,
+# so an overclaim phrase in the same framed segment is being forbidden, not
+# asserted (e.g. "Must not claim: ... production or live federation.";
+# "Unsafe without more evidence: ICN is production-ready.").
 #
-# Because a match exempts the WHOLE line, this is kept to unambiguous nonclaim
-# *objects* ("claim" / "formal pilot" / "organizer-ready") only. It deliberately
-# does NOT include direct readiness negations like "not production-ready" /
-# "no live federation": those are handled precisely, clause-by-clause, by
-# NEGATION_RE — putting them here would let a disclaimer in one clause silently
-# mask a separate affirmative overclaim in another clause on the same line, e.g.
-# "This is not production-ready; ICN is generally available." (see the regression
-# test test_disclaimer_does_not_mask_separate_overclaim).
+# This is applied to the matched phrase's SEGMENT (delimited by ./;/|/()/em-dash —
+# but NOT ":" or ",", so a "framing:" prefix stays attached to the list it
+# introduces), NOT the whole line — a whole-line skip would let framing in one
+# clause silently mask a separate affirmative overclaim in a LATER clause, e.g.
+# "Unsafe ...: production-ready; ICN is generally available." must still flag the
+# second clause (see test_nonclaim_framing_does_not_mask_later_overclaim). Direct
+# readiness negations ("not production-ready") stay out of here — NEGATION_RE
+# handles those clause-by-clause.
 NONCLAIM_LINE_RE = re.compile(
     r"(?i)("
     r"do(?:es)? not claim|must not (?:be )?claim(?:ed)?|cannot claim|never claim|"
@@ -277,23 +297,26 @@ def scan_lines(rel_path, lines):
             # Entering/leaving a nonclaim/red-line section toggles the context.
             in_nonclaim_section = bool(NONCLAIM_SECTION_RE.search(heading.group(1)))
 
-        # Nonclaim-context exemptions (precision): lines under a nonclaim/red-line
-        # section, explicit "do/must not claim ..." lines, and interrogative/FAQ
-        # prompts are not affirmative claims.
-        if in_nonclaim_section or _is_interrogative(line) or NONCLAIM_LINE_RE.search(line):
+        # Whole-line/context exemptions: lines under a nonclaim/red-line section and
+        # interrogative/FAQ prompts are not affirmative claims. (Nonclaim FRAMING is
+        # checked PER-MATCH below, scoped to the matched phrase's segment.)
+        if in_nonclaim_section or _is_interrogative(line):
             continue
 
         for pattern, rule in OVERCLAIM_PATTERNS:
             m = pattern.search(line)
             if not m:
                 continue
-            # Per-match precision: a quoted example phrase (`"production-ready"`), a
-            # risk-labelled phrase ("live federation overclaim"), or a phrase
-            # followed by "claim requires ..." (a meta-statement about the claim) is
-            # not itself an affirmative claim. All scoped to THIS match so a separate
-            # overclaim elsewhere on the line still warns.
+            # Per-match precision (all scoped to THIS match so a separate overclaim
+            # elsewhere on the line still warns): explicit nonclaim FRAMING in the
+            # matched phrase's segment ("Must not claim: ...", "Unsafe ...:",
+            # "nonclaims for ...", "without requiring ... live federation"); a quoted
+            # example phrase (`"production-ready"`); a risk-labelled phrase
+            # ("live federation overclaim"); or a "<phrase> claim requires ..."
+            # meta-statement.
             if (
-                _phrase_is_quoted(line, m.start(), m.end())
+                NONCLAIM_LINE_RE.search(_framing_segment(line, m.start(), m.end()))
+                or _phrase_is_quoted(line, m.start(), m.end())
                 or _labels_a_risk(line, m.end())
                 or _describes_a_claim(line, m.end())
             ):

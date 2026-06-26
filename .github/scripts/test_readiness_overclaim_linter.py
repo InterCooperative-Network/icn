@@ -227,6 +227,31 @@ class TestProjectIndexFP(unittest.TestCase):
         v = linter.scan_lines("x.md", ["ICN is production-ready without caveats."])
         self.assertEqual(len(v), 1)
 
+    # --- nonclaim FRAMING is segment-scoped: it must NOT mask a separate
+    #     affirmative overclaim in a LATER clause of the same line ---
+    def test_nonclaim_framing_does_not_mask_later_overclaim(self):
+        cases = [
+            # caveat prefix exempts clause 1, but clause 2 is a separate claim
+            ("Unsafe without more evidence: ICN is production-ready; ICN is generally available.",
+             "general availability"),
+            # "nonclaims for ..." exempts clause 1, clause 2 still warns
+            ("Includes nonclaims for live federation; ICN is production-ready.",
+             "production-ready"),
+            # narrow "without ... live federation" exempts clause 1, clause 2 warns
+            ("Walks proofs without requiring a live federation step; ICN is generally available.",
+             "general availability"),
+        ]
+        for line, expected_rule in cases:
+            v = linter.scan_lines("x.md", [line])
+            self.assertEqual(len(v), 1, msg=line)
+            self.assertEqual(v[0].rule, expected_rule, msg=line)
+
+    def test_must_not_claim_prefix_still_exempts_its_list(self):
+        # The ":"-inclusive segment keeps the framing attached to the list it
+        # introduces, so "Must not claim: ... live federation." stays exempt.
+        line = "Must not claim: that any of this is production-ready or live federation."
+        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+
 
 class TestFixturesEndToEnd(unittest.TestCase):
     def test_bad_fixture_flagged(self):
