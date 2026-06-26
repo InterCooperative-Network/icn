@@ -55,7 +55,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </ul>
 <h2>Snapshot</h2>
 <ul>
-<li>Source commit: <code>17f0c0caf5fcd8a07f8f599bd3d912ae72502aef</code></li>
+<li>Source commit: <code>c686c909318b0dc9510683166f5eb0a8a8cd8ed4</code></li>
 <li>Source scanned: <code>icn/bins/icnctl/src/**</code> (clap <code>#[derive(Subcommand)]</code> / <code>#[derive(Parser)]</code> tree)</li>
 </ul>
 <h2>Summary</h2>
@@ -63,7 +63,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <li><strong>Total leaf commands (default build): 162</strong></li>
 <li>Top-level command groups: 33</li>
 <li>By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2</li>
-<li>By status (curated, see section below): live 27 · partial 35 · planned 10 · unknown / needs local verification 90</li>
+<li>By status (curated, see section below): live 27 · partial 49 · planned 10 · unknown / needs local verification 76</li>
 <li>Proof level: every command is <code>L1</code> (declaration exists in source).</li>
 <li><strong>Feature-gated commands (NOT in the default build, excluded from the counts above): 1</strong> (see section below).</li>
 <li>Unparsed / unresolved candidates: 0 (see section below).</li>
@@ -82,85 +82,85 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </thead>
 <tbody><tr>
 <td><code>icnctl amendment add-change</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1867</td>
 </tr>
 <tr>
 <td><code>icnctl amendment list</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1766</td>
 </tr>
 <tr>
 <td><code>icnctl amendment open-voting</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1809</td>
 </tr>
 <tr>
 <td><code>icnctl amendment propose</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1731</td>
 </tr>
 <tr>
 <td><code>icnctl amendment show</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1785</td>
 </tr>
 <tr>
 <td><code>icnctl amendment submit</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1795</td>
 </tr>
 <tr>
 <td><code>icnctl amendment vote</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1823</td>
 </tr>
 <tr>
 <td><code>icnctl amendment withdraw</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1849</td>
 </tr>
 <tr>
 <td><code>icnctl appeal add-evidence</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1972</td>
 </tr>
 <tr>
 <td><code>icnctl appeal file</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1904</td>
 </tr>
 <tr>
 <td><code>icnctl appeal list</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1943</td>
 </tr>
 <tr>
 <td><code>icnctl appeal respond</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:2002</td>
 </tr>
 <tr>
 <td><code>icnctl appeal show</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1962</td>
 </tr>
 <tr>
 <td><code>icnctl appeal withdraw</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:2024</td>
 </tr>
@@ -1130,7 +1130,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td>partial</td>
-<td>35</td>
+<td>49</td>
 </tr>
 <tr>
 <td>fixture-demo</td>
@@ -1142,10 +1142,10 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td>unknown / needs local verification</td>
-<td>90</td>
+<td>76</td>
 </tr>
 </tbody></table>
-<h3>Classified commands (72)</h3>
+<h3>Classified commands (86)</h3>
 <p>Every non-<code>unknown</code> command, with its evidence basis. (All other default-build commands carry <code>unknown / needs local verification</code>.)</p>
 <table>
 <thead>
@@ -1317,6 +1317,90 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td>live</td>
 <td>local backup verification; integration-tested (<code>icn/bins/icnctl/tests/backup_restore_test.rs</code>)</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:114</td>
+</tr>
+<tr>
+<td><code>icnctl amendment add-change</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest POST {gateway}/v1/constitutional/amendments/{id}/changes</code> (route in route-inventory; auth via get_gateway_token) (<code>icn/bins/icnctl/src/main.rs</code> AmendmentCommands::AddChange); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1867</td>
+</tr>
+<tr>
+<td><code>icnctl amendment list</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest GET {gateway}/v1/constitutional/amendments</code> (route in route-inventory) (<code>icn/bins/icnctl/src/main.rs</code> AmendmentCommands::List); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1766</td>
+</tr>
+<tr>
+<td><code>icnctl amendment open-voting</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest POST {gateway}/v1/constitutional/amendments/{id}/vote</code> (route in route-inventory; auth via get_gateway_token) (<code>icn/bins/icnctl/src/main.rs</code> AmendmentCommands::OpenVoting); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1809</td>
+</tr>
+<tr>
+<td><code>icnctl amendment propose</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest POST {gateway}/v1/constitutional/amendments</code> (route in <code>docs/reference/project-index/generated/route-inventory.md</code>; auth via get_gateway_token) (<code>icn/bins/icnctl/src/main.rs</code> AmendmentCommands::Propose); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1731</td>
+</tr>
+<tr>
+<td><code>icnctl amendment show</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest GET {gateway}/v1/constitutional/amendments/{id}</code> (route in route-inventory) (<code>icn/bins/icnctl/src/main.rs</code> AmendmentCommands::Show); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1785</td>
+</tr>
+<tr>
+<td><code>icnctl amendment submit</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest POST {gateway}/v1/constitutional/amendments/{id}/submit</code> (route in route-inventory; auth via get_gateway_token) (<code>icn/bins/icnctl/src/main.rs</code> AmendmentCommands::Submit); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1795</td>
+</tr>
+<tr>
+<td><code>icnctl amendment vote</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest POST {gateway}/v1/constitutional/amendments/{id}/ratify</code> (route in route-inventory; auth via get_gateway_token) (<code>icn/bins/icnctl/src/main.rs</code> AmendmentCommands::Vote); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1823</td>
+</tr>
+<tr>
+<td><code>icnctl amendment withdraw</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest POST {gateway}/v1/constitutional/amendments/{id}/withdraw</code> (route in route-inventory; auth via get_gateway_token) (<code>icn/bins/icnctl/src/main.rs</code> AmendmentCommands::Withdraw); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1849</td>
+</tr>
+<tr>
+<td><code>icnctl appeal add-evidence</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest POST {gateway}/v1/constitutional/appeals/{id}/evidence</code> (route in route-inventory; auth via get_gateway_token) (<code>icn/bins/icnctl/src/main.rs</code> AppealCommands::AddEvidence); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1972</td>
+</tr>
+<tr>
+<td><code>icnctl appeal file</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest POST {gateway}/v1/constitutional/appeals</code> (route in route-inventory; auth via get_gateway_token) (<code>icn/bins/icnctl/src/main.rs</code> AppealCommands::File); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1904</td>
+</tr>
+<tr>
+<td><code>icnctl appeal list</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest GET {gateway}/v1/constitutional/appeals</code> (route in route-inventory) (<code>icn/bins/icnctl/src/main.rs</code> AppealCommands::List); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1943</td>
+</tr>
+<tr>
+<td><code>icnctl appeal respond</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest POST {gateway}/v1/constitutional/appeals/{id}/respond</code> (route in route-inventory; auth via get_gateway_token) (<code>icn/bins/icnctl/src/main.rs</code> AppealCommands::Respond); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:2002</td>
+</tr>
+<tr>
+<td><code>icnctl appeal show</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest GET {gateway}/v1/constitutional/appeals/{id}</code> (route in route-inventory) (<code>icn/bins/icnctl/src/main.rs</code> AppealCommands::Show); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1962</td>
+</tr>
+<tr>
+<td><code>icnctl appeal withdraw</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest POST {gateway}/v1/constitutional/appeals/{id}/withdraw</code> (route in route-inventory; auth via get_gateway_token) (<code>icn/bins/icnctl/src/main.rs</code> AppealCommands::Withdraw); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:2024</td>
 </tr>
 <tr>
 <td><code>icnctl audit verify</code></td>
