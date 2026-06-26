@@ -11,10 +11,13 @@ This is deliberately humble (issue #2112):
 - It proves route **declarations** exist in source. It does NOT prove route
   correctness, authentication, test coverage, production readiness, or public
   safety. "OpenAPI documented" does not mean complete or correct.
-- Every recorded entry is capped at **proof level L1** (a declaration / contract /
+- Every **tabulated route row** (gateway macros, governance candidates,
+  OpenAPI-unmatched ops) is recorded at **proof level L1** (a declaration / contract /
   registration site exists in source) per `proof-level-taxonomy-capability-matrix.md`.
   A static scan cannot assert L2+ (tests), L5 (live daemon/gateway), or higher — those
-  need evidence this pass does not collect. The level is uniform by construction.
+  need evidence this pass does not collect. The level is uniform by construction. The
+  unparsed `web::resource`/`.route` candidates are flagged leads (not parsed into routes)
+  and carry no proof level.
 - Full mounted-path resolution is **best-effort** (a module->scope heuristic
   read from server.rs), not a real Rust parser. The relative macro path and the
   source file are authoritative; the "group" column is approximate.
@@ -314,7 +317,7 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_can
     out.append("")
     out.append("- **Proves:** these route declarations (Actix routing attribute macros) exist in the gateway source at the snapshot commit.")
     out.append("- **Does NOT prove:** route correctness, authentication/authorization, test coverage, runtime health, production readiness, or public-claim safety. `OpenAPI documented = yes` does **not** mean the contract is complete or correct.")
-    out.append("- **Proof level (per [`proof-level-taxonomy-capability-matrix.md`](../proof-level-taxonomy-capability-matrix.md)):** every entry is capped at **L1** — a declaration / contract / registration site exists in source. A static scan **cannot** assert L2+ (unit/integration tests), L5 (live daemon/gateway), or higher; those require evidence this pass does not collect. `OpenAPI documented = yes` is still only L1 (a schema/contract exists), not runtime proof. The `Proof` column is therefore uniform `L1` by construction — it marks the *ceiling* of this evidence, not a per-route assessment.")
+    out.append("- **Proof level (per [`proof-level-taxonomy-capability-matrix.md`](../proof-level-taxonomy-capability-matrix.md)):** every **tabulated route row** — gateway macros, governance-app registration candidates, and OpenAPI-unmatched operations — is recorded at **L1** (a declaration / contract / registration site exists in source). A static scan **cannot** assert L2+ (unit/integration tests), L5 (live daemon/gateway), or higher; those require evidence this pass does not collect. `OpenAPI documented = yes` is still only L1 (a schema/contract exists), not runtime proof. The `Proof` column is uniform `L1` by construction — it marks the *ceiling* of this evidence, not a per-route assessment. The *unparsed route-registration candidates* below are flagged leads (not parsed into routes) and carry **no** proof level.")
     out.append("- Defer to canonical truth/precedence: [`source-of-truth-map.md`](../source-of-truth-map.md) and proof levels in [`proof-level-taxonomy-capability-matrix.md`](../proof-level-taxonomy-capability-matrix.md). This is an orientation artifact (`Canonical: no`).")
     out.append("")
     out.append("## Snapshot")
@@ -332,7 +335,7 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_can
     out.append(f"- Documented share of discovered routes: ~{pct_doc:.1f}%")
     out.append(f"- **OpenAPI operations (method + path) not matched to a discovered gateway route: {len(unmatched_ops)}** (see section below)")
     out.append(f"- **Governance app route-registration candidates (separate surface, not gateway macros): {len(gov_candidates)}** (see section below)")
-    out.append(f"- **Proof level: `L1` for every recorded entry** ({total} gateway macros + {len(gov_candidates)} governance candidates + {len(oapi)} OpenAPI paths + {len(reg_candidates)} unparsed candidates) — a declaration/contract/registration exists in source; the static scan asserts no level above L1.")
+    out.append(f"- **Proof level: every tabulated route row is recorded at `L1`** ({total} gateway macros + {len(gov_candidates)} governance candidates + {len(unmatched_ops)} OpenAPI-unmatched operations) — a declaration/contract/registration exists in source; the static scan asserts no level above L1. The {len(reg_candidates)} unparsed `web::resource`/`.route` candidates are flagged leads (not parsed into routes) and carry no proof level.")
     out.append("")
     out.append("> The gap is structural: only handlers hand-annotated for utoipa reach the OpenAPI spec. "
                "Of the OpenAPI paths, several belong to `icn-governance-actor` HTTP handlers that live outside "

@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T01:41:58+00:00
+Generated: 2026-06-26T01:48:00+00:00
 ---
 
 # Gateway Route Inventory (generated)
@@ -13,12 +13,12 @@ Generated: 2026-06-26T01:41:58+00:00
 
 - **Proves:** these route declarations (Actix routing attribute macros) exist in the gateway source at the snapshot commit.
 - **Does NOT prove:** route correctness, authentication/authorization, test coverage, runtime health, production readiness, or public-claim safety. `OpenAPI documented = yes` does **not** mean the contract is complete or correct.
-- **Proof level (per [`proof-level-taxonomy-capability-matrix.md`](../proof-level-taxonomy-capability-matrix.md)):** every entry is capped at **L1** — a declaration / contract / registration site exists in source. A static scan **cannot** assert L2+ (unit/integration tests), L5 (live daemon/gateway), or higher; those require evidence this pass does not collect. `OpenAPI documented = yes` is still only L1 (a schema/contract exists), not runtime proof. The `Proof` column is therefore uniform `L1` by construction — it marks the *ceiling* of this evidence, not a per-route assessment.
+- **Proof level (per [`proof-level-taxonomy-capability-matrix.md`](../proof-level-taxonomy-capability-matrix.md)):** every **tabulated route row** — gateway macros, governance-app registration candidates, and OpenAPI-unmatched operations — is recorded at **L1** (a declaration / contract / registration site exists in source). A static scan **cannot** assert L2+ (unit/integration tests), L5 (live daemon/gateway), or higher; those require evidence this pass does not collect. `OpenAPI documented = yes` is still only L1 (a schema/contract exists), not runtime proof. The `Proof` column is uniform `L1` by construction — it marks the *ceiling* of this evidence, not a per-route assessment. The *unparsed route-registration candidates* below are flagged leads (not parsed into routes) and carry **no** proof level.
 - Defer to canonical truth/precedence: [`source-of-truth-map.md`](../source-of-truth-map.md) and proof levels in [`proof-level-taxonomy-capability-matrix.md`](../proof-level-taxonomy-capability-matrix.md). This is an orientation artifact (`Canonical: no`).
 
 ## Snapshot
 
-- Source commit: `bd43ef83b4939522ad4856a1f665da00f115cb94`
+- Source commit: `5c0ecabcd3329f3c59749b18f9d65d0b6f893c46`
 - Gateway source scanned: `icn/crates/icn-gateway/src/**`
 - OpenAPI spec: `docs/api/openapi.generated.yaml`
 
@@ -31,7 +31,7 @@ Generated: 2026-06-26T01:41:58+00:00
 - Documented share of discovered routes: ~0.7%
 - **OpenAPI operations (method + path) not matched to a discovered gateway route: 3** (see section below)
 - **Governance app route-registration candidates (separate surface, not gateway macros): 83** (see section below)
-- **Proof level: `L1` for every recorded entry** (287 gateway macros + 83 governance candidates + 5 OpenAPI paths + 4 unparsed candidates) — a declaration/contract/registration exists in source; the static scan asserts no level above L1.
+- **Proof level: every tabulated route row is recorded at `L1`** (287 gateway macros + 83 governance candidates + 3 OpenAPI-unmatched operations) — a declaration/contract/registration exists in source; the static scan asserts no level above L1. The 4 unparsed `web::resource`/`.route` candidates are flagged leads (not parsed into routes) and carry no proof level.
 
 > The gap is structural: only handlers hand-annotated for utoipa reach the OpenAPI spec. Of the OpenAPI paths, several belong to `icn-governance-actor` HTTP handlers that live outside the gateway crate and are not captured by this macro scan — so the documented/undocumented counts here are a best-effort comparison, while the two headline counts (discovered macros, OpenAPI paths) are the robust measured facts.
 
