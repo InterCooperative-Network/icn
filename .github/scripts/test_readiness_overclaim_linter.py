@@ -171,6 +171,56 @@ class TestNonclaimContext(unittest.TestCase):
         self.assertEqual(linter.scan_lines("x.md", lines), [])
 
 
+class TestProjectIndexFP(unittest.TestCase):
+    """Precision for the docs/reference/project-index FP classes (so that root can be
+    scanned cleanly), while direct affirmative claims still warn."""
+
+    # --- true positives still warn ---
+    def test_tp_production_ready(self):
+        v = linter.scan_lines("x.md", ["ICN is production-ready."])
+        self.assertEqual(len(v), 1)
+
+    def test_tp_has_live_federation(self):
+        v = linter.scan_lines("x.md", ["ICN has live federation between cooperatives."])
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].rule, "live federation")
+
+    def test_tp_generally_available(self):
+        v = linter.scan_lines("x.md", ["ICN is generally available."])
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].rule, "general availability")
+
+    # --- false positives suppressed ---
+    def test_caveat_prefix_unsafe_suppressed(self):
+        line = "- Unsafe without more evidence: ICN is production-ready across arbitrary networks."
+        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+
+    def test_quoted_avoid_list_suppressed(self):
+        line = '- "production-ready", "fully federated", "live pilot", "secure by default"'
+        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+
+    def test_risk_cell_overclaim_label_suppressed(self):
+        line = "| Entity / federation / trust | implemented but partial | high: live federation overclaim |"
+        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+
+    def test_checklist_nonclaims_item_suppressed(self):
+        line = "- [ ] Includes nonclaims for production readiness, formal pilot readiness, live federation."
+        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+
+    def test_claim_requires_meta_statement_suppressed(self):
+        line = "A live federation claim requires a governed inter-institutional relationship and evidence."
+        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+
+    def test_without_requiring_live_federation_suppressed(self):
+        line = "The operator ladder walks drive content into proofs without requiring a live federation step."
+        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+
+    # --- a blanket "without" must NOT suppress a real claim ---
+    def test_without_blanket_does_not_mask_real_claim(self):
+        v = linter.scan_lines("x.md", ["ICN is production-ready without caveats."])
+        self.assertEqual(len(v), 1)
+
+
 class TestFixturesEndToEnd(unittest.TestCase):
     def test_bad_fixture_flagged(self):
         v = linter.scan_file("bad_unbannered.md", os.path.join(FIX, "bad_unbannered.md"))

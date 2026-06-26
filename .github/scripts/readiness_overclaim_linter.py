@@ -44,24 +44,24 @@ from typing import List
 # docs/pilots (organizer-/partner-facing, claim-sensitive; measured low-noise —
 # 10 files, 1 bounded ALLOWLIST exception).
 #
-# NOT yet added. The nonclaim-context precision below (red-line/nonclaim section
-# headings, explicit "does not claim ..." lines, FAQ questions, "nothing/none"
-# disclaimers) was added 2026-06-26 and cut the measured noise substantially, but
-# these roots are still not clean enough to add without warnings:
-#   docs/reference/project-index : 18 -> 6 violations  (still deferred)
-#   docs/demo                    : 6  -> 4 violations
-#   docs/strategy                : 5  -> 4 violations
-# The residual hits are a different FP class (caveat-prefixed claims like
-# "Unsafe ...: <phrase>", quoted avoid-lists like `"production-ready"`, risk-column
-# table cells naming an overclaim, and checklist items describing nonclaims) that
-# narrow phrase rules can't suppress without risking real-claim masking. Adding a
-# root is a future ratchet step once its residual is bounded — see
-# docs/ci/GATE_RATCHET_PLAN.md.
+# docs/reference/project-index (the claim-discipline maps themselves) was added
+# 2026-06-26 once its residual was driven to zero: the nonclaim-context precision
+# below (section headings, "does not claim ..." lines, FAQ questions, nothing/none
+# disclaimers) handled most hits, and the project-index-specific FP classes
+# (caveat-prefixed "Unsafe ...: <phrase>", quoted avoid-lists `"production-ready"`,
+# risk-register cells "live federation overclaim", "claim requires ..."
+# meta-statements, checklist "nonclaims" items, narrow "without requiring a live
+# federation ...") were closed by targeted rules below — 18 -> 0.
+#
+# NOT yet added (measured after this precision pass, still > 0): docs/demo (4),
+# docs/strategy (4). Their residuals need their own bounded rules/allowlists first
+# — a future ratchet step (docs/ci/GATE_RATCHET_PLAN.md).
 # ---------------------------------------------------------------------------
 SCAN_DIRS = [
     "docs/deployment",
     "docs/operations/deployment",
     "docs/pilots",
+    "docs/reference/project-index",  # added 2026-06-26; generated/ pruned via EXCLUDE_DIRS
 ]
 
 # Directory basenames pruned from every scan root: generated artifacts (they
@@ -205,7 +205,21 @@ NONCLAIM_LINE_RE = re.compile(
     r"(?i)("
     r"do(?:es)? not claim|must not (?:be )?claim(?:ed)?|cannot claim|never claim|"
     r"must not be (?:presented|shown)|should not be (?:claimed|presented|shown)|"
-    r"not (?:a )?formal pilot|no formal pilot|not organi[sz]er-ready"
+    r"not (?:a )?formal pilot|no formal pilot|not organi[sz]er-ready|"
+    # Caveat prefixes that PRESENT the phrase as a bad example / unsafe claim
+    # (e.g. "Unsafe without more evidence: ICN is production-ready ...").
+    r"unsafe (?:without[^:]*evidence|claim|to (?:claim|say))|do not say|don't say|avoid saying|"
+    # Meta-statements ABOUT making the claim, not the claim itself
+    # (e.g. "A live federation claim requires more than working code.").
+    r"claims? (?:require|requires|need|needs|would require)|"
+    # A line that is itself enumerating nonclaims (e.g. a PR-checklist item
+    # "Includes nonclaims for ... live federation").
+    r"\bnonclaims?\b|"
+    # Narrow, phrase-specific "without ..." exemption — NOT a blanket "without"
+    # negation (that would mask "production-ready without caveats"): the federation
+    # phrase is explicitly being avoided (e.g. "without requiring a live federation
+    # step", "without claiming live federation").
+    r"without (?:requiring|claiming|needing)\b[^.\n]{0,40}\blive federation"
     r")"
 )
 
@@ -219,6 +233,23 @@ def _is_interrogative(line):
     """True if the line, stripped of markdown decoration, is a question (an FAQ
     prompt is not an assertion unless a later answer line asserts it)."""
     return line.strip().strip(_MD_TRIM).strip().endswith("?")
+
+
+_QUOTE_CHARS = "\"'`"
+
+
+def _phrase_is_quoted(line, start, end):
+    """True if the matched phrase is wrapped in quotes/backticks — i.e. cited as a
+    banned/example phrase (e.g. an "Avoid" list `"production-ready"`), not asserted."""
+    before = line[start - 1] if start > 0 else ""
+    after = line[end] if end < len(line) else ""
+    return before in _QUOTE_CHARS and after in _QUOTE_CHARS
+
+
+def _labels_a_risk(line, end):
+    """True if the matched phrase is immediately labelled as a risk/overclaim — a
+    risk-register cell ("live federation overclaim") names the danger, not a claim."""
+    return "overclaim" in line[end:end + 20].lower()
 
 
 def scan_lines(rel_path, lines):
@@ -244,6 +275,10 @@ def scan_lines(rel_path, lines):
         for pattern, rule in OVERCLAIM_PATTERNS:
             m = pattern.search(line)
             if not m:
+                continue
+            # Per-match precision: a quoted example phrase (`"production-ready"`) or
+            # a risk-labelled phrase ("live federation overclaim") is not a claim.
+            if _phrase_is_quoted(line, m.start(), m.end()) or _labels_a_risk(line, m.end()):
                 continue
             # Only the overclaim's own clause exempts it — not an unrelated
             # negation/conditional elsewhere on the same line.
