@@ -348,6 +348,26 @@ STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     # planned (pass 11, issue #2113) — `federation clearing rate` makes NO client call: it prints the rate
     # back plus a note, with the in-source comment "Rate updates are not yet implemented via RPC".
     "federation clearing rate": (STATUS_PLANNED, "no client call — prints \"Exchange rate noted...\" + a note; in-source comment \"Rate updates are not yet implemented via RPC\" (`icn/bins/icnctl/src/main.rs` ClearingCommands::Rate)"),
+    # partial (pass 12, issue #2113) — `policy` arms are daemon RPC: `handle_policy_command` builds
+    # `create_authenticated_rpc_client` then each arm `await`s `client.call("policy.*")`; every cited
+    # method is registered in the daemon dispatch `icn/crates/icn-rpc/src/server.rs` (set:768, get:771,
+    # list:774, remove:777). Daemon-dependent, no binary-spawning e2e test (no icnctl test references policy).
+    "policy set": (STATUS_PARTIAL, "daemon RPC `client.call(\"policy.set\")` via `create_authenticated_rpc_client` (reads the policy JSON file locally first) (`icn/bins/icnctl/src/main.rs` PolicyCommands::Set); method registered `icn/crates/icn-rpc/src/server.rs`:768; requires a running daemon, not integration-tested"),
+    "policy show": (STATUS_PARTIAL, "daemon RPC `client.call(\"policy.get\")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` PolicyCommands::Show); method registered server.rs:771; requires a running daemon, not integration-tested"),
+    "policy list": (STATUS_PARTIAL, "daemon RPC `client.call(\"policy.list\")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` PolicyCommands::List); method registered server.rs:774; requires a running daemon, not integration-tested"),
+    "policy remove": (STATUS_PARTIAL, "daemon RPC `client.call(\"policy.remove\")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` PolicyCommands::Remove); method registered server.rs:777; requires a running daemon, not integration-tested"),
+    # unknown (pass 12, issue #2113) — `init-coop` is intentionally NOT classified (left unknown by
+    # omission). `handle_init_coop_command` is a hybrid local-first setup wizard: it ALWAYS does local
+    # work (create/unlock AgeKeyStore, write icn.toml, write governance_setup.json bootstrap, create
+    # SledStore trust edges), then makes a BEST-EFFORT gateway call (GET /v1/health, and POST
+    # /v1/gov/domains only if the daemon is up AND ICN_TOKEN is set), falling back to the local bootstrap
+    # file otherwise (no daemon is spawned; `--no-start` only changes printed guidance). Its end state is
+    # environment-dependent (pure-local vs live gateway domain creation), so no single static L1 status is
+    # honest — `unknown / needs local verification` pending a runtime check.
+    # unknown (pass 10, issue #2113) — `gov vote delegate/delegations/revoke` remain unknown: re-confirmed
+    # this pass that `governance.delegation.{create,list,revoke}` is still NOT registered in the daemon
+    # dispatch `icn/crates/icn-rpc/src/server.rs` (governance arms there are domain.*/proposal.*/vote.cast
+    # only) and a repo-wide search finds `governance.delegation` only in those three icnctl client calls.
     # planned — handler is an explicit placeholder / prints "not yet implemented".
     "charter deploy": (STATUS_PLANNED, "handler validates the CCL doc locally, then prints \"Not yet implemented — charter deployment requires gateway integration\" (`icn/bins/icnctl/src/main.rs` CharterCommands::Deploy)"),
     "steward check-vui": (STATUS_PLANNED, "placeholder; validates input then prints \"VUI registry check requires running steward daemon\" (`icn/bins/icnctl/src/main.rs` StewardCommands::CheckVui)"),
