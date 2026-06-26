@@ -57,7 +57,9 @@ on drift and **succeeds**; it only **fails** if a checker itself errors (e.g.
 workflow is not a branch-protection–required check, so it does not block merge.
 
 This conservative start matches the repo convention for orientation artifacts
-(route-inventory is warn-only — issue #2112). See
+(both the route inventory and the `icnctl` command inventory are warn-only,
+gated in [`docs-freshness.yml`](../../.github/workflows/docs-freshness.yml) —
+issues #2112 / #2113). See
 [`GATE_RATCHET_PLAN.md`](GATE_RATCHET_PLAN.md) for how observational checks
 graduate to enforceable gates.
 
@@ -92,6 +94,9 @@ python3 scripts/generate-live-state-overlay.py            # markdown to stdout
   doc asked for now holds. They are ready to graduate from observational to
   blocking. **Promotion is a branch-protection (repo-settings) change and a
   cadence decision — deliberately NOT taken in this docs pass.**
+  `docs/scripts/icnctl_command_inventory.py --check` joined this warn-only set
+  in `docs-freshness.yml` (#2113 follow-up, alongside `route_inventory`) and is
+  likewise a promotion candidate, not promoted here.
   - **NOT a promotion candidate:** `generate_repo_record.py --check`. The
     file-record snapshot inventories per-file SHAs, so it drifts on *any* PR
     that touches an inventoried file and is refreshed by a separate

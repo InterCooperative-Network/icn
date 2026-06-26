@@ -22,6 +22,11 @@ on:
       # the gateway's /gov scope — include that source so governance route changes
       # also fire the --check drift guard.
       - 'icn/apps/governance/src/http/**'
+      # icnctl-inventory code-truth: icnctl_command_inventory.py scans the clap
+      # derive command tree under icn/bins/icnctl/src/** (ICNCTL_SRC), so a command
+      # added there must still fire the --check drift guard. The script and its
+      # generated artifact under docs/ are already covered by docs/**.
+      - 'icn/bins/icnctl/src/**'
       # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
       # under docs/scripts + docs/contracts are already covered by docs/**
       - 'web/pilot-ui/fixtures/**'
@@ -49,6 +54,11 @@ on:
       # the gateway's /gov scope — include that source so governance route changes
       # also fire the --check drift guard.
       - 'icn/apps/governance/src/http/**'
+      # icnctl-inventory code-truth: icnctl_command_inventory.py scans the clap
+      # derive command tree under icn/bins/icnctl/src/** (ICNCTL_SRC), so a command
+      # added there must still fire the --check drift guard. The script and its
+      # generated artifact under docs/ are already covered by docs/**.
+      - 'icn/bins/icnctl/src/**'
       # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
       # under docs/scripts + docs/contracts are already covered by docs/**
       - 'web/pilot-ui/fixtures/**'
@@ -255,9 +265,40 @@ jobs:
             exit "$rc"
           fi
 
+  icnctl_inventory:
+    name: Check Generated icnctl Command Inventory
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      # Generated-artifact drift guard, mirroring the route-inventory check above: a
+      # stale docs/reference/project-index/generated/icnctl-command-inventory.md is a
+      # WARNING, not a merge blocker (the artifact is Canonical: no, orientation-only —
+      # issue #2113). The script is stdlib-only and reads git + the icnctl clap tree
+      # under icn/bins/icnctl/src/**; no extra deps.
+      #   exit 0 = current   ->  pass
+      #   exit 1 = stale      ->  ::warning:: (regenerate with --write); job still succeeds
+      #   exit >=2 = checker itself broke -> fail
+      - name: Check icnctl command inventory is current (warn on drift)
+        run: |
+          python3 docs/scripts/icnctl_command_inventory.py --check && rc=0 || rc=$?
+          if [ "$rc" = "0" ]; then
+            echo "icnctl command inventory is current."
+          elif [ "$rc" = "1" ]; then
+            echo "::warning::docs/reference/project-index/generated/icnctl-command-inventory.md is stale vs a fresh clap-tree scan. Regenerate: python3 docs/scripts/icnctl_command_inventory.py --write"
+          else
+            echo "::error::icnctl_command_inventory.py failed (exit $rc) — checker error, not a staleness signal."
+            exit "$rc"
+          fi
+
   summary:
     name: Documentation CI Summary
-    needs: [doc_control, lint, freshness, index, fixture_bundle, route_inventory]
+    needs: [doc_control, lint, freshness, index, fixture_bundle, route_inventory, icnctl_inventory]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -288,6 +329,12 @@ jobs:
           # means the checker itself errored, which is worth surfacing.
           if [ "${{ needs.route_inventory.result }}" = "failure" ]; then
             echo "::error::Route inventory checker errored (not a staleness signal)"
+            exit 1
+          fi
+          # Same posture as route_inventory: drift is a ::warning:: inside the job
+          # (success); a failure here means the checker itself errored.
+          if [ "${{ needs.icnctl_inventory.result }}" = "failure" ]; then
+            echo "::error::icnctl command inventory checker errored (not a staleness signal)"
             exit 1
           fi
 
