@@ -11,6 +11,10 @@ This is deliberately humble (issue #2112):
 - It proves route **declarations** exist in source. It does NOT prove route
   correctness, authentication, test coverage, production readiness, or public
   safety. "OpenAPI documented" does not mean complete or correct.
+- Every recorded entry is capped at **proof level L1** (a declaration / contract /
+  registration site exists in source) per `proof-level-taxonomy-capability-matrix.md`.
+  A static scan cannot assert L2+ (tests), L5 (live daemon/gateway), or higher — those
+  need evidence this pass does not collect. The level is uniform by construction.
 - Full mounted-path resolution is **best-effort** (a module->scope heuristic
   read from server.rs), not a real Rust parser. The relative macro path and the
   source file are authoritative; the "group" column is approximate.
@@ -310,6 +314,7 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_can
     out.append("")
     out.append("- **Proves:** these route declarations (Actix routing attribute macros) exist in the gateway source at the snapshot commit.")
     out.append("- **Does NOT prove:** route correctness, authentication/authorization, test coverage, runtime health, production readiness, or public-claim safety. `OpenAPI documented = yes` does **not** mean the contract is complete or correct.")
+    out.append("- **Proof level (per [`proof-level-taxonomy-capability-matrix.md`](../proof-level-taxonomy-capability-matrix.md)):** every entry is capped at **L1** — a declaration / contract / registration site exists in source. A static scan **cannot** assert L2+ (unit/integration tests), L5 (live daemon/gateway), or higher; those require evidence this pass does not collect. `OpenAPI documented = yes` is still only L1 (a schema/contract exists), not runtime proof. The `Proof` column is therefore uniform `L1` by construction — it marks the *ceiling* of this evidence, not a per-route assessment.")
     out.append("- Defer to canonical truth/precedence: [`source-of-truth-map.md`](../source-of-truth-map.md) and proof levels in [`proof-level-taxonomy-capability-matrix.md`](../proof-level-taxonomy-capability-matrix.md). This is an orientation artifact (`Canonical: no`).")
     out.append("")
     out.append("## Snapshot")
@@ -327,6 +332,7 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_can
     out.append(f"- Documented share of discovered routes: ~{pct_doc:.1f}%")
     out.append(f"- **OpenAPI operations (method + path) not matched to a discovered gateway route: {len(unmatched_ops)}** (see section below)")
     out.append(f"- **Governance app route-registration candidates (separate surface, not gateway macros): {len(gov_candidates)}** (see section below)")
+    out.append(f"- **Proof level: `L1` for every recorded entry** ({total} gateway macros + {len(gov_candidates)} governance candidates + {len(oapi)} OpenAPI paths + {len(reg_candidates)} unparsed candidates) — a declaration/contract/registration exists in source; the static scan asserts no level above L1.")
     out.append("")
     out.append("> The gap is structural: only handlers hand-annotated for utoipa reach the OpenAPI spec. "
                "Of the OpenAPI paths, several belong to `icn-governance-actor` HTTP handlers that live outside "
@@ -345,12 +351,12 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_can
                "`unknown / needs local verification`.")
     out.append("")
     if unmatched_ops:
-        out.append("| Method | OpenAPI path | Matched gateway route | Governance registration candidate | Status | Claim safety |")
-        out.append("|---|---|---|---|---|---|")
+        out.append("| Method | OpenAPI path | Matched gateway route | Governance registration candidate | Proof | Status | Claim safety |")
+        out.append("|---|---|---|---|---|---|---|")
         for op in sorted(unmatched_ops, key=lambda x: (x["path"], x["method"])):
             reg = op.get("registration")
             reg_cell = f"`{reg['handler']}` @ `{reg['file']}`:{reg['line']}" if reg else "none"
-            out.append(f"| {op['method']} | `{md_table_escape(op['path'])}` | no | {reg_cell} | "
+            out.append(f"| {op['method']} | `{md_table_escape(op['path'])}` | no | {reg_cell} | L1 | "
                        "unknown / needs local verification | needs review |")
         out.append("")
     else:
@@ -372,12 +378,12 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_can
                "candidate's `(verb, /gov + path)` matches a generated OpenAPI operation.")
     out.append("")
     if gov_candidates:
-        out.append("| Method | Path (relative, under `/gov`) | Source | Handler | OpenAPI documented | Status | Claim safety |")
-        out.append("|---|---|---|---|---|---|---|")
+        out.append("| Method | Path (relative, under `/gov`) | Source | Handler | OpenAPI documented | Proof | Status | Claim safety |")
+        out.append("|---|---|---|---|---|---|---|---|")
         for c in sorted(gov_candidates, key=lambda x: (x["path"], x["verb"])):
             oapi_doc = "yes" if any(gov_matches_op(c, m, e["path"]) for e in oapi for m in (e["methods"] or ["?"])) else "no"
             out.append(f"| {c['verb']} | `{md_table_escape(c['path'] or '(none)')}` | `{c['file']}`:{c['line']} | "
-                       f"`{md_table_escape(c['handler'])}` | {oapi_doc} | unknown / needs local verification | needs review |")
+                       f"`{md_table_escape(c['handler'])}` | {oapi_doc} | L1 | unknown / needs local verification | needs review |")
         out.append("")
 
     out.append("## Limitations")
@@ -403,12 +409,12 @@ def render(routes: list[dict], scopes: dict[str, str], oapi: list[dict], reg_can
                "status defaults to `unknown / needs local verification` and claim-safety to `needs review`, pending "
                "human or runtime confirmation.")
     out.append("")
-    out.append("| Method | Path (macro) | Group (best-effort) | Source | Handler | OpenAPI | Status | Claim safety |")
-    out.append("|---|---|---|---|---|---|---|---|")
+    out.append("| Method | Path (macro) | Group (best-effort) | Source | Handler | OpenAPI | Proof | Status | Claim safety |")
+    out.append("|---|---|---|---|---|---|---|---|---|")
     for r, fp, doc in rows:
         out.append(
             f"| {r['method']} | `{md_table_escape(r['path'] or '(empty)')}` | `{md_table_escape(fp)}` | "
-            f"`{r['file']}`:{r['line']} | `{md_table_escape(r['handler'])}` | {doc} | unknown / needs local verification | needs review |"
+            f"`{r['file']}`:{r['line']} | `{md_table_escape(r['handler'])}` | {doc} | L1 | unknown / needs local verification | needs review |"
         )
     out.append("")
 
