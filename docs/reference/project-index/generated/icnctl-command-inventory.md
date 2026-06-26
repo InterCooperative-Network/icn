@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T19:09:13+00:00
+Generated: 2026-06-26T19:16:01+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -19,7 +19,7 @@ Generated: 2026-06-26T19:09:13+00:00
 
 ## Snapshot
 
-- Source commit: `69af9c0ebbe21dd79a025dbc57b2fa11e7ff022f`
+- Source commit: `4e9b0be4fdfd23547b11ee87478c08c35600e3df`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
@@ -336,7 +336,7 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl registry trace` | partial | concrete gateway client `reqwest GET {gateway}/v1/registry/decisions/{receipt_id}/trace` (route in `docs/reference/project-index/generated/route-inventory.md`) (`icn/bins/icnctl/src/main.rs` RegistryCommands::Trace); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:389 |
 | `icnctl status` | partial | RPC client to the daemon (`create_rpc_client` + `client.get_status()`) in `handle_status_command` (`icn/bins/icnctl/src/main.rs` Commands::Status); prints local config and fails gracefully when no daemon; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:51 |
 | `icnctl steward attesters` | partial | gateway client `reqwest GET {gateway}/v1/steward/attesters` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Attesters); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1458 |
-| `icnctl steward info` | partial | gateway client `reqwest GET {gateway}/v1/steward/by-did/{did}` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Info); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1436 |
+| `icnctl steward info` | partial | gateway client `reqwest GET` whose route branches on the input: `{gateway}/v1/steward/by-did/{steward}` if it starts with `did:`, else `{gateway}/v1/steward/{steward}` (both routes in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Info); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1436 |
 | `icnctl steward list` | partial | gateway client `reqwest GET {gateway}/v1/steward` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::List); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1445 |
 | `icnctl steward register` | partial | gateway client `reqwest POST {gateway}/v1/steward` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Register); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1465 |
 | `icnctl steward retire` | partial | gateway client `reqwest POST {gateway}/v1/steward/{id}/retire` (route in route-inventory) (`icn/bins/icnctl/src/main.rs` StewardCommands::Retire); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1487 |
