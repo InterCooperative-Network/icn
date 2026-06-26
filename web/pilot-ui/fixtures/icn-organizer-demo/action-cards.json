@@ -53,6 +53,24 @@
       "receipt_expected": true,
       "source_id": "demo-action-item-001",
       "domain_id": "demo.coop.organizing"
+    },
+    {
+      "id": "demo-card-action-item-complete-registration-001",
+      "source_kind": "action_item",
+      "action_kind": "complete",
+      "scope": "structure",
+      "title": "Mark a registration-desk step complete (badge-packet check)",
+      "summary": "A day-of registration-desk step is assigned to the logistics committee role. Marking it complete produces a completion receipt. Fictional demo data; no real attendee information.",
+      "authority_basis": "Logistics Committee role (demo role)",
+      "required_authority_scope": [
+        "registration_desk"
+      ],
+      "deadline": 1730500000,
+      "risk_level": "normal",
+      "accessibility_hint": "Plain-language step summary before structured fields; status read in order; no color-only signaling.",
+      "receipt_expected": true,
+      "source_id": "demo-action-item-registration-001",
+      "domain_id": "demo.coop.organizing"
     }
   ],
   "generated_at": 1730000000
