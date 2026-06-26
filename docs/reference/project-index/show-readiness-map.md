@@ -6,7 +6,7 @@ Last Reviewed: 2026-04-29
 
 # Show-Readiness Map
 
-> For current project truth, defer to [`docs/STATE.md`](../../STATE.md) and [`docs/PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md). This map describes what is *show-ready* — the line between what is honest to demonstrate and what should not be presented as finished.
+> For current project truth, defer to [`docs/STATE.md`](../../STATE.md) and [`docs/PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md). This map describes what is *show-ready* — the line between what is honest to demonstrate and what should not be presented as finished. For the broader claim-discipline rules these red lines sit inside, see [`claim-boundaries.md`](claim-boundaries.md).
 
 This document is the load-bearing one for outside-facing conversations. Anyone presenting ICN to organizers, cooperative developers, technically curious contributors, or grant reviewers should walk this list before the meeting.
 

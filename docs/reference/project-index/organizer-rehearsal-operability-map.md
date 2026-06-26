@@ -6,7 +6,7 @@ Last Reviewed: 2026-06-26
 
 # Organizer Rehearsal Operability Map
 
-> For current project truth, defer to [`docs/STATE.md`](../../STATE.md) and [`docs/PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md). This map is an **orientation aid**, not a source of truth: it reads the already-merged generated evidence surfaces (route inventory, `icnctl` command inventory) and the capability matrix, and translates them into "what can safely be shown to an organizer, what is fixture-backed, what needs a steward/operator, and what must not be claimed yet." It changes no behavior and grants no readiness.
+> For current project truth, defer to [`docs/STATE.md`](../../STATE.md) and [`docs/PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md). This map is an **orientation aid**, not a source of truth: it reads the already-merged generated evidence surfaces (route inventory, `icnctl` command inventory) and the capability matrix, and translates them into "what can safely be shown to an organizer, what is fixture-backed, what needs a steward/operator, and what must not be claimed yet." It changes no behavior and grants no readiness. The claim-discipline rules behind these distinctions (forbidden collapses such as wired route ≠ organizer-ready) are collected in [`claim-boundaries.md`](claim-boundaries.md).
 
 ## Purpose
 

@@ -2565,6 +2565,21 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation", "proof-level", "rehearsal", "show-readiness"]
 recommended_action = "keep"
+
+[docs."docs/reference/project-index/claim-boundaries.md"]
+category = "reference"
+status = "living"
+title = "Claim-Boundary Map"
+description = "Operational claim-boundary manual: disambiguates the architectural Meaning Firewall from the claim-discipline firewall, summarizes source precedence and status-vs-proof, tabulates forbidden collapses with their evidence and enforcement status, and gives a reusable inventory/PR claim-discipline checklist. Orientation, not a truth root. Defers to STATE.md and PHASE_PROGRESS.md for current truth."
+last_updated = "2026-06-26"
+owner = "matt"
+audiences = ["all", "team"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["project-index", "navigation", "claim-discipline", "proof-level", "show-readiness", "meaning-firewall"]
+recommended_action = "keep"
 last_reviewed = "2026-06-26"
 
 [docs."docs/reference/project-index/invariants-catalog.md"]

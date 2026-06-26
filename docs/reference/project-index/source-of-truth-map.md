@@ -157,6 +157,7 @@ When in doubt, update the truth-bearing source first, then update this map.
 | File | Relationship |
 |---|---|
 | `current-truth-map.md` | Short orientation to what is real now. This file explains how to rank sources when that answer is contested. |
+| `claim-boundaries.md` | Operational claim-boundary manual. Applies this precedence hierarchy (plus the proof-level taxonomy and show-readiness red lines) to inventories, PR bodies, generated artifacts, and public language. Orientation, not a truth root. |
 | `repo-atlas.md` | Directory/subsystem placement. This file tells readers which evidence outranks which. |
 | `full-repo-record.md` | Mechanical record protocol. This file explains how to interpret records against truth-bearing sources. |
 | `stale-and-archived-map.md` | Future companion map for known stale/historical docs and preserved WIP material. |
