@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T19:25:52+00:00
+Generated: 2026-06-26T19:44:25+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -19,7 +19,7 @@ Generated: 2026-06-26T19:25:52+00:00
 
 ## Snapshot
 
-- Source commit: `73cceb1c28dee9dde0d92476876e57a3c0842280`
+- Source commit: `e77e107df06e1f7e2b71f7bac97bc2248af60647`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
@@ -27,7 +27,7 @@ Generated: 2026-06-26T19:25:52+00:00
 - **Total leaf commands (default build): 162**
 - Top-level command groups: 33
 - By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2
-- By status (curated, see section below): live 34 · partial 73 · planned 10 · unknown / needs local verification 45
+- By status (curated, see section below): live 34 · partial 86 · planned 12 · unknown / needs local verification 30
 - Proof level: every command is `L1` (declaration exists in source).
 - **Feature-gated commands (NOT in the default build, excluded from the counts above): 1** (see section below).
 - Unparsed / unresolved candidates: 0 (see section below).
@@ -74,21 +74,21 @@ Role is the **curated** top-level-group heuristic (needs review). `status` is a 
 | `icnctl dispute get` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1388 |
 | `icnctl dispute list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1377 |
 | `icnctl dispute resolve` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1416 |
-| `icnctl gov domain add-member` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1168 |
-| `icnctl gov domain create` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1127 |
-| `icnctl gov domain list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1165 |
-| `icnctl gov domain show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1158 |
-| `icnctl gov proposal cancel` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1278 |
-| `icnctl gov proposal close` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1271 |
-| `icnctl gov proposal create` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1191 |
-| `icnctl gov proposal list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1253 |
-| `icnctl gov proposal open` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1242 |
-| `icnctl gov proposal show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1264 |
-| `icnctl gov vote cast` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1288 |
-| `icnctl gov vote delegate` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1310 |
-| `icnctl gov vote delegations` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1325 |
-| `icnctl gov vote revoke` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1328 |
-| `icnctl gov vote show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1303 |
+| `icnctl gov domain add-member` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1168 |
+| `icnctl gov domain create` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1127 |
+| `icnctl gov domain list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1165 |
+| `icnctl gov domain show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1158 |
+| `icnctl gov proposal cancel` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1278 |
+| `icnctl gov proposal close` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1271 |
+| `icnctl gov proposal create` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1191 |
+| `icnctl gov proposal list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1253 |
+| `icnctl gov proposal open` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1242 |
+| `icnctl gov proposal show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1264 |
+| `icnctl gov vote cast` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1288 |
+| `icnctl gov vote delegate` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1310 |
+| `icnctl gov vote delegations` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1325 |
+| `icnctl gov vote revoke` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1328 |
+| `icnctl gov vote show` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1303 |
 | `icnctl init-coop` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:128 |
 | `icnctl institution bootstrap apply` | partial | L1 | `icn/bins/icnctl/src/institution_bootstrap.rs`:49 |
 | `icnctl institution bootstrap plan` | live | L1 | `icn/bins/icnctl/src/institution_bootstrap.rs`:38 |
@@ -243,12 +243,12 @@ Status is a **curated** classification (issue #2113), defaulting to `unknown / n
 | Status | Count |
 |---|---|
 | live | 34 |
-| partial | 73 |
+| partial | 86 |
 | fixture-demo | 0 |
-| planned | 10 |
-| unknown / needs local verification | 45 |
+| planned | 12 |
+| unknown / needs local verification | 30 |
 
-### Classified commands (117)
+### Classified commands (132)
 
 Every non-`unknown` command, with its evidence basis. (All other default-build commands carry `unknown / needs local verification`.)
 
@@ -323,6 +323,19 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl dispute get` | partial | daemon RPC `client.dispute_get()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::Get); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1388 |
 | `icnctl dispute list` | partial | daemon RPC `client.dispute_list()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1377 |
 | `icnctl dispute resolve` | partial | daemon RPC `client.dispute_resolve()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::Resolve); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1416 |
+| `icnctl gov domain add-member` | partial | gateway client `reqwest POST {gateway}/v1/gov/domains/{domain_id}/members` (bearer_auth; route `add_domain_member` @ `icn/apps/governance/src/http/configure.rs`, in route-inventory) — does not use the RPC client (`icn/bins/icnctl/src/main.rs` DomainCommands::AddMember); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/main.rs`:1168 |
+| `icnctl gov domain create` | partial | daemon RPC `client.call("governance.domain.create")` via `create_authenticated_rpc_client` in `handle_gov_command` (`icn/bins/icnctl/src/main.rs` DomainCommands::Create); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1127 |
+| `icnctl gov domain list` | partial | daemon RPC `client.call("governance.domain.list")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` DomainCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1165 |
+| `icnctl gov domain show` | partial | daemon RPC `client.call("governance.domain.get")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` DomainCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1158 |
+| `icnctl gov proposal close` | partial | daemon RPC `client.call("governance.proposal.close")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Close); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1271 |
+| `icnctl gov proposal create` | partial | daemon RPC `client.call("governance.proposal.create")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Create); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1191 |
+| `icnctl gov proposal list` | partial | daemon RPC `client.call("governance.proposal.list")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1253 |
+| `icnctl gov proposal open` | partial | daemon RPC `client.call("governance.proposal.get"/"governance.domain.get"/"governance.proposal.open")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Open); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1242 |
+| `icnctl gov proposal show` | partial | daemon RPC `client.call("governance.proposal.get")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1264 |
+| `icnctl gov vote cast` | partial | daemon RPC `client.call("governance.vote.cast")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Cast); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1288 |
+| `icnctl gov vote delegate` | partial | daemon RPC `client.call("governance.delegation.create")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Delegate); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1310 |
+| `icnctl gov vote delegations` | partial | daemon RPC `client.call("governance.delegation.list")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Delegations); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1325 |
+| `icnctl gov vote revoke` | partial | daemon RPC `client.call("governance.delegation.revoke")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Revoke); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1328 |
 | `icnctl institution bootstrap apply` | partial | async `apply_package` posts the package to the gateway via `reqwest::Client` (`icn/bins/icnctl/src/institution_bootstrap.rs` InstitutionCommands::Bootstrap -> InstitutionBootstrapCommands::Apply); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/institution_bootstrap.rs`:49 |
 | `icnctl ledger balance` | partial | daemon RPC client `client.get_ledger_balance()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Balance); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:728 |
 | `icnctl ledger head` | partial | daemon RPC client `client.get_ledger_head()` via `create_rpc_client` in `handle_ledger_command` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Head); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:725 |
@@ -365,6 +378,8 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl commons affiliations` | planned | prints "Affiliation lookup requires gateway integration. This feature is pending gateway API implementation." — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Affiliations) | `icn/bins/icnctl/src/main.rs`:1582 |
 | `icnctl commons join` | planned | prints "Join request requires gateway integration. This feature is pending gateway API implementation." — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Join) | `icn/bins/icnctl/src/main.rs`:1589 |
 | `icnctl commons leave` | planned | prints "Leave request requires gateway integration. This feature is pending gateway API implementation." — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Leave) | `icn/bins/icnctl/src/main.rs`:1600 |
+| `icnctl gov proposal cancel` | planned | `bail!("Cancel command not yet supported via RPC. Use 'proposal close' instead, or stop the daemon and modify the store directly.")` before any client call (`icn/bins/icnctl/src/main.rs` ProposalCommands::Cancel) | `icn/bins/icnctl/src/main.rs`:1278 |
+| `icnctl gov vote show` | planned | `bail!("Vote show command not yet supported via RPC. Use 'proposal show ...'")` before any client call (`icn/bins/icnctl/src/main.rs` VoteCommands::Show) | `icn/bins/icnctl/src/main.rs`:1303 |
 | `icnctl steward check-vui` | planned | placeholder; validates input then prints "VUI registry check requires running steward daemon" (`icn/bins/icnctl/src/main.rs` StewardCommands::CheckVui) | `icn/bins/icnctl/src/main.rs`:1496 |
 | `icnctl steward enrollment-status` | planned | placeholder; ceremony status check requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::EnrollmentStatus) | `icn/bins/icnctl/src/main.rs`:1513 |
 | `icnctl steward issue-token` | planned | placeholder for the full SDIS token issuance flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::IssueToken) | `icn/bins/icnctl/src/main.rs`:1544 |
