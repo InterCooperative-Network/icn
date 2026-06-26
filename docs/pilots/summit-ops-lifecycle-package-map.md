@@ -69,7 +69,7 @@ Each stage names: **where the work lives today** (Google plane), **the repo-safe
 
 ### 1. Plan the summit
 
-- **Today (Google):** the central planning spreadsheet and its lanes (Fundraising, Organizers, Content, Budget, Attendee list, Food, Ideation, Meeting attendance, Day-of schedule, Tech List), committee Docs, organizer-only Groups, real meetings.
+- **Today (Google):** a central planning spreadsheet organized into committee/function lanes, committee Docs, organizer-only Groups, real meetings. (The live spreadsheet's specific lane inventory is NYCN operating detail and stays in the private `nycn` package, referenced here only at boundary level per [`docs/ATLAS.md`](../ATLAS.md).)
 - **Repo-safe package shape:** the Summit cycle modeled as an `Activity` with sub-`Activity` lanes; committees as `Structure`s; role/steward shapes; a **column-mapping config** describing what *would* be syncable (the existing `sheets_mapping` shape) — never the sheet contents. Budget/program/logistics/accessibility lanes already have `*.example.yaml` shapes under the package's `summit/2026/`.
 - **Eventual ICN node:** `Activity` + `Structure` + `RoleAssignment` under the organizing-cooperative's governance `Domain`. `icn_target_status: planned`.
 - **Must not claim:** that planning happens in git; that any sheet is synced; that committee membership or budget figures are in the repo.
