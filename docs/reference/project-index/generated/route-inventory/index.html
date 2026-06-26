@@ -49,11 +49,12 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <ul>
 <li><strong>Proves:</strong> these route declarations (Actix routing attribute macros) exist in the gateway source at the snapshot commit.</li>
 <li><strong>Does NOT prove:</strong> route correctness, authentication/authorization, test coverage, runtime health, production readiness, or public-claim safety. <code>OpenAPI documented = yes</code> does <strong>not</strong> mean the contract is complete or correct.</li>
+<li><strong>Proof level (per <a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">`proof-level-taxonomy-capability-matrix.md`</a>):</strong> every <strong>tabulated route row</strong> — gateway macros, governance-app registration candidates, and OpenAPI-unmatched operations — is recorded at <strong>L1</strong> (a declaration / contract / registration site exists in source). A static scan <strong>cannot</strong> assert L2+ (unit/integration tests), L5 (live daemon/gateway), or higher; those require evidence this pass does not collect. <code>OpenAPI documented = yes</code> is still only L1 (a schema/contract exists), not runtime proof. The <code>Proof</code> column is uniform <code>L1</code> by construction — it marks the <em>ceiling</em> of this evidence, not a per-route assessment. The <em>unparsed route-registration candidates</em> below are flagged leads (not parsed into routes) and carry <strong>no</strong> proof level.</li>
 <li>Defer to canonical truth/precedence: <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">`source-of-truth-map.md`</a> and proof levels in <a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">`proof-level-taxonomy-capability-matrix.md`</a>. This is an orientation artifact (<code>Canonical: no</code>).</li>
 </ul>
 <h2>Snapshot</h2>
 <ul>
-<li>Source commit: <code>16593e3fe42209422093aabd80c4073116d4457f</code></li>
+<li>Source commit: <code>5c0ecabcd3329f3c59749b18f9d65d0b6f893c46</code></li>
 <li>Gateway source scanned: <code>icn/crates/icn-gateway/src/**</code></li>
 <li>OpenAPI spec: <code>docs/api/openapi.generated.yaml</code></li>
 </ul>
@@ -66,6 +67,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <li>Documented share of discovered routes: ~0.7%</li>
 <li><strong>OpenAPI operations (method + path) not matched to a discovered gateway route: 3</strong> (see section below)</li>
 <li><strong>Governance app route-registration candidates (separate surface, not gateway macros): 83</strong> (see section below)</li>
+<li><strong>Proof level: every tabulated route row is recorded at <code>L1</code></strong> (287 gateway macros + 83 governance candidates + 3 OpenAPI-unmatched operations) — a declaration/contract/registration exists in source; the static scan asserts no level above L1. The 4 unparsed <code>web::resource</code>/<code>.route</code> candidates are flagged leads (not parsed into routes) and carry no proof level.</li>
 </ul>
 <blockquote>
 <p>The gap is structural: only handlers hand-annotated for utoipa reach the OpenAPI spec. Of the OpenAPI paths, several belong to <code>icn-governance-actor</code> HTTP handlers that live outside the gateway crate and are not captured by this macro scan — so the documented/undocumented counts here are a best-effort comparison, while the two headline counts (discovered macros, OpenAPI paths) are the robust measured facts.</p>
@@ -79,6 +81,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <th>OpenAPI path</th>
 <th>Matched gateway route</th>
 <th>Governance registration candidate</th>
+<th>Proof</th>
 <th>Status</th>
 <th>Claim safety</th>
 </tr>
@@ -88,6 +91,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt</code></td>
 <td>no</td>
 <td><code>get_action_item_completion_receipt</code> @ <code>icn/apps/governance/src/http/configure.rs</code>:682</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -96,6 +100,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>/gov/me/action-cards</code></td>
 <td>no</td>
 <td><code>get_my_action_cards</code> @ <code>icn/apps/governance/src/http/configure.rs</code>:849</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -104,6 +109,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>/gov/me/standing</code></td>
 <td>no</td>
 <td><code>get_my_standing</code> @ <code>icn/apps/governance/src/http/configure.rs</code>:845</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -118,6 +124,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <th>Source</th>
 <th>Handler</th>
 <th>OpenAPI documented</th>
+<th>Proof</th>
 <th>Status</th>
 <th>Claim safety</th>
 </tr>
@@ -128,6 +135,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:722</td>
 <td><code>get_activity</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -137,6 +145,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:587</td>
 <td><code>activate_charter</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -146,6 +155,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:654</td>
 <td><code>list_delegations</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -155,6 +165,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:653</td>
 <td><code>create_delegation</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -164,6 +175,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:658</td>
 <td><code>revoke_delegation</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -173,6 +185,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:842</td>
 <td><code>get_digest</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -182,6 +195,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:576</td>
 <td><code>list_domains</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -191,6 +205,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:575</td>
 <td><code>create_domain</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -200,6 +215,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:579</td>
 <td><code>get_domain</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -209,6 +225,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:664</td>
 <td><code>list_action_items</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -218,6 +235,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:663</td>
 <td><code>create_action_item</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -227,6 +245,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:670</td>
 <td><code>delete_action_item</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -236,6 +255,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:668</td>
 <td><code>get_action_item</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -245,6 +265,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:669</td>
 <td><code>update_action_item</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -254,6 +275,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:682</td>
 <td><code>get_action_item_completion_receipt</code></td>
 <td>yes</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -263,6 +285,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:678</td>
 <td><code>add_action_item_note</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -272,6 +295,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:674</td>
 <td><code>update_action_item_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -281,6 +305,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:692</td>
 <td><code>adopt_domain_policy</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -290,6 +315,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:697</td>
 <td><code>declare_institutional_domain</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -299,6 +325,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:773</td>
 <td><code>list_meetings</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -308,6 +335,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:772</td>
 <td><code>create_meeting</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -317,6 +345,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:584</td>
 <td><code>remove_domain_member</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -326,6 +355,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:583</td>
 <td><code>add_domain_member</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -335,6 +365,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:687</td>
 <td><code>record_process_gate_result</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -344,6 +375,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:728</td>
 <td><code>list_programs_by_domain</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -353,6 +385,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:727</td>
 <td><code>create_program</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -362,6 +395,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:718</td>
 <td><code>list_activities</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -371,6 +405,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:717</td>
 <td><code>create_activity</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -380,6 +415,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:703</td>
 <td><code>list_structures</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -389,6 +425,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:702</td>
 <td><code>create_structure</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -398,6 +435,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:849</td>
 <td><code>get_my_action_cards</code></td>
 <td>yes</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -407,6 +445,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:844</td>
 <td><code>get_my_scopes</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -416,6 +455,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:845</td>
 <td><code>get_my_standing</code></td>
 <td>yes</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -425,6 +465,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:846</td>
 <td><code>get_my_work</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -434,6 +475,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:777</td>
 <td><code>get_meeting</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -443,6 +485,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:797</td>
 <td><code>add_agenda_item</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -452,6 +495,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:801</td>
 <td><code>update_agenda_item</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -461,6 +505,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:793</td>
 <td><code>mark_attendance</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -470,6 +515,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:789</td>
 <td><code>add_attendee</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -479,6 +525,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:785</td>
 <td><code>end_meeting</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -488,6 +535,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:781</td>
 <td><code>start_meeting</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -497,6 +545,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:758</td>
 <td><code>get_milestone</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -506,6 +555,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:759</td>
 <td><code>update_milestone_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -515,6 +565,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:767</td>
 <td><code>get_milestone_history</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -524,6 +575,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:763</td>
 <td><code>preview_milestone</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -533,6 +585,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:732</td>
 <td><code>get_program</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -542,6 +595,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:754</td>
 <td><code>unlink_activity_from_program</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -551,6 +605,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:753</td>
 <td><code>link_activity_to_program</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -560,6 +615,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:740</td>
 <td><code>get_program_dashboard</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -569,6 +625,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:749</td>
 <td><code>list_milestones_by_program</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -578,6 +635,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:748</td>
 <td><code>create_milestone</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -587,6 +645,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:736</td>
 <td><code>update_program_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -596,6 +655,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:744</td>
 <td><code>get_program_summary</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -605,6 +665,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:592</td>
 <td><code>list_proposals</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -614,6 +675,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:591</td>
 <td><code>create_proposal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -623,6 +685,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:814</td>
 <td><code>create_establish_clearing_proposal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -632,6 +695,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:818</td>
 <td><code>create_terminate_clearing_proposal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -641,6 +705,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:806</td>
 <td><code>create_join_federation_proposal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -650,6 +715,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:810</td>
 <td><code>create_leave_federation_proposal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -659,6 +725,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:830</td>
 <td><code>create_update_federation_policy_proposal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -668,6 +735,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:822</td>
 <td><code>create_vouch_proposal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -677,6 +745,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:826</td>
 <td><code>create_revoke_vouch_proposal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -686,6 +755,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:835</td>
 <td><code>create_appoint_steward_proposal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -695,6 +765,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:839</td>
 <td><code>create_remove_steward_proposal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -704,6 +775,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:596</td>
 <td><code>get_proposal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -713,6 +785,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:620</td>
 <td><code>get_chain</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -722,6 +795,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:604</td>
 <td><code>close_proposal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -731,6 +805,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:624</td>
 <td><code>get_proposal_deliberation</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -740,6 +815,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:633</td>
 <td><code>get_discussion</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -749,6 +825,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:638</td>
 <td><code>list_comments</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -758,6 +835,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:637</td>
 <td><code>add_comment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -767,6 +845,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:643</td>
 <td><code>delete_comment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -776,6 +855,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:642</td>
 <td><code>edit_comment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -785,6 +865,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:648</td>
 <td><code>remove_reaction</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -794,6 +875,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:647</td>
 <td><code>add_reaction</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -803,6 +885,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:628</td>
 <td><code>list_proposal_effects</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -812,6 +895,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:600</td>
 <td><code>open_proposal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -821,6 +905,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:616</td>
 <td><code>get_proof</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -830,6 +915,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:612</td>
 <td><code>get_vote_tally</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -839,6 +925,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:608</td>
 <td><code>cast_vote</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -848,6 +935,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:707</td>
 <td><code>get_structure</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -857,6 +945,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:712</td>
 <td><code>list_roles</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -866,6 +955,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/apps/governance/src/http/configure.rs</code>:711</td>
 <td><code>assign_role</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -887,6 +977,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <th>Source</th>
 <th>Handler</th>
 <th>OpenAPI</th>
+<th>Proof</th>
 <th>Status</th>
 <th>Claim safety</th>
 </tr>
@@ -898,6 +989,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/agreements.rs</code>:789</td>
 <td><code>list_agreements</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -908,6 +1000,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/agreements.rs</code>:855</td>
 <td><code>create_agreement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -918,6 +1011,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/agreements.rs</code>:936</td>
 <td><code>delete_agreement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -928,6 +1022,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/agreements.rs</code>:900</td>
 <td><code>get_agreement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -938,6 +1033,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/agreements.rs</code>:1302</td>
 <td><code>list_amendments</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -948,6 +1044,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/agreements.rs</code>:1358</td>
 <td><code>propose_amendment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -958,6 +1055,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/agreements.rs</code>:1419</td>
 <td><code>sign_amendment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -968,6 +1066,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/agreements.rs</code>:971</td>
 <td><code>add_party</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -978,6 +1077,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/agreements.rs</code>:1092</td>
 <td><code>propose_agreement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -988,6 +1088,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/agreements.rs</code>:1196</td>
 <td><code>resume_agreement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -998,6 +1099,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/agreements.rs</code>:1126</td>
 <td><code>sign_agreement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1008,6 +1110,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/agreements.rs</code>:1161</td>
 <td><code>suspend_agreement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1018,6 +1121,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/agreements.rs</code>:1231</td>
 <td><code>terminate_agreement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1028,6 +1132,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/agreements.rs</code>:1033</td>
 <td><code>set_terms</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1038,6 +1143,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/auth.rs</code>:38</td>
 <td><code>challenge</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1048,6 +1154,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/auth.rs</code>:68</td>
 <td><code>verify</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1058,6 +1165,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/budgets.rs</code>:87</td>
 <td><code>list_budgets</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1068,6 +1176,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/budgets.rs</code>:35</td>
 <td><code>create_budget</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1078,6 +1187,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/budgets.rs</code>:212</td>
 <td><code>delete_budget</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1088,6 +1198,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/budgets.rs</code>:127</td>
 <td><code>get_budget</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1098,6 +1209,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/budgets.rs</code>:161</td>
 <td><code>update_budget</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1108,6 +1220,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/charter/mod.rs</code>:241</td>
 <td><code>list_charters</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1118,6 +1231,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/charter/mod.rs</code>:162</td>
 <td><code>create_charter</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1128,6 +1242,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/charter/mod.rs</code>:225</td>
 <td><code>get_charter_by_domain</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1138,6 +1253,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/charter/mod.rs</code>:209</td>
 <td><code>get_charter</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1148,6 +1264,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/charter/mod.rs</code>:308</td>
 <td><code>activate_charter</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1158,6 +1275,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/charter/mod.rs</code>:478</td>
 <td><code>get_charter_founders</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1168,6 +1286,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/charter/mod.rs</code>:267</td>
 <td><code>sign_charter</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1178,6 +1297,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/charter/mod.rs</code>:346</td>
 <td><code>update_charter_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1188,6 +1308,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/charter/mod.rs</code>:462</td>
 <td><code>get_charter_summary</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1198,6 +1319,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/charter/mod.rs</code>:517</td>
 <td><code>get_charter_timeline</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1208,6 +1330,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/commons/anchor.rs</code>:123</td>
 <td><code>get_anchor_by_did</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1218,6 +1341,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/commons/mod.rs</code>:429</td>
 <td><code>dev_bootstrap_standing</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1228,6 +1352,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/commons/mod.rs</code>:180</td>
 <td><code>get_holder_by_id</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1238,6 +1363,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/commons/mod.rs</code>:154</td>
 <td><code>get_holder_by_did</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1248,6 +1374,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/commons/mod.rs</code>:226</td>
 <td><code>list_affiliations</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1258,6 +1385,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/commons/mod.rs</code>:261</td>
 <td><code>join_jurisdiction</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1268,6 +1396,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/commons/mod.rs</code>:342</td>
 <td><code>leave_jurisdiction</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1278,6 +1407,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/commons/mod.rs</code>:303</td>
 <td><code>update_affiliation</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1288,6 +1418,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/commons/mod.rs</code>:116</td>
 <td><code>get_commons_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1298,6 +1429,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/commons/anchor.rs</code>:107</td>
 <td><code>get_anchor_by_id</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1308,6 +1440,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/commons/anchor.rs</code>:146</td>
 <td><code>list_attestations</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1318,6 +1451,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/commons/anchor.rs</code>:168</td>
 <td><code>add_attestation</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1328,6 +1462,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/commons/anchor.rs</code>:280</td>
 <td><code>update_anchor_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1338,6 +1473,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/communities.rs</code>:137</td>
 <td><code>list_communities</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1348,6 +1484,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/communities.rs</code>:99</td>
 <td><code>create_community</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1358,6 +1495,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/communities.rs</code>:196</td>
 <td><code>dissolve_community</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1368,6 +1506,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/communities.rs</code>:150</td>
 <td><code>get_community</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1378,6 +1517,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/communities.rs</code>:164</td>
 <td><code>update_community</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1388,6 +1528,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/communities.rs</code>:182</td>
 <td><code>activate_community</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1398,6 +1539,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/communities.rs</code>:283</td>
 <td><code>list_members</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1408,6 +1550,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/communities.rs</code>:215</td>
 <td><code>join_community</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1418,6 +1561,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/communities.rs</code>:253</td>
 <td><code>leave_community</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1428,6 +1572,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/communities.rs</code>:320</td>
 <td><code>get_resource_pools</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1438,6 +1583,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/communities.rs</code>:297</td>
 <td><code>allocate_resource</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1448,6 +1594,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/compute.rs</code>:310</td>
 <td><code>cancel_task</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1458,6 +1605,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/compute.rs</code>:586</td>
 <td><code>query_settlement_by_receipt</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1468,6 +1616,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/compute.rs</code>:565</td>
 <td><code>query_settlement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1478,6 +1627,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/compute.rs</code>:263</td>
 <td><code>get_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1488,6 +1638,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/compute.rs</code>:117</td>
 <td><code>submit_task</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1498,6 +1649,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/compute.rs</code>:501</td>
 <td><code>list_wasm</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1508,6 +1660,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/compute.rs</code>:442</td>
 <td><code>upload_wasm</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1518,6 +1671,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/compute.rs</code>:527</td>
 <td><code>get_wasm_metadata</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1528,6 +1682,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:690</td>
 <td><code>list_amendments</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1538,6 +1693,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:565</td>
 <td><code>create_amendment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1548,6 +1704,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:731</td>
 <td><code>get_amendment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1558,6 +1715,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:875</td>
 <td><code>add_amendment_change</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1568,6 +1726,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/voting.rs</code>:422</td>
 <td><code>get_my_vote</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1578,6 +1737,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:827</td>
 <td><code>ratify_amendment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1588,6 +1748,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/voting.rs</code>:317</td>
 <td><code>get_results</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1598,6 +1759,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:759</td>
 <td><code>submit_amendment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1608,6 +1770,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:793</td>
 <td><code>open_amendment_voting</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1618,6 +1781,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/voting.rs</code>:288</td>
 <td><code>list_votes</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1628,6 +1792,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/voting.rs</code>:193</td>
 <td><code>cast_vote</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1638,6 +1803,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:931</td>
 <td><code>withdraw_amendment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1648,6 +1814,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:1069</td>
 <td><code>list_appeals</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1658,6 +1825,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:976</td>
 <td><code>file_appeal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1668,6 +1836,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/appeals_ui.rs</code>:233</td>
 <td><code>get_appeals_dashboard</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1678,6 +1847,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:1108</td>
 <td><code>get_appeal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1688,6 +1858,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/appeals_ui.rs</code>:174</td>
 <td><code>assign_reviewer</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1698,6 +1869,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:1136</td>
 <td><code>add_appeal_evidence</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1708,6 +1880,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:1282</td>
 <td><code>resolve_appeal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1718,6 +1891,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:1210</td>
 <td><code>add_appeal_response</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1728,6 +1902,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:1255</td>
 <td><code>begin_appeal_review</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1738,6 +1913,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/appeals_ui.rs</code>:141</td>
 <td><code>get_appeal_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1748,6 +1924,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/appeals_ui.rs</code>:107</td>
 <td><code>get_appeal_timeline</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1758,6 +1935,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/constitutional/mod.rs</code>:1317</td>
 <td><code>withdraw_appeal</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1768,6 +1946,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/contracts.rs</code>:406</td>
 <td><code>list_contracts</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1778,6 +1957,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/contracts.rs</code>:346</td>
 <td><code>deploy_contract</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1788,6 +1968,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/contracts.rs</code>:717</td>
 <td><code>get_version_history</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1798,6 +1979,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/contracts.rs</code>:561</td>
 <td><code>revoke_contract</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1808,6 +1990,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/contracts.rs</code>:450</td>
 <td><code>get_contract</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1818,6 +2001,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/contracts.rs</code>:636</td>
 <td><code>deprecate_contract</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1828,6 +2012,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/contracts.rs</code>:608</td>
 <td><code>get_contract_metadata</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1838,6 +2023,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/contracts.rs</code>:689</td>
 <td><code>get_contract_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1848,6 +2034,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/contracts.rs</code>:496</td>
 <td><code>get_contract_summary</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1858,6 +2045,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/coops.rs</code>:37</td>
 <td><code>create_coop</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1868,6 +2056,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/coops.rs</code>:337</td>
 <td><code>get_coop_stats</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1878,6 +2067,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/coops.rs</code>:143</td>
 <td><code>delete_coop</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1888,6 +2078,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/coops.rs</code>:74</td>
 <td><code>get_coop</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1898,6 +2089,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/coops.rs</code>:174</td>
 <td><code>add_member</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1908,6 +2100,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/coops.rs</code>:230</td>
 <td><code>remove_member</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1918,6 +2111,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/coops.rs</code>:268</td>
 <td><code>update_member_role</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1928,6 +2122,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/coops.rs</code>:89</td>
 <td><code>update_settings</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1938,6 +2133,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/devices.rs</code>:134</td>
 <td><code>list_devices</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1948,6 +2144,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/devices.rs</code>:77</td>
 <td><code>register_device</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1958,6 +2155,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/devices.rs</code>:174</td>
 <td><code>revoke_device</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1968,6 +2166,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/devices.rs</code>:222</td>
 <td><code>get_device</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1978,6 +2177,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:289</td>
 <td><code>register_entity</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1985,9 +2185,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>POST</td>
 <td><code>/audit/prune</code></td>
 <td><code>/v1/entities/audit/prune</code></td>
-<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:1739</td>
+<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:1751</td>
 <td><code>prune_audit</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -1995,9 +2196,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/audit/stats</code></td>
 <td><code>/v1/entities/audit/stats</code></td>
-<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:1829</td>
+<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:1841</td>
 <td><code>audit_stats</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2005,9 +2207,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>DELETE</td>
 <td><code>/{id}</code></td>
 <td><code>/v1/entities/{id}</code></td>
-<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:632</td>
+<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:644</td>
 <td><code>delete_entity</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2015,9 +2218,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/{id}</code></td>
 <td><code>/v1/entities/{id}</code></td>
-<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:482</td>
+<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:485</td>
 <td><code>get_entity</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2025,9 +2229,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>PUT</td>
 <td><code>/{id}</code></td>
 <td><code>/v1/entities/{id}</code></td>
-<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:513</td>
+<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:519</td>
 <td><code>update_entity</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2035,9 +2240,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/{id}/audit</code></td>
 <td><code>/v1/entities/{id}/audit</code></td>
-<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:1667</td>
+<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:1679</td>
 <td><code>get_entity_audit</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2045,9 +2251,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>DELETE</td>
 <td><code>/{id}/dissolution</code></td>
 <td><code>/v1/entities/{id}/dissolution</code></td>
-<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:1521</td>
+<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:1533</td>
 <td><code>cancel_dissolution</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2055,9 +2262,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>POST</td>
 <td><code>/{id}/dissolution</code></td>
 <td><code>/v1/entities/{id}/dissolution</code></td>
-<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:1129</td>
+<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:1141</td>
 <td><code>initiate_dissolution</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2065,9 +2273,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>POST</td>
 <td><code>/{id}/dissolution/complete</code></td>
 <td><code>/v1/entities/{id}/dissolution/complete</code></td>
-<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:1335</td>
+<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:1347</td>
 <td><code>complete_dissolution</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2075,9 +2284,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/{id}/members</code></td>
 <td><code>/v1/entities/{id}/members</code></td>
-<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:720</td>
+<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:732</td>
 <td><code>list_members</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2085,9 +2295,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>POST</td>
 <td><code>/{id}/members</code></td>
 <td><code>/v1/entities/{id}/members</code></td>
-<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:832</td>
+<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:844</td>
 <td><code>add_membership</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2095,9 +2306,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>DELETE</td>
 <td><code>/{id}/members/{member_id}</code></td>
 <td><code>/v1/entities/{id}/members/{member_id}</code></td>
-<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:971</td>
+<td><code>icn/crates/icn-gateway/src/api/entity.rs</code>:983</td>
 <td><code>remove_membership</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2108,6 +2320,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/escrow.rs</code>:86</td>
 <td><code>list_escrows</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2118,6 +2331,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/escrow.rs</code>:39</td>
 <td><code>create_escrow</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2128,6 +2342,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/escrow.rs</code>:127</td>
 <td><code>get_escrow</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2138,6 +2353,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/escrow.rs</code>:275</td>
 <td><code>refund_escrow</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2148,6 +2364,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/escrow.rs</code>:156</td>
 <td><code>release_escrow</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2158,6 +2375,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/execution.rs</code>:119</td>
 <td><code>list_records</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2168,6 +2386,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/execution.rs</code>:137</td>
 <td><code>get_record</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2178,6 +2397,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:719</td>
 <td><code>issue_attestation</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2188,6 +2408,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:701</td>
 <td><code>get_attestations</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2198,6 +2419,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:790</td>
 <td><code>list_agreements</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2208,6 +2430,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:894</td>
 <td><code>create_agreement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2218,6 +2441,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:1140</td>
 <td><code>perform_multilateral_netting</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2228,6 +2452,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:1176</td>
 <td><code>apply_multilateral_netting</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2238,6 +2463,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:1105</td>
 <td><code>process_scheduled_settlements</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2248,6 +2474,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:841</td>
 <td><code>get_agreement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2258,6 +2485,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:1030</td>
 <td><code>get_position</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2268,6 +2496,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:1079</td>
 <td><code>trigger_settlement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2278,6 +2507,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:972</td>
 <td><code>propose_clearing_adoption</code></td>
 <td>yes</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2288,6 +2518,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:1210</td>
 <td><code>federation_connect</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2298,6 +2529,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:255</td>
 <td><code>list_coops</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2308,6 +2540,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:337</td>
 <td><code>register_coop</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2318,6 +2551,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:295</td>
 <td><code>get_coop</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2328,6 +2562,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:415</td>
 <td><code>vouch_for_coop</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2338,6 +2573,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:381</td>
 <td><code>get_vouches</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2348,6 +2584,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:208</td>
 <td><code>init_federation</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2358,6 +2595,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:166</td>
 <td><code>get_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2368,6 +2606,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/federation.rs</code>:562</td>
 <td><code>get_topology</code></td>
 <td>yes</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2378,6 +2617,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/flow_c.rs</code>:22</td>
 <td><code>propose_spend_alias</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2388,6 +2628,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/flow_c.rs</code>:35</td>
 <td><code>get_treasury_position_alias</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2398,6 +2639,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/flow_c.rs</code>:112</td>
 <td><code>get_proof_alias</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2408,6 +2650,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/flow_c.rs</code>:46</td>
 <td><code>cast_vote_alias</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2418,6 +2661,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/governance_dashboard.rs</code>:21</td>
 <td><code>get_governance_dashboard</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2428,6 +2672,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/health.rs</code>:169</td>
 <td><code>health</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2438,6 +2683,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/health.rs</code>:182</td>
 <td><code>health_detailed</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2448,6 +2694,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/health.rs</code>:284</td>
 <td><code>health_full</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2458,6 +2705,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/health.rs</code>:36</td>
 <td><code>liveness</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2468,6 +2716,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/health.rs</code>:100</td>
 <td><code>ready</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2478,6 +2727,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/health.rs</code>:48</td>
 <td><code>readiness</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2488,6 +2738,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/identity.rs</code>:100</td>
 <td><code>identity_health</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2498,6 +2749,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/identity.rs</code>:60</td>
 <td><code>resolve_did</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2508,6 +2760,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/invites.rs</code>:101</td>
 <td><code>list_invites</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2518,6 +2771,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/invites.rs</code>:25</td>
 <td><code>create_invite</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2528,6 +2782,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/invites.rs</code>:146</td>
 <td><code>join_via_invite</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2538,6 +2793,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/ledger.rs</code>:389</td>
 <td><code>get_entries_by_decision</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2548,6 +2804,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/ledger.rs</code>:237</td>
 <td><code>get_history</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2558,6 +2815,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/ledger.rs</code>:22</td>
 <td><code>get_position</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2568,6 +2826,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/ledger.rs</code>:55</td>
 <td><code>create_settlement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2578,6 +2837,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/ledger.rs</code>:546</td>
 <td><code>create_cross_settlement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2588,6 +2848,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/ledger.rs</code>:657</td>
 <td><code>get_cross_settlement_quote</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2598,6 +2859,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/listings.rs</code>:637</td>
 <td><code>list_listings</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2608,6 +2870,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/listings.rs</code>:576</td>
 <td><code>create_listing</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2618,6 +2881,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/listings.rs</code>:1013</td>
 <td><code>get_my_listings</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2628,6 +2892,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/listings.rs</code>:786</td>
 <td><code>delete_listing</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2638,6 +2903,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/listings.rs</code>:681</td>
 <td><code>get_listing</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2648,6 +2914,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/listings.rs</code>:715</td>
 <td><code>update_listing</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2658,6 +2925,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/listings.rs</code>:895</td>
 <td><code>express_interest</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2668,6 +2936,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/listings.rs</code>:973</td>
 <td><code>get_interests</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2678,6 +2947,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/listings.rs</code>:830</td>
 <td><code>update_listing_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2688,6 +2958,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/members.rs</code>:40</td>
 <td><code>get_member_profile</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2698,6 +2969,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/members.rs</code>:130</td>
 <td><code>update_member_profile</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2708,6 +2980,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:136</td>
 <td><code>apply_for_membership</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2718,6 +2991,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:225</td>
 <td><code>approve_membership</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2728,6 +3002,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:345</td>
 <td><code>ban_member</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2738,6 +3013,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:506</td>
 <td><code>check_capability</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2748,6 +3024,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:440</td>
 <td><code>grant_capability</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2758,6 +3035,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:473</td>
 <td><code>revoke_capability</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2768,6 +3046,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:703</td>
 <td><code>exit_membership</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2778,6 +3057,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:611</td>
 <td><code>list_members</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2788,6 +3068,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:255</td>
 <td><code>promote_member</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2798,6 +3079,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:315</td>
 <td><code>reinstate_member</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2808,6 +3090,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:387</td>
 <td><code>revoke_membership</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2818,6 +3101,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:536</td>
 <td><code>add_role</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2828,6 +3112,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:566</td>
 <td><code>remove_role</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2838,6 +3123,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:180</td>
 <td><code>get_membership_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2848,6 +3134,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/membership/mod.rs</code>:285</td>
 <td><code>suspend_member</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2858,6 +3145,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/names.rs</code>:138</td>
 <td><code>resolve_name</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2868,6 +3156,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/notifications.rs</code>:118</td>
 <td><code>list_notifications</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2878,6 +3167,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/notifications.rs</code>:154</td>
 <td><code>get_notification_count</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2888,6 +3178,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/notifications.rs</code>:196</td>
 <td><code>mark_all_read</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2898,6 +3189,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/notifications.rs</code>:36</td>
 <td><code>register_device</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2908,6 +3200,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/notifications.rs</code>:57</td>
 <td><code>unregister_device</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2918,6 +3211,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/notifications.rs</code>:213</td>
 <td><code>delete_notification</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2928,6 +3222,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/notifications.rs</code>:171</td>
 <td><code>mark_notification_read</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2938,6 +3233,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/notifications.rs</code>:241</td>
 <td><code>get_delivery_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2948,6 +3244,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/oracle.rs</code>:280</td>
 <td><code>convert_amount</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2958,6 +3255,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/oracle.rs</code>:380</td>
 <td><code>set_rate</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2968,6 +3266,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/oracle.rs</code>:213</td>
 <td><code>get_rate</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2978,6 +3277,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/oracle.rs</code>:355</td>
 <td><code>list_sources</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2988,6 +3288,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/receipts.rs</code>:569</td>
 <td><code>list_allocations</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -2998,6 +3299,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/receipts.rs</code>:282</td>
 <td><code>get_allocation</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3008,6 +3310,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/receipts.rs</code>:331</td>
 <td><code>get_chain</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3018,6 +3321,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/receipts.rs</code>:381</td>
 <td><code>get_full_chain</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3028,6 +3332,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/receipts.rs</code>:598</td>
 <td><code>list_intents</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3038,6 +3343,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/receipts.rs</code>:305</td>
 <td><code>get_intent</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3048,6 +3354,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/recurring_settlements.rs</code>:94</td>
 <td><code>list_recurring_settlements</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3058,6 +3365,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/recurring_settlements.rs</code>:44</td>
 <td><code>create_recurring_settlement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3068,6 +3376,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/recurring_settlements.rs</code>:214</td>
 <td><code>cancel_recurring_settlement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3078,6 +3387,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/recurring_settlements.rs</code>:135</td>
 <td><code>get_recurring_settlement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3088,6 +3398,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/recurring_settlements.rs</code>:164</td>
 <td><code>update_recurring_settlement</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3098,6 +3409,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/registry.rs</code>:702</td>
 <td><code>list_decisions</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3108,6 +3420,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/registry.rs</code>:598</td>
 <td><code>index_decision_endpoint</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3118,6 +3431,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/registry.rs</code>:745</td>
 <td><code>get_decision</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3128,6 +3442,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/registry.rs</code>:781</td>
 <td><code>get_decision_trace</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3138,6 +3453,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/registry.rs</code>:564</td>
 <td><code>list_meetings</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3148,6 +3464,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/registry.rs</code>:491</td>
 <td><code>create_meeting</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3158,6 +3475,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/rights.rs</code>:12</td>
 <td><code>rights_summary</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3168,6 +3486,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/anchor.rs</code>:332</td>
 <td><code>add_device</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3178,6 +3497,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs</code>:501</td>
 <td><code>complete_enrollment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3188,6 +3508,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs</code>:281</td>
 <td><code>start_enrollment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3198,6 +3519,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs</code>:331</td>
 <td><code>verify_level1</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3208,6 +3530,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs</code>:406</td>
 <td><code>verify_level2</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3218,6 +3541,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/mod.rs</code>:301</td>
 <td><code>generate_ephemeral</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3228,6 +3552,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/mod.rs</code>:175</td>
 <td><code>sdis_health</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3238,6 +3563,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs</code>:913</td>
 <td><code>reject_enrollment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3248,6 +3574,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/anchor.rs</code>:271</td>
 <td><code>rotate_keys</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3258,6 +3585,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/enrollment.rs</code>:258</td>
 <td><code>start_enrollment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3268,6 +3596,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/recovery.rs</code>:216</td>
 <td><code>start_recovery</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3278,6 +3607,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/mod.rs</code>:189</td>
 <td><code>verify_level1</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3288,6 +3618,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/mod.rs</code>:209</td>
 <td><code>verify_level2</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3298,6 +3629,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs</code>:824</td>
 <td><code>steward_vouch</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3308,6 +3640,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/anchor.rs</code>:246</td>
 <td><code>get_anchor</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3318,6 +3651,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/anchor.rs</code>:368</td>
 <td><code>list_devices</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3328,6 +3662,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/anchor.rs</code>:311</td>
 <td><code>get_rotation_history</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3338,6 +3673,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/enrollment.rs</code>:294</td>
 <td><code>get_enrollment_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3348,6 +3684,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/enrollment.rs</code>:368</td>
 <td><code>approve_ceremony</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3358,6 +3695,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/enrollment.rs</code>:318</td>
 <td><code>finalize_enrollment</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3368,6 +3706,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/recovery.rs</code>:252</td>
 <td><code>get_recovery_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3378,6 +3717,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/recovery.rs</code>:329</td>
 <td><code>approve_recovery</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3388,6 +3728,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sdis/recovery.rs</code>:275</td>
 <td><code>complete_recovery</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3398,6 +3739,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/services.rs</code>:494</td>
 <td><code>query_services</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3408,6 +3750,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/services.rs</code>:238</td>
 <td><code>announce_service</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3418,6 +3761,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/services.rs</code>:388</td>
 <td><code>discover_services</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3428,6 +3772,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/services.rs</code>:347</td>
 <td><code>withdraw_service</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3438,6 +3783,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/services.rs</code>:550</td>
 <td><code>get_service</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3448,6 +3794,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sessions.rs</code>:137</td>
 <td><code>create_session</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3458,6 +3805,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sessions.rs</code>:184</td>
 <td><code>get_session_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3468,6 +3816,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/sessions.rs</code>:251</td>
 <td><code>approve_session</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3478,6 +3827,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/steward/mod.rs</code>:170</td>
 <td><code>list_stewards</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3488,6 +3838,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/steward/mod.rs</code>:72</td>
 <td><code>register_steward</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3498,6 +3849,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/steward/mod.rs</code>:195</td>
 <td><code>list_attesters</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3508,6 +3860,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/steward/mod.rs</code>:150</td>
 <td><code>get_steward_by_did</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3518,6 +3871,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/steward/mod.rs</code>:133</td>
 <td><code>get_steward</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3528,6 +3882,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/steward/mod.rs</code>:570</td>
 <td><code>record_attestation</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3538,6 +3893,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/steward/mod.rs</code>:432</td>
 <td><code>add_bond</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3548,6 +3904,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/steward/mod.rs</code>:484</td>
 <td><code>slash_bond</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3558,6 +3915,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/steward/mod.rs</code>:624</td>
 <td><code>record_dispute</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3568,6 +3926,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/steward/mod.rs</code>:686</td>
 <td><code>record_dispute_won</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3578,6 +3937,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/steward/mod.rs</code>:360</td>
 <td><code>extend_steward_term</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3588,6 +3948,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/steward/mod.rs</code>:319</td>
 <td><code>retire_steward</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3598,6 +3959,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/steward/mod.rs</code>:214</td>
 <td><code>update_steward_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3605,9 +3967,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/{coop_id}</code></td>
 <td><code>/v1/treasury/{coop_id}</code></td>
-<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:375</td>
+<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:407</td>
 <td><code>get_treasury_status</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3615,9 +3978,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/{coop_id}/audit</code></td>
 <td><code>/v1/treasury/{coop_id}/audit</code></td>
-<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:939</td>
+<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:971</td>
 <td><code>get_audit_trail</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3625,9 +3989,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/{coop_id}/budgets</code></td>
 <td><code>/v1/treasury/{coop_id}/budgets</code></td>
-<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:576</td>
+<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:608</td>
 <td><code>list_budgets</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3635,9 +4000,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>POST</td>
 <td><code>/{coop_id}/budgets</code></td>
 <td><code>/v1/treasury/{coop_id}/budgets</code></td>
-<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:732</td>
+<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:764</td>
 <td><code>create_budget</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3645,9 +4011,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/{coop_id}/budgets/{budget_id}</code></td>
 <td><code>/v1/treasury/{coop_id}/budgets/{budget_id}</code></td>
-<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:646</td>
+<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:678</td>
 <td><code>get_budget</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3655,9 +4022,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>POST</td>
 <td><code>/{coop_id}/deposit</code></td>
 <td><code>/v1/treasury/{coop_id}/deposit</code></td>
-<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:1029</td>
+<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:1061</td>
 <td><code>deposit_to_treasury</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3665,9 +4033,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/{coop_id}/nonce</code></td>
 <td><code>/v1/treasury/{coop_id}/nonce</code></td>
-<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:521</td>
+<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:553</td>
 <td><code>get_treasury_nonce</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3675,9 +4044,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/{coop_id}/position</code></td>
 <td><code>/v1/treasury/{coop_id}/position</code></td>
-<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:450</td>
+<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:482</td>
 <td><code>get_treasury_position</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3685,9 +4055,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>POST</td>
 <td><code>/{coop_id}/spend</code></td>
 <td><code>/v1/treasury/{coop_id}/spend</code></td>
-<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:1163</td>
+<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:1195</td>
 <td><code>propose_spend</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3695,9 +4066,10 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/{coop_id}/spending-rules</code></td>
 <td><code>/v1/treasury/{coop_id}/spending-rules</code></td>
-<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:872</td>
+<td><code>icn/crates/icn-gateway/src/api/treasury.rs</code>:904</td>
 <td><code>list_spending_rules</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3708,6 +4080,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/trust.rs</code>:103</td>
 <td><code>create_trust_attestation</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3718,6 +4091,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/trust.rs</code>:179</td>
 <td><code>revoke_trust_attestation</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3728,6 +4102,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/trust.rs</code>:35</td>
 <td><code>get_trust_score</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3738,6 +4113,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/trust.rs</code>:72</td>
 <td><code>get_trust_edges</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3748,6 +4124,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/trust.rs</code>:143</td>
 <td><code>get_trust_network</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3758,6 +4135,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td><code>icn/crates/icn-gateway/src/api/websocket.rs</code>:12</td>
 <td><code>websocket</code></td>
 <td>no</td>
+<td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
@@ -3788,12 +4166,12 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td><code>web::resource</code></td>
 <td><code>/{session_id}/approve</code></td>
-<td><code>icn/crates/icn-gateway/src/server.rs</code>:1968</td>
+<td><code>icn/crates/icn-gateway/src/server.rs</code>:2011</td>
 </tr>
 <tr>
 <td><code>.route</code></td>
 <td>—</td>
-<td><code>icn/crates/icn-gateway/src/server.rs</code>:1969</td>
+<td><code>icn/crates/icn-gateway/src/server.rs</code>:2012</td>
 </tr>
 </tbody></table>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
