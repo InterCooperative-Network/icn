@@ -6,7 +6,7 @@ Last Reviewed: 2026-06-26
 
 # Summit Ops Registration Action-Card Proof Loop (generic ICN)
 
-> For current project truth, defer to [`docs/STATE.md`](../STATE.md) and [`docs/PHASE_PROGRESS.md`](../PHASE_PROGRESS.md). This is a **generic ICN-side, fictional, fixture-backed proof-loop map** for one event-day lane — the Registration Desk — taken from the [run-stage facilitator path](summit-ops-run-stage-facilitator-path.md). It is a **proof-loop map / rehearsal-ready shape**, not a runtime proof: no action-card loop has been executed for this lane. It changes no code, syncs no Google surface, mutates no partner repo, and commits no real attendee data.
+> For current project truth, defer to [`docs/STATE.md`](../STATE.md) and [`docs/PHASE_PROGRESS.md`](../PHASE_PROGRESS.md). This is a **generic ICN-side, fictional, fixture-ready proof-loop map** for one event-day lane — the Registration Desk — taken from the [run-stage facilitator path](summit-ops-run-stage-facilitator-path.md). (Fixture-ready, not fixture-backed: no registration-lane fixtures are committed yet — see "What is fixture-ready now" below.) It is a **proof-loop map / rehearsal-ready shape**, not a runtime proof: no action-card loop has been executed for this lane. It changes no code, syncs no Google surface, mutates no partner repo, and commits no real attendee data.
 
 ## Purpose
 
@@ -36,7 +36,7 @@ The Registration Desk is operationally central (it gates arrival and touches eve
 ## What this path is for
 
 - Showing the minimal ICN proof loop for one lane, on fiction, so a steward can rehearse it.
-- Giving the run stage a concrete, fixture-backed shape that maps to future ICN action cards / receipts / evidence.
+- Giving the run stage a concrete, fixture-ready shape that maps to future ICN action cards / receipts / evidence.
 
 ## What this path is not
 
@@ -93,7 +93,7 @@ A repo-safe evidence-export candidate: basenames + status categories only, e.g. 
 
 A fictional follow-up shape, e.g. "review walk-in escalation handling for next cycle" — a package-side close-stage item (the NYCN package may track these as committee-log / milestone categories; those are package vocabulary, not ICN-core ActionCard `source_kind`s). No person-identifying content.
 
-## Minimal fixture-backed walkthrough
+## Minimal walkthrough (fixture-ready shape)
 
 ```text
 fictional registration source packet
@@ -105,7 +105,7 @@ fictional registration source packet
   → a post-event follow-up item is produced
 ```
 
-This is a **shape and rehearsal path**, not running software. The closest existing surface is the fixture-backed rehearsal shell (`fixture-backed`, L2 — [capability matrix](../reference/project-index/proof-level-taxonomy-capability-matrix.md) row 7); wiring it to render this lane's register is the open milestone ([#1746](https://github.com/InterCooperative-Network/icn/issues/1746)).
+This is a **shape and rehearsal path**, not running software, and **no registration-lane fixtures are committed yet** — the shell's current pack (`web/pilot-ui/fixtures/icn-organizer-demo/`) holds an accessibility/checklist `action_item/complete` card plus standing/preview fixtures, **not** registration-desk rows, so a steward cannot rehearse *this* lane from committed fixtures today. The closest existing surface is the fixture-backed rehearsal shell (`fixture-backed`, L2 — [capability matrix](../reference/project-index/proof-level-taxonomy-capability-matrix.md) row 7); adding the registration-lane fixtures and wiring the shell to render this lane's register is the open milestone ([#1746](https://github.com/InterCooperative-Network/icn/issues/1746)). Until then this lane is **fixture-ready, not fixture-backed**.
 
 ## ICN route / command touchpoints
 
@@ -132,12 +132,13 @@ Because this PR is docs-only, it is a **proof-loop map / rehearsal-ready shape**
 
 Never committed: real attendee names; real registration roll; real emails; phone numbers; accessibility/accommodation details; medical details; payment/settlement details; raw Google Docs/Sheets/Groups exports; credentials/tokens; private Drive URLs. Registration Desk is `attendee-restricted`. Rehearsal privacy is by **exclusion** (fictional fixtures), not enforced disclosure (`private-boundary`; enforcement is design-only, L1 — matrix row 9). Attendance is modeled as **count categories**, never a roll.
 
-## What can be fixture-backed now
+## What is fixture-ready now (shapes only — no committed lane fixtures yet)
 
-- The fictional registration source packet + checklist shape.
-- The action-card candidate shape (schema-valid `action_item`/`complete`), with fictional title and id-only payload.
-- The receipt/evidence candidate shapes (basenames + status categories).
-- A no-terminal walkthrough driven by committed fixtures (the existing fixture-backed shell, L2).
+- The fictional registration source packet + checklist **shape** (in this doc; not yet a committed JSON fixture the shell loads).
+- The action-card candidate **shape** (schema-valid `action_item`/`complete`), with fictional title and id-only payload.
+- The receipt/evidence candidate **shapes** (basenames + status categories).
+
+**No registration-lane fixtures are committed yet.** The shell's current pack (`web/pilot-ui/fixtures/icn-organizer-demo/`) holds an accessibility/checklist `action_item/complete` card plus standing/preview fixtures — **not** registration-desk/badge-packet/walk-in rows — so a steward cannot today rehearse *this* lane from committed fixtures. Adding those lane fixtures so the shell can render this lane's source/action/evidence rows is a next slice; until then this lane is **fixture-ready, not fixture-backed**.
 
 ## What remains planned / unknown
 
