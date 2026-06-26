@@ -55,7 +55,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </ul>
 <h2>Snapshot</h2>
 <ul>
-<li>Source commit: <code>73cceb1c28dee9dde0d92476876e57a3c0842280</code></li>
+<li>Source commit: <code>5177e4918c55ba930f1a803a762752875d9fa01f</code></li>
 <li>Source scanned: <code>icn/bins/icnctl/src/**</code> (clap <code>#[derive(Subcommand)]</code> / <code>#[derive(Parser)]</code> tree)</li>
 </ul>
 <h2>Summary</h2>
@@ -63,7 +63,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <li><strong>Total leaf commands (default build): 162</strong></li>
 <li>Top-level command groups: 33</li>
 <li>By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2</li>
-<li>By status (curated, see section below): live 34 · partial 73 · planned 10 · unknown / needs local verification 45</li>
+<li>By status (curated, see section below): live 34 · partial 83 · planned 12 · unknown / needs local verification 33</li>
 <li>Proof level: every command is <code>L1</code> (declaration exists in source).</li>
 <li><strong>Feature-gated commands (NOT in the default build, excluded from the counts above): 1</strong> (see section below).</li>
 <li>Unparsed / unresolved candidates: 0 (see section below).</li>
@@ -286,67 +286,67 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl gov domain add-member</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1168</td>
 </tr>
 <tr>
 <td><code>icnctl gov domain create</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1127</td>
 </tr>
 <tr>
 <td><code>icnctl gov domain list</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1165</td>
 </tr>
 <tr>
 <td><code>icnctl gov domain show</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1158</td>
 </tr>
 <tr>
 <td><code>icnctl gov proposal cancel</code></td>
-<td>unknown / needs local verification</td>
+<td>planned</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1278</td>
 </tr>
 <tr>
 <td><code>icnctl gov proposal close</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1271</td>
 </tr>
 <tr>
 <td><code>icnctl gov proposal create</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1191</td>
 </tr>
 <tr>
 <td><code>icnctl gov proposal list</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1253</td>
 </tr>
 <tr>
 <td><code>icnctl gov proposal open</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1242</td>
 </tr>
 <tr>
 <td><code>icnctl gov proposal show</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1264</td>
 </tr>
 <tr>
 <td><code>icnctl gov vote cast</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1288</td>
 </tr>
@@ -370,7 +370,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl gov vote show</code></td>
-<td>unknown / needs local verification</td>
+<td>planned</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1303</td>
 </tr>
@@ -1130,7 +1130,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td>partial</td>
-<td>73</td>
+<td>83</td>
 </tr>
 <tr>
 <td>fixture-demo</td>
@@ -1138,14 +1138,14 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td>planned</td>
-<td>10</td>
+<td>12</td>
 </tr>
 <tr>
 <td>unknown / needs local verification</td>
-<td>45</td>
+<td>33</td>
 </tr>
 </tbody></table>
-<h3>Classified commands (117)</h3>
+<h3>Classified commands (129)</h3>
 <p>Every non-<code>unknown</code> command, with its evidence basis. (All other default-build commands carry <code>unknown / needs local verification</code>.)</p>
 <table>
 <thead>
@@ -1571,6 +1571,66 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td><code>icn/bins/icnctl/src/main.rs</code>:1416</td>
 </tr>
 <tr>
+<td><code>icnctl gov domain add-member</code></td>
+<td>partial</td>
+<td>gateway client <code>reqwest POST {gateway}/v1/gov/domains/{domain_id}/members</code> (bearer_auth; route <code>add_domain_member</code> @ <code>icn/apps/governance/src/http/configure.rs</code>, in route-inventory) — does not use the RPC client (<code>icn/bins/icnctl/src/main.rs</code> DomainCommands::AddMember); requires a running gateway, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1168</td>
+</tr>
+<tr>
+<td><code>icnctl gov domain create</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;governance.domain.create&quot;)</code> via <code>create_authenticated_rpc_client</code> in <code>handle_gov_command</code> (<code>icn/bins/icnctl/src/main.rs</code> DomainCommands::Create); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1127</td>
+</tr>
+<tr>
+<td><code>icnctl gov domain list</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;governance.domain.list&quot;)</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> DomainCommands::List); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1165</td>
+</tr>
+<tr>
+<td><code>icnctl gov domain show</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;governance.domain.get&quot;)</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> DomainCommands::Show); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1158</td>
+</tr>
+<tr>
+<td><code>icnctl gov proposal close</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;governance.proposal.close&quot;)</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> ProposalCommands::Close); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1271</td>
+</tr>
+<tr>
+<td><code>icnctl gov proposal create</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;governance.proposal.create&quot;)</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> ProposalCommands::Create); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1191</td>
+</tr>
+<tr>
+<td><code>icnctl gov proposal list</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;governance.proposal.list&quot;)</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> ProposalCommands::List); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1253</td>
+</tr>
+<tr>
+<td><code>icnctl gov proposal open</code></td>
+<td>partial</td>
+<td>three daemon RPC calls via <code>create_authenticated_rpc_client</code>: <code>client.call(&quot;governance.proposal.get&quot;)</code>, then <code>client.call(&quot;governance.domain.get&quot;)</code>, then <code>client.call(&quot;governance.proposal.open&quot;)</code> (<code>icn/bins/icnctl/src/main.rs</code> ProposalCommands::Open); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1242</td>
+</tr>
+<tr>
+<td><code>icnctl gov proposal show</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;governance.proposal.get&quot;)</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> ProposalCommands::Show); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1264</td>
+</tr>
+<tr>
+<td><code>icnctl gov vote cast</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;governance.vote.cast&quot;)</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> VoteCommands::Cast); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1288</td>
+</tr>
+<tr>
 <td><code>icnctl institution bootstrap apply</code></td>
 <td>partial</td>
 <td>async <code>apply_package</code> posts the package to the gateway via <code>reqwest::Client</code> (<code>icn/bins/icnctl/src/institution_bootstrap.rs</code> InstitutionCommands::Bootstrap -&gt; InstitutionBootstrapCommands::Apply); requires a running gateway, not integration-tested</td>
@@ -1821,6 +1881,18 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td>planned</td>
 <td>prints &quot;Leave request requires gateway integration. This feature is pending gateway API implementation.&quot; — no client call (<code>icn/bins/icnctl/src/main.rs</code> CommonsCommands::Leave)</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1600</td>
+</tr>
+<tr>
+<td><code>icnctl gov proposal cancel</code></td>
+<td>planned</td>
+<td><code>bail!(&quot;Cancel command not yet supported via RPC. Use &#39;proposal close&#39; instead, or stop the daemon and modify the store directly.&quot;)</code> before any client call (<code>icn/bins/icnctl/src/main.rs</code> ProposalCommands::Cancel)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1278</td>
+</tr>
+<tr>
+<td><code>icnctl gov vote show</code></td>
+<td>planned</td>
+<td><code>bail!(&quot;Vote show command not yet supported via RPC. Use &#39;proposal show {proposal_id}&#39; to see the proposal.&quot;)</code> before any client call (<code>icn/bins/icnctl/src/main.rs</code> VoteCommands::Show)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1303</td>
 </tr>
 <tr>
 <td><code>icnctl steward check-vui</code></td>
