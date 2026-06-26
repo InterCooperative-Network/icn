@@ -149,6 +149,7 @@ Never committed, in any form: real attendee names; real registration roll; real 
 | You want… | Read |
 |---|---|
 | The full event lifecycle map | [`summit-ops-lifecycle-package-map.md`](summit-ops-lifecycle-package-map.md) |
+| A single lane walked through the ICN proof loop (fictional, registration desk) | [`summit-ops-registration-action-card-proof-loop.md`](summit-ops-registration-action-card-proof-loop.md) |
 | What is safe to show an organizer now | [`organizer-rehearsal-operability-map.md`](../reference/project-index/organizer-rehearsal-operability-map.md) |
 | Recorded proof per capability | [`proof-level-taxonomy-capability-matrix.md`](../reference/project-index/proof-level-taxonomy-capability-matrix.md) |
 | The ICN spine + meaning firewall | [`docs/architecture/ICN_OPERATING_MODEL.md`](../architecture/ICN_OPERATING_MODEL.md) |
