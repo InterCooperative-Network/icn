@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T20:17:59+00:00
+Generated: 2026-06-26T20:30:42+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -19,7 +19,7 @@ Generated: 2026-06-26T20:17:59+00:00
 
 ## Snapshot
 
-- Source commit: `a3cdd5ac46917504962209af17f117909542df2e`
+- Source commit: `791af47ea51abb0e29dbfa0643d67b5507689a11`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
@@ -27,7 +27,7 @@ Generated: 2026-06-26T20:17:59+00:00
 - **Total leaf commands (default build): 162**
 - Top-level command groups: 33
 - By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2
-- By status (curated, see section below): live 38 · partial 103 · planned 13 · unknown / needs local verification 8
+- By status (curated, see section below): live 38 · partial 107 · planned 13 · unknown / needs local verification 4
 - Proof level: every command is `L1` (declaration exists in source).
 - **Feature-gated commands (NOT in the default build, excluded from the counts above): 1** (see section below).
 - Unparsed / unresolved candidates: 0 (see section below).
@@ -129,10 +129,10 @@ Role is the **curated** top-level-group heuristic (needs review). `status` is a 
 | `icnctl network peers` | partial | L1 | `icn/bins/icnctl/src/main.rs`:834 |
 | `icnctl network stats` | partial | L1 | `icn/bins/icnctl/src/main.rs`:847 |
 | `icnctl network status` | partial | L1 | `icn/bins/icnctl/src/main.rs`:850 |
-| `icnctl policy list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:531 |
-| `icnctl policy remove` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:534 |
-| `icnctl policy set` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:513 |
-| `icnctl policy show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:524 |
+| `icnctl policy list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:531 |
+| `icnctl policy remove` | partial | L1 | `icn/bins/icnctl/src/main.rs`:534 |
+| `icnctl policy set` | partial | L1 | `icn/bins/icnctl/src/main.rs`:513 |
+| `icnctl policy show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:524 |
 | `icnctl preflight` | partial | L1 | `icn/bins/icnctl/src/main.rs`:203 |
 | `icnctl quota list` | partial | L1 | `icn/bins/icnctl/src/main.rs`:555 |
 | `icnctl quota show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:544 |
@@ -243,12 +243,12 @@ Status is a **curated** classification (issue #2113), defaulting to `unknown / n
 | Status | Count |
 |---|---|
 | live | 38 |
-| partial | 103 |
+| partial | 107 |
 | fixture-demo | 0 |
 | planned | 13 |
-| unknown / needs local verification | 8 |
+| unknown / needs local verification | 4 |
 
-### Classified commands (154)
+### Classified commands (158)
 
 Every non-`unknown` command, with its evidence basis. (All other default-build commands carry `unknown / needs local verification`.)
 
@@ -370,6 +370,10 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl network peers` | partial | daemon RPC client `client.get_peers()` via `create_rpc_client` in `handle_network_command` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Peers); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:834 |
 | `icnctl network stats` | partial | daemon RPC client `client.get_stats()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Stats); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:847 |
 | `icnctl network status` | partial | daemon RPC client `client.get_status()` then optionally `client.get_nat_status()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` NetworkCommands::Status); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:850 |
+| `icnctl policy list` | partial | daemon RPC `client.call("policy.list")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` PolicyCommands::List); method registered server.rs:774; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:531 |
+| `icnctl policy remove` | partial | daemon RPC `client.call("policy.remove")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` PolicyCommands::Remove); method registered server.rs:777; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:534 |
+| `icnctl policy set` | partial | daemon RPC `client.call("policy.set")` via `create_authenticated_rpc_client` (reads the policy JSON file locally first) (`icn/bins/icnctl/src/main.rs` PolicyCommands::Set); method registered `icn/crates/icn-rpc/src/server.rs`:768; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:513 |
+| `icnctl policy show` | partial | daemon RPC `client.call("policy.get")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` PolicyCommands::Show); method registered server.rs:771; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:524 |
 | `icnctl preflight` | partial | runs real local health checks (data-dir, keystore open via `AgeKeyStore`) in `handle_preflight_command`; the gateway-connectivity check requires a running gateway; not integration-tested | `icn/bins/icnctl/src/main.rs`:203 |
 | `icnctl quota list` | partial | authenticated daemon RPC `client.call("quota.list", ...)` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` QuotaCommands::List); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:555 |
 | `icnctl quota show` | partial | authenticated daemon RPC `client.call("quota.usage", ...)` via `create_authenticated_rpc_client` in `handle_quota_command` (`icn/bins/icnctl/src/main.rs` QuotaCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:544 |
