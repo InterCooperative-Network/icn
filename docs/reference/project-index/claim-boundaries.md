@@ -21,7 +21,7 @@ ICN uses "Meaning Firewall" for an **architectural** boundary. The **claim-bound
 | Firewall | What it asserts | Where it is defined | Enforcement status |
 |---|---|---|---|
 | **Architectural Meaning Firewall** | Apps translate meaning into constraints; the kernel enforces constraints **without understanding meaning**. Kernel crates must not import/depend on domain/app crates. | [`KERNEL_APP_SEPARATION.md`](../../architecture/KERNEL_APP_SEPARATION.md), [`meaning-firewall-audit.md`](../../architecture/meaning-firewall-audit.md), onboarding [`05-the-meaning-firewall.md`](../../onboarding/path/phase-2-architecture/05-the-meaning-firewall.md) | **Tool-enforced (partial).** `scripts/check-meaning-firewall.sh` (kernel `use icn_trust::`, with known migrations #865/#866/#867) and `.github/scripts/firewall_denylist.py` (kernel→domain crate deps, #1007). Migration not complete; some couplings tracked, not yet zero. |
-| **Claim-boundary firewall** | Docs, PRs, inventories, demos, and public pages must not claim more than the evidence proves. | This map; [`proof-level-taxonomy-capability-matrix.md`](proof-level-taxonomy-capability-matrix.md); [`show-readiness-map.md`](show-readiness-map.md); [`source-of-truth-map.md`](source-of-truth-map.md). | **Mostly convention.** Narrow tool coverage only: `compliance_linter.py` (fintech vocabulary on API surfaces), `readiness_overclaim_linter.py` (`docs/deployment` only, ~4 phrases), `doc_control_check.py` (doc truth-class front-matter), the route-inventory `--check` gate. The forbidden collapses in §5 are **not** mechanically enforced. |
+| **Claim-boundary firewall** | Docs, PRs, inventories, demos, and public pages must not claim more than the evidence proves. | This map; [`proof-level-taxonomy-capability-matrix.md`](proof-level-taxonomy-capability-matrix.md); [`show-readiness-map.md`](show-readiness-map.md); [`source-of-truth-map.md`](source-of-truth-map.md). | **Mostly convention.** Narrow tool coverage only: `compliance_linter.py` (fintech vocabulary on API surfaces), `readiness_overclaim_linter.py` (scans `docs/deployment` + `docs/operations/deployment`; ~9 patterns across production-readiness / live-federation / blanket-operability / general-availability / governance-completion), `doc_control_check.py` (doc truth-class front-matter), the route-inventory `--check` gate. The forbidden collapses in §5 are **not** mechanically enforced. |
 
 ## 3. Source-of-truth hierarchy
 
@@ -60,11 +60,11 @@ Each row pairs a tempting overclaim with the minimum evidence that would license
 | route registered ⇒ auth/correctness/show-safe | auth gate + correctness test; accessibility/privacy review for show | handler + tests; §9 red lines | No (convention) |
 | client call exists ⇒ server/daemon method is wired | the cited RPC method is registered in daemon dispatch (or the route exists server-side) | [`icn/crates/icn-rpc/src/server.rs`](../../../icn/crates/icn-rpc/src/server.rs); `generated/route-inventory.md` | No (convention) |
 | `partial` ⇒ `live` | local-only operation, or binary-spawning e2e proof | handler; `icn/bins/icnctl/tests/**` | No (convention) |
-| `live` ⇒ production-ready | hardening: security/privacy/recovery/observability (L8) | `show-readiness-map.md`; `STATE.md` | Narrow: `readiness_overclaim_linter.py` (`docs/deployment` only) |
+| `live` ⇒ production-ready | hardening: security/privacy/recovery/observability (L8) | `show-readiness-map.md`; `STATE.md` | Narrow: `readiness_overclaim_linter.py` (deployment/ops docs only) |
 | fixture/demo data ⇒ live participant state | a live daemon/gateway run, not a committed fixture | `proof-level-taxonomy` rows 7/11/12 | No (convention) |
 | fixture-backed shell ⇒ organizer-ready rehearsal | L7 accessibility/privacy checklist **and** #1746 acceptance | `proof-level-taxonomy` §accessibility gate; #1746 | No (convention) |
 | NYCN intended partner ⇒ formal pilot | a signed agreement / committed launch | `show-readiness-map.md`; `STATE.md` | No (convention) |
-| federation commands/primitives ⇒ live federation | two cooperatives federating in production (Phase 3) | `PHASE_PROGRESS.md`; `show-readiness-map.md` | Narrow: overclaim linter catches the phrase in `docs/deployment` |
+| federation commands/primitives ⇒ live federation | two cooperatives federating in production (Phase 3) | `PHASE_PROGRESS.md`; `show-readiness-map.md` | Narrow: overclaim linter catches the "live federation" phrase, but only in the deployment/ops docs it scans |
 | local proof loop ⇒ multi-node/devnet/production | a recorded L6 devnet/K3s run | `proof-level-taxonomy` (L5 vs L6) | No (convention) |
 | website maturity band ⇒ evidence | an ADR/issue/code-path/phase link that resolves | ADR-0032 bands; ADR-0033 (**proposed**) | Editorial only; ADR-0033 linter **not built** |
 
@@ -84,6 +84,7 @@ Per [`docs/ci/GENERATED_TRUTH_DRIFT.md`](../../ci/GENERATED_TRUTH_DRIFT.md):
 - A generated artifact must state **what it proves and does not prove** (generated records prove files existed at generation time, not current truth — hierarchy rank 8).
 - **Do not hand-edit generated files.** Edit the generator and regenerate (`docs/scripts/icnctl_command_inventory.py --write`, `docs/scripts/route_inventory.py --write`).
 - Every committed generated artifact must either **have a drift check** (wired into `generated-truth.yml` / `docs-freshness.yml`) **or be explicitly declared on-demand with no committed snapshot**. A committed generated artifact with neither silently rots.
+- **Known current exception:** `generated/route-inventory.md` is drift-gated (`route_inventory.py --check` runs in `docs-freshness.yml`), but `generated/icnctl-command-inventory.md` is committed and has a `--check` script that is **not yet wired into any workflow** — so today it *can* silently rot. Wiring that gate is a tracked follow-up (see §8 of this map's PR / the lane follow-ups); until then, treat the icnctl inventory's freshness as **manually maintained**, not CI-guaranteed.
 - Generated records are orientation aids, not truth roots.
 
 ## 8. PR body / review checklist (inventory & status PRs)
