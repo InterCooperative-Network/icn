@@ -67,7 +67,7 @@ View source on GitHub →
 <td><strong>Claim-boundary firewall</strong></td>
 <td>Docs, PRs, inventories, demos, and public pages must not claim more than the evidence proves.</td>
 <td>This map; <a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">`proof-level-taxonomy-capability-matrix.md`</a>; <a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">`show-readiness-map.md`</a>; <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">`source-of-truth-map.md`</a>.</td>
-<td><strong>Mostly convention.</strong> Narrow tool coverage only: <code>compliance_linter.py</code> (fintech vocabulary on API surfaces), <code>readiness_overclaim_linter.py</code> (scans <code>docs/deployment</code> + <code>docs/operations/deployment</code>; ~9 patterns across production-readiness / live-federation / blanket-operability / general-availability / governance-completion), <code>doc_control_check.py</code> (doc truth-class front-matter), the route-inventory <code>--check</code> gate. The forbidden collapses in §5 are <strong>not</strong> mechanically enforced.</td>
+<td><strong>Mostly convention.</strong> Narrow tool coverage only: <code>compliance_linter.py</code> (fintech vocabulary on API surfaces), <code>readiness_overclaim_linter.py</code> (scans <code>docs/deployment</code> + <code>docs/operations/deployment</code> + <code>docs/pilots</code>; ~9 patterns across production-readiness / live-federation / blanket-operability / general-availability / governance-completion — a narrow phrase-level guardrail, not whole-firewall enforcement), <code>doc_control_check.py</code> (doc truth-class front-matter), the route-inventory <code>--check</code> gate. The forbidden collapses in §5 are <strong>not</strong> mechanically enforced.</td>
 </tr>
 </tbody></table>
 <h2>3. Source-of-truth hierarchy</h2>
@@ -139,7 +139,7 @@ View source on GitHub →
 <td><code>live</code> ⇒ production-ready</td>
 <td>hardening: security/privacy/recovery/observability (L8)</td>
 <td><code>show-readiness-map.md</code>; <code>STATE.md</code></td>
-<td>Narrow: <code>readiness_overclaim_linter.py</code> (deployment/ops docs only)</td>
+<td>Narrow: <code>readiness_overclaim_linter.py</code> (deployment/ops + pilots docs)</td>
 </tr>
 <tr>
 <td>fixture/demo data ⇒ live participant state</td>
@@ -163,7 +163,7 @@ View source on GitHub →
 <td>federation commands/primitives ⇒ live federation</td>
 <td>two cooperatives federating in production (Phase 3)</td>
 <td><code>PHASE_PROGRESS.md</code>; <code>show-readiness-map.md</code></td>
-<td>Narrow: overclaim linter catches the &quot;live federation&quot; phrase, but only in the deployment/ops docs it scans</td>
+<td>Narrow: overclaim linter catches the &quot;live federation&quot; phrase, but only in the deployment/ops + pilots docs it scans</td>
 </tr>
 <tr>
 <td>local proof loop ⇒ multi-node/devnet/production</td>

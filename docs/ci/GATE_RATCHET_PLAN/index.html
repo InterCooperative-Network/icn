@@ -127,14 +127,22 @@ Linter covers all public-facing API surfaces.</p>
 <p>Owner: @core-arch</p>
 <h4>Readiness Overclaim Check (<code>GATE_RATCHET_PHASE_READINESS</code>) — NEW (2026-05-31)</h4>
 <p>Phase: WARNING (observational entry; non-blocking).</p>
-<p>Scans active deployment guidance (<code>docs/deployment/**</code>, <code>docs/operations/deployment/**</code>) for
-un-disclaimed, affirmative production / live-federation / governance-completion claims. A dated
-readiness claim is allowed when the file carries a stale/archive banner; negated/conditional lines
-and an explicit <code>ALLOWLIST</code> are honoured. Complements the Regulatory Compliance Linter (fintech
-vocabulary); does not replace it.</p>
-<p>Scope (by design, to keep precision high): deployment guidance only. It deliberately does NOT yet
-cover the broader SDK / website / user-manual fintech-vocabulary debt — that is tracked separately.
-Widening scope is a later ratchet step, taken as each surface is cleaned.</p>
+<p>Scans active claim-sensitive guidance (<code>docs/deployment/**</code>, <code>docs/operations/deployment/**</code>, and —
+added 2026-06-26 — <code>docs/pilots/**</code>) for un-disclaimed, affirmative production / live-federation /
+governance-completion claims. A dated readiness claim is allowed when the file carries a stale/archive
+banner; negated/conditional lines and an explicit <code>ALLOWLIST</code> are honoured. Generated artifacts and
+<code>archive</code>/<code>dev-journal</code> subtrees are pruned (<code>EXCLUDE_DIRS</code>). Complements the Regulatory Compliance
+Linter (fintech vocabulary); does not replace it. It is a narrow phrase-level guardrail — it does NOT
+enforce the whole claim-boundary firewall (see <code>docs/reference/project-index/claim-boundaries.md</code>).</p>
+<p>Scope (by design, allowlist-based, to keep precision high): deployment/ops guidance + <code>docs/pilots</code>.
+<code>docs/pilots</code> was measured low-noise (10 files, 1 bounded <code>ALLOWLIST</code> exception). Widening is a
+deliberate ratchet step taken as each surface is cleaned.</p>
+<p>NOT yet added (measured high-noise 2026-06-26): <code>docs/reference/project-index</code>, <code>docs/demo</code>,
+<code>docs/strategy</code>. These are claim-sensitive docs that <em>enumerate</em> the red-line phrases as
+nonclaim / &quot;does not claim&quot; lists, plus FAQ questions and roadmap targets — false positives the
+line-local negation guard cannot see. Adding them needs a precision step first (nonclaim-list /
+question / disclaimer-word handling), then a per-surface cleanup. This deliberately does NOT yet
+cover the broader SDK / website / user-manual fintech-vocabulary debt — tracked separately.</p>
 <p>Remediation on failure: banner the dated doc (point to <code>docs/ci/CI_CURRENT_STATUS.md</code>), or fix the
 claim, or add an <code>ALLOWLIST</code> entry with a reason. Never weaken the patterns. Self-test:
 <code>.github/scripts/test_readiness_overclaim_linter.py</code> (run by the CI job before scanning).</p>
