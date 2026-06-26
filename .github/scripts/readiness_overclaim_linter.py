@@ -303,35 +303,39 @@ def scan_lines(rel_path, lines):
         if in_nonclaim_section or _is_interrogative(line):
             continue
 
+        key = rel_path + ":" + str(line_num)
+        if key in ALLOWLIST:
+            continue
+        flagged = False
         for pattern, rule in OVERCLAIM_PATTERNS:
-            m = pattern.search(line)
-            if not m:
-                continue
-            # Per-match precision (all scoped to THIS match so a separate overclaim
-            # elsewhere on the line still warns): explicit nonclaim FRAMING in the
-            # matched phrase's segment ("Must not claim: ...", "Unsafe ...:",
-            # "nonclaims for ...", "without requiring ... live federation"); a quoted
-            # example phrase (`"production-ready"`); a risk-labelled phrase
-            # ("live federation overclaim"); or a "<phrase> claim requires ..."
-            # meta-statement.
-            if (
-                NONCLAIM_LINE_RE.search(_framing_segment(line, m.start(), m.end()))
-                or _phrase_is_quoted(line, m.start(), m.end())
-                or _labels_a_risk(line, m.end())
-                or _describes_a_claim(line, m.end())
-            ):
-                continue
-            # Only the overclaim's own clause exempts it — not an unrelated
-            # negation/conditional elsewhere on the same line.
-            if NEGATION_RE.search(_clause_around(line, m.start(), m.end())):
-                continue
-            key = rel_path + ":" + str(line_num)
-            if key in ALLOWLIST:
-                continue
-            violations.append(
-                Violation(file=rel_path, line=line_num, text=line.rstrip()[:160], rule=rule)
-            )
-            break  # one violation per line is enough
+            # Iterate EVERY occurrence: a suppressed first match (e.g. a quoted
+            # example) must not hide a later real assertion of the same pattern.
+            for m in pattern.finditer(line):
+                # Per-match precision (all scoped to THIS match so a separate
+                # overclaim elsewhere on the line still warns): explicit nonclaim
+                # FRAMING in the matched phrase's segment ("Must not claim: ...",
+                # "Unsafe ...:", "nonclaims for ...", "without requiring ... live
+                # federation"); a quoted example phrase (`"production-ready"`); a
+                # risk-labelled phrase ("live federation overclaim"); or a
+                # "<phrase> claim requires ..." meta-statement.
+                if (
+                    NONCLAIM_LINE_RE.search(_framing_segment(line, m.start(), m.end()))
+                    or _phrase_is_quoted(line, m.start(), m.end())
+                    or _labels_a_risk(line, m.end())
+                    or _describes_a_claim(line, m.end())
+                ):
+                    continue
+                # Only the overclaim's own clause exempts it — not an unrelated
+                # negation/conditional elsewhere on the same line.
+                if NEGATION_RE.search(_clause_around(line, m.start(), m.end())):
+                    continue
+                violations.append(
+                    Violation(file=rel_path, line=line_num, text=line.rstrip()[:160], rule=rule)
+                )
+                flagged = True
+                break  # one violation per line is enough
+            if flagged:
+                break
     return violations
 
 

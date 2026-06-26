@@ -255,6 +255,18 @@ class TestProjectIndexFP(unittest.TestCase):
         line = "Must not claim: that any of this is production-ready or live federation."
         self.assertEqual(linter.scan_lines("x.md", [line]), [])
 
+    # --- a suppressed first occurrence must NOT hide a later real assertion of
+    #     the SAME pattern (scan_lines iterates every match per pattern) ---
+    def test_suppressed_match_does_not_hide_later_same_pattern(self):
+        cases = [
+            ('"production-ready" is an avoid-list example; ICN is production-ready.', "production-ready"),
+            ("high: live federation overclaim; ICN has live federation deployed.", "live federation"),
+        ]
+        for line, expected_rule in cases:
+            v = linter.scan_lines("x.md", [line])
+            self.assertEqual(len(v), 1, msg=line)
+            self.assertEqual(v[0].rule, expected_rule, msg=line)
+
 
 class TestFixturesEndToEnd(unittest.TestCase):
     def test_bad_fixture_flagged(self):
