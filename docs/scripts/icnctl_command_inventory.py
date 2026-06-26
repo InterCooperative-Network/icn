@@ -267,7 +267,10 @@ STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     # partial (pass 9, issue #2113) — `recovery` storage-based ops + the whole `ledger` group are
     # daemon RPC clients: each arm calls a real `client.*().await` (via create_authenticated_rpc_client
     # / create_rpc_client) that fails with "Is icnd running?" — real work, but requires a running
-    # daemon and has no binary-spawning e2e test (icnctl tests cover only i18n keys / backup-restore).
+    # daemon. No icnctl test spawns a daemon, so none of these recovery/ledger RPC arms has a
+    # binary-spawning e2e test: the binary-spawning tests drive other commands (backup/restore,
+    # coop entity-report/backfill, qr/device-pairing), audit_verify_test builds typed payloads, and
+    # i18n_test only asserts `cli.ledger.*` translation keys — none invokes a recovery/ledger RPC.
     "recovery initiate": (STATUS_PARTIAL, "authenticated daemon RPC `client.initiate_recovery()` via `create_authenticated_rpc_client` in `handle_recovery_command` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Initiate); \"Is icnd running?\"; requires a running daemon, not integration-tested"),
     "recovery attest": (STATUS_PARTIAL, "authenticated daemon RPC `client.attest_recovery()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::Attest); requires a running daemon, not integration-tested"),
     "recovery list": (STATUS_PARTIAL, "authenticated daemon RPC `client.list_recoveries()` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` RecoveryCommands::List); requires a running daemon, not integration-tested"),
