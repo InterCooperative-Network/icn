@@ -50,12 +50,12 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <li><strong>Proves:</strong> these <code>icnctl</code> command declarations exist in the clap command tree under <code>icn/bins/icnctl/src/**</code> at the snapshot commit (proof level <strong>L1</strong>).</li>
 <li><strong>Does NOT prove:</strong> that a command works, is safe for organizers, is production-ready, is wired to a live gateway, has correct auth/permissions, is part of a supported pilot flow, or is appropriate for non-technical users.</li>
 <li><strong><code>role</code> is a curated navigation heuristic</strong> (top-level command group -&gt; role), <strong>not</strong> mechanically derived from clap and <strong>needs review</strong>. It says &quot;where might I look first&quot;, never &quot;this user may safely run this&quot;.</li>
-<li><strong><code>status</code> is uniformly <code>unknown / needs local verification</code></strong> by construction: a static clap scan proves a command is <em>declared</em>, not whether it is <code>implemented</code> / <code>implemented but partial</code> / <code>fixture-backed</code> / <code>gateway-backed</code> / <code>docs-only / design-direction</code> / <code>planned</code>. Assigning those per command is a human/runtime follow-up — so nothing here is presented as live.</li>
+<li><strong><code>status</code> is a curated, evidence-pointer classification</strong> (issue #2113): <code>live</code> / <code>partial</code> / <code>fixture-demo</code> / <code>planned</code>, defaulting to <code>unknown / needs local verification</code> for any command not explicitly classified. It is curated from source/test evidence (a static clap scan proves a command is <em>declared</em>, not how far its handler is implemented), so it is <strong>never</strong> inferred from a declaration. <code>live</code> is asserted only with concrete-handler + (integration test | local-only no-network) evidence and is <strong>not</strong> a production-readiness claim; demo/dev-gated commands are never presented as live. See the <a href="#implementation-status-classification">Implementation status</a> section.</li>
 <li>Defer to canonical truth/precedence: <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">`source-of-truth-map.md`</a> and proof levels in <a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">`proof-level-taxonomy-capability-matrix.md`</a>. Orientation artifact (<code>Canonical: no</code>); companion to <a href="https://github.com/InterCooperative-Network/icn/blob/main/route-inventory">`generated/route-inventory.md`</a>.</li>
 </ul>
 <h2>Snapshot</h2>
 <ul>
-<li>Source commit: <code>1b9576e06a74658a45242ac19c7a934149bf5c08</code></li>
+<li>Source commit: <code>439d3b18053d77b6bf9a015b12bcf66d47055b09</code></li>
 <li>Source scanned: <code>icn/bins/icnctl/src/**</code> (clap <code>#[derive(Subcommand)]</code> / <code>#[derive(Parser)]</code> tree)</li>
 </ul>
 <h2>Summary</h2>
@@ -63,13 +63,13 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <li><strong>Total leaf commands (default build): 162</strong></li>
 <li>Top-level command groups: 33</li>
 <li>By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2</li>
-<li>By status: every default-build command is <code>unknown / needs local verification</code> (162) — see note above.</li>
+<li>By status (curated, see section below): live 10 · partial 2 · planned 7 · unknown / needs local verification 143</li>
 <li>Proof level: every command is <code>L1</code> (declaration exists in source).</li>
 <li><strong>Feature-gated commands (NOT in the default build, excluded from the counts above): 1</strong> (see section below).</li>
 <li>Unparsed / unresolved candidates: 0 (see section below).</li>
 </ul>
 <h2>Commands by role</h2>
-<p>Role is the <strong>curated</strong> top-level-group heuristic (needs review). <code>status</code> and <code>proof</code> are uniform by construction (see the note above).</p>
+<p>Role is the <strong>curated</strong> top-level-group heuristic (needs review). <code>status</code> is a <strong>curated, per-command</strong> classification (see the <a href="#implementation-status-classification">Implementation status</a> section); <code>proof</code> is uniform at <code>L1</code> (declaration scan).</p>
 <h3>organizer (53)</h3>
 <table>
 <thead>
@@ -172,7 +172,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl charter deploy</code></td>
-<td>unknown / needs local verification</td>
+<td>planned</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1718</td>
 </tr>
@@ -411,13 +411,13 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </thead>
 <tbody><tr>
 <td><code>icnctl audit verify</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:330</td>
 </tr>
 <tr>
 <td><code>icnctl backup</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:98</td>
 </tr>
@@ -621,7 +621,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl preflight</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:203</td>
 </tr>
@@ -639,7 +639,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl restore</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:104</td>
 </tr>
@@ -687,7 +687,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl steward check-vui</code></td>
-<td>unknown / needs local verification</td>
+<td>planned</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1496</td>
 </tr>
@@ -699,7 +699,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl steward enrollment-status</code></td>
-<td>unknown / needs local verification</td>
+<td>planned</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1513</td>
 </tr>
@@ -711,7 +711,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl steward issue-token</code></td>
-<td>unknown / needs local verification</td>
+<td>planned</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1544</td>
 </tr>
@@ -723,7 +723,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl steward recovery-status</code></td>
-<td>unknown / needs local verification</td>
+<td>planned</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1538</td>
 </tr>
@@ -741,13 +741,13 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl steward start-enrollment</code></td>
-<td>unknown / needs local verification</td>
+<td>planned</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1502</td>
 </tr>
 <tr>
 <td><code>icnctl steward start-recovery</code></td>
-<td>unknown / needs local verification</td>
+<td>planned</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1519</td>
 </tr>
@@ -789,7 +789,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl verify-backup</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:114</td>
 </tr>
@@ -806,7 +806,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </thead>
 <tbody><tr>
 <td><code>icnctl api export-openapi</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:267</td>
 </tr>
@@ -818,7 +818,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl completions</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:214</td>
 </tr>
@@ -884,7 +884,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl device add</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:600</td>
 </tr>
@@ -920,7 +920,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl id init</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:565</td>
 </tr>
@@ -932,7 +932,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl id show</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:568</td>
 </tr>
@@ -1075,13 +1075,13 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </thead>
 <tbody><tr>
 <td><code>icnctl coop entity-backfill-surrogates</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:249</td>
 </tr>
 <tr>
 <td><code>icnctl coop entity-report</code></td>
-<td>unknown / needs local verification</td>
+<td>live</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:230</td>
 </tr>
@@ -1106,8 +1106,178 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td><code>icn/bins/icnctl/src/main.rs</code>:579</td>
 </tr>
 </tbody></table>
-<h2>Commands by status</h2>
-<p>All 162 default-build commands carry the conservative status <code>unknown / needs local verification</code>. The static clap scan cannot mechanically distinguish <code>implemented</code> / <code>implemented but partial</code> / <code>fixture-backed</code> / <code>gateway-backed</code> / <code>docs-only / design-direction</code> / <code>planned</code>; that per-command classification is a human/runtime verification follow-up (so demo/dev-gated commands are never presented here as live).</p>
+<h2>Implementation status classification</h2>
+<p>Status is a <strong>curated</strong> classification (issue #2113), defaulting to <code>unknown / needs local verification</code>. It is curated from source/test evidence — a static clap scan proves a command is <em>declared</em>, not how far its handler is implemented — so it is never inferred from a declaration. This is a deliberately <strong>narrow, defensible first pass</strong>: only commands with clear evidence are classified; the rest stay <code>unknown</code> (honest, not a failure).</p>
+<h3>Vocabulary</h3>
+<ul>
+<li><strong><code>live</code></strong> — compiled in the default build, calls a concrete client/runtime path, and has evidence it works: an integration test that spawns the binary and asserts success, OR a local-only operation with no network dependency. <strong>Not</strong> asserted because a clap subcommand exists; <strong>not</strong> a production-readiness claim.</li>
+<li><strong><code>partial</code></strong> — the handler does real work but depends on incomplete/unproven runtime support (e.g. a live gateway) and is not integration-tested end-to-end.</li>
+<li><strong><code>fixture-demo</code></strong> — a demo / fixture / rehearsal-only path, exercisable without live network/service; must not be implied as live operational use.</li>
+<li><strong><code>planned</code></strong> — declared but the handler is a placeholder / TODO / prints &quot;not yet implemented&quot;.</li>
+<li><strong><code>unknown / needs local verification</code></strong> — status not established from source/tests/docs in this pass; the conservative default.</li>
+</ul>
+<h3>Counts by status (default build)</h3>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Count</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>live</td>
+<td>10</td>
+</tr>
+<tr>
+<td>partial</td>
+<td>2</td>
+</tr>
+<tr>
+<td>fixture-demo</td>
+<td>0</td>
+</tr>
+<tr>
+<td>planned</td>
+<td>7</td>
+</tr>
+<tr>
+<td>unknown / needs local verification</td>
+<td>143</td>
+</tr>
+</tbody></table>
+<h3>Classified commands (19)</h3>
+<p>Every non-<code>unknown</code> command, with its evidence basis. (All other default-build commands carry <code>unknown / needs local verification</code>.)</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Status</th>
+<th>Basis (source/test evidence)</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icnctl api export-openapi</code></td>
+<td>live</td>
+<td>serializes the embedded <code>icn_gateway::openapi::ApiDoc</code> to file/stdout; local-only, no gateway (<code>icn/bins/icnctl/src/main.rs</code> ApiCommands::ExportOpenapi)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:267</td>
+</tr>
+<tr>
+<td><code>icnctl backup</code></td>
+<td>live</td>
+<td>local data-dir backup; integration-tested (<code>icn/bins/icnctl/tests/backup_restore_test.rs</code> asserts success + tarball created)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:98</td>
+</tr>
+<tr>
+<td><code>icnctl completions</code></td>
+<td>live</td>
+<td>shell-completion generation via <code>clap_complete::generate</code>; local-only, no network (<code>icn/bins/icnctl/src/main.rs</code> Commands::Completions)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:214</td>
+</tr>
+<tr>
+<td><code>icnctl coop entity-backfill-surrogates</code></td>
+<td>live</td>
+<td>local coop-store surrogate backfill; integration-tested (<code>icn/bins/icnctl/tests/coop_entity_backfill_test.rs</code> asserts success)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:249</td>
+</tr>
+<tr>
+<td><code>icnctl coop entity-report</code></td>
+<td>live</td>
+<td>read-only local coop-store report; integration-tested (<code>icn/bins/icnctl/tests/coop_entity_report_test.rs</code>, <code>icn/bins/icnctl/tests/coop_entity_backfill_test.rs</code> assert success + JSON)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:230</td>
+</tr>
+<tr>
+<td><code>icnctl device add</code></td>
+<td>live</td>
+<td>local keystore device add; integration-tested (<code>icn/bins/icnctl/tests/qr_code_test.rs</code> asserts success)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:600</td>
+</tr>
+<tr>
+<td><code>icnctl id init</code></td>
+<td>live</td>
+<td>local keystore init; integration-tested (<code>icn/bins/icnctl/tests/backup_restore_test.rs</code>, <code>icn/bins/icnctl/tests/qr_code_test.rs</code> spawn the binary, assert success)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:565</td>
+</tr>
+<tr>
+<td><code>icnctl id show</code></td>
+<td>live</td>
+<td>local keystore read; integration-tested (<code>icn/bins/icnctl/tests/backup_restore_test.rs</code>, <code>icn/bins/icnctl/tests/qr_code_test.rs</code>)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:568</td>
+</tr>
+<tr>
+<td><code>icnctl restore</code></td>
+<td>live</td>
+<td>local data-dir restore; integration-tested (<code>icn/bins/icnctl/tests/backup_restore_test.rs</code>)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:104</td>
+</tr>
+<tr>
+<td><code>icnctl verify-backup</code></td>
+<td>live</td>
+<td>local backup verification; integration-tested (<code>icn/bins/icnctl/tests/backup_restore_test.rs</code>)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:114</td>
+</tr>
+<tr>
+<td><code>icnctl audit verify</code></td>
+<td>partial</td>
+<td>concrete gateway client <code>GET /v1/receipts/chain/{hash}</code> (<code>icn/bins/icnctl/src/main.rs</code> AuditCommands::Verify); chain-verification algorithm covered by <code>icn/bins/icnctl/tests/audit_verify_test.rs</code> (inlined copy); end-to-end against a live gateway not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:330</td>
+</tr>
+<tr>
+<td><code>icnctl preflight</code></td>
+<td>partial</td>
+<td>runs real local health checks (data-dir, keystore open via <code>AgeKeyStore</code>) in <code>handle_preflight_command</code>; the gateway-connectivity check requires a running gateway; not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:203</td>
+</tr>
+<tr>
+<td><code>icnctl charter deploy</code></td>
+<td>planned</td>
+<td>handler validates the CCL doc locally, then prints &quot;Not yet implemented — charter deployment requires gateway integration&quot; (<code>icn/bins/icnctl/src/main.rs</code> CharterCommands::Deploy)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1718</td>
+</tr>
+<tr>
+<td><code>icnctl steward check-vui</code></td>
+<td>planned</td>
+<td>placeholder; validates input then prints &quot;VUI registry check requires running steward daemon&quot; (<code>icn/bins/icnctl/src/main.rs</code> StewardCommands::CheckVui)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1496</td>
+</tr>
+<tr>
+<td><code>icnctl steward enrollment-status</code></td>
+<td>planned</td>
+<td>placeholder; ceremony status check requires a running steward daemon (<code>icn/bins/icnctl/src/main.rs</code> StewardCommands::EnrollmentStatus)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1513</td>
+</tr>
+<tr>
+<td><code>icnctl steward issue-token</code></td>
+<td>planned</td>
+<td>placeholder for the full SDIS token issuance flow; requires a running steward daemon (<code>icn/bins/icnctl/src/main.rs</code> StewardCommands::IssueToken)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1544</td>
+</tr>
+<tr>
+<td><code>icnctl steward recovery-status</code></td>
+<td>planned</td>
+<td>placeholder; ceremony status check requires a running steward daemon (<code>icn/bins/icnctl/src/main.rs</code> StewardCommands::RecoveryStatus)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1538</td>
+</tr>
+<tr>
+<td><code>icnctl steward start-enrollment</code></td>
+<td>planned</td>
+<td>placeholder for the full SDIS enrollment flow; requires a running steward daemon (<code>icn/bins/icnctl/src/main.rs</code> StewardCommands::StartEnrollment)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1502</td>
+</tr>
+<tr>
+<td><code>icnctl steward start-recovery</code></td>
+<td>planned</td>
+<td>placeholder for the full SDIS recovery flow; requires a running steward daemon (<code>icn/bins/icnctl/src/main.rs</code> StewardCommands::StartRecovery)</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1519</td>
+</tr>
+</tbody></table>
+<h3>Status non-claims</h3>
+<ul>
+<li>A command marked <code>live</code> is <strong>not</strong> a production-readiness claim — only that it runs and does real work per the cited local/test evidence.</li>
+<li>This generated static inventory is <strong>not</strong> runtime execution proof except where a basis cites a test; proof level stays <code>L1</code> (declaration) regardless of status.</li>
+<li>A default <code>unknown / needs local verification</code> is an honest &quot;not yet verified&quot;, not a failure or a defect.</li>
+<li>Feature-gated commands remain <strong>excluded</strong> from the default-build counts and are left unclassified.</li>
+</ul>
 <h2>Unparsed / unknown candidates</h2>
 <ul>
 <li>None: every top-level variant resolved to either a leaf command or a parsed <code>#[derive(Subcommand)]</code> enum.</li>
