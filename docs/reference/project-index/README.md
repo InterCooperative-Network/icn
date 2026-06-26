@@ -31,6 +31,7 @@ ICN already has several truth- and freshness-tracking systems. **This index does
 |---|---|
 | Which source wins when two disagree? (precedence, status labels, overclaim guardrails) | [`source-of-truth-map.md`](source-of-truth-map.md) |
 | How strong is the proof behind a claim? (L0–L8 ladder) | [`proof-level-taxonomy-capability-matrix.md`](proof-level-taxonomy-capability-matrix.md) |
+| Is a claim outrunning its evidence? (two firewalls, forbidden collapses, inventory/PR claim discipline) | [`claim-boundaries.md`](claim-boundaries.md) |
 | What truth-class / canonical status does a doc carry? | [`docs/registry.toml`](../../registry.toml) + [`docs-control-map.md`](docs-control-map.md) (checked by `docs/scripts/doc_control_check.py`) |
 | How complete is a subsystem's implementation? | [`docs/status.toml`](../../status.toml) |
 | Is an `ARCHITECTURE.md` section stale? | [`docs/freshness.toml`](../../freshness.toml) (checked by `docs/scripts/freshness-check.py`; broader SME re-review tracked in [#2047](https://github.com/InterCooperative-Network/icn/issues/2047)) |
@@ -75,6 +76,7 @@ ICN already has several truth- and freshness-tracking systems. **This index does
 | [`show-readiness-map.md`](show-readiness-map.md) | What can be shown now, what should not be shown as finished, the suggested demo narrative, and red lines. |
 | [`project-coverage-matrix.md`](project-coverage-matrix.md) | Coverage-style matrix: subsystem → anchors → drift and show risks. |
 | [`proof-level-taxonomy-capability-matrix.md`](proof-level-taxonomy-capability-matrix.md) | Proof-level taxonomy (L0–L8) as shared claim-boundary vocabulary, plus a capability matrix for the current organizer-rehearsal path. Supports #1746, narrows #1796. |
+| [`claim-boundaries.md`](claim-boundaries.md) | Operational claim-boundary manual: the two firewalls (architectural vs claim-discipline), source precedence, status-vs-proof, forbidden collapses, and the inventory/PR claim-discipline checklist. Orientation, not a truth root. |
 | [`invariants-catalog.md`](invariants-catalog.md) | Source-linked index of the four canonical invariant families (operational / firewall-contract / frozen-core / regulatory, 28 total). Index only; canonical sources remain authoritative. Machine-readable: [`invariants-catalog.toml`](invariants-catalog.toml). |
 | [`identity-crypto-map.md`](identity-crypto-map.md) | Identity, keys, DIDs, signing — where code and docs live. |
 | [`network-gossip-map.md`](network-gossip-map.md) | QUIC, gossip, discovery — runtime surfaces and overclaim guardrails. |

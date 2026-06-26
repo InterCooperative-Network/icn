@@ -6,7 +6,7 @@ Last Reviewed: 2026-06-26
 
 # Proof-Level Taxonomy and Capability Matrix
 
-> For current project truth, defer to [`docs/STATE.md`](../../STATE.md) and [`docs/PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md). This map adds a shared **proof-level vocabulary** and a capability matrix for the current organizer-rehearsal path. It is a claim-boundary aid, not a new source of truth.
+> For current project truth, defer to [`docs/STATE.md`](../../STATE.md) and [`docs/PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md). This map adds a shared **proof-level vocabulary** and a capability matrix for the current organizer-rehearsal path. It is a claim-boundary aid, not a new source of truth. For how these proof levels feed the broader claim-discipline rules (forbidden collapses, inventory/PR checklist, two firewalls), see [`claim-boundaries.md`](claim-boundaries.md).
 
 This map exists for issue [#1796](https://github.com/InterCooperative-Network/icn/issues/1796) and directly supports the organizer-rehearsal milestone [#1746](https://github.com/InterCooperative-Network/icn/issues/1746). ICN now has many overlapping readiness states — implemented, partial, fixture-backed, local proof loop, live daemon proof, K3s/devnet proof, design-only, stale, aspirational. Without shared proof language, a contributor, facilitator, reviewer, or agent can accidentally over- or under-claim. This doc gives everyone the same words so the current demo/rehearsal state is honest, legible, and reusable.
 
