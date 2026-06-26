@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T02:17:04+00:00
+Generated: 2026-06-26T13:17:35+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -14,12 +14,12 @@ Generated: 2026-06-26T02:17:04+00:00
 - **Proves:** these `icnctl` command declarations exist in the clap command tree under `icn/bins/icnctl/src/**` at the snapshot commit (proof level **L1**).
 - **Does NOT prove:** that a command works, is safe for organizers, is production-ready, is wired to a live gateway, has correct auth/permissions, is part of a supported pilot flow, or is appropriate for non-technical users.
 - **`role` is a curated navigation heuristic** (top-level command group -> role), **not** mechanically derived from clap and **needs review**. It says "where might I look first", never "this user may safely run this".
-- **`status` is uniformly `unknown / needs local verification`** by construction: a static clap scan proves a command is *declared*, not whether it is `implemented` / `implemented but partial` / `fixture-backed` / `gateway-backed` / `docs-only / design-direction` / `planned`. Assigning those per command is a human/runtime follow-up — so nothing here is presented as live.
+- **`status` is a curated, evidence-pointer classification** (issue #2113): `live` / `partial` / `fixture-demo` / `planned`, defaulting to `unknown / needs local verification` for any command not explicitly classified. It is curated from source/test evidence (a static clap scan proves a command is *declared*, not how far its handler is implemented), so it is **never** inferred from a declaration. `live` is asserted only with concrete-handler + (integration test | local-only no-network) evidence and is **not** a production-readiness claim; demo/dev-gated commands are never presented as live. See the [Implementation status](#implementation-status-classification) section.
 - Defer to canonical truth/precedence: [`source-of-truth-map.md`](../source-of-truth-map.md) and proof levels in [`proof-level-taxonomy-capability-matrix.md`](../proof-level-taxonomy-capability-matrix.md). Orientation artifact (`Canonical: no`); companion to [`generated/route-inventory.md`](route-inventory.md).
 
 ## Snapshot
 
-- Source commit: `1b9576e06a74658a45242ac19c7a934149bf5c08`
+- Source commit: `f06d5b0305ddb22551e0ec07b97185601df559ce`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
@@ -27,7 +27,7 @@ Generated: 2026-06-26T02:17:04+00:00
 - **Total leaf commands (default build): 162**
 - Top-level command groups: 33
 - By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2
-- By status: every default-build command is `unknown / needs local verification` (162) — see note above.
+- By status (curated, see section below): live 10 · partial 2 · planned 7 · unknown / needs local verification 143
 - Proof level: every command is `L1` (declaration exists in source).
 - **Feature-gated commands (NOT in the default build, excluded from the counts above): 1** (see section below).
 - Unparsed / unresolved candidates: 0 (see section below).
@@ -55,7 +55,7 @@ Role is the **curated** top-level-group heuristic (needs review). `status` and `
 | `icnctl appeal show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1962 |
 | `icnctl appeal withdraw` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:2024 |
 | `icnctl charter create` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1614 |
-| `icnctl charter deploy` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1718 |
+| `icnctl charter deploy` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1718 |
 | `icnctl charter inspect` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1704 |
 | `icnctl charter list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1651 |
 | `icnctl charter ratify` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1684 |
@@ -98,8 +98,8 @@ Role is the **curated** top-level-group heuristic (needs review). `status` and `
 
 | Command | Status | Proof | Source |
 |---|---|---|---|
-| `icnctl audit verify` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:330 |
-| `icnctl backup` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:98 |
+| `icnctl audit verify` | partial | L1 | `icn/bins/icnctl/src/main.rs`:330 |
+| `icnctl backup` | live | L1 | `icn/bins/icnctl/src/main.rs`:98 |
 | `icnctl federation add` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:862 |
 | `icnctl federation attestation from` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1022 |
 | `icnctl federation attestation issue` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1028 |
@@ -133,10 +133,10 @@ Role is the **curated** top-level-group heuristic (needs review). `status` and `
 | `icnctl policy remove` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:534 |
 | `icnctl policy set` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:513 |
 | `icnctl policy show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:524 |
-| `icnctl preflight` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:203 |
+| `icnctl preflight` | partial | L1 | `icn/bins/icnctl/src/main.rs`:203 |
 | `icnctl quota list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:555 |
 | `icnctl quota show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:544 |
-| `icnctl restore` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:104 |
+| `icnctl restore` | live | L1 | `icn/bins/icnctl/src/main.rs`:104 |
 | `icnctl snapshot cleanup` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1356 |
 | `icnctl snapshot create` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1338 |
 | `icnctl snapshot delete` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1350 |
@@ -144,32 +144,32 @@ Role is the **curated** top-level-group heuristic (needs review). `status` and `
 | `icnctl snapshot verify` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1344 |
 | `icnctl status` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:51 |
 | `icnctl steward attesters` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1458 |
-| `icnctl steward check-vui` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1496 |
+| `icnctl steward check-vui` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1496 |
 | `icnctl steward config` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1433 |
-| `icnctl steward enrollment-status` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1513 |
+| `icnctl steward enrollment-status` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1513 |
 | `icnctl steward info` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1436 |
-| `icnctl steward issue-token` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1544 |
+| `icnctl steward issue-token` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1544 |
 | `icnctl steward list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1445 |
-| `icnctl steward recovery-status` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1538 |
+| `icnctl steward recovery-status` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1538 |
 | `icnctl steward register` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1465 |
 | `icnctl steward retire` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1487 |
-| `icnctl steward start-enrollment` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1502 |
-| `icnctl steward start-recovery` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1519 |
+| `icnctl steward start-enrollment` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1502 |
+| `icnctl steward start-recovery` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1519 |
 | `icnctl steward status` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1430 |
 | `icnctl steward topics` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1555 |
 | `icnctl trust add` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:694 |
 | `icnctl trust list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:707 |
 | `icnctl trust remove` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:716 |
 | `icnctl trust show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:710 |
-| `icnctl verify-backup` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:114 |
+| `icnctl verify-backup` | live | L1 | `icn/bins/icnctl/src/main.rs`:114 |
 
 ### developer (43)
 
 | Command | Status | Proof | Source |
 |---|---|---|---|
-| `icnctl api export-openapi` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:267 |
+| `icnctl api export-openapi` | live | L1 | `icn/bins/icnctl/src/main.rs`:267 |
 | `icnctl auth token` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:410 |
-| `icnctl completions` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:214 |
+| `icnctl completions` | live | L1 | `icn/bins/icnctl/src/main.rs`:214 |
 | `icnctl compute cancel` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:500 |
 | `icnctl compute status` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:494 |
 | `icnctl compute submit` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:432 |
@@ -180,15 +180,15 @@ Role is the **curated** top-level-group heuristic (needs review). `status` and `
 | `icnctl contract list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:828 |
 | `icnctl contract prepare` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:786 |
 | `icnctl contract sign` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:796 |
-| `icnctl device add` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:600 |
+| `icnctl device add` | live | L1 | `icn/bins/icnctl/src/main.rs`:600 |
 | `icnctl device approve` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:614 |
 | `icnctl device list` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:597 |
 | `icnctl device revoke` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:620 |
 | `icnctl id export` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:582 |
 | `icnctl id import` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:588 |
-| `icnctl id init` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:565 |
+| `icnctl id init` | live | L1 | `icn/bins/icnctl/src/main.rs`:565 |
 | `icnctl id rotate` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:571 |
-| `icnctl id show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:568 |
+| `icnctl id show` | live | L1 | `icn/bins/icnctl/src/main.rs`:568 |
 | `icnctl ledger balance` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:728 |
 | `icnctl ledger head` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:725 |
 | `icnctl ledger history` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:738 |
@@ -215,8 +215,8 @@ Role is the **curated** top-level-group heuristic (needs review). `status` and `
 
 | Command | Status | Proof | Source |
 |---|---|---|---|
-| `icnctl coop entity-backfill-surrogates` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:249 |
-| `icnctl coop entity-report` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:230 |
+| `icnctl coop entity-backfill-surrogates` | live | L1 | `icn/bins/icnctl/src/main.rs`:249 |
+| `icnctl coop entity-report` | live | L1 | `icn/bins/icnctl/src/main.rs`:230 |
 
 ## Feature-gated commands (not in the default build)
 
@@ -226,9 +226,60 @@ These commands are guarded by a Cargo `#[cfg(feature = …)]` and are **absent f
 |---|---|---|---|---|
 | `icnctl id upgrade-pq` | `cfg(feature = "post-quantum")` | developer | L1 | `icn/bins/icnctl/src/main.rs`:579 |
 
-## Commands by status
+## Implementation status classification
 
-All 162 default-build commands carry the conservative status `unknown / needs local verification`. The static clap scan cannot mechanically distinguish `implemented` / `implemented but partial` / `fixture-backed` / `gateway-backed` / `docs-only / design-direction` / `planned`; that per-command classification is a human/runtime verification follow-up (so demo/dev-gated commands are never presented here as live).
+Status is a **curated** classification (issue #2113), defaulting to `unknown / needs local verification`. It is curated from source/test evidence — a static clap scan proves a command is *declared*, not how far its handler is implemented — so it is never inferred from a declaration. This is a deliberately **narrow, defensible first pass**: only commands with clear evidence are classified; the rest stay `unknown` (honest, not a failure).
+
+### Vocabulary
+
+- **`live`** — compiled in the default build, calls a concrete client/runtime path, and has evidence it works: an integration test that spawns the binary and asserts success, OR a local-only operation with no network dependency. **Not** asserted because a clap subcommand exists; **not** a production-readiness claim.
+- **`partial`** — the handler does real work but depends on incomplete/unproven runtime support (e.g. a live gateway) and is not integration-tested end-to-end.
+- **`fixture-demo`** — a demo / fixture / rehearsal-only path, exercisable without live network/service; must not be implied as live operational use.
+- **`planned`** — declared but the handler is a placeholder / TODO / prints "not yet implemented" (or the feature is unavailable in the default build).
+- **`unknown / needs local verification`** — status not established from source/tests/docs in this pass; the conservative default.
+
+### Counts by status (default build)
+
+| Status | Count |
+|---|---|
+| live | 10 |
+| partial | 2 |
+| fixture-demo | 0 |
+| planned | 7 |
+| unknown / needs local verification | 143 |
+
+### Classified commands (19)
+
+Every non-`unknown` command, with its evidence basis. (All other default-build commands carry `unknown / needs local verification`.)
+
+| Command | Status | Basis (source/test evidence) | Source |
+|---|---|---|---|
+| `icnctl api export-openapi` | live | serializes the embedded `icn_gateway::openapi::ApiDoc` to file/stdout; local-only, no gateway (`main.rs` ApiCommands::ExportOpenapi) | `icn/bins/icnctl/src/main.rs`:267 |
+| `icnctl backup` | live | local data-dir backup; integration-tested (`backup_restore_test.rs` asserts success + tarball created) | `icn/bins/icnctl/src/main.rs`:98 |
+| `icnctl completions` | live | shell-completion generation via `clap_complete::generate`; local-only, no network (`main.rs` Commands::Completions) | `icn/bins/icnctl/src/main.rs`:214 |
+| `icnctl coop entity-backfill-surrogates` | live | local coop-store surrogate backfill; integration-tested (`coop_entity_backfill_test.rs` asserts success) | `icn/bins/icnctl/src/main.rs`:249 |
+| `icnctl coop entity-report` | live | read-only local coop-store report; integration-tested (`coop_entity_report_test.rs`, `coop_entity_backfill_test.rs` assert success + JSON) | `icn/bins/icnctl/src/main.rs`:230 |
+| `icnctl device add` | live | local keystore device add; integration-tested (`qr_code_test.rs` asserts success) | `icn/bins/icnctl/src/main.rs`:600 |
+| `icnctl id init` | live | local keystore init; integration-tested (`bins/icnctl/tests/backup_restore_test.rs`, `qr_code_test.rs` spawn the binary, assert success) | `icn/bins/icnctl/src/main.rs`:565 |
+| `icnctl id show` | live | local keystore read; integration-tested (`backup_restore_test.rs`, `qr_code_test.rs`) | `icn/bins/icnctl/src/main.rs`:568 |
+| `icnctl restore` | live | local data-dir restore; integration-tested (`backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:104 |
+| `icnctl verify-backup` | live | local backup verification; integration-tested (`backup_restore_test.rs`) | `icn/bins/icnctl/src/main.rs`:114 |
+| `icnctl audit verify` | partial | concrete gateway client `GET /v1/receipts/chain/{hash}` (`main.rs` AuditCommands::Verify); chain-verification algorithm covered by `audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested | `icn/bins/icnctl/src/main.rs`:330 |
+| `icnctl preflight` | partial | runs real local health checks (data-dir, keystore open via `AgeKeyStore`) in `handle_preflight_command`; the gateway-connectivity check requires a running gateway; not integration-tested | `icn/bins/icnctl/src/main.rs`:203 |
+| `icnctl charter deploy` | planned | handler validates the CCL doc locally, then prints "Not yet implemented — charter deployment requires gateway integration" (`main.rs` CharterCommands::Deploy) | `icn/bins/icnctl/src/main.rs`:1718 |
+| `icnctl steward check-vui` | planned | placeholder; validates input then prints "VUI registry check requires running steward daemon" (`main.rs` StewardCommands::CheckVui) | `icn/bins/icnctl/src/main.rs`:1496 |
+| `icnctl steward enrollment-status` | planned | placeholder; ceremony status check requires a running steward daemon (`main.rs` StewardCommands::EnrollmentStatus) | `icn/bins/icnctl/src/main.rs`:1513 |
+| `icnctl steward issue-token` | planned | placeholder for the full SDIS token issuance flow; requires a running steward daemon (`main.rs` StewardCommands::IssueToken) | `icn/bins/icnctl/src/main.rs`:1544 |
+| `icnctl steward recovery-status` | planned | placeholder; ceremony status check requires a running steward daemon (`main.rs` StewardCommands::RecoveryStatus) | `icn/bins/icnctl/src/main.rs`:1538 |
+| `icnctl steward start-enrollment` | planned | placeholder for the full SDIS enrollment flow; requires a running steward daemon (`main.rs` StewardCommands::StartEnrollment) | `icn/bins/icnctl/src/main.rs`:1502 |
+| `icnctl steward start-recovery` | planned | placeholder for the full SDIS recovery flow; requires a running steward daemon (`main.rs` StewardCommands::StartRecovery) | `icn/bins/icnctl/src/main.rs`:1519 |
+
+### Status non-claims
+
+- A command marked `live` is **not** a production-readiness claim — only that it runs and does real work per the cited local/test evidence.
+- This generated static inventory is **not** runtime execution proof except where a basis cites a test; proof level stays `L1` (declaration) regardless of status.
+- A default `unknown / needs local verification` is an honest "not yet verified", not a failure or a defect.
+- Feature-gated commands remain **excluded** from the default-build counts and are left unclassified.
 
 ## Unparsed / unknown candidates
 
