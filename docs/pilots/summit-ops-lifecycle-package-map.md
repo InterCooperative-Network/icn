@@ -159,6 +159,7 @@ Smallest claim-safe steps, each a candidate child of [#1746](https://github.com/
 | The ICN spine + vocabulary + meaning firewall | [`docs/architecture/ICN_OPERATING_MODEL.md`](../architecture/ICN_OPERATING_MODEL.md) |
 | What is safe to show an organizer now | [`organizer-rehearsal-operability-map.md`](../reference/project-index/organizer-rehearsal-operability-map.md) |
 | The event-day "run the summit" facilitator path (first concrete child of this map) | [`summit-ops-run-stage-facilitator-path.md`](summit-ops-run-stage-facilitator-path.md) |
+| The post-event "close the loop" closeout / continuity packet | [`summit-ops-closeout-continuity-packet.md`](summit-ops-closeout-continuity-packet.md) |
 | Recorded proof per capability | [`proof-level-taxonomy-capability-matrix.md`](../reference/project-index/proof-level-taxonomy-capability-matrix.md) |
 | Red lines for outside-facing material | [`show-readiness-map.md`](../reference/project-index/show-readiness-map.md) |
 | The milestone + spine control issues | [#1746](https://github.com/InterCooperative-Network/icn/issues/1746) · [#2141](https://github.com/InterCooperative-Network/icn/issues/2141) |

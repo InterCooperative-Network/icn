@@ -3575,6 +3575,22 @@ domain_tags = ["pilot", "nycn", "summit", "run-stage", "package-boundary"]
 recommended_action = "keep"
 last_reviewed = "2026-06-26"
 
+[docs."docs/pilots/summit-ops-closeout-continuity-packet.md"]
+category = "reference"
+status = "living"
+title = "Summit Ops Closeout Continuity Packet (generic ICN)"
+description = "Docs-only map of the Summit Ops 'close the loop' lifecycle stage: how a package turns post-event work (attendance summary, speaker/sponsor follow-up, reimbursements, accessibility lessons, incident closeout, volunteer appreciation, budget reconciliation, public recap, next-year continuity, evidence export, follow-up register) into repo-safe shapes and future ICN action-card/receipt/evidence candidates. L1 declared shapes / rehearsal-ready — not fixture-backed, not runtime proof; categorical/fictional only, no private data; no pilot-UI change (#2099 gates that)."
+last_updated = "2026-06-26"
+owner = "matt"
+audiences = ["team", "organizers"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["pilot", "nycn", "summit", "closeout", "package-boundary"]
+recommended_action = "keep"
+last_reviewed = "2026-06-26"
+
 [docs."docs/pilots/summit-ops-registration-action-card-proof-loop.md"]
 category = "reference"
 status = "living"
