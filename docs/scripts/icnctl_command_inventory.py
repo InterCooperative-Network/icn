@@ -163,6 +163,13 @@ STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     # by these arms).
     "contract prepare": (STATUS_LIVE, "local contract-deployment preparation `handle_contract_prepare` (reads contract JSON, signs with keystore, `std::fs::write`s the deployment file); sync, no client/network (`icn/bins/icnctl/src/main.rs` ContractCommands::Prepare)"),
     "contract sign": (STATUS_LIVE, "local deployment-file co-signing `handle_contract_sign` (reads deployment file, signs with keystore, `std::fs::write`s output); sync, no client/network (`icn/bins/icnctl/src/main.rs` ContractCommands::Sign)"),
+    # live (pass 6, issue #2113) — local-only `commons` identity readouts (read the keystore, print
+    # status/guidance; no network) and the local `institution bootstrap` validate/plan helpers
+    # (`validate_package` / `build_plan_report` are synchronous `pub fn`s — structurally no async/network).
+    "commons status": (STATUS_LIVE, "local Commons-holder status: reads the keystore via `AgeKeyStore` and prints identity/enrollment status; no network (`icn/bins/icnctl/src/main.rs` CommonsCommands::Status)"),
+    "commons enroll": (STATUS_LIVE, "local: reads the keystore for the DID and prints enrollment guidance (the actual enrollment is the out-of-band steward/in-person flow); no network (`icn/bins/icnctl/src/main.rs` CommonsCommands::Enroll)"),
+    "institution bootstrap validate": (STATUS_LIVE, "local package validation `validate_package` (sync `pub fn`, reads the package dir, no network) (`icn/bins/icnctl/src/institution_bootstrap.rs` InstitutionCommands::Bootstrap::Validate)"),
+    "institution bootstrap plan": (STATUS_LIVE, "local bootstrap plan report `build_plan_report` (sync `pub fn`, no network) (`icn/bins/icnctl/src/institution_bootstrap.rs` InstitutionCommands::Bootstrap::Plan)"),
     # partial — real work, but depends on incomplete/unproven runtime; not integration-tested end-to-end.
     "audit verify": (STATUS_PARTIAL, "concrete gateway client `GET /v1/receipts/chain/{hash}` (`icn/bins/icnctl/src/main.rs` AuditCommands::Verify); chain-verification algorithm covered by `icn/bins/icnctl/tests/audit_verify_test.rs` (inlined copy); end-to-end against a live gateway not integration-tested"),
     "preflight": (STATUS_PARTIAL, "runs real local health checks (data-dir, keystore open via `AgeKeyStore`) in `handle_preflight_command`; the gateway-connectivity check requires a running gateway; not integration-tested"),
@@ -203,6 +210,17 @@ STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     "contract deploy-signed": (STATUS_PARTIAL, "daemon RPC deploy of a pre-signed deployment file via `handle_contract_deploy_signed(.., &mut client)` (`icn/bins/icnctl/src/main.rs` ContractCommands::DeploySigned); requires a running daemon, not integration-tested"),
     "contract call": (STATUS_PARTIAL, "daemon RPC `client.call_contract()` (`icn/bins/icnctl/src/main.rs` ContractCommands::Call); \"Is icnd running?\"; requires a running daemon, not integration-tested"),
     "contract list": (STATUS_PARTIAL, "daemon RPC `client.list_contracts()` (`icn/bins/icnctl/src/main.rs` ContractCommands::List); requires a running daemon, not integration-tested"),
+    # partial (pass 6, issue #2113) — `dispute` daemon RPC clients, the `commons anchor` gateway
+    # client, and `institution bootstrap apply` (async gateway client). Each makes a real client
+    # call but depends on a running daemon/gateway and has no binary-spawning e2e test.
+    "dispute file": (STATUS_PARTIAL, "daemon RPC `client.dispute_file()` (`icn_rpc::RpcClient`) (`icn/bins/icnctl/src/main.rs` DisputeCommands::File); \"Is icnd running?\"; requires a running daemon, not integration-tested"),
+    "dispute list": (STATUS_PARTIAL, "daemon RPC `client.dispute_list()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::List); requires a running daemon, not integration-tested"),
+    "dispute get": (STATUS_PARTIAL, "daemon RPC `client.dispute_get()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::Get); requires a running daemon, not integration-tested"),
+    "dispute add-evidence": (STATUS_PARTIAL, "daemon RPC `client.dispute_add_evidence()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::AddEvidence); requires a running daemon, not integration-tested"),
+    "dispute assign-mediator": (STATUS_PARTIAL, "daemon RPC `client.dispute_assign_mediator()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::AssignMediator); requires a running daemon, not integration-tested"),
+    "dispute resolve": (STATUS_PARTIAL, "daemon RPC `client.dispute_resolve()` (`icn/bins/icnctl/src/main.rs` DisputeCommands::Resolve); requires a running daemon, not integration-tested"),
+    "commons anchor": (STATUS_PARTIAL, "gateway client `reqwest GET {gateway}/v1/commons/anchor/by-did/{did}` (gateway from `ICN_GATEWAY` env) (`icn/bins/icnctl/src/main.rs` CommonsCommands::Anchor); requires a running gateway, not integration-tested"),
+    "institution bootstrap apply": (STATUS_PARTIAL, "async `apply_package` posts the package to the gateway via `reqwest::Client` (`icn/bins/icnctl/src/institution_bootstrap.rs` InstitutionCommands::Bootstrap::Apply); requires a running gateway, not integration-tested"),
     # planned — handler is an explicit placeholder / prints "not yet implemented".
     "charter deploy": (STATUS_PLANNED, "handler validates the CCL doc locally, then prints \"Not yet implemented — charter deployment requires gateway integration\" (`icn/bins/icnctl/src/main.rs` CharterCommands::Deploy)"),
     "steward check-vui": (STATUS_PLANNED, "placeholder; validates input then prints \"VUI registry check requires running steward daemon\" (`icn/bins/icnctl/src/main.rs` StewardCommands::CheckVui)"),
@@ -211,6 +229,11 @@ STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     "steward start-recovery": (STATUS_PLANNED, "placeholder for the full SDIS recovery flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::StartRecovery)"),
     "steward recovery-status": (STATUS_PLANNED, "placeholder; ceremony status check requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::RecoveryStatus)"),
     "steward issue-token": (STATUS_PLANNED, "placeholder for the full SDIS token issuance flow; requires a running steward daemon (`icn/bins/icnctl/src/main.rs` StewardCommands::IssueToken)"),
+    # planned (pass 6, issue #2113) — `commons` membership ops that print
+    # "this feature is pending gateway API implementation" (no client call yet).
+    "commons affiliations": (STATUS_PLANNED, "prints \"Affiliation lookup requires gateway integration. This feature is pending gateway API implementation.\" — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Affiliations)"),
+    "commons join": (STATUS_PLANNED, "prints \"Join request requires gateway integration. This feature is pending gateway API implementation.\" — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Join)"),
+    "commons leave": (STATUS_PLANNED, "prints \"Leave request requires gateway integration. This feature is pending gateway API implementation.\" — no client call (`icn/bins/icnctl/src/main.rs` CommonsCommands::Leave)"),
 }
 
 CFG_RE = re.compile(r"^\s*#\[cfg\((.+)\)\]\s*$")
