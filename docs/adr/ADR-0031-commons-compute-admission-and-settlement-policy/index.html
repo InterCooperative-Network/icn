@@ -42,7 +42,7 @@ View source on GitHub →
 <h2>Status</h2>
 <p><strong>Accepted (2026-04-26).</strong> Back-fill of the operational policy that has shipped with the commons pool and settlement engine. ADR-0005 set the commons-credit settlement direction; this ADR records what is enforced today.</p>
 <h2>Context</h2>
-<p>ICN&#39;s commons compute is the shared-infrastructure layer: members and federated peers contribute compute capacity to a pool, and consumers draw from it under a trust-gated admission policy. Settlement runs on mutual credit, balanced earn/spend journal entries (ADR-0005), and is regulatory-safe in vocabulary (ADR-0004).</p>
+<p>ICN&#39;s commons compute is the shared-infrastructure layer: members and federated peers contribute compute capacity to a pool, and consumers draw from it under a trust-gated admission policy. Settlement runs on mutual credit, balanced contribution/allocation journal entries (ADR-0005), and is regulatory-safe in vocabulary (ADR-0004).</p>
 <p>The pool, admission policy, and settlement engine have been implemented and tested for some time. The pieces:</p>
 <ul>
 <li><code>CommonsPool</code> tracks affiliated and unaffiliated participant budgets per resource (cpu / memory / storage), with sybil rejection.</li>
