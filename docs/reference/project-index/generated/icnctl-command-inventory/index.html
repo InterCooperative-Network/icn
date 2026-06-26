@@ -55,7 +55,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </ul>
 <h2>Snapshot</h2>
 <ul>
-<li>Source commit: <code>a3cdd5ac46917504962209af17f117909542df2e</code></li>
+<li>Source commit: <code>791af47ea51abb0e29dbfa0643d67b5507689a11</code></li>
 <li>Source scanned: <code>icn/bins/icnctl/src/**</code> (clap <code>#[derive(Subcommand)]</code> / <code>#[derive(Parser)]</code> tree)</li>
 </ul>
 <h2>Summary</h2>
@@ -63,7 +63,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <li><strong>Total leaf commands (default build): 162</strong></li>
 <li>Top-level command groups: 33</li>
 <li>By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2</li>
-<li>By status (curated, see section below): live 38 · partial 103 · planned 13 · unknown / needs local verification 8</li>
+<li>By status (curated, see section below): live 38 · partial 107 · planned 13 · unknown / needs local verification 4</li>
 <li>Proof level: every command is <code>L1</code> (declaration exists in source).</li>
 <li><strong>Feature-gated commands (NOT in the default build, excluded from the counts above): 1</strong> (see section below).</li>
 <li>Unparsed / unresolved candidates: 0 (see section below).</li>
@@ -597,25 +597,25 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl policy list</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:531</td>
 </tr>
 <tr>
 <td><code>icnctl policy remove</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:534</td>
 </tr>
 <tr>
 <td><code>icnctl policy set</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:513</td>
 </tr>
 <tr>
 <td><code>icnctl policy show</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:524</td>
 </tr>
@@ -1130,7 +1130,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td>partial</td>
-<td>103</td>
+<td>107</td>
 </tr>
 <tr>
 <td>fixture-demo</td>
@@ -1142,10 +1142,10 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td>unknown / needs local verification</td>
-<td>8</td>
+<td>4</td>
 </tr>
 </tbody></table>
-<h3>Classified commands (154)</h3>
+<h3>Classified commands (158)</h3>
 <p>Every non-<code>unknown</code> command, with its evidence basis. (All other default-build commands carry <code>unknown / needs local verification</code>.)</p>
 <table>
 <thead>
@@ -1851,6 +1851,30 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td>partial</td>
 <td>daemon RPC client <code>client.get_status()</code> then optionally <code>client.get_nat_status()</code> via <code>create_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> NetworkCommands::Status); requires a running daemon, not integration-tested</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:850</td>
+</tr>
+<tr>
+<td><code>icnctl policy list</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;policy.list&quot;)</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> PolicyCommands::List); method registered server.rs:774; requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:531</td>
+</tr>
+<tr>
+<td><code>icnctl policy remove</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;policy.remove&quot;)</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> PolicyCommands::Remove); method registered server.rs:777; requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:534</td>
+</tr>
+<tr>
+<td><code>icnctl policy set</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;policy.set&quot;)</code> via <code>create_authenticated_rpc_client</code> (reads the policy JSON file locally first) (<code>icn/bins/icnctl/src/main.rs</code> PolicyCommands::Set); method registered <code>icn/crates/icn-rpc/src/server.rs</code>:768; requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:513</td>
+</tr>
+<tr>
+<td><code>icnctl policy show</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;policy.get&quot;)</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> PolicyCommands::Show); method registered server.rs:771; requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:524</td>
 </tr>
 <tr>
 <td><code>icnctl preflight</code></td>
