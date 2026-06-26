@@ -58,7 +58,7 @@ These are real and may be presented honestly to organizers, **bounded to the rec
 | Show this | Declaration evidence (L1) | Recorded proof | Honest framing |
 |---|---|---|---|
 | Decision → action → receipt proof loop (proposal/vote, action_item/complete, meeting/attend) | route `/gov/me/action-cards` (`get_my_action_cards` @ `icn/apps/governance/src/http/configure.rs:849`), completion-receipt route (`:682`); `icnctl audit verify` (`main.rs:330`), `icnctl receipts chain` (`:281`) | `L5` live single-node (matrix rows 1, 8); `L4` one-command local proof loop (matrix row 5) | "live daemon/gateway proof of the governed receipt chain on a local ephemeral node — proof of path, not deployment readiness; three of five action-card source paths." |
-| Member standing / action-card / scopes read models (the shapes) | routes `/gov/me/standing` (`:845`), `/me/scopes` (`:844`), `/me/work` (`:846`) — `standing`/`action-cards` are OpenAPI-documented; `scopes`/`work` are not | `L5` live for the emitted action-card paths (matrix row 8) | "declared + (for standing/action-cards) OpenAPI-documented member-facing read models; fixture-backed in the shell's demo panes." Do not assert every `/me/*` route is live. |
+| Member standing / action-card / scopes read models (the shapes) | routes `/gov/me/standing` (`:845`), `/gov/me/scopes` (`:844`), `/gov/me/work` (`:846`) — `standing`/`action-cards` are OpenAPI-documented; `scopes`/`work` are not | `L5` live for the emitted action-card paths (matrix row 8) | "declared + (for standing/action-cards) OpenAPI-documented member-facing read models; fixture-backed in the shell's demo panes." Do not assert every `/gov/me/*` route is live. |
 | Fixture-backed organizer rehearsal shell | n/a (UI fixtures, not routes/commands) | `L2` fixture-backed (matrix row 7); `web/pilot-ui/fixtures/icn-organizer-demo/` | "a bounded rehearsal artifact in demo mode — no live daemon behind it; fictional fixtures only." |
 | DEV/DEMO appliance image — single-actor loop in one VM | n/a (image/profile) | `L5` stranger-runnable local proof (matrix row 11) | "one local DEV/DEMO node instance proving the single-actor loop — unsigned image, fictional data, not production, not a pilot, not federation, not multi-person." |
 | The thesis + roadmap posture | n/a | per [show-readiness-map](show-readiness-map.md) | Phase 2 in progress; NYCN the *intended* first partner; never a formal pilot / live federation. |
@@ -107,7 +107,7 @@ From the generated [route inventory](generated/route-inventory.md). Every entry 
 | `GET /gov/me/action-cards` | `get_my_action_cards` @ `configure.rs:849` | yes | L1 | L5 live, L6 partial (matrix row 8) |
 | `GET /gov/me/scopes` | `get_my_scopes` @ `configure.rs:844` | no | L1 | none recorded — `unknown / needs local verification` |
 | `GET /gov/me/work` | `get_my_work` @ `configure.rs:846` | no | L1 | none recorded — `unknown / needs local verification` |
-| `GET …/action-items/{item_id}/completion-receipt` | `get_action_item_completion_receipt` @ `configure.rs:682` | yes | L1 | L5 receipt-chain path (matrix rows 1, 8) |
+| `GET /gov/domains/{domain_id}/action-items/{item_id}/completion-receipt` | `get_action_item_completion_receipt` @ `configure.rs:682` | yes | L1 | L5 receipt-chain path (matrix rows 1, 8) |
 
 Reminder: OpenAPI presence proves a path is **documented**, not served; a served route does not prove it is public-safe ([runtime-surface-map](runtime-surface-map.md)).
 
@@ -153,7 +153,7 @@ The smallest claim-safe steps that move the rehearsal from "evidence exists" tow
 
 1. **Identify the minimal rehearsal path** — pin the single end-to-end story (standing → action card → discharge → receipt → evidence) to the specific routes/commands above, so facilitator and steward read from one path.
 2. **Map the steward/operator commands needed** — promote the steward-only `icnctl` set above into a per-command status pass (the [#2113](https://github.com/InterCooperative-Network/icn/issues/2113) follow-up): which are `gateway-backed` and proven, which remain `unknown / needs local verification`.
-3. **Map the routes/surfaces rendered to the organizer** — confirm which `/me/*` read models the shell actually renders, and bound each to its recorded proof (not its L1 declaration).
+3. **Map the routes/surfaces rendered to the organizer** — confirm which `/gov/me/*` read models the shell actually renders, and bound each to its recorded proof (not its L1 declaration).
 4. **Produce a plain-language preview/review packet** — bind the pending-publish summary contract (matrix row 6) to a facilitator-readable preview, no jargon/URNs/hashes as primary labels (accessibility gate).
 5. **Produce a no-terminal facilitator path** — a fixture-backed walkthrough a facilitator can show without a terminal, satisfying the [#1746](https://github.com/InterCooperative-Network/icn/issues/1746) definition of done, with the accessibility/privacy checklist applied as a gate.
 
