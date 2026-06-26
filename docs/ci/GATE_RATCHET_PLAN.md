@@ -114,12 +114,26 @@ Scope (by design, allowlist-based, to keep precision high): deployment/ops guida
 `docs/pilots` was measured low-noise (10 files, 1 bounded `ALLOWLIST` exception). Widening is a
 deliberate ratchet step taken as each surface is cleaned.
 
-NOT yet added (measured high-noise 2026-06-26): `docs/reference/project-index`, `docs/demo`,
-`docs/strategy`. These are claim-sensitive docs that *enumerate* the red-line phrases as
-nonclaim / "does not claim" lists, plus FAQ questions and roadmap targets — false positives the
-line-local negation guard cannot see. Adding them needs a precision step first (nonclaim-list /
-question / disclaimer-word handling), then a per-surface cleanup. This deliberately does NOT yet
-cover the broader SDK / website / user-manual fintech-vocabulary debt — tracked separately.
+Nonclaim-context precision (added 2026-06-26): the linter now exempts lines under nonclaim/red-line
+section headings (`Nonclaims`, `Non-goals`, `Red lines`, `Claims to avoid`, `What is not …`,
+`What … must not imply`, `Forbidden collapses`), explicit `does/must not claim …` lines, FAQ
+question lines (`Is this ready for production?`), and `nothing`/`none` disclaimers — all
+line-local + nearest-heading, no parsing. Self-tested (10 added cases). This cut the measured noise
+on the deferred roots but did not make them clean:
+
+| Candidate root | violations before precision | after precision | decision |
+|---|---|---|---|
+| `docs/reference/project-index` | 18 | **6** | **still deferred** (not added) |
+| `docs/demo` | 6 | 4 | deferred |
+| `docs/strategy` | 5 | 4 | deferred |
+
+`docs/reference/project-index` was the preferred next root but stays deferred: its 6 residual hits
+are a *different* false-positive class the narrow rules cannot suppress without risking real-claim
+masking — caveat-prefixed claims (`Unsafe …: <phrase>`), quoted avoid-lists (`"production-ready"`),
+risk-column table cells that *name* an overclaim, and checklist items describing nonclaims. Closing
+those needs either narrower per-pattern rules or a few bounded `ALLOWLIST` entries per file, taken
+as a later step. This deliberately does NOT yet cover the broader SDK / website / user-manual
+fintech-vocabulary debt — tracked separately.
 
 Remediation on failure: banner the dated doc (point to `docs/ci/CI_CURRENT_STATUS.md`), or fix the
 claim, or add an `ALLOWLIST` entry with a reason. Never weaken the patterns. Self-test:
