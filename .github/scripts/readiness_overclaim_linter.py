@@ -259,18 +259,46 @@ _QUOTE_CHARS = "\"'`"
 
 
 def _phrase_is_quoted(line, start, end):
-    """True if the matched phrase is a quoted item in an avoid/example LIST — wrapped
-    in a quote/backtick AND the line carries at least two segments of that same quote
-    char (an enumeration like `- "production-ready", "fully federated", ...`).
-
-    Requiring a list (>= 2 quoted segments) is deliberate: a single scare-quoted
-    phrase in an assertion (e.g. `ICN is "production-ready".`) is still a claim and
-    must NOT be exempted by quoting alone."""
+    """True if the matched phrase is wrapped in a matching quote/backtick pair
+    (e.g. `"production-ready"`). This is necessary but NOT sufficient to exempt the
+    phrase — the caller additionally requires the line to sit inside an explicit
+    avoid/forbidden list block (see `in_avoid_list`). Quoting alone never exempts a
+    claim: a scare-quoted assertion like `ICN is "production-ready".`, or a quoted
+    PAIR with no avoid framing like `"live federation" and "production-ready" are
+    now true.`, is still a claim and must warn."""
     before = line[start - 1] if start > 0 else ""
     after = line[end] if end < len(line) else ""
-    if before not in _QUOTE_CHARS or after != before:
-        return False
-    return line.count(before) >= 4  # >= 2 quoted segments of this quote char
+    return before in _QUOTE_CHARS and after == before
+
+
+# A line that INTRODUCES a list of things ICN must not claim — e.g.
+# "**Avoid** (these claim past the evidence):" or "Claims to avoid:". Such a
+# lead-in puts the following bullet block into "avoid-list" context, where quoted
+# red-line phrases are being forbidden, not asserted. Requires explicit
+# avoid/forbidden/nonclaim framing AND a trailing ":" (a list introducer), so a
+# benign sentence ending in ":" cannot open the exemption.
+_AVOID_LEADIN_FRAMING = re.compile(
+    r"(?i)\b("
+    r"avoid|forbidden|red[\s-]?lines?|nonclaims?|non-?claims?|claims? to avoid|"
+    r"claim past the evidence|do(?:es)? not claim|must not (?:claim|be|say|use)|"
+    r"do not (?:claim|say|use)|don't (?:claim|say|use)|never (?:claim|say)"
+    r")\b"
+)
+
+
+def _is_avoid_leadin(line):
+    """True if the line introduces an avoid/forbidden list (carries avoid framing
+    AND ends with ':' after trailing markdown emphasis is stripped)."""
+    core = line.rstrip().rstrip(" *_`")
+    return core.endswith(":") and bool(_AVOID_LEADIN_FRAMING.search(line))
+
+
+_LIST_ITEM_RE = re.compile(r"^\s*([-*+]|\d+[.)])\s+")
+
+
+def _is_list_item(line):
+    """True if the line is a markdown bullet / numbered list item."""
+    return bool(_LIST_ITEM_RE.match(line))
 
 
 def _labels_a_risk(line, end):
@@ -298,11 +326,21 @@ def scan_lines(rel_path, lines):
 
     violations = []
     in_nonclaim_section = False
+    in_avoid_list = False
     for line_num, line in enumerate(lines, start=1):
         heading = _HEADING_RE.match(line)
         if heading:
             # Entering/leaving a nonclaim/red-line section toggles the context.
             in_nonclaim_section = bool(NONCLAIM_SECTION_RE.search(heading.group(1)))
+            in_avoid_list = False  # a heading ends any open avoid-list block
+        elif _is_avoid_leadin(line):
+            # An "Avoid: ..."-style lead-in opens an avoid-list block: the bullet
+            # lines it introduces are red-line phrases being forbidden.
+            in_avoid_list = True
+        elif line.strip() and not _is_list_item(line):
+            # A non-blank, non-bullet line ends the block (blank lines and bullets
+            # keep it open so a lead-in can be separated from its list by a blank).
+            in_avoid_list = False
 
         # Whole-line/context exemptions: lines under a nonclaim/red-line section and
         # interrogative/FAQ prompts are not affirmative claims. (Nonclaim FRAMING is
@@ -322,12 +360,14 @@ def scan_lines(rel_path, lines):
                 # overclaim elsewhere on the line still warns): explicit nonclaim
                 # FRAMING in the matched phrase's segment ("Must not claim: ...",
                 # "Unsafe ...:", "nonclaims for ...", "without requiring ... live
-                # federation"); a quoted example phrase (`"production-ready"`); a
+                # federation"); a quoted example phrase INSIDE an avoid-list block
+                # (`- "production-ready", ...` under an "Avoid:" lead-in — quoting
+                # alone is NOT enough, the avoid framing must be in scope); a
                 # risk-labelled phrase ("live federation overclaim"); or a
                 # "<phrase> claim requires ..." meta-statement.
                 if (
                     NONCLAIM_LINE_RE.search(_framing_segment(line, m.start(), m.end()))
-                    or _phrase_is_quoted(line, m.start(), m.end())
+                    or (in_avoid_list and _phrase_is_quoted(line, m.start(), m.end()))
                     or _labels_a_risk(line, m.end())
                     or _describes_a_claim(line, m.end())
                 ):

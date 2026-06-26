@@ -196,16 +196,53 @@ class TestProjectIndexFP(unittest.TestCase):
         self.assertEqual(linter.scan_lines("x.md", [line]), [])
 
     def test_quoted_avoid_list_suppressed(self):
-        line = '- "production-ready", "fully federated", "live pilot", "secure by default"'
-        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+        # A quoted red-line phrase is exempt only INSIDE an explicit avoid-list
+        # block — the "**Avoid** ...:" lead-in (separated by a blank line, as in
+        # the real proof-level-taxonomy doc) puts the bullet into avoid context.
+        lines = [
+            "**Avoid** (these claim past the evidence):",
+            "",
+            '- "production-ready", "fully federated", "live pilot", "secure by default"',
+        ]
+        self.assertEqual(linter.scan_lines("x.md", lines), [])
 
     def test_single_scare_quoted_claim_still_warns(self):
-        # A lone scare-quoted phrase in an assertion is still a claim — only a
-        # quoted-phrase LIST (>= 2 quoted segments) is treated as an avoid-list.
+        # A lone scare-quoted phrase in an assertion (no avoid-list context) is
+        # still a claim — quoting alone never exempts.
         for line in ['ICN is "production-ready".', "The status is `production-ready`."]:
             v = linter.scan_lines("x.md", [line])
             self.assertEqual(len(v), 1, msg=line)
             self.assertEqual(v[0].rule, "production-ready", msg=line)
+
+    def test_quoted_pair_without_avoid_framing_still_warns(self):
+        # Regression for Codex review (#2230): two quoted phrases on a line is NOT
+        # an avoid-list. Without explicit avoid framing, a quoted affirmative
+        # assertion must warn — the old quote-count heuristic wrongly suppressed it.
+        line = 'Status: "live federation" and "production-ready" are now true.'
+        v = linter.scan_lines("x.md", [line])
+        self.assertEqual(len(v), 1)
+
+    def test_avoid_block_ends_at_heading_then_quoted_claim_warns(self):
+        # The avoid-list block is bounded: a heading closes it, so a quoted claim
+        # after the block still warns (the exemption cannot leak past its list).
+        lines = [
+            "**Avoid** (these claim past the evidence):",
+            '- "production-ready", "live pilot"',
+            "",
+            "## Status",
+            'ICN is "production-ready" now.',
+        ]
+        v = linter.scan_lines("x.md", lines)
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].line, 5)
+
+    def test_quoted_overclaim_without_leadin_warns(self):
+        # A bullet of quoted red-line phrases with NO preceding avoid lead-in is
+        # not in avoid context, so the quoted overclaim still warns.
+        line = '- "production-ready" and shipping today'
+        v = linter.scan_lines("x.md", [line])
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].rule, "production-ready")
 
     def test_risk_cell_overclaim_label_suppressed(self):
         line = "| Entity / federation / trust | implemented but partial | high: live federation overclaim |"
