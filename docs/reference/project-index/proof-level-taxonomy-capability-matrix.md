@@ -1,7 +1,7 @@
 ---
 Status: descriptive
 Canonical: no
-Last Reviewed: 2026-06-13
+Last Reviewed: 2026-06-26
 ---
 
 # Proof-Level Taxonomy and Capability Matrix
@@ -51,7 +51,7 @@ A surface can be `implemented` (status) yet only L2 (proof) because no integrati
 
 ## Capability matrix (organizer-rehearsal path)
 
-Evidence is grounded in merged commits on `main` and committed artifacts. **`STATE.md`'s last sync edit (2026-05-22) predates this cycle**, so it does not yet record [#1985](https://github.com/InterCooperative-Network/icn/pull/1985)→[#1999](https://github.com/InterCooperative-Network/icn/pull/1999); `STATE.md` remains the canonical per-PR record and should be read as lagging this matrix until its next sync. Where this matrix and a future `STATE.md` sync disagree, `STATE.md` wins.
+Evidence is grounded in merged commits on `main` and committed artifacts. [`STATE.md`](../../STATE.md) and [`PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md) are the canonical state documents and have been truth-synced through the later June 2026 cycle (the earlier [#1985](https://github.com/InterCooperative-Network/icn/pull/1985)→[#1999](https://github.com/InterCooperative-Network/icn/pull/1999) receipt-chain/rehearsal cycle is now recorded on `main`). This matrix is an indexed proof-level **view**, not the root state authority: where it and `STATE.md` / `PHASE_PROGRESS.md` disagree, the canonical state documents win (per the source-of-truth hierarchy in [`source-of-truth-map.md`](source-of-truth-map.md)).
 
 | # | Capability | Proof level | Status | Evidence (PR / issue) | Privacy boundary | Next |
 |---|---|---|---|---|---|---|
@@ -66,6 +66,7 @@ Evidence is grounded in merged commits on `main` and committed artifacts. **`STA
 | 9 | Private-data disclosure boundary / scoped vault | **L1** (design) | design-direction | [#1792](https://github.com/InterCooperative-Network/icn/issues/1792); [`artifact-registry-and-scoped-vault.md`](../../spec/artifact-registry-and-scoped-vault.md) | **no runtime enforcement**; privacy today is by exclusion | [#1792](https://github.com/InterCooperative-Network/icn/issues/1792) / [#1798](https://github.com/InterCooperative-Network/icn/issues/1798) / [#1767](https://github.com/InterCooperative-Network/icn/issues/1767) |
 | 10 | NYCN organizer rehearsal milestone (overall) | components at **L2/L4/L5**; **L7 OPEN** | implemented but partial | [#1746](https://github.com/InterCooperative-Network/icn/issues/1746) | no live private data; disclosure boundary design-only | [#1746](https://github.com/InterCooperative-Network/icn/issues/1746) |
 | 11 | DEV/DEMO appliance image — single-actor loop in one VM | **L5** (stranger-runnable local proof) | implemented (sealed July Demo Candidate 0.1) | [#2028](https://github.com/InterCooperative-Network/icn/pull/2028); `deploy/appliance/` (`ICN_APPLIANCE_DEMO_PROFILE=1`), [`DEMO_QUICKSTART.md`](../../../deploy/appliance/DEMO_QUICKSTART.md) | dev gates labeled; fictional fixture institution; image unsigned, not production | **single-actor only** — multi-person flow is a future lane, not built |
+| 12 | Summit Ops Registration Desk lane — action-card fixture | **L2** (fixture/demo) | fixture-backed | [#2209](https://github.com/InterCooperative-Network/icn/pull/2209); `web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json` + `standing.json` | fictional demo data only; no real attendee/registration data | render full action register — gate on [#2099](https://github.com/InterCooperative-Network/icn/issues/2099); [#1746](https://github.com/InterCooperative-Network/icn/issues/1746) |
 
 ### Per-capability detail
 
@@ -96,6 +97,8 @@ The table above is the scannable view. The prose below carries the honest claim-
 **10. NYCN organizer rehearsal milestone (overall) — components L2/L4/L5; L7 OPEN.** *Real now:* the kernel can prove (L5 receipt chain, L4 one-command rehearsal) and the rehearsal shell + contracts can rehearse (L2). *Fixture-only / mocked:* the integrated organizer-facing **operable** rehearsal — the participation surface joining the live proof loop to the rehearsal shell — does not exist yet. *Public/demo wording:* "fixture-backed organizer rehearsal plus a local proof loop; the operable participation surface is the open milestone — not a formal pilot, not live federation, not production." *Known gaps:* the participation surface ([#1746](https://github.com/InterCooperative-Network/icn/issues/1746)); disclosure enforcement ([#1792](https://github.com/InterCooperative-Network/icn/issues/1792)); the accessibility/privacy checklist below; the NYCN dogfood gossip-port preflight bug ([#1956](https://github.com/InterCooperative-Network/icn/issues/1956)); CI disk flake ([#1955](https://github.com/InterCooperative-Network/icn/issues/1955)).
 
 **11. DEV/DEMO appliance image — single-actor loop in one VM — L5 (stranger-runnable local proof).** *Real now:* `ICN_APPLIANCE_DEMO_PROFILE=1` produces a reproducible bootable **VM image** (a template, not a physical device) that a stranger can build from public main and boot in QEMU/KVM. A node instance booted from it serves the member-shell and runs the full single-actor spine — standing → action card → discharge → receipt → evidence/audit — plus an in-VM 13/13 governed receipt-chain audit (`sudo icn-demo-verify --chain`; the in-VM helpers run as root). *Fixture-only / mocked:* the institution is the fictional NYCN fixture package; the shell's `?mode=demo` panes are fixture-backed. *Terminology (use precisely):* the **appliance image** is a reproducible VM image/template; a **running node instance** is a VM booted from it; the **hypervisor host** (Proxmox/KVM/cloud/local machine) runs one or many node instances; org/domain assignment and any future QR claim ceremony apply to a **running node instance**, never to the generic image and never to a physical box. *Public/demo wording:* "one local DEV/DEMO node instance proving the single-actor loop — not production, not a pilot, not federation, not multi-person, unsigned image, fictional data." *Known gaps / next lanes (not built):* multi-person interaction (two-member action flow), QR node-claim ceremony, commons resource allocation.
+
+**12. Summit Ops Registration Desk lane — action-card fixture — L2 (fixture/demo).** *Real now:* a committed fictional Registration Desk `action_item`/`complete` ActionCard (`demo-card-action-item-complete-registration-001`) in `web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json`, with a matching demo Logistics Committee role granting `registration_desk` in `standing.json` (so the card is derivable from holder standing). Validated per-card against [`action-card.schema.json`](../../contracts/institution-package/action-card.schema.json), by `docs/scripts/validate-rehearsal-shell-fixtures.py`, and by the pilot-ui e2e `web/pilot-ui/tests/e2e/demo-fixture-preload.spec.js` + the "Rehearsal Fixture Bundle" CI gate ([#2209](https://github.com/InterCooperative-Network/icn/pull/2209)). Docs: [`summit-ops-registration-action-card-proof-loop.md`](../../pilots/summit-ops-registration-action-card-proof-loop.md), [`summit-ops-registration-fixture-shape.md`](../../pilots/summit-ops-registration-fixture-shape.md). *Fixture-only / mocked:* **entirely** — a committed fictional fixture the rehearsal shell loads/validates; there is no live daemon and no action-card→receipt runtime loop for this lane. *Public/demo wording:* "L2 fixture-backed Registration Desk card — committed fictional fixture, **not** runtime proof, **not** live NYCN action cards/receipts, **not** a node-hosted Summit Ops cockpit, **not** organizer-ready (L7), **not** a formal pilot, **not** production; no Google sync, no private data." *Known gaps / #2099 gating:* #2209 added **data fixtures only** — no pilot-UI code changed. Any future "render the registration action register in the shell" slice expands/touches pilot-UI surface behavior and should first clear [#2099](https://github.com/InterCooperative-Network/icn/issues/2099) (open: CodeQL DOM-XSS / missing-SRI triage in pilot UI / gateway static).
 
 ## Public / demo wording discipline
 
@@ -138,13 +141,13 @@ This map does not claim:
 - live federation between cooperatives;
 - private-data handling readiness (the disclosure boundary is design-only);
 - that the fixture-backed rehearsal shell runs against a live daemon;
-- that `STATE.md` already records the [#1985](https://github.com/InterCooperative-Network/icn/pull/1985)→[#1999](https://github.com/InterCooperative-Network/icn/pull/1999) cycle.
+- that any committed demo fixture (e.g. the Registration Desk card, row 12) is a runtime proof — committed fictional fixtures are L2 demo evidence only.
 
 ## When to update this map
 
 - A capability's strongest honest evidence changes (a new test, a live run, a recorded devnet proof) → bump its proof level.
 - A new capability enters the organizer-rehearsal path → add a row plus a detail block.
-- A `STATE.md` sync absorbs the [#1985](https://github.com/InterCooperative-Network/icn/pull/1985)→[#1999](https://github.com/InterCooperative-Network/icn/pull/1999) cycle → update the lag note above and reconcile.
+- A `STATE.md` / `PHASE_PROGRESS.md` sync changes a capability's recorded state → reconcile the affected rows here (the canonical state documents win).
 - The accessibility/privacy checklist or [#1746](https://github.com/InterCooperative-Network/icn/issues/1746) acceptance conditions change → revisit which capabilities may be called organizer-facing (L7).
 
 ## Where to read deeper

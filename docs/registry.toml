@@ -2556,7 +2556,7 @@ category = "reference"
 status = "living"
 title = "Proof-Level Taxonomy and Capability Matrix"
 description = "Proof-level taxonomy (L0-L8) as shared claim-boundary vocabulary, plus a capability matrix for the current organizer-rehearsal path. Supports #1746 and narrows #1796. Orthogonal to the project-coverage-matrix status vocabulary. Defers to STATE.md and PHASE_PROGRESS.md for current truth."
-last_updated = "2026-06-09"
+last_updated = "2026-06-26"
 owner = "matt"
 audiences = ["all", "team"]
 truth_class = "descriptive"
@@ -2565,7 +2565,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation", "proof-level", "rehearsal", "show-readiness"]
 recommended_action = "keep"
-last_reviewed = "2026-06-09"
+last_reviewed = "2026-06-26"
 
 [docs."docs/reference/project-index/invariants-catalog.md"]
 category = "reference"
