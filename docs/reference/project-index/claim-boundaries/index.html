@@ -1,0 +1,313 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Claim-Boundary Map | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>reference</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>project index</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>claim boundaries</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/reference/project-index/claim-boundaries.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Claim-Boundary Map</h1>
+<blockquote>
+<p>For current project truth, defer to <a href="/docs/STATE">`docs/STATE.md`</a>, <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>, current source/tests, and accepted ADRs/RFCs. This map is an <strong>operating manual</strong>, not a truth root.</p>
+</blockquote>
+<h2>1. Purpose</h2>
+<p>This guide collects ICN&#39;s already-existing firewall, proof-level, source-precedence, and show-readiness rules into one <strong>operational claim-boundary</strong> reference: the rule that <em>a claim must not outrun its evidence</em>, applied to inventories, PR bodies, generated artifacts, organizer-rehearsal docs, and public language.</p>
+<p>It is <strong>not</strong> a canonical truth source and adds <strong>no</strong> new status vocabulary. It routes to the documents that already own each rule. When this map and a canonical source disagree, the canonical source wins (see §3). There is deliberately no <code>docs/truth/</code> tree — a parallel truth root is exactly what the meaning-firewall and source-precedence discipline exist to prevent (see <a href="/docs/README">`README.md`</a> §Truth layer).</p>
+<h2>2. Two firewalls — do not conflate</h2>
+<p>ICN uses &quot;Meaning Firewall&quot; for an <strong>architectural</strong> boundary. The <strong>claim-boundary</strong> firewall is a separate, mostly-conventional discipline. Conflating them is itself a claim-discipline error: the architectural CI checks do <strong>not</strong> police claims, and the claim conventions do <strong>not</strong> police kernel imports.</p>
+<table>
+<thead>
+<tr>
+<th>Firewall</th>
+<th>What it asserts</th>
+<th>Where it is defined</th>
+<th>Enforcement status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Architectural Meaning Firewall</strong></td>
+<td>Apps translate meaning into constraints; the kernel enforces constraints <strong>without understanding meaning</strong>. Kernel crates must not import/depend on domain/app crates.</td>
+<td><a href="/docs/architecture/KERNEL_APP_SEPARATION">`KERNEL_APP_SEPARATION.md`</a>, <a href="/docs/architecture/meaning-firewall-audit">`meaning-firewall-audit.md`</a>, onboarding <a href="/docs/onboarding/path/phase-2-architecture/05-the-meaning-firewall">`05-the-meaning-firewall.md`</a></td>
+<td><strong>Tool-enforced (partial).</strong> <code>scripts/check-meaning-firewall.sh</code> (kernel <code>use icn_trust::</code>, with known migrations #865/#866/#867) and <code>.github/scripts/firewall_denylist.py</code> (kernel→domain crate deps, #1007). Migration not complete; some couplings tracked, not yet zero.</td>
+</tr>
+<tr>
+<td><strong>Claim-boundary firewall</strong></td>
+<td>Docs, PRs, inventories, demos, and public pages must not claim more than the evidence proves.</td>
+<td>This map; <a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">`proof-level-taxonomy-capability-matrix.md`</a>; <a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">`show-readiness-map.md`</a>; <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">`source-of-truth-map.md`</a>.</td>
+<td><strong>Mostly convention.</strong> Narrow tool coverage only: <code>compliance_linter.py</code> (fintech vocabulary on API surfaces), <code>readiness_overclaim_linter.py</code> (scans <code>docs/deployment</code> + <code>docs/operations/deployment</code>; ~9 patterns across production-readiness / live-federation / blanket-operability / general-availability / governance-completion), <code>doc_control_check.py</code> (doc truth-class front-matter), the route-inventory <code>--check</code> gate. The forbidden collapses in §5 are <strong>not</strong> mechanically enforced.</td>
+</tr>
+</tbody></table>
+<h2>3. Source-of-truth hierarchy</h2>
+<p>Full rules and conflict resolution: <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">`source-of-truth-map.md`</a>. Summary order (highest first) — <strong>this map does not replace it</strong>:</p>
+<ol>
+<li>Current source code and tests (test-only fixtures prove test behavior, not production readiness)</li>
+<li><code>docs/STATE.md</code> and <code>docs/PHASE_PROGRESS.md</code></li>
+<li>Accepted ADRs/RFCs (proposed/draft = design direction, not shipped)</li>
+<li>Recent merged PR bodies / issue-closure notes / review dispositions</li>
+<li>Runtime contracts, schemas, OpenAPI surfaces, contract docs</li>
+<li>Project-index maps (navigation; route to truth, do not override it)</li>
+<li>Architecture / strategy / design-direction docs</li>
+<li>Generated records (prove files existed at generation time, not current truth)</li>
+<li>Historical / archive material (archaeology only)</li>
+</ol>
+<h2>4. Status vs proof level</h2>
+<p>Two <strong>orthogonal</strong> axes; carry both. Detail: <a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">`proof-level-taxonomy-capability-matrix.md`</a>.</p>
+<ul>
+<li><strong>Status</strong> answers <em>&quot;is the code written, and how completely?&quot;</em> (<code>live</code>/<code>partial</code>/<code>planned</code>/<code>fixture-demo</code>/<code>unknown</code>, or the <code>source-of-truth-map.md</code> implementation labels).</li>
+<li><strong>Proof level (L0–L8)</strong> answers <em>&quot;how much verification evidence stands behind the claim?&quot;</em> (<code>L0</code> named → <code>L1</code> schema/contract → <code>L2</code> unit → <code>L3</code> integration → <code>L4</code> local proof loop → <code>L5</code> live daemon/gateway → <code>L6</code> multi-node/devnet → <code>L7</code> partner/organizer rehearsal → <code>L8</code> production hardening).</li>
+</ul>
+<p>Load-bearing consequences:</p>
+<ul>
+<li>A <code>live</code> or <code>partial</code> status is <strong>not</strong> a production-readiness claim.</li>
+<li>A static generated inventory (clap-tree scan, route scan) is <strong>L1</strong> — it proves a surface is <em>declared</em>, not that its handler runs, unless stronger evidence (a test, a live run) is explicitly cited.</li>
+</ul>
+<h2>5. Forbidden collapses</h2>
+<p>Each row pairs a tempting overclaim with the minimum evidence that would license the stronger claim. &quot;Enforced today?&quot; states honestly whether tooling catches the collapse or it rests on review convention.</p>
+<table>
+<thead>
+<tr>
+<th>Unsafe collapse (do not assert)</th>
+<th>Minimum evidence to license it</th>
+<th>Where to verify</th>
+<th>Enforced today?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>declaration exists ⇒ implementation works</td>
+<td>a test, or handler-body read showing real work</td>
+<td>source; tests</td>
+<td>No (convention)</td>
+</tr>
+<tr>
+<td>OpenAPI documents a path ⇒ it is mounted/complete/correct</td>
+<td>the route is mounted in the gateway router and behaves</td>
+<td>gateway router + handler; <code>generated/route-inventory.md</code></td>
+<td>No (convention)</td>
+</tr>
+<tr>
+<td>route registered ⇒ auth/correctness/show-safe</td>
+<td>auth gate + correctness test; accessibility/privacy review for show</td>
+<td>handler + tests; §9 red lines</td>
+<td>No (convention)</td>
+</tr>
+<tr>
+<td>client call exists ⇒ server/daemon method is wired</td>
+<td>the cited RPC method is registered in daemon dispatch (or the route exists server-side)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-rpc/src/server.rs">`icn/crates/icn-rpc/src/server.rs`</a>; <code>generated/route-inventory.md</code></td>
+<td>No (convention)</td>
+</tr>
+<tr>
+<td><code>partial</code> ⇒ <code>live</code></td>
+<td>local-only operation, or binary-spawning e2e proof</td>
+<td>handler; <code>icn/bins/icnctl/tests/**</code></td>
+<td>No (convention)</td>
+</tr>
+<tr>
+<td><code>live</code> ⇒ production-ready</td>
+<td>hardening: security/privacy/recovery/observability (L8)</td>
+<td><code>show-readiness-map.md</code>; <code>STATE.md</code></td>
+<td>Narrow: <code>readiness_overclaim_linter.py</code> (deployment/ops docs only)</td>
+</tr>
+<tr>
+<td>fixture/demo data ⇒ live participant state</td>
+<td>a live daemon/gateway run, not a committed fixture</td>
+<td><code>proof-level-taxonomy</code> rows 7/11/12</td>
+<td>No (convention)</td>
+</tr>
+<tr>
+<td>fixture-backed shell ⇒ organizer-ready rehearsal</td>
+<td>L7 accessibility/privacy checklist <strong>and</strong> #1746 acceptance</td>
+<td><code>proof-level-taxonomy</code> §accessibility gate; #1746</td>
+<td>No (convention)</td>
+</tr>
+<tr>
+<td>NYCN intended partner ⇒ formal pilot</td>
+<td>a signed agreement / committed launch</td>
+<td><code>show-readiness-map.md</code>; <code>STATE.md</code></td>
+<td>No (convention)</td>
+</tr>
+<tr>
+<td>federation commands/primitives ⇒ live federation</td>
+<td>two cooperatives federating in production (Phase 3)</td>
+<td><code>PHASE_PROGRESS.md</code>; <code>show-readiness-map.md</code></td>
+<td>Narrow: overclaim linter catches the &quot;live federation&quot; phrase, but only in the deployment/ops docs it scans</td>
+</tr>
+<tr>
+<td>local proof loop ⇒ multi-node/devnet/production</td>
+<td>a recorded L6 devnet/K3s run</td>
+<td><code>proof-level-taxonomy</code> (L5 vs L6)</td>
+<td>No (convention)</td>
+</tr>
+<tr>
+<td>website maturity band ⇒ evidence</td>
+<td>an ADR/issue/code-path/phase link that resolves</td>
+<td>ADR-0032 bands; ADR-0033 (<strong>proposed</strong>)</td>
+<td>Editorial only; ADR-0033 linter <strong>not built</strong></td>
+</tr>
+</tbody></table>
+<h2>6. Worked examples (the completed #2113 icnctl-status lane)</h2>
+<p>The icnctl command-status inventory (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/generated/icnctl-command-inventory">`generated/icnctl-command-inventory.md`</a>, #2113) is a concrete reference implementation of §5:</p>
+<ul>
+<li><strong>Declared ≠ implemented.</strong> The clap-tree scan is <strong>L1</strong> — it proves a command is <em>declared</em>. Status is a <em>separate</em>, curated signal verified from handler source, never inferred from the declaration.</li>
+<li><strong>#2222 (gov delegation) — client call ≠ server wiring.</strong> <code>gov vote delegate/delegations/revoke</code> call <code>governance.delegation.*</code>, but those methods are <strong>not registered</strong> in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-rpc/src/server.rs">`icn-rpc/src/server.rs`</a> and a repo-wide search finds them only in the CLI. Against a running daemon they return method-not-found, so they were <strong>not</strong> marked <code>partial</code> — left <code>unknown</code>.</li>
+<li><strong>#2223 (federation) — <code>partial</code> only after a server-side check.</strong> All 20 <code>partial</code> federation commands were classified <code>partial</code> <em>because</em> each cited <code>network.*</code>/<code>federation.*</code> RPC method was confirmed registered in <code>server.rs</code>, or the gateway route was confirmed in <code>route-inventory.md</code>. &quot;Does not claim live federation&quot; is on the nonclaims for exactly this reason.</li>
+<li><strong>#2224 (final unknowns) — honest non-collapse.</strong> <code>policy.*</code> became <code>partial</code> because the methods are registered in daemon dispatch; <code>init-coop</code> was left <strong><code>unknown</code></strong> because static review cannot honestly collapse its hybrid behavior (always-local keystore/config/bootstrap <strong>plus</strong> a best-effort gateway <code>POST /v1/gov/domains</code> gated on daemon-up <em>and</em> a token) into a single status.</li>
+</ul>
+<h2>7. Generated artifact rules</h2>
+<p>Per <a href="/docs/ci/GENERATED_TRUTH_DRIFT">`docs/ci/GENERATED_TRUTH_DRIFT.md`</a>:</p>
+<ul>
+<li>A generated artifact must state <strong>what it proves and does not prove</strong> (generated records prove files existed at generation time, not current truth — hierarchy rank 8).</li>
+<li><strong>Do not hand-edit generated files.</strong> Edit the generator and regenerate (<code>docs/scripts/icnctl_command_inventory.py --write</code>, <code>docs/scripts/route_inventory.py --write</code>).</li>
+<li>Every committed generated artifact must either <strong>have a drift check</strong> (wired into <code>generated-truth.yml</code> / <code>docs-freshness.yml</code>) <strong>or be explicitly declared on-demand with no committed snapshot</strong>. A committed generated artifact with neither silently rots.</li>
+<li><strong>Known current exception:</strong> <code>generated/route-inventory.md</code> is drift-gated (<code>route_inventory.py --check</code> runs in <code>docs-freshness.yml</code>), but <code>generated/icnctl-command-inventory.md</code> is committed and has a <code>--check</code> script that is <strong>not yet wired into any workflow</strong> — so today it <em>can</em> silently rot. Wiring that gate is a tracked follow-up (see §8 of this map&#39;s PR / the lane follow-ups); until then, treat the icnctl inventory&#39;s freshness as <strong>manually maintained</strong>, not CI-guaranteed.</li>
+<li>Generated records are orientation aids, not truth roots.</li>
+</ul>
+<h2>8. PR body / review checklist (inventory &amp; status PRs)</h2>
+<p>Reusable checklist — copy into the PR body or run it as a reviewer:</p>
+<ul>
+<li><input disabled="" type="checkbox"> Distinguishes <strong>mechanical discovery</strong> (clap/route scan) from <strong>curated status</strong>.</li>
+<li><input disabled="" type="checkbox"> Every <code>partial</code> cites <strong>server-side wiring</strong> (RPC method registered in <code>server.rs</code>) or <strong>route registration</strong> where relevant.</li>
+<li><input disabled="" type="checkbox"> Every <code>live</code> cites <strong>local-only</strong> behavior or <strong>binary-spawning e2e</strong> evidence.</li>
+<li><input disabled="" type="checkbox"> Every <code>planned</code> cites an explicit <strong>placeholder / <code>bail!</code> / &quot;not yet supported&quot;</strong> marker.</li>
+<li><input disabled="" type="checkbox"> <strong>Unknowns left unknown</strong> where evidence is ambiguous (not force-fit to a positive status).</li>
+<li><input disabled="" type="checkbox"> Uses <code>Refs #N</code> (not a closing keyword) when the issue&#39;s acceptance is not met.</li>
+<li><input disabled="" type="checkbox"> Includes <strong>nonclaims</strong> for production readiness, formal pilot readiness, live federation, Phase 2 completion, and (when relevant) #2082 and #2099.</li>
+</ul>
+<h2>9. Public / show-readiness language</h2>
+<p>Full list and the suggested demo narrative: <a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">`show-readiness-map.md`</a>; website convention: <a href="/docs/adr/ADR-0032-website-truth-boundary">ADR-0032</a> (accepted; maturity bands <code>strong</code>/<code>advancing</code>/<code>maturing</code>/<code>behind</code>/<code>not-yet</code>). Red lines to restate briefly:</p>
+<ul>
+<li>No crypto / web3 / token framing (no token, no native currency, receipts are evidentiary, not tradable).</li>
+<li>No financial-product framing (use settlement / unit / identity / position / obligation / allocation; the <code>compliance_linter.py</code> enforces the vocabulary on API surfaces).</li>
+<li>No NYCN commitment claim (intended first partner, not a signed/launched pilot).</li>
+<li>No live-federation claim (Phase 3, not Phase 2).</li>
+<li>No blanket production-readiness claim across the substrate.</li>
+</ul>
+<p><a href="/docs/adr/ADR-0033-public-maturity-claims-and-evidence-links">ADR-0033</a> (evidence-link requirement) is <strong>proposed, not implemented</strong> — do not claim evidence-link enforcement exists yet.</p>
+<h2>10. Non-goals</h2>
+<p>This map is <strong>not</strong>: a new canonical truth source; a replacement for <code>STATE.md</code> / <code>PHASE_PROGRESS.md</code>; a new status vocabulary; a new CI gate; a runtime behavior change; and <strong>not</strong> a claim that the claim-boundary rules are fully enforced (most are convention — §2, §5).</p>
+<h2>Where to read deeper</h2>
+<table>
+<thead>
+<tr>
+<th>You want…</th>
+<th>Read</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Which source wins on conflict</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">`source-of-truth-map.md`</a></td>
+</tr>
+<tr>
+<td>How strong the proof is (L0–L8)</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/proof-level-taxonomy-capability-matrix">`proof-level-taxonomy-capability-matrix.md`</a></td>
+</tr>
+<tr>
+<td>What is safe to show / red lines</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/show-readiness-map">`show-readiness-map.md`</a></td>
+</tr>
+<tr>
+<td>Which routes / <code>icnctl</code> commands back the rehearsal</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/organizer-rehearsal-operability-map">`organizer-rehearsal-operability-map.md`</a></td>
+</tr>
+<tr>
+<td>The architectural Meaning Firewall</td>
+<td><a href="/docs/architecture/KERNEL_APP_SEPARATION">`KERNEL_APP_SEPARATION.md`</a></td>
+</tr>
+<tr>
+<td>Generated-artifact drift discipline</td>
+<td><a href="/docs/ci/GENERATED_TRUTH_DRIFT">`docs/ci/GENERATED_TRUTH_DRIFT.md`</a></td>
+</tr>
+</tbody></table>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
