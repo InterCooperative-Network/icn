@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T02:06:21+00:00
+Generated: 2026-06-26T02:17:04+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -19,16 +19,17 @@ Generated: 2026-06-26T02:06:21+00:00
 
 ## Snapshot
 
-- Source commit: `b5b3867033d8c652af9fa1c1fdd3e9787595a78f`
+- Source commit: `1b9576e06a74658a45242ac19c7a934149bf5c08`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
 
-- **Total leaf commands discovered: 163**
+- **Total leaf commands (default build): 162**
 - Top-level command groups: 33
-- By role (curated, needs review): organizer 53 · operator 64 · developer 44 · maintainer 2
-- By status: every command is `unknown / needs local verification` (163) — see note above.
+- By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2
+- By status: every default-build command is `unknown / needs local verification` (162) — see note above.
 - Proof level: every command is `L1` (declaration exists in source).
+- **Feature-gated commands (NOT in the default build, excluded from the counts above): 1** (see section below).
 - Unparsed / unresolved candidates: 0 (see section below).
 
 ## Commands by role
@@ -162,7 +163,7 @@ Role is the **curated** top-level-group heuristic (needs review). `status` and `
 | `icnctl trust show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:710 |
 | `icnctl verify-backup` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:114 |
 
-### developer (44)
+### developer (43)
 
 | Command | Status | Proof | Source |
 |---|---|---|---|
@@ -188,7 +189,6 @@ Role is the **curated** top-level-group heuristic (needs review). `status` and `
 | `icnctl id init` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:565 |
 | `icnctl id rotate` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:571 |
 | `icnctl id show` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:568 |
-| `icnctl id upgrade-pq` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:579 |
 | `icnctl ledger balance` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:728 |
 | `icnctl ledger head` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:725 |
 | `icnctl ledger history` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:738 |
@@ -218,9 +218,17 @@ Role is the **curated** top-level-group heuristic (needs review). `status` and `
 | `icnctl coop entity-backfill-surrogates` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:249 |
 | `icnctl coop entity-report` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:230 |
 
+## Feature-gated commands (not in the default build)
+
+These commands are guarded by a Cargo `#[cfg(feature = …)]` and are **absent from the default `icnctl` build** (`icn/bins/icnctl/Cargo.toml` has `default = []`). They are **excluded** from the counts and role tables above and only exist when the named feature is enabled at build time.
+
+| Command | Required cfg | Role (curated) | Proof | Source |
+|---|---|---|---|---|
+| `icnctl id upgrade-pq` | `cfg(feature = "post-quantum")` | developer | L1 | `icn/bins/icnctl/src/main.rs`:579 |
+
 ## Commands by status
 
-All 163 discovered commands carry the conservative status `unknown / needs local verification`. The static clap scan cannot mechanically distinguish `implemented` / `implemented but partial` / `fixture-backed` / `gateway-backed` / `docs-only / design-direction` / `planned`; that per-command classification is a human/runtime verification follow-up (so demo/dev-gated commands are never presented here as live).
+All 162 default-build commands carry the conservative status `unknown / needs local verification`. The static clap scan cannot mechanically distinguish `implemented` / `implemented but partial` / `fixture-backed` / `gateway-backed` / `docs-only / design-direction` / `planned`; that per-command classification is a human/runtime verification follow-up (so demo/dev-gated commands are never presented here as live).
 
 ## Unparsed / unknown candidates
 
@@ -229,6 +237,6 @@ All 163 discovered commands carry the conservative status `unknown / needs local
 ## Safe vs unsafe claims (examples)
 
 - ✅ Safe: "`icnctl api export-openapi` is declared in the CLI at this commit (L1)."
-- ✅ Safe: "`icnctl` declares 163 commands across these groups; role grouping is a curated navigation aid pending review."
+- ✅ Safe: "`icnctl` declares 162 commands across these groups; role grouping is a curated navigation aid pending review."
 - ❌ Unsafe: "`icnctl gov …` is organizer-ready" / "this command is live in production" / "this command is safe for non-technical organizers" — none of that is established by a declaration scan.
 

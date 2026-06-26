@@ -96,6 +96,7 @@ ROLE_BY_GROUP: dict[str, str] = {
 UNIFORM_STATUS = "unknown / needs local verification"
 PROOF_LEVEL = "L1"
 
+CFG_RE = re.compile(r"^\s*#\[cfg\((.+)\)\]\s*$")
 ENUM_RE = re.compile(r"#\[derive\([^)]*\bSubcommand\b[^)]*\)\]")
 ENUM_DECL_RE = re.compile(r"^\s*(?:pub\s+)?enum\s+([A-Za-z_]\w*)\s*\{")
 # A variant at enum top level: `Name`, `Name,`, `Name {`, or `Name(Type)`. Group 3 is the
@@ -163,6 +164,7 @@ def parse_enums(text: str, rel: str) -> dict[str, list[dict]]:
             variants: list[dict] = []
             depth = 0
             started = False
+            pending_cfg: str | None = None  # a `#[cfg(...)]` seen since the last variant
             k = j
             while k < n:
                 line = lines[k]
@@ -174,19 +176,27 @@ def parse_enums(text: str, rel: str) -> dict[str, list[dict]]:
                     continue
                 # Only treat a line as a variant when at the enum's own brace depth (1).
                 if depth == 1:
-                    vm = VARIANT_RE.match(line)
-                    if vm:
-                        delegates = None
-                        if vm.group(3):
-                            # `Name(Type)` — strip module path, take the final segment.
-                            delegates = vm.group(3).strip().split("::")[-1]
-                        elif vm.group(4) == "{":
-                            # Struct variant — may delegate via a nested subcommand field.
-                            delegates = struct_variant_delegation(lines, k)
-                        variants.append(
-                            {"variant": vm.group(1), "delegates_to": delegates,
-                             "line": k + 1, "file": rel}
-                        )
+                    cm = CFG_RE.match(line)
+                    if cm:
+                        # `#[cfg(...)]` on a variant (e.g. `#[cfg(feature = "post-quantum")]`)
+                        # means the command only exists when that cfg is active. Attach it to
+                        # the next variant. (Field-level cfgs live at depth 2 and are ignored.)
+                        pending_cfg = cm.group(1).strip()
+                    else:
+                        vm = VARIANT_RE.match(line)
+                        if vm:
+                            delegates = None
+                            if vm.group(3):
+                                # `Name(Type)` — strip module path, take the final segment.
+                                delegates = vm.group(3).strip().split("::")[-1]
+                            elif vm.group(4) == "{":
+                                # Struct variant — may delegate via a nested subcommand field.
+                                delegates = struct_variant_delegation(lines, k)
+                            variants.append(
+                                {"variant": vm.group(1), "delegates_to": delegates,
+                                 "line": k + 1, "file": rel, "cfg": pending_cfg}
+                            )
+                            pending_cfg = None
                 depth += line.count("{") - line.count("}")
                 if depth <= 0:
                     break
@@ -219,16 +229,19 @@ def build_tree() -> tuple[list[dict], list[str]]:
 
     seen_enums: set[str] = set()
 
-    def walk(enum_name: str, prefix: list[str]) -> None:
+    def walk(enum_name: str, prefix: list[str], cfg: str | None) -> None:
         if enum_name in seen_enums:  # cycle guard (none expected)
             return
         seen_enums.add(enum_name)
         for v in enums[enum_name]:
             kebab = camel_to_kebab(v["variant"])
             path = prefix + [kebab]
+            # A command is feature-gated if it OR any ancestor group is cfg-gated.
+            vcfg = v.get("cfg")
+            combined = " && ".join(c for c in (cfg, vcfg) if c) or None
             dele = v["delegates_to"]
             if dele and dele in enums:
-                walk(dele, path)
+                walk(dele, path, combined)
             else:
                 if dele and dele not in enums:
                     # Tuple variant whose type is not a parsed Subcommand enum —
@@ -243,11 +256,12 @@ def build_tree() -> tuple[list[dict], list[str]]:
                         "group": path[0],
                         "file": v["file"],
                         "line": v["line"],
+                        "cfg": combined,
                     }
                 )
         seen_enums.discard(enum_name)
 
-    walk(TOP_ENUM, [])
+    walk(TOP_ENUM, [], None)
     leaves.sort(key=lambda x: x["path"])
     return leaves, unparsed
 
@@ -257,18 +271,27 @@ def md_escape(s: str) -> str:
 
 
 def render(leaves: list[dict], unparsed: list[str], commit: str) -> str:
+    # A command guarded by `#[cfg(feature = …)]` is NOT present in the default build
+    # (`icnctl` Cargo.toml has `default = []`). Count those separately so the default-build
+    # surface and totals are not inflated (issue #2113 review).
+    default_cmds = [c for c in leaves if not c.get("cfg")]
+    gated_cmds = [c for c in leaves if c.get("cfg")]
+
     by_role: dict[str, list[dict]] = {}
     role_counts: dict[str, int] = {}
     group_set = set()
-    for c in leaves:
+    for c in default_cmds:
         role = ROLE_BY_GROUP.get(c["group"], "unknown")
         c["role"] = role
         by_role.setdefault(role, []).append(c)
         role_counts[role] = role_counts.get(role, 0) + 1
         group_set.add(c["group"])
+    for c in gated_cmds:
+        c["role"] = ROLE_BY_GROUP.get(c["group"], "unknown")
+        group_set.add(c["group"])
 
     now = datetime.now(timezone.utc).replace(microsecond=0).isoformat()
-    total = len(leaves)
+    total = len(default_cmds)
     role_order = ["organizer", "operator", "developer", "agent", "maintainer", "unknown"]
 
     o: list[str] = []
@@ -310,12 +333,14 @@ def render(leaves: list[dict], unparsed: list[str], commit: str) -> str:
     o.append("")
     o.append("## Summary")
     o.append("")
-    o.append(f"- **Total leaf commands discovered: {total}**")
+    o.append(f"- **Total leaf commands (default build): {total}**")
     o.append(f"- Top-level command groups: {len(group_set)}")
     o.append("- By role (curated, needs review): "
              + " · ".join(f"{r} {role_counts.get(r, 0)}" for r in role_order if role_counts.get(r, 0)))
-    o.append(f"- By status: every command is `{UNIFORM_STATUS}` ({total}) — see note above.")
+    o.append(f"- By status: every default-build command is `{UNIFORM_STATUS}` ({total}) — see note above.")
     o.append(f"- Proof level: every command is `{PROOF_LEVEL}` (declaration exists in source).")
+    o.append(f"- **Feature-gated commands (NOT in the default build, excluded from the counts "
+             f"above): {len(gated_cmds)}** (see section below).")
     o.append(f"- Unparsed / unresolved candidates: {len(unparsed)} (see section below).")
     o.append("")
     o.append("## Commands by role")
@@ -336,9 +361,27 @@ def render(leaves: list[dict], unparsed: list[str], commit: str) -> str:
                      f"`{c['file']}`:{c['line']} |")
         o.append("")
 
+    o.append("## Feature-gated commands (not in the default build)")
+    o.append("")
+    o.append("These commands are guarded by a Cargo `#[cfg(feature = …)]` and are **absent from "
+             "the default `icnctl` build** (`icn/bins/icnctl/Cargo.toml` has `default = []`). They "
+             "are **excluded** from the counts and role tables above and only exist when the named "
+             "feature is enabled at build time.")
+    o.append("")
+    if gated_cmds:
+        o.append("| Command | Required cfg | Role (curated) | Proof | Source |")
+        o.append("|---|---|---|---|---|")
+        for c in sorted(gated_cmds, key=lambda x: x["path"]):
+            o.append(f"| `icnctl {md_escape(c['path'])}` | `cfg({md_escape(c['cfg'])})` | "
+                     f"{c['role']} | {PROOF_LEVEL} | `{c['file']}`:{c['line']} |")
+        o.append("")
+    else:
+        o.append("- None: every discovered command is present in the default build.")
+        o.append("")
+
     o.append("## Commands by status")
     o.append("")
-    o.append(f"All {total} discovered commands carry the conservative status "
+    o.append(f"All {total} default-build commands carry the conservative status "
              f"`{UNIFORM_STATUS}`. The static clap scan cannot mechanically distinguish "
              "`implemented` / `implemented but partial` / `fixture-backed` / `gateway-backed` / "
              "`docs-only / design-direction` / `planned`; that per-command classification is a "
@@ -398,11 +441,13 @@ def main() -> int:
         print(f"ERROR: icnctl command inventory could not be built: {detail}", file=sys.stderr)
         return 2
     content = render(leaves, unparsed, commit)
+    gated = sum(1 for c in leaves if c.get("cfg"))
+    counts = f"{len(leaves) - gated} default-build + {gated} feature-gated, {len(unparsed)} unparsed"
 
     if args.write:
         ARTIFACT.parent.mkdir(parents=True, exist_ok=True)
         ARTIFACT.write_text(content + "\n", encoding="utf-8")
-        print(f"wrote {ARTIFACT.relative_to(ROOT)}: {len(leaves)} commands, {len(unparsed)} unparsed")
+        print(f"wrote {ARTIFACT.relative_to(ROOT)}: {counts}")
         return 0
 
     if not ARTIFACT.is_file():
@@ -410,7 +455,7 @@ def main() -> int:
         return 1
     committed = ARTIFACT.read_text(encoding="utf-8")
     if strip_volatile(committed).strip() == strip_volatile(content).strip():
-        print(f"OK: icnctl command inventory up to date ({len(leaves)} commands, {len(unparsed)} unparsed)")
+        print(f"OK: icnctl command inventory up to date ({counts})")
         return 0
     print(f"STALE: {ARTIFACT.relative_to(ROOT)} differs from a fresh scan — run --write and commit",
           file=sys.stderr)
