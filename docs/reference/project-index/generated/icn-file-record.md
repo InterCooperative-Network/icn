@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-21T21:21:29.799055+00:00
+Generated: 2026-06-28T04:35:53.561136+00:00
 ---
 
 # Full Repository Record — `icn`
@@ -11,37 +11,37 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 ## Snapshot
 
 - Repo: `icn`
-- Branch: `fix/file-record-exclude-self`
-- HEAD: `fa819b47fbf774296400b42ca6f7c7c8630004af`
+- Branch: `docs/repo-record-truth-sync`
+- HEAD: `e87d2a43b916beb11dfd7c3aa061cdfab0120be7`
 - Working tree: `clean (no uncommitted changes against HEAD)`
 - SHA source: `working tree bytes (may differ from HEAD blob bytes when .gitattributes filters apply, e.g. CRLF normalization)`
-- Files recorded: `3094`
-- Tracked files recorded: `3094`
+- Files recorded: `3120`
+- Tracked files recorded: `3120`
 - Directories recorded: `610`
-- Total recorded bytes: `46534125`
-- Total tracked bytes: `46534125`
-- Entry kinds: `file: 3094`
+- Total recorded bytes: `47515557`
+- Total tracked bytes: `47515557`
+- Entry kinds: `file: 3120`
 
 ## Role summary
 
 | Role guess | Files |
 |---|---:|
-| Rust library crate | 922 |
-| documentation | 898 |
+| Rust library crate | 924 |
+| documentation | 910 |
 | uncategorized | 155 |
 | repo configuration | 144 |
 | React Native SDK | 139 |
 | deployment | 130 |
-| runtime app crate | 126 |
-| operations / coordination | 87 |
+| runtime app crate | 130 |
+| operations / coordination | 88 |
 | pilot UI | 84 |
 | public website | 71 |
-| script | 54 |
+| script | 55 |
 | demo | 53 |
 | institution package | 40 |
-| architecture decision record | 36 |
+| architecture decision record | 37 |
+| project index / atlas | 30 |
 | TypeScript SDK | 29 |
-| project index / atlas | 25 |
 | agent definition | 22 |
 | GitHub Actions workflow | 18 |
 | Rust binary | 16 |
@@ -56,17 +56,17 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 
 | Extension | Files |
 |---|---:|
-| `.md` | 1168 |
-| `.rs` | 940 |
+| `.md` | 1184 |
+| `.rs` | 946 |
 | `.json` | 153 |
 | `.sh` | 119 |
-| `.toml` | 112 |
-| `.ts` | 112 |
+| `.toml` | 113 |
+| `.ts` | 113 |
 | `.yaml` | 92 |
 | `.yml` | 60 |
 | `.js` | 43 |
+| `.py` | 43 |
 | `.tsx` | 43 |
-| `.py` | 41 |
 | `.astro` | 31 |
 | `.png` | 24 |
 | `(none)` | 19 |
@@ -109,13 +109,13 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 
 | Directory | Depth | Files under directory | Child dirs | Size bytes | Role guess |
 |---|---:|---:|---:|---:|---|
-| `.` | 0 | 3094 | 25 | 46534125 | repo root |
+| `.` | 0 | 3120 | 25 | 47515557 | repo root |
 | `.agents` | 1 | 25 | 1 | 71663 | repo configuration |
 | `.claude` | 1 | 65 | 5 | 228531 | repo configuration |
 | `.codex` | 1 | 16 | 2 | 19783 | repo configuration |
 | `.cursor` | 1 | 1 | 0 | 135 | repo configuration |
 | `.devcontainer` | 1 | 1 | 0 | 1307 | repo configuration |
-| `.github` | 1 | 69 | 6 | 289482 | repo configuration |
+| `.github` | 1 | 69 | 6 | 317850 | repo configuration |
 | `.opencode` | 1 | 2 | 1 | 1837 | repo configuration |
 | `apps` | 1 | 5 | 1 | 11841 | legacy/top-level app |
 | `config` | 1 | 11 | 0 | 34536 | uncategorized |
@@ -123,17 +123,17 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `demo` | 1 | 53 | 6 | 512850 | demo |
 | `deploy` | 1 | 130 | 10 | 571828 | deployment |
 | `docker` | 1 | 6 | 0 | 17165 | uncategorized |
-| `docs` | 1 | 967 | 46 | 13955313 | documentation |
+| `docs` | 1 | 985 | 46 | 14484530 | documentation |
 | `examples` | 1 | 43 | 5 | 562715 | uncategorized |
-| `icn` | 1 | 1081 | 9 | 21916668 | uncategorized |
+| `icn` | 1 | 1087 | 9 | 22316305 | uncategorized |
 | `institutions` | 1 | 40 | 1 | 102081 | institution package |
 | `monitoring` | 1 | 9 | 0 | 67029 | monitoring |
-| `ops` | 1 | 87 | 8 | 843723 | operations / coordination |
-| `scripts` | 1 | 54 | 0 | 481807 | script |
+| `ops` | 1 | 88 | 8 | 850967 | operations / coordination |
+| `scripts` | 1 | 55 | 0 | 492557 | script |
 | `sdk` | 1 | 168 | 2 | 2524210 | uncategorized |
 | `sims` | 1 | 19 | 1 | 92514 | uncategorized |
 | `tools` | 1 | 26 | 1 | 89999 | uncategorized |
-| `web` | 1 | 106 | 4 | 1667858 | uncategorized |
+| `web` | 1 | 106 | 4 | 1673763 | uncategorized |
 | `website` | 1 | 71 | 6 | 1910144 | public website |
 | `.agents/skills` | 2 | 25 | 25 | 71663 | repo configuration |
 | `.claude/agents` | 2 | 16 | 0 | 82164 | repo configuration |
@@ -147,8 +147,8 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `.github/actions` | 2 | 2 | 2 | 3265 | repo configuration |
 | `.github/agents` | 2 | 22 | 0 | 59062 | agent definition |
 | `.github/instructions` | 2 | 5 | 0 | 28980 | repo configuration |
-| `.github/scripts` | 2 | 8 | 1 | 39349 | repo configuration |
-| `.github/workflows` | 2 | 18 | 0 | 113844 | GitHub Actions workflow |
+| `.github/scripts` | 2 | 8 | 1 | 63793 | repo configuration |
+| `.github/workflows` | 2 | 18 | 0 | 117768 | GitHub Actions workflow |
 | `.opencode/commands` | 2 | 1 | 0 | 409 | repo configuration |
 | `apps/echo` | 2 | 5 | 1 | 11841 | legacy/top-level app |
 | `contracts/governance` | 2 | 5 | 0 | 69912 | contract template |
@@ -170,19 +170,19 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `deploy/k8s` | 2 | 51 | 5 | 235397 | deployment |
 | `deploy/kubernetes` | 2 | 12 | 0 | 25850 | deployment |
 | `deploy/prometheus` | 2 | 1 | 0 | 4149 | deployment |
-| `docs/adr` | 2 | 36 | 0 | 300071 | architecture decision record |
+| `docs/adr` | 2 | 37 | 0 | 321590 | architecture decision record |
 | `docs/ai` | 2 | 5 | 0 | 26161 | documentation |
 | `docs/api` | 2 | 6 | 0 | 143308 | documentation |
-| `docs/architecture` | 2 | 43 | 0 | 1241547 | documentation |
+| `docs/architecture` | 2 | 44 | 0 | 1262179 | documentation |
 | `docs/archive` | 2 | 78 | 2 | 1050816 | documentation |
-| `docs/ci` | 2 | 4 | 0 | 18053 | documentation |
+| `docs/ci` | 2 | 4 | 0 | 22772 | documentation |
 | `docs/contracts` | 2 | 13 | 1 | 138697 | documentation |
 | `docs/crate-manifests` | 2 | 42 | 0 | 46904 | documentation |
 | `docs/demo` | 2 | 14 | 0 | 191732 | documentation |
 | `docs/deployment` | 2 | 12 | 0 | 110143 | documentation |
-| `docs/design` | 2 | 76 | 6 | 1131479 | documentation |
+| `docs/design` | 2 | 78 | 6 | 1168184 | documentation |
 | `docs/design-language` | 2 | 3 | 0 | 39612 | documentation |
-| `docs/dev` | 2 | 36 | 0 | 626299 | documentation |
+| `docs/dev` | 2 | 37 | 0 | 634708 | documentation |
 | `docs/development` | 2 | 189 | 3 | 2245017 | documentation |
 | `docs/examples` | 2 | 7 | 1 | 11596 | documentation |
 | `docs/features` | 2 | 2 | 0 | 50031 | documentation |
@@ -199,16 +199,16 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/ops` | 2 | 5 | 1 | 23101 | documentation |
 | `docs/performance` | 2 | 7 | 0 | 41495 | documentation |
 | `docs/phases` | 2 | 1 | 0 | 3801 | documentation |
-| `docs/pilots` | 2 | 4 | 0 | 38839 | documentation |
+| `docs/pilots` | 2 | 10 | 0 | 127525 | documentation |
 | `docs/planning` | 2 | 7 | 0 | 102284 | documentation |
 | `docs/plans` | 2 | 17 | 1 | 415015 | documentation |
-| `docs/reference` | 2 | 38 | 3 | 475326 | documentation |
-| `docs/rfcs` | 2 | 8 | 0 | 176908 | request for comments |
-| `docs/scripts` | 2 | 9 | 0 | 105739 | documentation |
+| `docs/reference` | 2 | 43 | 3 | 604015 | documentation |
+| `docs/rfcs` | 2 | 8 | 0 | 176921 | request for comments |
+| `docs/scripts` | 2 | 10 | 0 | 184730 | documentation |
 | `docs/sdis` | 2 | 13 | 0 | 161014 | documentation |
 | `docs/security` | 2 | 20 | 0 | 279869 | documentation |
-| `docs/spec` | 2 | 16 | 0 | 527494 | documentation |
-| `docs/state` | 2 | 4 | 0 | 32902 | documentation |
+| `docs/spec` | 2 | 17 | 0 | 553017 | documentation |
+| `docs/state` | 2 | 4 | 0 | 33729 | documentation |
 | `docs/status` | 2 | 5 | 0 | 28327 | documentation |
 | `docs/strategy` | 2 | 49 | 1 | 1623575 | documentation |
 | `docs/summit` | 2 | 1 | 0 | 13525 | documentation |
@@ -223,10 +223,10 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `examples/wasm-compute` | 2 | 3 | 1 | 6409 | uncategorized |
 | `icn/.cargo` | 2 | 3 | 0 | 1519 | uncategorized |
 | `icn/.config` | 2 | 1 | 0 | 779 | uncategorized |
-| `icn/apps` | 2 | 126 | 7 | 2841591 | runtime app crate |
-| `icn/bins` | 2 | 16 | 3 | 712750 | Rust binary |
+| `icn/apps` | 2 | 130 | 7 | 3009400 | runtime app crate |
+| `icn/bins` | 2 | 16 | 3 | 719108 | Rust binary |
 | `icn/config` | 2 | 1 | 0 | 8247 | uncategorized |
-| `icn/crates` | 2 | 922 | 38 | 18095675 | Rust library crate |
+| `icn/crates` | 2 | 924 | 38 | 18321120 | Rust library crate |
 | `icn/docs` | 2 | 1 | 0 | 10540 | uncategorized |
 | `icn/examples` | 2 | 1 | 0 | 4866 | uncategorized |
 | `icn/scripts` | 2 | 1 | 0 | 7253 | uncategorized |
@@ -236,7 +236,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `ops/coordination` | 2 | 5 | 0 | 136117 | operations / coordination |
 | `ops/docs` | 2 | 2 | 1 | 45626 | operations / coordination |
 | `ops/ideas` | 2 | 13 | 3 | 276322 | operations / coordination |
-| `ops/mcp` | 2 | 43 | 1 | 296740 | operations / coordination |
+| `ops/mcp` | 2 | 44 | 1 | 303984 | operations / coordination |
 | `ops/scripts` | 2 | 3 | 0 | 24198 | operations / coordination |
 | `ops/state` | 2 | 14 | 5 | 47649 | operations / coordination |
 | `sdk/react-native` | 2 | 139 | 3 | 1829453 | React Native SDK |
@@ -246,7 +246,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `web/api-docs` | 2 | 5 | 0 | 51150 | uncategorized |
 | `web/dashboard` | 2 | 7 | 0 | 53602 | dashboard UI |
 | `web/member-shell` | 2 | 10 | 1 | 106320 | uncategorized |
-| `web/pilot-ui` | 2 | 84 | 5 | 1456786 | pilot UI |
+| `web/pilot-ui` | 2 | 84 | 5 | 1462691 | pilot UI |
 | `website/.claude` | 2 | 2 | 1 | 3418 | public website |
 | `website/.github` | 2 | 1 | 1 | 1004 | public website |
 | `website/.vscode` | 2 | 2 | 0 | 294 | public website |
@@ -360,7 +360,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/plans/.scratch` | 3 | 1 | 0 | 1229 | documentation |
 | `docs/reference/api` | 3 | 5 | 0 | 52497 | documentation |
 | `docs/reference/config` | 3 | 4 | 0 | 24982 | documentation |
-| `docs/reference/project-index` | 3 | 25 | 1 | 357319 | project index / atlas |
+| `docs/reference/project-index` | 3 | 30 | 1 | 486008 | project index / atlas |
 | `docs/strategy/grants` | 3 | 7 | 0 | 32301 | documentation |
 | `docs/superpowers/plans` | 3 | 1 | 0 | 42648 | documentation |
 | `docs/superpowers/specs` | 3 | 7 | 0 | 69765 | documentation |
@@ -368,15 +368,15 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `examples/mobile-app/src` | 3 | 10 | 3 | 39760 | uncategorized |
 | `examples/wasm-compute/src` | 3 | 1 | 0 | 3089 | uncategorized |
 | `icn/apps/charter` | 3 | 3 | 1 | 16833 | runtime app crate |
-| `icn/apps/governance` | 3 | 51 | 2 | 1928731 | runtime app crate |
+| `icn/apps/governance` | 3 | 55 | 2 | 2096540 | runtime app crate |
 | `icn/apps/governance-app` | 3 | 5 | 1 | 18596 | runtime app crate |
 | `icn/apps/ledger` | 3 | 7 | 2 | 26000 | runtime app crate |
 | `icn/apps/ledger-app` | 3 | 11 | 1 | 69873 | runtime app crate |
 | `icn/apps/membership` | 3 | 35 | 1 | 603618 | runtime app crate |
 | `icn/apps/trust-app` | 3 | 14 | 3 | 177940 | runtime app crate |
 | `icn/bins/icn-console` | 3 | 2 | 1 | 35842 | Rust binary |
-| `icn/bins/icnctl` | 3 | 11 | 3 | 611032 | Rust binary |
-| `icn/bins/icnd` | 3 | 3 | 1 | 65876 | Rust binary |
+| `icn/bins/icnctl` | 3 | 11 | 3 | 612026 | Rust binary |
+| `icn/bins/icnd` | 3 | 3 | 1 | 71240 | Rust binary |
 | `icn/crates/icn-api` | 3 | 8 | 1 | 65967 | Rust library crate |
 | `icn/crates/icn-authz` | 3 | 11 | 2 | 48635 | Rust library crate |
 | `icn/crates/icn-baseline-lock` | 3 | 12 | 2 | 72017 | Rust library crate |
@@ -385,27 +385,27 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-ccl` | 3 | 76 | 4 | 925986 | Rust library crate |
 | `icn/crates/icn-commons` | 3 | 10 | 2 | 191868 | Rust library crate |
 | `icn/crates/icn-community` | 3 | 13 | 2 | 131502 | Rust library crate |
-| `icn/crates/icn-compute` | 3 | 36 | 4 | 1042294 | Rust library crate |
-| `icn/crates/icn-coop` | 3 | 8 | 1 | 197308 | Rust library crate |
-| `icn/crates/icn-core` | 3 | 140 | 2 | 2610494 | Rust library crate |
+| `icn/crates/icn-compute` | 3 | 36 | 4 | 1045166 | Rust library crate |
+| `icn/crates/icn-coop` | 3 | 8 | 1 | 205519 | Rust library crate |
+| `icn/crates/icn-core` | 3 | 140 | 2 | 2612490 | Rust library crate |
 | `icn/crates/icn-crypto` | 3 | 2 | 1 | 1737 | Rust library crate |
 | `icn/crates/icn-crypto-pq` | 3 | 11 | 2 | 149222 | Rust library crate |
 | `icn/crates/icn-encoding` | 3 | 2 | 1 | 4341 | Rust library crate |
-| `icn/crates/icn-entity` | 3 | 15 | 1 | 384840 | Rust library crate |
+| `icn/crates/icn-entity` | 3 | 15 | 1 | 420891 | Rust library crate |
 | `icn/crates/icn-federation` | 3 | 27 | 2 | 549567 | Rust library crate |
-| `icn/crates/icn-gateway` | 3 | 158 | 5 | 3802638 | Rust library crate |
+| `icn/crates/icn-gateway` | 3 | 159 | 5 | 3909811 | Rust library crate |
 | `icn/crates/icn-gossip` | 3 | 36 | 3 | 614926 | Rust library crate |
-| `icn/crates/icn-governance` | 3 | 48 | 2 | 1274237 | Rust library crate |
+| `icn/crates/icn-governance` | 3 | 49 | 2 | 1297909 | Rust library crate |
 | `icn/crates/icn-http-kit` | 3 | 6 | 1 | 39014 | Rust library crate |
 | `icn/crates/icn-identity` | 3 | 26 | 3 | 518615 | Rust library crate |
-| `icn/crates/icn-kernel-api` | 3 | 34 | 2 | 1172315 | Rust library crate |
-| `icn/crates/icn-ledger` | 3 | 53 | 4 | 1141873 | Rust library crate |
+| `icn/crates/icn-kernel-api` | 3 | 34 | 2 | 1178318 | Rust library crate |
+| `icn/crates/icn-ledger` | 3 | 53 | 4 | 1148353 | Rust library crate |
 | `icn/crates/icn-naming` | 3 | 2 | 1 | 29980 | Rust library crate |
 | `icn/crates/icn-net` | 3 | 41 | 3 | 848264 | Rust library crate |
 | `icn/crates/icn-obs` | 3 | 24 | 2 | 415208 | Rust library crate |
 | `icn/crates/icn-privacy` | 3 | 7 | 2 | 68864 | Rust library crate |
 | `icn/crates/icn-protocol` | 3 | 2 | 1 | 1731 | Rust library crate |
-| `icn/crates/icn-rpc` | 3 | 23 | 2 | 417356 | Rust library crate |
+| `icn/crates/icn-rpc` | 3 | 23 | 2 | 450343 | Rust library crate |
 | `icn/crates/icn-security` | 3 | 3 | 1 | 74333 | Rust library crate |
 | `icn/crates/icn-services` | 3 | 2 | 1 | 2051 | Rust library crate |
 | `icn/crates/icn-snapshot` | 3 | 4 | 1 | 97784 | Rust library crate |
@@ -430,7 +430,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `ops/ideas/dogfood` | 3 | 2 | 0 | 70885 | operations / coordination |
 | `ops/ideas/framing` | 3 | 3 | 0 | 106667 | operations / coordination |
 | `ops/ideas/templates` | 3 | 5 | 0 | 20805 | operations / coordination |
-| `ops/mcp/src` | 3 | 39 | 6 | 188529 | operations / coordination |
+| `ops/mcp/src` | 3 | 40 | 6 | 195773 | operations / coordination |
 | `ops/state/config` | 3 | 1 | 0 | 2124 | operations / coordination |
 | `ops/state/decisions` | 3 | 1 | 0 | 1081 | operations / coordination |
 | `ops/state/deferrals` | 3 | 1 | 0 | 844 | operations / coordination |
@@ -446,7 +446,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `tools/claude-code/plugins` | 3 | 26 | 1 | 89999 | uncategorized |
 | `web/member-shell/fixtures` | 3 | 4 | 0 | 2606 | uncategorized |
 | `web/pilot-ui/components` | 3 | 1 | 0 | 11066 | pilot UI |
-| `web/pilot-ui/fixtures` | 3 | 5 | 1 | 21453 | pilot UI |
+| `web/pilot-ui/fixtures` | 3 | 5 | 1 | 22719 | pilot UI |
 | `web/pilot-ui/icons` | 3 | 11 | 0 | 16172 | pilot UI |
 | `web/pilot-ui/locales` | 3 | 2 | 0 | 9489 | pilot UI |
 | `web/pilot-ui/tests` | 3 | 12 | 1 | 101204 | pilot UI |
@@ -499,14 +499,14 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/onboarding/path/phase-2-architecture` | 4 | 4 | 0 | 36895 | documentation |
 | `docs/onboarding/path/phase-3-systems` | 4 | 4 | 0 | 15550 | documentation |
 | `docs/onboarding/path/phase-4-ownership` | 4 | 3 | 0 | 9932 | documentation |
-| `docs/reference/project-index/generated` | 4 | 2 | 0 | 182713 | project index / atlas |
+| `docs/reference/project-index/generated` | 4 | 3 | 0 | 252001 | project index / atlas |
 | `examples/mobile-app/src/contexts` | 4 | 1 | 0 | 673 | uncategorized |
 | `examples/mobile-app/src/screens` | 4 | 7 | 0 | 27991 | uncategorized |
 | `examples/mobile-app/src/services` | 4 | 2 | 0 | 11096 | uncategorized |
 | `icn/apps/charter/src` | 4 | 2 | 0 | 16217 | runtime app crate |
 | `icn/apps/governance-app/src` | 4 | 3 | 0 | 17619 | runtime app crate |
-| `icn/apps/governance/src` | 4 | 25 | 4 | 1444562 | runtime app crate |
-| `icn/apps/governance/tests` | 4 | 25 | 0 | 481851 | runtime app crate |
+| `icn/apps/governance/src` | 4 | 26 | 4 | 1549789 | runtime app crate |
+| `icn/apps/governance/tests` | 4 | 28 | 0 | 544433 | runtime app crate |
 | `icn/apps/ledger-app/src` | 4 | 8 | 0 | 66769 | runtime app crate |
 | `icn/apps/ledger/src` | 4 | 5 | 0 | 20308 | runtime app crate |
 | `icn/apps/ledger/tests` | 4 | 1 | 0 | 5065 | runtime app crate |
@@ -517,8 +517,8 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/bins/icn-console/src` | 4 | 1 | 0 | 34935 | Rust binary |
 | `icn/bins/icnctl/locales` | 4 | 2 | 0 | 17044 | Rust binary |
 | `icn/bins/icnctl/src` | 4 | 2 | 0 | 516916 | Rust binary |
-| `icn/bins/icnctl/tests` | 4 | 6 | 0 | 75322 | Rust binary |
-| `icn/bins/icnd/src` | 4 | 2 | 0 | 64396 | Rust binary |
+| `icn/bins/icnctl/tests` | 4 | 6 | 0 | 76316 | Rust binary |
+| `icn/bins/icnd/src` | 4 | 2 | 0 | 69738 | Rust binary |
 | `icn/crates/icn-api/src` | 4 | 6 | 0 | 56373 | Rust library crate |
 | `icn/crates/icn-authz/src` | 4 | 9 | 3 | 40747 | Rust library crate |
 | `icn/crates/icn-authz/tests` | 4 | 1 | 0 | 7533 | Rust library crate |
@@ -536,37 +536,37 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-community/tests` | 4 | 3 | 0 | 14167 | Rust library crate |
 | `icn/crates/icn-compute/benches` | 4 | 1 | 0 | 9737 | Rust library crate |
 | `icn/crates/icn-compute/examples` | 4 | 1 | 0 | 6242 | Rust library crate |
-| `icn/crates/icn-compute/src` | 4 | 29 | 1 | 930111 | Rust library crate |
+| `icn/crates/icn-compute/src` | 4 | 29 | 1 | 932983 | Rust library crate |
 | `icn/crates/icn-compute/tests` | 4 | 4 | 0 | 94328 | Rust library crate |
-| `icn/crates/icn-coop/src` | 4 | 7 | 0 | 196305 | Rust library crate |
-| `icn/crates/icn-core/src` | 4 | 79 | 6 | 1505599 | Rust library crate |
-| `icn/crates/icn-core/tests` | 4 | 60 | 0 | 1102749 | Rust library crate |
+| `icn/crates/icn-coop/src` | 4 | 7 | 0 | 204516 | Rust library crate |
+| `icn/crates/icn-core/src` | 4 | 79 | 6 | 1507582 | Rust library crate |
+| `icn/crates/icn-core/tests` | 4 | 60 | 0 | 1102762 | Rust library crate |
 | `icn/crates/icn-crypto-pq/src` | 4 | 9 | 0 | 124095 | Rust library crate |
 | `icn/crates/icn-crypto-pq/tests` | 4 | 1 | 0 | 23393 | Rust library crate |
 | `icn/crates/icn-crypto/src` | 4 | 1 | 0 | 1279 | Rust library crate |
 | `icn/crates/icn-encoding/src` | 4 | 1 | 0 | 3935 | Rust library crate |
-| `icn/crates/icn-entity/src` | 4 | 14 | 0 | 384199 | Rust library crate |
+| `icn/crates/icn-entity/src` | 4 | 14 | 0 | 420250 | Rust library crate |
 | `icn/crates/icn-federation/src` | 4 | 21 | 1 | 397127 | Rust library crate |
 | `icn/crates/icn-federation/tests` | 4 | 5 | 0 | 151102 | Rust library crate |
 | `icn/crates/icn-gateway/benches` | 4 | 1 | 0 | 6965 | Rust library crate |
 | `icn/crates/icn-gateway/locales` | 4 | 2 | 0 | 4338 | Rust library crate |
-| `icn/crates/icn-gateway/src` | 4 | 99 | 1 | 2569554 | Rust library crate |
-| `icn/crates/icn-gateway/static` | 4 | 14 | 1 | 551652 | Rust library crate |
-| `icn/crates/icn-gateway/tests` | 4 | 38 | 0 | 644106 | Rust library crate |
+| `icn/crates/icn-gateway/src` | 4 | 100 | 1 | 2673453 | Rust library crate |
+| `icn/crates/icn-gateway/static` | 4 | 14 | 1 | 552071 | Rust library crate |
+| `icn/crates/icn-gateway/tests` | 4 | 38 | 0 | 646961 | Rust library crate |
 | `icn/crates/icn-gossip/benches` | 4 | 1 | 0 | 4548 | Rust library crate |
 | `icn/crates/icn-gossip/src` | 4 | 29 | 2 | 533087 | Rust library crate |
 | `icn/crates/icn-gossip/tests` | 4 | 4 | 0 | 68952 | Rust library crate |
-| `icn/crates/icn-governance/src` | 4 | 45 | 1 | 1228907 | Rust library crate |
+| `icn/crates/icn-governance/src` | 4 | 46 | 1 | 1252579 | Rust library crate |
 | `icn/crates/icn-governance/tests` | 4 | 2 | 0 | 44282 | Rust library crate |
 | `icn/crates/icn-http-kit/src` | 4 | 5 | 0 | 38589 | Rust library crate |
 | `icn/crates/icn-identity/examples` | 4 | 1 | 0 | 4573 | Rust library crate |
 | `icn/crates/icn-identity/src` | 4 | 21 | 0 | 490526 | Rust library crate |
 | `icn/crates/icn-identity/tests` | 4 | 3 | 0 | 22384 | Rust library crate |
-| `icn/crates/icn-kernel-api/src` | 4 | 29 | 0 | 984110 | Rust library crate |
+| `icn/crates/icn-kernel-api/src` | 4 | 29 | 0 | 990113 | Rust library crate |
 | `icn/crates/icn-kernel-api/tests` | 4 | 4 | 0 | 187094 | Rust library crate |
 | `icn/crates/icn-ledger/benches` | 4 | 1 | 0 | 4364 | Rust library crate |
 | `icn/crates/icn-ledger/examples` | 4 | 1 | 0 | 9759 | Rust library crate |
-| `icn/crates/icn-ledger/src` | 4 | 45 | 3 | 1049600 | Rust library crate |
+| `icn/crates/icn-ledger/src` | 4 | 45 | 3 | 1056080 | Rust library crate |
 | `icn/crates/icn-ledger/tests` | 4 | 5 | 0 | 77016 | Rust library crate |
 | `icn/crates/icn-naming/src` | 4 | 1 | 0 | 29546 | Rust library crate |
 | `icn/crates/icn-net/benches` | 4 | 1 | 0 | 7879 | Rust library crate |
@@ -577,7 +577,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-privacy/src` | 4 | 5 | 0 | 47483 | Rust library crate |
 | `icn/crates/icn-privacy/tests` | 4 | 1 | 0 | 20725 | Rust library crate |
 | `icn/crates/icn-protocol/src` | 4 | 1 | 0 | 1367 | Rust library crate |
-| `icn/crates/icn-rpc/src` | 4 | 21 | 1 | 358587 | Rust library crate |
+| `icn/crates/icn-rpc/src` | 4 | 21 | 1 | 391429 | Rust library crate |
 | `icn/crates/icn-rpc/tests` | 4 | 1 | 0 | 57690 | Rust library crate |
 | `icn/crates/icn-security/src` | 4 | 2 | 0 | 73819 | Rust library crate |
 | `icn/crates/icn-services/src` | 4 | 1 | 0 | 1657 | Rust library crate |
@@ -603,15 +603,15 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `ops/mcp/src/diagnostics` | 4 | 11 | 0 | 65232 | operations / coordination |
 | `ops/mcp/src/polling` | 4 | 4 | 0 | 9725 | operations / coordination |
 | `ops/mcp/src/state` | 4 | 3 | 0 | 6774 | operations / coordination |
-| `ops/mcp/src/tests` | 4 | 8 | 1 | 38791 | operations / coordination |
-| `ops/mcp/src/tools` | 4 | 9 | 0 | 54782 | operations / coordination |
+| `ops/mcp/src/tests` | 4 | 9 | 1 | 44313 | operations / coordination |
+| `ops/mcp/src/tools` | 4 | 9 | 0 | 56504 | operations / coordination |
 | `ops/mcp/src/utils` | 4 | 2 | 0 | 6173 | operations / coordination |
 | `ops/state/sprint/history` | 4 | 2 | 0 | 6311 | operations / coordination |
 | `sdk/react-native/examples/CoopWallet` | 4 | 94 | 3 | 868144 | React Native SDK |
 | `sdk/react-native/src/__mocks__` | 4 | 2 | 0 | 2265 | React Native SDK |
 | `sdk/typescript/src/generated` | 4 | 1 | 0 | 61644 | TypeScript SDK |
 | `tools/claude-code/plugins/icn-agent-pack` | 4 | 26 | 5 | 89999 | uncategorized |
-| `web/pilot-ui/fixtures/icn-organizer-demo` | 4 | 5 | 0 | 21453 | pilot UI |
+| `web/pilot-ui/fixtures/icn-organizer-demo` | 4 | 5 | 0 | 22719 | pilot UI |
 | `web/pilot-ui/tests/e2e` | 4 | 8 | 0 | 75708 | pilot UI |
 | `website/public/.well-known/matrix` | 4 | 1 | 0 | 86 | public website |
 | `website/src/content/blog` | 4 | 5 | 0 | 18137 | public website |
@@ -623,7 +623,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `deploy/devnet/monitoring/grafana/provisioning` | 5 | 2 | 2 | 473 | deployment |
 | `icn/apps/governance/src/bin` | 5 | 1 | 0 | 10643 | runtime app crate |
 | `icn/apps/governance/src/handlers` | 5 | 2 | 0 | 50813 | runtime app crate |
-| `icn/apps/governance/src/http` | 5 | 5 | 0 | 497152 | runtime app crate |
+| `icn/apps/governance/src/http` | 5 | 5 | 0 | 518077 | runtime app crate |
 | `icn/apps/governance/src/registry` | 5 | 3 | 0 | 23205 | runtime app crate |
 | `icn/apps/membership/src/community_core` | 5 | 9 | 0 | 116000 | runtime app crate |
 | `icn/apps/membership/src/coop_core` | 5 | 8 | 0 | 180981 | runtime app crate |
@@ -637,15 +637,15 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-ccl/src/registry_actor` | 5 | 4 | 0 | 55065 | Rust library crate |
 | `icn/crates/icn-ccl/src/schema` | 5 | 8 | 0 | 104199 | Rust library crate |
 | `icn/crates/icn-commons/src/bin` | 5 | 1 | 0 | 4783 | Rust library crate |
-| `icn/crates/icn-compute/src/actor` | 5 | 9 | 0 | 295857 | Rust library crate |
+| `icn/crates/icn-compute/src/actor` | 5 | 9 | 0 | 296849 | Rust library crate |
 | `icn/crates/icn-core/src/apps` | 5 | 5 | 0 | 101408 | Rust library crate |
 | `icn/crates/icn-core/src/bin` | 5 | 1 | 0 | 7964 | Rust library crate |
 | `icn/crates/icn-core/src/config` | 5 | 17 | 0 | 173955 | Rust library crate |
 | `icn/crates/icn-core/src/replication` | 5 | 3 | 0 | 45643 | Rust library crate |
 | `icn/crates/icn-core/src/services` | 5 | 7 | 0 | 288342 | Rust library crate |
-| `icn/crates/icn-core/src/supervisor` | 5 | 30 | 0 | 633716 | Rust library crate |
+| `icn/crates/icn-core/src/supervisor` | 5 | 30 | 0 | 635699 | Rust library crate |
 | `icn/crates/icn-federation/src/agreement` | 5 | 5 | 0 | 127390 | Rust library crate |
-| `icn/crates/icn-gateway/src/api` | 5 | 49 | 6 | 1198204 | Rust library crate |
+| `icn/crates/icn-gateway/src/api` | 5 | 49 | 6 | 1199816 | Rust library crate |
 | `icn/crates/icn-gateway/static/locales` | 5 | 2 | 0 | 9489 | Rust library crate |
 | `icn/crates/icn-gossip/src/bin` | 5 | 1 | 0 | 7639 | Rust library crate |
 | `icn/crates/icn-gossip/src/handlers` | 5 | 12 | 0 | 161306 | Rust library crate |
@@ -656,7 +656,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-net/src/actor` | 5 | 3 | 0 | 117351 | Rust library crate |
 | `icn/crates/icn-net/src/handlers` | 5 | 7 | 0 | 93885 | Rust library crate |
 | `icn/crates/icn-obs/src/metrics` | 5 | 16 | 0 | 123294 | Rust library crate |
-| `icn/crates/icn-rpc/src/handler` | 5 | 12 | 0 | 163337 | Rust library crate |
+| `icn/crates/icn-rpc/src/handler` | 5 | 12 | 0 | 191861 | Rust library crate |
 | `icn/crates/icn-steward/src/ceremony` | 5 | 3 | 0 | 32006 | Rust library crate |
 | `icn/crates/icn-trust/src/bin` | 5 | 1 | 0 | 6169 | Rust library crate |
 | `icn/crates/icn-zkp/src/circuit` | 5 | 5 | 0 | 52798 | Rust library crate |
@@ -884,8 +884,8 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `.github/scripts/fixtures/readiness/bad_unbannered.md` | 155 | `d4f271f3c7df8a39542c739da3f878b098db09d96b87c75038789a74b6e687f9` | Markdown | repo configuration |
 | `.github/scripts/fixtures/readiness/good_bannered.md` | 344 | `d827689652701930f71d9aaa75d5965fa55cac13d069f43468c8bebfbb8594e6` | Markdown | repo configuration |
 | `.github/scripts/fixtures/readiness/good_negated.md` | 304 | `c2db26885c5078e7fffe517d1d3936aac4a5943f70faaaee2e74359b344b9bc6` | Markdown | repo configuration |
-| `.github/scripts/readiness_overclaim_linter.py` | 10688 | `ff439735a3b33f68c526bfd4b7962aa49b70ba318e8ec3247d0c8e5e7c063735` | Python | repo configuration |
-| `.github/scripts/test_readiness_overclaim_linter.py` | 5230 | `f88e203dabe3fa9b5e27e4f9a179061595ea66e5c951d27c94a1e1221bf10dd3` | Python | repo configuration |
+| `.github/scripts/readiness_overclaim_linter.py` | 23184 | `dc2c851047a18aadf6a3645db9a9af0988bd71843eafba0819f1c17290ba78d0` | Python | repo configuration |
+| `.github/scripts/test_readiness_overclaim_linter.py` | 17178 | `9d732308825babf04d02caca59931b2919b55110d75c7db981a7414492c86811` | Python | repo configuration |
 | `.github/workflows/agent-drift-check.yml` | 1283 | `77a32c55b27ed37405bd3c8b53f4732c47a24e326405c47227ec881118cc4224` | YAML | GitHub Actions workflow |
 | `.github/workflows/api-types.yml` | 2926 | `21ff932b492fade8f11b02751fbf6693e5dcb23e52d9df405cefee0f989acf6d` | YAML | GitHub Actions workflow |
 | `.github/workflows/benchmark.yml` | 9506 | `2e57f895aac9904d1d9b5123628eb8b16db8818c6f68756ed508228f241e8c8e` | YAML | GitHub Actions workflow |
@@ -893,9 +893,9 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `.github/workflows/claude-code-review.yml` | 13991 | `b60ab7d810f3cb81e84ae9f105c5b9f3099759bf64074ae47b11a7076a73c5e2` | YAML | GitHub Actions workflow |
 | `.github/workflows/claude.yml` | 3058 | `cdc7f225666a3dc6510fdbb61ba4208cc5936219e0cc940bc823fb6e6d6e4174` | YAML | GitHub Actions workflow |
 | `.github/workflows/docker-build-deploy.yml` | 11985 | `9ae7de0aa36858caba55dfbaa911f4994c26e1069ea730e974608259d8b6b538` | YAML | GitHub Actions workflow |
-| `.github/workflows/docs-freshness.yml` | 11562 | `f474a69b3d3639e195b703e215bd4f93c4df2fada10a53b97cd278a9b3bce1dd` | YAML | GitHub Actions workflow |
+| `.github/workflows/docs-freshness.yml` | 14138 | `cfc2004ed1bc23d4e150cffd8bb85fd929a9486b4da91d1003704557466dab06` | YAML | GitHub Actions workflow |
 | `.github/workflows/fuzz.yml` | 3037 | `e2ff1c562395135582738e773e5db1b984d190e8204fab5e4b7bffb57d9612fa` | YAML | GitHub Actions workflow |
-| `.github/workflows/generated-truth.yml` | 5426 | `cf03e607fbfac884f97a1301c6fe40f53f6d4aa1403beaa9e7d00e1ec5f1c3d9` | YAML | GitHub Actions workflow |
+| `.github/workflows/generated-truth.yml` | 6774 | `67dd609b0ffa089fee6e723d30046587f3a0f7708b8a56ebd551247be62b1179` | YAML | GitHub Actions workflow |
 | `.github/workflows/issue-label-enforcer.yml` | 6117 | `ff4342a962c2d2395a24033abfdb5ad1d9a4f21230f120204829a78cdf474731` | YAML | GitHub Actions workflow |
 | `.github/workflows/mcp-portability.yml` | 999 | `312f0e0ec6c3eb9e507863dcda9dea8705a53cb9563b3913598db66bd34e058d` | YAML | GitHub Actions workflow |
 | `.github/workflows/npm-publish.yml` | 2107 | `cc0712289070cc9b08630b359acb6b296174e3df6749750ffe7fd98afefd5db1` | YAML | GitHub Actions workflow |
@@ -908,7 +908,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `.mcp.json` | 135 | `1e365a870be91c6c154b88a439da630a535e67e28524c84b5afc8102262a1f3a` | JSON | repo configuration |
 | `.opencode/commands/checkpoint.md` | 409 | `b106821e24824534a9ec3a409040a0f5db1ee5a809032cda1e0571b0e6bdb361` | Markdown | repo configuration |
 | `.opencode/opencode.json` | 1428 | `67abd881122905dc0f8f8f389aa44512ffc462202b22c4304389ab51bb94973d` | JSON | repo configuration |
-| `AGENTS.md` | 16225 | `c1975970f33c70428816f8b8f3a7120391f77a03bde7b2939ce9d6426c0bfc60` | Markdown | repo control document |
+| `AGENTS.md` | 16536 | `0651ebbd05698280445dd28a5fe855687cc319e6ebe650b3a4c0b420939674ff` | Markdown | repo control document |
 | `CHANGELOG.md` | 271554 | `a67df62eeff9bf3e62b9bf2e74ec3f9547b0e49feee47730dfb2eba604238da1` | Markdown | uncategorized |
 | `CLAUDE.md` | 41798 | `e1dbac164c030cee7999bc0dba2108d25ccac0a2538ab689b12938b7f11cb4b1` | Markdown | repo control document |
 | `CODE_OF_CONDUCT.md` | 5489 | `ea5dc671c7def95591ab73b1b8152125af1451100c095734c01ecb40e1f387e5` | Markdown | uncategorized |
@@ -1140,22 +1140,22 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docker/docker-compose.dev.yml` | 2069 | `6d6f886289bedce325ad0569ba6264d3a09e51e51c3656b092e9b86b36a9412e` | YAML | uncategorized |
 | `docker/docker-compose.yml` | 4190 | `78497084696009b6c0e8b833dbc1700610f2ceb4a858228bac648973f175006e` | YAML | uncategorized |
 | `docker/prometheus.yml` | 853 | `c96ed6db391790cc1c6a69b9ef02fd67e268db84b51443af37bc4689848d9db3` | YAML | uncategorized |
-| `docs/ARCHITECTURE.md` | 67843 | `c673d4e72cb2311979baa0b22c5d41cd61d584153c5fa7540e923ce849e983e1` | Markdown | documentation |
+| `docs/ARCHITECTURE.md` | 68272 | `a52965cd3df3c479fcb1b40628dab48c834f7371507ebc9109cde9ac3d6eff9f` | Markdown | documentation |
 | `docs/ATLAS.md` | 14455 | `6dc9fab6be423bb85c5b06b2199b25808f96add0e10e0611bf3d2a7c47727f49` | Markdown | documentation |
 | `docs/DESIGN_PRINCIPLES.md` | 18709 | `e2b07c7e87f94c308925f68dfbf729155a56d187916ef0f04256212d221cf488` | Markdown | documentation |
 | `docs/DOCUMENTATION_CONTROL_SYSTEM.md` | 18211 | `492ba28857b9cbe27b6ac5d78e8b9298b781757b8e5612eb2e50614d91198adf` | Markdown | documentation |
 | `docs/DOCUMENTATION_MAINTENANCE.md` | 17600 | `1334cbbc9f7423ad72a758bf772c1f144322485eb78ff190b60516226cf33d3a` | Markdown | documentation |
-| `docs/DOCUMENT_REGISTRY.md` | 4302 | `3f0a751dd74654eb557520662cd74b6d2fed839444ec596b0fbad6cff8d26f78` | Markdown | documentation |
+| `docs/DOCUMENT_REGISTRY.md` | 4302 | `c7ec550652d5023a81781e7bd244519cb90dbf7b958d735c8e3de2ebc1d54d29` | Markdown | documentation |
 | `docs/GETTING_STARTED.md` | 6309 | `a0ec4a52c2f835cc7432957eaa69bb53b83884ced4395deaad1dfb4c0d306a57` | Markdown | documentation |
 | `docs/GOLDEN_PROMPT.md` | 768 | `fb9c7a045d7d84219f83eba32b8b20e81a23adf613c1cdcefc9ed447d8b74fa2` | Markdown | documentation |
-| `docs/INDEX.generated.md` | 99153 | `0ec037af1eeec408d2b619b1fbdbb14a9335122806ada2ed61341442a425f94b` | Markdown | documentation |
-| `docs/INDEX.md` | 46794 | `cf10472b41c3bcf4c8cdb5dc89e6791359b10b19fb989817075249e1e3e9e576` | Markdown | documentation |
+| `docs/INDEX.generated.md` | 101719 | `8cd88882b7a351e0248d8ef95161da6c441f2d12efc2828c5866ba17556d8a89` | Markdown | documentation |
+| `docs/INDEX.md` | 47191 | `01074caa5ada400313d636db9f2baf759db243cc2fa24e04fb9f4fa98580a5d3` | Markdown | documentation |
 | `docs/OVERVIEW.md` | 17180 | `b48fe3ac1aa3ef7ea1f82ae9b1908c5e4c4181313f2a1de2ff06b8f2f339d584` | Markdown | documentation |
 | `docs/PHASE_HISTORY.md` | 17368 | `9d19e4f8030fa1067b4d599cc77f2464d0a588a6d1dc013f1040dca0088b84b9` | Markdown | documentation |
-| `docs/PHASE_PROGRESS.md` | 93188 | `a1a5b4e070331a8ff4b4e72023f141e3275810e08ea9e37877f6eb7a9ab9e6c6` | Markdown | documentation |
+| `docs/PHASE_PROGRESS.md` | 123482 | `6172bbba21aa256fb9c2528038e1205478006b7c8b18ec22eeeaab529b2b5968` | Markdown | documentation |
 | `docs/README.md` | 7313 | `69e37fc3e652339beb53fd24cb1b66abf3e834ec838560780d1efafd5e6dcc86` | Markdown | documentation |
 | `docs/REORGANIZATION_2026.md` | 14226 | `13e0c6c9d3ae339ec1ea833c75af153978e9606171fa9e28304e760471b3d755` | Markdown | documentation |
-| `docs/STATE.md` | 167484 | `b361ad4c8c749d3278ad990ed33f0a821ade8ee2fd4fde4ce423c352836e9407` | Markdown | documentation |
+| `docs/STATE.md` | 233027 | `db34cdc3f2c27b888d6e28040c204915e3d0f735180f670552ba3b30741c50b6` | Markdown | documentation |
 | `docs/SYNC_LOG.md` | 1361 | `914569d96c0daa94f35b7868c1500e42520803cef5d09b3aea2b149398e71756` | Markdown | documentation |
 | `docs/TODO.md` | 1668 | `12723cd9c98ebaa2e72dcf45c64f55b44e3f2c8301e1d51be4889e6cfabf4150` | Markdown | documentation |
 | `docs/adr/ADR-0001-orchestration-plane-architecture.md` | 4405 | `c8578ec4bc28e42dd4d77df95a89872ae2fd234b7910dfdc52541d47d75b55dd` | Markdown | architecture decision record |
@@ -1188,11 +1188,12 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/adr/ADR-0028-accessibility-baseline-for-member-interfaces.md` | 7560 | `232b6f4e2ab03d10f4c57dadd48e93fa8be2fea2d039bb53fa29bd08dc31343b` | Markdown | architecture decision record |
 | `docs/adr/ADR-0029-conflict-resolution-object-model.md` | 7130 | `7a11af16da54015032fd88cc6f01de90d39b5c78a0f155828785632c856dd940` | Markdown | architecture decision record |
 | `docs/adr/ADR-0030-compute-workload-manifest-and-authority-boundary.md` | 8442 | `6cd4cae4e8c9e633240c128f32a2c8e6904ccc62f3ab0ddf3de14641f4f9aaf4` | Markdown | architecture decision record |
-| `docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md` | 8069 | `8b9e87f83a205c47ab994aebc01fe4e5d9e2d71486c6f6b65a68941b8edb91a7` | Markdown | architecture decision record |
+| `docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md` | 8082 | `9d6163d897413ec396ec22e7eb65866580f0db399f36db27522a670c931ec664` | Markdown | architecture decision record |
 | `docs/adr/ADR-0032-website-truth-boundary.md` | 6296 | `e87f92b3336d1b59efeb9b6c0c1e0675da244c39ad553d10a410f20be6d9bcb2` | Markdown | architecture decision record |
 | `docs/adr/ADR-0033-public-maturity-claims-and-evidence-links.md` | 4385 | `e97bb5a305319eb39e66e5b10b4a0e8c6a019845fb8c254fed364f30b86943a1` | Markdown | architecture decision record |
 | `docs/adr/ADR-0034-adr-candidate-registry-as-architectural-memory.md` | 5371 | `bf48bdfaa77a56ae00cd70c738e9bc949ad0b3730b091800ec0617f9b74d9090` | Markdown | architecture decision record |
 | `docs/adr/ADR-0035-entity-aware-request-authorization.md` | 9337 | `935b98bf2d991fcdb02e689313607d067e9b849ecc0eef2fd9873a5685a1fd0b` | Markdown | architecture decision record |
+| `docs/adr/ADR-0083-institutional-domain-and-domain-policy-runtime-root.md` | 21506 | `cda87ddd0d26e7b1f20c24ed8a0e10bed78d1bbc159c3238f337351d666331aa` | Markdown | architecture decision record |
 | `docs/adr/template.md` | 2116 | `93da786ffa4d64a75f1df8f7e4bd7f393e7b6d2ec7c26001c8d9220405c6c211` | Markdown | architecture decision record |
 | `docs/ai/CODEX_WORKFLOW.md` | 3221 | `a60b6df40d2cc7e46d0408b2cc9f590ac43fb2f472e2204a72f193dfb1548b27` | Markdown | documentation |
 | `docs/ai/ICN_CONSTITUTIONAL_CORE.md` | 10280 | `d8139c260917ea8d3d9775ea4d5ca0f934be9d560522b78bb08b7f34a7a267db` | Markdown | documentation |
@@ -1233,6 +1234,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/architecture/FEDERATION_INTEROP_CONTRACT.md` | 35946 | `13564182a65bf66892d4fac907de700725fc400642a5c9417fd3ccf5b9148566` | Markdown | documentation |
 | `docs/architecture/GOVERNANCE_STATE_MACHINE.md` | 29287 | `da529698f05396d8b184c8c3edd5183f7d976f1ce9f12010bc728a98b1575117` | Markdown | documentation |
 | `docs/architecture/ICN_INTEGRATED_SYSTEM_MODEL.md` | 33032 | `662f6c8acbdd33582d4d69e7127979298b83cb729d4915b044312155103ea632` | Markdown | documentation |
+| `docs/architecture/ICN_OPERATING_MODEL.md` | 20462 | `00d1a3373ee424b9b234639d80144723f714a7625a40d79b15a221e8811fca0a` | Markdown | documentation |
 | `docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md` | 41091 | `192d5451eca0d7889af82df03ff72a9d44489c1bf7da266f136435f8b8eaac32` | Markdown | documentation |
 | `docs/architecture/IMPLEMENTATION_GAP_ANALYSIS.md` | 30467 | `c981209dbb2e0bd396977d763086f800333e46d739d00eb5a746846793077180` | Markdown | documentation |
 | `docs/architecture/INSTITUTIONAL_FEEDBACK_AND_SUPPORT_PRIMITIVES.md` | 33692 | `3c7785bc80bf8a4cfb627028e5db39649bb3d291f408d2ddf17d4b397a6b2d77` | Markdown | documentation |
@@ -1241,7 +1243,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/architecture/MEMBER_STANDING.md` | 74741 | `a337d6874960f95a08f3e60ff92d6ab3b156bf1f772608c4143ffcd9fa3514a9` | Markdown | documentation |
 | `docs/architecture/MODEL_WORKLOADS_AND_DELIBERATION.md` | 9957 | `cc89b1195f7d969508e70f5c9246b4134627b614643a55d593dfeedadd2ed368` | Markdown | documentation |
 | `docs/architecture/PROTOCOL_SELECTION_FOR_MEMBER_SERVICES.md` | 10172 | `6bbabe82208ce8b2f5ad4f48c8832f9d073ac227839883bb138ece226e0b7858` | Markdown | documentation |
-| `docs/architecture/README.md` | 6803 | `757583802c0a14b536b8e46e0c70fc567e37c9db4b9829ef92a88ca535ee7443` | Markdown | documentation |
+| `docs/architecture/README.md` | 6973 | `acf7069a5a926afb64b9348a5ac2e6e02a4e4dcf6025d33db598de0f626408d4` | Markdown | documentation |
 | `docs/architecture/SCOPE_BOUNDED_TRUST.md` | 14171 | `cc274f2a7783c2ac80f87941c5cb3683cbb00c691177d617a0c5890b8f9a2754` | Markdown | documentation |
 | `docs/architecture/SERVICE_HOSTING_MODEL.md` | 11218 | `3f588c459247b019a3c2136a75bcb2a7cfbd875083f81c4f7e3acd0db7dff8d9` | Markdown | documentation |
 | `docs/architecture/SESSION_SUMMARY_2025-12-17_ARCHITECTURE.md` | 9380 | `f4863774245716429cbe5caeab2a1f2e36ff40857135d038d4c6ca6e44a8b6d3` | Markdown | documentation |
@@ -1328,8 +1330,8 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/archive/README.md` | 924 | `485797a166626c1e4bb221980ac5fb0ef8efa21c1662f23f9d48b93f81bb202f` | Markdown | documentation |
 | `docs/ci/CI_ALL_GREEN_REPORT.md` | 3384 | `1c5b85e4f9f8270c282d602d11514fdf7df52b687ab8d44ab5f8940fb0f81528` | Markdown | documentation |
 | `docs/ci/CI_CURRENT_STATUS.md` | 1709 | `3212b15b6adbb956eb5a42e2c1660928af6418c1697d94cd6eeccdb0e3ab09fb` | Markdown | documentation |
-| `docs/ci/GATE_RATCHET_PLAN.md` | 8724 | `9debcec8b18cadb02071d2277b80ad8a040da8932c61a761a4c7751b4c9ebd98` | Markdown | documentation |
-| `docs/ci/GENERATED_TRUTH_DRIFT.md` | 4236 | `46753d3d2baf4c0c709efc771a7a8b304bd4477ebf4d66fea06fcdc0e20e7085` | Markdown | documentation |
+| `docs/ci/GATE_RATCHET_PLAN.md` | 10532 | `b6fa9a2e8f305843c67f1775663a11a022e2f9e7d29deea3b167b58178488d2d` | Markdown | documentation |
+| `docs/ci/GENERATED_TRUTH_DRIFT.md` | 7147 | `5dac2efd8b1242a41e0240a7ee7757ba289a9c5699a54b9fcfe7082a12762281` | Markdown | documentation |
 | `docs/contracts/institution-package/README.md` | 7597 | `54d05a99be96955597dce088b32f261d0e4798b7e9550812386f04912e942743` | Markdown | documentation |
 | `docs/contracts/institution-package/action-card.example.json` | 726 | `7f9e1b55b852517dcb03c274c1d374cb182bb403ac7bcdc263062ac00a1f48e5` | JSON | documentation |
 | `docs/contracts/institution-package/action-card.schema.json` | 5435 | `d58485a48ab5c1f05623fc216580260bdc7505053bcfba2bcb7cc147171ab755` | JSON | documentation |
@@ -1447,6 +1449,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/design/claude-design-seed/REVIEW_NOTES.md` | 10568 | `450cbe488ef88db7a54868e78977b86e1100a9db45183a4bcb38cd3225616163` | Markdown | documentation |
 | `docs/design/compute-classes.md` | 6295 | `264a51e31f615f5c561a60d2784f044257577f5466b85ac7da314fda9d0868a0` | Markdown | documentation |
 | `docs/design/compute-substrate-design.md` | 43337 | `fd9a9e25459d78bb7eff839e79f2cb48549116b65dd229354c61abf2a1aaf231` | Markdown | documentation |
+| `docs/design/coop-id-entity-resolver.md` | 20773 | `721394b534ec62d9f390cf1d6cf032bbf0e95e023ed5a01233b9a7b81ecda1de` | Markdown | documentation |
 | `docs/design/deterministic-core.md` | 11971 | `d3c9811d87c257186b6469995f45ab246a9d77d331478b2542b3913f8e8e4da9` | Markdown | documentation |
 | `docs/design/dual-foundation-minimal-seams.md` | 1707 | `3d513532fe91141ea27d5e9c334c2c5891d4304d29ed58b29f11684ac138eb25` | Markdown | documentation |
 | `docs/design/economics/ECONOMIC_ARCHITECTURE.md` | 18547 | `bd449c7a69df4b20699c248e3181c86de12d18c4ade5bca51a8da646d9f0d355` | Markdown | documentation |
@@ -1458,6 +1461,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/design/economics/economic-safety.md` | 18702 | `16a592e0665c00fe6ed8db68d6d5b7a950ec795c647e0e0079d300d21f7d82ea` | Markdown | documentation |
 | `docs/design/economics/economics-truth-contract.md` | 18431 | `4f29d0131267c17f41e35b16df9ff7f84812078b548aea5ad677d89e890d0118` | Markdown | documentation |
 | `docs/design/economics/model-validation.md` | 23102 | `701be200619da1f7501270546d176f908c594fb19906f2c6a44574913aed5fcc` | Markdown | documentation |
+| `docs/design/entity-aware-auth-control-map.md` | 15932 | `7b3e0e7df712964c34a98fc54339daea2216711f2a1983aec40437191e390ff6` | Markdown | documentation |
 | `docs/design/entity-dissolution-example.md` | 7465 | `63b1bd932f5713b5eac4ae27674dd4f0643e9fc933bde39757184c18160efd1b` | Markdown | documentation |
 | `docs/design/entity-dissolution.md` | 9090 | `46ea6bbfe39a7e9ce8ebfbb3281c43e2c6178753ffdacac001cc451b66b55b90` | Markdown | documentation |
 | `docs/design/execution-bridge-spec.md` | 24871 | `b9080287f3b305f55756697d6d5b6c06b3c9e19082240c02512d0d405fb170dd` | Markdown | documentation |
@@ -1524,6 +1528,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/dev/handoff-2026-05-22-current-state-and-next-plan.md` | 13629 | `dc88cea6445bbf7045821f0de9a6a4097e444c09972187ffa8291e337eaccb67` | Markdown | documentation |
 | `docs/dev/handoff-2026-06-10-appliance-negative-firstboot-smoke.md` | 11025 | `7e82098a5b41daab9d131f4c6471cffdf01ec8ede02322212ee522e3605eecb2` | Markdown | documentation |
 | `docs/dev/handoff-2026-06-10-truth-sync.md` | 6444 | `b98bb391eff0f009e52a0c6f4100bd236eb1cd5bc34ef3a3d1ba6ec78f301762` | Markdown | documentation |
+| `docs/dev/handoff-2026-06-21-truth-refresh.md` | 8409 | `11f32e3ee0c11b6ab02b13d08a297b77e5d9861ec3e134061f7e59416582269a` | Markdown | documentation |
 | `docs/dev/language-guide.md` | 12393 | `b08ded433f37a48a2d4caae72a27dded787f6b7282a15b517d02942f0ca3562c` | Markdown | documentation |
 | `docs/dev/openapi-member-surface-gaps.md` | 6940 | `85c0d484def8bf4fe193d7ce753eda72717b62ce365e09100929f509dca5eff4` | Markdown | documentation |
 | `docs/development/README.md` | 1680 | `bec067d96213deb35cc794d3a1f50cddcb81f4e833f880e1ec70a31f9719bede` | Markdown | documentation |
@@ -1724,7 +1729,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/examples/policies/time-restricted.json` | 730 | `0668a90103c0d66105a2641f3a6e3560e648bdf8b158024018196e62b919610c` | JSON | documentation |
 | `docs/features/ACTION_ITEMS_EXCHANGE.md` | 17110 | `0838939908999c7bdd9d35c2a46555e2a07f4d34041b0042ae87d2d1e31dd281` | Markdown | documentation |
 | `docs/features/witness-signature-best-practices.md` | 32921 | `83555dbdf62da72d479eb029ef690983c9033f248a8a67444c1684efe65bf9a7` | Markdown | documentation |
-| `docs/freshness.toml` | 10972 | `1acdedabf33c8488b00d31f22833dce403537fe96f877c1b2fc5c4797e6a0cb5` | TOML | documentation |
+| `docs/freshness.toml` | 12476 | `59b3996e3e7d06902469d350830381bc442db9a3389bc7172c8b761bf9a81f1b` | TOML | documentation |
 | `docs/genesis.md` | 16232 | `190ddb217ba2b2790ff31d5f57d7156f26f9e0a2ecc0673497ddf493f718e291` | Markdown | documentation |
 | `docs/glossary.md` | 21392 | `2cd23a30bf8e6c4a4f1d40403d5c70d3dde6604b02523c9af8331c76c2fb284e` | Markdown | documentation |
 | `docs/guides/FAQ.md` | 13567 | `232715f7701b5055cb97b4b2c729e2dff38126ece65ce4d6ba07059f4c679f9f` | Markdown | documentation |
@@ -1894,6 +1899,12 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/pilots/hosted-approach.md` | 7291 | `bb4ed4066cc3fa8282ac6f70f8b50370cba827b06d55e279ad3312690248e8d4` | Markdown | documentation |
 | `docs/pilots/no-cli-organizer-member-rehearsal-workflow.md` | 14212 | `d8a8eb32d1b66bc9060aa50af9fb2d3f00f4b43e1656a03177834a98b58da7b8` | Markdown | documentation |
 | `docs/pilots/pilot-proposal-template.md` | 6687 | `3fc4ef30cb9c851a242b365594c6c82e220dfedfde1fe5e6baaaffca77902a33` | Markdown | documentation |
+| `docs/pilots/summit-ops-closeout-continuity-packet.md` | 15191 | `b82fb856d8026691576ba7eef387282b5ad2592020ce8442b57dc35cd14a8ebd` | Markdown | documentation |
+| `docs/pilots/summit-ops-closeout-recap-fixture-shape.md` | 14442 | `81dffbb9bd8810bc8c7dd07499cd36760bf5930f416ce38719d262fbab179100` | Markdown | documentation |
+| `docs/pilots/summit-ops-lifecycle-package-map.md` | 17952 | `49fdf5b492dae3de9252303de035ebe37165038e6aebfea8a7a4567a453256dc` | Markdown | documentation |
+| `docs/pilots/summit-ops-registration-action-card-proof-loop.md` | 16666 | `ddcb59a26652b6a80bc8fdfda20433e369fd441c848887d00a07befaedbcab6d` | Markdown | documentation |
+| `docs/pilots/summit-ops-registration-fixture-shape.md` | 10248 | `7f2f791aecc271a7205c0cd388228937f31982b7c2209862592d1bbae731741d` | Markdown | documentation |
+| `docs/pilots/summit-ops-run-stage-facilitator-path.md` | 14187 | `891c9b825074c3518a15acca193db8cb8ea8f7aff3732fcc3586a3755ada2031` | Markdown | documentation |
 | `docs/planning/agent-knowledge-architecture.md` | 18309 | `f060caf881db274d12898a944e710e1936600d89c81f02e71404575eb0e5dbc9` | Markdown | documentation |
 | `docs/planning/documentation-namespace-resolution.md` | 4585 | `a8b9829c1435edf8216484cbfa346aa4f4b76b89937a62065ab4287f27275e95` | Markdown | documentation |
 | `docs/planning/icn-crate-reference.md` | 25217 | `44278a69f1c91c5d2579bde30f37656fd50d575e2f14bd2c02c7360770a2692d` | Markdown | documentation |
@@ -1931,35 +1942,40 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/reference/entity-topology-patterns.md` | 8297 | `9440c2dcb73e814e44a0fcd7601d9415700f29064b8b03453edc9998f418e28b` | Markdown | documentation |
 | `docs/reference/governance-playbook.md` | 9914 | `7cf8d6b194326e5e169068748da27ca3f29ae5c73a0ad84ed7e60984a730dde5` | Markdown | documentation |
 | `docs/reference/institution-package-bootstrap.md` | 4876 | `607b4dbc13267b91d381ea84242bc5a2e137450bd44739856a9ff5a9b41dd14f` | Markdown | documentation |
-| `docs/reference/project-index/README.md` | 10895 | `b2da92bf909d786ae76eacca13df4a7618f78c60699ecf33054ff09b3844d97a` | Markdown | project index / atlas |
+| `docs/reference/project-index/README.md` | 11979 | `75dd075fb77fae188bb0c534182b3179829e0cc36f09bd763381aecd06087ceb` | Markdown | project index / atlas |
 | `docs/reference/project-index/ccl-map.md` | 4809 | `d5a5b36ebf53ce8b185e0d23a04af55dff0d08c4e0738db66e6ab6ef2b4f984e` | Markdown | project index / atlas |
 | `docs/reference/project-index/ci-ops-deploy-map.md` | 7404 | `75d672049f162c4ea1b5fc205f4842d1a7d732fcec7c9b64b3486357d53133e6` | Markdown | project index / atlas |
+| `docs/reference/project-index/claim-boundaries.md` | 13350 | `8aec3994c5b5cf413838e58b75d2802ee39bc4b374087b3794022f93b87de40a` | Markdown | project index / atlas |
 | `docs/reference/project-index/current-truth-map.md` | 6143 | `57b26f5d7ed0846ebf690db55b5dcf9fd64eae7ed09793df25f7cb21bef2c2fe` | Markdown | project index / atlas |
 | `docs/reference/project-index/docs-control-map.md` | 7227 | `41469ea307fb54c0466e6d20feaa8449b7bc643c45790574683237f030987c7c` | Markdown | project index / atlas |
 | `docs/reference/project-index/full-repo-record.md` | 7597 | `56a3be5e123f70aaf8fce07505f6143d486e04951ea35a94b8f5b0b7dd4d7730` | Markdown | project index / atlas |
 | `docs/reference/project-index/generated/agent-context-spine.json` | 106372 | `a68345f938a12c782befa3e4fa1c597068c9911537aaaa5c599bed9d63ff6e57` | JSON | project index / atlas |
-| `docs/reference/project-index/generated/route-inventory.md` | 76341 | `9298458ceb36c2a253a982be6e0136699fc9a0262fdcbfc3c0d616db828de6ae` | Markdown | project index / atlas |
+| `docs/reference/project-index/generated/icnctl-command-inventory.md` | 65597 | `ad0fbeb452896d2ea96ae7f9d361186af2c68210bffb1b6dbc09bdee996811a0` | Markdown | project index / atlas |
+| `docs/reference/project-index/generated/route-inventory.md` | 80032 | `7918c40dfa23b94a5db8fcd72e7cdd4448aca8997c6ba9326eb37097f864a708` | Markdown | project index / atlas |
 | `docs/reference/project-index/identity-crypto-map.md` | 5006 | `cffd912bd654b76ee514ab3a3a574e44adeec3e7a953de89e4adfcfe5ebac828` | Markdown | project index / atlas |
+| `docs/reference/project-index/invariants-catalog.md` | 8076 | `ad282d22482e4bd35338346de2ea4851499568372259f8eeeaf0b5f21059f919` | Markdown | project index / atlas |
+| `docs/reference/project-index/invariants-catalog.toml` | 14518 | `02eb17ce60e87e356fab2a584de23ff3ff1d7f4895266b8bbeca85a0d4aa2b06` | TOML | project index / atlas |
 | `docs/reference/project-index/network-gossip-map.md` | 6833 | `2b4269277bcc2291b85f66a676eb1d382359f8d2e73b3af4c69eb32ee02ce117` | Markdown | project index / atlas |
+| `docs/reference/project-index/organizer-rehearsal-operability-map.md` | 18594 | `15a5c5d7c35581cd3dd2c0e5cac3a0aad1cb0b597d404c00441f11cb46a786f1` | Markdown | project index / atlas |
 | `docs/reference/project-index/pilot-ui-current-state-map.md` | 4777 | `6657b47f6cddf503b39c1c0939127e7a71f5f2ddfae4385fba09081f8b35c4c1` | Markdown | project index / atlas |
 | `docs/reference/project-index/project-coverage-matrix.md` | 14971 | `573d6ddbe32e89a6e35cf30b5ea4e151321a4a0e34af2ef1d5fe49d0897b6f07` | Markdown | project index / atlas |
-| `docs/reference/project-index/proof-level-taxonomy-capability-matrix.md` | 22249 | `e57f919f70df3299b162b5058ebbdff7cc6dc65b4ab461ee8ca1f0a95a4307c0` | Markdown | project index / atlas |
+| `docs/reference/project-index/proof-level-taxonomy-capability-matrix.md` | 25160 | `9b48dbdb80cc9b1fe15f2a75dc0630f53a7e97160b0cd7a75930cf8d101249f5` | Markdown | project index / atlas |
 | `docs/reference/project-index/remote-work-plan.md` | 1935 | `090c23f7c6f86b661615e6b999a11fb2584ad89b26bdfc11fde4dc12b42ccdfc` | Markdown | project index / atlas |
 | `docs/reference/project-index/repo-atlas.md` | 5616 | `b4720b3ccb32ea97cf67e3e142cfe7af5adcf0a2f6735ce2065c12b922f63c50` | Markdown | project index / atlas |
 | `docs/reference/project-index/repository-map.md` | 5833 | `364afe68002cda1520e891807dd9d650f6651112bacff214ce57f1587ed3da1f` | Markdown | project index / atlas |
-| `docs/reference/project-index/runtime-surface-map.md` | 11267 | `154f524464e4cf4fda7c76f8147aae5aa9545ce6490bdfd45d3510b0278bca79` | Markdown | project index / atlas |
+| `docs/reference/project-index/runtime-surface-map.md` | 11760 | `315d151f7780cb6f303c921b615c8c6c07bcdbdcf36aea539929c7b6812ba220` | Markdown | project index / atlas |
 | `docs/reference/project-index/rust-workspace-map.md` | 6194 | `ee344929ee477539372971b4f1f44375a324cd3dffcccaa5cb57fe6cb26d3eb4` | Markdown | project index / atlas |
 | `docs/reference/project-index/service-hosting-map.md` | 5340 | `3058ab04e6d21e55d29ea65173b333a6bc9d707d1e6ed49c2be83b01e59c8d2c` | Markdown | project index / atlas |
-| `docs/reference/project-index/show-readiness-map.md` | 8835 | `1efd2c3450fc98cd0e3187dfa18366beba54779cd33383dc1daf5af856c8250e` | Markdown | project index / atlas |
-| `docs/reference/project-index/source-of-truth-map.md` | 9824 | `86a7f1298cd6c16168508233d1e931b797f56121b803124c88dfe22bf3aa5b79` | Markdown | project index / atlas |
+| `docs/reference/project-index/show-readiness-map.md` | 8952 | `6bd3f3c01f79cd3c2a4f311b2e81c5fec6597346843a1c27d01a51b1c01841dc` | Markdown | project index / atlas |
+| `docs/reference/project-index/source-of-truth-map.md` | 10082 | `6c5685ffa24f5a9ec86cab795d8961aa6d48f4138799c2b411bd8498bcb9c657` | Markdown | project index / atlas |
 | `docs/reference/project-index/source-tree-map.md` | 6084 | `3eec9a5e92948cc67093ddac43310e5bef5be3b7dbd07a28f1369ee8f7fddbd6` | Markdown | project index / atlas |
 | `docs/reference/project-index/stale-and-archived-map.md` | 4967 | `df2487b6062c051c08afe0bbfd45c9979630dc412321b47212314aba44216320` | Markdown | project index / atlas |
 | `docs/reference/project-index/tool-commons-map.md` | 6015 | `82b53c42f5b7b22e856b4f45ec0b1c78ff08ace40beedbab56e541d72c5c1d8d` | Markdown | project index / atlas |
 | `docs/reference/project-index/website-truth-map.md` | 4785 | `4737cbee0ab9a1e860eb55bc0e4f344ffe750a813c490ef05843b11f1e85282d` | Markdown | project index / atlas |
-| `docs/registry.toml` | 167435 | `d583b268217bade099ba349c8c382c8697bdcb66de374b864400e1f8d76f6601` | TOML | documentation |
+| `docs/registry.toml` | 181206 | `e067213709452ac2c0b8af28c61bf606b64b5bcb2330983c3df2226bdabae9ee` | TOML | documentation |
 | `docs/rfcs/README.md` | 5324 | `cf109b12e3c96f1940cd8b54303c4bcba9bfc0cd705a9df83b295625947a5e37` | Markdown | request for comments |
 | `docs/rfcs/RFC-0000-rfc-process.md` | 12207 | `ccb99a67bc4c412e39114596f3c97ae496cff46bd29010aa2f80f292b27d432f` | Markdown | request for comments |
-| `docs/rfcs/RFC-0001-obligation-allocation-settlement-primitives.md` | 34160 | `643b05a55e58bb4b2b7b97e92a9110456c49dd929e190452d445fe8284111ba1` | Markdown | request for comments |
+| `docs/rfcs/RFC-0001-obligation-allocation-settlement-primitives.md` | 34173 | `adc176a8278b6b1f7a8cac81508254c5e6b7df647600484db307359f3af987e2` | Markdown | request for comments |
 | `docs/rfcs/RFC-0015-public-surface-and-learning-repo-architecture.md` | 21922 | `46761a839d0cbe79343b56f4ece02d41b6994f033908c5c6a58c1b004bf2a7b7` | Markdown | request for comments |
 | `docs/rfcs/RFC-0016-relationship-surface.md` | 14532 | `5c21a9fd7e0526560a78d0d08522fb194fb26eed1ac0bc0371ff1b71389d7d77` | Markdown | request for comments |
 | `docs/rfcs/RFC-0017-tool-install-infrastructure.md` | 57715 | `9d3e3c48e234dafdb56e98491f476d69fb3e848d14c5e97c65dc3f97fe1e1a89` | Markdown | request for comments |
@@ -1968,8 +1984,9 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/scripts/doc_control_check.py` | 28650 | `0c36890093b788ebc2654383b65b92bcd105f7a79a6d691130af7cfbf4199f76` | Python | documentation |
 | `docs/scripts/freshness-check.py` | 7140 | `1a7ac460b96309ee97dd7f069415b849ad518631cd69b69352b2f7d87cf6b15e` | Python | documentation |
 | `docs/scripts/generate-index.py` | 6708 | `2245c66bf47ff62c7c468238e2c3984f6423ea27585fc9a5d339521f1119c225` | Python | documentation |
+| `docs/scripts/icnctl_command_inventory.py` | 77115 | `571869bd44398a4015b48e597f6bfd1338f4afb5dbe5f69c5d857a3c6ff78cea` | Python | documentation |
 | `docs/scripts/lint-arch.py` | 9293 | `daa9e01015f6af7b8aebe94671593a54b0913134b144a7b6075c57d21d553532` | Python | documentation |
-| `docs/scripts/route_inventory.py` | 26456 | `c8316e636befbccfb4953eb9696fa926bf32d0742b297dbabe676c85aefbb2a8` | Python | documentation |
+| `docs/scripts/route_inventory.py` | 28332 | `ef52db5c2b378484d1e0cc157b5392de9393b155d4ba73cb785f1a5406b51720` | Python | documentation |
 | `docs/scripts/validate-action-card.py` | 5778 | `7782806b1f6c6db578dc9d8b0c0171394c05064c616db76af690d7c554e237b8` | Python | documentation |
 | `docs/scripts/validate-preview-review.py` | 5911 | `e03079bffa878602f8a1f6fe31a2fa22b122e92a5c026a2cc67ab4451c0235bd` | Python | documentation |
 | `docs/scripts/validate-rehearsal-evidence.py` | 3245 | `4283d40fa78962cd70585655d91493dbf50165b377cf44c169e3aa5ae6892e81` | Python | documentation |
@@ -2016,7 +2033,8 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/spec/federation-settlement-finality.md` | 8994 | `7185d61adca2106ff75548ce8becd1b148fa74144d500e175e1edead98d24368` | Markdown | documentation |
 | `docs/spec/governed-service-binding.md` | 34764 | `58cf2f6325811a8e3ec6fedf0e69de3405eb8ed0d2e897cb0cd5b709f76559bb` | Markdown | documentation |
 | `docs/spec/icn-civic-shell-v0.md` | 20994 | `1fe0173f124546f8bf56065c5b72f5656792f2985e227b668d0531572fdb48d7` | Markdown | documentation |
-| `docs/spec/institutional-domain.md` | 31503 | `38aecb4974296b76c700dcafc856e6d3a94938e4b1b33024da706116ed563df4` | Markdown | documentation |
+| `docs/spec/institutional-domain.md` | 42927 | `6e9297b4960b26834dc1b184c7b1779ab31289c1d091d634497cc977feee7d6c` | Markdown | documentation |
+| `docs/spec/institutional-powers.md` | 14099 | `2f97a721ecda957c9016f1961cd1935e760209ccb9274e98cfe0aa6182bafc62` | Markdown | documentation |
 | `docs/spec/member-shell-i18n-v0.md` | 8575 | `bad089b0005913ccf6c76e4cecd7f957981d12f2a3586b6050acb756f7905268` | Markdown | documentation |
 | `docs/spec/member-shell-v0.md` | 49126 | `6605394ad9c6cffcd41f43cc71519a840abb3d9c901681f65bbbddcedefb30b5` | Markdown | documentation |
 | `docs/spec/network-anti-entropy-proof-loops.md` | 58756 | `c739881e62365275fdb1a31695d838c5257bac5d8de20a751cd61f94957c98b1` | Markdown | documentation |
@@ -2026,7 +2044,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `docs/state/ICN-Platform-Baseline-2026-03.md` | 10597 | `e43abb5e5e6fa30338bb013b07b0e40cdcf8f2a6b2d4a610261544a72557a26e` | Markdown | documentation |
 | `docs/state/README.md` | 316 | `60c875c35c649d74f4d469fc2fe0b5ecfc0e07bf4082c1e5b04a44fd93830d59` | Markdown | documentation |
 | `docs/state/demo-path-2026-03.md` | 14599 | `d9953baa438c4171537265685ede2a1bc97c21b0bbb4dc7da5e4043a0d8680f1` | Markdown | documentation |
-| `docs/state/storage-governance-spec.md` | 7390 | `3fad1d9ebd10d1b851e87ba109a02e906e5815fbd6d73db5a9c41846454e8332` | Markdown | documentation |
+| `docs/state/storage-governance-spec.md` | 8217 | `fe6985fcec3943f689ed1b57d9b1b34b5d1ffc00d21079e6299448f73fcd3579` | Markdown | documentation |
 | `docs/status.toml` | 14153 | `62fedac7e7e9662d0d28613a257307db9a10189d44d13eba772038f59b97b2e5` | TOML | documentation |
 | `docs/status/DEPLOYMENT_VERIFICATION.md` | 9068 | `47216764806d4cc7dac534773ed1a0d0644077e397f4143ed3b19851e6b7256a` | Markdown | documentation |
 | `docs/status/MOBILE_APP_DEMO.md` | 3575 | `b1401f93332ca8e1b9b69e4ac2a425c08104ee4a635df2ce84f20e0cf4a63411` | Markdown | documentation |
@@ -2156,7 +2174,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/.cargo/config.user.toml.example` | 624 | `dea544add56c74402e7d57d3005b8b643504dda9996eb5ce250d16887e128a27` | unknown | uncategorized |
 | `icn/.config/nextest.toml` | 779 | `f431e3fb17e3b1d97eab6e165b64ccb07a21092711e4366fc4bb19f5f3cdfe50` | TOML | uncategorized |
 | `icn/.dockerignore` | 373 | `c4f2cbd8ea971b3446568181e2f54ae5362226ed63b54193f2b1dfa44b6526e1` | unknown | uncategorized |
-| `icn/Cargo.lock` | 215694 | `2ef6b85eaea3eb592a94a0025f0658deb896495fc7db8e09b54e9fce3952aea4` | unknown | uncategorized |
+| `icn/Cargo.lock` | 215719 | `3614ec911f9abbb47fcf072f43dbbef29d71609b233125a996fcdf6302b9877c` | unknown | uncategorized |
 | `icn/Cargo.toml` | 5410 | `a9e66fc0e810ad2cc362a257b7e8d38a92f7cb9049a2569fcd95a7f1114c13d7` | TOML | uncategorized |
 | `icn/QUICKSTART.md` | 2433 | `90b080229730e010533bc3ac0d43fe4d73bc180674d68521e0ca5194b5b7bc9b` | Markdown | uncategorized |
 | `icn/apps/charter/Cargo.toml` | 616 | `a033fa8a465db37f269e4e02e2e9936b35f07fbaa37199ef6ed9a204b6c96aba` | TOML | runtime app crate |
@@ -2173,26 +2191,27 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/apps/governance/src/close_journal.rs` | 9747 | `a64bfbcf7da30c1945bb22d387e3f348ed91964b5559d5abf1e8bd2def914bbb` | Rust | runtime app crate |
 | `icn/apps/governance/src/dispatch_evidence.rs` | 11501 | `7842019581d81f636af4495af6b8bea83cb801ba803bd807acfd019804b71a61` | Rust | runtime app crate |
 | `icn/apps/governance/src/dispatch_evidence_sink.rs` | 19766 | `8739897731f91a6c2e566b45850c03b2196fb491c4553ee41683cb6423d32c08` | Rust | runtime app crate |
+| `icn/apps/governance/src/domain_policy_adoption.rs` | 66615 | `bb0a432d728eb293dd458e0ab03811177ea8f96d821d3e7be8986cb04d86adf6` | Rust | runtime app crate |
 | `icn/apps/governance/src/events.rs` | 3075 | `0a6e7d2324f1dffc4e0f85be826ad34216ae41fb718559f40bfd4fd9e7f6cfe0` | Rust | runtime app crate |
 | `icn/apps/governance/src/executor.rs` | 4947 | `dc0aee4a6cd9de7d9bca48181385070df1b03d39002b113df3b9f4f6f6e6c91b` | Rust | runtime app crate |
 | `icn/apps/governance/src/grant_minting.rs` | 121370 | `8b11e18d371ec454e67a2295144142da2eb51bf60b5a877c865c5822806e0273` | Rust | runtime app crate |
 | `icn/apps/governance/src/handlers/execution.rs` | 50546 | `f490648dd8f3f14e13b55f29eabcfc03736d383f9208dd98f891bb2d593101ba` | Rust | runtime app crate |
 | `icn/apps/governance/src/handlers/mod.rs` | 267 | `259f33bccc0c4b395fe63c5ad65e67834360044e5289274f9faa98cb58d81294` | Rust | runtime app crate |
-| `icn/apps/governance/src/http/configure.rs` | 54744 | `f953108a2795998cfaeaea6076d9ee1cf9fee9e29a565af9c4dfd59d059e7d03` | Rust | runtime app crate |
-| `icn/apps/governance/src/http/handlers.rs` | 361119 | `88ead143cb6a1b5566add0566bc0121f721c579d0f00f4b8d456b979764aba4a` | Rust | runtime app crate |
+| `icn/apps/governance/src/http/configure.rs` | 55588 | `fee2ca3eec9269489a7a9de87df6e31f0f6521a916581bfb3a13b977c6f493f2` | Rust | runtime app crate |
+| `icn/apps/governance/src/http/handlers.rs` | 375289 | `536a30a4206870b4302a71fb43767f3a8decf881f31a25f72daf4b276f08e027` | Rust | runtime app crate |
 | `icn/apps/governance/src/http/mod.rs` | 487 | `b531fa6106dc1312fe2dde1a365c35171c4cbb83d6e30dcb336ef21a0daeb38c` | Rust | runtime app crate |
-| `icn/apps/governance/src/http/models.rs` | 62902 | `95ee4fb2a957c0487666c08ee13c7751312329a8779e512d3a12bded223696bf` | Rust | runtime app crate |
-| `icn/apps/governance/src/http/validation.rs` | 17900 | `425cffb608ae11d966ee67b7a5e0544a03d70bce8749734f97a2fa5f80bdff3f` | Rust | runtime app crate |
+| `icn/apps/governance/src/http/models.rs` | 67801 | `55657c549bb10dae8c2c7019174c206eccc984eb2a1896e21d928227ca4d77ed` | Rust | runtime app crate |
+| `icn/apps/governance/src/http/validation.rs` | 18912 | `da3248b7094c498929d8a5c60fe4068886331ded62e93559d0eca7cde955c79e` | Rust | runtime app crate |
 | `icn/apps/governance/src/init.rs` | 4699 | `c9b8aea21e6a3fd9d4ccd77d5905f4e3e5513de3f85429ff205eb7f3ed5fae12` | Rust | runtime app crate |
 | `icn/apps/governance/src/institutional_effect.rs` | 20303 | `395c5b373daea2f7156443ca4bc1180a65c9d08ceeee3b6d99b38b8182c9468b` | Rust | runtime app crate |
-| `icn/apps/governance/src/lib.rs` | 19619 | `2144f34e912811a97df72acf3ccefe8c05e4c90d60712aa0a265c032110b0efd` | Rust | runtime app crate |
-| `icn/apps/governance/src/manager.rs` | 359295 | `14e523b233f1bf43843ae66cbae43f059b4905e2f0bd9356cbf91fce1885bc80` | Rust | runtime app crate |
-| `icn/apps/governance/src/mandate_gate.rs` | 55170 | `6a1959ae7cb5fdc4cd73663204d539da8ef7b0ebf4955eacacd44289d4184daa` | Rust | runtime app crate |
+| `icn/apps/governance/src/lib.rs` | 19651 | `4749ea718cd7251be6588e2bd6d28b685ca93446a6615362a0fb5cac94edb632` | Rust | runtime app crate |
+| `icn/apps/governance/src/manager.rs` | 363022 | `09d668443bda53fa7953cb258512fba9cb3b63a8949ad0af3c8081dc2db89a89` | Rust | runtime app crate |
+| `icn/apps/governance/src/mandate_gate.rs` | 56082 | `8b2f70004682e4643ebb5d1d3f6c55486bee40c813c4d0ee07c98024cd823d92` | Rust | runtime app crate |
 | `icn/apps/governance/src/receipt_backend.rs` | 36470 | `7e4866df3d2e9a19c0615da3196c77cd84d423d5bab72b475ce2bee8b670fe9a` | Rust | runtime app crate |
 | `icn/apps/governance/src/registry/mod.rs` | 2184 | `b270a29b4d42ed783d04149b90fbd6568fc9aba672d8bc4b64a23a3de922d777` | Rust | runtime app crate |
 | `icn/apps/governance/src/registry/models.rs` | 9127 | `d5631e6ae640f7f9a2337ec8cc52303717310a3b94f3da0a1e6df8ac21b63009` | Rust | runtime app crate |
 | `icn/apps/governance/src/registry/store.rs` | 11894 | `d5fc9a2bfa02371d4576f92c7c397551bc54e9987c50a54d57e7f9ca7242f83e` | Rust | runtime app crate |
-| `icn/apps/governance/src/state_store.rs` | 11360 | `9dadb0f1d09b5cb193c64b64c8ac9a7041f51fc5a5bc0891d02d4fa1af5d9172` | Rust | runtime app crate |
+| `icn/apps/governance/src/state_store.rs` | 24376 | `17dbb4b2f080b862859fa2faa67444c2f8db58baf8896c18c616aa75123b0553` | Rust | runtime app crate |
 | `icn/apps/governance/tests/activity_scope_migration.rs` | 6553 | `268298f317d7d6ca70435af19087ffb9573af946063f29509a42febea9d539b6` | Rust | runtime app crate |
 | `icn/apps/governance/tests/actor_acceptance_closure_atomicity.rs` | 30240 | `babfa91029b238fcff5fd9ba13f8fab725d5867f528e1e09e3909e472520cb32` | Rust | runtime app crate |
 | `icn/apps/governance/tests/actor_close_crossstore_atomicity.rs` | 51921 | `7cdf835c739756c6e02cc79d2d6102340df255fdee09293348302e1f423569a1` | Rust | runtime app crate |
@@ -2204,8 +2223,10 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/apps/governance/tests/charter_activation.rs` | 19260 | `516309881da30b2e4379111bd2cede85873eef63aa943c93c714de2c74d24fd5` | Rust | runtime app crate |
 | `icn/apps/governance/tests/charter_scope_migration.rs` | 9299 | `4f6e5bde43188cb2f4aa6a7c6018d74fd78ab7850cd48350d05a964094fd5573` | Rust | runtime app crate |
 | `icn/apps/governance/tests/comment_scope_migration.rs` | 6309 | `3e8338057986320c3dae71372f4525f22274b511c101cbb6ad90f21e3b2f8351` | Rust | runtime app crate |
+| `icn/apps/governance/tests/domain_policy_adoption_http_route.rs` | 27801 | `62d589ab658e42c30e58b1b2ca7b1def363640b6a657522488e204795ba6d1cb` | Rust | runtime app crate |
 | `icn/apps/governance/tests/federation_scope_migration.rs` | 9204 | `472b333387330673cb2f12ecaa502183a5d9e7e645bdba7ee8c99b9282f3671a` | Rust | runtime app crate |
 | `icn/apps/governance/tests/governance_decision_receipt_v3_emission.rs` | 19897 | `2947afd7a492d7aab07f94dcf199eb7a2c0a74ae24e7bd8fca9aedd9bf68d820` | Rust | runtime app crate |
+| `icn/apps/governance/tests/institutional_domain_declare_http_route.rs` | 20836 | `da722b07938d8cde87cd00ef174b77a132d8290ad9d11008c383f4eeb88e10d2` | Rust | runtime app crate |
 | `icn/apps/governance/tests/me_action_card_receipt_chain.rs` | 16137 | `d9ac9da4068ffb0f2f07f020ef986eee261d5001de2367f9315a3ad20d722f5e` | Rust | runtime app crate |
 | `icn/apps/governance/tests/me_action_cards.rs` | 12774 | `6f473099f17b834ba8d9f057e7168b4d9247f12e02267e3b4b5b030aa6a6ef3e` | Rust | runtime app crate |
 | `icn/apps/governance/tests/me_action_item_receipt_chain.rs` | 46010 | `7e57cdc8de711606907ce301b09a097752cb81ef32af9d161efba3caa8fb5996` | Rust | runtime app crate |
@@ -2213,6 +2234,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/apps/governance/tests/me_standing.rs` | 15256 | `6df51ed06cc42226a0cb230461b1fb9bbf8b37e6ea88fe6e5135ce12e40cb193` | Rust | runtime app crate |
 | `icn/apps/governance/tests/meeting_scope_migration.rs` | 6394 | `38e1c3c3a029038abde0793f119a74a99edbe165e090d1b05e15bed357835d1a` | Rust | runtime app crate |
 | `icn/apps/governance/tests/persistence_proof.rs` | 10311 | `798bf89471bfe77e9456fdc69bfd7efefb2e23af3c1ba76c82643087d3eca42e` | Rust | runtime app crate |
+| `icn/apps/governance/tests/process_gate_result_http_route.rs` | 13945 | `3d127265b4df7e6ecc5a4a34a4771e99115bb53024a745a68f14c30165617728` | Rust | runtime app crate |
 | `icn/apps/governance/tests/process_gate_result_receipt_runtime_slice.rs` | 35240 | `884e263f26662eacabd3df0852b8c46e0fba1025d6a65d99033b40de42bf281b` | Rust | runtime app crate |
 | `icn/apps/governance/tests/proposal_scope_migration.rs` | 16806 | `92290ae6ad412c01fca635020b4c15992d74a65ab0ffbaa8c22656d303dcd157` | Rust | runtime app crate |
 | `icn/apps/governance/tests/reconciliation_status_invariants.rs` | 19717 | `9c9847492e6b5428626711f9781cffa3ee3db499d78f5d9a9a1389f2ddae8324` | Rust | runtime app crate |
@@ -2294,13 +2316,13 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/bins/icnctl/src/main.rs` | 415618 | `38c0d17929dfbddcf98b6f5df926ede6fdfdb375a962e3ab50fe9eb864bb2723` | Rust | Rust binary |
 | `icn/bins/icnctl/tests/audit_verify_test.rs` | 15668 | `3e5c21ef0ae71f99868ee9fcd924a5d1ae641217e4f859f5a7c662d6fc34c4a7` | Rust | Rust binary |
 | `icn/bins/icnctl/tests/backup_restore_test.rs` | 13406 | `b51e3f9adc11ef01c46091b2040ec5f20c274a18bc01caad34ea94e96c36d62d` | Rust | Rust binary |
-| `icn/bins/icnctl/tests/coop_entity_backfill_test.rs` | 13805 | `24ff61508ad85e34582c229c6413e86f636b812626d5bbaf61a08af7e4dde536` | Rust | Rust binary |
+| `icn/bins/icnctl/tests/coop_entity_backfill_test.rs` | 14799 | `108e94ce61cb9f46209d04ebec3aefa8c57ea88d3cd0faa270da38da8365e3eb` | Rust | Rust binary |
 | `icn/bins/icnctl/tests/coop_entity_report_test.rs` | 11324 | `31b1e38d006f3be744821e88eed7c009f42d92c9cf20d61ab78bae5dc655b312` | Rust | Rust binary |
 | `icn/bins/icnctl/tests/i18n_test.rs` | 10780 | `52ad320e99abfe45d3320ea5064b723df2b6bcd0b3f77a217d5dba9b899d999b` | Rust | Rust binary |
 | `icn/bins/icnctl/tests/qr_code_test.rs` | 10339 | `75cfd40bb0e6bfc17114aa32a53ca8b48d0b15baa162a08a480641be8def3a8b` | Rust | Rust binary |
-| `icn/bins/icnd/Cargo.toml` | 1480 | `d583baa325019b58e873cea81bac3fa258cdd1c20add77478087bc3e7a811f14` | TOML | Rust binary |
-| `icn/bins/icnd/src/compute_wiring.rs` | 18793 | `ddce7c3a89f562e44006803f2ef4dc1042316d96a98afccf51835a49fdde64ab` | Rust | Rust binary |
-| `icn/bins/icnd/src/main.rs` | 45603 | `bee35cab7967435478c569e809ee92f7cea377e0c12adbe3faacd973e484ca19` | Rust | Rust binary |
+| `icn/bins/icnd/Cargo.toml` | 1502 | `5032b580948f07e20df5dd11675b9b3408e4f304fc8187f512fb240e80363bc7` | TOML | Rust binary |
+| `icn/bins/icnd/src/compute_wiring.rs` | 24100 | `4db2f493f3cc337be231e43554839a9b27758456c694d78c4ca7810e0f21f7f5` | Rust | Rust binary |
+| `icn/bins/icnd/src/main.rs` | 45638 | `9fa4cf357516e7a1b8d2d1919422127aff9eca1c3e04df65c790af65ea98c809` | Rust | Rust binary |
 | `icn/check_output_2.txt` | 2183 | `34a29e2a89a5bec3d2981b68131102fb79d56c33dbf2ab2fb526352138d571c5` | Text | uncategorized |
 | `icn/clippy.toml` | 621 | `2ea68cc8456a5fdb4769fcb81a07c86f0bd396a46a61010414db7bd1762c8e32` | TOML | uncategorized |
 | `icn/config/icn.toml.example` | 8247 | `65660cbaca66d6338ab48964001dfdbfccbaa6a919f3e7b9149b1e03865ce903` | unknown | uncategorized |
@@ -2450,8 +2472,8 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-compute/src/actor/migration.rs` | 8269 | `b40f8cc115dba755740913534bc576eb627cb6408a7a5e481bdd096687a63cd9` | Rust | Rust library crate |
 | `icn/crates/icn-compute/src/actor/mod.rs` | 51611 | `09b134ab177048b1b62022041f39c46a5da2a80662c57c48b4bac36bb2cec347` | Rust | Rust library crate |
 | `icn/crates/icn-compute/src/actor/placement.rs` | 61354 | `2a07b4a99c99a3fcb9e64d0d321783dde3a3597725389567a5a9e6fafa5f1ea3` | Rust | Rust library crate |
-| `icn/crates/icn-compute/src/actor/tests.rs` | 72070 | `1fc164d2c1e0ed38255a4e68244e3cee1ace35278d59c54dad3384048d947218` | Rust | Rust library crate |
-| `icn/crates/icn-compute/src/actor/types.rs` | 11568 | `7e4bd7f4555965571e2d1238ec3377cebe78da1d71d5ee6150bc2b89b046867a` | Rust | Rust library crate |
+| `icn/crates/icn-compute/src/actor/tests.rs` | 73036 | `0cd03ffe4b5dc3adb8f5c82e26dff86ee54b119b0bc90d81a30ab6deb15722d8` | Rust | Rust library crate |
+| `icn/crates/icn-compute/src/actor/types.rs` | 11594 | `519197e0fb33398ec84ee9e37095241ec628c65b3356a2acf1e6dfc3a04e8b79` | Rust | Rust library crate |
 | `icn/crates/icn-compute/src/actor_model.rs` | 15720 | `d3ee518656ca237fb92d5476edac95c7f134945280af0a607b7bbc963486126a` | Rust | Rust library crate |
 | `icn/crates/icn-compute/src/actor_runtime.rs` | 28551 | `e89d514396c339b1577c28a4e8c66bb69b16636f112a43084341081423ce87cb` | Rust | Rust library crate |
 | `icn/crates/icn-compute/src/checkpoint_store.rs` | 19834 | `301fcfcecc1263e4297fc46c7b726405847a0b0486cffe9e99f7a4fbb00cfdb3` | Rust | Rust library crate |
@@ -2469,7 +2491,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-compute/src/result_quorum.rs` | 32378 | `ea677700949a2b573546c99954c2ec849b26577eb68243448c8bbac937603ca8` | Rust | Rust library crate |
 | `icn/crates/icn-compute/src/scheduler.rs` | 92159 | `c17f206cb47318fedfdacf6f051cd3612704761238dea8b24cbbdd4f10625a55` | Rust | Rust library crate |
 | `icn/crates/icn-compute/src/task.rs` | 15167 | `fc2aaf201764893203b2d4f07122470b6235f5e5fdeff1a1eab089f89baef85d` | Rust | Rust library crate |
-| `icn/crates/icn-compute/src/types.rs` | 45606 | `3e9bececff11db59670c34624e2834c119684e7d17b06eb0160d21c5b3d9a405` | Rust | Rust library crate |
+| `icn/crates/icn-compute/src/types.rs` | 47486 | `ebc6d9d64e74ec77c8983857939e880f668e3821ed75c6d50ae645e95ccb241a` | Rust | Rust library crate |
 | `icn/crates/icn-compute/src/wasm_executor.rs` | 50978 | `2084b42fd825d217a684ca9bf2b00125bf4d8cfb5c56542d8607df000d4ec961` | Rust | Rust library crate |
 | `icn/crates/icn-compute/src/wasm_registry.rs` | 47332 | `80ea6c0c1da264296525aa9d6c6d556f8369ac0334230b8fc04c26ce9b781924` | Rust | Rust library crate |
 | `icn/crates/icn-compute/tests/commons_integration.rs` | 46672 | `220322eb8379da107107da39ded7469747a6987cfd2efec37ed09befdb52c805` | Rust | Rust library crate |
@@ -2477,9 +2499,9 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-compute/tests/compute_integration.rs` | 23217 | `59e16f4268b3a39137ed77754110f01ea5cbb54606bf0dc3de5611243930ce2b` | Rust | Rust library crate |
 | `icn/crates/icn-compute/tests/federation_integration.rs` | 13253 | `8e898938c2e66d229f12d5ca7f8348ec11813a14db4b318db708f75c99d726c4` | Rust | Rust library crate |
 | `icn/crates/icn-coop/Cargo.toml` | 1003 | `e228d8ba8ab2456b6a0799cac9c2c8a06fac11161cc7c546dd25e1cec4f5508b` | TOML | Rust library crate |
-| `icn/crates/icn-coop/src/actor.rs` | 72400 | `1bdfd9fa66d3082847e701093f8d90dafb1623fc30b3a37f1029dd5e41cb2812` | Rust | Rust library crate |
+| `icn/crates/icn-coop/src/actor.rs` | 80578 | `fbcb13bbf536a5956a77360559ed34c0fd2c4cdea72edcfad725a703c70d6fac` | Rust | Rust library crate |
 | `icn/crates/icn-coop/src/handle.rs` | 10398 | `3b6bf02e6677231bdc2e5fe21163fb136fe802f81aace101c07f46ff74ca3c93` | Rust | Rust library crate |
-| `icn/crates/icn-coop/src/lib.rs` | 2491 | `2e9a85c2c5744d455848a4a386433167abf30ced6dfe2045bd24b1339bb04dca` | Rust | Rust library crate |
+| `icn/crates/icn-coop/src/lib.rs` | 2524 | `79075f2ba71c92d886ffeb8bd5d63237578cd5164784bb15c4fd625f8af72c73` | Rust | Rust library crate |
 | `icn/crates/icn-coop/src/lifecycle.rs` | 23315 | `9a9bfc9f1e1e00c9bdc87a1fd85ebb09b2e4012297dc43b160ec626a99edd4b1` | Rust | Rust library crate |
 | `icn/crates/icn-coop/src/membership.rs` | 19218 | `d9dedd60ba5ec81ab68f5142d01d7476873eb3fc62e8b98bdb1fcf76b079d8a7` | Rust | Rust library crate |
 | `icn/crates/icn-coop/src/store.rs` | 29624 | `1794136baf374ca0de44dd63e605ae9daa510b5d8990d4e2ab6d751acd39de08` | Rust | Rust library crate |
@@ -2531,7 +2553,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-core/src/services/sdis_service.rs` | 63363 | `3d7c3cd7f5344c43bb4c25954106dacfe1b602b4a51fa90d29d3bea98e390825` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/services/state_hash.rs` | 17752 | `0b15e3996f88a2c1baa203b8df32a751d7d9a55352472ab529c38064d044ada5` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/storage_challenge.rs` | 38870 | `c737ea081fa0678012125411ae90aceb2569e57e47e23b099c4e6de9cc31fb38` | Rust | Rust library crate |
-| `icn/crates/icn-core/src/supervisor/actors.rs` | 10253 | `3f4abea5b37a575f1786378ef1ac6f839aea114eb7f6e98c9bda9ea46d9e744e` | Rust | Rust library crate |
+| `icn/crates/icn-core/src/supervisor/actors.rs` | 10574 | `8329490ff84ddb96d14fa224e83160747a8ed21caee9cc9e7ce1f983c4487d5f` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/background_tasks.rs` | 37638 | `de2054b557c55f2d0915c8061f538fa93bbb8678f6e69b00169647e50b12a57f` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/bridge.rs` | 12291 | `9e932192da5beadb1e1a6e4ae35d60722b102b008a3615c17c2d033d0a816825` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/decision_executor.rs` | 70718 | `46b462242f476e5365ee72a8f492906e442a3a7c098c70f321725cce00d45e83` | Rust | Rust library crate |
@@ -2545,18 +2567,18 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-core/src/supervisor/init_coop.rs` | 4133 | `b622ddb5c3ab88b169be13ebce69b4ba596c2666a3e02a57d6585b85ede75ee0` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/init_entity.rs` | 7231 | `65e6b91da8a7d37b16edad10e5bb92f4b4b5ae1586b7d11e8b97152acd37d45b` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/init_federation.rs` | 19288 | `708a440229024f0a6d261eb8f9a42efe0e3b678e2f453aac7d519b9453f237e8` | Rust | Rust library crate |
-| `icn/crates/icn-core/src/supervisor/init_gateway.rs` | 12537 | `2a06e1e14feac571a7b119c446ff205272127a3e220b0f06ac3e97c31c855d43` | Rust | Rust library crate |
+| `icn/crates/icn-core/src/supervisor/init_gateway.rs` | 13059 | `c347cbdb4792ef904c5e5eaf9ef717a9f45a437eb1b9f943c60b58418c986df6` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/init_gossip.rs` | 15157 | `77d2b20c691c7508b6c59b2162a8237e234599e158ed85f6ab7e8d1035498a3d` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/init_governance.rs` | 6380 | `852141ef1814800f7b4a34a5ee0861aacfe74ee71eb7e0942c73bde05e0e6552` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/init_naming.rs` | 704 | `874b4129243693946bdcff26096e9077a2214b2d450db522f3f1ae08dffd274a` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/init_network.rs` | 16356 | `e358de8627db572ca76c84189a1b146ffa598c6c948eff7f04e8cf3e764a39a9` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/init_notifications.rs` | 53854 | `fea1f3cf2b967446e67226dfff49e27bf23b682acb51521d6f9d02e07fe5a714` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/init_resource_enforcer.rs` | 2828 | `cdae1394bf0813306d627458cce411c0b95714dca0b12a2df6ff55e5e1641562` | Rust | Rust library crate |
-| `icn/crates/icn-core/src/supervisor/init_rpc.rs` | 8681 | `dcd7984cc201dbce46b7c84890e961a35c2c03da32e5405775149b0153a001ce` | Rust | Rust library crate |
+| `icn/crates/icn-core/src/supervisor/init_rpc.rs` | 9392 | `6ad4cdcf0fe85969d7482b699f9b576a5552d3812938993ff819b1ed824936fc` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/init_send_callback.rs` | 11976 | `e1917eb3138fe4ec4ea39196d83289e8d3464e65d28f17317673b746fa4f7875` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/init_snapshot.rs` | 561 | `e041c4028d2867d1592f6b3a250304a697b768e0b99637f1b447cc32c6d16456` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/init_steward.rs` | 6880 | `8f516146ac36ce690abffe169b9dbbf870a73e2b0cc0678d705b5ba44740af60` | Rust | Rust library crate |
-| `icn/crates/icn-core/src/supervisor/lifecycle.rs` | 69866 | `bb29a7e570bc09efcb1d6c0d0bab735d61721af8846fdf06bd20d9a7215ee3d9` | Rust | Rust library crate |
+| `icn/crates/icn-core/src/supervisor/lifecycle.rs` | 70295 | `8d0fbc1769b30bae5e85d3a3c322021bfcfd002dd2fc9a4788dc66773c70a563` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/mod.rs` | 2915 | `c5b1239fe916438fde1219d7878b923fb4c5f2c0b725273d95049f20b645ebae` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/nat_dial.rs` | 17853 | `fb54f48aef019db898833a5fa9098027bd6c941594cb8a8cc9b09568ce0ebe9c` | Rust | Rust library crate |
 | `icn/crates/icn-core/src/supervisor/shutdown.rs` | 6939 | `e431e219c01435689c651cf7e077ec63e55c372f468cb62c7dc364eacd718a3b` | Rust | Rust library crate |
@@ -2570,7 +2592,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-core/tests/budget_enforcement_integration.rs` | 20757 | `a178b56f096d93f5bbabff3ed86e39d9b8fba308e78c833d942e47b911f8abb7` | Rust | Rust library crate |
 | `icn/crates/icn-core/tests/byzantine_integration.rs` | 22360 | `288b4ce8009a977331c2ed69b4b6c63fea212d851d7addb92b00716b1c015913` | Rust | Rust library crate |
 | `icn/crates/icn-core/tests/charter_enforcement_integration.rs` | 8444 | `edc0615fffec9fd2559cbf5a6875a86d440e1ae4ff4c3dbb25e2d0f1e0f1e986` | Rust | Rust library crate |
-| `icn/crates/icn-core/tests/commons_multinode_integration.rs` | 10457 | `2bbcfccb85e8220a602c0456b096881b5f75229c35d2a49108dbbbc7dff1a49a` | Rust | Rust library crate |
+| `icn/crates/icn-core/tests/commons_multinode_integration.rs` | 10470 | `cdf9070fbaf5165c1388426f0ef104fb748d07cd679d88a7272e38fa8bf61e7b` | Rust | Rust library crate |
 | `icn/crates/icn-core/tests/contract_deployment_integration.rs` | 54045 | `9f723d61eb146328c30b4bddf37457b819754b9a58147ae83d2f47ca3aef1557` | Rust | Rust library crate |
 | `icn/crates/icn-core/tests/coop_entity_map_wiring.rs` | 3445 | `86b8b5dbcd14f94242bc3652e6b13aae9a09177ef945a7f36fc5e42869e8f465` | Rust | Rust library crate |
 | `icn/crates/icn-core/tests/decision_executor_runtime_test.rs` | 70089 | `00aae5d363939979bd5ae8268ef866da8cc8b20216404d6942957c1801ed0586` | Rust | Rust library crate |
@@ -2641,15 +2663,15 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-encoding/src/lib.rs` | 3935 | `6c8b0d069b4cef6476449630f3759b007e1e4e3d81c2163312a00b33a0322bc7` | Rust | Rust library crate |
 | `icn/crates/icn-entity/Cargo.toml` | 641 | `2add136e6338e2c5a20e0e6ef32a351043481631c5fcb48ff21f14066915b055` | TOML | Rust library crate |
 | `icn/crates/icn-entity/src/actor.rs` | 22065 | `dc22556dd0de1db1b493de92a193d4ff28d0137f443213452b105259fd02ce14` | Rust | Rust library crate |
-| `icn/crates/icn-entity/src/coop_entity_backfill.rs` | 39856 | `f8e41ef4b3b45fece23e33a8913fdd7f15f098e71e42c3ada5b20f7d10dab72d` | Rust | Rust library crate |
+| `icn/crates/icn-entity/src/coop_entity_backfill.rs` | 45574 | `c140346a4b876656558779087e9d508752a42b86d183d9cbe1f60b5c91b465ac` | Rust | Rust library crate |
 | `icn/crates/icn-entity/src/coop_entity_inventory.rs` | 38771 | `60fc32fc4885ab4ae15131c7ee351dad5ceffbd23d47c92634f4d3b01029b971` | Rust | Rust library crate |
-| `icn/crates/icn-entity/src/coop_entity_map.rs` | 41929 | `5178a2b92ee583c6505e7e9aea24e4449f14251bfa77fac871d5902fe3549a43` | Rust | Rust library crate |
+| `icn/crates/icn-entity/src/coop_entity_map.rs` | 72210 | `8d6e3464b9539412b9476160917846a5835155dfebb90bbdd3cb32587cfc3292` | Rust | Rust library crate |
 | `icn/crates/icn-entity/src/coop_entity_surrogate.rs` | 10500 | `5febf83608ad634a948da17dcd2d20c3df171f499eae7ec285b76bd179adf476` | Rust | Rust library crate |
 | `icn/crates/icn-entity/src/entity.rs` | 48976 | `1ed065ba5d0d5a338c4b867cd6b9d272dc8e57681cb73627e59b2183067c1477` | Rust | Rust library crate |
 | `icn/crates/icn-entity/src/error.rs` | 2369 | `aa123ca045a6bd62246061e8210960475654b98c7def5d790ddeead13b2a201a` | Rust | Rust library crate |
 | `icn/crates/icn-entity/src/handle.rs` | 7306 | `65995581079716c4ce70b21b74dbba736885e86736f91ee5a7e3c401560e2c55` | Rust | Rust library crate |
 | `icn/crates/icn-entity/src/labor_exchange.rs` | 13279 | `b41e65a7bd8ddf6f00343a962b0da6e37706db6208936399dbb7923776e2383b` | Rust | Rust library crate |
-| `icn/crates/icn-entity/src/lib.rs` | 4469 | `14d63726c85d786a2a3a149bb9eae7b75d92fae5909ec557f678ca6aa58f3c03` | Rust | Rust library crate |
+| `icn/crates/icn-entity/src/lib.rs` | 4521 | `ffb59babfe4aade2a9cd98f9573f301f91085225600a2b749024302155e024d9` | Rust | Rust library crate |
 | `icn/crates/icn-entity/src/lifecycle.rs` | 17967 | `e5014c4254122d62b7ddbc327648e647d750d40ccdfdc240778af7024ca32f24` | Rust | Rust library crate |
 | `icn/crates/icn-entity/src/membership.rs` | 46588 | `29fd745c5c22593da3b0475f3aed340e9e7633258984bc8a1e786d5613cd1dbd` | Rust | Rust library crate |
 | `icn/crates/icn-entity/src/registry.rs` | 33604 | `b3c5d7a52379c46a7b0a5f1102268b4107b68aab2fcdc4a584482213edc41ce8` | Rust | Rust library crate |
@@ -2702,7 +2724,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-gateway/src/api/contracts.rs` | 25467 | `c984199818a8248ebe8a17bd032952426ec374d4a477f17e9d584bdcbaf94b37` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/api/coops.rs` | 24910 | `047571db43acd66fb0ded1f299f4a7b145b227fa1c25a941a6a9227cc1f57477` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/api/devices.rs` | 9583 | `0131d44fcf29e8ee705753f07089eb2b0d79915b4b2107d2974567d7615101ec` | Rust | Rust library crate |
-| `icn/crates/icn-gateway/src/api/entity.rs` | 74757 | `5a115aeb8d5c5b3086f17a6493367525e4143e8f9f48a5ee7426c8965fe650f9` | Rust | Rust library crate |
+| `icn/crates/icn-gateway/src/api/entity.rs` | 75121 | `187a23562b2db838922a5800ca25765e34532047ab19c8a17903ddb50ec95274` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/api/escrow.rs` | 18449 | `c093d58a8bc60aaf9ef2bec907610ca4a4098014c5fcae7ceec6128c91464150` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/api/execution.rs` | 7810 | `bb046c587b95151b82c2be7ad5db5551d343a306fa88ed7fbfbd464613195332` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/api/federation.rs` | 113754 | `c585278ad43000364a2d868db2e7b715a172e7508e29f3e5d6c92525bebc2b44` | Rust | Rust library crate |
@@ -2734,12 +2756,12 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-gateway/src/api/services.rs` | 25251 | `0171730b711372b2c66ed91463d7561d9aa45da338dd7d3bf977b340588fc256` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/api/sessions.rs` | 16215 | `086bcf329215deabef5a86a36d5bd60e9d6acbd7dd9f645463c9e71d8ec83ab0` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/api/steward/mod.rs` | 26765 | `e88824cd66fb37842522a2033843c355baf949830531315615d43dd6158d8c82` | Rust | Rust library crate |
-| `icn/crates/icn-gateway/src/api/treasury.rs` | 59556 | `892a34468e8451a4e669df55d9d26c193788858aa3da08d8f30a0db5c873ca33` | Rust | Rust library crate |
+| `icn/crates/icn-gateway/src/api/treasury.rs` | 60804 | `6e8e052fc7ff45358862778ad8be400f262a7d5d815b11dd4c650d4b23c8652e` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/api/trust.rs` | 7595 | `6f5d31f92f3f2de27aabefd10f3799654c850972e485d147047c9f8a36dcf299` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/api/websocket.rs` | 1650 | `e9baa5eea0cb2064f1677a4406b6fffa597f395d566ccc431bc00f6a9e2c7386` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/audit.rs` | 7364 | `e97e1b522c765eecd98f27f56654a0f0f7c0cc9a944a7624cafb955e5c19a32b` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/auth.rs` | 31048 | `d017f1ec4a3028812473593c0d62f6266653d554558233570eab4d166f953717` | Rust | Rust library crate |
-| `icn/crates/icn-gateway/src/authority.rs` | 35098 | `0b0c2459b64b1608f445aabbbf223655e717d54c868e6ded0b6688f80e289437` | Rust | Rust library crate |
+| `icn/crates/icn-gateway/src/authority.rs` | 103222 | `4854fe77442b3b5cfdce1ea562cbe1fe15a26ace39eccd570f0ac4ddae95ad80` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/commons_mgr.rs` | 37781 | `cb981f120c2d36bcc49817aceeb1a6f6c10c92668434d83e85302c51c3b78106` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/commons_store.rs` | 54274 | `48747a89bd85d2cfa6a94489e15128d3f28979836a1fe6c72fb8e3d7b00167af` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/community_mgr.rs` | 4626 | `3cdf183ac686c6cfd4a0ddf3a8a90e923fe9294fd35e3652dcfa5d1fc4e5cb55` | Rust | Rust library crate |
@@ -2747,6 +2769,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-gateway/src/compute_mgr.rs` | 16589 | `61e50b0fdc7560f7c98fbdef2ca22268805f22be2a603b84f629b8fd240e6e14` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/coop.rs` | 28299 | `a1c075e304844abaa077de69fbafe3d0c15ffa8756e04462e9066c1619f78d4f` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/coop_actor_adapter.rs` | 8595 | `d94c72a52a6df883a0211bffb734440f9e6426f4be7896010b3fa99cffdd132d` | Rust | Rust library crate |
+| `icn/crates/icn-gateway/src/coop_entity_resolver.rs` | 31587 | `0ef11e4275db84b9c839c61d8ca8a9e5d75c8c5695e06903be1965e8e6c8650f` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/dispatch_evidence_backfill.rs` | 19434 | `8a855164ad33daccc76d2827cdd117a6bc76e7f5040cce92aab195072d63d740` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/email_client.rs` | 30562 | `f21c89a9e8f0d0567fbcdf2319c4ee1dc6ccaff60659800e8cfe3ac7e2cdc880` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/entity_audit.rs` | 37813 | `e84f3d855a0bb1c330850fcf38ded683c7589f48ddf06bbf49be426537600bf1` | Rust | Rust library crate |
@@ -2762,7 +2785,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-gateway/src/invite.rs` | 7289 | `fac1077d63c5938e463b6ae60efeebcc130f5fccf28ba8173052795e37edeffb` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/ledger_events.rs` | 16744 | `769d9264ecd64f30517606d72470d9f589f466391a78f2d4650a2eda6fb2e4f5` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/ledger_mgr.rs` | 29245 | `5f8a6e6bc7e82123bcead70bfdb619b0b7c32efadcb5a1aa6945c39d24105bdf` | Rust | Rust library crate |
-| `icn/crates/icn-gateway/src/lib.rs` | 4006 | `9228d55f3df894193558a41a8a7b6a656c2a099b70f12f3d2a07328c14bdb52d` | Rust | Rust library crate |
+| `icn/crates/icn-gateway/src/lib.rs` | 4036 | `27a1a4ab2b781d658a3fdffe9a1734a14ac066127ffacec9f868404e990c7757` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/listings_mgr.rs` | 65412 | `1a72f06d7b34a178e339a135cd36ccf2dcc9ca3f071ac74de43cde1296b73aec` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/logging.rs` | 1942 | `54438b96d3c3f367219bf3858305866914120ad59322b81f259dff375c5130e2` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/middleware.rs` | 20806 | `e86c07fcda523fc6200ab8380d4dd4bf514afccf12932539407e42768a97f67f` | Rust | Rust library crate |
@@ -2778,7 +2801,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-gateway/src/rate_limit.rs` | 42323 | `99ef5ae492d0ad59ed2478de9911d63d1005004cdd020432fa35d25102b29249` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/receipt_store.rs` | 181810 | `e8eca4775f3c402dfe564a6ff1fa93eefc25177d0900929f287aedc04fcf1886` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/security.rs` | 23916 | `fceb52c469718b4c9383431fc4b4f7fe42b7a76a75003550a8918e05b649956e` | Rust | Rust library crate |
-| `icn/crates/icn-gateway/src/server.rs` | 127192 | `eecabb6a8162c8975229b71433e61b266a877dba77381086a75668c0dfe063bd` | Rust | Rust library crate |
+| `icn/crates/icn-gateway/src/server.rs` | 129738 | `29ce7fb2a45261a3413a72a0b3ff624a98f3a79685eb6adbf8cc848e77f86d7c` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/service_discovery_mgr.rs` | 64619 | `40938231cea9657837cb558249a94db919fc84f4ea84919f44cd9e2a92f23244` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/session.rs` | 12710 | `01381552373578e0e31c06fd50662855590f098d1c6eb2e957e4776ddfcaaad1` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/src/steward_mgr.rs` | 6527 | `c60bc68ece803327c65f4ae6d932c3bf4842f7d4bd26f174a6e21a9b3f5045a9` | Rust | Rust library crate |
@@ -2792,7 +2815,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-gateway/static/demo.html` | 9940 | `555d53dc21cde129297e22a5f7367c12df116a187fabeb784e1a50bac65eef23` | HTML | Rust library crate |
 | `icn/crates/icn-gateway/static/demo.js` | 23780 | `5d87e8c6d027b2e8ea22f1c38fabc33e230e1e4bd311203845ba0d2da3497603` | JavaScript | Rust library crate |
 | `icn/crates/icn-gateway/static/i18n.js` | 5039 | `68f06459707f062c10b46fdb02d2ec6d84ba2e05076cc6f53bd4b00139b6b000` | JavaScript | Rust library crate |
-| `icn/crates/icn-gateway/static/index.html` | 97231 | `93c27be12136554ccdb9757a6d01d732eb6e459fa186c0bdcd3d987ca2ab9c2c` | HTML | Rust library crate |
+| `icn/crates/icn-gateway/static/index.html` | 97650 | `3f9d8621c5187564b3a677315cbdb5e3386b5e7ce8e48311f759787e82cb3ea8` | HTML | Rust library crate |
 | `icn/crates/icn-gateway/static/locales/en.json` | 4560 | `48f6b22dfe864487a0568a1198bed0bc957fe06b16f55c9a582ac89729edc24a` | JSON | Rust library crate |
 | `icn/crates/icn-gateway/static/locales/es.json` | 4929 | `11cccced8cc34f684c874e23f1a0a5ad0153a08a64b1e199fa0bf5c214e463a4` | JSON | Rust library crate |
 | `icn/crates/icn-gateway/static/manifest.json` | 2898 | `339396c3ba9f3eceb7529e3677c11f45428c43ced7b5b4013091c256095ecf4b` | JSON | Rust library crate |
@@ -2800,7 +2823,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-gateway/static/offline.html` | 5735 | `15458d79294fc6ca649b82d51914d3601f80115a6ffbde9df4f07edc0757fc57` | HTML | Rust library crate |
 | `icn/crates/icn-gateway/static/receipts.js` | 17641 | `474f8ba1ce8f8046d8f972e89f900717284160223dbe8cd9e14c0afd79790879` | JavaScript | Rust library crate |
 | `icn/crates/icn-gateway/static/style.css` | 106463 | `1c20aad951912be7cd59cf3b703ad1d971545167268f89f0bb2e1ea6bb26f70a` | CSS | Rust library crate |
-| `icn/crates/icn-gateway/static/sw.js` | 12014 | `29e788d153426b4d84cfa5f7db5b8d3dc80b4071fdc1bbe65f477dc17aa88376` | JavaScript | Rust library crate |
+| `icn/crates/icn-gateway/static/sw.js` | 12014 | `3aeefd6c9d8bbca5cfad723327661a4a81ff276083ecdfd9fd763c0c700ef9a0` | JavaScript | Rust library crate |
 | `icn/crates/icn-gateway/tests/authority_enforcement_integration.rs` | 26081 | `ec61ed66ac4b8293bf4de9e3b5c98d91d8d2fb3c84702b2ed7967fa0b20362df` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/tests/boundary_scope_integration.rs` | 8849 | `596fb61856d75a7cbba460c49f4a48f44cc0053f33c7127151f385415d0c43ce` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/tests/budget_integration.rs` | 3329 | `641aa2e04c53a2ab4642f5c0f34e8fdf4e328e7d95629a9c593432ddd3d40679` | Rust | Rust library crate |
@@ -2820,7 +2843,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-gateway/tests/e2e_trust_threshold_close_time_enforcement.rs` | 23876 | `26b4925c771efe4cd99a507e751275418e1ce51db013baee00c7dc9b3997b7e6` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/tests/e2e_vote_standing_gate.rs` | 17709 | `ee4b5cf475d002a2de73686aaffa7d3b5b6da04ca2c9e958d24d3ed2b2e61f9a` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/tests/entity_dissolution_integration.rs` | 34539 | `f18482d730ef4a273386b8d6a999c679d72e98dafd7ab785c1ba860463564090` | Rust | Rust library crate |
-| `icn/crates/icn-gateway/tests/entity_integration.rs` | 35835 | `8a5fececb35c9586d38f88118eef1012b5b22c1f42d28501a8ed3c88a811c400` | Rust | Rust library crate |
+| `icn/crates/icn-gateway/tests/entity_integration.rs` | 38690 | `355f572003c606a050874ab2bf4e07fa8fc7e1a451be5c876b6504ba192f24ac` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/tests/escrow_integration.rs` | 5357 | `05cb6df6a2270d6d92631864b4b07d85ceaa029881691ca2eefcad50947b1e27` | Rust | Rust library crate |
 | `icn/crates/icn-gateway/tests/federation_endpoints.hurl` | 6275 | `712b37cb5106b42b752754fa24547bfd4b6fcb0be9060a69f01c9c2d4f080b11` | unknown | Rust library crate |
 | `icn/crates/icn-gateway/tests/governance_flows_integration.rs` | 22149 | `c33ae07db900186b14f0dc9e036040d42c03dbb8827a58d018f568c08ddd084a` | Rust | Rust library crate |
@@ -2892,8 +2915,9 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-governance/src/error.rs` | 2333 | `2cec0e76fc73b54f3b8f7f4e6d5067bb0d0f4cf09de64f8f8fa5e812ec03dc19` | Rust | Rust library crate |
 | `icn/crates/icn-governance/src/gate.rs` | 6508 | `eb6b92da13c5fecf3d2fc9657d9bcc2e5a987e462fb78a028f6a2ae59d050717` | Rust | Rust library crate |
 | `icn/crates/icn-governance/src/handle.rs` | 10008 | `d5e3d27bc5f606490c7621742f18bb6ec82c8145c2ca2a6b302f4ffdecf92e34` | Rust | Rust library crate |
+| `icn/crates/icn-governance/src/institutional_domain.rs` | 23509 | `79ce1648fae3ce58877afd666e41fa535ee57f557b5f14c6106a044e64609330` | Rust | Rust library crate |
 | `icn/crates/icn-governance/src/invariant_gate.rs` | 18063 | `31bba0bd30f4c53c4c23dd56807ecad791f3555907656df0392409febda93dea` | Rust | Rust library crate |
-| `icn/crates/icn-governance/src/lib.rs` | 9223 | `5993050f686bbd9f75407a29c74732950fc0e6c8303940fe5dc7aa4f08570b83` | Rust | Rust library crate |
+| `icn/crates/icn-governance/src/lib.rs` | 9386 | `f93879d256488d943d939cb6603d29e37e6035bf85a730cc6810a56dbcbbfe5b` | Rust | Rust library crate |
 | `icn/crates/icn-governance/src/mandate.rs` | 15868 | `544616a587bf8503d7b6a5682424b66447c49ff115805b865463dd5dbd50db0f` | Rust | Rust library crate |
 | `icn/crates/icn-governance/src/meeting.rs` | 24304 | `871de21ad9223f500a4144c97e17acbb34e88c03cc8d71b4c1c871f29147f1ee` | Rust | Rust library crate |
 | `icn/crates/icn-governance/src/membership.rs` | 2600 | `1b0691bf661b68d88de5fa27c7ad9cd060676bc4782e11b8a063fe19c47ea73d` | Rust | Rust library crate |
@@ -2972,7 +2996,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-kernel-api/src/governance.rs` | 32775 | `9ea867ab3705436c28056f9cb08704bab0079d22ef848538eae0997d9e9fbb54` | Rust | Rust library crate |
 | `icn/crates/icn-kernel-api/src/identity.rs` | 7496 | `45001d0237a6d1d450ea3027ae577c6f1af510659d9319381c8c27249e1f9af5` | Rust | Rust library crate |
 | `icn/crates/icn-kernel-api/src/invariants.rs` | 7910 | `e249811ab1856bf5ee3eb32fd9d36f8f008ee36c390c92f5cecb04703c3582d6` | Rust | Rust library crate |
-| `icn/crates/icn-kernel-api/src/lib.rs` | 7315 | `f75eaee597d2df91c0f00372a3ac7c6b3262514ef401bbeb2efa05f4e8a2e696` | Rust | Rust library crate |
+| `icn/crates/icn-kernel-api/src/lib.rs` | 7360 | `4e2fe34f8bf4d22b90ced9c7ff48ca03041d684d523f0214ad3c96959b40c97b` | Rust | Rust library crate |
 | `icn/crates/icn-kernel-api/src/naming.rs` | 28527 | `82c6316153fac115fa7e1ea93d66ca40cc9e1bdf20b75f1ddfe0b4f70729374d` | Rust | Rust library crate |
 | `icn/crates/icn-kernel-api/src/proofs.rs` | 393150 | `7c05a7dc81672d9058f10305b82d8509c137f8ed1f6c2b26b6c7011e9a130949` | Rust | Rust library crate |
 | `icn/crates/icn-kernel-api/src/protocol_params.rs` | 42754 | `b76aac0f83e990fac9bcef2b57394b725470e44329a79172c061ce0de27267f1` | Rust | Rust library crate |
@@ -2981,7 +3005,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-kernel-api/src/scope.rs` | 18033 | `151b33356127eb52480b3b5ee104a68afb07b700d38e3cebb9a506ffad87f9d8` | Rust | Rust library crate |
 | `icn/crates/icn-kernel-api/src/services.rs` | 90035 | `7ea59e0aa827450186b9e89ff216f6fd1d1850bd1d0ea0ca1408980fdd4b0ddb` | Rust | Rust library crate |
 | `icn/crates/icn-kernel-api/src/state.rs` | 38281 | `8e2507645c973c7bc6980463bf38fdeaf2b5018fb7c99b9e5ba406f07875418c` | Rust | Rust library crate |
-| `icn/crates/icn-kernel-api/src/storage.rs` | 19970 | `2932be565bfd21a691dff207c79d4a0fa692234c9db8bd3b3a6357e05870e07f` | Rust | Rust library crate |
+| `icn/crates/icn-kernel-api/src/storage.rs` | 25928 | `b1ae4607498f207ab26526e2fb6d029f82d09593890a6c059724daca0fbf02ee` | Rust | Rust library crate |
 | `icn/crates/icn-kernel-api/src/time.rs` | 9428 | `e69ae303466f866f550f415305733695edc5589a88ba3da93ca08162b92d3bb6` | Rust | Rust library crate |
 | `icn/crates/icn-kernel-api/src/types.rs` | 8291 | `58201df710b39bddb4bc8fd67e58977d78a7e65909ffbbc636be3f7ba2380116` | Rust | Rust library crate |
 | `icn/crates/icn-kernel-api/src/version.rs` | 3574 | `06dc8e16412e016c83f3458bef6eab2acaf8f1783e0313339801a7d903f87ba9` | Rust | Rust library crate |
@@ -3007,7 +3031,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-ledger/src/fx.rs` | 51493 | `8b9332f72eb0f9af81b00c334cd995f59d88405cfb5008737d448d7f58c31c89` | Rust | Rust library crate |
 | `icn/crates/icn-ledger/src/hash.rs` | 6186 | `732c4881174e4b524dc4a2d658e32a7333cc0367c4ddf47126a339d91d91459a` | Rust | Rust library crate |
 | `icn/crates/icn-ledger/src/labor_shares.rs` | 33338 | `5424cadb57c2838a6c233c7742b865a83d8d5e1d09489860ffc3c6f62deaeaff` | Rust | Rust library crate |
-| `icn/crates/icn-ledger/src/ledger.rs` | 190069 | `79c522e64ecf8f1041729bafa9fc93cc2cd45682561ced5126ca51dac6ef7ace` | Rust | Rust library crate |
+| `icn/crates/icn-ledger/src/ledger.rs` | 196517 | `bfc75dd8604a85fc3e9aa4e80af0a6aaa6a05bef7676cb3518a6b194ac742e1e` | Rust | Rust library crate |
 | `icn/crates/icn-ledger/src/ledger_impl/balances.rs` | 10492 | `3e5d551680adaacc933c50525bc706bba06201b3cee7d425591ab8962d1658fa` | Rust | Rust library crate |
 | `icn/crates/icn-ledger/src/ledger_impl/fork_ops.rs` | 16098 | `c42ca407891c0de25151a4923d63a90c4f01d24d2393078b1a5827b6b7d6150e` | Rust | Rust library crate |
 | `icn/crates/icn-ledger/src/ledger_impl/freeze_ops.rs` | 8490 | `0deaccd89ddc62cecac8b063aaad69b0fae96489c0538305fee4abb8336fe3af` | Rust | Rust library crate |
@@ -3035,7 +3059,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-ledger/src/treasury/approvals.rs` | 14812 | `bfcfc2d3f740cf0ac07ae400b9f4064c3f4c285b6532fc550df188edbb497256` | Rust | Rust library crate |
 | `icn/crates/icn-ledger/src/treasury/audit.rs` | 9205 | `dc1abd1d4fcd205f7509ca6aa203f9f284b0694cb10b4759c6e0cd70383c35d8` | Rust | Rust library crate |
 | `icn/crates/icn-ledger/src/treasury/budgets.rs` | 12716 | `ae5839bf81998cc664b8d80162601a4518dd92507c86c200d773a0c4fae874ad` | Rust | Rust library crate |
-| `icn/crates/icn-ledger/src/types.rs` | 23789 | `d992e01721f0c050175c08c87dbb9ccba5e5c873e53c26aa6a6db2887ae3c9a9` | Rust | Rust library crate |
+| `icn/crates/icn-ledger/src/types.rs` | 23821 | `0c67123c53be42a8c398f44da34e58ad3d21f280aa8e37c1927c8ac9f6dd516a` | Rust | Rust library crate |
 | `icn/crates/icn-ledger/src/use_access.rs` | 101020 | `1f5f192190571001b013cbe0471d8692e53437c5dcf9d9b54697aede68fb7890` | Rust | Rust library crate |
 | `icn/crates/icn-ledger/tests/dynamic_limits_integration.rs` | 12464 | `3d510bcc3dde0cda45f304d5dc6b0f8fa00f19cf6c65ba8e799588a3f14748c2` | Rust | Rust library crate |
 | `icn/crates/icn-ledger/tests/gossip_sync.rs` | 20462 | `28a5b423939c3c5adc9e572a0a14a43cd1db4e72e613d295bfca4f6a45ecbf37` | Rust | Rust library crate |
@@ -3118,8 +3142,8 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-privacy/tests/privacy_integration.rs` | 20725 | `63e9dc78cedda13c550962c8b36cd12c74f56113dde139eaace7c0cc39e810e2` | Rust | Rust library crate |
 | `icn/crates/icn-protocol/Cargo.toml` | 364 | `f057dfaddab5669838d7016d03a9819603e3bc5e1df88d51f9b95d229154d7d7` | TOML | Rust library crate |
 | `icn/crates/icn-protocol/src/lib.rs` | 1367 | `472aba069c69030afa195ce3f367d9f7cbb239e5e24972d4e44afb21339d6267` | Rust | Rust library crate |
-| `icn/crates/icn-rpc/Cargo.toml` | 1079 | `3fd30e2e74d46cc1b7ce148b5d5c59b0afdb85b09e65a671635fbbfbabbcec35` | TOML | Rust library crate |
-| `icn/crates/icn-rpc/src/auth.rs` | 61346 | `48ce6ecc5417011e26c7970944d387cf174cf19200cec0c433904c87d94d8590` | Rust | Rust library crate |
+| `icn/crates/icn-rpc/Cargo.toml` | 1224 | `3e60c7824dfc7c9ed21966449504382aca838f65db85fbd796cb817ffd85c617` | TOML | Rust library crate |
+| `icn/crates/icn-rpc/src/auth.rs` | 63017 | `36fe153dc8cd8c8c86a676871e6684a713f03d286b39ec3fe741d04d84addf86` | Rust | Rust library crate |
 | `icn/crates/icn-rpc/src/client.rs` | 30172 | `d024810960765a601905ed32669ba8e4ef4291fcf7780b67f65cefd496055c85` | Rust | Rust library crate |
 | `icn/crates/icn-rpc/src/context.rs` | 5725 | `1d614bc2d6854f183ab874cab8f4a8af57e514613045d56bcfaeebf5ec01667d` | Rust | Rust library crate |
 | `icn/crates/icn-rpc/src/error_codes.rs` | 11249 | `a68fe090a89c1eba682e27cd3036fb61c2bda8c36b48c00efbcf7ac31f924265` | Rust | Rust library crate |
@@ -3128,7 +3152,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-rpc/src/handler/contract.rs` | 11100 | `0b5a7cc9fc75d10d05961ee328efe3fd94fb17b1853b2bfff6ecaf693e4e304b` | Rust | Rust library crate |
 | `icn/crates/icn-rpc/src/handler/dispute.rs` | 17254 | `01088834a4abc4cc37e30faf4d637dcef2ad4f6d430ea6aa01c781bddf941eac` | Rust | Rust library crate |
 | `icn/crates/icn-rpc/src/handler/federation.rs` | 31393 | `c4168d399c5abb0563e2a344096033acc3e02f9441a08a130538067776f055e7` | Rust | Rust library crate |
-| `icn/crates/icn-rpc/src/handler/governance.rs` | 25405 | `9f7c3dd0676488caef849f516ff88b1efb00637514aa15738f4a96bbc7e49f84` | Rust | Rust library crate |
+| `icn/crates/icn-rpc/src/handler/governance.rs` | 53929 | `22b5fc9349cc59a7b92e368b164f96b466a1f6d4a7b4c775a8122ff28f0af43a` | Rust | Rust library crate |
 | `icn/crates/icn-rpc/src/handler/ledger.rs` | 21612 | `1751c097ba255c78b33ebf2e5ecc24e4c679dd85c640fc1bd59dd676dc2bafa9` | Rust | Rust library crate |
 | `icn/crates/icn-rpc/src/handler/mod.rs` | 287 | `786ca7121b6630cb19db9b734e6843da23d0459def7f2bb0b67d0158bb814254` | Rust | Rust library crate |
 | `icn/crates/icn-rpc/src/handler/network.rs` | 5261 | `4d23e50124ec2adbf60fb310be4df9c69ae67a0ad7c6e5188b33a6c5af058415` | Rust | Rust library crate |
@@ -3138,8 +3162,8 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `icn/crates/icn-rpc/src/lib.rs` | 1678 | `ecc0674be6a22bc6bc454130214056fc597ab61dd8cca98729dfb83f2ab23efe` | Rust | Rust library crate |
 | `icn/crates/icn-rpc/src/pagination.rs` | 11229 | `ee172c8bf020b15cc87f7dafb6699e214f07729ece251cd3cf64ab7734eaa523` | Rust | Rust library crate |
 | `icn/crates/icn-rpc/src/receipt.rs` | 11871 | `5ed89655d7c5e85834c78372b8f45215aafc28e5d531fda6ef6e4bd55a7789aa` | Rust | Rust library crate |
-| `icn/crates/icn-rpc/src/server.rs` | 37500 | `7b0ee90e7290a7e84af227b4007e6fae8f415ea5a34097c55818ca493b816866` | Rust | Rust library crate |
-| `icn/crates/icn-rpc/src/types.rs` | 24480 | `10a9a4c750d7f1cae9432df701112a92a74a09ff28509f3cfab158b309e53601` | Rust | Rust library crate |
+| `icn/crates/icn-rpc/src/server.rs` | 39272 | `bc02e4a240aa4e22dc0fcfd75b0fab3086c7dc8ef409d7e8148c75a1acdce138` | Rust | Rust library crate |
+| `icn/crates/icn-rpc/src/types.rs` | 25355 | `ed1ec3abd5ae05df2910694700fbf7d1741b940e4f6e9b87569893880e6a6e96` | Rust | Rust library crate |
 | `icn/crates/icn-rpc/tests/rpc_integration.rs` | 57690 | `1e0a8cf32963fa1459153acb5cdb8cb344ec0e31f38b718fe9406619a1450cba` | Rust | Rust library crate |
 | `icn/crates/icn-security/Cargo.toml` | 514 | `15a31ec51fe6560efdb3de11f6ea2cb6e9585d64a49938379487fb572f0749ef` | TOML | Rust library crate |
 | `icn/crates/icn-security/src/lib.rs` | 593 | `57d8b9fbdea2fbcba4a5c55ca0d18889180ba61d63743ddbf27d41ea3f30a5e1` | Rust | Rust library crate |
@@ -3335,19 +3359,20 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `ops/mcp/src/tests/agent-context-spine.test.ts` | 13360 | `d589c757afaea3083e5210b766a46ab3573dea7fa0b97f88018ad45076a85370` | TypeScript | operations / coordination |
 | `ops/mcp/src/tests/agent-diagnostics.test.ts` | 5432 | `d0dfb67314c48334300c483063108c8b9ca80b5b2c136e5f060315742bee9621` | TypeScript | operations / coordination |
 | `ops/mcp/src/tests/commands.test.ts` | 3193 | `05a378f39279eecede13a54d4bf9c61c851b5c83e04a4d9e8fb4e9c73c652087` | TypeScript | operations / coordination |
-| `ops/mcp/src/tests/decisions.test.ts` | 6642 | `a8d0d21bcb246cbde42fef48edf0f2e0ba2e1194f6c7beab1f05b8860d29893b` | TypeScript | operations / coordination |
+| `ops/mcp/src/tests/decisions.test.ts` | 9270 | `38d6196a5ec8f733372b451611ac46daf03f0e938ea2df48050b0112de066890` | TypeScript | operations / coordination |
 | `ops/mcp/src/tests/fixtures/sprint.json` | 287 | `f94135ff2fab0dde2d0776776c0d031ab49c5e98e147c095cba9746a72764c90` | JSON | operations / coordination |
+| `ops/mcp/src/tests/repos.test.ts` | 818 | `ab9f73c706d9296d70620da012df975471b5542a1609dce3e0c52d17418285a3` | TypeScript | operations / coordination |
 | `ops/mcp/src/tests/sessions.test.ts` | 1909 | `ec79762b28e8bd431dff81d5c36265ae254f890ce659487a083664237162e4db` | TypeScript | operations / coordination |
-| `ops/mcp/src/tests/tasks.test.ts` | 2000 | `d164211810df7d376aeeea5626d9b367a7b2ba085523430d98d54919680f6e8c` | TypeScript | operations / coordination |
+| `ops/mcp/src/tests/tasks.test.ts` | 4076 | `eba3a07b5287f90db50919a93c97d26127c9e8f0d2e514ba2a0c0580696fa19c` | TypeScript | operations / coordination |
 | `ops/mcp/src/tests/workflow-guidance.test.ts` | 5968 | `e6ccb10d08a3c02d791c9d238917e94daecc8be122c0b1eb4a979bd7a48c6d42` | TypeScript | operations / coordination |
 | `ops/mcp/src/tools/agent-ops.ts` | 6759 | `bcee92066c3a0dc1dc0475f26302fea4fe92a0df0a2012d50b590a5beb30c36b` | TypeScript | operations / coordination |
 | `ops/mcp/src/tools/comms.ts` | 4494 | `92cb4159a9a3f9b8cea19f3844b3d4a341772e6885ffec4e1fddae132c70a00d` | TypeScript | operations / coordination |
-| `ops/mcp/src/tools/decisions.ts` | 14665 | `5068a702878f85bcf16481c99a81d756ecfc12e2a832e1da974106ef68416324` | TypeScript | operations / coordination |
+| `ops/mcp/src/tools/decisions.ts` | 15191 | `25246b8d7946d20c1ca26ba42db98457112578f56c78fa501f4dcd23df976395` | TypeScript | operations / coordination |
 | `ops/mcp/src/tools/events.ts` | 2381 | `3e7caccbf3b30fcf778394342e2577dd28cfa875035a45aa56fc4521a374f787` | TypeScript | operations / coordination |
 | `ops/mcp/src/tools/health.ts` | 4258 | `4652edee1d344720656a8441545b17c9872fe4fcf61c4bd377b637b489d4d673` | TypeScript | operations / coordination |
-| `ops/mcp/src/tools/repos.ts` | 7164 | `f18682eabbcbff5f954402eb711f7f827b1bd490b421cec4b6186c9abb936caf` | TypeScript | operations / coordination |
+| `ops/mcp/src/tools/repos.ts` | 7615 | `7f67341ab4acb6cd1f6c1556663221bae8907a1bc0c3bc65f3fbeca6d4c14bbe` | TypeScript | operations / coordination |
 | `ops/mcp/src/tools/sessions.ts` | 5830 | `1758e32f7cbf5a2951437164c81ab05b21f0dd1e513b1d4b56e4acd454039f7b` | TypeScript | operations / coordination |
-| `ops/mcp/src/tools/tasks.ts` | 6784 | `c0673eaa8d519752e273c8e04df9d17bc005aa0ba0622f29df4cc6a84f0a79ce` | TypeScript | operations / coordination |
+| `ops/mcp/src/tools/tasks.ts` | 7529 | `5c07fe1a7331f6ed92db334fd4dd8b935ffaf77a82025f128da5712fb40d6f43` | TypeScript | operations / coordination |
 | `ops/mcp/src/tools/watchers.ts` | 2447 | `8d04a5ab0417f4bcdfe9e3b7793ac12d49d57050fd0c75a4b9f6b22483527f72` | TypeScript | operations / coordination |
 | `ops/mcp/src/utils/commands.ts` | 4677 | `c0bc49379085f3b98322f6585911367be36052fc39ea0d1e5fefbea5dc56e1e7` | TypeScript | operations / coordination |
 | `ops/mcp/src/utils/kubectl-pods.ts` | 1496 | `5ec808d967ec0c7e5f6fae6de343e0ea4a70521596a947e8dfb03d625296102c` | TypeScript | operations / coordination |
@@ -3380,6 +3405,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `scripts/check-mcp-portability.py` | 3031 | `842d1996988a65649bc6bd515f9368bc53ddfaeae20586479ee5786e55994f75` | Python | script |
 | `scripts/check-meaning-firewall.sh` | 1866 | `232811f6567c5b9764ea199e604e43f90a8acec38e481209584888fc1df8bd4c` | Shell | script |
 | `scripts/check-onboarding-maps.sh` | 1443 | `0620d80def2cee542a9e38b26bbfaa2bbdd58074639dbfe445a04204fe761217` | Shell | script |
+| `scripts/check-state-lag.py` | 7362 | `3f01d73a6f71ab8e239f4f181d36497fb36fc62145ae126c035c4ed7c5d91e6e` | Python | script |
 | `scripts/demo-flow-a.sh` | 2841 | `985de4c7fe0e2efb984ece328075e942095cb81d1141326f9a65c2eede128935` | Shell | script |
 | `scripts/demo-flow-b.sh` | 7027 | `7c28087f4d7591aa9e178dbf42e5f1d0e6a28706117b0f711159dded8170a728` | Shell | script |
 | `scripts/demo-flow-c.sh` | 3437 | `07f3f22bc11960fe24bd8b6e7edd83393151be631572ad1d7efe1d1f293cd576` | Shell | script |
@@ -3393,7 +3419,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `scripts/federated-governance-demo.sh` | 12412 | `913fc025cbead401c35727ba64114e7ca818bb1f2a5ac706e2a9e992e141427a` | Shell | script |
 | `scripts/forbidden-deps-allowlist.txt` | 737 | `e3acf72c847044428dc42af1cc9a11c78e5c68a8b6cf731d63b5fcef1454d11d` | Text | script |
 | `scripts/generate-agent-context-spine.py` | 39619 | `e6a3ae3d2042febc9754d6a6fa6ec8c6d27dddbefde12fea9c6b84824e352dbd` | Python | script |
-| `scripts/generate-live-state-overlay.py` | 50165 | `04398e0a68e0c8a4293f82a881aaaacb77eae0d90a36a00bc2690069532fe61f` | Python | script |
+| `scripts/generate-live-state-overlay.py` | 53553 | `a66ac414c3c8dea0ab5ae18b9b819c4363949c4601d50d000cb0bce182e32fba` | Python | script |
 | `scripts/generate-test-token.sh` | 1581 | `bea751d5058b9d0ab6b841980e143acd23356ec207ad2da886afc3680b0b8714` | Shell | script |
 | `scripts/generate_repo_record.py` | 30347 | `1b7f9aec71df765a4df383b254cecdde81a46b011998123dd1a30b23f66f83ff` | Python | script |
 | `scripts/governance-demo.sh` | 9746 | `d9db1799692b5323e8a0cf2bf51ebdada86bf616bd14699e6316a4af80159d20` | Shell | script |
@@ -3690,10 +3716,10 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `web/pilot-ui/crypto.js` | 9889 | `b79b91d579f78633426c568fa102800f32e4f7c6aa7d485422bc72de0e29fa41` | JavaScript | pilot UI |
 | `web/pilot-ui/deploy-ui.sh` | 5078 | `73c2101fbf998323ab21da56265e61dc209fa86acda9bc5596f08a362de382a9` | Shell | pilot UI |
 | `web/pilot-ui/fixtures/icn-organizer-demo/README.md` | 8858 | `39b968ab144a17608f575c53938b91bbfbb347dbdb782e57cbdcaff0dfad195e` | Markdown | pilot UI |
-| `web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json` | 2467 | `34f3d94423aca6c110f9ac012f38683f731eabfd4362fe5ae9e2dd0a91326ff0` | JSON | pilot UI |
+| `web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json` | 3377 | `1b60b11b3b4d994ed596c1b1eaa4d0cc55a02d3c0b2bd4ee514d18c6b49a3522` | JSON | pilot UI |
 | `web/pilot-ui/fixtures/icn-organizer-demo/preview-review.pending-publish-summary.json` | 4399 | `8ba45540aba23852e8e6519c934873123af1f40d1a990e0e3e2973feb0997546` | JSON | pilot UI |
 | `web/pilot-ui/fixtures/icn-organizer-demo/rehearsal-shell.manifest.json` | 4409 | `3b9050b58355fd9758e257ebebfad9751fcce6bf2fcc1d5867cfbbe39beb88ff` | JSON | pilot UI |
-| `web/pilot-ui/fixtures/icn-organizer-demo/standing.json` | 1320 | `0c6a34ca2d6e8bd8ecb3335dbe426142ed7f205ba059ad0164c392a3db452fa7` | JSON | pilot UI |
+| `web/pilot-ui/fixtures/icn-organizer-demo/standing.json` | 1676 | `efb29ba7f36343a7395a885e69183878d46c63812fed0249ce6d8f45738566b8` | JSON | pilot UI |
 | `web/pilot-ui/i18n.js` | 5039 | `68f06459707f062c10b46fdb02d2ec6d84ba2e05076cc6f53bd4b00139b6b000` | JavaScript | pilot UI |
 | `web/pilot-ui/icons/icon-128x128.png` | 940 | `c77a0c9f6f39ff1811a9d9de492e500e29987b73fc7b2026c41d20d8fdfd2334` | unknown | pilot UI |
 | `web/pilot-ui/icons/icon-144x144.png` | 1046 | `e6932dc7c0cf0ebd32f7526af2179dd41cbac9ac235c08b772fa1e7fb859ff6f` | unknown | pilot UI |
@@ -3706,7 +3732,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `web/pilot-ui/icons/shortcut-history.png` | 671 | `1a20e1a26bb6d48ccbe9faf81877590456ab04502397bd7398f66a5d96bda79a` | unknown | pilot UI |
 | `web/pilot-ui/icons/shortcut-log.png` | 671 | `1a20e1a26bb6d48ccbe9faf81877590456ab04502397bd7398f66a5d96bda79a` | unknown | pilot UI |
 | `web/pilot-ui/icons/shortcut-vote.png` | 671 | `1a20e1a26bb6d48ccbe9faf81877590456ab04502397bd7398f66a5d96bda79a` | unknown | pilot UI |
-| `web/pilot-ui/index.html` | 129907 | `872d5f3efb8f814eda769a9236cfa3262da11bc97d5cf8bb999cab70cb3ff354` | HTML | pilot UI |
+| `web/pilot-ui/index.html` | 130326 | `0d8530acae0d781b5c671028eea7ac32321784f2391ec9365ab1e18a5a1ed76c` | HTML | pilot UI |
 | `web/pilot-ui/locales/en.json` | 4560 | `48f6b22dfe864487a0568a1198bed0bc957fe06b16f55c9a582ac89729edc24a` | JSON | pilot UI |
 | `web/pilot-ui/locales/es.json` | 4929 | `11cccced8cc34f684c874e23f1a0a5ad0153a08a64b1e199fa0bf5c214e463a4` | JSON | pilot UI |
 | `web/pilot-ui/manifest.json` | 2898 | `339396c3ba9f3eceb7529e3677c11f45428c43ced7b5b4013091c256095ecf4b` | JSON | pilot UI |
@@ -3718,13 +3744,13 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `web/pilot-ui/receipts.js` | 26534 | `9b081cfaa2da27684ece19f0f51674ea7228656e8bb3f9d397310f2379213373` | JavaScript | pilot UI |
 | `web/pilot-ui/sdis-enrollment.css` | 8508 | `b2fdffe0ea25cbcb3aea947bebf8ea084e5b8798be0146e174ac8b554d62345a` | CSS | pilot UI |
 | `web/pilot-ui/sdis-enrollment.html` | 9054 | `07b4811f8b5f5c808797d60d1123aef4fb54ec79af870c52ca907f60f6824090` | HTML | pilot UI |
-| `web/pilot-ui/sdis-enrollment.js` | 18260 | `f9239b0f14e80dc30537ac93c2e7085fcf6596819c212501d8c32d11424b9a28` | JavaScript | pilot UI |
+| `web/pilot-ui/sdis-enrollment.js` | 18795 | `98de14df7087affb2ebce3f3643c0bcc4cd03eff96ccb424f372128fdfecf5aa` | JavaScript | pilot UI |
 | `web/pilot-ui/sdis-identity.css` | 6094 | `0f0955d41818798db79af4cf23ecaeabe74a9fa0b478a4a03d2142f6bad1dd49` | CSS | pilot UI |
 | `web/pilot-ui/sdis-identity.html` | 7702 | `f79e18c19c1524db8c8fca36bd925a1d232e046f78fea47de84235be258389c9` | HTML | pilot UI |
-| `web/pilot-ui/sdis-identity.js` | 13882 | `082a3e578e50a794dec2e299e55511627f806783b6d978a181785f2d9057595a` | JavaScript | pilot UI |
+| `web/pilot-ui/sdis-identity.js` | 15762 | `1ad9548b257ba436496b4232be75ac1f7ff70b00722ba4ace2fc54cd955d9a1e` | JavaScript | pilot UI |
 | `web/pilot-ui/sdis-proofs.css` | 6287 | `da7e9f4fd45f7566eac17114ae5f2c390aee1689778543d00a7c8eb4d85792a4` | CSS | pilot UI |
 | `web/pilot-ui/sdis-proofs.html` | 8506 | `c96d6a6c0d44ee5973fac7ed908e194e866f150cc560c396a23b9de04468878c` | HTML | pilot UI |
-| `web/pilot-ui/sdis-proofs.js` | 16385 | `c3a5cc17132ec7683fef0058f820da5f173f2e59c56b5c352f6851da08ddd563` | JavaScript | pilot UI |
+| `web/pilot-ui/sdis-proofs.js` | 18190 | `8b150a5b35776d40ad208c37202ca5271a99a5c34678756b8ac4f76e95486ce5` | JavaScript | pilot UI |
 | `web/pilot-ui/sdis-recovery.css` | 7070 | `74f145358df2d1f5faf4bb11bf9a74940d428e61529ff57e4dbc5ca0db7a3300` | CSS | pilot UI |
 | `web/pilot-ui/sdis-recovery.html` | 12594 | `83b2e9244ca130658aba1c84e67d30a16ed868ec5a19a11de772fc4bfbe1bb9b` | HTML | pilot UI |
 | `web/pilot-ui/sdis-recovery.js` | 14219 | `4229f4f5a66f22be675463c1c3dce3f8a4e15ae85bed06351206d069b35ea0e7` | JavaScript | pilot UI |
@@ -3733,7 +3759,7 @@ Generated: 2026-06-21T21:21:29.799055+00:00
 | `web/pilot-ui/steward-dashboard.html` | 6281 | `15bfcd98cb0193fb0753343477749d13f5897c86003257a58ef4ff174f5d318a` | HTML | pilot UI |
 | `web/pilot-ui/steward-dashboard.js` | 23128 | `31d3afcdfa7cfdde41ab749dac0d83086343b18b124f653ce37a9c9e6bc469ad` | JavaScript | pilot UI |
 | `web/pilot-ui/style.css` | 149509 | `44e0d1ef7c31bd11738fbbcaedaebb6a7508d2d93595842e938bcbf6b21cc43e` | CSS | pilot UI |
-| `web/pilot-ui/sw.js` | 12339 | `af2715c7f57cd78e790bdd49ce828d7fb0351fcbfced2d158b45fccd146bc9e0` | JavaScript | pilot UI |
+| `web/pilot-ui/sw.js` | 12339 | `a0b5f7834b0f5b850cd11e46ec01c4b77745c871aecae413312ebc08f0d17c4c` | JavaScript | pilot UI |
 | `web/pilot-ui/test-api.html` | 2155 | `b5a1b66d9b6bdd89b17f5c891e86eabc50f894993404eac23864f26147d34e19` | HTML | pilot UI |
 | `web/pilot-ui/tests/README.md` | 8229 | `ac71637bda5c3bff8591435bc0385a628ce793dd2a8f1cf72604b37c7303ed02` | Markdown | pilot UI |
 | `web/pilot-ui/tests/e2e/accessibility.spec.js` | 10755 | `36c2efcad0f9c08105ce7fdc31943835596698029b4006337a42131941bec869` | JavaScript | pilot UI |

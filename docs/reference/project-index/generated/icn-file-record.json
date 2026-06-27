@@ -1,5 +1,5 @@
 {
-  "branch": "fix/file-record-exclude-self",
+  "branch": "docs/repo-record-truth-sync",
   "directories": [
     {
       "child_directory_count": 25,
@@ -29,7 +29,7 @@
         ".kt": 2,
         ".lock": 3,
         ".log": 1,
-        ".md": 1168,
+        ".md": 1184,
         ".mermaid": 1,
         ".mjs": 2,
         ".pdf": 5,
@@ -37,15 +37,15 @@
         ".pptx": 1,
         ".pro": 1,
         ".properties": 2,
-        ".py": 41,
-        ".rs": 940,
+        ".py": 43,
+        ".rs": 946,
         ".service": 4,
         ".sh": 119,
         ".svg": 5,
         ".test": 1,
-        ".toml": 112,
+        ".toml": 113,
         ".tpl": 1,
-        ".ts": 112,
+        ".ts": 113,
         ".tsx": 43,
         ".txt": 5,
         ".wasm": 1,
@@ -54,10 +54,10 @@
         ".yaml": 92,
         ".yml": 60
       },
-      "file_count": 3094,
+      "file_count": 3120,
       "path": ".",
       "role_guess": "repo root",
-      "total_size_bytes": 46534125
+      "total_size_bytes": 47515557
     },
     {
       "child_directory_count": 1,
@@ -132,7 +132,7 @@
       "file_count": 69,
       "path": ".github",
       "role_guess": "repo configuration",
-      "total_size_bytes": 289482
+      "total_size_bytes": 317850
     },
     {
       "child_directory_count": 1,
@@ -254,20 +254,20 @@
       "extensions": {
         ".html": 3,
         ".json": 15,
-        ".md": 881,
+        ".md": 897,
         ".mermaid": 1,
         ".pdf": 5,
         ".pptx": 1,
-        ".py": 10,
+        ".py": 11,
         ".sh": 1,
         ".svg": 1,
-        ".toml": 45,
+        ".toml": 46,
         ".yaml": 4
       },
-      "file_count": 967,
+      "file_count": 985,
       "path": "docs",
       "role_guess": "documentation",
-      "total_size_bytes": 13955313
+      "total_size_bytes": 14484530
     },
     {
       "child_directory_count": 5,
@@ -303,7 +303,7 @@
         ".json": 43,
         ".lock": 3,
         ".md": 11,
-        ".rs": 938,
+        ".rs": 944,
         ".sh": 2,
         ".toml": 56,
         ".txt": 1,
@@ -311,10 +311,10 @@
         ".yaml": 7,
         ".yml": 1
       },
-      "file_count": 1081,
+      "file_count": 1087,
       "path": "icn",
       "role_guess": "uncategorized",
-      "total_size_bytes": 21916668
+      "total_size_bytes": 22316305
     },
     {
       "child_directory_count": 1,
@@ -350,28 +350,28 @@
         ".md": 24,
         ".py": 1,
         ".sh": 3,
-        ".ts": 39,
+        ".ts": 40,
         ".yaml": 3,
         ".yml": 1
       },
-      "file_count": 87,
+      "file_count": 88,
       "path": "ops",
       "role_guess": "operations / coordination",
-      "total_size_bytes": 843723
+      "total_size_bytes": 850967
     },
     {
       "child_directory_count": 0,
       "depth": 1,
       "extensions": {
         ".js": 1,
-        ".py": 10,
+        ".py": 11,
         ".sh": 42,
         ".txt": 1
       },
-      "file_count": 54,
+      "file_count": 55,
       "path": "scripts",
       "role_guess": "script",
-      "total_size_bytes": 481807
+      "total_size_bytes": 492557
     },
     {
       "child_directory_count": 2,
@@ -450,7 +450,7 @@
       "file_count": 106,
       "path": "web",
       "role_guess": "uncategorized",
-      "total_size_bytes": 1667858
+      "total_size_bytes": 1673763
     },
     {
       "child_directory_count": 6,
@@ -623,7 +623,7 @@
       "file_count": 8,
       "path": ".github/scripts",
       "role_guess": "repo configuration",
-      "total_size_bytes": 39349
+      "total_size_bytes": 63793
     },
     {
       "child_directory_count": 0,
@@ -634,7 +634,7 @@
       "file_count": 18,
       "path": ".github/workflows",
       "role_guess": "GitHub Actions workflow",
-      "total_size_bytes": 113844
+      "total_size_bytes": 117768
     },
     {
       "child_directory_count": 0,
@@ -910,12 +910,12 @@
       "child_directory_count": 0,
       "depth": 2,
       "extensions": {
-        ".md": 36
+        ".md": 37
       },
-      "file_count": 36,
+      "file_count": 37,
       "path": "docs/adr",
       "role_guess": "architecture decision record",
-      "total_size_bytes": 300071
+      "total_size_bytes": 321590
     },
     {
       "child_directory_count": 0,
@@ -946,12 +946,12 @@
       "child_directory_count": 0,
       "depth": 2,
       "extensions": {
-        ".md": 43
+        ".md": 44
       },
-      "file_count": 43,
+      "file_count": 44,
       "path": "docs/architecture",
       "role_guess": "documentation",
-      "total_size_bytes": 1241547
+      "total_size_bytes": 1262179
     },
     {
       "child_directory_count": 2,
@@ -973,7 +973,7 @@
       "file_count": 4,
       "path": "docs/ci",
       "role_guess": "documentation",
-      "total_size_bytes": 18053
+      "total_size_bytes": 22772
     },
     {
       "child_directory_count": 1,
@@ -1024,13 +1024,13 @@
       "child_directory_count": 6,
       "depth": 2,
       "extensions": {
-        ".md": 75,
+        ".md": 77,
         ".svg": 1
       },
-      "file_count": 76,
+      "file_count": 78,
       "path": "docs/design",
       "role_guess": "documentation",
-      "total_size_bytes": 1131479
+      "total_size_bytes": 1168184
     },
     {
       "child_directory_count": 0,
@@ -1047,12 +1047,12 @@
       "child_directory_count": 0,
       "depth": 2,
       "extensions": {
-        ".md": 36
+        ".md": 37
       },
-      "file_count": 36,
+      "file_count": 37,
       "path": "docs/dev",
       "role_guess": "documentation",
-      "total_size_bytes": 626299
+      "total_size_bytes": 634708
     },
     {
       "child_directory_count": 3,
@@ -1235,12 +1235,12 @@
       "child_directory_count": 0,
       "depth": 2,
       "extensions": {
-        ".md": 4
+        ".md": 10
       },
-      "file_count": 4,
+      "file_count": 10,
       "path": "docs/pilots",
       "role_guess": "documentation",
-      "total_size_bytes": 38839
+      "total_size_bytes": 127525
     },
     {
       "child_directory_count": 0,
@@ -1269,13 +1269,14 @@
       "depth": 2,
       "extensions": {
         ".json": 1,
-        ".md": 36,
+        ".md": 40,
+        ".toml": 1,
         ".yaml": 1
       },
-      "file_count": 38,
+      "file_count": 43,
       "path": "docs/reference",
       "role_guess": "documentation",
-      "total_size_bytes": 475326
+      "total_size_bytes": 604015
     },
     {
       "child_directory_count": 0,
@@ -1286,18 +1287,18 @@
       "file_count": 8,
       "path": "docs/rfcs",
       "role_guess": "request for comments",
-      "total_size_bytes": 176908
+      "total_size_bytes": 176921
     },
     {
       "child_directory_count": 0,
       "depth": 2,
       "extensions": {
-        ".py": 9
+        ".py": 10
       },
-      "file_count": 9,
+      "file_count": 10,
       "path": "docs/scripts",
       "role_guess": "documentation",
-      "total_size_bytes": 105739
+      "total_size_bytes": 184730
     },
     {
       "child_directory_count": 0,
@@ -1325,12 +1326,12 @@
       "child_directory_count": 0,
       "depth": 2,
       "extensions": {
-        ".md": 16
+        ".md": 17
       },
-      "file_count": 16,
+      "file_count": 17,
       "path": "docs/spec",
       "role_guess": "documentation",
-      "total_size_bytes": 527494
+      "total_size_bytes": 553017
     },
     {
       "child_directory_count": 0,
@@ -1341,7 +1342,7 @@
       "file_count": 4,
       "path": "docs/state",
       "role_guess": "documentation",
-      "total_size_bytes": 32902
+      "total_size_bytes": 33729
     },
     {
       "child_directory_count": 0,
@@ -1520,14 +1521,14 @@
       "extensions": {
         ".gitignore": 3,
         ".md": 2,
-        ".rs": 111,
+        ".rs": 115,
         ".toml": 7,
         ".yaml": 3
       },
-      "file_count": 126,
+      "file_count": 130,
       "path": "icn/apps",
       "role_guess": "runtime app crate",
-      "total_size_bytes": 2841591
+      "total_size_bytes": 3009400
     },
     {
       "child_directory_count": 3,
@@ -1540,7 +1541,7 @@
       "file_count": 16,
       "path": "icn/bins",
       "role_guess": "Rust binary",
-      "total_size_bytes": 712750
+      "total_size_bytes": 719108
     },
     {
       "child_directory_count": 0,
@@ -1564,16 +1565,16 @@
         ".json": 43,
         ".lock": 2,
         ".md": 7,
-        ".rs": 815,
+        ".rs": 817,
         ".toml": 39,
         ".wasm": 1,
         ".yaml": 2,
         ".yml": 1
       },
-      "file_count": 922,
+      "file_count": 924,
       "path": "icn/crates",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 18095675
+      "total_size_bytes": 18321120
     },
     {
       "child_directory_count": 0,
@@ -1683,12 +1684,12 @@
       "depth": 2,
       "extensions": {
         ".json": 4,
-        ".ts": 39
+        ".ts": 40
       },
-      "file_count": 43,
+      "file_count": 44,
       "path": "ops/mcp",
       "role_guess": "operations / coordination",
-      "total_size_bytes": 296740
+      "total_size_bytes": 303984
     },
     {
       "child_directory_count": 0,
@@ -1851,7 +1852,7 @@
       "file_count": 84,
       "path": "web/pilot-ui",
       "role_guess": "pilot UI",
-      "total_size_bytes": 1456786
+      "total_size_bytes": 1462691
     },
     {
       "child_directory_count": 1,
@@ -3136,12 +3137,13 @@
       "depth": 3,
       "extensions": {
         ".json": 1,
-        ".md": 24
+        ".md": 28,
+        ".toml": 1
       },
-      "file_count": 25,
+      "file_count": 30,
       "path": "docs/reference/project-index",
       "role_guess": "project index / atlas",
-      "total_size_bytes": 357319
+      "total_size_bytes": 486008
     },
     {
       "child_directory_count": 0,
@@ -3226,13 +3228,13 @@
       "child_directory_count": 2,
       "depth": 3,
       "extensions": {
-        ".rs": 50,
+        ".rs": 54,
         ".toml": 1
       },
-      "file_count": 51,
+      "file_count": 55,
       "path": "icn/apps/governance",
       "role_guess": "runtime app crate",
-      "total_size_bytes": 1928731
+      "total_size_bytes": 2096540
     },
     {
       "child_directory_count": 1,
@@ -3325,7 +3327,7 @@
       "file_count": 11,
       "path": "icn/bins/icnctl",
       "role_guess": "Rust binary",
-      "total_size_bytes": 611032
+      "total_size_bytes": 612026
     },
     {
       "child_directory_count": 1,
@@ -3337,7 +3339,7 @@
       "file_count": 3,
       "path": "icn/bins/icnd",
       "role_guess": "Rust binary",
-      "total_size_bytes": 65876
+      "total_size_bytes": 71240
     },
     {
       "child_directory_count": 1,
@@ -3452,7 +3454,7 @@
       "file_count": 36,
       "path": "icn/crates/icn-compute",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 1042294
+      "total_size_bytes": 1045166
     },
     {
       "child_directory_count": 1,
@@ -3464,7 +3466,7 @@
       "file_count": 8,
       "path": "icn/crates/icn-coop",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 197308
+      "total_size_bytes": 205519
     },
     {
       "child_directory_count": 2,
@@ -3476,7 +3478,7 @@
       "file_count": 140,
       "path": "icn/crates/icn-core",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 2610494
+      "total_size_bytes": 2612490
     },
     {
       "child_directory_count": 1,
@@ -3524,7 +3526,7 @@
       "file_count": 15,
       "path": "icn/crates/icn-entity",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 384840
+      "total_size_bytes": 420891
     },
     {
       "child_directory_count": 2,
@@ -3549,15 +3551,15 @@
         ".js": 6,
         ".json": 4,
         ".md": 2,
-        ".rs": 137,
+        ".rs": 138,
         ".toml": 1,
         ".yaml": 2,
         ".yml": 1
       },
-      "file_count": 158,
+      "file_count": 159,
       "path": "icn/crates/icn-gateway",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 3802638
+      "total_size_bytes": 3909811
     },
     {
       "child_directory_count": 3,
@@ -3576,13 +3578,13 @@
       "child_directory_count": 2,
       "depth": 3,
       "extensions": {
-        ".rs": 47,
+        ".rs": 48,
         ".toml": 1
       },
-      "file_count": 48,
+      "file_count": 49,
       "path": "icn/crates/icn-governance",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 1274237
+      "total_size_bytes": 1297909
     },
     {
       "child_directory_count": 1,
@@ -3618,7 +3620,7 @@
       "file_count": 34,
       "path": "icn/crates/icn-kernel-api",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 1172315
+      "total_size_bytes": 1178318
     },
     {
       "child_directory_count": 4,
@@ -3630,7 +3632,7 @@
       "file_count": 53,
       "path": "icn/crates/icn-ledger",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 1141873
+      "total_size_bytes": 1148353
     },
     {
       "child_directory_count": 1,
@@ -3703,7 +3705,7 @@
       "file_count": 23,
       "path": "icn/crates/icn-rpc",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 417356
+      "total_size_bytes": 450343
     },
     {
       "child_directory_count": 1,
@@ -3988,12 +3990,12 @@
       "depth": 3,
       "extensions": {
         ".json": 1,
-        ".ts": 38
+        ".ts": 39
       },
-      "file_count": 39,
+      "file_count": 40,
       "path": "ops/mcp/src",
       "role_guess": "operations / coordination",
-      "total_size_bytes": 188529
+      "total_size_bytes": 195773
     },
     {
       "child_directory_count": 0,
@@ -4189,7 +4191,7 @@
       "file_count": 5,
       "path": "web/pilot-ui/fixtures",
       "role_guess": "pilot UI",
-      "total_size_bytes": 21453
+      "total_size_bytes": 22719
     },
     {
       "child_directory_count": 0,
@@ -4777,12 +4779,12 @@
       "depth": 4,
       "extensions": {
         ".json": 1,
-        ".md": 1
+        ".md": 2
       },
-      "file_count": 2,
+      "file_count": 3,
       "path": "docs/reference/project-index/generated",
       "role_guess": "project index / atlas",
-      "total_size_bytes": 182713
+      "total_size_bytes": 252001
     },
     {
       "child_directory_count": 0,
@@ -4843,23 +4845,23 @@
       "child_directory_count": 4,
       "depth": 4,
       "extensions": {
-        ".rs": 25
+        ".rs": 26
       },
-      "file_count": 25,
+      "file_count": 26,
       "path": "icn/apps/governance/src",
       "role_guess": "runtime app crate",
-      "total_size_bytes": 1444562
+      "total_size_bytes": 1549789
     },
     {
       "child_directory_count": 0,
       "depth": 4,
       "extensions": {
-        ".rs": 25
+        ".rs": 28
       },
-      "file_count": 25,
+      "file_count": 28,
       "path": "icn/apps/governance/tests",
       "role_guess": "runtime app crate",
-      "total_size_bytes": 481851
+      "total_size_bytes": 544433
     },
     {
       "child_directory_count": 0,
@@ -4981,7 +4983,7 @@
       "file_count": 6,
       "path": "icn/bins/icnctl/tests",
       "role_guess": "Rust binary",
-      "total_size_bytes": 75322
+      "total_size_bytes": 76316
     },
     {
       "child_directory_count": 0,
@@ -4992,7 +4994,7 @@
       "file_count": 2,
       "path": "icn/bins/icnd/src",
       "role_guess": "Rust binary",
-      "total_size_bytes": 64396
+      "total_size_bytes": 69738
     },
     {
       "child_directory_count": 0,
@@ -5195,7 +5197,7 @@
       "file_count": 29,
       "path": "icn/crates/icn-compute/src",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 930111
+      "total_size_bytes": 932983
     },
     {
       "child_directory_count": 0,
@@ -5217,7 +5219,7 @@
       "file_count": 7,
       "path": "icn/crates/icn-coop/src",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 196305
+      "total_size_bytes": 204516
     },
     {
       "child_directory_count": 6,
@@ -5228,7 +5230,7 @@
       "file_count": 79,
       "path": "icn/crates/icn-core/src",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 1505599
+      "total_size_bytes": 1507582
     },
     {
       "child_directory_count": 0,
@@ -5239,7 +5241,7 @@
       "file_count": 60,
       "path": "icn/crates/icn-core/tests",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 1102749
+      "total_size_bytes": 1102762
     },
     {
       "child_directory_count": 0,
@@ -5294,7 +5296,7 @@
       "file_count": 14,
       "path": "icn/crates/icn-entity/src",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 384199
+      "total_size_bytes": 420250
     },
     {
       "child_directory_count": 1,
@@ -5345,12 +5347,12 @@
       "child_directory_count": 1,
       "depth": 4,
       "extensions": {
-        ".rs": 99
+        ".rs": 100
       },
-      "file_count": 99,
+      "file_count": 100,
       "path": "icn/crates/icn-gateway/src",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 2569554
+      "total_size_bytes": 2673453
     },
     {
       "child_directory_count": 1,
@@ -5365,7 +5367,7 @@
       "file_count": 14,
       "path": "icn/crates/icn-gateway/static",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 551652
+      "total_size_bytes": 552071
     },
     {
       "child_directory_count": 0,
@@ -5377,7 +5379,7 @@
       "file_count": 38,
       "path": "icn/crates/icn-gateway/tests",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 644106
+      "total_size_bytes": 646961
     },
     {
       "child_directory_count": 0,
@@ -5416,12 +5418,12 @@
       "child_directory_count": 1,
       "depth": 4,
       "extensions": {
-        ".rs": 45
+        ".rs": 46
       },
-      "file_count": 45,
+      "file_count": 46,
       "path": "icn/crates/icn-governance/src",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 1228907
+      "total_size_bytes": 1252579
     },
     {
       "child_directory_count": 0,
@@ -5487,7 +5489,7 @@
       "file_count": 29,
       "path": "icn/crates/icn-kernel-api/src",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 984110
+      "total_size_bytes": 990113
     },
     {
       "child_directory_count": 0,
@@ -5531,7 +5533,7 @@
       "file_count": 45,
       "path": "icn/crates/icn-ledger/src",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 1049600
+      "total_size_bytes": 1056080
     },
     {
       "child_directory_count": 0,
@@ -5652,7 +5654,7 @@
       "file_count": 21,
       "path": "icn/crates/icn-rpc/src",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 358587
+      "total_size_bytes": 391429
     },
     {
       "child_directory_count": 0,
@@ -5934,12 +5936,12 @@
       "depth": 4,
       "extensions": {
         ".json": 1,
-        ".ts": 7
+        ".ts": 8
       },
-      "file_count": 8,
+      "file_count": 9,
       "path": "ops/mcp/src/tests",
       "role_guess": "operations / coordination",
-      "total_size_bytes": 38791
+      "total_size_bytes": 44313
     },
     {
       "child_directory_count": 0,
@@ -5950,7 +5952,7 @@
       "file_count": 9,
       "path": "ops/mcp/src/tools",
       "role_guess": "operations / coordination",
-      "total_size_bytes": 54782
+      "total_size_bytes": 56504
     },
     {
       "child_directory_count": 0,
@@ -6046,7 +6048,7 @@
       "file_count": 5,
       "path": "web/pilot-ui/fixtures/icn-organizer-demo",
       "role_guess": "pilot UI",
-      "total_size_bytes": 21453
+      "total_size_bytes": 22719
     },
     {
       "child_directory_count": 0,
@@ -6179,7 +6181,7 @@
       "file_count": 5,
       "path": "icn/apps/governance/src/http",
       "role_guess": "runtime app crate",
-      "total_size_bytes": 497152
+      "total_size_bytes": 518077
     },
     {
       "child_directory_count": 0,
@@ -6333,7 +6335,7 @@
       "file_count": 9,
       "path": "icn/crates/icn-compute/src/actor",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 295857
+      "total_size_bytes": 296849
     },
     {
       "child_directory_count": 0,
@@ -6399,7 +6401,7 @@
       "file_count": 30,
       "path": "icn/crates/icn-core/src/supervisor",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 633716
+      "total_size_bytes": 635699
     },
     {
       "child_directory_count": 0,
@@ -6421,7 +6423,7 @@
       "file_count": 49,
       "path": "icn/crates/icn-gateway/src/api",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 1198204
+      "total_size_bytes": 1199816
     },
     {
       "child_directory_count": 0,
@@ -6542,7 +6544,7 @@
       "file_count": 12,
       "path": "icn/crates/icn-rpc/src/handler",
       "role_guess": "Rust library crate",
-      "total_size_bytes": 163337
+      "total_size_bytes": 191861
     },
     {
       "child_directory_count": 0,
@@ -9348,8 +9350,8 @@
       "name": "readiness_overclaim_linter.py",
       "path": ".github/scripts/readiness_overclaim_linter.py",
       "role_guess": "repo configuration",
-      "sha256": "ff439735a3b33f68c526bfd4b7962aa49b70ba318e8ec3247d0c8e5e7c063735",
-      "size_bytes": 10688,
+      "sha256": "dc2c851047a18aadf6a3645db9a9af0988bd71843eafba0819f1c17290ba78d0",
+      "size_bytes": 23184,
       "symlink_target": null,
       "tracked": true
     },
@@ -9361,8 +9363,8 @@
       "name": "test_readiness_overclaim_linter.py",
       "path": ".github/scripts/test_readiness_overclaim_linter.py",
       "role_guess": "repo configuration",
-      "sha256": "f88e203dabe3fa9b5e27e4f9a179061595ea66e5c951d27c94a1e1221bf10dd3",
-      "size_bytes": 5230,
+      "sha256": "9d732308825babf04d02caca59931b2919b55110d75c7db981a7414492c86811",
+      "size_bytes": 17178,
       "symlink_target": null,
       "tracked": true
     },
@@ -9465,8 +9467,8 @@
       "name": "docs-freshness.yml",
       "path": ".github/workflows/docs-freshness.yml",
       "role_guess": "GitHub Actions workflow",
-      "sha256": "f474a69b3d3639e195b703e215bd4f93c4df2fada10a53b97cd278a9b3bce1dd",
-      "size_bytes": 11562,
+      "sha256": "cfc2004ed1bc23d4e150cffd8bb85fd929a9486b4da91d1003704557466dab06",
+      "size_bytes": 14138,
       "symlink_target": null,
       "tracked": true
     },
@@ -9491,8 +9493,8 @@
       "name": "generated-truth.yml",
       "path": ".github/workflows/generated-truth.yml",
       "role_guess": "GitHub Actions workflow",
-      "sha256": "cf03e607fbfac884f97a1301c6fe40f53f6d4aa1403beaa9e7d00e1ec5f1c3d9",
-      "size_bytes": 5426,
+      "sha256": "67dd609b0ffa089fee6e723d30046587f3a0f7708b8a56ebd551247be62b1179",
+      "size_bytes": 6774,
       "symlink_target": null,
       "tracked": true
     },
@@ -9660,8 +9662,8 @@
       "name": "AGENTS.md",
       "path": "AGENTS.md",
       "role_guess": "repo control document",
-      "sha256": "c1975970f33c70428816f8b8f3a7120391f77a03bde7b2939ce9d6426c0bfc60",
-      "size_bytes": 16225,
+      "sha256": "0651ebbd05698280445dd28a5fe855687cc319e6ebe650b3a4c0b420939674ff",
+      "size_bytes": 16536,
       "symlink_target": null,
       "tracked": true
     },
@@ -12676,8 +12678,8 @@
       "name": "ARCHITECTURE.md",
       "path": "docs/ARCHITECTURE.md",
       "role_guess": "documentation",
-      "sha256": "c673d4e72cb2311979baa0b22c5d41cd61d584153c5fa7540e923ce849e983e1",
-      "size_bytes": 67843,
+      "sha256": "a52965cd3df3c479fcb1b40628dab48c834f7371507ebc9109cde9ac3d6eff9f",
+      "size_bytes": 68272,
       "symlink_target": null,
       "tracked": true
     },
@@ -12741,7 +12743,7 @@
       "name": "DOCUMENT_REGISTRY.md",
       "path": "docs/DOCUMENT_REGISTRY.md",
       "role_guess": "documentation",
-      "sha256": "3f0a751dd74654eb557520662cd74b6d2fed839444ec596b0fbad6cff8d26f78",
+      "sha256": "c7ec550652d5023a81781e7bd244519cb90dbf7b958d735c8e3de2ebc1d54d29",
       "size_bytes": 4302,
       "symlink_target": null,
       "tracked": true
@@ -12780,8 +12782,8 @@
       "name": "INDEX.generated.md",
       "path": "docs/INDEX.generated.md",
       "role_guess": "documentation",
-      "sha256": "0ec037af1eeec408d2b619b1fbdbb14a9335122806ada2ed61341442a425f94b",
-      "size_bytes": 99153,
+      "sha256": "8cd88882b7a351e0248d8ef95161da6c441f2d12efc2828c5866ba17556d8a89",
+      "size_bytes": 101719,
       "symlink_target": null,
       "tracked": true
     },
@@ -12793,8 +12795,8 @@
       "name": "INDEX.md",
       "path": "docs/INDEX.md",
       "role_guess": "documentation",
-      "sha256": "cf10472b41c3bcf4c8cdb5dc89e6791359b10b19fb989817075249e1e3e9e576",
-      "size_bytes": 46794,
+      "sha256": "01074caa5ada400313d636db9f2baf759db243cc2fa24e04fb9f4fa98580a5d3",
+      "size_bytes": 47191,
       "symlink_target": null,
       "tracked": true
     },
@@ -12832,8 +12834,8 @@
       "name": "PHASE_PROGRESS.md",
       "path": "docs/PHASE_PROGRESS.md",
       "role_guess": "documentation",
-      "sha256": "a1a5b4e070331a8ff4b4e72023f141e3275810e08ea9e37877f6eb7a9ab9e6c6",
-      "size_bytes": 93188,
+      "sha256": "6172bbba21aa256fb9c2528038e1205478006b7c8b18ec22eeeaab529b2b5968",
+      "size_bytes": 123482,
       "symlink_target": null,
       "tracked": true
     },
@@ -12871,8 +12873,8 @@
       "name": "STATE.md",
       "path": "docs/STATE.md",
       "role_guess": "documentation",
-      "sha256": "b361ad4c8c749d3278ad990ed33f0a821ade8ee2fd4fde4ce423c352836e9407",
-      "size_bytes": 167484,
+      "sha256": "db34cdc3f2c27b888d6e28040c204915e3d0f735180f670552ba3b30741c50b6",
+      "size_bytes": 233027,
       "symlink_target": null,
       "tracked": true
     },
@@ -13300,8 +13302,8 @@
       "name": "ADR-0031-commons-compute-admission-and-settlement-policy.md",
       "path": "docs/adr/ADR-0031-commons-compute-admission-and-settlement-policy.md",
       "role_guess": "architecture decision record",
-      "sha256": "8b9e87f83a205c47ab994aebc01fe4e5d9e2d71486c6f6b65a68941b8edb91a7",
-      "size_bytes": 8069,
+      "sha256": "9d6163d897413ec396ec22e7eb65866580f0db399f36db27522a670c931ec664",
+      "size_bytes": 8082,
       "symlink_target": null,
       "tracked": true
     },
@@ -13354,6 +13356,19 @@
       "role_guess": "architecture decision record",
       "sha256": "935b98bf2d991fcdb02e689313607d067e9b849ecc0eef2fd9873a5685a1fd0b",
       "size_bytes": 9337,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/adr",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
+      "name": "ADR-0083-institutional-domain-and-domain-policy-runtime-root.md",
+      "path": "docs/adr/ADR-0083-institutional-domain-and-domain-policy-runtime-root.md",
+      "role_guess": "architecture decision record",
+      "sha256": "cda87ddd0d26e7b1f20c24ed8a0e10bed78d1bbc159c3238f337351d666331aa",
+      "size_bytes": 21506,
       "symlink_target": null,
       "tracked": true
     },
@@ -13882,6 +13897,19 @@
       "extension": ".md",
       "kind": "file",
       "language": "Markdown",
+      "name": "ICN_OPERATING_MODEL.md",
+      "path": "docs/architecture/ICN_OPERATING_MODEL.md",
+      "role_guess": "documentation",
+      "sha256": "00d1a3373ee424b9b234639d80144723f714a7625a40d79b15a221e8811fca0a",
+      "size_bytes": 20462,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/architecture",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
       "name": "IDENTITY_MEMBERSHIP_ARCHITECTURE.md",
       "path": "docs/architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md",
       "role_guess": "documentation",
@@ -13989,8 +14017,8 @@
       "name": "README.md",
       "path": "docs/architecture/README.md",
       "role_guess": "documentation",
-      "sha256": "757583802c0a14b536b8e46e0c70fc567e37c9db4b9829ef92a88ca535ee7443",
-      "size_bytes": 6803,
+      "sha256": "acf7069a5a926afb64b9348a5ac2e6e02a4e4dcf6025d33db598de0f626408d4",
+      "size_bytes": 6973,
       "symlink_target": null,
       "tracked": true
     },
@@ -15120,8 +15148,8 @@
       "name": "GATE_RATCHET_PLAN.md",
       "path": "docs/ci/GATE_RATCHET_PLAN.md",
       "role_guess": "documentation",
-      "sha256": "9debcec8b18cadb02071d2277b80ad8a040da8932c61a761a4c7751b4c9ebd98",
-      "size_bytes": 8724,
+      "sha256": "b6fa9a2e8f305843c67f1775663a11a022e2f9e7d29deea3b167b58178488d2d",
+      "size_bytes": 10532,
       "symlink_target": null,
       "tracked": true
     },
@@ -15133,8 +15161,8 @@
       "name": "GENERATED_TRUTH_DRIFT.md",
       "path": "docs/ci/GENERATED_TRUTH_DRIFT.md",
       "role_guess": "documentation",
-      "sha256": "46753d3d2baf4c0c709efc771a7a8b304bd4477ebf4d66fea06fcdc0e20e7085",
-      "size_bytes": 4236,
+      "sha256": "5dac2efd8b1242a41e0240a7ee7757ba289a9c5699a54b9fcfe7082a12762281",
+      "size_bytes": 7147,
       "symlink_target": null,
       "tracked": true
     },
@@ -16664,6 +16692,19 @@
       "extension": ".md",
       "kind": "file",
       "language": "Markdown",
+      "name": "coop-id-entity-resolver.md",
+      "path": "docs/design/coop-id-entity-resolver.md",
+      "role_guess": "documentation",
+      "sha256": "721394b534ec62d9f390cf1d6cf032bbf0e95e023ed5a01233b9a7b81ecda1de",
+      "size_bytes": 20773,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/design",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
       "name": "deterministic-core.md",
       "path": "docs/design/deterministic-core.md",
       "role_guess": "documentation",
@@ -16799,6 +16840,19 @@
       "role_guess": "documentation",
       "sha256": "701be200619da1f7501270546d176f908c594fb19906f2c6a44574913aed5fcc",
       "size_bytes": 23102,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/design",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
+      "name": "entity-aware-auth-control-map.md",
+      "path": "docs/design/entity-aware-auth-control-map.md",
+      "role_guess": "documentation",
+      "sha256": "7b3e0e7df712964c34a98fc54339daea2216711f2a1983aec40437191e390ff6",
+      "size_bytes": 15932,
       "symlink_target": null,
       "tracked": true
     },
@@ -17657,6 +17711,19 @@
       "role_guess": "documentation",
       "sha256": "b98bb391eff0f009e52a0c6f4100bd236eb1cd5bc34ef3a3d1ba6ec78f301762",
       "size_bytes": 6444,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/dev",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
+      "name": "handoff-2026-06-21-truth-refresh.md",
+      "path": "docs/dev/handoff-2026-06-21-truth-refresh.md",
+      "role_guess": "documentation",
+      "sha256": "11f32e3ee0c11b6ab02b13d08a297b77e5d9861ec3e134061f7e59416582269a",
+      "size_bytes": 8409,
       "symlink_target": null,
       "tracked": true
     },
@@ -20268,8 +20335,8 @@
       "name": "freshness.toml",
       "path": "docs/freshness.toml",
       "role_guess": "documentation",
-      "sha256": "1acdedabf33c8488b00d31f22833dce403537fe96f877c1b2fc5c4797e6a0cb5",
-      "size_bytes": 10972,
+      "sha256": "59b3996e3e7d06902469d350830381bc442db9a3389bc7172c8b761bf9a81f1b",
+      "size_bytes": 12476,
       "symlink_target": null,
       "tracked": true
     },
@@ -22471,6 +22538,84 @@
       "tracked": true
     },
     {
+      "directory": "docs/pilots",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
+      "name": "summit-ops-closeout-continuity-packet.md",
+      "path": "docs/pilots/summit-ops-closeout-continuity-packet.md",
+      "role_guess": "documentation",
+      "sha256": "b82fb856d8026691576ba7eef387282b5ad2592020ce8442b57dc35cd14a8ebd",
+      "size_bytes": 15191,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/pilots",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
+      "name": "summit-ops-closeout-recap-fixture-shape.md",
+      "path": "docs/pilots/summit-ops-closeout-recap-fixture-shape.md",
+      "role_guess": "documentation",
+      "sha256": "81dffbb9bd8810bc8c7dd07499cd36760bf5930f416ce38719d262fbab179100",
+      "size_bytes": 14442,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/pilots",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
+      "name": "summit-ops-lifecycle-package-map.md",
+      "path": "docs/pilots/summit-ops-lifecycle-package-map.md",
+      "role_guess": "documentation",
+      "sha256": "49fdf5b492dae3de9252303de035ebe37165038e6aebfea8a7a4567a453256dc",
+      "size_bytes": 17952,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/pilots",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
+      "name": "summit-ops-registration-action-card-proof-loop.md",
+      "path": "docs/pilots/summit-ops-registration-action-card-proof-loop.md",
+      "role_guess": "documentation",
+      "sha256": "ddcb59a26652b6a80bc8fdfda20433e369fd441c848887d00a07befaedbcab6d",
+      "size_bytes": 16666,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/pilots",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
+      "name": "summit-ops-registration-fixture-shape.md",
+      "path": "docs/pilots/summit-ops-registration-fixture-shape.md",
+      "role_guess": "documentation",
+      "sha256": "7f2f791aecc271a7205c0cd388228937f31982b7c2209862592d1bbae731741d",
+      "size_bytes": 10248,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/pilots",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
+      "name": "summit-ops-run-stage-facilitator-path.md",
+      "path": "docs/pilots/summit-ops-run-stage-facilitator-path.md",
+      "role_guess": "documentation",
+      "sha256": "891c9b825074c3518a15acca193db8cb8ea8f7aff3732fcc3586a3755ada2031",
+      "size_bytes": 14187,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
       "directory": "docs/planning",
       "extension": ".md",
       "kind": "file",
@@ -22959,8 +23104,8 @@
       "name": "README.md",
       "path": "docs/reference/project-index/README.md",
       "role_guess": "project index / atlas",
-      "sha256": "b2da92bf909d786ae76eacca13df4a7618f78c60699ecf33054ff09b3844d97a",
-      "size_bytes": 10895,
+      "sha256": "75dd075fb77fae188bb0c534182b3179829e0cc36f09bd763381aecd06087ceb",
+      "size_bytes": 11979,
       "symlink_target": null,
       "tracked": true
     },
@@ -22987,6 +23132,19 @@
       "role_guess": "project index / atlas",
       "sha256": "75d672049f162c4ea1b5fc205f4842d1a7d732fcec7c9b64b3486357d53133e6",
       "size_bytes": 7404,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/reference/project-index",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
+      "name": "claim-boundaries.md",
+      "path": "docs/reference/project-index/claim-boundaries.md",
+      "role_guess": "project index / atlas",
+      "sha256": "8aec3994c5b5cf413838e58b75d2802ee39bc4b374087b3794022f93b87de40a",
+      "size_bytes": 13350,
       "symlink_target": null,
       "tracked": true
     },
@@ -23047,11 +23205,24 @@
       "extension": ".md",
       "kind": "file",
       "language": "Markdown",
+      "name": "icnctl-command-inventory.md",
+      "path": "docs/reference/project-index/generated/icnctl-command-inventory.md",
+      "role_guess": "project index / atlas",
+      "sha256": "ad0fbeb452896d2ea96ae7f9d361186af2c68210bffb1b6dbc09bdee996811a0",
+      "size_bytes": 65597,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/reference/project-index/generated",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
       "name": "route-inventory.md",
       "path": "docs/reference/project-index/generated/route-inventory.md",
       "role_guess": "project index / atlas",
-      "sha256": "9298458ceb36c2a253a982be6e0136699fc9a0262fdcbfc3c0d616db828de6ae",
-      "size_bytes": 76341,
+      "sha256": "7918c40dfa23b94a5db8fcd72e7cdd4448aca8997c6ba9326eb37097f864a708",
+      "size_bytes": 80032,
       "symlink_target": null,
       "tracked": true
     },
@@ -23073,11 +23244,50 @@
       "extension": ".md",
       "kind": "file",
       "language": "Markdown",
+      "name": "invariants-catalog.md",
+      "path": "docs/reference/project-index/invariants-catalog.md",
+      "role_guess": "project index / atlas",
+      "sha256": "ad282d22482e4bd35338346de2ea4851499568372259f8eeeaf0b5f21059f919",
+      "size_bytes": 8076,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/reference/project-index",
+      "extension": ".toml",
+      "kind": "file",
+      "language": "TOML",
+      "name": "invariants-catalog.toml",
+      "path": "docs/reference/project-index/invariants-catalog.toml",
+      "role_guess": "project index / atlas",
+      "sha256": "02eb17ce60e87e356fab2a584de23ff3ff1d7f4895266b8bbeca85a0d4aa2b06",
+      "size_bytes": 14518,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/reference/project-index",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
       "name": "network-gossip-map.md",
       "path": "docs/reference/project-index/network-gossip-map.md",
       "role_guess": "project index / atlas",
       "sha256": "2b4269277bcc2291b85f66a676eb1d382359f8d2e73b3af4c69eb32ee02ce117",
       "size_bytes": 6833,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/reference/project-index",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
+      "name": "organizer-rehearsal-operability-map.md",
+      "path": "docs/reference/project-index/organizer-rehearsal-operability-map.md",
+      "role_guess": "project index / atlas",
+      "sha256": "15a5c5d7c35581cd3dd2c0e5cac3a0aad1cb0b597d404c00441f11cb46a786f1",
+      "size_bytes": 18594,
       "symlink_target": null,
       "tracked": true
     },
@@ -23115,8 +23325,8 @@
       "name": "proof-level-taxonomy-capability-matrix.md",
       "path": "docs/reference/project-index/proof-level-taxonomy-capability-matrix.md",
       "role_guess": "project index / atlas",
-      "sha256": "e57f919f70df3299b162b5058ebbdff7cc6dc65b4ab461ee8ca1f0a95a4307c0",
-      "size_bytes": 22249,
+      "sha256": "9b48dbdb80cc9b1fe15f2a75dc0630f53a7e97160b0cd7a75930cf8d101249f5",
+      "size_bytes": 25160,
       "symlink_target": null,
       "tracked": true
     },
@@ -23167,8 +23377,8 @@
       "name": "runtime-surface-map.md",
       "path": "docs/reference/project-index/runtime-surface-map.md",
       "role_guess": "project index / atlas",
-      "sha256": "154f524464e4cf4fda7c76f8147aae5aa9545ce6490bdfd45d3510b0278bca79",
-      "size_bytes": 11267,
+      "sha256": "315d151f7780cb6f303c921b615c8c6c07bcdbdcf36aea539929c7b6812ba220",
+      "size_bytes": 11760,
       "symlink_target": null,
       "tracked": true
     },
@@ -23206,8 +23416,8 @@
       "name": "show-readiness-map.md",
       "path": "docs/reference/project-index/show-readiness-map.md",
       "role_guess": "project index / atlas",
-      "sha256": "1efd2c3450fc98cd0e3187dfa18366beba54779cd33383dc1daf5af856c8250e",
-      "size_bytes": 8835,
+      "sha256": "6bd3f3c01f79cd3c2a4f311b2e81c5fec6597346843a1c27d01a51b1c01841dc",
+      "size_bytes": 8952,
       "symlink_target": null,
       "tracked": true
     },
@@ -23219,8 +23429,8 @@
       "name": "source-of-truth-map.md",
       "path": "docs/reference/project-index/source-of-truth-map.md",
       "role_guess": "project index / atlas",
-      "sha256": "86a7f1298cd6c16168508233d1e931b797f56121b803124c88dfe22bf3aa5b79",
-      "size_bytes": 9824,
+      "sha256": "6c5685ffa24f5a9ec86cab795d8961aa6d48f4138799c2b411bd8498bcb9c657",
+      "size_bytes": 10082,
       "symlink_target": null,
       "tracked": true
     },
@@ -23284,8 +23494,8 @@
       "name": "registry.toml",
       "path": "docs/registry.toml",
       "role_guess": "documentation",
-      "sha256": "d583b268217bade099ba349c8c382c8697bdcb66de374b864400e1f8d76f6601",
-      "size_bytes": 167435,
+      "sha256": "e067213709452ac2c0b8af28c61bf606b64b5bcb2330983c3df2226bdabae9ee",
+      "size_bytes": 181206,
       "symlink_target": null,
       "tracked": true
     },
@@ -23323,8 +23533,8 @@
       "name": "RFC-0001-obligation-allocation-settlement-primitives.md",
       "path": "docs/rfcs/RFC-0001-obligation-allocation-settlement-primitives.md",
       "role_guess": "request for comments",
-      "sha256": "643b05a55e58bb4b2b7b97e92a9110456c49dd929e190452d445fe8284111ba1",
-      "size_bytes": 34160,
+      "sha256": "adc176a8278b6b1f7a8cac81508254c5e6b7df647600484db307359f3af987e2",
+      "size_bytes": 34173,
       "symlink_target": null,
       "tracked": true
     },
@@ -23437,6 +23647,19 @@
       "extension": ".py",
       "kind": "file",
       "language": "Python",
+      "name": "icnctl_command_inventory.py",
+      "path": "docs/scripts/icnctl_command_inventory.py",
+      "role_guess": "documentation",
+      "sha256": "571869bd44398a4015b48e597f6bfd1338f4afb5dbe5f69c5d857a3c6ff78cea",
+      "size_bytes": 77115,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/scripts",
+      "extension": ".py",
+      "kind": "file",
+      "language": "Python",
       "name": "lint-arch.py",
       "path": "docs/scripts/lint-arch.py",
       "role_guess": "documentation",
@@ -23453,8 +23676,8 @@
       "name": "route_inventory.py",
       "path": "docs/scripts/route_inventory.py",
       "role_guess": "documentation",
-      "sha256": "c8316e636befbccfb4953eb9696fa926bf32d0742b297dbabe676c85aefbb2a8",
-      "size_bytes": 26456,
+      "sha256": "ef52db5c2b378484d1e0cc157b5392de9393b155d4ba73cb785f1a5406b51720",
+      "size_bytes": 28332,
       "symlink_target": null,
       "tracked": true
     },
@@ -24064,8 +24287,21 @@
       "name": "institutional-domain.md",
       "path": "docs/spec/institutional-domain.md",
       "role_guess": "documentation",
-      "sha256": "38aecb4974296b76c700dcafc856e6d3a94938e4b1b33024da706116ed563df4",
-      "size_bytes": 31503,
+      "sha256": "6e9297b4960b26834dc1b184c7b1779ab31289c1d091d634497cc977feee7d6c",
+      "size_bytes": 42927,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "docs/spec",
+      "extension": ".md",
+      "kind": "file",
+      "language": "Markdown",
+      "name": "institutional-powers.md",
+      "path": "docs/spec/institutional-powers.md",
+      "role_guess": "documentation",
+      "sha256": "2f97a721ecda957c9016f1961cd1935e760209ccb9274e98cfe0aa6182bafc62",
+      "size_bytes": 14099,
       "symlink_target": null,
       "tracked": true
     },
@@ -24194,8 +24430,8 @@
       "name": "storage-governance-spec.md",
       "path": "docs/state/storage-governance-spec.md",
       "role_guess": "documentation",
-      "sha256": "3fad1d9ebd10d1b851e87ba109a02e906e5815fbd6d73db5a9c41846454e8332",
-      "size_bytes": 7390,
+      "sha256": "fe6985fcec3943f689ed1b57d9b1b34b5d1ffc00d21079e6299448f73fcd3579",
+      "size_bytes": 8217,
       "symlink_target": null,
       "tracked": true
     },
@@ -25884,8 +26120,8 @@
       "name": "Cargo.lock",
       "path": "icn/Cargo.lock",
       "role_guess": "uncategorized",
-      "sha256": "2ef6b85eaea3eb592a94a0025f0658deb896495fc7db8e09b54e9fce3952aea4",
-      "size_bytes": 215694,
+      "sha256": "3614ec911f9abbb47fcf072f43dbbef29d71609b233125a996fcdf6302b9877c",
+      "size_bytes": 215719,
       "symlink_target": null,
       "tracked": true
     },
@@ -26102,6 +26338,19 @@
       "extension": ".rs",
       "kind": "file",
       "language": "Rust",
+      "name": "domain_policy_adoption.rs",
+      "path": "icn/apps/governance/src/domain_policy_adoption.rs",
+      "role_guess": "runtime app crate",
+      "sha256": "bb0a432d728eb293dd458e0ab03811177ea8f96d821d3e7be8986cb04d86adf6",
+      "size_bytes": 66615,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "icn/apps/governance/src",
+      "extension": ".rs",
+      "kind": "file",
+      "language": "Rust",
       "name": "events.rs",
       "path": "icn/apps/governance/src/events.rs",
       "role_guess": "runtime app crate",
@@ -26170,8 +26419,8 @@
       "name": "configure.rs",
       "path": "icn/apps/governance/src/http/configure.rs",
       "role_guess": "runtime app crate",
-      "sha256": "f953108a2795998cfaeaea6076d9ee1cf9fee9e29a565af9c4dfd59d059e7d03",
-      "size_bytes": 54744,
+      "sha256": "fee2ca3eec9269489a7a9de87df6e31f0f6521a916581bfb3a13b977c6f493f2",
+      "size_bytes": 55588,
       "symlink_target": null,
       "tracked": true
     },
@@ -26183,8 +26432,8 @@
       "name": "handlers.rs",
       "path": "icn/apps/governance/src/http/handlers.rs",
       "role_guess": "runtime app crate",
-      "sha256": "88ead143cb6a1b5566add0566bc0121f721c579d0f00f4b8d456b979764aba4a",
-      "size_bytes": 361119,
+      "sha256": "536a30a4206870b4302a71fb43767f3a8decf881f31a25f72daf4b276f08e027",
+      "size_bytes": 375289,
       "symlink_target": null,
       "tracked": true
     },
@@ -26209,8 +26458,8 @@
       "name": "models.rs",
       "path": "icn/apps/governance/src/http/models.rs",
       "role_guess": "runtime app crate",
-      "sha256": "95ee4fb2a957c0487666c08ee13c7751312329a8779e512d3a12bded223696bf",
-      "size_bytes": 62902,
+      "sha256": "55657c549bb10dae8c2c7019174c206eccc984eb2a1896e21d928227ca4d77ed",
+      "size_bytes": 67801,
       "symlink_target": null,
       "tracked": true
     },
@@ -26222,8 +26471,8 @@
       "name": "validation.rs",
       "path": "icn/apps/governance/src/http/validation.rs",
       "role_guess": "runtime app crate",
-      "sha256": "425cffb608ae11d966ee67b7a5e0544a03d70bce8749734f97a2fa5f80bdff3f",
-      "size_bytes": 17900,
+      "sha256": "da3248b7094c498929d8a5c60fe4068886331ded62e93559d0eca7cde955c79e",
+      "size_bytes": 18912,
       "symlink_target": null,
       "tracked": true
     },
@@ -26261,8 +26510,8 @@
       "name": "lib.rs",
       "path": "icn/apps/governance/src/lib.rs",
       "role_guess": "runtime app crate",
-      "sha256": "2144f34e912811a97df72acf3ccefe8c05e4c90d60712aa0a265c032110b0efd",
-      "size_bytes": 19619,
+      "sha256": "4749ea718cd7251be6588e2bd6d28b685ca93446a6615362a0fb5cac94edb632",
+      "size_bytes": 19651,
       "symlink_target": null,
       "tracked": true
     },
@@ -26274,8 +26523,8 @@
       "name": "manager.rs",
       "path": "icn/apps/governance/src/manager.rs",
       "role_guess": "runtime app crate",
-      "sha256": "14e523b233f1bf43843ae66cbae43f059b4905e2f0bd9356cbf91fce1885bc80",
-      "size_bytes": 359295,
+      "sha256": "09d668443bda53fa7953cb258512fba9cb3b63a8949ad0af3c8081dc2db89a89",
+      "size_bytes": 363022,
       "symlink_target": null,
       "tracked": true
     },
@@ -26287,8 +26536,8 @@
       "name": "mandate_gate.rs",
       "path": "icn/apps/governance/src/mandate_gate.rs",
       "role_guess": "runtime app crate",
-      "sha256": "6a1959ae7cb5fdc4cd73663204d539da8ef7b0ebf4955eacacd44289d4184daa",
-      "size_bytes": 55170,
+      "sha256": "8b2f70004682e4643ebb5d1d3f6c55486bee40c813c4d0ee07c98024cd823d92",
+      "size_bytes": 56082,
       "symlink_target": null,
       "tracked": true
     },
@@ -26352,8 +26601,8 @@
       "name": "state_store.rs",
       "path": "icn/apps/governance/src/state_store.rs",
       "role_guess": "runtime app crate",
-      "sha256": "9dadb0f1d09b5cb193c64b64c8ac9a7041f51fc5a5bc0891d02d4fa1af5d9172",
-      "size_bytes": 11360,
+      "sha256": "17dbb4b2f080b862859fa2faa67444c2f8db58baf8896c18c616aa75123b0553",
+      "size_bytes": 24376,
       "symlink_target": null,
       "tracked": true
     },
@@ -26505,6 +26754,19 @@
       "extension": ".rs",
       "kind": "file",
       "language": "Rust",
+      "name": "domain_policy_adoption_http_route.rs",
+      "path": "icn/apps/governance/tests/domain_policy_adoption_http_route.rs",
+      "role_guess": "runtime app crate",
+      "sha256": "62d589ab658e42c30e58b1b2ca7b1def363640b6a657522488e204795ba6d1cb",
+      "size_bytes": 27801,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "icn/apps/governance/tests",
+      "extension": ".rs",
+      "kind": "file",
+      "language": "Rust",
       "name": "federation_scope_migration.rs",
       "path": "icn/apps/governance/tests/federation_scope_migration.rs",
       "role_guess": "runtime app crate",
@@ -26523,6 +26785,19 @@
       "role_guess": "runtime app crate",
       "sha256": "2947afd7a492d7aab07f94dcf199eb7a2c0a74ae24e7bd8fca9aedd9bf68d820",
       "size_bytes": 19897,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "icn/apps/governance/tests",
+      "extension": ".rs",
+      "kind": "file",
+      "language": "Rust",
+      "name": "institutional_domain_declare_http_route.rs",
+      "path": "icn/apps/governance/tests/institutional_domain_declare_http_route.rs",
+      "role_guess": "runtime app crate",
+      "sha256": "da722b07938d8cde87cd00ef174b77a132d8290ad9d11008c383f4eeb88e10d2",
+      "size_bytes": 20836,
       "symlink_target": null,
       "tracked": true
     },
@@ -26614,6 +26889,19 @@
       "role_guess": "runtime app crate",
       "sha256": "798bf89471bfe77e9456fdc69bfd7efefb2e23af3c1ba76c82643087d3eca42e",
       "size_bytes": 10311,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "icn/apps/governance/tests",
+      "extension": ".rs",
+      "kind": "file",
+      "language": "Rust",
+      "name": "process_gate_result_http_route.rs",
+      "path": "icn/apps/governance/tests/process_gate_result_http_route.rs",
+      "role_guess": "runtime app crate",
+      "sha256": "3d127265b4df7e6ecc5a4a34a4771e99115bb53024a745a68f14c30165617728",
+      "size_bytes": 13945,
       "symlink_target": null,
       "tracked": true
     },
@@ -27678,8 +27966,8 @@
       "name": "coop_entity_backfill_test.rs",
       "path": "icn/bins/icnctl/tests/coop_entity_backfill_test.rs",
       "role_guess": "Rust binary",
-      "sha256": "24ff61508ad85e34582c229c6413e86f636b812626d5bbaf61a08af7e4dde536",
-      "size_bytes": 13805,
+      "sha256": "108e94ce61cb9f46209d04ebec3aefa8c57ea88d3cd0faa270da38da8365e3eb",
+      "size_bytes": 14799,
       "symlink_target": null,
       "tracked": true
     },
@@ -27730,8 +28018,8 @@
       "name": "Cargo.toml",
       "path": "icn/bins/icnd/Cargo.toml",
       "role_guess": "Rust binary",
-      "sha256": "d583baa325019b58e873cea81bac3fa258cdd1c20add77478087bc3e7a811f14",
-      "size_bytes": 1480,
+      "sha256": "5032b580948f07e20df5dd11675b9b3408e4f304fc8187f512fb240e80363bc7",
+      "size_bytes": 1502,
       "symlink_target": null,
       "tracked": true
     },
@@ -27743,8 +28031,8 @@
       "name": "compute_wiring.rs",
       "path": "icn/bins/icnd/src/compute_wiring.rs",
       "role_guess": "Rust binary",
-      "sha256": "ddce7c3a89f562e44006803f2ef4dc1042316d96a98afccf51835a49fdde64ab",
-      "size_bytes": 18793,
+      "sha256": "4db2f493f3cc337be231e43554839a9b27758456c694d78c4ca7810e0f21f7f5",
+      "size_bytes": 24100,
       "symlink_target": null,
       "tracked": true
     },
@@ -27756,8 +28044,8 @@
       "name": "main.rs",
       "path": "icn/bins/icnd/src/main.rs",
       "role_guess": "Rust binary",
-      "sha256": "bee35cab7967435478c569e809ee92f7cea377e0c12adbe3faacd973e484ca19",
-      "size_bytes": 45603,
+      "sha256": "9fa4cf357516e7a1b8d2d1919422127aff9eca1c3e04df65c790af65ea98c809",
+      "size_bytes": 45638,
       "symlink_target": null,
       "tracked": true
     },
@@ -29706,8 +29994,8 @@
       "name": "tests.rs",
       "path": "icn/crates/icn-compute/src/actor/tests.rs",
       "role_guess": "Rust library crate",
-      "sha256": "1fc164d2c1e0ed38255a4e68244e3cee1ace35278d59c54dad3384048d947218",
-      "size_bytes": 72070,
+      "sha256": "0cd03ffe4b5dc3adb8f5c82e26dff86ee54b119b0bc90d81a30ab6deb15722d8",
+      "size_bytes": 73036,
       "symlink_target": null,
       "tracked": true
     },
@@ -29719,8 +30007,8 @@
       "name": "types.rs",
       "path": "icn/crates/icn-compute/src/actor/types.rs",
       "role_guess": "Rust library crate",
-      "sha256": "7e4bd7f4555965571e2d1238ec3377cebe78da1d71d5ee6150bc2b89b046867a",
-      "size_bytes": 11568,
+      "sha256": "519197e0fb33398ec84ee9e37095241ec628c65b3356a2acf1e6dfc3a04e8b79",
+      "size_bytes": 11594,
       "symlink_target": null,
       "tracked": true
     },
@@ -29953,8 +30241,8 @@
       "name": "types.rs",
       "path": "icn/crates/icn-compute/src/types.rs",
       "role_guess": "Rust library crate",
-      "sha256": "3e9bececff11db59670c34624e2834c119684e7d17b06eb0160d21c5b3d9a405",
-      "size_bytes": 45606,
+      "sha256": "ebc6d9d64e74ec77c8983857939e880f668e3821ed75c6d50ae645e95ccb241a",
+      "size_bytes": 47486,
       "symlink_target": null,
       "tracked": true
     },
@@ -30057,8 +30345,8 @@
       "name": "actor.rs",
       "path": "icn/crates/icn-coop/src/actor.rs",
       "role_guess": "Rust library crate",
-      "sha256": "1bdfd9fa66d3082847e701093f8d90dafb1623fc30b3a37f1029dd5e41cb2812",
-      "size_bytes": 72400,
+      "sha256": "fbcb13bbf536a5956a77360559ed34c0fd2c4cdea72edcfad725a703c70d6fac",
+      "size_bytes": 80578,
       "symlink_target": null,
       "tracked": true
     },
@@ -30083,8 +30371,8 @@
       "name": "lib.rs",
       "path": "icn/crates/icn-coop/src/lib.rs",
       "role_guess": "Rust library crate",
-      "sha256": "2e9a85c2c5744d455848a4a386433167abf30ced6dfe2045bd24b1339bb04dca",
-      "size_bytes": 2491,
+      "sha256": "79075f2ba71c92d886ffeb8bd5d63237578cd5164784bb15c4fd625f8af72c73",
+      "size_bytes": 2524,
       "symlink_target": null,
       "tracked": true
     },
@@ -30759,8 +31047,8 @@
       "name": "actors.rs",
       "path": "icn/crates/icn-core/src/supervisor/actors.rs",
       "role_guess": "Rust library crate",
-      "sha256": "3f4abea5b37a575f1786378ef1ac6f839aea114eb7f6e98c9bda9ea46d9e744e",
-      "size_bytes": 10253,
+      "sha256": "8329490ff84ddb96d14fa224e83160747a8ed21caee9cc9e7ce1f983c4487d5f",
+      "size_bytes": 10574,
       "symlink_target": null,
       "tracked": true
     },
@@ -30941,8 +31229,8 @@
       "name": "init_gateway.rs",
       "path": "icn/crates/icn-core/src/supervisor/init_gateway.rs",
       "role_guess": "Rust library crate",
-      "sha256": "2a06e1e14feac571a7b119c446ff205272127a3e220b0f06ac3e97c31c855d43",
-      "size_bytes": 12537,
+      "sha256": "c347cbdb4792ef904c5e5eaf9ef717a9f45a437eb1b9f943c60b58418c986df6",
+      "size_bytes": 13059,
       "symlink_target": null,
       "tracked": true
     },
@@ -31032,8 +31320,8 @@
       "name": "init_rpc.rs",
       "path": "icn/crates/icn-core/src/supervisor/init_rpc.rs",
       "role_guess": "Rust library crate",
-      "sha256": "dcd7984cc201dbce46b7c84890e961a35c2c03da32e5405775149b0153a001ce",
-      "size_bytes": 8681,
+      "sha256": "6ad4cdcf0fe85969d7482b699f9b576a5552d3812938993ff819b1ed824936fc",
+      "size_bytes": 9392,
       "symlink_target": null,
       "tracked": true
     },
@@ -31084,8 +31372,8 @@
       "name": "lifecycle.rs",
       "path": "icn/crates/icn-core/src/supervisor/lifecycle.rs",
       "role_guess": "Rust library crate",
-      "sha256": "bb29a7e570bc09efcb1d6c0d0bab735d61721af8846fdf06bd20d9a7215ee3d9",
-      "size_bytes": 69866,
+      "sha256": "8d0fbc1769b30bae5e85d3a3c322021bfcfd002dd2fc9a4788dc66773c70a563",
+      "size_bytes": 70295,
       "symlink_target": null,
       "tracked": true
     },
@@ -31266,8 +31554,8 @@
       "name": "commons_multinode_integration.rs",
       "path": "icn/crates/icn-core/tests/commons_multinode_integration.rs",
       "role_guess": "Rust library crate",
-      "sha256": "2bbcfccb85e8220a602c0456b096881b5f75229c35d2a49108dbbbc7dff1a49a",
-      "size_bytes": 10457,
+      "sha256": "cdf9070fbaf5165c1388426f0ef104fb748d07cd679d88a7272e38fa8bf61e7b",
+      "size_bytes": 10470,
       "symlink_target": null,
       "tracked": true
     },
@@ -32189,8 +32477,8 @@
       "name": "coop_entity_backfill.rs",
       "path": "icn/crates/icn-entity/src/coop_entity_backfill.rs",
       "role_guess": "Rust library crate",
-      "sha256": "f8e41ef4b3b45fece23e33a8913fdd7f15f098e71e42c3ada5b20f7d10dab72d",
-      "size_bytes": 39856,
+      "sha256": "c140346a4b876656558779087e9d508752a42b86d183d9cbe1f60b5c91b465ac",
+      "size_bytes": 45574,
       "symlink_target": null,
       "tracked": true
     },
@@ -32215,8 +32503,8 @@
       "name": "coop_entity_map.rs",
       "path": "icn/crates/icn-entity/src/coop_entity_map.rs",
       "role_guess": "Rust library crate",
-      "sha256": "5178a2b92ee583c6505e7e9aea24e4449f14251bfa77fac871d5902fe3549a43",
-      "size_bytes": 41929,
+      "sha256": "8d6e3464b9539412b9476160917846a5835155dfebb90bbdd3cb32587cfc3292",
+      "size_bytes": 72210,
       "symlink_target": null,
       "tracked": true
     },
@@ -32293,8 +32581,8 @@
       "name": "lib.rs",
       "path": "icn/crates/icn-entity/src/lib.rs",
       "role_guess": "Rust library crate",
-      "sha256": "14d63726c85d786a2a3a149bb9eae7b75d92fae5909ec557f678ca6aa58f3c03",
-      "size_bytes": 4469,
+      "sha256": "ffb59babfe4aade2a9cd98f9573f301f91085225600a2b749024302155e024d9",
+      "size_bytes": 4521,
       "symlink_target": null,
       "tracked": true
     },
@@ -32982,8 +33270,8 @@
       "name": "entity.rs",
       "path": "icn/crates/icn-gateway/src/api/entity.rs",
       "role_guess": "Rust library crate",
-      "sha256": "5a115aeb8d5c5b3086f17a6493367525e4143e8f9f48a5ee7426c8965fe650f9",
-      "size_bytes": 74757,
+      "sha256": "187a23562b2db838922a5800ca25765e34532047ab19c8a17903ddb50ec95274",
+      "size_bytes": 75121,
       "symlink_target": null,
       "tracked": true
     },
@@ -33398,8 +33686,8 @@
       "name": "treasury.rs",
       "path": "icn/crates/icn-gateway/src/api/treasury.rs",
       "role_guess": "Rust library crate",
-      "sha256": "892a34468e8451a4e669df55d9d26c193788858aa3da08d8f30a0db5c873ca33",
-      "size_bytes": 59556,
+      "sha256": "6e8e052fc7ff45358862778ad8be400f262a7d5d815b11dd4c650d4b23c8652e",
+      "size_bytes": 60804,
       "symlink_target": null,
       "tracked": true
     },
@@ -33463,8 +33751,8 @@
       "name": "authority.rs",
       "path": "icn/crates/icn-gateway/src/authority.rs",
       "role_guess": "Rust library crate",
-      "sha256": "0b0c2459b64b1608f445aabbbf223655e717d54c868e6ded0b6688f80e289437",
-      "size_bytes": 35098,
+      "sha256": "4854fe77442b3b5cfdce1ea562cbe1fe15a26ace39eccd570f0ac4ddae95ad80",
+      "size_bytes": 103222,
       "symlink_target": null,
       "tracked": true
     },
@@ -33556,6 +33844,19 @@
       "role_guess": "Rust library crate",
       "sha256": "d94c72a52a6df883a0211bffb734440f9e6426f4be7896010b3fa99cffdd132d",
       "size_bytes": 8595,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "icn/crates/icn-gateway/src",
+      "extension": ".rs",
+      "kind": "file",
+      "language": "Rust",
+      "name": "coop_entity_resolver.rs",
+      "path": "icn/crates/icn-gateway/src/coop_entity_resolver.rs",
+      "role_guess": "Rust library crate",
+      "sha256": "0ef11e4275db84b9c839c61d8ca8a9e5d75c8c5695e06903be1965e8e6c8650f",
+      "size_bytes": 31587,
       "symlink_target": null,
       "tracked": true
     },
@@ -33762,8 +34063,8 @@
       "name": "lib.rs",
       "path": "icn/crates/icn-gateway/src/lib.rs",
       "role_guess": "Rust library crate",
-      "sha256": "9228d55f3df894193558a41a8a7b6a656c2a099b70f12f3d2a07328c14bdb52d",
-      "size_bytes": 4006,
+      "sha256": "27a1a4ab2b781d658a3fdffe9a1734a14ac066127ffacec9f868404e990c7757",
+      "size_bytes": 4036,
       "symlink_target": null,
       "tracked": true
     },
@@ -33970,8 +34271,8 @@
       "name": "server.rs",
       "path": "icn/crates/icn-gateway/src/server.rs",
       "role_guess": "Rust library crate",
-      "sha256": "eecabb6a8162c8975229b71433e61b266a877dba77381086a75668c0dfe063bd",
-      "size_bytes": 127192,
+      "sha256": "29ce7fb2a45261a3413a72a0b3ff624a98f3a79685eb6adbf8cc848e77f86d7c",
+      "size_bytes": 129738,
       "symlink_target": null,
       "tracked": true
     },
@@ -34152,8 +34453,8 @@
       "name": "index.html",
       "path": "icn/crates/icn-gateway/static/index.html",
       "role_guess": "Rust library crate",
-      "sha256": "93c27be12136554ccdb9757a6d01d732eb6e459fa186c0bdcd3d987ca2ab9c2c",
-      "size_bytes": 97231,
+      "sha256": "3f9d8621c5187564b3a677315cbdb5e3386b5e7ce8e48311f759787e82cb3ea8",
+      "size_bytes": 97650,
       "symlink_target": null,
       "tracked": true
     },
@@ -34256,7 +34557,7 @@
       "name": "sw.js",
       "path": "icn/crates/icn-gateway/static/sw.js",
       "role_guess": "Rust library crate",
-      "sha256": "29e788d153426b4d84cfa5f7db5b8d3dc80b4071fdc1bbe65f477dc17aa88376",
+      "sha256": "3aeefd6c9d8bbca5cfad723327661a4a81ff276083ecdfd9fd763c0c700ef9a0",
       "size_bytes": 12014,
       "symlink_target": null,
       "tracked": true
@@ -34516,8 +34817,8 @@
       "name": "entity_integration.rs",
       "path": "icn/crates/icn-gateway/tests/entity_integration.rs",
       "role_guess": "Rust library crate",
-      "sha256": "8a5fececb35c9586d38f88118eef1012b5b22c1f42d28501a8ed3c88a811c400",
-      "size_bytes": 35835,
+      "sha256": "355f572003c606a050874ab2bf4e07fa8fc7e1a451be5c876b6504ba192f24ac",
+      "size_bytes": 38690,
       "symlink_target": null,
       "tracked": true
     },
@@ -35449,6 +35750,19 @@
       "extension": ".rs",
       "kind": "file",
       "language": "Rust",
+      "name": "institutional_domain.rs",
+      "path": "icn/crates/icn-governance/src/institutional_domain.rs",
+      "role_guess": "Rust library crate",
+      "sha256": "79ce1648fae3ce58877afd666e41fa535ee57f557b5f14c6106a044e64609330",
+      "size_bytes": 23509,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "icn/crates/icn-governance/src",
+      "extension": ".rs",
+      "kind": "file",
+      "language": "Rust",
       "name": "invariant_gate.rs",
       "path": "icn/crates/icn-governance/src/invariant_gate.rs",
       "role_guess": "Rust library crate",
@@ -35465,8 +35779,8 @@
       "name": "lib.rs",
       "path": "icn/crates/icn-governance/src/lib.rs",
       "role_guess": "Rust library crate",
-      "sha256": "5993050f686bbd9f75407a29c74732950fc0e6c8303940fe5dc7aa4f08570b83",
-      "size_bytes": 9223,
+      "sha256": "f93879d256488d943d939cb6603d29e37e6035bf85a730cc6810a56dbcbbfe5b",
+      "size_bytes": 9386,
       "symlink_target": null,
       "tracked": true
     },
@@ -36492,8 +36806,8 @@
       "name": "lib.rs",
       "path": "icn/crates/icn-kernel-api/src/lib.rs",
       "role_guess": "Rust library crate",
-      "sha256": "f75eaee597d2df91c0f00372a3ac7c6b3262514ef401bbeb2efa05f4e8a2e696",
-      "size_bytes": 7315,
+      "sha256": "4e2fe34f8bf4d22b90ced9c7ff48ca03041d684d523f0214ad3c96959b40c97b",
+      "size_bytes": 7360,
       "symlink_target": null,
       "tracked": true
     },
@@ -36609,8 +36923,8 @@
       "name": "storage.rs",
       "path": "icn/crates/icn-kernel-api/src/storage.rs",
       "role_guess": "Rust library crate",
-      "sha256": "2932be565bfd21a691dff207c79d4a0fa692234c9db8bd3b3a6357e05870e07f",
-      "size_bytes": 19970,
+      "sha256": "b1ae4607498f207ab26526e2fb6d029f82d09593890a6c059724daca0fbf02ee",
+      "size_bytes": 25928,
       "symlink_target": null,
       "tracked": true
     },
@@ -36947,8 +37261,8 @@
       "name": "ledger.rs",
       "path": "icn/crates/icn-ledger/src/ledger.rs",
       "role_guess": "Rust library crate",
-      "sha256": "79c522e64ecf8f1041729bafa9fc93cc2cd45682561ced5126ca51dac6ef7ace",
-      "size_bytes": 190069,
+      "sha256": "bfc75dd8604a85fc3e9aa4e80af0a6aaa6a05bef7676cb3518a6b194ac742e1e",
+      "size_bytes": 196517,
       "symlink_target": null,
       "tracked": true
     },
@@ -37311,8 +37625,8 @@
       "name": "types.rs",
       "path": "icn/crates/icn-ledger/src/types.rs",
       "role_guess": "Rust library crate",
-      "sha256": "d992e01721f0c050175c08c87dbb9ccba5e5c873e53c26aa6a6db2887ae3c9a9",
-      "size_bytes": 23789,
+      "sha256": "0c67123c53be42a8c398f44da34e58ad3d21f280aa8e37c1927c8ac9f6dd516a",
+      "size_bytes": 23821,
       "symlink_target": null,
       "tracked": true
     },
@@ -38390,8 +38704,8 @@
       "name": "Cargo.toml",
       "path": "icn/crates/icn-rpc/Cargo.toml",
       "role_guess": "Rust library crate",
-      "sha256": "3fd30e2e74d46cc1b7ce148b5d5c59b0afdb85b09e65a671635fbbfbabbcec35",
-      "size_bytes": 1079,
+      "sha256": "3e60c7824dfc7c9ed21966449504382aca838f65db85fbd796cb817ffd85c617",
+      "size_bytes": 1224,
       "symlink_target": null,
       "tracked": true
     },
@@ -38403,8 +38717,8 @@
       "name": "auth.rs",
       "path": "icn/crates/icn-rpc/src/auth.rs",
       "role_guess": "Rust library crate",
-      "sha256": "48ce6ecc5417011e26c7970944d387cf174cf19200cec0c433904c87d94d8590",
-      "size_bytes": 61346,
+      "sha256": "36fe153dc8cd8c8c86a676871e6684a713f03d286b39ec3fe741d04d84addf86",
+      "size_bytes": 63017,
       "symlink_target": null,
       "tracked": true
     },
@@ -38520,8 +38834,8 @@
       "name": "governance.rs",
       "path": "icn/crates/icn-rpc/src/handler/governance.rs",
       "role_guess": "Rust library crate",
-      "sha256": "9f7c3dd0676488caef849f516ff88b1efb00637514aa15738f4a96bbc7e49f84",
-      "size_bytes": 25405,
+      "sha256": "22b5fc9349cc59a7b92e368b164f96b466a1f6d4a7b4c775a8122ff28f0af43a",
+      "size_bytes": 53929,
       "symlink_target": null,
       "tracked": true
     },
@@ -38650,8 +38964,8 @@
       "name": "server.rs",
       "path": "icn/crates/icn-rpc/src/server.rs",
       "role_guess": "Rust library crate",
-      "sha256": "7b0ee90e7290a7e84af227b4007e6fae8f415ea5a34097c55818ca493b816866",
-      "size_bytes": 37500,
+      "sha256": "bc02e4a240aa4e22dc0fcfd75b0fab3086c7dc8ef409d7e8148c75a1acdce138",
+      "size_bytes": 39272,
       "symlink_target": null,
       "tracked": true
     },
@@ -38663,8 +38977,8 @@
       "name": "types.rs",
       "path": "icn/crates/icn-rpc/src/types.rs",
       "role_guess": "Rust library crate",
-      "sha256": "10a9a4c750d7f1cae9432df701112a92a74a09ff28509f3cfab158b309e53601",
-      "size_bytes": 24480,
+      "sha256": "ed1ec3abd5ae05df2910694700fbf7d1741b940e4f6e9b87569893880e6a6e96",
+      "size_bytes": 25355,
       "symlink_target": null,
       "tracked": true
     },
@@ -41211,8 +41525,8 @@
       "name": "decisions.test.ts",
       "path": "ops/mcp/src/tests/decisions.test.ts",
       "role_guess": "operations / coordination",
-      "sha256": "a8d0d21bcb246cbde42fef48edf0f2e0ba2e1194f6c7beab1f05b8860d29893b",
-      "size_bytes": 6642,
+      "sha256": "38d6196a5ec8f733372b451611ac46daf03f0e938ea2df48050b0112de066890",
+      "size_bytes": 9270,
       "symlink_target": null,
       "tracked": true
     },
@@ -41226,6 +41540,19 @@
       "role_guess": "operations / coordination",
       "sha256": "f94135ff2fab0dde2d0776776c0d031ab49c5e98e147c095cba9746a72764c90",
       "size_bytes": 287,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "ops/mcp/src/tests",
+      "extension": ".ts",
+      "kind": "file",
+      "language": "TypeScript",
+      "name": "repos.test.ts",
+      "path": "ops/mcp/src/tests/repos.test.ts",
+      "role_guess": "operations / coordination",
+      "sha256": "ab9f73c706d9296d70620da012df975471b5542a1609dce3e0c52d17418285a3",
+      "size_bytes": 818,
       "symlink_target": null,
       "tracked": true
     },
@@ -41250,8 +41577,8 @@
       "name": "tasks.test.ts",
       "path": "ops/mcp/src/tests/tasks.test.ts",
       "role_guess": "operations / coordination",
-      "sha256": "d164211810df7d376aeeea5626d9b367a7b2ba085523430d98d54919680f6e8c",
-      "size_bytes": 2000,
+      "sha256": "eba3a07b5287f90db50919a93c97d26127c9e8f0d2e514ba2a0c0580696fa19c",
+      "size_bytes": 4076,
       "symlink_target": null,
       "tracked": true
     },
@@ -41302,8 +41629,8 @@
       "name": "decisions.ts",
       "path": "ops/mcp/src/tools/decisions.ts",
       "role_guess": "operations / coordination",
-      "sha256": "5068a702878f85bcf16481c99a81d756ecfc12e2a832e1da974106ef68416324",
-      "size_bytes": 14665,
+      "sha256": "25246b8d7946d20c1ca26ba42db98457112578f56c78fa501f4dcd23df976395",
+      "size_bytes": 15191,
       "symlink_target": null,
       "tracked": true
     },
@@ -41341,8 +41668,8 @@
       "name": "repos.ts",
       "path": "ops/mcp/src/tools/repos.ts",
       "role_guess": "operations / coordination",
-      "sha256": "f18682eabbcbff5f954402eb711f7f827b1bd490b421cec4b6186c9abb936caf",
-      "size_bytes": 7164,
+      "sha256": "7f67341ab4acb6cd1f6c1556663221bae8907a1bc0c3bc65f3fbeca6d4c14bbe",
+      "size_bytes": 7615,
       "symlink_target": null,
       "tracked": true
     },
@@ -41367,8 +41694,8 @@
       "name": "tasks.ts",
       "path": "ops/mcp/src/tools/tasks.ts",
       "role_guess": "operations / coordination",
-      "sha256": "c0673eaa8d519752e273c8e04df9d17bc005aa0ba0622f29df4cc6a84f0a79ce",
-      "size_bytes": 6784,
+      "sha256": "5c07fe1a7331f6ed92db334fd4dd8b935ffaf77a82025f128da5712fb40d6f43",
+      "size_bytes": 7529,
       "symlink_target": null,
       "tracked": true
     },
@@ -41790,6 +42117,19 @@
     },
     {
       "directory": "scripts",
+      "extension": ".py",
+      "kind": "file",
+      "language": "Python",
+      "name": "check-state-lag.py",
+      "path": "scripts/check-state-lag.py",
+      "role_guess": "script",
+      "sha256": "3f01d73a6f71ab8e239f4f181d36497fb36fc62145ae126c035c4ed7c5d91e6e",
+      "size_bytes": 7362,
+      "symlink_target": null,
+      "tracked": true
+    },
+    {
+      "directory": "scripts",
       "extension": ".sh",
       "kind": "file",
       "language": "Shell",
@@ -41965,8 +42305,8 @@
       "name": "generate-live-state-overlay.py",
       "path": "scripts/generate-live-state-overlay.py",
       "role_guess": "script",
-      "sha256": "04398e0a68e0c8a4293f82a881aaaacb77eae0d90a36a00bc2690069532fe61f",
-      "size_bytes": 50165,
+      "sha256": "a66ac414c3c8dea0ab5ae18b9b819c4363949c4601d50d000cb0bce182e32fba",
+      "size_bytes": 53553,
       "symlink_target": null,
       "tracked": true
     },
@@ -45826,8 +46166,8 @@
       "name": "action-cards.json",
       "path": "web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json",
       "role_guess": "pilot UI",
-      "sha256": "34f3d94423aca6c110f9ac012f38683f731eabfd4362fe5ae9e2dd0a91326ff0",
-      "size_bytes": 2467,
+      "sha256": "1b60b11b3b4d994ed596c1b1eaa4d0cc55a02d3c0b2bd4ee514d18c6b49a3522",
+      "size_bytes": 3377,
       "symlink_target": null,
       "tracked": true
     },
@@ -45865,8 +46205,8 @@
       "name": "standing.json",
       "path": "web/pilot-ui/fixtures/icn-organizer-demo/standing.json",
       "role_guess": "pilot UI",
-      "sha256": "0c6a34ca2d6e8bd8ecb3335dbe426142ed7f205ba059ad0164c392a3db452fa7",
-      "size_bytes": 1320,
+      "sha256": "efb29ba7f36343a7395a885e69183878d46c63812fed0249ce6d8f45738566b8",
+      "size_bytes": 1676,
       "symlink_target": null,
       "tracked": true
     },
@@ -46034,8 +46374,8 @@
       "name": "index.html",
       "path": "web/pilot-ui/index.html",
       "role_guess": "pilot UI",
-      "sha256": "872d5f3efb8f814eda769a9236cfa3262da11bc97d5cf8bb999cab70cb3ff354",
-      "size_bytes": 129907,
+      "sha256": "0d8530acae0d781b5c671028eea7ac32321784f2391ec9365ab1e18a5a1ed76c",
+      "size_bytes": 130326,
       "symlink_target": null,
       "tracked": true
     },
@@ -46190,8 +46530,8 @@
       "name": "sdis-enrollment.js",
       "path": "web/pilot-ui/sdis-enrollment.js",
       "role_guess": "pilot UI",
-      "sha256": "f9239b0f14e80dc30537ac93c2e7085fcf6596819c212501d8c32d11424b9a28",
-      "size_bytes": 18260,
+      "sha256": "98de14df7087affb2ebce3f3643c0bcc4cd03eff96ccb424f372128fdfecf5aa",
+      "size_bytes": 18795,
       "symlink_target": null,
       "tracked": true
     },
@@ -46229,8 +46569,8 @@
       "name": "sdis-identity.js",
       "path": "web/pilot-ui/sdis-identity.js",
       "role_guess": "pilot UI",
-      "sha256": "082a3e578e50a794dec2e299e55511627f806783b6d978a181785f2d9057595a",
-      "size_bytes": 13882,
+      "sha256": "1ad9548b257ba436496b4232be75ac1f7ff70b00722ba4ace2fc54cd955d9a1e",
+      "size_bytes": 15762,
       "symlink_target": null,
       "tracked": true
     },
@@ -46268,8 +46608,8 @@
       "name": "sdis-proofs.js",
       "path": "web/pilot-ui/sdis-proofs.js",
       "role_guess": "pilot UI",
-      "sha256": "c3a5cc17132ec7683fef0058f820da5f173f2e59c56b5c352f6851da08ddd563",
-      "size_bytes": 16385,
+      "sha256": "8b150a5b35776d40ad208c37202ca5271a99a5c34678756b8ac4f76e95486ce5",
+      "size_bytes": 18190,
       "symlink_target": null,
       "tracked": true
     },
@@ -46385,7 +46725,7 @@
       "name": "sw.js",
       "path": "web/pilot-ui/sw.js",
       "role_guess": "pilot UI",
-      "sha256": "af2715c7f57cd78e790bdd49ce828d7fb0351fcbfced2d158b45fccd146bc9e0",
+      "sha256": "a0b5f7834b0f5b850cd11e46ec01c4b77745c871aecae413312ebc08f0d17c4c",
       "size_bytes": 12339,
       "symlink_target": null,
       "tracked": true
@@ -47483,8 +47823,8 @@
       "tracked": true
     }
   ],
-  "generated_at": "2026-06-21T21:21:29.736718+00:00",
-  "head": "fa819b47fbf774296400b42ca6f7c7c8630004af",
+  "generated_at": "2026-06-28T04:35:53.498966+00:00",
+  "head": "e87d2a43b916beb11dfd7c3aa061cdfab0120be7",
   "include_untracked": false,
   "repo": "icn",
   "schema": "icn.repo_record.v1",
@@ -47515,7 +47855,7 @@
       ".kt": 2,
       ".lock": 3,
       ".log": 1,
-      ".md": 1168,
+      ".md": 1184,
       ".mermaid": 1,
       ".mjs": 2,
       ".pdf": 5,
@@ -47523,15 +47863,15 @@
       ".pptx": 1,
       ".pro": 1,
       ".properties": 2,
-      ".py": 41,
-      ".rs": 940,
+      ".py": 43,
+      ".rs": 946,
       ".service": 4,
       ".sh": 119,
       ".svg": 5,
       ".test": 1,
-      ".toml": 112,
+      ".toml": 113,
       ".tpl": 1,
-      ".ts": 112,
+      ".ts": 113,
       ".tsx": 43,
       ".txt": 5,
       ".wasm": 1,
@@ -47540,41 +47880,41 @@
       ".yaml": 92,
       ".yml": 60
     },
-    "file_count": 3094,
+    "file_count": 3120,
     "kinds": {
-      "file": 3094
+      "file": 3120
     },
     "roles": {
       "GitHub Actions workflow": 18,
       "React Native SDK": 139,
       "Rust binary": 16,
-      "Rust library crate": 922,
+      "Rust library crate": 924,
       "TypeScript SDK": 29,
       "agent definition": 22,
-      "architecture decision record": 36,
+      "architecture decision record": 37,
       "contract template": 12,
       "dashboard UI": 7,
       "demo": 53,
       "deployment": 130,
-      "documentation": 898,
+      "documentation": 910,
       "institution package": 40,
       "legacy/top-level app": 5,
       "monitoring": 9,
-      "operations / coordination": 87,
+      "operations / coordination": 88,
       "pilot UI": 84,
-      "project index / atlas": 25,
+      "project index / atlas": 30,
       "public website": 71,
       "repo configuration": 144,
       "repo control document": 4,
       "request for comments": 8,
-      "runtime app crate": 126,
-      "script": 54,
+      "runtime app crate": 130,
+      "script": 55,
       "uncategorized": 155
     },
     "skipped_paths": [],
-    "total_size_bytes": 46534125,
-    "tracked_file_count": 3094,
-    "tracked_total_size_bytes": 46534125,
+    "total_size_bytes": 47515557,
+    "tracked_file_count": 3120,
+    "tracked_total_size_bytes": 47515557,
     "untracked_file_count": 0,
     "untracked_total_size_bytes": 0
   },
