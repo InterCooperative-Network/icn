@@ -290,12 +290,11 @@ STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     # SocketAddr endpoint) at the top; each arm below `await`s `client.call("governance.*")` (daemon RPC),
     # except `gov domain add-member` which builds its own `reqwest` gateway HTTP client. Only the RPC
     # methods actually registered in the daemon dispatch (`icn/crates/icn-rpc/src/server.rs` governance
-    # block: domain.list/get/create, proposal.list/get/create/open/close, vote.cast) count as partial —
-    # real work, but daemon/gateway-dependent with no binary-spawning e2e test (no icnctl test drives a
-    # gov arm). The `gov vote delegate/delegations/revoke` arms call `governance.delegation.*`, which is
-    # NOT registered on the daemon (a repo-wide search finds it only in these CLI calls), so against a
-    # running daemon they return method-not-found, not real governance work — left `unknown` (not in this
-    # map), pending local verification, rather than overstated as `partial`.
+    # block: domain.list/get/create, proposal.list/get/create/open/close, vote.cast,
+    # delegation.create/list/revoke) count as partial — real work, but daemon/gateway-dependent with no
+    # binary-spawning e2e test (no icnctl test drives a gov arm). The `gov vote delegate/delegations/revoke`
+    # arms call `governance.delegation.{create,list,revoke}`, which are now registered on the daemon
+    # (issue #2113) and gated per-caller in the handler (see those three entries below).
     "gov domain create": (STATUS_PARTIAL, "daemon RPC `client.call(\"governance.domain.create\")` via `create_authenticated_rpc_client` in `handle_gov_command` (`icn/bins/icnctl/src/main.rs` DomainCommands::Create); requires a running daemon, not integration-tested"),
     "gov domain show": (STATUS_PARTIAL, "daemon RPC `client.call(\"governance.domain.get\")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` DomainCommands::Show); requires a running daemon, not integration-tested"),
     "gov domain list": (STATUS_PARTIAL, "daemon RPC `client.call(\"governance.domain.list\")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` DomainCommands::List); requires a running daemon, not integration-tested"),
@@ -306,9 +305,13 @@ STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     "gov proposal show": (STATUS_PARTIAL, "daemon RPC `client.call(\"governance.proposal.get\")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Show); requires a running daemon, not integration-tested"),
     "gov proposal close": (STATUS_PARTIAL, "daemon RPC `client.call(\"governance.proposal.close\")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Close); requires a running daemon, not integration-tested"),
     "gov vote cast": (STATUS_PARTIAL, "daemon RPC `client.call(\"governance.vote.cast\")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Cast); requires a running daemon, not integration-tested"),
-    # NOTE: `gov vote delegate/delegations/revoke` are intentionally NOT classified here — they call
-    # `governance.delegation.{create,list,revoke}`, which is unregistered on the daemon (see comment
-    # above), so they fall back to `unknown / needs local verification` rather than `partial`.
+    # partial (issue #2113) — the three `gov vote` delegation arms now reach a registered, per-caller-gated
+    # daemon RPC path. Daemon-dependent, no binary-spawning e2e test (no icnctl test drives a gov arm) ->
+    # partial, not live. The auth gate lives in the handler, unit-tested in
+    # `icn/crates/icn-rpc/src/handler/governance.rs` (delegation_auth_tests).
+    "gov vote delegate": (STATUS_PARTIAL, "daemon RPC `client.call(\"governance.delegation.create\")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Delegate); method registered in `icn/crates/icn-rpc/src/server.rs` -> `handle_governance_delegation_create` (`icn/crates/icn-rpc/src/handler/governance.rs`), which binds the delegator to `ctx.caller_did` (a caller can only delegate their own vote); requires a running daemon, not integration-tested"),
+    "gov vote delegations": (STATUS_PARTIAL, "daemon RPC `client.call(\"governance.delegation.list\")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Delegations); method registered in `icn/crates/icn-rpc/src/server.rs` -> `handle_governance_delegation_list` (`icn/crates/icn-rpc/src/handler/governance.rs`), which returns only the caller's own given/received delegations; requires a running daemon, not integration-tested"),
+    "gov vote revoke": (STATUS_PARTIAL, "daemon RPC `client.call(\"governance.delegation.revoke\")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Revoke); method registered in `icn/crates/icn-rpc/src/server.rs` -> `handle_governance_delegation_revoke` (`icn/crates/icn-rpc/src/handler/governance.rs`), which revokes only when `delegation.delegator == ctx.caller_did`; requires a running daemon, not integration-tested"),
     # planned (pass 10, issue #2113) — `gov` arms that `bail!` with an explicit "not yet supported via
     # RPC" message before any client call (the daemon-side RPC method is unwired); the RPC client built
     # at the top of handle_gov_command is never awaited on these arms.
@@ -364,10 +367,6 @@ STATUS_BY_COMMAND: dict[str, tuple[str, str]] = {
     # file otherwise (no daemon is spawned; `--no-start` only changes printed guidance). Its end state is
     # environment-dependent (pure-local vs live gateway domain creation), so no single static L1 status is
     # honest — `unknown / needs local verification` pending a runtime check.
-    # unknown (pass 10, issue #2113) — `gov vote delegate/delegations/revoke` remain unknown: re-confirmed
-    # this pass that `governance.delegation.{create,list,revoke}` is still NOT registered in the daemon
-    # dispatch `icn/crates/icn-rpc/src/server.rs` (governance arms there are domain.*/proposal.*/vote.cast
-    # only) and a repo-wide search finds `governance.delegation` only in those three icnctl client calls.
     # planned — handler is an explicit placeholder / prints "not yet implemented".
     "charter deploy": (STATUS_PLANNED, "handler validates the CCL doc locally, then prints \"Not yet implemented — charter deployment requires gateway integration\" (`icn/bins/icnctl/src/main.rs` CharterCommands::Deploy)"),
     "steward check-vui": (STATUS_PLANNED, "placeholder; validates input then prints \"VUI registry check requires running steward daemon\" (`icn/bins/icnctl/src/main.rs` StewardCommands::CheckVui)"),

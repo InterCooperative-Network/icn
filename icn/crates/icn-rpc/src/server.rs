@@ -753,6 +753,32 @@ async fn dispatch_request(
             .await
         }
 
+        // Vote delegation (issue #2113). Each handler gates on ctx.caller_did:
+        // create binds the delegator to the caller, list returns only the caller's
+        // own delegations, revoke only succeeds for the delegation's delegator.
+        "governance.delegation.create" => {
+            handler::governance::handle_governance_delegation_create(
+                req.id,
+                &req.params,
+                state,
+                ctx.as_ref(),
+            )
+            .await
+        }
+        "governance.delegation.list" => {
+            handler::governance::handle_governance_delegation_list(req.id, state, ctx.as_ref())
+                .await
+        }
+        "governance.delegation.revoke" => {
+            handler::governance::handle_governance_delegation_revoke(
+                req.id,
+                &req.params,
+                state,
+                ctx.as_ref(),
+            )
+            .await
+        }
+
         // Compute methods (coop-scoped, ctx passed for future isolation)
         "compute.submit" => {
             handler::compute::handle_compute_submit(req.id, &req.params, state, ctx.as_ref()).await

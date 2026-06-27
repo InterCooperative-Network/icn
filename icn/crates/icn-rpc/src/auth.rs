@@ -1060,6 +1060,13 @@ pub fn required_scopes_for_method(method: &str) -> Option<&'static [&'static str
         | "governance.vote.cast" => {
             Some(&[scopes::GOVERNANCE_PROPOSAL_WRITE, scopes::GOVERNANCE_WRITE])
         }
+        // Vote delegation (#2113). Listing a caller's own delegations is a read;
+        // creating/revoking are governance writes gated like vote.cast. The handler
+        // additionally binds every write to ctx.caller_did (delegator == caller).
+        "governance.delegation.list" => Some(&[scopes::GOVERNANCE_READ]),
+        "governance.delegation.create" | "governance.delegation.revoke" => {
+            Some(&[scopes::GOVERNANCE_PROPOSAL_WRITE, scopes::GOVERNANCE_WRITE])
+        }
 
         // Compute methods
         "compute.status" => Some(&[scopes::COMPUTE_READ]),
@@ -1296,6 +1303,35 @@ mod tests {
             required_scopes_for_method("compute.submit"),
             Some(&[scopes::COMPUTE_WRITE][..])
         );
+    }
+
+    #[test]
+    fn delegation_methods_are_scope_gated() {
+        // #2113: the delegation write-path is gated like other governance writes,
+        // listing is a read. Defense-in-depth on top of the handler's per-caller
+        // delegator binding — a read-only token must not reach create/revoke.
+        assert_eq!(
+            required_scopes_for_method("governance.delegation.list"),
+            Some(&[scopes::GOVERNANCE_READ][..])
+        );
+        for m in [
+            "governance.delegation.create",
+            "governance.delegation.revoke",
+        ] {
+            assert_eq!(
+                required_scopes_for_method(m),
+                Some(&[scopes::GOVERNANCE_PROPOSAL_WRITE, scopes::GOVERNANCE_WRITE][..]),
+                "{m} must require a governance write scope"
+            );
+            assert!(
+                !method_authorized(m, &claims_with(&[scopes::GOVERNANCE_READ])),
+                "{m} must reject a read-only token"
+            );
+            assert!(
+                method_authorized(m, &claims_with(&[scopes::GOVERNANCE_WRITE])),
+                "{m} must accept the broad governance write token"
+            );
+        }
     }
 
     #[test]

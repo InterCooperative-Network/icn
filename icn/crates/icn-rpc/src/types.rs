@@ -247,6 +247,28 @@ pub struct CloseProposalRequest {
     pub proposal_id: String,
 }
 
+/// Request to create a vote delegation.
+///
+/// The delegator is ALWAYS the authenticated caller (`ctx.caller_did`); it is
+/// never read from these params, so a caller cannot create a delegation on behalf
+/// of another DID. Any stray `delegator` field in the JSON is ignored.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CreateDelegationRequest {
+    /// DID that will vote on the caller's behalf.
+    pub delegate: String,
+    /// Scope string: "blanket", "domain:<domain_id>", or "proposal:<proposal_id>".
+    pub scope: String,
+    /// Optional expiry as a Unix timestamp (seconds). None = never expires.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expires_at: Option<u64>,
+}
+
+/// Request to revoke a vote delegation.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RevokeDelegationRequest {
+    pub delegation_id: String,
+}
+
 // Compute task types
 
 /// Code type for compute tasks
