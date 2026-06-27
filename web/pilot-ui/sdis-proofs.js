@@ -402,16 +402,33 @@ function displayVerificationResult(result, proof) {
     const container = document.getElementById('verificationResult');
     container.style.display = 'block';
     container.className = result.valid ? 'success' : 'failure';
-    
-    container.innerHTML = `
-        <h3>${result.valid ? '✅ Valid Proof' : '❌ Invalid Proof'}</h3>
-        <div class="verification-details">
-            <p><strong>Issuer:</strong> ${proof.issuer_did}</p>
-            <p><strong>Type:</strong> ${formatProofType(proof.type)}</p>
-            <p><strong>Created:</strong> ${new Date(proof.created_at).toLocaleString()}</p>
-            ${result.message ? `<p><strong>Message:</strong> ${result.message}</p>` : ''}
-        </div>
-    `;
+
+    // Build with DOM APIs rather than innerHTML: proof.issuer_did / proof.type /
+    // result.message are attacker-influenced (an unverified pasted proof), so they
+    // must render as text, not markup (CodeQL js/xss-through-dom, issue #2099).
+    container.replaceChildren();
+
+    const h3 = document.createElement('h3');
+    h3.textContent = result.valid ? '✅ Valid Proof' : '❌ Invalid Proof';
+
+    const details = document.createElement('div');
+    details.className = 'verification-details';
+
+    const addRow = (label, value) => {
+        const p = document.createElement('p');
+        const strong = document.createElement('strong');
+        strong.textContent = label;
+        p.append(strong, document.createTextNode(' ' + value));
+        details.append(p);
+    };
+    addRow('Issuer:', proof.issuer_did);
+    addRow('Type:', formatProofType(proof.type));
+    addRow('Created:', new Date(proof.created_at).toLocaleString());
+    if (result.message) {
+        addRow('Message:', result.message);
+    }
+
+    container.append(h3, details);
 }
 
 function scanQrCode() {

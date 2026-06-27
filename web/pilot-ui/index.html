@@ -14,8 +14,14 @@
     <link rel="stylesheet" href="style.css?v=2026050802">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="/icons/icon-192x192.png">
-    <!-- QR Code library for passport (DID) login -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <!-- QR Code library for passport (DID) login.
+         Subresource Integrity pins the exact qrcodejs 1.0.0 bytes so a compromised
+         or substituted CDN response cannot execute (CodeQL js/functionality-from-
+         untrusted-source, issue #2099). sha384 computed from the cdnjs file. -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"
+            integrity="sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU"
+            crossorigin="anonymous"
+            referrerpolicy="no-referrer"></script>
 </head>
 <body>
     <!-- Skip Navigation Link -->

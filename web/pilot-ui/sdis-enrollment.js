@@ -156,11 +156,20 @@ const SDISEnrollment = {
         // Read and preview
         const reader = new FileReader();
         reader.onload = (e) => {
-            this.elements.documentPreview.innerHTML = `
-                <img src="${e.target.result}" alt="Document preview" />
-                <p class="text-sm text-gray-600 mt-2">${file.name}</p>
-            `;
-            this.elements.documentPreview.classList.remove('hidden');
+            // Build the preview with DOM APIs rather than innerHTML: a file named
+            // with HTML (e.g. "<img onerror=…>.png") must render as text, not markup
+            // (CodeQL js/xss-through-dom, issue #2099). The data: URL from
+            // readAsDataURL is safe as an img src; file.name goes via textContent.
+            const preview = this.elements.documentPreview;
+            preview.replaceChildren();
+            const img = document.createElement('img');
+            img.src = e.target.result;
+            img.alt = 'Document preview';
+            const caption = document.createElement('p');
+            caption.className = 'text-sm text-gray-600 mt-2';
+            caption.textContent = file.name;
+            preview.append(img, caption);
+            preview.classList.remove('hidden');
 
             // Store in proof data
             this.state.proofData.document = e.target.result;
