@@ -240,17 +240,26 @@ function displayGeneratedProof() {
         new Date(generatedProof.expires_at).toLocaleString() : 'Never';
     document.getElementById('proofRecipient').textContent = generatedProof.recipient_did || 'Public';
     
-    // Display claims
+    // Display claims. Claim keys/values come from untrusted form input
+    // (extractClaimsFromForm), so build with DOM APIs — textContent renders them
+    // as text, not markup (CodeQL js/xss-through-dom class, issue #2099).
     const claimsContainer = document.getElementById('proofClaims');
-    claimsContainer.innerHTML = '<h3>Proven Claims</h3>';
-    
+    claimsContainer.replaceChildren();
+    const claimsHeading = document.createElement('h3');
+    claimsHeading.textContent = 'Proven Claims';
+    claimsContainer.append(claimsHeading);
+
     Object.entries(generatedProof.claims || {}).forEach(([key, value]) => {
-        claimsContainer.innerHTML += `
-            <div class="claim-item">
-                <span class="claim-label">${key.replace(/_/g, ' ')}</span>
-                <span class="claim-value">${value}</span>
-            </div>
-        `;
+        const item = document.createElement('div');
+        item.className = 'claim-item';
+        const label = document.createElement('span');
+        label.className = 'claim-label';
+        label.textContent = key.replace(/_/g, ' ');
+        const val = document.createElement('span');
+        val.className = 'claim-value';
+        val.textContent = value;
+        item.append(label, val);
+        claimsContainer.append(item);
     });
     
     // Display signature
@@ -327,30 +336,45 @@ async function loadProofHistory() {
 
 function displayProofHistory(proofs) {
     const container = document.getElementById('proofHistoryList');
-    
+    container.replaceChildren();
+
     if (proofs.length === 0) {
-        container.innerHTML = '<p class="empty-state">No proofs generated yet</p>';
+        const empty = document.createElement('p');
+        empty.className = 'empty-state';
+        empty.textContent = 'No proofs generated yet';
+        container.append(empty);
         return;
     }
 
-    container.innerHTML = proofs.map(proof => {
+    // Build with DOM APIs and bind the click via addEventListener (NOT an inline
+    // onclick="…'${proof.id}'…" attribute): a crafted proof.id containing a quote
+    // could otherwise break out of the attribute and inject script (CodeQL
+    // js/xss-through-dom class, issue #2099). proof fields go via textContent.
+    proofs.forEach(proof => {
         const isExpired = proof.expires_at && new Date(proof.expires_at) < new Date();
         const status = isExpired ? 'expired' : 'valid';
-        
-        return `
-            <div class="history-item" onclick="viewHistoryProof('${proof.id}')">
-                <div class="history-info">
-                    <div class="history-type">${formatProofType(proof.type)}</div>
-                    <div class="history-date">
-                        ${new Date(proof.created_at).toLocaleDateString()}
-                    </div>
-                </div>
-                <span class="history-status ${status}">
-                    ${status.toUpperCase()}
-                </span>
-            </div>
-        `;
-    }).join('');
+
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.addEventListener('click', () => viewHistoryProof(proof.id));
+
+        const info = document.createElement('div');
+        info.className = 'history-info';
+        const type = document.createElement('div');
+        type.className = 'history-type';
+        type.textContent = formatProofType(proof.type);
+        const date = document.createElement('div');
+        date.className = 'history-date';
+        date.textContent = new Date(proof.created_at).toLocaleDateString();
+        info.append(type, date);
+
+        const statusEl = document.createElement('span');
+        statusEl.className = 'history-status ' + status;
+        statusEl.textContent = status.toUpperCase();
+
+        item.append(info, statusEl);
+        container.append(item);
+    });
 }
 
 function viewHistoryProof(proofId) {
