@@ -28,7 +28,7 @@ pub struct RpcDeps {
     pub contract_runtime: Arc<RwLock<ContractRuntime>>,
     pub gossip_handle: Arc<RwLock<GossipActor>>,
     pub governance_handle: GovernanceHandle,
-    /// Cooperative membership source for auth and suspension checks.
+    /// Cooperative membership source for delegation suspension checks.
     pub coop_handle: CoopHandle,
     pub compute_handle: ComputeHandle,
     /// Trust service for trust-based operations
@@ -96,7 +96,6 @@ pub fn spawn_rpc_server(
     rpc_server.set_contract_runtime(deps.contract_runtime);
     rpc_server.set_gossip_handle(deps.gossip_handle);
     rpc_server.set_governance_handle(deps.governance_handle);
-    rpc_server.set_coop_handle(deps.coop_handle.clone());
 
     let coop_handle_for_suspension = deps.coop_handle;
     rpc_server.set_suspension_checker(Arc::new(move |did, domain_id| {
