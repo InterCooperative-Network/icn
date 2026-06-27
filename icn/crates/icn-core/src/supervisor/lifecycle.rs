@@ -504,7 +504,7 @@ async fn spawn_actors_with_identity(
         };
 
     // Store handles for gateway integration
-    gateway_handles.coop = Some(coop_handle);
+    gateway_handles.coop = Some(coop_handle.clone());
     gateway_handles.community = Some(community_services.community_handle);
     gateway_handles.trust_service = trust_service_from_registry.clone();
     gateway_handles.entity = Some(entity_services.entity_handle);
@@ -1054,6 +1054,7 @@ async fn spawn_actors_with_identity(
             contract_runtime: contract_runtime_handle.clone(),
             gossip_handle: gossip_handle.clone(),
             governance_handle,
+            coop_handle: coop_handle.clone(),
             compute_handle,
             trust_service: trust_service_from_registry.clone(),
             dispute_manager: dispute_manager_handle,

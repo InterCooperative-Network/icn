@@ -17,7 +17,7 @@ use icn_governance::{
 
 use crate::context::RpcContext;
 use crate::error_codes::{
-    AUTHENTICATION_REQUIRED, INVALID_PARAMS, NOT_FOUND, RESOURCE_NOT_AVAILABLE,
+    AUTHENTICATION_REQUIRED, INVALID_PARAMS, NOT_FOUND, PERMISSION_DENIED, RESOURCE_NOT_AVAILABLE,
 };
 use crate::server::RpcServer;
 use crate::types::{
@@ -775,8 +775,8 @@ fn parse_delegation_scope(scope: &str) -> Result<DelegationScope, String> {
         if proposal.is_empty() {
             return Err("proposal scope requires an id: 'proposal:<id>'".to_string());
         }
-        return Ok(DelegationScope::Proposal(icn_governance::ProposalId(
-            proposal.to_string(),
+        return Ok(DelegationScope::Proposal(icn_governance::ProposalId::new(
+            proposal,
         )));
     }
     Err(format!(
@@ -788,8 +788,55 @@ fn parse_delegation_scope(scope: &str) -> Result<DelegationScope, String> {
 fn delegation_scope_to_string(scope: &DelegationScope) -> String {
     match scope {
         DelegationScope::Blanket => "blanket".to_string(),
-        DelegationScope::Domain(d) => format!("domain:{}", d.0),
-        DelegationScope::Proposal(p) => format!("proposal:{}", p.0),
+        DelegationScope::Domain(d) => format!("domain:{d}"),
+        DelegationScope::Proposal(p) => format!("proposal:{p}"),
+    }
+}
+
+/// Return the domain in which `delegator` is suspended for this scope.
+///
+/// This mirrors the governance HTTP gate: domain scopes are checked directly,
+/// proposal scopes resolve their domain, and blanket scopes enumerate static-list
+/// domains the delegator belongs to. Missing checker or lookup errors preserve the
+/// existing fail-open behavior used by the HTTP path.
+async fn suspended_domain_for_scope(
+    state: &RpcServer,
+    governance_handle: &dyn icn_governance::GovernanceOps,
+    delegator: &icn_identity::Did,
+    scope: &DelegationScope,
+) -> Option<String> {
+    let checker = state.suspension_checker()?;
+
+    match scope {
+        DelegationScope::Blanket => {
+            let domains = governance_handle.list_domains().await.ok()?;
+            for domain in domains {
+                if domain.config.membership.source.contains_static(delegator) {
+                    let domain_id = domain.id.to_string();
+                    if checker(delegator.clone(), domain_id.clone()).await {
+                        return Some(domain_id);
+                    }
+                }
+            }
+            None
+        }
+        DelegationScope::Domain(domain) => {
+            let domain_id = domain.to_string();
+            checker(delegator.clone(), domain_id.clone())
+                .await
+                .then_some(domain_id)
+        }
+        DelegationScope::Proposal(proposal) => {
+            let domain_id = governance_handle
+                .get_proposal(proposal)
+                .await
+                .ok()??
+                .domain_id
+                .to_string();
+            checker(delegator.clone(), domain_id.clone())
+                .await
+                .then_some(domain_id)
+        }
     }
 }
 
@@ -857,9 +904,29 @@ pub async fn handle_governance_delegation_create(
         Err(e) => return RpcResponse::error(id, INVALID_PARAMS, e),
     };
 
+    if let Some(domain_id) =
+        suspended_domain_for_scope(state, governance_handle, &ctx.caller_did, &scope).await
+    {
+        return RpcResponse::error(
+            id,
+            PERMISSION_DENIED,
+            format!(
+                "Delegator {} is suspended in domain {domain_id}; suspended members may not create delegations",
+                ctx.caller_did
+            ),
+        );
+    }
+
     // SECURITY: delegator is the authenticated caller, never read from params.
     let mut delegation = Delegation::new(ctx.caller_did.clone(), delegate, scope);
     if let Some(expires_at) = request.expires_at {
+        if expires_at <= delegation.created_at {
+            return RpcResponse::error(
+                id,
+                INVALID_PARAMS,
+                "expires_at must be later than the delegation creation time".to_string(),
+            );
+        }
         delegation = delegation.with_expiry(expires_at);
     }
     let delegation_id = delegation.id.to_string();
@@ -1242,6 +1309,53 @@ mod delegation_auth_tests {
         let params = serde_json::json!({ "delegate": bob.to_string(), "scope": "blanket" });
         let resp = handle_governance_delegation_create(1, &params, &state, None).await;
         assert_eq!(resp.error.unwrap().code, AUTHENTICATION_REQUIRED);
+        assert!(gov.delegations.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn create_rejects_suspended_caller() {
+        let gov = RecordingGovernance::default();
+        let alice = new_did();
+        let bob = new_did();
+        let suspended_alice = alice.clone();
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let mut server = RpcServer::new(addr);
+        server.set_governance_handle(gov.clone());
+        server.set_suspension_checker(Arc::new(move |did, domain_id| {
+            let suspended_alice = suspended_alice.clone();
+            Box::pin(async move { did == suspended_alice && domain_id == "workers" })
+        }));
+        let state = Arc::new(server);
+        let ctx = RpcContext::new(alice, None, vec![]);
+        let params = serde_json::json!({
+            "delegate": bob.to_string(),
+            "scope": "domain:workers",
+        });
+
+        let resp = handle_governance_delegation_create(1, &params, &state, Some(&ctx)).await;
+
+        let err = resp.error.expect("suspended caller must be rejected");
+        assert_eq!(err.code, PERMISSION_DENIED);
+        assert!(gov.delegations.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn create_rejects_expired_timestamp_instead_of_persisting_unbounded() {
+        let gov = RecordingGovernance::default();
+        let state = test_state(gov.clone());
+        let alice = new_did();
+        let bob = new_did();
+        let ctx = RpcContext::new(alice, None, vec![]);
+        let params = serde_json::json!({
+            "delegate": bob.to_string(),
+            "scope": "blanket",
+            "expires_at": 0,
+        });
+
+        let resp = handle_governance_delegation_create(1, &params, &state, Some(&ctx)).await;
+
+        let err = resp.error.expect("expired timestamp must be rejected");
+        assert_eq!(err.code, INVALID_PARAMS);
         assert!(gov.delegations.lock().unwrap().is_empty());
     }
 

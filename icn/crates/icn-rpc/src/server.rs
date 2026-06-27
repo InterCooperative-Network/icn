@@ -63,6 +63,13 @@ use crate::types::{RpcRequest, RpcResponse};
 use icn_gossip::GossipActor;
 use std::sync::LazyLock;
 
+/// Async predicate used to deny governance actions by suspended members.
+pub type SuspensionChecker = Arc<
+    dyn Fn(Did, String) -> std::pin::Pin<Box<dyn std::future::Future<Output = bool> + Send>>
+        + Send
+        + Sync,
+>;
+
 /// Synthetic DID for rate-limiting anonymous/unauthenticated requests.
 /// All anonymous requests share this single DID bucket, applying
 /// Isolated-level limits (10 req/sec, burst 2) to the aggregate.
@@ -107,6 +114,8 @@ pub struct RpcServer {
     rate_limiter: Option<Arc<RateLimiter>>,
     /// Cooperative handle for membership validation (coop isolation)
     coop_handle: Option<CoopHandle>,
+    /// App-provided suspension lookup used by governance mutation handlers.
+    suspension_checker: Option<SuspensionChecker>,
     listen_addr: SocketAddr,
 }
 
@@ -132,6 +141,7 @@ impl RpcServer {
             auth_manager: None,
             rate_limiter: None,
             coop_handle: None,
+            suspension_checker: None,
             listen_addr,
         }
     }
@@ -161,6 +171,7 @@ impl RpcServer {
             auth_manager: Some(Arc::new(RpcAuthManager::new(jwt_secret, true))),
             rate_limiter: None,
             coop_handle: None,
+            suspension_checker: None,
             listen_addr,
         }
     }
@@ -281,6 +292,11 @@ impl RpcServer {
         self.coop_handle = Some(handle);
     }
 
+    /// Set the suspension lookup used to gate governance mutations.
+    pub fn set_suspension_checker(&mut self, checker: SuspensionChecker) {
+        self.suspension_checker = Some(checker);
+    }
+
     // =========================================================================
     // Accessor methods for handler modules
     // =========================================================================
@@ -375,6 +391,11 @@ impl RpcServer {
     /// Get coop handle (for handler modules)
     pub fn coop_handle(&self) -> Option<&CoopHandle> {
         self.coop_handle.as_ref()
+    }
+
+    /// Get the suspension lookup used by governance mutation handlers.
+    pub fn suspension_checker(&self) -> Option<&SuspensionChecker> {
+        self.suspension_checker.as_ref()
     }
 
     /// Start the RPC server

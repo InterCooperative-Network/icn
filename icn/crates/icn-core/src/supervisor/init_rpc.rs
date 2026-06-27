@@ -11,6 +11,7 @@ use tracing::{debug, info, warn};
 
 use icn_ccl::ContractRuntime;
 use icn_compute::ComputeHandle;
+use icn_coop::{CoopHandle, MemberStatus};
 use icn_gossip::GossipActor;
 use icn_kernel_api::authz::PolicyOracle;
 use icn_kernel_api::services::TrustService;
@@ -27,6 +28,8 @@ pub struct RpcDeps {
     pub contract_runtime: Arc<RwLock<ContractRuntime>>,
     pub gossip_handle: Arc<RwLock<GossipActor>>,
     pub governance_handle: GovernanceHandle,
+    /// Cooperative membership source for auth and suspension checks.
+    pub coop_handle: CoopHandle,
     pub compute_handle: ComputeHandle,
     /// Trust service for trust-based operations
     pub trust_service: Option<Arc<dyn TrustService>>,
@@ -93,6 +96,23 @@ pub fn spawn_rpc_server(
     rpc_server.set_contract_runtime(deps.contract_runtime);
     rpc_server.set_gossip_handle(deps.gossip_handle);
     rpc_server.set_governance_handle(deps.governance_handle);
+    rpc_server.set_coop_handle(deps.coop_handle.clone());
+
+    let coop_handle_for_suspension = deps.coop_handle;
+    rpc_server.set_suspension_checker(Arc::new(move |did, domain_id| {
+        let handle = coop_handle_for_suspension.clone();
+        Box::pin(async move {
+            handle
+                .list_members(domain_id)
+                .await
+                .map(|members| {
+                    members
+                        .iter()
+                        .any(|member| member.did == did && member.status == MemberStatus::Suspended)
+                })
+                .unwrap_or(false)
+        })
+    }));
 
     // Clone compute handle for gateway before giving to RPC
     let compute_handle_for_gateway = deps.compute_handle.clone();
