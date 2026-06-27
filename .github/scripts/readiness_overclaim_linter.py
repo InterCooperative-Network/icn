@@ -233,8 +233,13 @@ NONCLAIM_LINE_RE = re.compile(
     # _describes_a_claim, NOT here — a line-level skip would mask a separate
     # affirmative overclaim in a later clause of the same line.)
     # A line that is itself enumerating nonclaims (e.g. a PR-checklist item
-    # "Includes nonclaims for ... live federation").
-    r"\bnonclaims?\b|"
+    # "Includes nonclaims for ... live federation"). Scoped to the "nonclaims for"
+    # phrasing (tolerating markdown bold, "**nonclaims** for") — a BARE mention must
+    # not suppress a separate overclaim in the same colon/comma-joined segment, since
+    # _framing_segment does not split on ":" or "," (e.g. "Nonclaims no longer apply:
+    # ICN is production-ready." and "This page lists nonclaims, but ICN is generally
+    # available." must still flag).
+    r"\bnonclaims?\**\s+for\b|"
     # Narrow, phrase-specific "without ..." exemption — NOT a blanket "without"
     # negation (that would mask "production-ready without caveats"): the federation
     # phrase is explicitly being avoided (e.g. "without requiring a live federation

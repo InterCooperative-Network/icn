@@ -249,8 +249,27 @@ class TestProjectIndexFP(unittest.TestCase):
         self.assertEqual(linter.scan_lines("x.md", [line]), [])
 
     def test_checklist_nonclaims_item_suppressed(self):
-        line = "- [ ] Includes nonclaims for production readiness, formal pilot readiness, live federation."
-        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+        # Both the plain and markdown-bold ("**nonclaims** for") checklist phrasings
+        # are exempt — the bold variant is the real project-index line.
+        for line in [
+            "- [ ] Includes nonclaims for production readiness, formal pilot readiness, live federation.",
+            "- [ ] Includes **nonclaims** for production readiness, live federation, Phase 2 completion.",
+        ]:
+            self.assertEqual(linter.scan_lines("x.md", [line]), [], msg=line)
+
+    def test_bare_nonclaims_mention_does_not_exempt_separate_claim(self):
+        # Regression for Codex review (#2230): the nonclaims exemption is scoped to
+        # the "nonclaims for ..." checklist phrasing. A bare mention must NOT suppress
+        # a separate overclaim in the same colon/comma-joined segment (_framing_segment
+        # does not split on ":" or ",").
+        cases = [
+            ("Nonclaims no longer apply: ICN is production-ready.", "production-ready"),
+            ("This page lists nonclaims, but ICN is generally available.", "general availability"),
+        ]
+        for line, rule in cases:
+            v = linter.scan_lines("x.md", [line])
+            self.assertEqual(len(v), 1, msg=line)
+            self.assertEqual(v[0].rule, rule, msg=line)
 
     def test_claim_requires_meta_statement_suppressed(self):
         line = "A live federation claim requires a governed inter-institutional relationship and evidence."
