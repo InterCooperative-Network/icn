@@ -44,24 +44,24 @@ from typing import List
 # docs/pilots (organizer-/partner-facing, claim-sensitive; measured low-noise —
 # 10 files, 1 bounded ALLOWLIST exception).
 #
-# NOT yet added. The nonclaim-context precision below (red-line/nonclaim section
-# headings, explicit "does not claim ..." lines, FAQ questions, "nothing/none"
-# disclaimers) was added 2026-06-26 and cut the measured noise substantially, but
-# these roots are still not clean enough to add without warnings:
-#   docs/reference/project-index : 18 -> 6 violations  (still deferred)
-#   docs/demo                    : 6  -> 4 violations
-#   docs/strategy                : 5  -> 4 violations
-# The residual hits are a different FP class (caveat-prefixed claims like
-# "Unsafe ...: <phrase>", quoted avoid-lists like `"production-ready"`, risk-column
-# table cells naming an overclaim, and checklist items describing nonclaims) that
-# narrow phrase rules can't suppress without risking real-claim masking. Adding a
-# root is a future ratchet step once its residual is bounded — see
-# docs/ci/GATE_RATCHET_PLAN.md.
+# docs/reference/project-index (the claim-discipline maps themselves) was added
+# 2026-06-26 once its residual was driven to zero: the nonclaim-context precision
+# below (section headings, "does not claim ..." lines, FAQ questions, nothing/none
+# disclaimers) handled most hits, and the project-index-specific FP classes
+# (caveat-prefixed "Unsafe ...: <phrase>", quoted avoid-lists `"production-ready"`,
+# risk-register cells "live federation overclaim", "claim requires ..."
+# meta-statements, checklist "nonclaims" items, narrow "without requiring a live
+# federation ...") were closed by targeted rules below — 18 -> 0.
+#
+# NOT yet added (measured after this precision pass, still > 0): docs/demo (4),
+# docs/strategy (4). Their residuals need their own bounded rules/allowlists first
+# — a future ratchet step (docs/ci/GATE_RATCHET_PLAN.md).
 # ---------------------------------------------------------------------------
 SCAN_DIRS = [
     "docs/deployment",
     "docs/operations/deployment",
     "docs/pilots",
+    "docs/reference/project-index",  # added 2026-06-26; generated/ pruned via EXCLUDE_DIRS
 ]
 
 # Directory basenames pruned from every scan root: generated artifacts (they
@@ -172,6 +172,26 @@ def _clause_around(line, start, end):
     return line[lo:hi]
 
 
+# Segment delimiters for nonclaim FRAMING — same as the clause delimiters but
+# WITHOUT ":" so a "framing:" prefix ("Must not claim: ...", "Unsafe ...:") stays
+# attached to the list/claim it introduces. ";"/"." still split, so framing in an
+# earlier sentence/clause cannot reach a separate overclaim after them.
+_NONCLAIM_DELIMS = set(".;|()") | {"—"}
+
+
+def _framing_segment(line, start, end):
+    """Return the framing segment (delimited by _NONCLAIM_DELIMS) containing the
+    [start, end) match — used to scope NONCLAIM_LINE_RE so it cannot mask a
+    separate overclaim in a later clause of the same line."""
+    lo = start
+    while lo > 0 and line[lo - 1] not in _NONCLAIM_DELIMS:
+        lo -= 1
+    hi = end
+    while hi < len(line) and line[hi] not in _NONCLAIM_DELIMS:
+        hi += 1
+    return line[lo:hi]
+
+
 # --- Nonclaim CONTEXT precision (line-local + nearest-heading; no parsing) ----
 # A markdown heading whose text matches this starts a block that is, by
 # construction, a list of things ICN does NOT claim. Every line until the next
@@ -188,24 +208,43 @@ NONCLAIM_SECTION_RE = re.compile(
     r")\b"
 )
 
-# Explicit line-level nonclaim FRAMING: the whole line tells the reader NOT to
-# claim something, so an overclaim phrase inside it is being forbidden, not
-# asserted. Catches enumerations the clause-local negation guard splits apart,
-# e.g. "Must not claim: ...; that any of this is production or live federation."
+# Explicit nonclaim FRAMING: the framing tells the reader NOT to claim something,
+# so an overclaim phrase in the same framed segment is being forbidden, not
+# asserted (e.g. "Must not claim: ... production or live federation.";
+# "Unsafe without more evidence: ICN is production-ready.").
 #
-# Because a match exempts the WHOLE line, this is kept to unambiguous nonclaim
-# *objects* ("claim" / "formal pilot" / "organizer-ready") only. It deliberately
-# does NOT include direct readiness negations like "not production-ready" /
-# "no live federation": those are handled precisely, clause-by-clause, by
-# NEGATION_RE — putting them here would let a disclaimer in one clause silently
-# mask a separate affirmative overclaim in another clause on the same line, e.g.
-# "This is not production-ready; ICN is generally available." (see the regression
-# test test_disclaimer_does_not_mask_separate_overclaim).
+# This is applied to the matched phrase's SEGMENT (delimited by ./;/|/()/em-dash —
+# but NOT ":" or ",", so a "framing:" prefix stays attached to the list it
+# introduces), NOT the whole line — a whole-line skip would let framing in one
+# clause silently mask a separate affirmative overclaim in a LATER clause, e.g.
+# "Unsafe ...: production-ready; ICN is generally available." must still flag the
+# second clause (see test_nonclaim_framing_does_not_mask_later_overclaim). Direct
+# readiness negations ("not production-ready") stay out of here — NEGATION_RE
+# handles those clause-by-clause.
 NONCLAIM_LINE_RE = re.compile(
     r"(?i)("
     r"do(?:es)? not claim|must not (?:be )?claim(?:ed)?|cannot claim|never claim|"
     r"must not be (?:presented|shown)|should not be (?:claimed|presented|shown)|"
-    r"not (?:a )?formal pilot|no formal pilot|not organi[sz]er-ready"
+    r"not (?:a )?formal pilot|no formal pilot|not organi[sz]er-ready|"
+    # Caveat prefixes that PRESENT the phrase as a bad example / unsafe claim
+    # (e.g. "Unsafe without more evidence: ICN is production-ready ...").
+    r"unsafe (?:without[^:]*evidence|claim|to (?:claim|say))|do not say|don't say|avoid saying|"
+    # (NB: "<phrase> claim requires ..." meta-statements are handled per-match by
+    # _describes_a_claim, NOT here — a line-level skip would mask a separate
+    # affirmative overclaim in a later clause of the same line.)
+    # A line that is itself enumerating nonclaims (e.g. a PR-checklist item
+    # "Includes nonclaims for ... live federation"). Scoped to the "nonclaims for"
+    # phrasing (tolerating markdown bold, "**nonclaims** for") — a BARE mention must
+    # not suppress a separate overclaim in the same colon/comma-joined segment, since
+    # _framing_segment does not split on ":" or "," (e.g. "Nonclaims no longer apply:
+    # ICN is production-ready." and "This page lists nonclaims, but ICN is generally
+    # available." must still flag).
+    r"\bnonclaims?\**\s+for\b|"
+    # Narrow, phrase-specific "without ..." exemption — NOT a blanket "without"
+    # negation (that would mask "production-ready without caveats"): the federation
+    # phrase is explicitly being avoided (e.g. "without requiring a live federation
+    # step", "without claiming live federation").
+    r"without (?:requiring|claiming|needing)\b[^.\n]{0,40}\blive federation"
     r")"
 )
 
@@ -221,6 +260,69 @@ def _is_interrogative(line):
     return line.strip().strip(_MD_TRIM).strip().endswith("?")
 
 
+_QUOTE_CHARS = "\"'`"
+
+
+def _phrase_is_quoted(line, start, end):
+    """True if the matched phrase is wrapped in a matching quote/backtick pair
+    (e.g. `"production-ready"`). This is necessary but NOT sufficient to exempt the
+    phrase — the caller additionally requires the line to sit inside an explicit
+    avoid/forbidden list block (see `in_avoid_list`). Quoting alone never exempts a
+    claim: a scare-quoted assertion like `ICN is "production-ready".`, or a quoted
+    PAIR with no avoid framing like `"live federation" and "production-ready" are
+    now true.`, is still a claim and must warn."""
+    before = line[start - 1] if start > 0 else ""
+    after = line[end] if end < len(line) else ""
+    return before in _QUOTE_CHARS and after == before
+
+
+# A line that INTRODUCES a list of things ICN must not claim — e.g.
+# "**Avoid** (these claim past the evidence):" or "Claims to avoid:". Such a
+# lead-in puts the following bullet block into "avoid-list" context, where quoted
+# red-line phrases are being forbidden, not asserted. Requires explicit
+# avoid/forbidden/nonclaim framing AND a trailing ":" (a list introducer), so a
+# benign sentence ending in ":" cannot open the exemption.
+_AVOID_LEADIN_FRAMING = re.compile(
+    r"(?i)\b("
+    r"avoid|forbidden|red[\s-]?lines?|nonclaims?|non-?claims?|claims? to avoid|"
+    r"claim past the evidence|do(?:es)? not claim|must not (?:claim|be|say|use)|"
+    r"do not (?:claim|say|use)|don't (?:claim|say|use)|never (?:claim|say)"
+    r")\b"
+)
+
+
+def _is_avoid_leadin(line):
+    """True if the line introduces an avoid/forbidden list (carries avoid framing
+    AND ends with ':' after trailing markdown emphasis is stripped)."""
+    core = line.rstrip().rstrip(" *_`")
+    return core.endswith(":") and bool(_AVOID_LEADIN_FRAMING.search(line))
+
+
+_LIST_ITEM_RE = re.compile(r"^\s*([-*+]|\d+[.)])\s+")
+
+
+def _is_list_item(line):
+    """True if the line is a markdown bullet / numbered list item."""
+    return bool(_LIST_ITEM_RE.match(line))
+
+
+def _labels_a_risk(line, end):
+    """True if the matched phrase is immediately labelled as a risk/overclaim — a
+    risk-register cell ("live federation overclaim") names the danger, not a claim."""
+    return "overclaim" in line[end:end + 20].lower()
+
+
+_CLAIM_META_RE = re.compile(r"(?i)^\s*claims?\s+(?:require|requires|need|needs|would require)\b")
+
+
+def _describes_a_claim(line, end):
+    """True if the matched phrase is immediately followed by "claim requires/needs"
+    — a meta-statement ABOUT making the claim (e.g. "A live federation claim
+    requires evidence"), not the claim itself. Scoped to the text right after the
+    match so a separate affirmative overclaim later on the line still warns."""
+    return bool(_CLAIM_META_RE.match(line[end:end + 24]))
+
+
 def scan_lines(rel_path, lines):
     """Flag affirmative readiness claims; honour banner, nonclaim context,
     negation, and allowlist."""
@@ -229,33 +331,63 @@ def scan_lines(rel_path, lines):
 
     violations = []
     in_nonclaim_section = False
+    in_avoid_list = False
     for line_num, line in enumerate(lines, start=1):
         heading = _HEADING_RE.match(line)
         if heading:
             # Entering/leaving a nonclaim/red-line section toggles the context.
             in_nonclaim_section = bool(NONCLAIM_SECTION_RE.search(heading.group(1)))
+            in_avoid_list = False  # a heading ends any open avoid-list block
+        elif _is_avoid_leadin(line):
+            # An "Avoid: ..."-style lead-in opens an avoid-list block: the bullet
+            # lines it introduces are red-line phrases being forbidden.
+            in_avoid_list = True
+        elif line.strip() and not _is_list_item(line):
+            # A non-blank, non-bullet line ends the block (blank lines and bullets
+            # keep it open so a lead-in can be separated from its list by a blank).
+            in_avoid_list = False
 
-        # Nonclaim-context exemptions (precision): lines under a nonclaim/red-line
-        # section, explicit "do/must not claim ..." lines, and interrogative/FAQ
-        # prompts are not affirmative claims.
-        if in_nonclaim_section or _is_interrogative(line) or NONCLAIM_LINE_RE.search(line):
+        # Whole-line/context exemptions: lines under a nonclaim/red-line section and
+        # interrogative/FAQ prompts are not affirmative claims. (Nonclaim FRAMING is
+        # checked PER-MATCH below, scoped to the matched phrase's segment.)
+        if in_nonclaim_section or _is_interrogative(line):
             continue
 
+        key = rel_path + ":" + str(line_num)
+        if key in ALLOWLIST:
+            continue
+        flagged = False
         for pattern, rule in OVERCLAIM_PATTERNS:
-            m = pattern.search(line)
-            if not m:
-                continue
-            # Only the overclaim's own clause exempts it — not an unrelated
-            # negation/conditional elsewhere on the same line.
-            if NEGATION_RE.search(_clause_around(line, m.start(), m.end())):
-                continue
-            key = rel_path + ":" + str(line_num)
-            if key in ALLOWLIST:
-                continue
-            violations.append(
-                Violation(file=rel_path, line=line_num, text=line.rstrip()[:160], rule=rule)
-            )
-            break  # one violation per line is enough
+            # Iterate EVERY occurrence: a suppressed first match (e.g. a quoted
+            # example) must not hide a later real assertion of the same pattern.
+            for m in pattern.finditer(line):
+                # Per-match precision (all scoped to THIS match so a separate
+                # overclaim elsewhere on the line still warns): explicit nonclaim
+                # FRAMING in the matched phrase's segment ("Must not claim: ...",
+                # "Unsafe ...:", "nonclaims for ...", "without requiring ... live
+                # federation"); a quoted example phrase INSIDE an avoid-list block
+                # (`- "production-ready", ...` under an "Avoid:" lead-in — quoting
+                # alone is NOT enough, the avoid framing must be in scope); a
+                # risk-labelled phrase ("live federation overclaim"); or a
+                # "<phrase> claim requires ..." meta-statement.
+                if (
+                    NONCLAIM_LINE_RE.search(_framing_segment(line, m.start(), m.end()))
+                    or (in_avoid_list and _phrase_is_quoted(line, m.start(), m.end()))
+                    or _labels_a_risk(line, m.end())
+                    or _describes_a_claim(line, m.end())
+                ):
+                    continue
+                # Only the overclaim's own clause exempts it — not an unrelated
+                # negation/conditional elsewhere on the same line.
+                if NEGATION_RE.search(_clause_around(line, m.start(), m.end())):
+                    continue
+                violations.append(
+                    Violation(file=rel_path, line=line_num, text=line.rstrip()[:160], rule=rule)
+                )
+                flagged = True
+                break  # one violation per line is enough
+            if flagged:
+                break
     return violations
 
 

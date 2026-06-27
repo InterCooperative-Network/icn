@@ -171,6 +171,167 @@ class TestNonclaimContext(unittest.TestCase):
         self.assertEqual(linter.scan_lines("x.md", lines), [])
 
 
+class TestProjectIndexFP(unittest.TestCase):
+    """Precision for the docs/reference/project-index FP classes (so that root can be
+    scanned cleanly), while direct affirmative claims still warn."""
+
+    # --- true positives still warn ---
+    def test_tp_production_ready(self):
+        v = linter.scan_lines("x.md", ["ICN is production-ready."])
+        self.assertEqual(len(v), 1)
+
+    def test_tp_has_live_federation(self):
+        v = linter.scan_lines("x.md", ["ICN has live federation between cooperatives."])
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].rule, "live federation")
+
+    def test_tp_generally_available(self):
+        v = linter.scan_lines("x.md", ["ICN is generally available."])
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].rule, "general availability")
+
+    # --- false positives suppressed ---
+    def test_caveat_prefix_unsafe_suppressed(self):
+        line = "- Unsafe without more evidence: ICN is production-ready across arbitrary networks."
+        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+
+    def test_quoted_avoid_list_suppressed(self):
+        # A quoted red-line phrase is exempt only INSIDE an explicit avoid-list
+        # block — the "**Avoid** ...:" lead-in (separated by a blank line, as in
+        # the real proof-level-taxonomy doc) puts the bullet into avoid context.
+        lines = [
+            "**Avoid** (these claim past the evidence):",
+            "",
+            '- "production-ready", "fully federated", "live pilot", "secure by default"',
+        ]
+        self.assertEqual(linter.scan_lines("x.md", lines), [])
+
+    def test_single_scare_quoted_claim_still_warns(self):
+        # A lone scare-quoted phrase in an assertion (no avoid-list context) is
+        # still a claim — quoting alone never exempts.
+        for line in ['ICN is "production-ready".', "The status is `production-ready`."]:
+            v = linter.scan_lines("x.md", [line])
+            self.assertEqual(len(v), 1, msg=line)
+            self.assertEqual(v[0].rule, "production-ready", msg=line)
+
+    def test_quoted_pair_without_avoid_framing_still_warns(self):
+        # Regression for Codex review (#2230): two quoted phrases on a line is NOT
+        # an avoid-list. Without explicit avoid framing, a quoted affirmative
+        # assertion must warn — the old quote-count heuristic wrongly suppressed it.
+        line = 'Status: "live federation" and "production-ready" are now true.'
+        v = linter.scan_lines("x.md", [line])
+        self.assertEqual(len(v), 1)
+
+    def test_avoid_block_ends_at_heading_then_quoted_claim_warns(self):
+        # The avoid-list block is bounded: a heading closes it, so a quoted claim
+        # after the block still warns (the exemption cannot leak past its list).
+        lines = [
+            "**Avoid** (these claim past the evidence):",
+            '- "production-ready", "live pilot"',
+            "",
+            "## Status",
+            'ICN is "production-ready" now.',
+        ]
+        v = linter.scan_lines("x.md", lines)
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].line, 5)
+
+    def test_quoted_overclaim_without_leadin_warns(self):
+        # A bullet of quoted red-line phrases with NO preceding avoid lead-in is
+        # not in avoid context, so the quoted overclaim still warns.
+        line = '- "production-ready" and shipping today'
+        v = linter.scan_lines("x.md", [line])
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].rule, "production-ready")
+
+    def test_risk_cell_overclaim_label_suppressed(self):
+        line = "| Entity / federation / trust | implemented but partial | high: live federation overclaim |"
+        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+
+    def test_checklist_nonclaims_item_suppressed(self):
+        # Both the plain and markdown-bold ("**nonclaims** for") checklist phrasings
+        # are exempt — the bold variant is the real project-index line.
+        for line in [
+            "- [ ] Includes nonclaims for production readiness, formal pilot readiness, live federation.",
+            "- [ ] Includes **nonclaims** for production readiness, live federation, Phase 2 completion.",
+        ]:
+            self.assertEqual(linter.scan_lines("x.md", [line]), [], msg=line)
+
+    def test_bare_nonclaims_mention_does_not_exempt_separate_claim(self):
+        # Regression for Codex review (#2230): the nonclaims exemption is scoped to
+        # the "nonclaims for ..." checklist phrasing. A bare mention must NOT suppress
+        # a separate overclaim in the same colon/comma-joined segment (_framing_segment
+        # does not split on ":" or ",").
+        cases = [
+            ("Nonclaims no longer apply: ICN is production-ready.", "production-ready"),
+            ("This page lists nonclaims, but ICN is generally available.", "general availability"),
+        ]
+        for line, rule in cases:
+            v = linter.scan_lines("x.md", [line])
+            self.assertEqual(len(v), 1, msg=line)
+            self.assertEqual(v[0].rule, rule, msg=line)
+
+    def test_claim_requires_meta_statement_suppressed(self):
+        line = "A live federation claim requires a governed inter-institutional relationship and evidence."
+        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+
+    def test_claim_requires_does_not_mask_separate_overclaim(self):
+        # The "claim requires" exemption is per-match (scoped to the described
+        # phrase), so a separate affirmative overclaim in another clause still warns.
+        v = linter.scan_lines("x.md", ["A live federation claim requires evidence; ICN is production-ready."])
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].rule, "production-ready")
+
+    def test_without_requiring_live_federation_suppressed(self):
+        line = "The operator ladder walks drive content into proofs without requiring a live federation step."
+        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+
+    # --- a blanket "without" must NOT suppress a real claim ---
+    def test_without_blanket_does_not_mask_real_claim(self):
+        v = linter.scan_lines("x.md", ["ICN is production-ready without caveats."])
+        self.assertEqual(len(v), 1)
+
+    # --- nonclaim FRAMING is segment-scoped: it must NOT mask a separate
+    #     affirmative overclaim in a LATER clause of the same line ---
+    def test_nonclaim_framing_does_not_mask_later_overclaim(self):
+        cases = [
+            # caveat prefix exempts clause 1, but clause 2 is a separate claim
+            ("Unsafe without more evidence: ICN is production-ready; ICN is generally available.",
+             "general availability"),
+            # "nonclaims for ..." exempts clause 1, clause 2 still warns
+            ("Includes nonclaims for live federation; ICN is production-ready.",
+             "production-ready"),
+            # narrow "without ... live federation" exempts clause 1, clause 2 warns
+            ("Walks proofs without requiring a live federation step; ICN is generally available.",
+             "general availability"),
+            # period (not just ';') also splits segments: framed example then a claim
+            ("Unsafe without more evidence: live federation. ICN is generally available.",
+             "general availability"),
+        ]
+        for line, expected_rule in cases:
+            v = linter.scan_lines("x.md", [line])
+            self.assertEqual(len(v), 1, msg=line)
+            self.assertEqual(v[0].rule, expected_rule, msg=line)
+
+    def test_must_not_claim_prefix_still_exempts_its_list(self):
+        # The ":"-inclusive segment keeps the framing attached to the list it
+        # introduces, so "Must not claim: ... live federation." stays exempt.
+        line = "Must not claim: that any of this is production-ready or live federation."
+        self.assertEqual(linter.scan_lines("x.md", [line]), [])
+
+    # --- a suppressed first occurrence must NOT hide a later real assertion of
+    #     the SAME pattern (scan_lines iterates every match per pattern) ---
+    def test_suppressed_match_does_not_hide_later_same_pattern(self):
+        cases = [
+            ('"production-ready" is an avoid-list example; ICN is production-ready.', "production-ready"),
+            ("high: live federation overclaim; ICN has live federation deployed.", "live federation"),
+        ]
+        for line, expected_rule in cases:
+            v = linter.scan_lines("x.md", [line])
+            self.assertEqual(len(v), 1, msg=line)
+            self.assertEqual(v[0].rule, expected_rule, msg=line)
+
+
 class TestFixturesEndToEnd(unittest.TestCase):
     def test_bad_fixture_flagged(self):
         v = linter.scan_file("bad_unbannered.md", os.path.join(FIX, "bad_unbannered.md"))
