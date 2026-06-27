@@ -128,35 +128,44 @@ Linter covers all public-facing API surfaces.</p>
 <h4>Readiness Overclaim Check (<code>GATE_RATCHET_PHASE_READINESS</code>) — NEW (2026-05-31)</h4>
 <p>Phase: WARNING (observational entry; non-blocking).</p>
 <p>Scans active claim-sensitive guidance (<code>docs/deployment/**</code>, <code>docs/operations/deployment/**</code>, and —
-added 2026-06-26 — <code>docs/pilots/**</code>) for un-disclaimed, affirmative production / live-federation /
-governance-completion claims. A dated readiness claim is allowed when the file carries a stale/archive
+added 2026-06-26 — <code>docs/pilots/**</code> and <code>docs/reference/project-index/**</code>) for un-disclaimed,
+affirmative production / live-federation / governance-completion claims. A dated readiness claim is allowed when the file carries a stale/archive
 banner; negated/conditional lines and an explicit <code>ALLOWLIST</code> are honoured. Generated artifacts and
 <code>archive</code>/<code>dev-journal</code> subtrees are pruned (<code>EXCLUDE_DIRS</code>). Complements the Regulatory Compliance
 Linter (fintech vocabulary); does not replace it. It is a narrow phrase-level guardrail — it does NOT
 enforce the whole claim-boundary firewall (see <code>docs/reference/project-index/claim-boundaries.md</code>).</p>
-<p>Scope (by design, allowlist-based, to keep precision high): deployment/ops guidance + <code>docs/pilots</code>.
-<code>docs/pilots</code> was measured low-noise (10 files, 1 bounded <code>ALLOWLIST</code> exception). Widening is a
-deliberate ratchet step taken as each surface is cleaned.</p>
-<p>Nonclaim-context precision (added 2026-06-26): the linter now exempts lines under nonclaim/red-line
+<p>Scope (by design, allowlist-based, to keep precision high): deployment/ops guidance + <code>docs/pilots</code></p>
+<ul>
+<li><code>docs/reference/project-index</code>. Each was measured clean before being added (a root is added only
+when the linter exits 0 over it). Widening is a deliberate ratchet step taken as each surface is
+cleaned.</li>
+</ul>
+<p>Nonclaim-context precision (added 2026-06-26): the linter exempts lines under nonclaim/red-line
 section headings (<code>Nonclaims</code>, <code>Non-goals</code>, <code>Red lines</code>, <code>Claims to avoid</code>, <code>What is not …</code>,
 <code>What … must not imply</code>, <code>Forbidden collapses</code>), explicit <code>does/must not claim …</code> lines, FAQ
-question lines (<code>Is this ready for production?</code>), and <code>nothing</code>/<code>none</code> disclaimers — all
-line-local + nearest-heading, no parsing. Self-tested (10 added cases). This cut the measured noise
-on the deferred roots but did not make them clean:</p>
+question lines (<code>Is this ready for production?</code>), and <code>nothing</code>/<code>none</code> disclaimers — all line-local</p>
+<ul>
+<li>nearest-heading, no parsing. A second precision pass added the project-index-specific FP rules:
+caveat prefixes (<code>Unsafe …: &lt;phrase&gt;</code>), quoted avoid-lists (<code>&quot;production-ready&quot;</code>), risk-register
+overclaim labels (<code>live federation overclaim</code>), <code>… claim requires …</code> meta-statements, checklist
+<code>nonclaims</code> items, and a narrow <code>without requiring/claiming … live federation</code> exemption (a blanket
+<code>without</code> is deliberately NOT a negation — it would mask <code>production-ready without caveats</code>).</li>
+</ul>
+<p>Measured per root after the precision passes:</p>
 <table>
 <thead>
 <tr>
 <th>Candidate root</th>
-<th>violations before precision</th>
-<th>after precision</th>
+<th>before precision</th>
+<th>after</th>
 <th>decision</th>
 </tr>
 </thead>
 <tbody><tr>
 <td><code>docs/reference/project-index</code></td>
 <td>18</td>
-<td><strong>6</strong></td>
-<td><strong>still deferred</strong> (not added)</td>
+<td><strong>0</strong></td>
+<td><strong>added 2026-06-26</strong> (clean)</td>
 </tr>
 <tr>
 <td><code>docs/demo</code></td>
@@ -171,13 +180,9 @@ on the deferred roots but did not make them clean:</p>
 <td>deferred</td>
 </tr>
 </tbody></table>
-<p><code>docs/reference/project-index</code> was the preferred next root but stays deferred: its 6 residual hits
-are a <em>different</em> false-positive class the narrow rules cannot suppress without risking real-claim
-masking — caveat-prefixed claims (<code>Unsafe …: &lt;phrase&gt;</code>), quoted avoid-lists (<code>&quot;production-ready&quot;</code>),
-risk-column table cells that <em>name</em> an overclaim, and checklist items describing nonclaims. Closing
-those needs either narrower per-pattern rules or a few bounded <code>ALLOWLIST</code> entries per file, taken
-as a later step. This deliberately does NOT yet cover the broader SDK / website / user-manual
-fintech-vocabulary debt — tracked separately.</p>
+<p><code>docs/demo</code> (4) and <code>docs/strategy</code> (4) stay deferred — their residuals need their own bounded
+rules/allowlists before they are added, a later ratchet step. This deliberately does NOT yet cover
+the broader SDK / website / user-manual fintech-vocabulary debt — tracked separately.</p>
 <p>Remediation on failure: banner the dated doc (point to <code>docs/ci/CI_CURRENT_STATUS.md</code>), or fix the
 claim, or add an <code>ALLOWLIST</code> entry with a reason. Never weaken the patterns. Self-test:
 <code>.github/scripts/test_readiness_overclaim_linter.py</code> (run by the CI job before scanning).</p>
