@@ -1,7 +1,7 @@
 ---
 Status: descriptive
 Canonical: no
-Last Reviewed: 2026-06-26
+Last Reviewed: 2026-06-28
 ---
 
 # Organizer Rehearsal Operability Map
@@ -48,7 +48,7 @@ All status labels below come from the existing vocabulary in the [source-of-trut
 | Proof-level capability matrix | Per-capability recorded proof for the organizer-rehearsal path | `L0`–`L8`, tied to merged PRs | [`proof-level-taxonomy-capability-matrix.md`](proof-level-taxonomy-capability-matrix.md) |
 | Show-readiness map | What is honest to demonstrate vs what must not be shown as finished; red lines | claim boundaries | [`show-readiness-map.md`](show-readiness-map.md) |
 | Runtime surface map | Member-facing read models, action-card proof loops, receipt retrieval | routing layer | [`runtime-surface-map.md`](runtime-surface-map.md) |
-| Pilot-UI / member-shell fixtures | Fixture-backed rehearsal shell and demo panes | `fixture-backed` (L2 per matrix row 7) | `web/pilot-ui/fixtures/icn-organizer-demo/`, `web/member-shell/` |
+| Pilot-UI / member-shell fixtures | Fixture-backed Review Preview, standing, and Action Card demo panes | `fixture-backed` (L2 per matrix row 7) | `web/pilot-ui/fixtures/icn-organizer-demo/`, `web/member-shell/` |
 | DEV/DEMO appliance image | Single-actor loop bootable VM image | `L5` stranger-runnable local proof (matrix row 11) | [`docs/demo/`](../../demo/), `deploy/appliance/` |
 
 ## What is safe to show now
@@ -59,7 +59,7 @@ These are real and may be presented honestly to organizers, **bounded to the rec
 |---|---|---|---|
 | Decision → action → receipt proof loop (proposal/vote, action_item/complete, meeting/attend) | route `/gov/me/action-cards` (`get_my_action_cards` @ `icn/apps/governance/src/http/configure.rs:849`), completion-receipt route (`:682`); `icnctl audit verify` (`main.rs:330`), `icnctl receipts chain` (`:281`) | `L5` live single-node (matrix rows 1, 8); `L4` one-command local proof loop (matrix row 5) | "live daemon/gateway proof of the governed receipt chain on a local ephemeral node — proof of path, not deployment readiness; three of five action-card source paths." |
 | Member standing / action-card / scopes read models (the shapes) | routes `/gov/me/standing` (`:845`), `/gov/me/scopes` (`:844`), `/gov/me/work` (`:846`) — `standing`/`action-cards` are OpenAPI-documented; `scopes`/`work` are not | `L5` live for the emitted action-card paths (matrix row 8) | "declared + (for standing/action-cards) OpenAPI-documented member-facing read models; fixture-backed in the shell's demo panes." Do not assert every `/gov/me/*` route is live. |
-| Fixture-backed organizer rehearsal shell | n/a (UI fixtures, not routes/commands) | `L2` fixture-backed (matrix row 7); `web/pilot-ui/fixtures/icn-organizer-demo/` | "a bounded rehearsal artifact in demo mode — no live daemon behind it; fictional fixtures only." |
+| Fixture-backed organizer rehearsal shell | n/a (UI fixtures, not routes/commands) | `L2` fixture-backed (matrix row 7); [#2237](https://github.com/InterCooperative-Network/icn/pull/2237); `web/pilot-ui/fixtures/icn-organizer-demo/` | "bounded Review Preview / Standing / Action Card rehearsal artifacts in demo mode — disabled review choices, no decision recorded, no live daemon; fictional fixtures only." |
 | DEV/DEMO appliance image — single-actor loop in one VM | n/a (image/profile) | `L5` stranger-runnable local proof (matrix row 11) | "one local DEV/DEMO node instance proving the single-actor loop — unsigned image, fictional data, not production, not a pilot, not federation, not multi-person." |
 | The thesis + roadmap posture | n/a | per [show-readiness-map](show-readiness-map.md) | Phase 2 in progress; NYCN the *intended* first partner; never a formal pilot / live federation. |
 
@@ -68,9 +68,9 @@ These are real and may be presented honestly to organizers, **bounded to the rec
 `fixture-backed` (matrix row 7, L2) — demonstrated through committed **fictional** fixtures only; no live daemon behind them. Show these as rehearsal artifacts, never as live participant state:
 
 - The organizer rehearsal **shell** in demo mode (`web/pilot-ui/fixtures/icn-organizer-demo/`, `web/member-shell/`).
-- The shell's `?mode=demo` standing / action-card panes.
+- The shell's `?mode=demo` **Review Preview**, standing, and Action Card panes. Review Preview renders the contract wrapper and canonical-matched pending-publish rows with disabled choices; it records no decision and performs no mutation ([#2237](https://github.com/InterCooperative-Network/icn/pull/2237)).
 - The fictional NYCN fixture institution used by the appliance image and the rehearsal packet.
-- The pending-publish summary **contract example** (`urn:icn:contract:pending-publish-summary:v1`) — a read-model contract with a validating fictional example (matrix row 6, L2); no producing endpoint binds to it yet.
+- The pending-publish summary **contract example** (`urn:icn:contract:pending-publish-summary:v1`) — a read-model contract with a validating fictional example (matrix row 6, L2), now rendered by Review Preview from a mechanically matched browser fixture; no producing endpoint binds to it yet.
 
 Demo fixtures prove UI rendering and contract shape. They do **not** prove live participant state, live federation, production readiness, or formal pilot status (per the [source-of-truth map](source-of-truth-map.md), "Demo fixtures vs live state").
 
@@ -154,8 +154,8 @@ The smallest claim-safe steps that move the rehearsal from "evidence exists" tow
 1. **Identify the minimal rehearsal path** — pin the single end-to-end story (standing → action card → discharge → receipt → evidence) to the specific routes/commands above, so facilitator and steward read from one path.
 2. **Map the steward/operator commands needed** — promote the steward-only `icnctl` set above into a per-command status pass (the [#2113](https://github.com/InterCooperative-Network/icn/issues/2113) follow-up): which are `gateway-backed` and proven, which remain `unknown / needs local verification`.
 3. **Map the routes/surfaces rendered to the organizer** — confirm which `/gov/me/*` read models the shell actually renders, and bound each to its recorded proof (not its L1 declaration).
-4. **Produce a plain-language preview/review packet** — bind the pending-publish summary contract (matrix row 6) to a facilitator-readable preview, no jargon/URNs/hashes as primary labels (accessibility gate).
-5. **Produce a no-terminal facilitator path** — a fixture-backed walkthrough a facilitator can show without a terminal, satisfying the [#1746](https://github.com/InterCooperative-Network/icn/issues/1746) definition of done, with the accessibility/privacy checklist applied as a gate.
+4. **Run the human accessibility pass** — Review Preview clears automated Playwright/axe checks, but screen-reader, 200% zoom, external contrast-tool, and non-mouse/assistive-technology evidence remain owed before any organizer-ready claim.
+5. **Produce a no-terminal facilitator path** — join the fixture-backed Review Preview → Standing → Action Cards → receipt/evidence story into a walkthrough a facilitator can show without a terminal, with the accessibility/privacy checklist applied as a gate. This remains below the [#1746](https://github.com/InterCooperative-Network/icn/issues/1746) definition of done until an organizer-oriented walkthrough is actually recorded.
 
 ## Where to read deeper
 
