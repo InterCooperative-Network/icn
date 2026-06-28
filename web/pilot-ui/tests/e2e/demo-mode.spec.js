@@ -109,13 +109,14 @@ test.describe('Demo Mode (PR 2)', () => {
         await expect(nonClaims).toContainText('Not implemented in this demo');
     });
 
-    test('Demo Guide says standing and action cards are fixture-backed (not coming-next)', async ({ page }) => {
+    test('Demo Guide says review preview, standing, and action cards are fixture-backed (not coming-next)', async ({ page }) => {
         await page.goto('/?mode=demo');
         await page.waitForLoadState('networkidle');
 
         const guide = page.locator('#demo-guide');
-        // After #1771–#1774, standing + action cards are live + fixture-backed.
+        // Review preview joins the existing standing + action-card fixture slice.
         // Old "PR 3 / Not yet wired" framing must be gone.
+        await expect(guide).toContainText('Review Preview surface');
         await expect(guide).toContainText('My Standing surface');
         await expect(guide).toContainText('Action Cards surface');
         await expect(guide).toContainText('Fixture-backed today');
@@ -209,7 +210,7 @@ test.describe('Demo Mode (PR 2)', () => {
 
     test('?mode=demo hides timebank-oriented nav buttons (Dashboard/Log Hours/History/Members/Profile)', async ({ page }) => {
         // The organizing-committee demo's preferred nav is:
-        //   Demo Guide • My Standing & Action Cards • Governance • Receipts (• Federation, optional)
+        //   Demo Guide • Review Preview • My Standing & Action Cards • Governance • Receipts (• Federation, optional)
         // Timebank-oriented surfaces are hidden in demo mode (only — they
         // remain in the DOM and remain visible in non-demo mode).
         await page.goto('/?mode=demo');
@@ -221,7 +222,7 @@ test.describe('Demo Mode (PR 2)', () => {
         }
 
         // Organizing-path nav remains visible (no hidden class).
-        for (const tab of ['demo-guide', 'my-standing', 'governance', 'receipts']) {
+        for (const tab of ['demo-guide', 'review-preview', 'my-standing', 'governance', 'receipts']) {
             const btn = page.locator(`[data-tab="${tab}"]`);
             await expect(btn).not.toHaveClass(/hidden/);
         }

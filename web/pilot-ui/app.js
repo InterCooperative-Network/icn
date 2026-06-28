@@ -29,7 +29,7 @@ const DEMO_MODE = (() => {
     }
 })();
 const DEMO_MODE_MESSAGES = {
-    demo:    'Local organizer/member demo. Only Standing and Action Cards are fixture-backed today.',
+    demo:    'Local organizer/member demo. Review Preview, Standing, and Action Cards are fixture-backed today.',
     fixture: 'UI is in FIXTURE mode — committed test data only; not real participant state.',
     devnet:  'UI is in DEVNET mode — local 3-node Docker cluster; not production.',
     local:   'UI is in LOCAL mode — single-node local gateway.',
@@ -89,6 +89,8 @@ function applyDemoMode() {
             el.classList.remove('active');
             el.removeAttribute('aria-current');
         });
+        const reviewPreviewNav = document.getElementById('review-preview-nav-btn');
+        if (reviewPreviewNav) reviewPreviewNav.classList.remove('hidden');
     }
 }
 
@@ -212,6 +214,11 @@ const state = {
     // above (per-domain ledger via /gov/domains/{d}/action-items).
     memberStanding: null,
     memberActionCards: [],
+    // Fixture-only organizer review packets. These are loaded only in
+    // ?mode=demo and remain read-only; no review action is persisted.
+    organizerReviewWrapper: null,
+    organizerReviewRows: [],
+    organizerReviewSelectedIndex: 0,
 };
 
 // DOM Elements
@@ -3215,6 +3222,13 @@ elements.navBtns.forEach(btn => {
     btn.addEventListener('click', () => switchTab(btn.dataset.tab));
 });
 
+// Fixture-only organizer review preview. The tab is hidden outside
+// ?mode=demo; loading it performs same-origin static fixture reads only.
+const reviewPreviewNavBtn = document.querySelector('[data-tab="review-preview"]');
+if (reviewPreviewNavBtn) {
+    reviewPreviewNavBtn.addEventListener('click', loadOrganizerReviewPreview);
+}
+
 // PR 3 — Lazy-load /me/standing and /me/action-cards when the user
 // opens the "My Standing & Action Cards" tab for the first time per
 // session. Subsequent opens re-fetch (cheap) so the user sees current
@@ -3308,6 +3322,7 @@ document.addEventListener('click', (e) => {
     if (!target) return;
     e.preventDefault();
     switchTab(target);
+    if (target === 'review-preview') loadOrganizerReviewPreview();
 });
 
 // Enter key on login form
@@ -7382,6 +7397,303 @@ async function loadDemoFixture(name) {
         throw new Error(`Demo fixture fetch failed: ${response.status} ${response.statusText} (${url})`);
     }
     return response.json();
+}
+
+const ORGANIZER_REVIEW_KIND_LABELS = {
+    action_item: 'Action item',
+    decision: 'Decision',
+    attendance: 'Attendance',
+    obligation: 'Obligation',
+    allocation: 'Allocation',
+    settlement: 'Settlement',
+    evidence_note: 'Evidence note',
+    risk_note: 'Risk note',
+};
+
+const ORGANIZER_REVIEW_ROW_STATUS_LABELS = {
+    pending_review: 'Awaiting row review',
+    approved_for_publish: 'Approved to stage the row’s next step',
+    rejected: 'Row rejected',
+    needs_edit: 'Row needs changes',
+    needs_more_info: 'Row needs more information',
+};
+
+const ORGANIZER_REVIEW_WRAPPER_STATUS_LABELS = {
+    draft: 'Draft preview',
+    ready_for_review: 'Ready for review',
+    changes_requested: 'Changes requested for the overall preview',
+    approved_for_next_step: 'Approved for the next review step — no mutation recorded here',
+    rejected: 'Overall preview rejected',
+};
+
+const ORGANIZER_REVIEW_ACTION_LABELS = {
+    approve: 'Approve',
+    reject: 'Reject',
+    edit: 'Request changes',
+    request_info: 'Ask for information',
+    defer: 'Review later',
+};
+
+function organizerReviewLabel(map, value) {
+    if (map[value]) return map[value];
+    return String(value || 'unknown')
+        .replace(/_/g, ' ')
+        .replace(/^./, (first) => first.toUpperCase());
+}
+
+async function loadOrganizerReviewPreview() {
+    if (DEMO_MODE !== 'demo') return;
+    try {
+        const [wrapper, rows] = await Promise.all([
+            loadDemoFixture('preview-review.pending-publish-summary'),
+            loadDemoFixture('pending-publish-summary'),
+        ]);
+        state.organizerReviewWrapper = wrapper;
+        state.organizerReviewRows = Array.isArray(rows && rows.preview_rows)
+            ? rows.preview_rows
+            : [];
+        state.organizerReviewSelectedIndex = 0;
+    } catch (error) {
+        console.error('Failed to load organizer review-preview fixtures:', error);
+        state.organizerReviewWrapper = null;
+        state.organizerReviewRows = [];
+    }
+    renderOrganizerReviewPreview();
+}
+
+function appendOrganizerReviewFact(list, label, value) {
+    const dt = document.createElement('dt');
+    dt.textContent = label;
+    const dd = document.createElement('dd');
+    dd.textContent = value || 'Not provided';
+    list.append(dt, dd);
+}
+
+function renderOrganizerReviewPreview() {
+    const container = document.getElementById('organizer-review-content');
+    if (!container) return;
+    container.replaceChildren();
+
+    const wrapper = state.organizerReviewWrapper;
+    const rows = Array.isArray(state.organizerReviewRows)
+        ? state.organizerReviewRows
+        : [];
+    if (!wrapper || rows.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'empty-state';
+        empty.textContent = 'The fixture-only review preview could not be loaded. No decision was recorded.';
+        container.append(empty);
+        return;
+    }
+
+    const overview = document.createElement('section');
+    overview.className = 'organizer-review-overview';
+    overview.setAttribute('aria-labelledby', 'organizer-review-overview-heading');
+
+    const boundary = document.createElement('p');
+    boundary.className = 'organizer-review-boundary';
+    boundary.textContent = 'FIXTURE ONLY · READ-ONLY · NOTHING CHANGES HERE';
+
+    const overviewHeading = document.createElement('h3');
+    overviewHeading.id = 'organizer-review-overview-heading';
+    overviewHeading.textContent = `${rows.length} fictional items are ready for review`;
+
+    const overviewSummary = document.createElement('p');
+    overviewSummary.className = 'organizer-review-summary';
+    overviewSummary.textContent = wrapper.proposed_artifact && wrapper.proposed_artifact.summary
+        ? wrapper.proposed_artifact.summary
+        : 'Committed fictional rows presented before any documented next step.';
+
+    const overviewFacts = document.createElement('dl');
+    overviewFacts.className = 'organizer-review-overview-facts';
+    appendOrganizerReviewFact(
+        overviewFacts,
+        'Review status',
+        organizerReviewLabel(ORGANIZER_REVIEW_WRAPPER_STATUS_LABELS, wrapper.review_status)
+    );
+    appendOrganizerReviewFact(overviewFacts, 'Items', String(rows.length));
+    appendOrganizerReviewFact(
+        overviewFacts,
+        'Privacy check',
+        wrapper.privacy_review && wrapper.privacy_review.status === 'reviewed-clean'
+            ? 'Reviewed clean (fictional fixture)'
+            : organizerReviewLabel({}, wrapper.privacy_review && wrapper.privacy_review.status)
+    );
+    appendOrganizerReviewFact(
+        overviewFacts,
+        'Repository safety',
+        wrapper.repo_safety && wrapper.repo_safety.classification === 'repo-safe'
+            ? 'Safe to show (fictional fixture)'
+            : organizerReviewLabel({}, wrapper.repo_safety && wrapper.repo_safety.classification)
+    );
+
+    overview.append(boundary, overviewHeading, overviewSummary, overviewFacts);
+
+    const sourceMaterial = Array.isArray(wrapper.source_material)
+        ? wrapper.source_material
+        : [];
+    if (sourceMaterial.length > 0) {
+        const sourceHeading = document.createElement('h4');
+        sourceHeading.textContent = 'Source material (safe basenames only)';
+        const sourceList = document.createElement('ul');
+        sourceList.className = 'organizer-review-source-list';
+        sourceMaterial.forEach((source) => {
+            const item = document.createElement('li');
+            const basename = document.createElement('strong');
+            basename.textContent = source.basename || 'Fictional source fixture';
+            item.append(basename);
+            if (source.summary) {
+                const summary = document.createElement('span');
+                summary.textContent = ` — ${source.summary}`;
+                item.append(summary);
+            }
+            sourceList.append(item);
+        });
+        overview.append(sourceHeading, sourceList);
+    }
+    container.append(overview);
+
+    const layout = document.createElement('div');
+    layout.className = 'organizer-review-layout';
+
+    const listSection = document.createElement('section');
+    listSection.className = 'organizer-review-list-section';
+    listSection.setAttribute('aria-labelledby', 'organizer-review-list-heading');
+    const listHeading = document.createElement('h3');
+    listHeading.id = 'organizer-review-list-heading';
+    listHeading.textContent = 'Proposed items';
+    const list = document.createElement('ol');
+    list.className = 'organizer-review-list';
+
+    rows.forEach((row, index) => {
+        const item = document.createElement('li');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'organizer-review-row-select';
+        button.dataset.rowId = row.id || String(index);
+        button.setAttribute('aria-pressed', index === state.organizerReviewSelectedIndex ? 'true' : 'false');
+
+        const kind = document.createElement('span');
+        kind.className = 'organizer-review-row-kind';
+        kind.textContent = organizerReviewLabel(ORGANIZER_REVIEW_KIND_LABELS, row.kind);
+        const summary = document.createElement('span');
+        summary.className = 'organizer-review-row-summary';
+        summary.textContent = row.plain_summary || '(No summary provided)';
+        const status = document.createElement('span');
+        status.className = 'organizer-review-row-status';
+        status.textContent = organizerReviewLabel(ORGANIZER_REVIEW_ROW_STATUS_LABELS, row.status);
+
+        button.append(kind, summary, status);
+        button.addEventListener('click', () => {
+            state.organizerReviewSelectedIndex = index;
+            renderOrganizerReviewPreview();
+            const selected = document.querySelector('.organizer-review-row-select[aria-pressed="true"]');
+            if (selected) selected.focus();
+        });
+        item.append(button);
+        list.append(item);
+    });
+    listSection.append(listHeading, list);
+
+    const safeIndex = Math.min(
+        Math.max(state.organizerReviewSelectedIndex, 0),
+        rows.length - 1
+    );
+    const row = rows[safeIndex];
+    const detail = buildOrganizerReviewDetail(row, safeIndex, rows.length);
+
+    layout.append(listSection, detail);
+    container.append(layout);
+}
+
+function buildOrganizerReviewDetail(row, index, total) {
+    const article = document.createElement('article');
+    article.className = 'organizer-review-detail';
+    article.setAttribute('aria-labelledby', 'organizer-review-detail-heading');
+
+    const position = document.createElement('p');
+    position.className = 'organizer-review-position';
+    position.textContent = `Item ${index + 1} of ${total} · ${organizerReviewLabel(ORGANIZER_REVIEW_KIND_LABELS, row.kind)}`;
+
+    const heading = document.createElement('h3');
+    heading.id = 'organizer-review-detail-heading';
+    heading.textContent = row.plain_summary || '(No summary provided)';
+
+    const facts = document.createElement('dl');
+    facts.className = 'organizer-review-detail-facts';
+    appendOrganizerReviewFact(
+        facts,
+        'Row status',
+        organizerReviewLabel(ORGANIZER_REVIEW_ROW_STATUS_LABELS, row.status)
+    );
+    appendOrganizerReviewFact(facts, 'Governing body', row.governing_body_label);
+    appendOrganizerReviewFact(facts, 'Scope', row.target_scope_label);
+    if (row.assignee_label) {
+        appendOrganizerReviewFact(facts, 'Assignee label', row.assignee_label);
+    }
+    appendOrganizerReviewFact(facts, 'Authority', row.authority_basis);
+    appendOrganizerReviewFact(facts, 'Risk', organizerReviewLabel({}, row.risk_level));
+    if (row.source_provenance_ref) {
+        appendOrganizerReviewFact(facts, 'Source', row.source_provenance_ref.ref_label);
+    }
+    article.append(position, heading, facts);
+
+    if (row.assignee_label) {
+        const identityBoundary = document.createElement('p');
+        identityBoundary.className = 'organizer-review-identity-boundary';
+        identityBoundary.textContent = 'This is an organizer-readable label, not a DID. Identity binding is a separate private activation step.';
+        article.append(identityBoundary);
+    }
+
+    if (row.accessibility_hint) {
+        const access = document.createElement('p');
+        access.className = 'organizer-review-accessibility-hint';
+        access.textContent = `Access note: ${row.accessibility_hint}`;
+        article.append(access);
+    }
+
+    const actionsHeading = document.createElement('h4');
+    actionsHeading.textContent = 'What could the reviewer decide?';
+    const actionNote = document.createElement('p');
+    actionNote.className = 'organizer-review-action-note';
+    actionNote.textContent = 'Fixture preview only: these disabled choices do not record a decision.';
+    const actions = document.createElement('div');
+    actions.className = 'organizer-review-actions';
+    const reviewActions = Array.isArray(row.review_actions) ? row.review_actions : [];
+    reviewActions.forEach((action) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.disabled = true;
+        button.dataset.reviewAction = action;
+        button.textContent = organizerReviewLabel(ORGANIZER_REVIEW_ACTION_LABELS, action);
+        actions.append(button);
+    });
+    article.append(actionsHeading, actionNote, actions);
+
+    const mutationHeading = document.createElement('h4');
+    mutationHeading.textContent = 'Before anything changes';
+    const mutation = document.createElement('p');
+    mutation.className = 'organizer-review-mutation-preview';
+    mutation.textContent = row.mutation_preview && row.mutation_preview.summary
+        ? row.mutation_preview.summary
+        : 'No mutation preview was provided. Nothing is changed by this surface.';
+    article.append(mutationHeading, mutation);
+
+    const receipt = document.createElement('p');
+    receipt.className = 'organizer-review-receipt';
+    const expected = row.receipt_expected && row.receipt_expected.expected;
+    const category = row.receipt_expected && row.receipt_expected.category;
+    receipt.textContent = expected
+        ? `Expected evidence: ${organizerReviewLabel({}, category)}. This receipt is expected later; it has not been issued by opening this preview.`
+        : 'Expected evidence: none. Opening this preview issues no receipt.';
+    article.append(receipt);
+
+    const nonClaim = document.createElement('p');
+    nonClaim.className = 'organizer-review-nonclaim';
+    nonClaim.textContent = 'No record, ActionCard, receipt, or evidence export is created by this fixture-only review surface.';
+    article.append(nonClaim);
+
+    return article;
 }
 
 async function loadMemberStanding() {

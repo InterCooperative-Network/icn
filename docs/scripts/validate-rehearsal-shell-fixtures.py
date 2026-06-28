@@ -24,7 +24,10 @@ What it checks, given a manifest:
      JSON Schema, so the substrate contracts stay the single source of
      truth). Each `validate: "shape_only"` read_model has its declared
      `structural_keys` present at the top level.
-  5. A simple, deterministic forbidden-reference guard runs over every
+  5. A read_model with `must_match` is structurally equal to the named
+     canonical packet, preventing a browser-served fixture copy from
+     silently drifting away from its contract example.
+  6. A simple, deterministic forbidden-reference guard runs over every
      referenced packet and the manifest itself: no live cloud-sync
      hostnames, no insecure URLs, no off-allowlist https hosts, no
      JWT-looking strings, no absolute private paths, and no
@@ -307,6 +310,28 @@ def main() -> int:
                 print(f"  [ok] {name}: shape-only keys present")
         else:
             failures.append(f"{name}: unknown validate mode {mode!r}")
+
+        must_match = rm.get("must_match")
+        if must_match is not None:
+            canonical_path, match_err = resolve_repo_relative(
+                must_match, f"{name}.must_match"
+            )
+            if match_err:
+                failures.append(match_err)
+            elif not canonical_path.exists():
+                failures.append(
+                    f"{name}: canonical match packet missing: {must_match}"
+                )
+            else:
+                canonical_data = load_json(
+                    canonical_path, f"{name} canonical match packet"
+                )
+                if data != canonical_data:
+                    failures.append(
+                        f"{name}: packet differs from canonical match {must_match}"
+                    )
+                else:
+                    print(f"  [ok] {name}: matches canonical packet {must_match}")
 
         for finding in forbidden_reference_findings(
             name, data, raw_text, allowlist_hosts

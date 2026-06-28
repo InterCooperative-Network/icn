@@ -646,6 +646,9 @@
                 <button class="nav-btn hidden" data-tab="demo-guide" id="demo-guide-nav-btn" aria-controls="demo-guide">
                     <span aria-label="Demo guide and orientation">Demo Guide</span>
                 </button>
+                <button class="nav-btn hidden" data-tab="review-preview" id="review-preview-nav-btn" aria-controls="review-preview">
+                    <span aria-label="Fixture-only organizer review preview">Review Preview</span>
+                </button>
                 <button class="nav-btn active" data-tab="dashboard" data-demo-irrelevant="true" aria-current="page">
                     <span aria-label="Dashboard">Dashboard</span>
                 </button>
@@ -690,7 +693,7 @@
                             <p class="demo-guide-eyebrow">Local demo · Civic coordination substrate</p>
                             <h2 id="demo-guide-heading">ICN Organizing Committee Demo</h2>
                             <p class="demo-guide-intro">
-                                You are running ICN's pilot UI as a local organizing-committee demo. ICN is a substrate for cooperative civic coordination, not a timebank app. The <strong>§3 Guided workflow</strong> narrative walks: <strong>standing → action cards → governance → receipts → provenance/evidence</strong>. The cards below label what is fixture-backed today, what is still gateway-backed, and what is not implemented in this demo.
+                                You are running ICN's pilot UI as a local organizing-committee demo. ICN is a substrate for cooperative civic coordination, not a timebank app. The <strong>§3 Guided workflow</strong> narrative walks: <strong>review preview → standing → action cards → governance → receipts → provenance/evidence</strong>. The cards below label what is fixture-backed today, what is still gateway-backed, and what is not implemented in this demo.
                             </p>
                         </div>
 
@@ -716,10 +719,12 @@
                                 <ul class="demo-guide-list demo-guide-available">
                                     <li>No-gateway demo bootstrap <span class="demo-status demo-status--live">live</span></li>
                                     <li>Demo / local mode banner <span class="demo-status demo-status--live">live</span></li>
+                                    <li><a href="#review-preview" data-demo-target="review-preview">Review Preview surface</a> <span class="demo-status demo-status--live">live</span></li>
                                     <li><a href="#my-standing" data-demo-target="my-standing">My Standing surface</a> <span class="demo-status demo-status--live">live</span></li>
                                     <li><a href="#my-standing" data-demo-target="my-standing">Action Cards surface</a> <span class="demo-status demo-status--live">live</span></li>
                                     <li>Standing fixture <span class="demo-status demo-status--fixture">fixture</span> <span class="demo-note">committed under <code>web/pilot-ui/fixtures/icn-organizer-demo/standing.json</code></span></li>
                                     <li>Action-card fixture <span class="demo-status demo-status--fixture">fixture</span> <span class="demo-note">committed under <code>web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json</code></span></li>
+                                    <li>Review-preview fixtures <span class="demo-status demo-status--fixture">fixture</span> <span class="demo-note">committed fictional wrapper + rows; read-only and no-network</span></li>
                                     <li>Plain-language receipt summary shell <span class="demo-status demo-status--live">live</span> <span class="demo-note">render path via <code>receipts.js</code>; needs gateway data to populate</span></li>
                                 </ul>
                             </section>
@@ -730,10 +735,11 @@
                                     <span class="demo-guide-card-badge">Fixture</span>
                                 </div>
                                 <ul class="demo-guide-list demo-guide-fixture">
+                                    <li>Review preview</li>
                                     <li>Standing</li>
                                     <li>Action cards</li>
                                 </ul>
-                                <p class="demo-guide-card-note">These two surfaces render committed fictional fixtures and require no running gateway.</p>
+                                <p class="demo-guide-card-note">These three surfaces render committed fictional fixtures and require no running gateway. Review choices are disabled and record nothing.</p>
                             </section>
 
                             <section class="demo-guide-card" data-section="gateway-backed" aria-labelledby="demo-guide-gateway-heading">
@@ -1786,6 +1792,20 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
                         </div>
                     </div>
                 </div>
+            </main>
+
+            <!-- Fixture-only organizer review preview (read-only; no mutation handlers) -->
+            <main id="review-preview" class="tab-content" role="tabpanel" aria-labelledby="review-preview-nav-btn">
+                <section class="organizer-review-section" aria-labelledby="organizer-review-heading">
+                    <p class="organizer-review-eyebrow">Fixture-only rehearsal</p>
+                    <h2 id="organizer-review-heading">Review preview</h2>
+                    <p class="organizer-review-intro">
+                        Review four fictional proposed items in plain language before any later step. This surface is read-only: opening it, selecting a row, or inspecting a review choice records nothing and changes nothing.
+                    </p>
+                    <div id="organizer-review-content" class="organizer-review-content" aria-live="polite">
+                        <p class="empty-state">Loading review preview&hellip;</p>
+                    </div>
+                </section>
             </main>
 
             <!-- My Standing & Action Cards (PR 3 — answers "Who am I, what is my standing, what can I do?") -->
