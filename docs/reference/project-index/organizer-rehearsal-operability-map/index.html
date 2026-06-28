@@ -108,7 +108,7 @@ View source on GitHub →
 </tr>
 <tr>
 <td>Pilot-UI / member-shell fixtures</td>
-<td>Fixture-backed rehearsal shell and demo panes</td>
+<td>Fixture-backed Review Preview, standing, and Action Card demo panes</td>
 <td><code>fixture-backed</code> (L2 per matrix row 7)</td>
 <td><code>web/pilot-ui/fixtures/icn-organizer-demo/</code>, <code>web/member-shell/</code></td>
 </tr>
@@ -145,8 +145,8 @@ View source on GitHub →
 <tr>
 <td>Fixture-backed organizer rehearsal shell</td>
 <td>n/a (UI fixtures, not routes/commands)</td>
-<td><code>L2</code> fixture-backed (matrix row 7); <code>web/pilot-ui/fixtures/icn-organizer-demo/</code></td>
-<td>&quot;a bounded rehearsal artifact in demo mode — no live daemon behind it; fictional fixtures only.&quot;</td>
+<td><code>L2</code> fixture-backed (matrix row 7); <a href="https://github.com/InterCooperative-Network/icn/pull/2237" target="_blank" rel="noopener">#2237</a>; <code>web/pilot-ui/fixtures/icn-organizer-demo/</code></td>
+<td>&quot;bounded Review Preview / Standing / Action Card rehearsal artifacts in demo mode — disabled review choices, no decision recorded, no live daemon; fictional fixtures only.&quot;</td>
 </tr>
 <tr>
 <td>DEV/DEMO appliance image — single-actor loop in one VM</td>
@@ -165,9 +165,9 @@ View source on GitHub →
 <p><code>fixture-backed</code> (matrix row 7, L2) — demonstrated through committed <strong>fictional</strong> fixtures only; no live daemon behind them. Show these as rehearsal artifacts, never as live participant state:</p>
 <ul>
 <li>The organizer rehearsal <strong>shell</strong> in demo mode (<code>web/pilot-ui/fixtures/icn-organizer-demo/</code>, <code>web/member-shell/</code>).</li>
-<li>The shell&#39;s <code>?mode=demo</code> standing / action-card panes.</li>
+<li>The shell&#39;s <code>?mode=demo</code> <strong>Review Preview</strong>, standing, and Action Card panes. Review Preview renders the contract wrapper and canonical-matched pending-publish rows with disabled choices; it records no decision and performs no mutation (<a href="https://github.com/InterCooperative-Network/icn/pull/2237" target="_blank" rel="noopener">#2237</a>).</li>
 <li>The fictional NYCN fixture institution used by the appliance image and the rehearsal packet.</li>
-<li>The pending-publish summary <strong>contract example</strong> (<code>urn:icn:contract:pending-publish-summary:v1</code>) — a read-model contract with a validating fictional example (matrix row 6, L2); no producing endpoint binds to it yet.</li>
+<li>The pending-publish summary <strong>contract example</strong> (<code>urn:icn:contract:pending-publish-summary:v1</code>) — a read-model contract with a validating fictional example (matrix row 6, L2), now rendered by Review Preview from a mechanically matched browser fixture; no producing endpoint binds to it yet.</li>
 </ul>
 <p>Demo fixtures prove UI rendering and contract shape. They do <strong>not</strong> prove live participant state, live federation, production readiness, or formal pilot status (per the <a href="https://github.com/InterCooperative-Network/icn/blob/main/source-of-truth-map">source-of-truth map</a>, &quot;Demo fixtures vs live state&quot;).</p>
 <h2>What requires steward/operator handling</h2>
@@ -350,8 +350,8 @@ View source on GitHub →
 <li><strong>Identify the minimal rehearsal path</strong> — pin the single end-to-end story (standing → action card → discharge → receipt → evidence) to the specific routes/commands above, so facilitator and steward read from one path.</li>
 <li><strong>Map the steward/operator commands needed</strong> — promote the steward-only <code>icnctl</code> set above into a per-command status pass (the <a href="https://github.com/InterCooperative-Network/icn/issues/2113" target="_blank" rel="noopener">#2113</a> follow-up): which are <code>gateway-backed</code> and proven, which remain <code>unknown / needs local verification</code>.</li>
 <li><strong>Map the routes/surfaces rendered to the organizer</strong> — confirm which <code>/gov/me/*</code> read models the shell actually renders, and bound each to its recorded proof (not its L1 declaration).</li>
-<li><strong>Produce a plain-language preview/review packet</strong> — bind the pending-publish summary contract (matrix row 6) to a facilitator-readable preview, no jargon/URNs/hashes as primary labels (accessibility gate).</li>
-<li><strong>Produce a no-terminal facilitator path</strong> — a fixture-backed walkthrough a facilitator can show without a terminal, satisfying the <a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a> definition of done, with the accessibility/privacy checklist applied as a gate.</li>
+<li><strong>Run the human accessibility pass</strong> — Review Preview clears automated Playwright/axe checks, but screen-reader, 200% zoom, external contrast-tool, and non-mouse/assistive-technology evidence remain owed before any organizer-ready claim.</li>
+<li><strong>Produce a no-terminal facilitator path</strong> — join the fixture-backed Review Preview → Standing → Action Cards → receipt/evidence story into a walkthrough a facilitator can show without a terminal, with the accessibility/privacy checklist applied as a gate. This remains below the <a href="https://github.com/InterCooperative-Network/icn/issues/1746" target="_blank" rel="noopener">#1746</a> definition of done until an organizer-oriented walkthrough is actually recorded.</li>
 </ol>
 <h2>Where to read deeper</h2>
 <table>
