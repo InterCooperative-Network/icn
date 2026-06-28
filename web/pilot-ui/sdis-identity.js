@@ -136,27 +136,53 @@ function displayAnchors(anchors) {
         return;
     }
 
-    container.innerHTML = anchors.map(anchor => `
-        <div class="anchor-item">
-            <div class="anchor-info">
-                <div class="anchor-type">${anchor.anchor_type}</div>
-                <div class="anchor-value">${anchor.anchor_value}</div>
-            </div>
-            <div class="anchor-status ${anchor.verified ? 'verified' : 'pending'}">
-                ${anchor.verified ? 'Verified' : 'Pending'}
-            </div>
-            <div class="anchor-actions">
-                ${!anchor.verified ? `
-                    <button class="icon-btn" onclick="verifyAnchor('${anchor.id}')">
-                        ✓
-                    </button>
-                ` : ''}
-                <button class="icon-btn danger" onclick="removeAnchor('${anchor.id}')">
-                    ✕
-                </button>
-            </div>
-        </div>
-    `).join('');
+    // Build with DOM APIs rather than innerHTML: anchor_type / anchor_value / id
+    // are attacker-influenced (server-returned anchor records), so they must
+    // render as text and never enter markup or a JS string via an inline
+    // onclick (CodeQL js/xss-through-dom, issue #2099).
+    container.replaceChildren();
+
+    anchors.forEach(anchor => {
+        const item = document.createElement('div');
+        item.className = 'anchor-item';
+
+        const info = document.createElement('div');
+        info.className = 'anchor-info';
+
+        const type = document.createElement('div');
+        type.className = 'anchor-type';
+        type.textContent = anchor.anchor_type;
+
+        const value = document.createElement('div');
+        value.className = 'anchor-value';
+        value.textContent = anchor.anchor_value;
+
+        info.append(type, value);
+
+        const statusEl = document.createElement('div');
+        statusEl.className = `anchor-status ${anchor.verified ? 'verified' : 'pending'}`;
+        statusEl.textContent = anchor.verified ? 'Verified' : 'Pending';
+
+        const actions = document.createElement('div');
+        actions.className = 'anchor-actions';
+
+        if (!anchor.verified) {
+            const verifyBtn = document.createElement('button');
+            verifyBtn.className = 'icon-btn';
+            verifyBtn.textContent = '✓';
+            verifyBtn.addEventListener('click', () => verifyAnchor(anchor.id));
+            actions.append(verifyBtn);
+        }
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'icon-btn danger';
+        removeBtn.textContent = '✕';
+        removeBtn.addEventListener('click', () => removeAnchor(anchor.id));
+        actions.append(removeBtn);
+
+        item.append(info, statusEl, actions);
+        container.append(item);
+    });
 }
 
 async function loadCredentials() {
@@ -182,22 +208,49 @@ function displayCredentials(credentials) {
         return;
     }
 
-    container.innerHTML = credentials.map(cred => `
-        <div class="credential-item">
-            <div class="credential-header">
-                <div>
-                    <div class="credential-type">${cred.type}</div>
-                    <div class="credential-issuer">Issued by: ${cred.issuer}</div>
-                </div>
-                <button class="icon-btn" onclick="viewCredential('${cred.id}')">
-                    👁️
-                </button>
-            </div>
-            <ul class="credential-claims">
-                ${cred.claims.map(claim => `<li>${claim}</li>`).join('')}
-            </ul>
-        </div>
-    `).join('');
+    // Build with DOM APIs rather than innerHTML: type / issuer / id / claims are
+    // attacker-influenced (server-returned credential records), so they must
+    // render as text and never enter markup or a JS string via an inline
+    // onclick (CodeQL js/xss-through-dom, issue #2099).
+    container.replaceChildren();
+
+    credentials.forEach(cred => {
+        const item = document.createElement('div');
+        item.className = 'credential-item';
+
+        const header = document.createElement('div');
+        header.className = 'credential-header';
+
+        const headerText = document.createElement('div');
+
+        const type = document.createElement('div');
+        type.className = 'credential-type';
+        type.textContent = cred.type;
+
+        const issuer = document.createElement('div');
+        issuer.className = 'credential-issuer';
+        issuer.textContent = `Issued by: ${cred.issuer}`;
+
+        headerText.append(type, issuer);
+
+        const viewBtn = document.createElement('button');
+        viewBtn.className = 'icon-btn';
+        viewBtn.textContent = '👁️';
+        viewBtn.addEventListener('click', () => viewCredential(cred.id));
+
+        header.append(headerText, viewBtn);
+
+        const claims = document.createElement('ul');
+        claims.className = 'credential-claims';
+        cred.claims.forEach(claim => {
+            const li = document.createElement('li');
+            li.textContent = claim;
+            claims.append(li);
+        });
+
+        item.append(header, claims);
+        container.append(item);
+    });
 }
 
 async function loadActivity() {
