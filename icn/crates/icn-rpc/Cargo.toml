@@ -41,6 +41,9 @@ icn-api.workspace = true
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "time"] }
+# Test-only: implement the async GovernanceOps trait as an in-memory double for
+# the delegation-handler auth tests (#2113).
+async-trait = "0.1"
 
 [lints]
 workspace = true

@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-06-26T20:30:42+00:00
+Generated: 2026-06-27T00:54:47+00:00
 ---
 
 # `icnctl` Command Inventory (generated)
@@ -19,7 +19,7 @@ Generated: 2026-06-26T20:30:42+00:00
 
 ## Snapshot
 
-- Source commit: `791af47ea51abb0e29dbfa0643d67b5507689a11`
+- Source commit: `d9d25fd30848fbfad4e52ec08b7b686e1e5bc5cb`
 - Source scanned: `icn/bins/icnctl/src/**` (clap `#[derive(Subcommand)]` / `#[derive(Parser)]` tree)
 
 ## Summary
@@ -27,7 +27,7 @@ Generated: 2026-06-26T20:30:42+00:00
 - **Total leaf commands (default build): 162**
 - Top-level command groups: 33
 - By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2
-- By status (curated, see section below): live 38 · partial 107 · planned 13 · unknown / needs local verification 4
+- By status (curated, see section below): live 38 · partial 110 · planned 13 · unknown / needs local verification 1
 - Proof level: every command is `L1` (declaration exists in source).
 - **Feature-gated commands (NOT in the default build, excluded from the counts above): 1** (see section below).
 - Unparsed / unresolved candidates: 0 (see section below).
@@ -85,9 +85,9 @@ Role is the **curated** top-level-group heuristic (needs review). `status` is a 
 | `icnctl gov proposal open` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1242 |
 | `icnctl gov proposal show` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1264 |
 | `icnctl gov vote cast` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1288 |
-| `icnctl gov vote delegate` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1310 |
-| `icnctl gov vote delegations` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1325 |
-| `icnctl gov vote revoke` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:1328 |
+| `icnctl gov vote delegate` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1310 |
+| `icnctl gov vote delegations` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1325 |
+| `icnctl gov vote revoke` | partial | L1 | `icn/bins/icnctl/src/main.rs`:1328 |
 | `icnctl gov vote show` | planned | L1 | `icn/bins/icnctl/src/main.rs`:1303 |
 | `icnctl init-coop` | unknown / needs local verification | L1 | `icn/bins/icnctl/src/main.rs`:128 |
 | `icnctl institution bootstrap apply` | partial | L1 | `icn/bins/icnctl/src/institution_bootstrap.rs`:49 |
@@ -243,12 +243,12 @@ Status is a **curated** classification (issue #2113), defaulting to `unknown / n
 | Status | Count |
 |---|---|
 | live | 38 |
-| partial | 107 |
+| partial | 110 |
 | fixture-demo | 0 |
 | planned | 13 |
-| unknown / needs local verification | 4 |
+| unknown / needs local verification | 1 |
 
-### Classified commands (158)
+### Classified commands (161)
 
 Every non-`unknown` command, with its evidence basis. (All other default-build commands carry `unknown / needs local verification`.)
 
@@ -357,6 +357,9 @@ Every non-`unknown` command, with its evidence basis. (All other default-build c
 | `icnctl gov proposal open` | partial | three daemon RPC calls via `create_authenticated_rpc_client`: `client.call("governance.proposal.get")`, then `client.call("governance.domain.get")`, then `client.call("governance.proposal.open")` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Open); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1242 |
 | `icnctl gov proposal show` | partial | daemon RPC `client.call("governance.proposal.get")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` ProposalCommands::Show); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1264 |
 | `icnctl gov vote cast` | partial | daemon RPC `client.call("governance.vote.cast")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Cast); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1288 |
+| `icnctl gov vote delegate` | partial | daemon RPC `client.call("governance.delegation.create")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Delegate); method registered in `icn/crates/icn-rpc/src/server.rs` -> `handle_governance_delegation_create` (`icn/crates/icn-rpc/src/handler/governance.rs`), which binds the delegator to `ctx.caller_did` (a caller can only delegate their own vote); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1310 |
+| `icnctl gov vote delegations` | partial | daemon RPC `client.call("governance.delegation.list")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Delegations); method registered in `icn/crates/icn-rpc/src/server.rs` -> `handle_governance_delegation_list` (`icn/crates/icn-rpc/src/handler/governance.rs`), which returns only the caller's own given/received delegations; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1325 |
+| `icnctl gov vote revoke` | partial | daemon RPC `client.call("governance.delegation.revoke")` via `create_authenticated_rpc_client` (`icn/bins/icnctl/src/main.rs` VoteCommands::Revoke); method registered in `icn/crates/icn-rpc/src/server.rs` -> `handle_governance_delegation_revoke` (`icn/crates/icn-rpc/src/handler/governance.rs`), which revokes only when `delegation.delegator == ctx.caller_did`; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:1328 |
 | `icnctl institution bootstrap apply` | partial | async `apply_package` posts the package to the gateway via `reqwest::Client` (`icn/bins/icnctl/src/institution_bootstrap.rs` InstitutionCommands::Bootstrap -> InstitutionBootstrapCommands::Apply); requires a running gateway, not integration-tested | `icn/bins/icnctl/src/institution_bootstrap.rs`:49 |
 | `icnctl ledger balance` | partial | daemon RPC client `client.get_ledger_balance()` via `create_rpc_client` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Balance); requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:728 |
 | `icnctl ledger head` | partial | daemon RPC client `client.get_ledger_head()` via `create_rpc_client` in `handle_ledger_command` (`icn/bins/icnctl/src/main.rs` LedgerCommands::Head); "Is icnd running?"; requires a running daemon, not integration-tested | `icn/bins/icnctl/src/main.rs`:725 |

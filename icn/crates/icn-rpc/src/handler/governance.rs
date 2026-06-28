@@ -10,15 +10,21 @@
 
 use std::sync::Arc;
 
-use icn_governance::{MembershipSource, ProposalPayload, ProposalState, VoteChoice};
+use icn_governance::{
+    Delegation, DelegationId, DelegationScope, MembershipSource, ProposalPayload, ProposalState,
+    VoteChoice,
+};
 
 use crate::context::RpcContext;
-use crate::error_codes::{NOT_FOUND, RESOURCE_NOT_AVAILABLE};
+use crate::error_codes::{
+    AUTHENTICATION_REQUIRED, INVALID_PARAMS, NOT_FOUND, PERMISSION_DENIED, RESOURCE_NOT_AVAILABLE,
+};
 use crate::server::RpcServer;
 use crate::types::{
-    CastVoteRequest, CloseProposalRequest, CreateDomainRequest, CreateProposalRequest,
-    CreateProposalResponse, GovernanceDomainInfo, GovernanceParamsInfo, MembershipConfigInfo,
-    OpenProposalRequest, ProposalInfo, ProposalPayloadInfo, RpcResponse,
+    CastVoteRequest, CloseProposalRequest, CreateDelegationRequest, CreateDomainRequest,
+    CreateProposalRequest, CreateProposalResponse, GovernanceDomainInfo, GovernanceParamsInfo,
+    MembershipConfigInfo, OpenProposalRequest, ProposalInfo, ProposalPayloadInfo,
+    RevokeDelegationRequest, RpcResponse,
 };
 
 /// Handle governance.domain.list RPC call - list all governance domains
@@ -731,5 +737,766 @@ pub async fn handle_governance_proposal_close(
             RpcResponse::success(id, result)
         }
         Err(e) => RpcResponse::internal_error(id, e),
+    }
+}
+
+// ============================================================================
+// Vote delegation (issue #2113)
+//
+// These three handlers wire icnctl's `gov vote delegate/delegations/revoke`
+// commands to the existing `GovernanceOps` delegation methods. The load-bearing
+// part is the authorization gate, not the storage: a governance write-path must
+// never let a caller act on another member's behalf.
+//
+//   create -> delegator is ALWAYS ctx.caller_did (never a params field)
+//   list   -> only the caller's own outgoing/incoming delegations
+//   revoke -> load first, revoke only if delegation.delegator == ctx.caller_did
+//
+// All three fail closed when the request is unauthenticated.
+// ============================================================================
+
+/// Parse a delegation scope string (`blanket` / `domain:<id>` / `proposal:<id>`).
+fn parse_delegation_scope(scope: &str) -> Result<DelegationScope, String> {
+    let scope = scope.trim();
+    if scope.eq_ignore_ascii_case("blanket") {
+        return Ok(DelegationScope::Blanket);
+    }
+    if let Some(domain) = scope.strip_prefix("domain:") {
+        let domain = domain.trim();
+        if domain.is_empty() {
+            return Err("domain scope requires an id: 'domain:<id>'".to_string());
+        }
+        return Ok(DelegationScope::Domain(
+            icn_governance::GovernanceDomainId::new(domain),
+        ));
+    }
+    if let Some(proposal) = scope.strip_prefix("proposal:") {
+        let proposal = proposal.trim();
+        if proposal.is_empty() {
+            return Err("proposal scope requires an id: 'proposal:<id>'".to_string());
+        }
+        return Ok(DelegationScope::Proposal(icn_governance::ProposalId::new(
+            proposal,
+        )));
+    }
+    Err(format!(
+        "invalid delegation scope '{scope}'. Expected 'blanket', 'domain:<id>', or 'proposal:<id>'"
+    ))
+}
+
+/// Render a [`DelegationScope`] back to its wire string form.
+fn delegation_scope_to_string(scope: &DelegationScope) -> String {
+    match scope {
+        DelegationScope::Blanket => "blanket".to_string(),
+        DelegationScope::Domain(d) => format!("domain:{d}"),
+        DelegationScope::Proposal(p) => format!("proposal:{p}"),
+    }
+}
+
+/// Return the domain in which `delegator` is suspended for this scope.
+///
+/// This mirrors the governance HTTP gate: domain scopes are checked directly,
+/// proposal scopes resolve their domain, and blanket scopes enumerate static-list
+/// domains the delegator belongs to. Missing checker or lookup errors preserve the
+/// existing fail-open behavior used by the HTTP path.
+async fn suspended_domain_for_scope(
+    state: &RpcServer,
+    governance_handle: &dyn icn_governance::GovernanceOps,
+    delegator: &icn_identity::Did,
+    scope: &DelegationScope,
+) -> Option<String> {
+    let checker = state.suspension_checker()?;
+
+    match scope {
+        DelegationScope::Blanket => {
+            let domains = governance_handle.list_domains().await.ok()?;
+            for domain in domains {
+                if domain.config.membership.source.contains_static(delegator) {
+                    let domain_id = domain.id.to_string();
+                    if checker(delegator.clone(), domain_id.clone()).await {
+                        return Some(domain_id);
+                    }
+                }
+            }
+            None
+        }
+        DelegationScope::Domain(domain) => {
+            let domain_id = domain.to_string();
+            checker(delegator.clone(), domain_id.clone())
+                .await
+                .then_some(domain_id)
+        }
+        DelegationScope::Proposal(proposal) => {
+            let domain_id = governance_handle
+                .get_proposal(proposal)
+                .await
+                .ok()??
+                .domain_id
+                .to_string();
+            checker(delegator.clone(), domain_id.clone())
+                .await
+                .then_some(domain_id)
+        }
+    }
+}
+
+/// Serialize a delegation into the JSON shape the icnctl client renders.
+fn delegation_to_json(d: &Delegation, now: u64) -> serde_json::Value {
+    serde_json::json!({
+        "id": d.id.to_string(),
+        "delegator": d.delegator.to_string(),
+        "delegate": d.delegate.to_string(),
+        "scope": delegation_scope_to_string(&d.scope),
+        "is_active": d.is_active(now),
+        "expires_at": d.expires_at,
+    })
+}
+
+/// Handle `governance.delegation.create` — create a vote delegation.
+///
+/// The delegator is the authenticated caller (`ctx.caller_did`), never a params
+/// field, so a caller can only ever delegate their own vote. Fail-closed when
+/// unauthenticated.
+pub async fn handle_governance_delegation_create(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
+) -> RpcResponse {
+    let ctx = match ctx {
+        Some(c) => c,
+        None => {
+            return RpcResponse::error(
+                id,
+                AUTHENTICATION_REQUIRED,
+                "Authentication required to create a delegation".to_string(),
+            );
+        }
+    };
+
+    tracing::debug!(caller = %ctx.caller_did, "governance.delegation.create called");
+
+    let governance_handle = match state.governance_handle() {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(
+                id,
+                RESOURCE_NOT_AVAILABLE,
+                "Governance not available".to_string(),
+            );
+        }
+    };
+
+    let request: CreateDelegationRequest = match serde_json::from_value(params.clone()) {
+        Ok(r) => r,
+        Err(e) => return RpcResponse::error(id, INVALID_PARAMS, format!("Invalid params: {e}")),
+    };
+
+    let delegate = match icn_identity::Did::from_str(&request.delegate) {
+        Ok(d) => d,
+        Err(e) => {
+            return RpcResponse::error(id, INVALID_PARAMS, format!("Invalid delegate DID: {e}"));
+        }
+    };
+
+    let scope = match parse_delegation_scope(&request.scope) {
+        Ok(s) => s,
+        Err(e) => return RpcResponse::error(id, INVALID_PARAMS, e),
+    };
+
+    if let Some(domain_id) =
+        suspended_domain_for_scope(state, governance_handle, &ctx.caller_did, &scope).await
+    {
+        return RpcResponse::error(
+            id,
+            PERMISSION_DENIED,
+            format!(
+                "Delegator {} is suspended in domain {domain_id}; suspended members may not create delegations",
+                ctx.caller_did
+            ),
+        );
+    }
+
+    // SECURITY: delegator is the authenticated caller, never read from params.
+    let mut delegation = Delegation::new(ctx.caller_did.clone(), delegate, scope);
+    if let Some(expires_at) = request.expires_at {
+        if expires_at <= delegation.created_at {
+            return RpcResponse::error(
+                id,
+                INVALID_PARAMS,
+                "expires_at must be later than the delegation creation time".to_string(),
+            );
+        }
+        delegation = delegation.with_expiry(expires_at);
+    }
+    let delegation_id = delegation.id.to_string();
+
+    match governance_handle.create_delegation(delegation).await {
+        Ok(()) => RpcResponse::success(id, serde_json::json!({ "id": delegation_id })),
+        Err(e) => RpcResponse::internal_error(id, e),
+    }
+}
+
+/// Handle `governance.delegation.list` — list the caller's own delegations.
+///
+/// Returns only the authenticated caller's outgoing (`given`) and incoming
+/// (`received`) delegations. No arbitrary-DID listing is accepted.
+pub async fn handle_governance_delegation_list(
+    id: u64,
+    state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
+) -> RpcResponse {
+    let ctx = match ctx {
+        Some(c) => c,
+        None => {
+            return RpcResponse::error(
+                id,
+                AUTHENTICATION_REQUIRED,
+                "Authentication required to list delegations".to_string(),
+            );
+        }
+    };
+
+    tracing::debug!(caller = %ctx.caller_did, "governance.delegation.list called");
+
+    let governance_handle = match state.governance_handle() {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(
+                id,
+                RESOURCE_NOT_AVAILABLE,
+                "Governance not available".to_string(),
+            );
+        }
+    };
+
+    let caller = &ctx.caller_did;
+    let given = match governance_handle.get_delegations_from(caller).await {
+        Ok(v) => v,
+        Err(e) => return RpcResponse::internal_error(id, e),
+    };
+    let received = match governance_handle.get_delegations_to(caller).await {
+        Ok(v) => v,
+        Err(e) => return RpcResponse::internal_error(id, e),
+    };
+
+    let now = icn_time::current_timestamp_secs();
+    let given: Vec<_> = given.iter().map(|d| delegation_to_json(d, now)).collect();
+    let received: Vec<_> = received
+        .iter()
+        .map(|d| delegation_to_json(d, now))
+        .collect();
+
+    RpcResponse::success(
+        id,
+        serde_json::json!({ "given": given, "received": received }),
+    )
+}
+
+/// Handle `governance.delegation.revoke` — revoke one of the caller's delegations.
+///
+/// The delegation is loaded first and revoked ONLY if the caller is its delegator.
+/// A delegation that does not exist OR is not owned by the caller returns the same
+/// `NOT_FOUND` response, so the endpoint never reveals another member's delegation.
+pub async fn handle_governance_delegation_revoke(
+    id: u64,
+    params: &serde_json::Value,
+    state: &Arc<RpcServer>,
+    ctx: Option<&RpcContext>,
+) -> RpcResponse {
+    let ctx = match ctx {
+        Some(c) => c,
+        None => {
+            return RpcResponse::error(
+                id,
+                AUTHENTICATION_REQUIRED,
+                "Authentication required to revoke a delegation".to_string(),
+            );
+        }
+    };
+
+    tracing::debug!(caller = %ctx.caller_did, "governance.delegation.revoke called");
+
+    let governance_handle = match state.governance_handle() {
+        Some(handle) => handle,
+        None => {
+            return RpcResponse::error(
+                id,
+                RESOURCE_NOT_AVAILABLE,
+                "Governance not available".to_string(),
+            );
+        }
+    };
+
+    let request: RevokeDelegationRequest = match serde_json::from_value(params.clone()) {
+        Ok(r) => r,
+        Err(e) => return RpcResponse::error(id, INVALID_PARAMS, format!("Invalid params: {e}")),
+    };
+
+    let delegation_id = DelegationId::new(request.delegation_id);
+
+    // Load first, then authorize: only the delegator may revoke. "Not found" and
+    // "not owned by caller" return the SAME response so existence is never leaked.
+    let existing = match governance_handle.get_delegation(&delegation_id).await {
+        Ok(d) => d,
+        Err(e) => return RpcResponse::internal_error(id, e),
+    };
+    match existing {
+        Some(d) if d.delegator == ctx.caller_did => {}
+        _ => return RpcResponse::error(id, NOT_FOUND, "Delegation not found".to_string()),
+    }
+
+    let now = icn_time::current_timestamp_secs();
+    match governance_handle
+        .revoke_delegation(&delegation_id, now)
+        .await
+    {
+        Ok(()) => RpcResponse::success(id, serde_json::json!({ "success": true })),
+        Err(e) => RpcResponse::internal_error(id, e),
+    }
+}
+
+#[cfg(test)]
+mod delegation_auth_tests {
+    use super::*;
+    use icn_identity::KeyPair;
+    use std::net::SocketAddr;
+    use std::sync::Mutex;
+
+    /// In-memory `GovernanceOps` test double. Only the delegation methods are
+    /// functional (backed by a shared Vec the test can inspect); every other method
+    /// is unused by these tests and panics if reached.
+    #[derive(Clone, Default)]
+    struct RecordingGovernance {
+        delegations: Arc<Mutex<Vec<Delegation>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl icn_governance::GovernanceOps for RecordingGovernance {
+        // ---- functional delegation methods ----
+        async fn create_delegation(&self, delegation: Delegation) -> anyhow::Result<()> {
+            self.delegations.lock().unwrap().push(delegation);
+            Ok(())
+        }
+        async fn get_delegation(&self, id: &DelegationId) -> anyhow::Result<Option<Delegation>> {
+            Ok(self
+                .delegations
+                .lock()
+                .unwrap()
+                .iter()
+                .find(|d| &d.id == id)
+                .cloned())
+        }
+        async fn get_delegations_from(
+            &self,
+            delegator: &icn_identity::Did,
+        ) -> anyhow::Result<Vec<Delegation>> {
+            Ok(self
+                .delegations
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|d| &d.delegator == delegator)
+                .cloned()
+                .collect())
+        }
+        async fn get_delegations_to(
+            &self,
+            delegate: &icn_identity::Did,
+        ) -> anyhow::Result<Vec<Delegation>> {
+            Ok(self
+                .delegations
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|d| &d.delegate == delegate)
+                .cloned()
+                .collect())
+        }
+        async fn revoke_delegation(
+            &self,
+            id: &DelegationId,
+            revoked_at: icn_governance::Timestamp,
+        ) -> anyhow::Result<()> {
+            let mut g = self.delegations.lock().unwrap();
+            if let Some(d) = g.iter_mut().find(|d| &d.id == id) {
+                d.revoked_at = Some(revoked_at);
+            }
+            Ok(())
+        }
+
+        // ---- unused methods (never reached by delegation handlers) ----
+        async fn list_domains(&self) -> anyhow::Result<Vec<icn_governance::GovernanceDomain>> {
+            unimplemented!()
+        }
+        async fn list_domains_paginated(
+            &self,
+            _cursor: Option<&str>,
+            _limit: usize,
+        ) -> anyhow::Result<icn_governance::PaginatedResult<icn_governance::GovernanceDomain>>
+        {
+            unimplemented!()
+        }
+        async fn get_domain(
+            &self,
+            _id: &icn_governance::GovernanceDomainId,
+        ) -> anyhow::Result<Option<icn_governance::GovernanceDomain>> {
+            unimplemented!()
+        }
+        async fn list_proposals(&self) -> anyhow::Result<Vec<icn_governance::Proposal>> {
+            unimplemented!()
+        }
+        async fn get_proposal(
+            &self,
+            _id: &icn_governance::ProposalId,
+        ) -> anyhow::Result<Option<icn_governance::Proposal>> {
+            unimplemented!()
+        }
+        async fn create_domain(
+            &self,
+            _domain_id: icn_governance::GovernanceDomainId,
+            _name: String,
+            _profile: String,
+            _params: icn_governance::GovernanceParams,
+            _membership: icn_governance::MembershipConfig,
+        ) -> anyhow::Result<()> {
+            unimplemented!()
+        }
+        async fn create_proposal(
+            &self,
+            _domain_id: icn_governance::GovernanceDomainId,
+            _title: String,
+            _description: String,
+            _payload: icn_governance::ProposalPayload,
+            _scope: icn_governance::ProposalScope,
+        ) -> anyhow::Result<icn_governance::ProposalId> {
+            unimplemented!()
+        }
+        async fn start_deliberation(
+            &self,
+            _proposal_id: icn_governance::ProposalId,
+            _deliberation_period_seconds: u64,
+        ) -> anyhow::Result<()> {
+            unimplemented!()
+        }
+        async fn end_deliberation_and_open(
+            &self,
+            _proposal_id: icn_governance::ProposalId,
+            _voting_period_seconds: u64,
+        ) -> anyhow::Result<()> {
+            unimplemented!()
+        }
+        async fn open_proposal(
+            &self,
+            _proposal_id: icn_governance::ProposalId,
+            _voting_period_seconds: u64,
+        ) -> anyhow::Result<()> {
+            unimplemented!()
+        }
+        async fn cast_vote(
+            &self,
+            _proposal_id: icn_governance::ProposalId,
+            _voter: icn_identity::Did,
+            _choice: icn_governance::VoteChoice,
+            _comment: Option<String>,
+        ) -> anyhow::Result<()> {
+            unimplemented!()
+        }
+        async fn close_proposal(
+            &self,
+            _proposal_id: icn_governance::ProposalId,
+        ) -> anyhow::Result<()> {
+            unimplemented!()
+        }
+        async fn update_domain_membership(
+            &self,
+            _domain_id: icn_governance::GovernanceDomainId,
+            _member: icn_identity::Did,
+            _action: icn_governance::MembershipAction,
+        ) -> anyhow::Result<()> {
+            unimplemented!()
+        }
+        async fn get_vote_tally(
+            &self,
+            _proposal_id: &icn_governance::ProposalId,
+        ) -> anyhow::Result<icn_governance::VoteTally> {
+            unimplemented!()
+        }
+        async fn get_voter_dids(
+            &self,
+            _proposal_id: &icn_governance::ProposalId,
+        ) -> anyhow::Result<Vec<icn_identity::Did>> {
+            unimplemented!()
+        }
+        async fn get_proof(
+            &self,
+            _proposal_id: &icn_governance::ProposalId,
+        ) -> anyhow::Result<Option<icn_governance::GovernanceProofV2>> {
+            unimplemented!()
+        }
+        async fn list_protocol_parameters(
+            &self,
+        ) -> anyhow::Result<Vec<icn_governance::ProtocolParameter>> {
+            unimplemented!()
+        }
+        async fn get_protocol_parameter(
+            &self,
+            _id: &str,
+        ) -> anyhow::Result<Option<icn_governance::ProtocolParameter>> {
+            unimplemented!()
+        }
+        async fn get_effective_protocol_parameter(
+            &self,
+            _id: &str,
+            _coop_id: Option<&str>,
+            _fed_id: Option<&str>,
+        ) -> anyhow::Result<Option<icn_governance::ProtocolParameter>> {
+            unimplemented!()
+        }
+        async fn get_protocol_parameter_history(
+            &self,
+            _id: &str,
+        ) -> anyhow::Result<Vec<icn_governance::ParameterChange>> {
+            unimplemented!()
+        }
+    }
+
+    fn test_state(gov: RecordingGovernance) -> Arc<RpcServer> {
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let mut server = RpcServer::new(addr);
+        server.set_governance_handle(gov);
+        Arc::new(server)
+    }
+
+    fn new_did() -> icn_identity::Did {
+        KeyPair::generate().unwrap().did().clone()
+    }
+
+    #[tokio::test]
+    async fn create_binds_delegator_to_caller_ignoring_params() {
+        let gov = RecordingGovernance::default();
+        let state = test_state(gov.clone());
+        let alice = new_did();
+        let bob = new_did();
+        let mallory = new_did();
+        let ctx = RpcContext::new(alice.clone(), None, vec![]);
+        // A spurious "delegator" field must be ignored — the delegator is the caller.
+        let params = serde_json::json!({
+            "delegate": bob.to_string(),
+            "scope": "blanket",
+            "delegator": mallory.to_string(),
+        });
+        let resp = handle_governance_delegation_create(1, &params, &state, Some(&ctx)).await;
+        assert!(
+            resp.error.is_none(),
+            "expected success, got {:?}",
+            resp.error
+        );
+        let stored = gov.delegations.lock().unwrap();
+        assert_eq!(stored.len(), 1);
+        assert_eq!(
+            stored[0].delegator, alice,
+            "delegator must be the authenticated caller, not a params value"
+        );
+        assert_eq!(stored[0].delegate, bob);
+    }
+
+    #[tokio::test]
+    async fn create_requires_authentication() {
+        let gov = RecordingGovernance::default();
+        let state = test_state(gov.clone());
+        let bob = new_did();
+        let params = serde_json::json!({ "delegate": bob.to_string(), "scope": "blanket" });
+        let resp = handle_governance_delegation_create(1, &params, &state, None).await;
+        assert_eq!(resp.error.unwrap().code, AUTHENTICATION_REQUIRED);
+        assert!(gov.delegations.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn create_rejects_suspended_caller() {
+        let gov = RecordingGovernance::default();
+        let alice = new_did();
+        let bob = new_did();
+        let suspended_alice = alice.clone();
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let mut server = RpcServer::new(addr);
+        server.set_governance_handle(gov.clone());
+        server.set_suspension_checker(Arc::new(move |did, domain_id| {
+            let suspended_alice = suspended_alice.clone();
+            Box::pin(async move { did == suspended_alice && domain_id == "workers" })
+        }));
+        let state = Arc::new(server);
+        let ctx = RpcContext::new(alice, None, vec![]);
+        let params = serde_json::json!({
+            "delegate": bob.to_string(),
+            "scope": "domain:workers",
+        });
+
+        let resp = handle_governance_delegation_create(1, &params, &state, Some(&ctx)).await;
+
+        let err = resp.error.expect("suspended caller must be rejected");
+        assert_eq!(err.code, PERMISSION_DENIED);
+        assert!(gov.delegations.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn create_rejects_expired_timestamp_instead_of_persisting_unbounded() {
+        let gov = RecordingGovernance::default();
+        let state = test_state(gov.clone());
+        let alice = new_did();
+        let bob = new_did();
+        let ctx = RpcContext::new(alice, None, vec![]);
+        let params = serde_json::json!({
+            "delegate": bob.to_string(),
+            "scope": "blanket",
+            "expires_at": 0,
+        });
+
+        let resp = handle_governance_delegation_create(1, &params, &state, Some(&ctx)).await;
+
+        let err = resp.error.expect("expired timestamp must be rejected");
+        assert_eq!(err.code, INVALID_PARAMS);
+        assert!(gov.delegations.lock().unwrap().is_empty());
+    }
+
+    #[tokio::test]
+    async fn list_returns_only_callers_own_delegations() {
+        let gov = RecordingGovernance::default();
+        let state = test_state(gov.clone());
+        let alice = new_did();
+        let bob = new_did();
+        let carol = new_did();
+        let dave = new_did();
+
+        let mk = |caller: &icn_identity::Did, delegate: &icn_identity::Did| {
+            (
+                RpcContext::new(caller.clone(), None, vec![]),
+                serde_json::json!({ "delegate": delegate.to_string(), "scope": "blanket" }),
+            )
+        };
+        let (ca, pa) = mk(&alice, &carol); // alice -> carol (given by alice)
+        handle_governance_delegation_create(1, &pa, &state, Some(&ca)).await;
+        let (cb, pb) = mk(&bob, &dave); // bob -> dave (unrelated to alice)
+        handle_governance_delegation_create(2, &pb, &state, Some(&cb)).await;
+        let (cd, pd) = mk(&dave, &alice); // dave -> alice (received by alice)
+        handle_governance_delegation_create(3, &pd, &state, Some(&cd)).await;
+
+        let ctx_alice = RpcContext::new(alice.clone(), None, vec![]);
+        let resp = handle_governance_delegation_list(9, &state, Some(&ctx_alice)).await;
+        let result = resp.result.expect("list result");
+        let given = result["given"].as_array().unwrap();
+        let received = result["received"].as_array().unwrap();
+
+        assert_eq!(given.len(), 1, "alice gave exactly one delegation");
+        assert_eq!(given[0]["delegator"], alice.to_string());
+        assert_eq!(given[0]["delegate"], carol.to_string());
+        assert_eq!(received.len(), 1, "alice received exactly one delegation");
+        assert_eq!(received[0]["delegate"], alice.to_string());
+        // Bob's unrelated delegation must not leak into alice's view at all.
+        assert!(
+            !result.to_string().contains(&bob.to_string()),
+            "another member's delegation leaked into the caller's list"
+        );
+    }
+
+    #[tokio::test]
+    async fn list_requires_authentication() {
+        let gov = RecordingGovernance::default();
+        let state = test_state(gov);
+        let resp = handle_governance_delegation_list(1, &state, None).await;
+        assert_eq!(resp.error.unwrap().code, AUTHENTICATION_REQUIRED);
+    }
+
+    #[tokio::test]
+    async fn revoke_by_owner_succeeds() {
+        let gov = RecordingGovernance::default();
+        let state = test_state(gov.clone());
+        let alice = new_did();
+        let bob = new_did();
+        let ctx_alice = RpcContext::new(alice.clone(), None, vec![]);
+        let create = serde_json::json!({ "delegate": bob.to_string(), "scope": "blanket" });
+        let cresp = handle_governance_delegation_create(1, &create, &state, Some(&ctx_alice)).await;
+        let dele_id = cresp.result.unwrap()["id"].as_str().unwrap().to_string();
+
+        let revoke = serde_json::json!({ "delegation_id": dele_id });
+        let rresp = handle_governance_delegation_revoke(2, &revoke, &state, Some(&ctx_alice)).await;
+        assert!(
+            rresp.error.is_none(),
+            "owner revoke should succeed: {:?}",
+            rresp.error
+        );
+        assert!(
+            gov.delegations.lock().unwrap()[0].revoked_at.is_some(),
+            "delegation should be revoked"
+        );
+    }
+
+    #[tokio::test]
+    async fn revoke_by_non_owner_is_rejected_and_not_leaking() {
+        let gov = RecordingGovernance::default();
+        let state = test_state(gov.clone());
+        let alice = new_did();
+        let bob = new_did();
+        let ctx_alice = RpcContext::new(alice.clone(), None, vec![]);
+        let ctx_bob = RpcContext::new(bob.clone(), None, vec![]);
+        let create = serde_json::json!({ "delegate": bob.to_string(), "scope": "blanket" });
+        let cresp = handle_governance_delegation_create(1, &create, &state, Some(&ctx_alice)).await;
+        let dele_id = cresp.result.unwrap()["id"].as_str().unwrap().to_string();
+
+        // Bob is the delegate, NOT the delegator — he must not be able to revoke.
+        let revoke = serde_json::json!({ "delegation_id": dele_id });
+        let rresp = handle_governance_delegation_revoke(2, &revoke, &state, Some(&ctx_bob)).await;
+        let err = rresp.error.expect("non-owner revoke must be rejected");
+        assert_eq!(
+            err.code, NOT_FOUND,
+            "non-owner gets the same not-found as a missing id"
+        );
+        assert!(
+            gov.delegations.lock().unwrap()[0].revoked_at.is_none(),
+            "a non-owner must NOT be able to revoke another member's delegation"
+        );
+    }
+
+    #[tokio::test]
+    async fn revoke_requires_authentication() {
+        let gov = RecordingGovernance::default();
+        let state = test_state(gov);
+        let params = serde_json::json!({ "delegation_id": "anything" });
+        let resp = handle_governance_delegation_revoke(1, &params, &state, None).await;
+        assert_eq!(resp.error.unwrap().code, AUTHENTICATION_REQUIRED);
+    }
+
+    #[tokio::test]
+    async fn revoke_unknown_id_returns_not_found() {
+        let gov = RecordingGovernance::default();
+        let state = test_state(gov);
+        let alice = new_did();
+        let ctx = RpcContext::new(alice, None, vec![]);
+        let params = serde_json::json!({ "delegation_id": "no-such-delegation" });
+        let resp = handle_governance_delegation_revoke(1, &params, &state, Some(&ctx)).await;
+        assert_eq!(resp.error.unwrap().code, NOT_FOUND);
+    }
+
+    #[test]
+    fn scope_parsing_accepts_known_forms_and_rejects_others() {
+        assert!(matches!(
+            parse_delegation_scope("blanket"),
+            Ok(DelegationScope::Blanket)
+        ));
+        assert!(matches!(
+            parse_delegation_scope("BLANKET"),
+            Ok(DelegationScope::Blanket)
+        ));
+        assert!(matches!(
+            parse_delegation_scope("domain:econ"),
+            Ok(DelegationScope::Domain(_))
+        ));
+        assert!(matches!(
+            parse_delegation_scope("proposal:p-1"),
+            Ok(DelegationScope::Proposal(_))
+        ));
+        assert!(parse_delegation_scope("domain:").is_err());
+        assert!(parse_delegation_scope("proposal:").is_err());
+        assert!(parse_delegation_scope("nonsense").is_err());
     }
 }
