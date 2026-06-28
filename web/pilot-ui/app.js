@@ -7587,7 +7587,7 @@ function renderOrganizerReviewPreview() {
         button.addEventListener('click', () => {
             state.organizerReviewSelectedIndex = index;
             renderOrganizerReviewPreview();
-            const selected = document.querySelector(`.organizer-review-row-select[data-row-id="${CSS.escape(row.id || String(index))}"]`);
+            const selected = document.querySelector('.organizer-review-row-select[aria-pressed="true"]');
             if (selected) selected.focus();
         });
         item.append(button);

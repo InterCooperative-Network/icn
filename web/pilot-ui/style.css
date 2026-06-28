@@ -6526,11 +6526,6 @@ body[data-demo-mode="true"] .organizer-review-section {
     box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
-.organizer-review-row-select:focus-visible {
-    outline: 3px solid #f59e0b;
-    outline-offset: 2px;
-}
-
 .organizer-review-row-kind {
     color: var(--primary-dark);
     text-transform: uppercase;
