@@ -1841,6 +1841,9 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
                 <section class="organizer-review-section" aria-labelledby="organizer-review-heading">
                     <p class="organizer-review-eyebrow">Fixture-only rehearsal</p>
                     <h2 id="organizer-review-heading" tabindex="-1">Review preview</h2>
+                    <button type="button" class="btn btn-secondary facilitator-continuation hidden" data-facilitator-continue="evidence">
+                        Continue to receipt and evidence explanation
+                    </button>
                     <p class="organizer-review-intro">
                         Review four fictional proposed items in plain language before any later step. This surface is read-only: opening it, selecting a row, or inspecting a review choice records nothing and changes nothing.
                     </p>
@@ -1854,17 +1857,34 @@ did:icn:charlie,did:icn:alice,3.5,Childcare</code></pre>
             <main id="my-standing" class="tab-content" role="tabpanel" aria-labelledby="tab-my-standing">
                 <section class="member-standing-section" aria-labelledby="member-standing-heading">
                     <h2 id="member-standing-heading" tabindex="-1">My Standing</h2>
+                    <button type="button" class="btn btn-secondary facilitator-continuation hidden" data-facilitator-continue="action-cards">
+                        Continue to Action Cards
+                    </button>
                     <p class="member-standing-intro">
-                        Who you are in this institution: domain memberships, role assignments, and the union of authority scopes that follow from those roles. This view reads the per-member <code>/v1/gov/me/standing</code> read-model (#1627). The trust graph is the source of truth for trust-threshold memberships; rows marked <strong>unverified</strong> indicate the read-model deferred to the trust graph rather than evaluating membership here.
+                        Who you are in this institution: domain memberships, role assignments, and the combined responsibilities that follow from those roles. A “verification pending” label means this read-only view did not evaluate that membership itself.
                     </p>
+                    <details class="member-technical-detail">
+                        <summary>Technical read-model detail</summary>
+                        <p>This surface reads <code>/v1/gov/me/standing</code> (#1627). The trust graph remains the source of truth for trust-threshold memberships; the fixture value <code>unverified</code> means evaluation was deferred.</p>
+                    </details>
                     <div id="member-standing-content" class="member-standing-content" aria-live="polite">
                         <p class="empty-state">Loading standing&hellip;</p>
                     </div>
                 </section>
                 <section class="member-action-cards-section" aria-labelledby="member-action-cards-heading">
                     <h2 id="member-action-cards-heading" tabindex="-1">Action Cards</h2>
+                    <button type="button" class="btn btn-secondary facilitator-continuation hidden" data-facilitator-continue="review-preview">
+                        Continue to Review Preview
+                    </button>
                     <p class="member-action-cards-intro">
-                        Your queue of actions across all governance domains. Each card surfaces who has authority, what is required, and whether completing the action produces a receipt. This view reads the per-member <code>/v1/gov/me/action-cards</code> read-model (#1659) and is <strong>distinct</strong> from the per-domain <a href="#governance" data-demo-target="governance">Action Items tab</a>, which uses a different endpoint and concept.
+                        Your queue of actions across governance domains. Each card explains who has authority, what is required, and whether a later completed action would be expected to produce a receipt.
+                    </p>
+                    <details class="member-technical-detail">
+                        <summary>Technical read-model detail</summary>
+                        <p>This surface reads <code>/v1/gov/me/action-cards</code> (#1659). It is <strong>distinct</strong> from the per-domain <a href="#governance" data-demo-target="governance">Action Items tab</a>, which uses a different endpoint and concept.</p>
+                    </details>
+                    <p id="member-action-cards-demo-limits" class="member-action-cards-demo-limits hidden">
+                        <strong>Demo limits:</strong> these cards are read-only examples. Current action status, reversal or challenge windows, “review later,” and help-request paths are not implemented in this demo fixture.
                     </p>
                     <div id="member-action-cards-list" class="member-action-cards-list" role="list" aria-live="polite">
                         <p class="empty-state" role="listitem">Loading action cards&hellip;</p>

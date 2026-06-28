@@ -51,26 +51,33 @@ test.describe('My Standing & Action Cards (PR 3)', () => {
         await expect(cardsList).toHaveCount(1);
     });
 
-    test('intro text labels Action Cards as distinct from Action Items', async ({ page }) => {
+    test('keeps Action Card technical distinctions behind secondary detail', async ({ page }) => {
         await page.goto('/');
         await page.waitForLoadState('networkidle');
 
         const intro = page.locator('.member-action-cards-intro');
-        await expect(intro).toContainText('distinct');
-        await expect(intro).toContainText('Action Items tab');
-        await expect(intro).toContainText('different endpoint and concept');
-        // Cite the actual endpoint that this surface consumes
-        await expect(intro).toContainText('/v1/gov/me/action-cards');
+        await expect(intro).toContainText('who has authority');
+        await expect(intro).toContainText('later completed action');
+
+        const technicalDetail = page.locator('.member-action-cards-section > .member-technical-detail');
+        await expect(technicalDetail).toContainText('distinct');
+        await expect(technicalDetail).toContainText('Action Items tab');
+        await expect(technicalDetail).toContainText('different endpoint and concept');
+        await expect(technicalDetail).toContainText('/v1/gov/me/action-cards');
     });
 
-    test('standing intro labels the standing read-model endpoint', async ({ page }) => {
+    test('leads with plain Standing language and keeps the endpoint secondary', async ({ page }) => {
         await page.goto('/');
         await page.waitForLoadState('networkidle');
 
         const intro = page.locator('.member-standing-intro');
-        await expect(intro).toContainText('/v1/gov/me/standing');
-        await expect(intro).toContainText('trust graph');
-        await expect(intro).toContainText('unverified');
+        await expect(intro).toContainText('combined responsibilities');
+        await expect(intro).toContainText('verification pending');
+
+        const technicalDetail = page.locator('.member-standing-section > .member-technical-detail');
+        await expect(technicalDetail).toContainText('/v1/gov/me/standing');
+        await expect(technicalDetail).toContainText('trust graph');
+        await expect(technicalDetail).toContainText('unverified');
     });
 
     test('empty-state messaging is plain language pre-fetch', async ({ page }) => {

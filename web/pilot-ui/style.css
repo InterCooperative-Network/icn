@@ -6484,6 +6484,12 @@ body[data-demo-mode="true"] .member-action-cards-list {
     font-size: 0.925rem;
 }
 
+.facilitator-continuation {
+    min-height: 44px;
+    margin: 0.25rem 0 0.85rem;
+    text-align: left;
+}
+
 .facilitator-evidence-explanation {
     margin-top: 0.85rem;
     padding-top: 0.85rem;
@@ -6558,6 +6564,22 @@ body[data-demo-mode="true"] .member-action-cards-list {
     .facilitator-walkthrough-steps,
     .facilitator-boundary-grid {
         grid-template-columns: 1fr;
+    }
+
+    body[data-demo-mode="true"] .member-action-cards-list {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    body[data-demo-mode="true"] .member-action-card {
+        min-width: 0;
+    }
+
+    .member-fixture-technical-detail dl {
+        grid-template-columns: 1fr;
+    }
+
+    .member-fixture-technical-detail dd {
+        margin-bottom: 0.45rem;
     }
 }
 
@@ -6858,7 +6880,7 @@ body[data-demo-mode="true"] .member-action-card .badge-action {
 
 body[data-demo-mode="true"] .member-action-card .badge-risk-low {
     background: rgba(22, 163, 74, 0.12);
-    color: #15803d;
+    color: #166534;
     border-color: rgba(22, 163, 74, 0.30);
     margin-left: auto;
 }
@@ -6928,6 +6950,53 @@ body[data-demo-mode="true"] .member-action-card-accessibility strong {
     font-weight: 700;
     letter-spacing: 0.06em;
     text-transform: uppercase;
+}
+
+.member-technical-detail {
+    margin: 0.35rem 0 1rem;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+}
+
+.member-technical-detail > summary {
+    min-height: 44px;
+    display: list-item;
+    box-sizing: border-box;
+    padding: 0.65rem 0;
+    font-weight: 650;
+    cursor: pointer;
+}
+
+.member-technical-detail > p {
+    margin: 0.35rem 0 0;
+    max-width: 78ch;
+    line-height: 1.5;
+}
+
+.member-fixture-technical-detail dl {
+    display: grid;
+    grid-template-columns: minmax(10rem, auto) minmax(0, 1fr);
+    gap: 0.35rem 0.75rem;
+    margin: 0.35rem 0 0;
+}
+
+.member-fixture-technical-detail dt {
+    font-weight: 650;
+}
+
+.member-fixture-technical-detail dd {
+    min-width: 0;
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+
+body[data-demo-mode="true"] .member-action-cards-demo-limits {
+    margin: 0 0 1rem;
+    padding: 0.75rem 0.9rem;
+    border-left: 4px solid #7c3aed;
+    border-radius: 8px;
+    background: var(--bg-secondary);
+    line-height: 1.5;
 }
 
 /* Receipt-expected footer: full-width subtle pill */

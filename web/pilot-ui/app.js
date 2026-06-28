@@ -93,6 +93,11 @@ function applyDemoMode() {
         if (reviewPreviewNav) reviewPreviewNav.classList.remove('hidden');
         const facilitatorWalkthrough = document.getElementById('facilitator-walkthrough');
         if (facilitatorWalkthrough) facilitatorWalkthrough.classList.remove('hidden');
+        document.querySelectorAll('[data-facilitator-continue]').forEach((control) => {
+            control.classList.remove('hidden');
+        });
+        const actionCardDemoLimits = document.getElementById('member-action-cards-demo-limits');
+        if (actionCardDemoLimits) actionCardDemoLimits.classList.remove('hidden');
     }
 }
 
@@ -3304,6 +3309,10 @@ async function openFacilitatorStep(step) {
 
 document.querySelectorAll('[data-facilitator-step]').forEach((button) => {
     button.addEventListener('click', () => openFacilitatorStep(button.dataset.facilitatorStep));
+});
+
+document.querySelectorAll('[data-facilitator-continue]').forEach((button) => {
+    button.addEventListener('click', () => openFacilitatorStep(button.dataset.facilitatorContinue));
 });
 
 // PR 2 — paint the demo-mode banner and Demo Guide nav button as soon
@@ -7839,6 +7848,83 @@ async function loadMemberActionCards() {
     renderMemberActionCards();
 }
 
+const DEMO_MEMBERSHIP_SOURCE_LABELS = {
+    static_list: 'Committed demo member list',
+    trust_threshold: 'Trust threshold; verification deferred',
+};
+
+const DEMO_STANDING_STATUS_LABELS = {
+    member: 'Member',
+    unverified: 'Verification pending',
+};
+
+const DEMO_ROLE_LABELS = {
+    chair: 'Committee chair',
+    member: 'Committee member',
+};
+
+const DEMO_AUTHORITY_SCOPE_LABELS = {
+    session_scheduling: 'Schedule sessions',
+    program_review: 'Review the program',
+    veto_for_cause: 'Raise a for-cause objection',
+    registration_desk: 'Coordinate the registration desk',
+};
+
+const DEMO_ACTION_SOURCE_LABELS = {
+    proposal: 'Proposal',
+    meeting: 'Meeting',
+    action_item: 'Action item',
+};
+
+const DEMO_ACTION_KIND_LABELS = {
+    vote: 'Vote',
+    attend: 'Attend meeting',
+    complete: 'Mark complete',
+};
+
+const DEMO_RISK_LEVEL_LABELS = {
+    low: 'Low risk',
+    normal: 'Standard risk',
+    elevated: 'Elevated risk',
+};
+
+function demoFixtureLabel(labels, value) {
+    if (DEMO_MODE !== 'demo') return String(value || 'unknown');
+    if (labels[value]) return labels[value];
+    const words = String(value || 'unknown').replace(/_/g, ' ');
+    return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+function buildDemoFixtureTechnicalDetails(summaryText, entries) {
+    if (DEMO_MODE !== 'demo') return null;
+    const populatedEntries = entries.filter((entry) => {
+        if (Array.isArray(entry.value)) return entry.value.length > 0;
+        return entry.value !== undefined && entry.value !== null && entry.value !== '';
+    });
+    if (populatedEntries.length === 0) return null;
+
+    const details = document.createElement('details');
+    details.className = 'member-technical-detail member-fixture-technical-detail';
+    const summary = document.createElement('summary');
+    summary.textContent = summaryText;
+    const list = document.createElement('dl');
+    populatedEntries.forEach((entry) => {
+        const term = document.createElement('dt');
+        term.textContent = entry.label;
+        const description = document.createElement('dd');
+        const values = Array.isArray(entry.value) ? entry.value : [entry.value];
+        values.forEach((value, index) => {
+            if (index > 0) description.appendChild(document.createTextNode(', '));
+            const code = document.createElement('code');
+            code.textContent = String(value);
+            description.appendChild(code);
+        });
+        list.append(term, description);
+    });
+    details.append(summary, list);
+    return details;
+}
+
 function renderMemberStanding() {
     const container = document.getElementById('member-standing-content');
     if (!container) return;
@@ -7856,20 +7942,30 @@ function renderMemberStanding() {
     // DID + display label header
     const didBlock = document.createElement('dl');
     didBlock.className = 'standing-id-block';
-    const didDt = document.createElement('dt');
-    didDt.textContent = 'DID';
-    const didDd = document.createElement('dd');
-    didDd.className = 'did-display';
-    didDd.textContent = standing.did || state.did || '—';
-    didBlock.appendChild(didDt);
-    didBlock.appendChild(didDd);
-    if (standing.display_label) {
+    const appendDisplayLabel = () => {
+        if (!standing.display_label) return;
         const labelDt = document.createElement('dt');
         labelDt.textContent = 'Display label';
         const labelDd = document.createElement('dd');
         labelDd.textContent = standing.display_label;
         didBlock.appendChild(labelDt);
         didBlock.appendChild(labelDd);
+    };
+    const appendDid = () => {
+        const didDt = document.createElement('dt');
+        didDt.textContent = DEMO_MODE === 'demo' ? 'Technical DID' : 'DID';
+        const didDd = document.createElement('dd');
+        didDd.className = 'did-display';
+        didDd.textContent = standing.did || state.did || '—';
+        didBlock.appendChild(didDt);
+        didBlock.appendChild(didDd);
+    };
+    if (DEMO_MODE === 'demo') {
+        appendDisplayLabel();
+        appendDid();
+    } else {
+        appendDid();
+        appendDisplayLabel();
     }
     container.appendChild(didBlock);
 
@@ -7892,17 +7988,21 @@ function renderMemberStanding() {
             const name = document.createElement('strong');
             name.textContent = d.domain_name || d.domain_id || '(unnamed domain)';
             li.appendChild(name);
-            const id = document.createElement('span');
-            id.className = 'standing-domain-id';
-            id.textContent = ` (${d.domain_id || ''})`;
-            li.appendChild(id);
+            if (DEMO_MODE !== 'demo') {
+                const id = document.createElement('span');
+                id.className = 'standing-domain-id';
+                id.textContent = ` (${d.domain_id || ''})`;
+                li.appendChild(id);
+            }
             const status = document.createElement('span');
             status.className = `standing-status standing-status-${d.status || 'unknown'}`;
-            status.textContent = d.status || 'unknown';
+            status.textContent = demoFixtureLabel(DEMO_STANDING_STATUS_LABELS, d.status);
             li.appendChild(status);
             const source = document.createElement('span');
             source.className = 'standing-source';
-            source.textContent = `via ${d.membership_source || 'unknown'}`;
+            source.textContent = DEMO_MODE === 'demo'
+                ? `Membership source: ${demoFixtureLabel(DEMO_MEMBERSHIP_SOURCE_LABELS, d.membership_source)}`
+                : `via ${d.membership_source || 'unknown'}`;
             li.appendChild(source);
             domainList.appendChild(li);
         });
@@ -7926,7 +8026,7 @@ function renderMemberStanding() {
             const li = document.createElement('li');
             li.className = 'standing-role';
             const role = document.createElement('strong');
-            role.textContent = r.role || '(unnamed role)';
+            role.textContent = demoFixtureLabel(DEMO_ROLE_LABELS, r.role || '(unnamed role)');
             li.appendChild(role);
             if (r.structure_name || r.structure_id) {
                 const structure = document.createElement('span');
@@ -7944,7 +8044,7 @@ function renderMemberStanding() {
                 r.authority_scope.forEach((s) => {
                     const badge = document.createElement('span');
                     badge.className = 'standing-scope-badge';
-                    badge.textContent = s;
+                    badge.textContent = demoFixtureLabel(DEMO_AUTHORITY_SCOPE_LABELS, s);
                     scopeWrap.appendChild(badge);
                 });
                 li.appendChild(scopeWrap);
@@ -7958,18 +8058,26 @@ function renderMemberStanding() {
     const scopes = Array.isArray(standing.authority_scopes) ? standing.authority_scopes : [];
     if (scopes.length > 0) {
         const scopesHeading = document.createElement('h3');
-        scopesHeading.textContent = 'Authority scopes (union)';
+        scopesHeading.textContent = DEMO_MODE === 'demo' ? 'Combined responsibilities' : 'Authority scopes (union)';
         container.appendChild(scopesHeading);
         const scopeWrap = document.createElement('div');
         scopeWrap.className = 'standing-scope-union';
         scopes.forEach((s) => {
             const badge = document.createElement('span');
             badge.className = 'standing-scope-badge';
-            badge.textContent = s;
+            badge.textContent = demoFixtureLabel(DEMO_AUTHORITY_SCOPE_LABELS, s);
             scopeWrap.appendChild(badge);
         });
         container.appendChild(scopeWrap);
     }
+
+    const standingTechnicalDetails = buildDemoFixtureTechnicalDetails('Technical standing fixture values', [
+        { label: 'Domain identifiers', value: domains.map((domain) => domain.domain_id).filter(Boolean) },
+        { label: 'Membership-source values', value: [...new Set(domains.map((domain) => domain.membership_source).filter(Boolean))] },
+        { label: 'Role values', value: [...new Set(roles.map((role) => role.role).filter(Boolean))] },
+        { label: 'Authority-scope values', value: scopes },
+    ]);
+    if (standingTechnicalDetails) container.appendChild(standingTechnicalDetails);
 }
 
 function renderMemberActionCards() {
@@ -8014,19 +8122,21 @@ function buildMemberActionCardElement(card) {
     if (card.source_kind) {
         const b = document.createElement('span');
         b.className = 'badge badge-source';
-        b.textContent = card.source_kind;
+        b.textContent = demoFixtureLabel(DEMO_ACTION_SOURCE_LABELS, card.source_kind);
         badges.appendChild(b);
     }
     if (card.action_kind) {
         const b = document.createElement('span');
         b.className = 'badge badge-action';
-        b.textContent = card.action_kind;
+        b.textContent = demoFixtureLabel(DEMO_ACTION_KIND_LABELS, card.action_kind);
         badges.appendChild(b);
     }
     if (card.risk_level) {
         const b = document.createElement('span');
         b.className = `badge badge-risk badge-risk-${String(card.risk_level).toLowerCase()}`;
-        b.textContent = `risk: ${card.risk_level}`;
+        b.textContent = DEMO_MODE === 'demo'
+            ? demoFixtureLabel(DEMO_RISK_LEVEL_LABELS, card.risk_level)
+            : `risk: ${card.risk_level}`;
         badges.appendChild(b);
     }
     header.appendChild(badges);
@@ -8049,12 +8159,15 @@ function buildMemberActionCardElement(card) {
         authority.appendChild(dt); authority.appendChild(dd);
     }
     if (Array.isArray(card.required_authority_scope) && card.required_authority_scope.length > 0) {
-        const dt = document.createElement('dt'); dt.textContent = 'Required scope';
-        const dd = document.createElement('dd'); dd.textContent = card.required_authority_scope.join(', ');
+        const dt = document.createElement('dt'); dt.textContent = DEMO_MODE === 'demo' ? 'Required responsibility' : 'Required scope';
+        const dd = document.createElement('dd');
+        dd.textContent = card.required_authority_scope
+            .map((scope) => demoFixtureLabel(DEMO_AUTHORITY_SCOPE_LABELS, scope))
+            .join(', ');
         authority.appendChild(dt); authority.appendChild(dd);
     }
     if (card.deadline !== undefined && card.deadline !== null) {
-        const dt = document.createElement('dt'); dt.textContent = 'Deadline';
+        const dt = document.createElement('dt'); dt.textContent = DEMO_MODE === 'demo' ? 'Demo fixture date' : 'Deadline';
         const dd = document.createElement('dd');
         // formatDateTime exists elsewhere in app.js; fall back to a Date conversion
         // when it is not in scope yet (defensive — shouldn't happen in practice).
@@ -8064,11 +8177,23 @@ function buildMemberActionCardElement(card) {
         } else {
             dd.textContent = String(card.deadline);
         }
+        if (DEMO_MODE === 'demo') {
+            dd.appendChild(document.createTextNode(' — frozen fictional value; not a current deadline.'));
+        }
         authority.appendChild(dt); authority.appendChild(dd);
     }
     if (authority.children.length > 0) {
         article.appendChild(authority);
     }
+
+    const technicalDetails = buildDemoFixtureTechnicalDetails('Technical action-card fixture values', [
+        { label: 'Source kind', value: card.source_kind },
+        { label: 'Action kind', value: card.action_kind },
+        { label: 'Required authority scopes', value: card.required_authority_scope || [] },
+        { label: 'Source identifier', value: card.source_id },
+        { label: 'Domain identifier', value: card.domain_id },
+    ]);
+    if (technicalDetails) article.appendChild(technicalDetails);
 
     // Accessibility hint (schema field — surface explicitly)
     if (card.accessibility_hint) {
@@ -8085,7 +8210,9 @@ function buildMemberActionCardElement(card) {
     if (card.receipt_expected) {
         const r = document.createElement('p');
         r.className = 'member-action-card-receipt-expected';
-        r.textContent = 'Completing this action will produce a receipt.';
+        r.textContent = DEMO_MODE === 'demo'
+            ? 'The fixture marks a receipt as expected after a later completed action. This card does not complete the action or create a receipt.'
+            : 'Completing this action will produce a receipt.';
         article.appendChild(r);
     }
 
