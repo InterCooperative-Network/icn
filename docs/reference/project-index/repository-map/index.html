@@ -78,6 +78,24 @@ View source on GitHub →
 <td>Discord-to-Matrix onboarding bridge. Scaffold/docs only, not deployed.</td>
 <td>See <code>docs/BRIDGE_POLICY.md</code> in that repo.</td>
 </tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn-infra" target="_blank" rel="noopener">`icn-infra`</a></td>
+<td>Private</td>
+<td>Organization infrastructure contracts, runbooks, templates, and sanitized inventories.</td>
+<td>Bridges public <code>icn</code> deployment artifacts and private provider truth. Not public product truth, a secrets store, or a production-readiness claim.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/.github" target="_blank" rel="noopener">`.github`</a></td>
+<td>Public</td>
+<td>Organization profile and shared community-health mirror.</td>
+<td>Follows public truth from <code>icn</code>; must not lead or redefine it.</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/demo-repository" target="_blank" rel="noopener">`demo-repository`</a></td>
+<td>Private</td>
+<td>GitHub-generated demonstration repository.</td>
+<td>Non-project noise unless the organization deliberately assigns and documents an ICN role.</td>
+</tr>
 </tbody></table>
 <p>If you came in expecting a separate <code>website</code> repository: the public site lives <strong>inside this repo</strong> at <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/website/">`website/`</a>. Treat it as part of <code>icn</code>, not a separate property.</p>
 <h2>Roles by repo</h2>
@@ -99,14 +117,22 @@ View source on GitHub →
 <p>When the facts in <code>icn-learn</code> and the source repos disagree, the source repos win and <code>icn-learn</code> is the one that has to update.</p>
 <h3><code>icn-community-bridge</code> — Discord ↔ Matrix bridge</h3>
 <p>A community-coordination utility, currently scaffold-and-docs only. Not deployed, not load-bearing. Treated as a small operational tool, not as a substrate component. See that repo&#39;s <code>docs/BRIDGE_POLICY.md</code>.</p>
+<h3><code>icn-infra</code> — private organization infrastructure contracts</h3>
+<p>The organization-owned home for infrastructure contracts, runbooks, templates, and sanitized inventories. It translates public deployment artifacts from <code>icn</code> into bounded operational contracts without making private provider implementation details public.</p>
+<p><code>icn-infra</code> is not public product truth, a secrets store, or evidence of production readiness. The private external provider repository <code>fahertym/network-ops</code> remains authoritative for its own implementation and topology; material may move into <code>icn-infra</code> only as a sanitized contract or path/reference, never as copied private topology or sensitive values.</p>
+<h3><code>.github</code> — public organization mirror</h3>
+<p>Organization profile and shared community-health files. This repository mirrors public project truth after it is established in <code>icn</code>; it does not originate architecture, status, or readiness claims.</p>
+<h3><code>demo-repository</code> — unassigned demonstration repository</h3>
+<p>The GitHub demonstration repository has no current ICN project role. Treat it as non-project noise unless a deliberate retention decision assigns a documented purpose and truth relationship.</p>
 <h2>Merge order across repos</h2>
 <p>When a change crosses repo boundaries, the canonical merge order is:</p>
 <ol>
 <li><strong><code>icn</code></strong> — primitives, public contracts, public claims.</li>
-<li><strong><code>nycn</code></strong> — application semantics built on those primitives.</li>
+<li><strong>Private consuming packages</strong> — <code>nycn</code> for institution semantics; <code>icn-infra</code> for organization infrastructure contracts; <code>icn-community-bridge</code> for its bounded scaffold/policy.</li>
 <li><strong><code>icn-learn</code></strong> — teaching that reflects what shipped above.</li>
+<li><strong><code>.github</code></strong> — organization-facing mirrors after public truth is established.</li>
 </ol>
-<p>See <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/coordination/PR_STACK_PROTOCOL">`ops/coordination/PR_STACK_PROTOCOL.md`</a> and the PR template&#39;s &quot;Cross-repo dependency status&quot; section. Out-of-order merges create teaching that describes something that does not yet exist, or institution behavior whose primitive moved underneath it.</p>
+<p><code>demo-repository</code> is outside this merge order because it has no assigned project role. See <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/coordination/PR_STACK_PROTOCOL">`ops/coordination/PR_STACK_PROTOCOL.md`</a> and the PR template&#39;s &quot;Cross-repo dependency status&quot; section. Out-of-order merges create mirrors or teaching that describe something that does not yet exist, or private package behavior whose public contract moved underneath it.</p>
 <h2>Truth and confidentiality rules per repo</h2>
 <table>
 <thead>
@@ -136,14 +162,30 @@ View source on GitHub →
 <td>Private, operational</td>
 <td>Bridge config and policy. Operational only.</td>
 </tr>
+<tr>
+<td><code>icn-infra</code></td>
+<td>Private, organization-infrastructure</td>
+<td>Contracts, runbooks, templates, and sanitized inventories. Not public product truth or provider implementation truth.</td>
+</tr>
+<tr>
+<td><code>.github</code></td>
+<td>Public, mirror</td>
+<td>Organization profile and shared community-health files. Must follow <code>icn</code> public truth.</td>
+</tr>
+<tr>
+<td><code>demo-repository</code></td>
+<td>Private, unassigned</td>
+<td>GitHub demonstration content with no current project truth role.</td>
+</tr>
 </tbody></table>
-<p>If a fact appears in <code>nycn</code> or <code>icn-learn</code> and is meant to be public, it has to find its way back to <code>icn</code> (typically <code>docs/</code>, <code>website/</code>, or a code change) before it can be cited externally.</p>
+<p>If a fact appears in a private or derivative repository and is meant to be public, it has to find its way back to <code>icn</code> (typically <code>docs/</code>, <code>website/</code>, or a code change) before it can be cited externally. <code>.github</code> may mirror that fact only after the public source exists.</p>
 <h2>Adjacent identifiers</h2>
 <p>A few external surfaces are referenced from ICN material but are not GitHub repos:</p>
 <ul>
 <li><strong><code>intercooperative.network</code></strong> — the public site, built from <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/website/">`website/`</a> in this repo.</li>
 <li><strong>GitHub Sponsors</strong> — <code>github.com/sponsors/InterCooperative-Network</code>. See <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/.github/FUNDING.yml">`.github/FUNDING.yml`</a>.</li>
 <li><strong>Live K3s deployment</strong> — see <a href="/docs/operations/deployment/HOMELAB_DEPLOYMENT">`docs/operations/deployment/HOMELAB_DEPLOYMENT.md`</a>. Operational, not a separate repo.</li>
+<li><strong><code>fahertym/network-ops</code></strong> — external private provider implementation truth. It is not an organization repository or public ICN truth root; do not copy private topology or sensitive values into public docs.</li>
 </ul>
 <h2>Where this map fits</h2>
 <p>This document is <strong>navigation</strong>, not state. For state, see <a href="/docs/STATE">`docs/STATE.md`</a> and <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>. For more granular maps inside this repo, see the rest of <a href="/docs/README">`docs/reference/project-index/`</a>.</p>
