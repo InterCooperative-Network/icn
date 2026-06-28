@@ -5,7 +5,7 @@
   "network": "disabled",
   "generated_from": "committed-fixtures",
   "title": "ICN organizer/member rehearsal-shell fixture bundle (demo mode, no network)",
-  "description": "Deterministic, repo-safe read-model bundle the future no-CLI organizer/member rehearsal shell (icn#1726) can load by default — without any network access or live partner data. This manifest is the fixture-mode bridge slice for icn#1727; the full backend `--demo-mode` flag on icnd remains OPEN. Each read_model points at an already-committed, fictional packet and (where a schema exists) the validator that checks it.",
+  "description": "Deterministic, repo-safe read-model bundle the no-CLI organizer/member rehearsal shell (icn#1726) can load in demo mode — without any network access or live partner data. The Pilot UI renders the preview-review wrapper and browser-served pending-publish rows as a read-only Review Preview; standing and Action Cards remain fixture-backed beside it. This is a frontend fixture slice for icn#1727; the full backend `--demo-mode` flag on icnd remains OPEN. Each read_model points at an already-committed, fictional packet and (where a schema exists) the validator that checks it.",
   "read_models": [
     {
       "name": "member_standing",
@@ -45,6 +45,17 @@
       "schema": "docs/contracts/pending-publish-summary.schema.json"
     },
     {
+      "name": "pending_publish_summary_browser_rows",
+      "surface": "Browser-served copy used by the fixture-only Review Preview tab",
+      "urn": "urn:icn:contract:pending-publish-summary:v1",
+      "composes_with": "preview_review_pending_publish_summary",
+      "path": "web/pilot-ui/fixtures/icn-organizer-demo/pending-publish-summary.json",
+      "must_match": "docs/contracts/pending-publish-summary.example.json",
+      "validate": "schema",
+      "validator": "docs/scripts/validate-preview-review.py",
+      "schema": "docs/contracts/pending-publish-summary.schema.json"
+    },
+    {
       "name": "rehearsal_evidence_export",
       "surface": "Repo-safe evidence packet a separate documented step would export after review",
       "urn": "urn:icn:contract:rehearsal-evidence-export:v1",
@@ -64,6 +75,6 @@
     "Not a formally committed NYCN cooperative pilot authorization.",
     "Not real holder-label to DID activation; that boundary is icn#1730 and is out of scope here.",
     "Not a payment, wallet, balance, or currency surface; allocation / settlement vocabulary refers to internal cooperative coordination primitives only.",
-    "Does not implement the icn#1726 organizer shell UI, nor the full backend --demo-mode flag on icnd that icn#1727 ultimately tracks."
+    "The read-only Review Preview does not implement decision persistence or complete the icn#1726 organizer shell, nor the full backend --demo-mode flag on icnd that icn#1727 ultimately tracks."
   ]
 }
