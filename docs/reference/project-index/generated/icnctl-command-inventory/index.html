@@ -55,7 +55,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </ul>
 <h2>Snapshot</h2>
 <ul>
-<li>Source commit: <code>791af47ea51abb0e29dbfa0643d67b5507689a11</code></li>
+<li>Source commit: <code>d9d25fd30848fbfad4e52ec08b7b686e1e5bc5cb</code></li>
 <li>Source scanned: <code>icn/bins/icnctl/src/**</code> (clap <code>#[derive(Subcommand)]</code> / <code>#[derive(Parser)]</code> tree)</li>
 </ul>
 <h2>Summary</h2>
@@ -63,7 +63,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <li><strong>Total leaf commands (default build): 162</strong></li>
 <li>Top-level command groups: 33</li>
 <li>By role (curated, needs review): organizer 53 · operator 64 · developer 43 · maintainer 2</li>
-<li>By status (curated, see section below): live 38 · partial 107 · planned 13 · unknown / needs local verification 4</li>
+<li>By status (curated, see section below): live 38 · partial 110 · planned 13 · unknown / needs local verification 1</li>
 <li>Proof level: every command is <code>L1</code> (declaration exists in source).</li>
 <li><strong>Feature-gated commands (NOT in the default build, excluded from the counts above): 1</strong> (see section below).</li>
 <li>Unparsed / unresolved candidates: 0 (see section below).</li>
@@ -352,19 +352,19 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td><code>icnctl gov vote delegate</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1310</td>
 </tr>
 <tr>
 <td><code>icnctl gov vote delegations</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1325</td>
 </tr>
 <tr>
 <td><code>icnctl gov vote revoke</code></td>
-<td>unknown / needs local verification</td>
+<td>partial</td>
 <td>L1</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1328</td>
 </tr>
@@ -1130,7 +1130,7 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td>partial</td>
-<td>107</td>
+<td>110</td>
 </tr>
 <tr>
 <td>fixture-demo</td>
@@ -1142,10 +1142,10 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 </tr>
 <tr>
 <td>unknown / needs local verification</td>
-<td>4</td>
+<td>1</td>
 </tr>
 </tbody></table>
-<h3>Classified commands (158)</h3>
+<h3>Classified commands (161)</h3>
 <p>Every non-<code>unknown</code> command, with its evidence basis. (All other default-build commands carry <code>unknown / needs local verification</code>.)</p>
 <table>
 <thead>
@@ -1773,6 +1773,24 @@ Regenerate: <code>python3 docs/scripts/icnctl_command_inventory.py --write</code
 <td>partial</td>
 <td>daemon RPC <code>client.call(&quot;governance.vote.cast&quot;)</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> VoteCommands::Cast); requires a running daemon, not integration-tested</td>
 <td><code>icn/bins/icnctl/src/main.rs</code>:1288</td>
+</tr>
+<tr>
+<td><code>icnctl gov vote delegate</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;governance.delegation.create&quot;)</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> VoteCommands::Delegate); method registered in <code>icn/crates/icn-rpc/src/server.rs</code> -&gt; <code>handle_governance_delegation_create</code> (<code>icn/crates/icn-rpc/src/handler/governance.rs</code>), which binds the delegator to <code>ctx.caller_did</code> (a caller can only delegate their own vote); requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1310</td>
+</tr>
+<tr>
+<td><code>icnctl gov vote delegations</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;governance.delegation.list&quot;)</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> VoteCommands::Delegations); method registered in <code>icn/crates/icn-rpc/src/server.rs</code> -&gt; <code>handle_governance_delegation_list</code> (<code>icn/crates/icn-rpc/src/handler/governance.rs</code>), which returns only the caller&#39;s own given/received delegations; requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1325</td>
+</tr>
+<tr>
+<td><code>icnctl gov vote revoke</code></td>
+<td>partial</td>
+<td>daemon RPC <code>client.call(&quot;governance.delegation.revoke&quot;)</code> via <code>create_authenticated_rpc_client</code> (<code>icn/bins/icnctl/src/main.rs</code> VoteCommands::Revoke); method registered in <code>icn/crates/icn-rpc/src/server.rs</code> -&gt; <code>handle_governance_delegation_revoke</code> (<code>icn/crates/icn-rpc/src/handler/governance.rs</code>), which revokes only when <code>delegation.delegator == ctx.caller_did</code>; requires a running daemon, not integration-tested</td>
+<td><code>icn/bins/icnctl/src/main.rs</code>:1328</td>
 </tr>
 <tr>
 <td><code>icnctl institution bootstrap apply</code></td>
