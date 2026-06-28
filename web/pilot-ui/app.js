@@ -29,7 +29,7 @@ const DEMO_MODE = (() => {
     }
 })();
 const DEMO_MODE_MESSAGES = {
-    demo:    'Local organizer/member demo. Review Preview, Standing, and Action Cards are fixture-backed today.',
+    demo:    'UI is in DEMO mode — a labeling convention. Local organizer/member demo. Review Preview, Standing, and Action Cards are fixture-backed today.',
     fixture: 'UI is in FIXTURE mode — committed test data only; not real participant state.',
     devnet:  'UI is in DEVNET mode — local 3-node Docker cluster; not production.',
     local:   'UI is in LOCAL mode — single-node local gateway.',
@@ -91,6 +91,8 @@ function applyDemoMode() {
         });
         const reviewPreviewNav = document.getElementById('review-preview-nav-btn');
         if (reviewPreviewNav) reviewPreviewNav.classList.remove('hidden');
+        const facilitatorWalkthrough = document.getElementById('facilitator-walkthrough');
+        if (facilitatorWalkthrough) facilitatorWalkthrough.classList.remove('hidden');
     }
 }
 
@@ -3243,6 +3245,66 @@ if (myStandingNavBtn) {
         loadMemberActionCards();
     });
 }
+
+const FACILITATOR_STEP_STATUS = {
+    standing: 'Step 1 of 4: inspect fictional Standing. No participant standing is queried or changed.',
+    'action-cards': 'Step 2 of 4: inspect fictional Action Cards. No work is assigned or completed.',
+    'review-preview': 'Step 3 of 4: inspect proposed rows and disabled review choices. No decision is recorded.',
+    evidence: 'Step 4 of 4: expected receipt categories are explanatory only. No receipt or evidence packet is created.',
+};
+
+function setFacilitatorStep(step) {
+    document.querySelectorAll('[data-facilitator-step]').forEach((button) => {
+        const current = button.dataset.facilitatorStep === step;
+        button.classList.toggle('current', current);
+        if (current) button.setAttribute('aria-current', 'step');
+        else button.removeAttribute('aria-current');
+    });
+    const status = document.getElementById('facilitator-walkthrough-status');
+    if (status) status.textContent = FACILITATOR_STEP_STATUS[step] || '';
+}
+
+function focusFacilitatorSurface(id) {
+    const target = document.getElementById(id);
+    if (target) target.focus();
+}
+
+async function openFacilitatorStep(step) {
+    if (DEMO_MODE !== 'demo') return;
+    setFacilitatorStep(step);
+
+    if (step === 'standing') {
+        switchTab('my-standing');
+        await loadMemberStanding();
+        focusFacilitatorSurface('member-standing-heading');
+        return;
+    }
+    if (step === 'action-cards') {
+        switchTab('my-standing');
+        await loadMemberActionCards();
+        focusFacilitatorSurface('member-action-cards-heading');
+        return;
+    }
+    if (step === 'review-preview') {
+        switchTab('review-preview');
+        await loadOrganizerReviewPreview();
+        focusFacilitatorSurface('organizer-review-heading');
+        return;
+    }
+    if (step === 'evidence') {
+        if (!state.organizerReviewWrapper || !Array.isArray(state.organizerReviewRows) || state.organizerReviewRows.length === 0) {
+            await loadOrganizerReviewPreview();
+        }
+        renderFacilitatorEvidenceExplanation();
+        const explanation = document.getElementById('facilitator-evidence-explanation');
+        if (explanation) explanation.open = true;
+        focusFacilitatorSurface('facilitator-evidence-summary');
+    }
+}
+
+document.querySelectorAll('[data-facilitator-step]').forEach((button) => {
+    button.addEventListener('click', () => openFacilitatorStep(button.dataset.facilitatorStep));
+});
 
 // PR 2 — paint the demo-mode banner and Demo Guide nav button as soon
 // as the DOM has the elements wired. Idempotent; refresh of DID/gateway
@@ -7604,6 +7666,40 @@ function renderOrganizerReviewPreview() {
 
     layout.append(listSection, detail);
     container.append(layout);
+}
+
+function renderFacilitatorEvidenceExplanation() {
+    const container = document.getElementById('facilitator-evidence-categories');
+    if (!container) return;
+    container.replaceChildren();
+
+    const intro = document.createElement('p');
+    intro.textContent = 'The committed Review Preview fixture says these receipt categories would be expected after separate future actions:';
+    container.append(intro);
+
+    const rows = Array.isArray(state.organizerReviewRows) ? state.organizerReviewRows : [];
+    const categories = [...new Set(rows
+        .filter((row) => row.receipt_expected && row.receipt_expected.expected && row.receipt_expected.category)
+        .map((row) => row.receipt_expected.category))];
+
+    if (categories.length > 0) {
+        const list = document.createElement('ul');
+        categories.forEach((category) => {
+            const item = document.createElement('li');
+            item.textContent = organizerReviewLabel({}, category);
+            list.append(item);
+        });
+        container.append(list);
+    } else {
+        const empty = document.createElement('p');
+        empty.textContent = 'No expected receipt categories are present in the loaded fixture.';
+        container.append(empty);
+    }
+
+    const boundary = document.createElement('p');
+    boundary.className = 'facilitator-evidence-warning';
+    boundary.textContent = 'Expected does not mean issued. This walkthrough displays category labels only; it creates and exports nothing.';
+    container.append(boundary);
 }
 
 function buildOrganizerReviewDetail(row, index, total) {
