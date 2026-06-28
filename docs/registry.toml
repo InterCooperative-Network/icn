@@ -3558,6 +3558,22 @@ domain_tags = ["pilot", "nycn", "communications", "action-cards", "accessibility
 recommended_action = "keep"
 last_reviewed = "2026-06-28"
 
+[docs."docs/pilots/organizer-facilitator-walkthrough-accessibility-pass.md"]
+category = "reference"
+status = "living"
+title = "Organizer facilitator walkthrough accessibility evidence (partial)"
+description = "Partial browser-assisted accessibility evidence for the fixture-backed, read-only organizer facilitator walkthrough merged in #2239. Records keyboard focus-order, semantic-tree, forced-colors, reduced-motion, target-size, narrow/reflow, and network observations against the twelve-category organizer/member gate. Explicitly does not claim a human, screen-reader, switch-control, low-vision, legal-conformance, organizer-readiness, member-facing-readiness, pilot-readiness, mutation, receipt, or evidence-export pass. Keeps #2041/#1726/#1727/#1746 open and records the remaining named human/AT work."
+last_updated = "2026-06-28"
+owner = "matt"
+audiences = ["team", "organizers", "contributors"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["pilot", "accessibility", "organizer", "action-cards", "evidence"]
+recommended_action = "keep"
+last_reviewed = "2026-06-28"
+
 [docs."docs/pilots/summit-ops-lifecycle-package-map.md"]
 category = "reference"
 status = "living"
