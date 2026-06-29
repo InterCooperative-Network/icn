@@ -341,6 +341,7 @@ Security documentation, threat models, and audit reports.
 - [security-roadmap.md](security/security-roadmap.md) - Security roadmap
 - [SECURITY_AUDIT_REPORT.md](security/SECURITY_AUDIT_REPORT.md) - Audit findings
 - [SECURITY_AUDIT_RESULTS.md](security/SECURITY_AUDIT_RESULTS.md) - Audit results
+- [codeql-alert-triage-2026-06-29.md](security/codeql-alert-triage-2026-06-29.md) - Point-in-time static triage of CodeQL alerts #100 and #101
 
 **SDIS Security:**
 - [SDIS_THREAT_MODEL.md](security/SDIS_THREAT_MODEL.md) - SDIS-specific threats

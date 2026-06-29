@@ -1719,6 +1719,15 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["security", "developers"]
 
+[docs."docs/security/codeql-alert-triage-2026-06-29.md"]
+category = "security"
+status = "living"
+title = "CodeQL Alert Triage (2026-06-29)"
+description = "Point-in-time static triage of CodeQL alerts #100 and #101, with an inventory of other open alerts"
+last_updated = "2026-06-29"
+owner = "matt"
+audiences = ["security", "developers"]
+
 # ============================================================================
 # API AND REFERENCE DOCUMENTS
 # ============================================================================
