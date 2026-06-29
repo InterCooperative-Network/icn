@@ -345,6 +345,7 @@ These links include historical reports, current scanning notes, and point-in-tim
 - [SECURITY_AUDIT_RESULTS.md](security/SECURITY_AUDIT_RESULTS.md) - Audit results
 - [codeql-alert-triage-2026-06-29.md](security/codeql-alert-triage-2026-06-29.md) - Point-in-time static triage of CodeQL alerts #100 and #101
 - [codeql-gossip-nonce-triage-2026-06-29.md](security/codeql-gossip-nonce-triage-2026-06-29.md) - Point-in-time static triage of gossip nonce alerts #30–#35
+- [codeql-triage-closeout-2026-06-29.md](security/codeql-triage-closeout-2026-06-29.md) - Point-in-time CodeQL inventory and maintainer disposition checklist
 
 **SDIS Security:**
 - [SDIS_THREAT_MODEL.md](security/SDIS_THREAT_MODEL.md) - SDIS-specific threats

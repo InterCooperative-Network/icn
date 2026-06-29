@@ -1737,6 +1737,15 @@ last_updated = "2026-06-29"
 owner = "matt"
 audiences = ["security", "developers"]
 
+[docs."docs/security/codeql-triage-closeout-2026-06-29.md"]
+category = "security"
+status = "living"
+title = "CodeQL Triage Closeout (2026-06-29)"
+description = "Point-in-time open-alert inventory, detailed remaining triage, and maintainer disposition checklist"
+last_updated = "2026-06-29"
+owner = "matt"
+audiences = ["security", "developers"]
+
 # ============================================================================
 # API AND REFERENCE DOCUMENTS
 # ============================================================================
