@@ -5,17 +5,19 @@ Comprehensive security documentation, threat models, audit reports, and hardenin
 **Last Updated**: 2026-06-29
 **Security Status**: Historical assessment snapshot (as of 2025-12-18)
 
+> **Claim boundary:** These security docs include historical reports and hardening references. They do not by themselves establish current production readiness, vulnerability remediation status, deployment approval, or security hardening completion. Verify current posture against live code, current CI, CodeQL/code-scanning results, dependency audits, state docs, and recent PR evidence.
+
 ## 🚨 Quick Links
 
-- **[FINAL_SECURITY_STATUS.md](FINAL_SECURITY_STATUS.md)** - Production readiness assessment ⭐
+- **[FINAL_SECURITY_STATUS.md](FINAL_SECURITY_STATUS.md)** - Historical assessment snapshot (2025-12-18)
 - **[threat-model.md](threat-model.md)** - Comprehensive threat analysis
-- **[production-hardening.md](production-hardening.md)** - Hardening measures
+- **[production-hardening.md](production-hardening.md)** - Historical hardening reference
 - **[SECURITY_TESTING_GUIDE.md](SECURITY_TESTING_GUIDE.md)** - Testing procedures
 
 ## Overview
 
 This directory contains all security-related documentation for ICN, including:
-- Production security status and assessments
+- Historical security assessments and status snapshots
 - Threat models and risk analysis
 - Security audit reports and findings
 - Hardening guides and best practices
@@ -30,21 +32,21 @@ No advanced workflow was added by this audit. The current default setup already 
 
 If maintainers later choose repo-owned configuration or the `security-extended` query suite, treat that as a coordinated settings-and-workflow change. Alert triage remains separate. This point-in-time audit did not change repository settings, branch protection, runtime behavior, or any CodeQL alert, and it makes no claim about vulnerability remediation, hardening completion, or readiness.
 
-## 📊 Production Security
+## 📊 Historical security assessments
 
-### Status Snapshot
+### Assessment archive
 
 | Document | Status | Description |
 |----------|--------|-------------|
-| [FINAL_SECURITY_STATUS.md](FINAL_SECURITY_STATUS.md) | ✅ Current | Production readiness assessment (2025-12-18) |
-| [COMPREHENSIVE_SECURITY_IMPROVEMENTS.md](COMPREHENSIVE_SECURITY_IMPROVEMENTS.md) | ✅ Complete | Security overview and improvements |
-| [SECURITY_FIXES_2025-12-18.md](SECURITY_FIXES_2025-12-18.md) | ✅ Applied | Detailed vulnerability fixes |
+| [FINAL_SECURITY_STATUS.md](FINAL_SECURITY_STATUS.md) | Historical snapshot | Assessment dated 2025-12-18; not current readiness evidence |
+| [COMPREHENSIVE_SECURITY_IMPROVEMENTS.md](COMPREHENSIVE_SECURITY_IMPROVEMENTS.md) | Historical report | Security overview and reported improvements from 2025-12-18 |
+| [SECURITY_FIXES_2025-12-18.md](SECURITY_FIXES_2025-12-18.md) | Historical fix record | Changes reported on 2025-12-18; current status requires verification |
 
-### Deployment & Operations
+### Historical deployment and hardening references
 
 | Document | Description |
 |----------|-------------|
-| [production-hardening.md](production-hardening.md) | Production hardening measures (67KB) |
+| [production-hardening.md](production-hardening.md) | Historical hardening measures and checklist (67KB) |
 | [SECURITY_TESTING_GUIDE.md](SECURITY_TESTING_GUIDE.md) | Testing procedures and validation |
 | [SECRET_MANAGEMENT.md](SECRET_MANAGEMENT.md) | Secret management best practices |
 | [GATEWAY_CSP.md](GATEWAY_CSP.md) | Content Security Policy configuration |
@@ -55,7 +57,7 @@ If maintainers later choose repo-owned configuration or the `security-extended` 
 
 | Document | Scope | Size |
 |----------|-------|------|
-| [threat-model.md](threat-model.md) | Complete system threat model | 43KB |
+| [threat-model.md](threat-model.md) | System threat-model reference | 43KB |
 | [security-roadmap.md](security-roadmap.md) | Security roadmap and priorities | 68KB |
 | [TOFU_SECURITY_MODEL.md](TOFU_SECURITY_MODEL.md) | Trust-On-First-Use model analysis | 6KB |
 
@@ -91,13 +93,13 @@ Sovereign Digital Identity System security documentation:
 ## 🎯 Quick Access by Role
 
 ### For Security Engineers
-1. [FINAL_SECURITY_STATUS.md](FINAL_SECURITY_STATUS.md) - Start here
+1. [FINAL_SECURITY_STATUS.md](FINAL_SECURITY_STATUS.md) - Historical assessment context
 2. [threat-model.md](threat-model.md) - Understand threats
 3. [SECURITY_AUDIT_REPORT.md](SECURITY_AUDIT_REPORT.md) - Review findings
 4. [security-roadmap.md](security-roadmap.md) - Future work
 
 ### For DevOps/Operators
-1. [production-hardening.md](production-hardening.md) - Hardening checklist
+1. [production-hardening.md](production-hardening.md) - Historical hardening checklist
 2. [SECRET_MANAGEMENT.md](SECRET_MANAGEMENT.md) - Secret handling
 3. [GATEWAY_CSP.md](GATEWAY_CSP.md) - Gateway security
 4. [SECURITY_TESTING_GUIDE.md](SECURITY_TESTING_GUIDE.md) - Validation
@@ -111,7 +113,7 @@ Sovereign Digital Identity System security documentation:
 ### For Auditors/Compliance
 1. [SECURITY_AUDIT_REPORT.md](SECURITY_AUDIT_REPORT.md) - Audit findings
 2. [SECURITY_AUDIT_RESULTS.md](SECURITY_AUDIT_RESULTS.md) - Detailed results
-3. [COMPREHENSIVE_SECURITY_IMPROVEMENTS.md](COMPREHENSIVE_SECURITY_IMPROVEMENTS.md) - Improvements made
+3. [COMPREHENSIVE_SECURITY_IMPROVEMENTS.md](COMPREHENSIVE_SECURITY_IMPROVEMENTS.md) - Historical improvements report
 4. [security-roadmap.md](security-roadmap.md) - Future plans
 
 ## 🔐 Security Domains
@@ -148,8 +150,8 @@ Sovereign Digital Identity System security documentation:
 
 ## 📈 Security Metrics
 
-Key security metrics tracked:
-- Vulnerability remediation time
+Metrics described by the referenced guidance include:
+- Vulnerability response time
 - Test coverage for security-critical paths
 - Cryptographic strength margins
 - Trust verification success rates
@@ -159,18 +161,18 @@ See [SECURITY_TESTING_GUIDE.md](SECURITY_TESTING_GUIDE.md) for monitoring proced
 
 ## 🚀 Security Roadmap
 
-Current security work is documented in:
-- [security-roadmap.md](security-roadmap.md) - Long-term roadmap
-- [SECURITY_ANALYSIS_REMAINING_ISSUES.md](SECURITY_ANALYSIS_REMAINING_ISSUES.md) - Outstanding issues
-- [SECURITY_FOLLOWUP.md](SECURITY_FOLLOWUP.md) - Follow-up actions
+Planning and follow-up references:
+- [security-roadmap.md](security-roadmap.md) - Long-term roadmap reference
+- [SECURITY_ANALYSIS_REMAINING_ISSUES.md](SECURITY_ANALYSIS_REMAINING_ISSUES.md) - Historical outstanding-issues snapshot
+- [SECURITY_FOLLOWUP.md](SECURITY_FOLLOWUP.md) - Historical follow-up record
 
-### Recent Milestones
-- ✅ 2025-12-18: Production hardening complete
-- ✅ 2025-12-18: Security audit resolution
-- ✅ 2025-12-17: Architecture security review
+### Historical report milestones
+- 2025-12-18 report set: production-hardening milestone recorded (historical claim)
+- 2025-12-18 report set: security-audit resolution milestone recorded (historical claim)
+- 2025-12-17 report set: architecture-security review milestone recorded (historical claim)
 
-### Upcoming Work
-See [security-roadmap.md](security-roadmap.md) for detailed future plans.
+### Follow-up areas
+See [security-roadmap.md](security-roadmap.md) for the recorded plans, then verify current priorities against live project evidence.
 
 ## 🔗 Related Documentation
 
@@ -186,7 +188,7 @@ When adding security documentation:
 1. **Threat Models**: Use STRIDE or similar frameworks
 2. **Findings**: Include severity, impact, and remediation
 3. **Cross-references**: Link to related security docs
-4. **Updates**: Keep FINAL_SECURITY_STATUS.md current
+4. **Updates**: Date and label assessment snapshots; do not present FINAL_SECURITY_STATUS.md as current truth
 5. **Sensitive Data**: Never commit secrets or keys
 
 See [../CONTRIBUTING.md](../../CONTRIBUTING.md) for general guidelines.
@@ -206,7 +208,7 @@ Follow responsible disclosure:
 - Security questions: Review [EDUCATIONAL_GUIDE_SECURITY_FIXES.md](EDUCATIONAL_GUIDE_SECURITY_FIXES.md)
 - Operational security: Check [production-hardening.md](production-hardening.md)
 - Testing: See [SECURITY_TESTING_GUIDE.md](SECURITY_TESTING_GUIDE.md)
-- Status: Review [FINAL_SECURITY_STATUS.md](FINAL_SECURITY_STATUS.md)
+- Historical assessment context: Review [FINAL_SECURITY_STATUS.md](FINAL_SECURITY_STATUS.md)
 
 ---
 
