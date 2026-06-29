@@ -24,7 +24,11 @@ use std::sync::Arc;
 use tracing::info;
 
 use crate::auth::TokenClaims;
-use crate::authority::{observe_treasury_entity_access, EntityAction};
+use crate::authority::{
+    active_treasury_entity_auth_mode, evaluate_treasury_entity_access,
+    observe_treasury_entity_access, treasury_gate_enforcement_denial, EntityAction,
+    TreasuryEntityAuthMode,
+};
 use crate::coop_entity_resolver::{
     CoopEntityResolver, ObserveCoopEntityResolver, UnwiredCoopEntityResolver,
 };
@@ -308,38 +312,67 @@ async fn observe_treasury(
     treasury_entity_id: Option<&EntityId>,
     coop_id: &str,
     action: EntityAction,
-) {
-    // Resolve the caller synchronously (cheap); bail quietly if the request is
-    // unauthenticated or the subject DID is unparseable.
+) -> Result<()> {
+    // Resolve the caller synchronously (cheap); bail quietly (proceed) if the request is
+    // unauthenticated or the subject DID is unparseable — the flat `require_coop_access`
+    // guard above remains authoritative for those cases.
     let Some(claims) = get_claims(req) else {
-        return;
+        return Ok(());
     };
     let Ok(caller_did) = claims.sub.parse::<Did>() else {
-        return;
+        return Ok(());
     };
     let caller = EntityId::from_did(&caller_did);
 
-    // Run the observation as a detached, best-effort task. The entity-registry
-    // lookup may be a daemon-actor round trip; awaiting it inline would let a slow
-    // or stalled EntityManager block an already-authorized treasury response, even
-    // though the result is discarded and non-enforcing. Spawning keeps observe mode
-    // strictly off the request path — it can affect neither the response nor its
-    // latency. (RFC-0018 observe mode, ADR-0035.)
     let entity_mgr = entity_mgr.get_ref().clone();
     let resolver = observe_coop_entity_resolver(req);
     let target = treasury_entity_id.cloned();
     let coop_id = coop_id.to_string();
-    actix_web::rt::spawn(async move {
-        let _ = observe_treasury_entity_access(
-            resolver.as_ref(),
-            &entity_mgr,
-            &caller,
-            target.as_ref(),
-            &coop_id,
-            action,
-        )
-        .await;
-    });
+
+    match active_treasury_entity_auth_mode() {
+        // A2e ENFORCE (operator-gated, off by default): consume the gate decision INLINE on
+        // the request path. A `WouldDeny` denies with the existing forbidden pattern (403)
+        // BEFORE any treasury mutation; `ProceedUnchanged` proceeds exactly as the flat
+        // guard decided. The same metrics/log/evidence chain is recorded as in observe mode
+        // (`evaluate_treasury_entity_access`). Awaiting inline is the deliberate cost of
+        // enforcement: an unverified entity gate must not let a slow/erroring EntityManager
+        // pass — a stall/error surfaces as `WouldDeny(ObservationError)` and fails closed.
+        TreasuryEntityAuthMode::EnforceTrustedResolver => {
+            let outcome = evaluate_treasury_entity_access(
+                resolver.as_ref(),
+                &entity_mgr,
+                &caller,
+                target.as_ref(),
+                &coop_id,
+                action,
+            )
+            .await;
+            match treasury_gate_enforcement_denial(outcome.decision) {
+                Some(err) => Err(err),
+                None => Ok(()),
+            }
+        }
+        // OBSERVE (default): run as a detached, best-effort task and discard the result.
+        // The entity-registry lookup may be a daemon-actor round trip; awaiting it inline
+        // would let a slow or stalled EntityManager block an already-authorized treasury
+        // response. Spawning keeps observe mode strictly off the request path — it can
+        // affect neither the response nor its latency, and never denies. Route allow/deny
+        // is byte-identical to the pre-A2e behavior. (RFC-0018 observe mode, ADR-0035.)
+        TreasuryEntityAuthMode::ObserveOnly => {
+            actix_web::rt::spawn(async move {
+                let _ = observe_treasury_entity_access(
+                    resolver.as_ref(),
+                    &entity_mgr,
+                    &caller,
+                    target.as_ref(),
+                    &coop_id,
+                    action,
+                )
+                .await;
+            });
+            Ok(())
+        }
+    }
 }
 
 /// Fetch the observe-mode `coop_id → EntityId` resolver from gateway app state (A2c).
@@ -372,12 +405,12 @@ async fn observe_treasury_by_did(
     treasury_mgr: &web::Data<Arc<GatewayTreasuryManager>>,
     treasury_did: &Did,
     action: EntityAction,
-) {
+) -> Result<()> {
     let Some(claims) = get_claims(req) else {
-        return;
+        return Ok(());
     };
     let Ok(caller_did) = claims.sub.parse::<Did>() else {
-        return;
+        return Ok(());
     };
     let caller = EntityId::from_did(&caller_did);
 
@@ -385,23 +418,56 @@ async fn observe_treasury_by_did(
     let treasury_mgr = treasury_mgr.get_ref().clone();
     let treasury_did = treasury_did.clone();
     let resolver = observe_coop_entity_resolver(req);
-    actix_web::rt::spawn(async move {
-        // Resolve the budget's owning treasury off the hot path; observe against
-        // its stored entity_id (and its own coop_id for the fallback projection).
-        let (target, coop_id) = match treasury_mgr.get_treasury(&treasury_did).await {
-            Ok(Some(t)) => (t.entity_id().cloned(), t.coop_id.clone()),
-            _ => (None, String::new()),
-        };
-        let _ = observe_treasury_entity_access(
-            resolver.as_ref(),
-            &entity_mgr,
-            &caller,
-            target.as_ref(),
-            &coop_id,
-            action,
-        )
-        .await;
-    });
+
+    match active_treasury_entity_auth_mode() {
+        // A2e ENFORCE (operator-gated, off by default): resolve the budget's owning treasury
+        // and consume the gate decision INLINE, before returning the budget. A `WouldDeny`
+        // (including the fail-closed case where the owning treasury cannot be resolved, so no
+        // trusted target exists) denies with the existing forbidden pattern (403);
+        // `ProceedUnchanged` proceeds. This enforces against the budget's REAL owning entity,
+        // not the path coop.
+        TreasuryEntityAuthMode::EnforceTrustedResolver => {
+            let (target, coop_id) = match treasury_mgr.get_treasury(&treasury_did).await {
+                Ok(Some(t)) => (t.entity_id().cloned(), t.coop_id.clone()),
+                _ => (None, String::new()),
+            };
+            let outcome = evaluate_treasury_entity_access(
+                resolver.as_ref(),
+                &entity_mgr,
+                &caller,
+                target.as_ref(),
+                &coop_id,
+                action,
+            )
+            .await;
+            match treasury_gate_enforcement_denial(outcome.decision) {
+                Some(err) => Err(err),
+                None => Ok(()),
+            }
+        }
+        // OBSERVE (default): resolve the owning treasury and observe off the hot path; the
+        // result is discarded and never denies (byte-identical to the pre-A2e behavior).
+        TreasuryEntityAuthMode::ObserveOnly => {
+            actix_web::rt::spawn(async move {
+                // Resolve the budget's owning treasury off the hot path; observe against
+                // its stored entity_id (and its own coop_id for the fallback projection).
+                let (target, coop_id) = match treasury_mgr.get_treasury(&treasury_did).await {
+                    Ok(Some(t)) => (t.entity_id().cloned(), t.coop_id.clone()),
+                    _ => (None, String::new()),
+                };
+                let _ = observe_treasury_entity_access(
+                    resolver.as_ref(),
+                    &entity_mgr,
+                    &caller,
+                    target.as_ref(),
+                    &coop_id,
+                    action,
+                )
+                .await;
+            });
+            Ok(())
+        }
+    }
 }
 
 #[get("/{coop_id}")]
@@ -438,7 +504,7 @@ pub async fn get_treasury_status(
         &coop_id,
         EntityAction::TreasuryRead,
     )
-    .await;
+    .await?;
 
     // Get budgets and spending rules
     let budgets = treasury_mgr
@@ -522,7 +588,7 @@ pub(crate) async fn do_get_treasury_position(
         &coop_id,
         EntityAction::TreasuryRead,
     )
-    .await;
+    .await?;
 
     // Check if ledger is wired for position queries
     if !treasury_mgr.is_ledger_wired() {
@@ -581,7 +647,7 @@ pub async fn get_treasury_nonce(
         &coop_id,
         EntityAction::TreasuryRead,
     )
-    .await;
+    .await?;
 
     let treasury_did = treasury.treasury_did.to_string();
     let nonce = treasury_mgr
@@ -640,7 +706,7 @@ pub async fn list_budgets(
         &coop_id,
         EntityAction::TreasuryRead,
     )
-    .await;
+    .await?;
 
     // Get budgets
     let budgets = treasury_mgr
@@ -715,7 +781,7 @@ pub async fn get_budget(
         &budget.treasury_did,
         EntityAction::TreasuryRead,
     )
-    .await;
+    .await?;
 
     // #2085: object-context binding in the flat-authz regime. The budget was
     // fetched by a globally-keyed id; require it to belong to the treasury of the
@@ -834,7 +900,7 @@ pub async fn create_budget(
         &coop_id,
         EntityAction::TreasuryWrite,
     )
-    .await;
+    .await?;
 
     info!(
         coop_id = %coop_id,
@@ -937,7 +1003,7 @@ pub async fn list_spending_rules(
         &coop_id,
         EntityAction::TreasuryRead,
     )
-    .await;
+    .await?;
 
     // Get spending rules
     let rules = treasury_mgr
@@ -1020,7 +1086,7 @@ pub async fn get_audit_trail(
         &coop_id,
         EntityAction::TreasuryRead,
     )
-    .await;
+    .await?;
 
     // Get audit trail
     let audit_trail = treasury_mgr
@@ -1112,7 +1178,7 @@ pub async fn deposit_to_treasury(
         &coop_id,
         EntityAction::TreasuryWrite,
     )
-    .await;
+    .await?;
 
     info!(
         coop_id = %coop_id,
@@ -1257,7 +1323,7 @@ pub(crate) async fn do_propose_spend(
         &coop_id,
         EntityAction::TreasuryWrite,
     )
-    .await;
+    .await?;
 
     let nonce = match body.expected_nonce {
         Some(n) => n,

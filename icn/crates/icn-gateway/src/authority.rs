@@ -755,21 +755,58 @@ fn record_treasury_gate(
     }
 }
 
-/// Compute, record, and return the entity-aware authorization observation for a
-/// treasury request that has ALREADY passed the flat `require_coop_access` guard.
+/// The route-consumable outcome of evaluating treasury entity-aware authorization (A2e):
+/// the gate `decision` under the active mode plus the underlying membership `observation`.
 ///
-/// This is observation-only — it emits a metric and a log line and returns the
-/// observation. It never denies the request (the caller discards the result).
-/// `treasury_entity_id` is the treasury's stored `EntityId` (`treasury.entity_id()`);
-/// `coop_id` is the path coop id used only as a best-effort fallback target.
-pub(crate) async fn observe_treasury_entity_access(
+/// The observe path ([`observe_treasury_entity_access`]) discards `decision`; the
+/// enforcement path consumes it via [`treasury_gate_enforcement_denial`].
+pub(crate) struct TreasuryAccessOutcome {
+    /// The gate decision under the operator-selected [`active_treasury_entity_auth_mode`].
+    pub(crate) decision: TreasuryGateDecision,
+    /// The entity-membership observation (the authority signal).
+    pub(crate) observation: EntityAccessObservation,
+}
+
+/// Map a treasury gate decision to an optional route denial under enforcement (A2e).
+///
+/// `ProceedUnchanged` -> `None`: the route proceeds exactly as the flat
+/// `require_coop_access` guard decided. `WouldDeny(reason)` ->
+/// `Some(GatewayError::Forbidden)`: the existing 403 forbidden/authorization pattern,
+/// carrying the decision's stable `reason.label()`. This is the ONLY place a treasury gate
+/// decision becomes a route outcome, and the route reaches it solely under the explicit
+/// [`TreasuryEntityAuthMode::EnforceTrustedResolver`] mode. Pure: it issues no token claim
+/// and consults no mapping — it only translates an already-made [`decide_treasury_gate`]
+/// decision into the existing denial type.
+pub(crate) fn treasury_gate_enforcement_denial(
+    decision: TreasuryGateDecision,
+) -> Option<GatewayError> {
+    match decision {
+        TreasuryGateDecision::ProceedUnchanged => None,
+        TreasuryGateDecision::WouldDeny(reason) => Some(GatewayError::Forbidden(format!(
+            "treasury entity-authorization gate denied this request ({})",
+            reason.label()
+        ))),
+    }
+}
+
+/// Compute, record, and return the entity-aware authorization outcome for a treasury
+/// request that has ALREADY passed the flat `require_coop_access` guard.
+///
+/// Emits a metric and a log line, records the A2d/A2e gate measurement, and returns the
+/// gate `decision` (under the active mode) bundled with the membership `observation`. The
+/// observe path ([`observe_treasury_entity_access`]) discards `decision`; the enforcement
+/// path consumes it. Both modes run this identical measurement/evidence chain —
+/// enforcement reuses the observe computation, it does not fork it. `treasury_entity_id`
+/// is the treasury's stored `EntityId` (`treasury.entity_id()`); `coop_id` is the path
+/// coop id used only as a best-effort fallback target.
+pub(crate) async fn evaluate_treasury_entity_access(
     resolver: &dyn CoopEntityResolver,
     entity_mgr: &EntityManager,
     caller: &EntityId,
     treasury_entity_id: Option<&EntityId>,
     coop_id: &str,
     action: EntityAction,
-) -> EntityAccessObservation {
+) -> TreasuryAccessOutcome {
     let membership =
         compute_treasury_observation(entity_mgr, caller, treasury_entity_id, coop_id, action).await;
 
@@ -848,7 +885,35 @@ pub(crate) async fn observe_treasury_entity_access(
         decide_treasury_gate(TreasuryEntityAuthMode::EnforceTrustedResolver, &evidence);
     record_treasury_gate(caller, action, &evidence, active_gate, would_enforce_gate);
 
-    evidence.membership.observation
+    TreasuryAccessOutcome {
+        decision: active_gate,
+        observation: evidence.membership.observation,
+    }
+}
+
+/// Observe-only wrapper over [`evaluate_treasury_entity_access`] that returns just the
+/// membership observation and discards the gate decision. Preserves the historical
+/// observe-mode signature and behavior — existing callers and tests are unchanged, and it
+/// still never denies. The enforcement path calls `evaluate_treasury_entity_access`
+/// directly to consume the decision.
+pub(crate) async fn observe_treasury_entity_access(
+    resolver: &dyn CoopEntityResolver,
+    entity_mgr: &EntityManager,
+    caller: &EntityId,
+    treasury_entity_id: Option<&EntityId>,
+    coop_id: &str,
+    action: EntityAction,
+) -> EntityAccessObservation {
+    evaluate_treasury_entity_access(
+        resolver,
+        entity_mgr,
+        caller,
+        treasury_entity_id,
+        coop_id,
+        action,
+    )
+    .await
+    .observation
 }
 
 /// Outcome of comparing the legacy `coop_id → EntityId` projection against the
@@ -2542,5 +2607,114 @@ mod coop_resolution_observe_tests {
                 "default (ObserveOnly) gate must proceed unchanged"
             );
         }
+    }
+
+    // ----------------------------------------------------------------------
+    // A2e: route-level enforcement consumption of the treasury gate decision.
+    //
+    // `treasury_gate_enforcement_denial` maps a gate decision to an optional route
+    // denial: `ProceedUnchanged` -> `None` (proceed exactly as the flat guard decided);
+    // `WouldDeny(reason)` -> `Some(GatewayError::Forbidden)` (the existing 403 forbidden
+    // pattern, carrying the stable reason label). The route only reaches this under the
+    // explicit `EnforceTrustedResolver` mode; `ObserveOnly` stays a detached, discarded
+    // observation that never denies. These are the env-free pure tests of the consumption
+    // seam — the *when* of `WouldDeny` vs `ProceedUnchanged` is proven by the `gate_*`
+    // decision tests above, and "missing/empty/unknown env -> ObserveOnly" by the
+    // `parse_mode_*` tests.
+    // ----------------------------------------------------------------------
+
+    #[test]
+    fn enforcement_denial_is_none_on_proceed_unchanged() {
+        assert!(treasury_gate_enforcement_denial(ProceedUnchanged).is_none());
+    }
+
+    #[test]
+    fn enforcement_denial_is_forbidden_for_every_would_deny_reason() {
+        for reason in [
+            NotMember,
+            UntrustedResolution,
+            ResolverConflict,
+            ResolverOnlyTargetUnverified,
+            AgreeTargetUnverified,
+            IndeterminateMembership,
+            ObservationError,
+        ] {
+            let denial = treasury_gate_enforcement_denial(WouldDeny(reason));
+            assert!(
+                matches!(&denial, Some(GatewayError::Forbidden(_))),
+                "WouldDeny({}) must map to a Forbidden (403) denial",
+                reason.label()
+            );
+            if let Some(GatewayError::Forbidden(msg)) = &denial {
+                assert!(
+                    msg.contains(reason.label()),
+                    "denial message must carry the stable reason label {}: {msg}",
+                    reason.label()
+                );
+            }
+        }
+    }
+
+    // Enforce mode denies EXACTLY when `decide_treasury_gate` returns `WouldDeny`, and
+    // proceeds when it returns `ProceedUnchanged`. A resolver/agreed mapping is never
+    // authority by itself; untrusted / `UnknownLegacy` / unprovenanced bases fail closed.
+    #[test]
+    fn enforce_mode_denies_exactly_when_gate_would_deny() {
+        let t = coop("food-coop");
+        let other = coop("other-coop");
+
+        // Trusted Agree basis + verified membership target + affirmative member -> proceed.
+        let allow_ev = agree(allow(), Some(t.clone()), t.clone());
+        let d = decide_treasury_gate(EnforceTrustedResolver, &allow_ev);
+        assert_eq!(d, ProceedUnchanged);
+        assert!(
+            treasury_gate_enforcement_denial(d).is_none(),
+            "verified trusted member-allow must proceed under enforcement"
+        );
+
+        // UnknownLegacy / unprovenanced / gossip-originated rows read back as an untrusted
+        // LegacyOnly basis -> WouldDeny(UntrustedResolution) -> denial.
+        let untrusted_ev = evidence(allow(), Some(t.clone()), untrusted(), Some(t.clone()), None);
+        let d = decide_treasury_gate(EnforceTrustedResolver, &untrusted_ev);
+        assert_eq!(d, WouldDeny(UntrustedResolution));
+        assert!(
+            treasury_gate_enforcement_denial(d).is_some(),
+            "untrusted basis (UnknownLegacy/unprovenanced) must deny under enforcement"
+        );
+
+        // Trusted basis but non-member -> WouldDeny(NotMember) -> denial.
+        let nonmember_ev = agree(deny(), Some(t.clone()), t.clone());
+        let d = decide_treasury_gate(EnforceTrustedResolver, &nonmember_ev);
+        assert_eq!(d, WouldDeny(NotMember));
+        assert!(treasury_gate_enforcement_denial(d).is_some());
+
+        // A resolver mapping alone is NOT authority: ResolverOnly with an UNVERIFIED
+        // membership target (member allow, but evaluated against the wrong entity) must
+        // not allow -> denial.
+        let resolver_only_unverified = resolver_only(allow(), Some(other.clone()), t.clone());
+        let d = decide_treasury_gate(EnforceTrustedResolver, &resolver_only_unverified);
+        assert!(
+            matches!(d, WouldDeny(_)),
+            "resolver-only with an unverified target must not grant access"
+        );
+        assert!(treasury_gate_enforcement_denial(d).is_some());
+    }
+
+    // The default / off path: under ObserveOnly the gate ALWAYS yields ProceedUnchanged,
+    // so even evidence that WOULD deny under enforcement produces no route denial — default
+    // route behavior is byte-identical to the flat guard.
+    #[test]
+    fn observe_mode_never_denies_even_when_enforce_would() {
+        let t = coop("food-coop");
+        let would_deny_ev = evidence(deny(), Some(t.clone()), untrusted(), Some(t.clone()), None);
+        // Sanity: this evidence denies under enforcement...
+        assert!(matches!(
+            decide_treasury_gate(EnforceTrustedResolver, &would_deny_ev),
+            WouldDeny(_)
+        ));
+        // ...but ObserveOnly proceeds, and the route consumes that as no denial.
+        let observe_decision = decide_treasury_gate(ObserveOnly, &would_deny_ev);
+        assert_eq!(observe_decision, ProceedUnchanged);
+        assert!(treasury_gate_enforcement_denial(observe_decision).is_none());
     }
 }
