@@ -269,4 +269,115 @@ test.describe('Demo Mode (PR 2)', () => {
         await expect(message).not.toContainText('PR 5');
         await expect(message).not.toContainText('arrives in');
     });
+
+    test('all reachable demo navigation stays local, static, and non-mutating', async ({ page, context }, testInfo) => {
+        const localOrigin = new URL(testInfo.project.use.baseURL || 'http://localhost:8000').origin;
+        const observedRequests = [];
+        context.on('request', (request) => {
+            observedRequests.push({ url: request.url(), method: request.method() });
+        });
+
+        await page.goto('/?mode=demo');
+        await page.waitForLoadState('networkidle');
+
+        const visibleTabs = await page.locator('nav[aria-label="Main navigation"] [data-tab]:visible')
+            .evaluateAll((buttons) => buttons.map((button) => button.dataset.tab));
+        expect(visibleTabs).toEqual([
+            'demo-guide',
+            'review-preview',
+            'my-standing',
+            'governance',
+            'federation',
+            'receipts',
+        ]);
+
+        const walkthroughBoundary = page.locator('#facilitator-walkthrough');
+        await expect(walkthroughBoundary).toBeVisible();
+        await expect(walkthroughBoundary).toContainText('COMMITTED FICTIONAL FIXTURES');
+        await expect(walkthroughBoundary).toContainText('READ-ONLY');
+        await expect(walkthroughBoundary).toContainText('NON-MUTATING');
+
+        await page.getByRole('link', { name: 'Review Preview surface' }).click();
+        await expect(page.locator('#review-preview')).toHaveClass(/active/);
+        await expect(page.locator('.organizer-review-row-select')).toHaveCount(4);
+        await expect(page.locator('.organizer-review-intro')).toContainText('records nothing and changes nothing');
+
+        const demoGuideNav = page.getByRole('button', { name: 'Demo guide and orientation' });
+        await demoGuideNav.click();
+        await page.getByRole('link', { name: 'My Standing surface' }).click();
+        await expect(page.locator('#my-standing')).toHaveClass(/active/);
+
+        await demoGuideNav.click();
+        await page.getByRole('link', { name: 'Action Cards surface' }).click();
+        await expect(page.locator('#my-standing')).toHaveClass(/active/);
+
+        await demoGuideNav.click();
+        await page.getByRole('button', { name: 'Fixture-only organizer review preview' }).click();
+        await expect(page.locator('.organizer-review-row-select')).toHaveCount(4);
+
+        await page.getByRole('button', {
+            name: 'My standing in this institution and my pending action cards',
+        }).click();
+        await expect(page.locator('#member-standing-content')).toContainText('Demo organizer (fictional)');
+        await expect(page.locator('.member-action-card')).toHaveCount(4);
+        await expect(page.locator('#member-action-cards-demo-limits')).toBeVisible();
+        await expect(page.locator('#member-action-cards-demo-limits')).toContainText('read-only examples');
+
+        const actionCardTechnicalDetail = page.locator('#my-standing .member-action-cards-section details');
+        await actionCardTechnicalDetail.getByText('Technical read-model detail').click();
+        await actionCardTechnicalDetail.getByRole('link', { name: 'Action Items tab' }).click();
+        await expect(page.locator('#governance .demo-tab-placeholder')).toContainText(
+            'Governance is visible in pilot-ui but is not fixture-backed in this demo.'
+        );
+        await page.locator('#governance .demo-tab-placeholder')
+            .getByRole('link', { name: 'Demo Guide' })
+            .click();
+
+        const gatewayBackedTabs = [
+            { name: 'Governance and proposals', id: 'governance', label: 'Governance' },
+            { name: 'Federation status and peers', id: 'federation', label: 'Federation' },
+            { name: 'Economic receipt chain viewer', id: 'receipts', label: 'Receipts' },
+        ];
+        for (const tab of gatewayBackedTabs) {
+            await page.getByRole('button', { name: tab.name }).click();
+            const placeholder = page.locator(`#${tab.id} .demo-tab-placeholder`);
+            await expect(placeholder).toBeVisible();
+            await expect(placeholder).toContainText('Demo mode · Gateway-backed');
+            await expect(placeholder).toContainText(
+                `${tab.label} is visible in pilot-ui but is not fixture-backed in this demo.`
+            );
+            await placeholder.getByRole('link', { name: 'Demo Guide' }).click();
+            await expect(page.locator('#demo-guide')).toHaveClass(/active/);
+        }
+
+        await page.waitForLoadState('networkidle');
+
+        const httpRequests = observedRequests.filter((request) => {
+            const protocol = new URL(request.url).protocol;
+            return protocol === 'http:' || protocol === 'https:';
+        });
+        expect(httpRequests.length).toBeGreaterThan(0);
+        expect(httpRequests.filter((request) => new URL(request.url).origin !== localOrigin)).toEqual([]);
+        expect(httpRequests.filter((request) => !['GET', 'HEAD'].includes(request.method))).toEqual([]);
+        expect(httpRequests.filter((request) => {
+            const pathname = new URL(request.url).pathname;
+            return /^\/(?:v1|api|graphql|rpc)(?:\/|$)/.test(pathname);
+        })).toEqual([]);
+        expect(httpRequests.map((request) => request.url)).not.toContain(
+            'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'
+        );
+
+        const fixtureRequests = httpRequests.filter((request) => (
+            new URL(request.url).pathname.startsWith('/fixtures/icn-organizer-demo/')
+        ));
+        expect(fixtureRequests.every((request) => (
+            request.method === 'GET' && new URL(request.url).origin === localOrigin
+        ))).toBeTruthy();
+        expect([...new Set(fixtureRequests.map((request) => new URL(request.url).pathname))].sort()).toEqual([
+            '/fixtures/icn-organizer-demo/action-cards.json',
+            '/fixtures/icn-organizer-demo/pending-publish-summary.json',
+            '/fixtures/icn-organizer-demo/preview-review.pending-publish-summary.json',
+            '/fixtures/icn-organizer-demo/standing.json',
+        ]);
+    });
 });
