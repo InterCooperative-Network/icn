@@ -400,6 +400,70 @@ fn path_owns_budget(path_treasury_did: Option<&Did>, budget_treasury_did: &Did) 
     path_treasury_did == Some(budget_treasury_did)
 }
 
+/// Whether the foreign-budget owner probe records observe-mode divergence telemetry for
+/// the given mode. `true` only for `ObserveOnly` — there the probe is detached and can
+/// never affect a route outcome. Under `EnforceTrustedResolver` it is `false`: an
+/// enforce-capable owner gate must NOT run before the ownership mask, or it could deny
+/// and thereby 403-leak the foreign budget's existence/ownership.
+fn budget_owner_probe_records_in_mode(mode: TreasuryEntityAuthMode) -> bool {
+    matches!(mode, TreasuryEntityAuthMode::ObserveOnly)
+}
+
+/// Observe-mode divergence telemetry for a FOUND-but-foreign (or path-coop-has-no-treasury)
+/// budget that `get_budget` is about to mask as a generic `NotFound`
+/// (`docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md` §4.11 item 5: "keep observe-mode /
+/// divergence recording firing **before** the enforced denial, so cross-context attempts
+/// stay visible as divergence rather than vanishing").
+///
+/// Records **only** under `ObserveOnly`: it resolves the budget's OWN owning treasury and
+/// fires the existing detached, fire-and-forget entity observation (so a cross-context
+/// probe stays visible — e.g. `flat_allow_entity_deny`). Under `EnforceTrustedResolver` it
+/// records NOTHING — running an enforce-capable gate against the foreign owner could deny
+/// and thereby leak its existence/ownership; the caller's response is the same generic
+/// `NotFound` either way. Returns `()`; it can never deny, change the response status, or
+/// add request-path latency.
+fn observe_foreign_budget_probe_if_observe_only(
+    req: &HttpRequest,
+    entity_mgr: &web::Data<Arc<EntityManager>>,
+    treasury_mgr: &web::Data<Arc<GatewayTreasuryManager>>,
+    owner_treasury_did: &Did,
+    action: EntityAction,
+) {
+    if !budget_owner_probe_records_in_mode(active_treasury_entity_auth_mode()) {
+        return;
+    }
+    let Some(claims) = get_claims(req) else {
+        return;
+    };
+    let Ok(caller_did) = claims.sub.parse::<Did>() else {
+        return;
+    };
+    let caller = EntityId::from_did(&caller_did);
+
+    let entity_mgr = entity_mgr.get_ref().clone();
+    let treasury_mgr = treasury_mgr.get_ref().clone();
+    let owner_treasury_did = owner_treasury_did.clone();
+    let resolver = observe_coop_entity_resolver(req);
+    actix_web::rt::spawn(async move {
+        // Resolve the budget's OWN owning treasury off the hot path; observe against its
+        // stored entity_id (and its own coop_id for the fallback projection). Discarded —
+        // observe mode never denies, so masking the response as NotFound is unaffected.
+        let (target, coop_id) = match treasury_mgr.get_treasury(&owner_treasury_did).await {
+            Ok(Some(t)) => (t.entity_id().cloned(), t.coop_id.clone()),
+            _ => (None, String::new()),
+        };
+        let _ = observe_treasury_entity_access(
+            resolver.as_ref(),
+            &entity_mgr,
+            &caller,
+            target.as_ref(),
+            &coop_id,
+            action,
+        )
+        .await;
+    });
+}
+
 #[get("/{coop_id}")]
 pub async fn get_treasury_status(
     req: HttpRequest,
@@ -724,6 +788,20 @@ pub async fn get_budget(
         &budget.treasury_did,
     );
     let Some(path_treasury) = path_treasury.filter(|_| path_owns) else {
+        // Foreign / no-path-treasury budget: mask as the SAME generic NotFound (#1642
+        // enumeration-safe). Per ABUSE_CASE_HARDENING_STRATEGY §4.11 item 5, keep
+        // observe-mode divergence recording firing BEFORE the masked denial so a
+        // cross-context probe stays visible (e.g. `flat_allow_entity_deny`) — but ONLY in
+        // ObserveOnly, where it is detached and can never deny or affect this response.
+        // Under EnforceTrustedResolver this records nothing (an enforce-capable
+        // foreign-owner gate could 403-leak existence); the response is the same NotFound.
+        observe_foreign_budget_probe_if_observe_only(
+            &req,
+            &entity_mgr,
+            &treasury_mgr,
+            &budget.treasury_did,
+            EntityAction::TreasuryRead,
+        );
         return Err(GatewayError::NotFound("Budget not found".to_string()));
     };
 
@@ -1527,7 +1605,8 @@ mod tests {
     /// Nested in its own module so the built-in `#[test]` is not shadowed by this test
     /// module's `use actix_web::test` (the actix attribute requires `async`).
     mod path_binding_precedes_entity_auth {
-        use super::super::path_owns_budget;
+        use super::super::{budget_owner_probe_records_in_mode, path_owns_budget};
+        use crate::authority::TreasuryEntityAuthMode;
         use icn_identity::KeyPair;
 
         #[test]
@@ -1542,6 +1621,20 @@ mod tests {
             assert!(!path_owns_budget(Some(&a), &b));
             // #2085: path coop has no treasury at all -> NOT owned -> generic NotFound.
             assert!(!path_owns_budget(None, &a));
+        }
+
+        /// The pre-mask divergence probe records ONLY under ObserveOnly (detached, never
+        /// denies). Under EnforceTrustedResolver it records nothing — an enforce-capable
+        /// foreign-owner gate must not run before the ownership mask, or it could 403-leak
+        /// the foreign budget's existence (ABUSE_CASE_HARDENING_STRATEGY §4.11 item 5).
+        #[test]
+        fn foreign_budget_probe_records_only_in_observe_only() {
+            assert!(budget_owner_probe_records_in_mode(
+                TreasuryEntityAuthMode::ObserveOnly
+            ));
+            assert!(!budget_owner_probe_records_in_mode(
+                TreasuryEntityAuthMode::EnforceTrustedResolver
+            ));
         }
     }
 
