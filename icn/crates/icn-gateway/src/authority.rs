@@ -321,10 +321,70 @@ pub(crate) enum TreasuryEntityAuthMode {
     EnforceTrustedResolver,
 }
 
-/// The active treasury entity-auth mode the gateway runs with. Hardcoded to the
-/// fail-safe default — this slice ships **no** path that sets it to enforcement.
-pub(crate) const ACTIVE_TREASURY_ENTITY_AUTH_MODE: TreasuryEntityAuthMode =
-    TreasuryEntityAuthMode::ObserveOnly;
+/// Environment variable that selects the treasury entity-auth mode (A2e).
+///
+/// Operator-gated and **off by default**: unset, empty, or any unrecognized value
+/// resolves to the fail-safe [`TreasuryEntityAuthMode::ObserveOnly`] (see
+/// [`parse_treasury_entity_auth_mode`]). Setting it to enforcement changes only which
+/// mode the observe-only *measurement* runs under — **no treasury route consumes the
+/// gate decision in this slice**, so route allow/deny outcomes stay byte-identical to
+/// the flat `require_coop_access` guard regardless of the value. Wiring the decision to
+/// a route (inline-await + deny) is a deliberate later cutover.
+pub(crate) const TREASURY_ENTITY_AUTH_MODE_ENV: &str = "ICN_TREASURY_ENTITY_AUTH_MODE";
+
+/// Select a [`TreasuryEntityAuthMode`] from an optional raw config value (A2e).
+///
+/// Fail-safe by construction: the absent case and every ambiguous input resolve to
+/// [`TreasuryEntityAuthMode::ObserveOnly`], so enforcement can never be enabled by
+/// accident (missing config, empty string, typo, or a separator-less near-miss like
+/// `enforcetrustedresolver`). Matching trims surrounding whitespace and is
+/// case-insensitive.
+///
+/// - `None`, empty / whitespace-only → `ObserveOnly`
+/// - `observe` / `observe-only` / `observe_only` → `ObserveOnly`
+/// - `enforce-trusted-resolver` / `enforce_trusted_resolver` → `EnforceTrustedResolver`
+/// - any other value → `ObserveOnly` (emits a diagnostic `warn!`; never silently enforces)
+///
+/// Deterministic for a given input; the only effect is a `warn!` on the unrecognized
+/// branch (inert without a tracing subscriber, so it is unit-tested by return value).
+pub(crate) fn parse_treasury_entity_auth_mode(value: Option<&str>) -> TreasuryEntityAuthMode {
+    let Some(raw) = value else {
+        return TreasuryEntityAuthMode::ObserveOnly;
+    };
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return TreasuryEntityAuthMode::ObserveOnly;
+    }
+    match trimmed.to_ascii_lowercase().as_str() {
+        "observe" | "observe-only" | "observe_only" => TreasuryEntityAuthMode::ObserveOnly,
+        "enforce-trusted-resolver" | "enforce_trusted_resolver" => {
+            TreasuryEntityAuthMode::EnforceTrustedResolver
+        }
+        _ => {
+            warn!(
+                target: "entity_authz_gate",
+                env = TREASURY_ENTITY_AUTH_MODE_ENV,
+                value = trimmed,
+                "unrecognized treasury entity-auth mode; defaulting to observe-only (enforcement is never enabled on unknown input)"
+            );
+            TreasuryEntityAuthMode::ObserveOnly
+        }
+    }
+}
+
+/// The active treasury entity-auth mode, read from the operator-gated
+/// [`TREASURY_ENTITY_AUTH_MODE_ENV`] environment variable (A2e).
+///
+/// This is the single seam that reads process configuration; the classification logic
+/// lives in the pure [`parse_treasury_entity_auth_mode`] (unit-tested without env
+/// races). **Off by default** — with the variable unset the result is
+/// [`TreasuryEntityAuthMode::ObserveOnly`], identical to the previously hardcoded
+/// constant, so default route behavior is unchanged. Selecting enforcement here changes
+/// only which mode the observe-only measurement runs under; no treasury route consumes
+/// the gate decision in this slice, so it can alter no route outcome on its own.
+pub(crate) fn active_treasury_entity_auth_mode() -> TreasuryEntityAuthMode {
+    parse_treasury_entity_auth_mode(std::env::var(TREASURY_ENTITY_AUTH_MODE_ENV).ok().as_deref())
+}
 
 /// What the A2d gate decides for a treasury request that has ALREADY passed the flat
 /// `require_coop_access` guard.
@@ -637,9 +697,9 @@ pub(crate) fn decide_treasury_gate(
 }
 
 /// Record (observe-only) the A2d treasury gate decision for cutover-readiness
-/// telemetry. `active` is the decision under the shipped
-/// [`ACTIVE_TREASURY_ENTITY_AUTH_MODE`] (always `ProceedUnchanged` today);
-/// `would_enforce` is the hypothetical [`TreasuryEntityAuthMode::EnforceTrustedResolver`]
+/// telemetry. `active` is the decision under the operator-selected
+/// [`active_treasury_entity_auth_mode`] (`ProceedUnchanged` under the off-by-default
+/// `ObserveOnly`); `would_enforce` is the hypothetical [`TreasuryEntityAuthMode::EnforceTrustedResolver`]
 /// decision. `evidence` supplies the target-verification context (how the membership
 /// target was chosen, and whether it matched the trusted resolver/agreed target) so a
 /// future cutover can see how often a trusted basis actually verifies its target.
@@ -767,20 +827,23 @@ pub(crate) async fn observe_treasury_entity_access(
     // flat guard, or any authorization decision.
     let resolution = observe_coop_entity_resolution(resolver, coop_id).await;
 
-    // A2d: observe → MEASURE the treasury entity-auth gate. The active gate runs under
-    // `ACTIVE_TREASURY_ENTITY_AUTH_MODE` (the shipped fail-safe default `ObserveOnly`),
-    // so its decision is always `ProceedUnchanged` and the route is NEVER altered here —
+    // A2d/A2e: observe → MEASURE the treasury entity-auth gate. The active gate runs under
+    // `active_treasury_entity_auth_mode()` — the operator-gated, OFF-BY-DEFAULT seam
+    // (A2e), which resolves to the fail-safe `ObserveOnly` unless an operator explicitly
+    // selects enforcement. Crucially, the route is NEVER altered here regardless of mode:
     // this function stays observe-only and its return value is still discarded by the
-    // caller. We additionally evaluate what `EnforceTrustedResolver` WOULD decide and
-    // record it, so a future cutover can be measured first. Neither path denies anything.
-    // The membership observation and the resolution evidence are bundled so the decision
-    // can verify whether membership was evaluated against the trusted resolver/agreed
-    // target (A2d target verification).
+    // caller (the route runs it as a detached, fire-and-forget task), so NO route consumes
+    // the gate decision in this slice. Selecting enforcement changes only which mode this
+    // measurement records as `active`. We additionally evaluate what `EnforceTrustedResolver`
+    // WOULD decide and record it, so a future route-consumption cutover can be measured
+    // first. Neither path denies anything. The membership observation and the resolution
+    // evidence are bundled so the decision can verify whether membership was evaluated
+    // against the trusted resolver/agreed target (A2d target verification).
     let evidence = TreasuryGateEvidence {
         membership,
         resolution,
     };
-    let active_gate = decide_treasury_gate(ACTIVE_TREASURY_ENTITY_AUTH_MODE, &evidence);
+    let active_gate = decide_treasury_gate(active_treasury_entity_auth_mode(), &evidence);
     let would_enforce_gate =
         decide_treasury_gate(TreasuryEntityAuthMode::EnforceTrustedResolver, &evidence);
     record_treasury_gate(caller, action, &evidence, active_gate, would_enforce_gate);
@@ -2382,5 +2445,102 @@ mod coop_resolution_observe_tests {
             !debug_out.contains("WARN"),
             "ordinary deny must NOT log at WARN: {debug_out:?}"
         );
+    }
+
+    // ----------------------------------------------------------------------
+    // A2e: operator-gated treasury entity-auth MODE config parser (fail-safe).
+    //
+    // `parse_treasury_entity_auth_mode` selects the active mode from an operator-supplied
+    // raw config value. It is off-by-default and fail-safe by construction: missing,
+    // empty, or unrecognized input resolves to `ObserveOnly`, so enforcement can never be
+    // enabled by accident (unset env, empty string, typo). Only the explicit enforce
+    // tokens select `EnforceTrustedResolver`. The env reader
+    // `active_treasury_entity_auth_mode` is the thin process-config seam over this pure
+    // function and is intentionally NOT unit-tested here, to avoid global-env races.
+    // ----------------------------------------------------------------------
+
+    #[test]
+    fn parse_mode_missing_value_defaults_to_observe_only() {
+        assert_eq!(parse_treasury_entity_auth_mode(None), ObserveOnly);
+    }
+
+    #[test]
+    fn parse_mode_empty_or_whitespace_defaults_to_observe_only() {
+        assert_eq!(parse_treasury_entity_auth_mode(Some("")), ObserveOnly);
+        assert_eq!(parse_treasury_entity_auth_mode(Some("   ")), ObserveOnly);
+        assert_eq!(parse_treasury_entity_auth_mode(Some("\t\n")), ObserveOnly);
+    }
+
+    #[test]
+    fn parse_mode_explicit_observe_values_select_observe_only() {
+        for v in [
+            "observe",
+            "observe-only",
+            "observe_only",
+            "OBSERVE",
+            "  Observe-Only  ",
+        ] {
+            assert_eq!(
+                parse_treasury_entity_auth_mode(Some(v)),
+                ObserveOnly,
+                "value {v:?} must select ObserveOnly"
+            );
+        }
+    }
+
+    #[test]
+    fn parse_mode_explicit_enforce_values_select_enforce_trusted_resolver() {
+        for v in [
+            "enforce-trusted-resolver",
+            "enforce_trusted_resolver",
+            "ENFORCE-TRUSTED-RESOLVER",
+            "  enforce_trusted_resolver  ",
+        ] {
+            assert_eq!(
+                parse_treasury_entity_auth_mode(Some(v)),
+                EnforceTrustedResolver,
+                "value {v:?} must select EnforceTrustedResolver"
+            );
+        }
+    }
+
+    #[test]
+    fn parse_mode_unknown_value_fails_safe_to_observe_only() {
+        // Typos, partial tokens, and adjacent-but-wrong values must NEVER silently enable
+        // enforcement — they fail safe to ObserveOnly. In particular a bare "enforce" and
+        // a separator-less "enforcetrustedresolver" are NOT enforcement (no fuzzy match
+        // toward the dangerous outcome).
+        for v in [
+            "enforce",
+            "enforce-all",
+            "enforcetrustedresolver",
+            "deny",
+            "true",
+            "1",
+            "on",
+        ] {
+            assert_eq!(
+                parse_treasury_entity_auth_mode(Some(v)),
+                ObserveOnly,
+                "unknown value {v:?} must fail safe to ObserveOnly"
+            );
+        }
+    }
+
+    #[test]
+    fn parse_mode_default_gate_decision_is_proceed_unchanged_for_all_evidence() {
+        // Ties the config seam's default to the route-safety contract: the shipped default
+        // (no config) selects ObserveOnly, which the gate proves never alters a route.
+        let mode = parse_treasury_entity_auth_mode(None);
+        assert_eq!(mode, ObserveOnly);
+        let t = coop("food-coop");
+        for o in [allow(), deny(), indeterminate(), errored()] {
+            let ev = agree(o, Some(t.clone()), t.clone());
+            assert_eq!(
+                decide_treasury_gate(mode, &ev),
+                ProceedUnchanged,
+                "default (ObserveOnly) gate must proceed unchanged"
+            );
+        }
     }
 }
