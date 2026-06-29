@@ -3574,6 +3574,22 @@ domain_tags = ["pilot", "accessibility", "organizer", "action-cards", "evidence"
 recommended_action = "keep"
 last_reviewed = "2026-06-28"
 
+[docs."docs/pilots/organizer-facilitator-walkthrough-human-at-test-plan.md"]
+category = "guide"
+status = "living"
+title = "Organizer facilitator walkthrough human AT test plan and evidence template"
+description = "Reusable, deliberately blank human assistive-technology smoke-test plan and repo-safe evidence template for the fixture-backed organizer facilitator walkthrough. Records the required tester, device, OS, browser, AT, input, zoom, theme, locale, task, observation, blocker, and follow-up fields; distinguishes automated/browser-assisted evidence from real human observations; and makes no claim that human AT testing or accessibility completion has occurred."
+last_updated = "2026-06-29"
+owner = "matt"
+audiences = ["team", "organizers", "contributors", "accessibility-testers"]
+truth_class = "operational"
+role = "guide"
+canonical = "no"
+freshness = "current"
+domain_tags = ["pilot", "accessibility", "organizer", "assistive-technology", "evidence"]
+recommended_action = "keep"
+last_reviewed = "2026-06-29"
+
 [docs."docs/pilots/summit-ops-lifecycle-package-map.md"]
 category = "reference"
 status = "living"
