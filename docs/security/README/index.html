@@ -42,17 +42,20 @@ View source on GitHub →
 <p>Comprehensive security documentation, threat models, audit reports, and hardening guides.</p>
 <p><strong>Last Updated</strong>: 2026-06-29
 <strong>Security Status</strong>: Historical assessment snapshot (as of 2025-12-18)</p>
+<blockquote>
+<p><strong>Claim boundary:</strong> These security docs include historical reports and hardening references. They do not by themselves establish current production readiness, vulnerability remediation status, deployment approval, or security hardening completion. Verify current posture against live code, current CI, CodeQL/code-scanning results, dependency audits, state docs, and recent PR evidence.</p>
+</blockquote>
 <h2>🚨 Quick Links</h2>
 <ul>
-<li><strong><a href="https://github.com/InterCooperative-Network/icn/blob/main/FINAL_SECURITY_STATUS">FINAL_SECURITY_STATUS.md</a></strong> - Production readiness assessment ⭐</li>
+<li><strong><a href="https://github.com/InterCooperative-Network/icn/blob/main/FINAL_SECURITY_STATUS">FINAL_SECURITY_STATUS.md</a></strong> - Historical assessment snapshot (2025-12-18)</li>
 <li><strong><a href="https://github.com/InterCooperative-Network/icn/blob/main/threat-model">threat-model.md</a></strong> - Comprehensive threat analysis</li>
-<li><strong><a href="https://github.com/InterCooperative-Network/icn/blob/main/production-hardening">production-hardening.md</a></strong> - Hardening measures</li>
+<li><strong><a href="https://github.com/InterCooperative-Network/icn/blob/main/production-hardening">production-hardening.md</a></strong> - Historical hardening reference</li>
 <li><strong><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_TESTING_GUIDE">SECURITY_TESTING_GUIDE.md</a></strong> - Testing procedures</li>
 </ul>
 <h2>Overview</h2>
 <p>This directory contains all security-related documentation for ICN, including:</p>
 <ul>
-<li>Production security status and assessments</li>
+<li>Historical security assessments and status snapshots</li>
 <li>Threat models and risk analysis</li>
 <li>Security audit reports and findings</li>
 <li>Hardening guides and best practices</li>
@@ -63,8 +66,8 @@ View source on GitHub →
 <p>A live repository audit found that GitHub CodeQL <strong>default setup</strong> is configured. GitHub dynamically analyzes Actions, JavaScript/TypeScript, Python, and Rust for pull requests and the default branch, with a weekly schedule and the default query suite. The repository does not contain a repo-owned <code>.github/workflows/codeql.yml</code> advanced setup workflow.</p>
 <p>No advanced workflow was added by this audit. The current default setup already provides the repository&#39;s observed language and event coverage. GitHub&#39;s <a href="https://docs.github.com/en/code-security/concepts/code-scanning/setup-types" target="_blank" rel="noopener">setup guidance</a> reserves advanced setup for cases that need more granular control, and <a href="https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/configure-code-scanning/configuring-advanced-setup-for-code-scanning" target="_blank" rel="noopener">switching from default to advanced setup</a> requires a coordinated repository-settings change. Adding an advanced workflow while leaving default setup active would not create a clean, independently reviewable transition.</p>
 <p>If maintainers later choose repo-owned configuration or the <code>security-extended</code> query suite, treat that as a coordinated settings-and-workflow change. Alert triage remains separate. This point-in-time audit did not change repository settings, branch protection, runtime behavior, or any CodeQL alert, and it makes no claim about vulnerability remediation, hardening completion, or readiness.</p>
-<h2>📊 Production Security</h2>
-<h3>Status Snapshot</h3>
+<h2>📊 Historical security assessments</h2>
+<h3>Assessment archive</h3>
 <table>
 <thead>
 <tr>
@@ -75,21 +78,21 @@ View source on GitHub →
 </thead>
 <tbody><tr>
 <td><a href="https://github.com/InterCooperative-Network/icn/blob/main/FINAL_SECURITY_STATUS">FINAL_SECURITY_STATUS.md</a></td>
-<td>✅ Current</td>
-<td>Production readiness assessment (2025-12-18)</td>
+<td>Historical snapshot</td>
+<td>Assessment dated 2025-12-18; not current readiness evidence</td>
 </tr>
 <tr>
 <td><a href="https://github.com/InterCooperative-Network/icn/blob/main/COMPREHENSIVE_SECURITY_IMPROVEMENTS">COMPREHENSIVE_SECURITY_IMPROVEMENTS.md</a></td>
-<td>✅ Complete</td>
-<td>Security overview and improvements</td>
+<td>Historical report</td>
+<td>Security overview and reported improvements from 2025-12-18</td>
 </tr>
 <tr>
 <td><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_FIXES_2025-12-18">SECURITY_FIXES_2025-12-18.md</a></td>
-<td>✅ Applied</td>
-<td>Detailed vulnerability fixes</td>
+<td>Historical fix record</td>
+<td>Changes reported on 2025-12-18; current status requires verification</td>
 </tr>
 </tbody></table>
-<h3>Deployment &amp; Operations</h3>
+<h3>Historical deployment and hardening references</h3>
 <table>
 <thead>
 <tr>
@@ -99,7 +102,7 @@ View source on GitHub →
 </thead>
 <tbody><tr>
 <td><a href="https://github.com/InterCooperative-Network/icn/blob/main/production-hardening">production-hardening.md</a></td>
-<td>Production hardening measures (67KB)</td>
+<td>Historical hardening measures and checklist (67KB)</td>
 </tr>
 <tr>
 <td><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_TESTING_GUIDE">SECURITY_TESTING_GUIDE.md</a></td>
@@ -126,7 +129,7 @@ View source on GitHub →
 </thead>
 <tbody><tr>
 <td><a href="https://github.com/InterCooperative-Network/icn/blob/main/threat-model">threat-model.md</a></td>
-<td>Complete system threat model</td>
+<td>System threat-model reference</td>
 <td>43KB</td>
 </tr>
 <tr>
@@ -221,14 +224,14 @@ View source on GitHub →
 <h2>🎯 Quick Access by Role</h2>
 <h3>For Security Engineers</h3>
 <ol>
-<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FINAL_SECURITY_STATUS">FINAL_SECURITY_STATUS.md</a> - Start here</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/FINAL_SECURITY_STATUS">FINAL_SECURITY_STATUS.md</a> - Historical assessment context</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/threat-model">threat-model.md</a> - Understand threats</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_AUDIT_REPORT">SECURITY_AUDIT_REPORT.md</a> - Review findings</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/security-roadmap">security-roadmap.md</a> - Future work</li>
 </ol>
 <h3>For DevOps/Operators</h3>
 <ol>
-<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/production-hardening">production-hardening.md</a> - Hardening checklist</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/production-hardening">production-hardening.md</a> - Historical hardening checklist</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECRET_MANAGEMENT">SECRET_MANAGEMENT.md</a> - Secret handling</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/GATEWAY_CSP">GATEWAY_CSP.md</a> - Gateway security</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_TESTING_GUIDE">SECURITY_TESTING_GUIDE.md</a> - Validation</li>
@@ -244,7 +247,7 @@ View source on GitHub →
 <ol>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_AUDIT_REPORT">SECURITY_AUDIT_REPORT.md</a> - Audit findings</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_AUDIT_RESULTS">SECURITY_AUDIT_RESULTS.md</a> - Detailed results</li>
-<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/COMPREHENSIVE_SECURITY_IMPROVEMENTS">COMPREHENSIVE_SECURITY_IMPROVEMENTS.md</a> - Improvements made</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/COMPREHENSIVE_SECURITY_IMPROVEMENTS">COMPREHENSIVE_SECURITY_IMPROVEMENTS.md</a> - Historical improvements report</li>
 <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/security-roadmap">security-roadmap.md</a> - Future plans</li>
 </ol>
 <h2>🔐 Security Domains</h2>
@@ -284,9 +287,9 @@ View source on GitHub →
 <li>Security monitoring</li>
 </ul>
 <h2>📈 Security Metrics</h2>
-<p>Key security metrics tracked:</p>
+<p>Metrics described by the referenced guidance include:</p>
 <ul>
-<li>Vulnerability remediation time</li>
+<li>Vulnerability response time</li>
 <li>Test coverage for security-critical paths</li>
 <li>Cryptographic strength margins</li>
 <li>Trust verification success rates</li>
@@ -294,20 +297,20 @@ View source on GitHub →
 </ul>
 <p>See <a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_TESTING_GUIDE">SECURITY_TESTING_GUIDE.md</a> for monitoring procedures.</p>
 <h2>🚀 Security Roadmap</h2>
-<p>Current security work is documented in:</p>
+<p>Planning and follow-up references:</p>
 <ul>
-<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/security-roadmap">security-roadmap.md</a> - Long-term roadmap</li>
-<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_ANALYSIS_REMAINING_ISSUES">SECURITY_ANALYSIS_REMAINING_ISSUES.md</a> - Outstanding issues</li>
-<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_FOLLOWUP">SECURITY_FOLLOWUP.md</a> - Follow-up actions</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/security-roadmap">security-roadmap.md</a> - Long-term roadmap reference</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_ANALYSIS_REMAINING_ISSUES">SECURITY_ANALYSIS_REMAINING_ISSUES.md</a> - Historical outstanding-issues snapshot</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_FOLLOWUP">SECURITY_FOLLOWUP.md</a> - Historical follow-up record</li>
 </ul>
-<h3>Recent Milestones</h3>
+<h3>Historical report milestones</h3>
 <ul>
-<li>✅ 2025-12-18: Production hardening complete</li>
-<li>✅ 2025-12-18: Security audit resolution</li>
-<li>✅ 2025-12-17: Architecture security review</li>
+<li>2025-12-18 report set: production-hardening milestone recorded (historical claim)</li>
+<li>2025-12-18 report set: security-audit resolution milestone recorded (historical claim)</li>
+<li>2025-12-17 report set: architecture-security review milestone recorded (historical claim)</li>
 </ul>
-<h3>Upcoming Work</h3>
-<p>See <a href="https://github.com/InterCooperative-Network/icn/blob/main/security-roadmap">security-roadmap.md</a> for detailed future plans.</p>
+<h3>Follow-up areas</h3>
+<p>See <a href="https://github.com/InterCooperative-Network/icn/blob/main/security-roadmap">security-roadmap.md</a> for the recorded plans, then verify current priorities against live project evidence.</p>
 <h2>🔗 Related Documentation</h2>
 <ul>
 <li><strong>Architecture</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/">../architecture/</a> - System architecture</li>
@@ -321,7 +324,7 @@ View source on GitHub →
 <li><strong>Threat Models</strong>: Use STRIDE or similar frameworks</li>
 <li><strong>Findings</strong>: Include severity, impact, and remediation</li>
 <li><strong>Cross-references</strong>: Link to related security docs</li>
-<li><strong>Updates</strong>: Keep FINAL_SECURITY_STATUS.md current</li>
+<li><strong>Updates</strong>: Date and label assessment snapshots; do not present FINAL_SECURITY_STATUS.md as current truth</li>
 <li><strong>Sensitive Data</strong>: Never commit secrets or keys</li>
 </ol>
 <p>See <a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING">../CONTRIBUTING.md</a> for general guidelines.</p>
@@ -339,7 +342,7 @@ View source on GitHub →
 <li>Security questions: Review <a href="https://github.com/InterCooperative-Network/icn/blob/main/EDUCATIONAL_GUIDE_SECURITY_FIXES">EDUCATIONAL_GUIDE_SECURITY_FIXES.md</a></li>
 <li>Operational security: Check <a href="https://github.com/InterCooperative-Network/icn/blob/main/production-hardening">production-hardening.md</a></li>
 <li>Testing: See <a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY_TESTING_GUIDE">SECURITY_TESTING_GUIDE.md</a></li>
-<li>Status: Review <a href="https://github.com/InterCooperative-Network/icn/blob/main/FINAL_SECURITY_STATUS">FINAL_SECURITY_STATUS.md</a></li>
+<li>Historical assessment context: Review <a href="https://github.com/InterCooperative-Network/icn/blob/main/FINAL_SECURITY_STATUS">FINAL_SECURITY_STATUS.md</a></li>
 </ul>
 <hr>
 <p><strong>Navigation</strong>: <a href="/docs/INDEX">Back to Index</a> | <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/">Architecture</a> | <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/sdis/">SDIS</a> | <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/operations/">Operations</a></p>
