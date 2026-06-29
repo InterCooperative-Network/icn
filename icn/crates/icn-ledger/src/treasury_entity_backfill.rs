@@ -62,8 +62,9 @@ pub enum TreasuryEntityIdBackfillAction {
     /// Skipped: the bound `EntityId` is not a well-formed cooperative entity
     /// (a flat `coop_id` denotes a cooperative target — RFC-0018). Fail closed.
     SkippedNonCooperativeEntity,
-    /// Skipped: the binding is internally inconsistent — the resolved entity's
-    /// reverse binding points to a *different* `coop_id`. Fail closed.
+    /// Skipped: the binding's reverse index does not unambiguously confirm this
+    /// `coop_id` — it points to a *different* `coop_id`, or is *missing* (a
+    /// one-sided / inconsistent store). Fail closed.
     SkippedAmbiguousBinding,
     /// Skipped: a storage read error prevented establishing safety. Fail closed.
     SkippedStorageError,
@@ -274,18 +275,28 @@ fn plan_target(
     }
 
     // Non-ambiguity cross-check: the resolved entity's reverse binding must point
-    // back to THIS coop_id. A mismatch (the entity is reverse-bound to a different
-    // coop_id) or a reverse read error fails closed.
+    // back to THIS coop_id. The CoopEntityMap writes the forward and reverse
+    // indexes atomically, so for a consistent store a trusted forward binding
+    // always has a matching reverse. Anything else fails closed: a reverse bound
+    // to a DIFFERENT coop_id (ambiguous), or a MISSING reverse (a one-sided /
+    // inconsistent store — a partial write, corruption, or a backend that does
+    // not maintain the reverse index) — neither unambiguously confirms this
+    // coop_id, so neither is eligible to populate entity_id. A reverse read error
+    // also fails closed.
     match map.coop_for_entity(&binding.entity_id) {
-        Ok(Some(reverse)) if reverse != target.coop_id => {
+        Ok(Some(reverse)) if reverse == target.coop_id => {}
+        Ok(reverse_opt) => {
+            let detail = match reverse_opt {
+                Some(reverse) => format!("is reverse-bound to a different coop_id ({reverse:?})"),
+                None => "has no reverse binding (one-sided / inconsistent store)".to_string(),
+            };
             return make(
                 TreasuryEntityIdBackfillAction::SkippedAmbiguousBinding,
                 Some(binding.entity_id.clone()),
-                format!("resolved entity is reverse-bound to a different coop_id ({reverse:?})"),
+                format!("resolved entity {detail}; fail closed"),
                 None,
             );
         }
-        Ok(_) => {}
         Err(e) => {
             return make(
                 TreasuryEntityIdBackfillAction::SkippedStorageError,
@@ -537,6 +548,36 @@ mod tests {
             TreasuryEntityIdBackfillAction::SkippedAmbiguousBinding
         );
         assert!(entry.reason.contains("other-coop"));
+    }
+
+    #[test]
+    fn skipped_when_reverse_binding_missing_one_sided() {
+        // A trusted forward binding but NO reverse binding (a one-sided /
+        // inconsistent store). The atomic forward+reverse invariant is broken, so
+        // the reverse does not confirm this coop_id — fail closed, never populate.
+        let map = StubMap {
+            binding: |coop_id| {
+                Ok(Some(CoopEntityBinding {
+                    coop_id: coop_id.to_string(),
+                    entity_id: EntityId::cooperative("food-coop").unwrap(),
+                    provenance: CoopEntityBindingProvenance::Activation,
+                }))
+            },
+            // Reverse index is missing entirely.
+            reverse: |_| Ok(None),
+        };
+        let plan = plan_treasury_entity_id_backfill(vec![target("food-coop", None)], &map);
+        assert_eq!(
+            plan.would_populate, 0,
+            "must not populate from a one-sided binding"
+        );
+        assert_eq!(plan.skipped_ambiguous_binding, 1);
+        let entry = one(&plan);
+        assert_eq!(
+            entry.action,
+            TreasuryEntityIdBackfillAction::SkippedAmbiguousBinding
+        );
+        assert!(entry.reason.contains("no reverse binding"));
     }
 
     #[test]
