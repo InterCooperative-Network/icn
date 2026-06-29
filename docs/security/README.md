@@ -70,6 +70,7 @@ If maintainers later choose repo-owned configuration or the `security-extended` 
 | [SECURITY_ANALYSIS_REMAINING_ISSUES.md](SECURITY_ANALYSIS_REMAINING_ISSUES.md) | 2025-12-18 | Outstanding issues tracking |
 | [SECURITY_FOLLOWUP.md](SECURITY_FOLLOWUP.md) | Various | Follow-up actions |
 | [phase-10c-security-analysis.md](phase-10c-security-analysis.md) | Phase 10c | Phase-specific analysis |
+| [codeql-alert-triage-2026-06-29.md](codeql-alert-triage-2026-06-29.md) | 2026-06-29 | Point-in-time static triage of CodeQL alerts #100 and #101 |
 
 ## 🆔 SDIS Security
 
