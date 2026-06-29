@@ -1,0 +1,327 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>CodeQL triage closeout — 2026-06-29 | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>security</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>codeql triage closeout 2026 06 29</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/security/codeql-triage-closeout-2026-06-29.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>CodeQL triage closeout — 2026-06-29</h1>
+<p>This is a point-in-time, static closeout record for the CodeQL alerts that were open when inspected. It consolidates the two earlier triage records, completes detailed triage for alerts #29 and #37, and gives maintainers a disposition checklist. It does not change alert state or runtime behavior.</p>
+<h2>Inspection basis</h2>
+<ul>
+<li>Repository commit inspected: <code>ae70ddb6bae868e3ecd4a37e02262a0e61282bc6</code>.</li>
+<li>Most recent alert instances were on <code>refs/heads/main</code> at <code>cf898d5714b59bbf1279a731fb7e548feb33eace</code>; the affected source files did not change between that commit and the inspected commit.</li>
+<li>Open-alert inventory: GitHub REST <code>GET /repos/InterCooperative-Network/icn/code-scanning/alerts</code>, paginated and filtered to <code>state == &quot;open&quot;</code>; details and all instances were fetched for every returned alert.</li>
+<li>GitHub CodeQL default setup was configured to analyze Actions, JavaScript/TypeScript, Python, and Rust. No repository-owned advanced CodeQL workflow was present or added.</li>
+<li>Repository policy basis: <a href="https://github.com/InterCooperative-Network/icn/blob/main/SECURITY">`SECURITY.md`</a> places the Rust workspace, including the gateway and steward crates, in scope.</li>
+<li>Assessment method: static alert metadata, source, compilation boundaries, call sites, history, manifests, existing merged triage, and nearby controls. No runtime validation or CodeQL query-engine inspection was performed.</li>
+<li>No alert was dismissed or otherwise modified. No repository setting, workflow, branch-protection rule, or security setting changed.</li>
+</ul>
+<h2>Open-alert inventory</h2>
+<p>All ten alerts were open and undismissed at inspection time. All use CodeQL rule <code>rust/hard-coded-cryptographic-value</code> with <code>critical</code> scanner severity.</p>
+<table>
+<thead>
+<tr>
+<th>Alert</th>
+<th>Reported use</th>
+<th>Location</th>
+<th>State</th>
+<th>Existing detailed record</th>
+<th>Current disposition bucket</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/security/code-scanning/101" target="_blank" rel="noopener">#101</a></td>
+<td>Nonce</td>
+<td><code>icn/crates/icn-zkp/src/types.rs:126</code></td>
+<td>Open, undismissed</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/codeql-alert-triage-2026-06-29">Alerts #100/#101 triage</a></td>
+<td>False-positive candidate; <code>not_actionable</code>, high confidence</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/security/code-scanning/100" target="_blank" rel="noopener">#100</a></td>
+<td>Salt</td>
+<td><code>icn/crates/icn-steward/src/enrollment.rs:97</code></td>
+<td>Open, undismissed</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/codeql-alert-triage-2026-06-29">Alerts #100/#101 triage</a></td>
+<td>False-positive candidate; <code>not_actionable</code>, high confidence</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/security/code-scanning/37" target="_blank" rel="noopener">#37</a></td>
+<td>Nonce</td>
+<td><code>icn/crates/icn-steward/src/token.rs:325</code></td>
+<td>Open, undismissed</td>
+<td>This document</td>
+<td>Test-only finding; <code>not_actionable</code>, high confidence</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/security/code-scanning/35" target="_blank" rel="noopener">#35</a></td>
+<td>Nonce</td>
+<td><code>icn/crates/icn-gossip/src/handlers/blob_transfer.rs:893</code></td>
+<td>Open, undismissed</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/codeql-gossip-nonce-triage-2026-06-29">Gossip nonce triage</a></td>
+<td>Test-only finding; <code>not_actionable</code>, high confidence</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/security/code-scanning/34" target="_blank" rel="noopener">#34</a></td>
+<td>Nonce</td>
+<td><code>icn/crates/icn-gossip/src/handlers/blob_transfer.rs:889</code></td>
+<td>Open, undismissed</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/codeql-gossip-nonce-triage-2026-06-29">Gossip nonce triage</a></td>
+<td>Test-only finding; <code>not_actionable</code>, high confidence</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/security/code-scanning/33" target="_blank" rel="noopener">#33</a></td>
+<td>Nonce</td>
+<td><code>icn/crates/icn-gossip/src/handlers/blob_transfer.rs:860</code></td>
+<td>Open, undismissed</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/codeql-gossip-nonce-triage-2026-06-29">Gossip nonce triage</a></td>
+<td>Test-only finding; <code>not_actionable</code>, high confidence</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/security/code-scanning/32" target="_blank" rel="noopener">#32</a></td>
+<td>Nonce</td>
+<td><code>icn/crates/icn-gossip/src/handlers/blob_transfer.rs:792</code></td>
+<td>Open, undismissed</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/codeql-gossip-nonce-triage-2026-06-29">Gossip nonce triage</a></td>
+<td>Test-only finding; <code>not_actionable</code>, high confidence</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/security/code-scanning/31" target="_blank" rel="noopener">#31</a></td>
+<td>Nonce</td>
+<td><code>icn/crates/icn-gossip/src/handlers/blob_transfer.rs:767</code></td>
+<td>Open, undismissed</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/codeql-gossip-nonce-triage-2026-06-29">Gossip nonce triage</a></td>
+<td>Test-only finding; <code>not_actionable</code>, high confidence</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/security/code-scanning/30" target="_blank" rel="noopener">#30</a></td>
+<td>Nonce</td>
+<td><code>icn/crates/icn-gossip/src/handlers/blob_nonce_guard.rs:212</code></td>
+<td>Open, undismissed</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/codeql-gossip-nonce-triage-2026-06-29">Gossip nonce triage</a></td>
+<td>Test-only finding; <code>not_actionable</code>, high confidence</td>
+</tr>
+<tr>
+<td><a href="https://github.com/InterCooperative-Network/icn/security/code-scanning/29" target="_blank" rel="noopener">#29</a></td>
+<td>Password</td>
+<td><code>icn/crates/icn-gateway/src/email_client.rs:853</code></td>
+<td>Open, undismissed</td>
+<td>This document</td>
+<td>Test-only finding; <code>not_actionable</code>, high confidence</td>
+</tr>
+</tbody></table>
+<h2>Detailed triage: alert #29 — fake SMTP credential fixture</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Assessment</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CodeQL report</td>
+<td>A hard-coded value is used as a password.</td>
+</tr>
+<tr>
+<td>Reported source</td>
+<td><code>SmtpConfig::sendgrid(&quot;api-key&quot;, ...)</code> at <code>email_client.rs:853</code></td>
+</tr>
+<tr>
+<td>Sink</td>
+<td><code>SmtpConfig::sendgrid</code> passes its <code>api_key</code> parameter into the SMTP password field used by <code>lettre::Credentials</code></td>
+</tr>
+<tr>
+<td>Classification</td>
+<td>Test-only finding</td>
+</tr>
+<tr>
+<td>Verdict</td>
+<td><code>not_actionable</code> with high static confidence</td>
+</tr>
+<tr>
+<td>Product boundary</td>
+<td>The reported literal is below <code>#[cfg(test)]</code> at <code>email_client.rs:847</code> and is not compiled into the shipped gateway</td>
+</tr>
+</tbody></table>
+<p>The literal is an obvious fake credential in <code>test_smtp_config_sendgrid</code>. The test checks SendGrid provider defaults—host, port, and username—and does not perform SMTP delivery. Repository-wide call-site inspection found <code>SmtpConfig::sendgrid</code> only in this test. The shipped notification processor instead reads the SMTP password from the operator-provided <code>ICN_SMTP_PASSWORD</code> environment variable and passes it to <code>SmtpConfig::new</code>.</p>
+<p>The production credential path is real and in scope, but it does not originate at the reported hard-coded string. Replacing this transparent test fixture with runtime secret loading or randomized text would not improve shipped behavior.</p>
+<p>Recommended next action: maintainers may review #29 for a policy-consistent test/false-positive disposition. No runtime remediation is indicated by this alert&#39;s reported source.</p>
+<h2>Detailed triage: alert #37 — response nonce fixture</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Assessment</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>CodeQL report</td>
+<td>A hard-coded value is used as a nonce.</td>
+</tr>
+<tr>
+<td>Reported source</td>
+<td><code>let nonce = [9u8; 16]</code> at <code>token.rs:325</code></td>
+</tr>
+<tr>
+<td>Sink</td>
+<td><code>TokenResponse::new(..., nonce)</code> at <code>token.rs:327</code></td>
+</tr>
+<tr>
+<td>Classification</td>
+<td>Test-only fixture/sentinel finding</td>
+</tr>
+<tr>
+<td>Verdict</td>
+<td><code>not_actionable</code> with high static confidence</td>
+</tr>
+<tr>
+<td>Product boundary</td>
+<td>The reported literal is below <code>#[cfg(test)]</code> at <code>token.rs:243</code> and is not compiled into the shipped steward crate</td>
+</tr>
+</tbody></table>
+<p>The fixed value is local to <code>test_token_response</code>, which asserts that the response preserves the supplied correlation nonce. Repository-wide call-site inspection found the fixed <code>TokenResponse::new</code> call only in this test. In shipped code, <code>TokenRequest::new</code> allocates a 16-byte nonce and fills the entire buffer with <code>rand_core::OsRng</code>; <code>TokenResponse</code> accepts the original request nonce for correlation rather than generating a new nonce.</p>
+<p>The public response type and correlation field are shipped, but the reported hard-coded source is not. Randomizing the equality fixture would add no product security property and would make the field-preservation test less explicit.</p>
+<p>Recommended next action: maintainers may review #37 for a policy-consistent test/false-positive disposition. No runtime remediation is indicated by this alert&#39;s reported source.</p>
+<h2>Previously triaged alerts</h2>
+<ul>
+<li>Alerts #100 and #101 remain covered by <a href="https://github.com/InterCooperative-Network/icn/blob/main/codeql-alert-triage-2026-06-29">CodeQL alert triage — 2026-06-29</a>. In both cases a zero-initialized destination buffer is fully overwritten by an RNG before cryptographic use; both remain <code>not_actionable</code> with high static confidence.</li>
+<li>Alerts #30–#35 remain covered by <a href="https://github.com/InterCooperative-Network/icn/blob/main/codeql-gossip-nonce-triage-2026-06-29">CodeQL gossip nonce triage — 2026-06-29</a>. Every reported literal is below <code>#[cfg(test)]</code> and intentionally selects duplicate, distinct, expiry, or sender-mismatch behavior; all remain <code>not_actionable</code> with high static confidence.</li>
+<li>The affected source for these eight alerts did not change after their merged triage records. Their live alert states remained open and undismissed.</li>
+</ul>
+<h2>Maintainer disposition checklist</h2>
+<p>This checklist is advisory. It does not perform or require an alert-state change.</p>
+<ul>
+<li><input disabled="" type="checkbox"> Review #100 and #101 as likely false-positive dispositions: the zero initializers are overwritten before use.</li>
+<li><input disabled="" type="checkbox"> Review #29, #30–#35, and #37 as likely test/false-positive dispositions: the reported literals are excluded from shipped builds by <code>#[cfg(test)]</code>.</li>
+<li><input disabled="" type="checkbox"> If changing alert state, verify the current default-branch instance and select a reason consistent with repository security policy and the evidence linked above.</li>
+<li><input disabled="" type="checkbox"> Record any administrative disposition separately from code remediation; this pass found no alert needing a runtime patch.</li>
+<li><input disabled="" type="checkbox"> Re-run the live inventory after any later CodeQL analysis because this record is point-in-time evidence, not a durable assertion that the alert set remains unchanged.</li>
+</ul>
+<p>At inspection time:</p>
+<ul>
+<li>Likely eligible for maintainer false-positive/test review: #29–#35, #37, #100, and #101.</li>
+<li>Needs remediation based on this static evidence: none.</li>
+<li>Needs runtime validation to decide the imported claim: none.</li>
+<li>Changed naturally outside this documentation pass: none.</li>
+</ul>
+<h2>Proof gaps</h2>
+<ul>
+<li>No CodeQL query-engine trace was inspected beyond live alert and instance metadata.</li>
+<li>No runtime, SMTP, token-flow, unit, integration, or human AT validation was performed.</li>
+<li>No alert was dismissed, so the checklist does not verify GitHub administrative reason selection or post-dismissal behavior.</li>
+<li>The inventory may change after later CodeQL analyses; the exact date, commit, and instance commit above bound this record.</li>
+</ul>
+<h2>Recommended next actions</h2>
+<ol>
+<li>Have a maintainer independently review the ten evidence-backed disposition candidates before any alert administration.</li>
+<li>Keep alert administration separate from runtime remediation and record the chosen reason per alert.</li>
+<li>Continue to treat future CodeQL findings as new inputs requiring their own source, sink, boundary, and reachability assessment.</li>
+<li>Keep human accessibility testing under #2041 and broader acceptance work under #1727 and #1746 separate from this security-documentation record.</li>
+</ol>
+<h2>Nonclaims</h2>
+<ul>
+<li>This does not dismiss any CodeQL/code-scanning alert.</li>
+<li>This does not remediate any vulnerability.</li>
+<li>This does not complete security hardening.</li>
+<li>This does not establish production readiness.</li>
+<li>This does not make ICN pilot-ready, organizer-ready, member-ready, or live-federated.</li>
+<li>This does not complete Phase 2 or #2041.</li>
+<li>This does not claim #2082 or #2113 completion.</li>
+<li>This does not change CodeQL setup, workflows, branch protection, repository settings, repository security settings, or runtime behavior.</li>
+<li>Human AT remains open under #2041.</li>
+<li>Maintainer alert disposition remains a separate administrative and security action.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
