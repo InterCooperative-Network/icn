@@ -342,6 +342,7 @@ Security documentation, threat models, and audit reports.
 - [SECURITY_AUDIT_REPORT.md](security/SECURITY_AUDIT_REPORT.md) - Audit findings
 - [SECURITY_AUDIT_RESULTS.md](security/SECURITY_AUDIT_RESULTS.md) - Audit results
 - [codeql-alert-triage-2026-06-29.md](security/codeql-alert-triage-2026-06-29.md) - Point-in-time static triage of CodeQL alerts #100 and #101
+- [codeql-gossip-nonce-triage-2026-06-29.md](security/codeql-gossip-nonce-triage-2026-06-29.md) - Point-in-time static triage of gossip nonce alerts #30–#35
 
 **SDIS Security:**
 - [SDIS_THREAT_MODEL.md](security/SDIS_THREAT_MODEL.md) - SDIS-specific threats

@@ -71,6 +71,7 @@ If maintainers later choose repo-owned configuration or the `security-extended` 
 | [SECURITY_FOLLOWUP.md](SECURITY_FOLLOWUP.md) | Various | Follow-up actions |
 | [phase-10c-security-analysis.md](phase-10c-security-analysis.md) | Phase 10c | Phase-specific analysis |
 | [codeql-alert-triage-2026-06-29.md](codeql-alert-triage-2026-06-29.md) | 2026-06-29 | Point-in-time static triage of CodeQL alerts #100 and #101 |
+| [codeql-gossip-nonce-triage-2026-06-29.md](codeql-gossip-nonce-triage-2026-06-29.md) | 2026-06-29 | Point-in-time static triage of gossip nonce alerts #30–#35 |
 
 ## 🆔 SDIS Security
 

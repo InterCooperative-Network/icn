@@ -1728,6 +1728,15 @@ last_updated = "2026-06-29"
 owner = "matt"
 audiences = ["security", "developers"]
 
+[docs."docs/security/codeql-gossip-nonce-triage-2026-06-29.md"]
+category = "security"
+status = "living"
+title = "CodeQL Gossip Nonce Triage (2026-06-29)"
+description = "Point-in-time static triage of gossip nonce alerts #30 through #35"
+last_updated = "2026-06-29"
+owner = "matt"
+audiences = ["security", "developers"]
+
 # ============================================================================
 # API AND REFERENCE DOCUMENTS
 # ============================================================================
