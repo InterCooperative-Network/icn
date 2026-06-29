@@ -29,6 +29,27 @@ test.describe('Demo Mode (PR 2)', () => {
         await expect(navBtn).toHaveClass(/hidden/);
     });
 
+    test('non-demo QR support keeps its SRI pin and loads only after QR sign-in is requested', async ({ page }) => {
+        const qrLibraryUrl = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+        await page.route(qrLibraryUrl, (route) => route.abort());
+
+        await page.goto('/');
+        await page.waitForLoadState('networkidle');
+        await expect(page.locator('script[data-qr-code-library]')).toHaveCount(0);
+
+        await page.locator('#gateway-url').fill('http://localhost:8000');
+        await page.locator('#coop-id').fill('demo-coop');
+        const qrRequest = page.waitForRequest(qrLibraryUrl);
+        await page.locator('#show-qr-login-btn').click();
+        await qrRequest;
+
+        const script = page.locator('script[data-qr-code-library="qrcodejs-1.0.0"]');
+        await expect(script).toHaveAttribute('src', qrLibraryUrl);
+        await expect(script).toHaveAttribute('integrity', 'sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU');
+        await expect(script).toHaveAttribute('crossorigin', 'anonymous');
+        await expect(script).toHaveAttribute('referrerpolicy', 'no-referrer');
+    });
+
     test('?mode=demo → banner renders with DEMO badge and label-mode dataset', async ({ page }) => {
         await page.goto('/?mode=demo');
         await page.waitForLoadState('networkidle');

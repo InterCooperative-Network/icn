@@ -23,6 +23,51 @@ test.describe('Fixture-only facilitator walkthrough', () => {
         await expect(walkthrough).toContainText('NON-MUTATING');
     });
 
+    test('keeps initial demo load and all four steps same-origin while QR sign-in stays deferred', async ({ page, context }, testInfo) => {
+        const localOrigin = new URL(testInfo.project.use.baseURL || 'http://localhost:8000').origin;
+        const observedRequests = [];
+        context.on('request', (request) => {
+            observedRequests.push({ url: request.url(), method: request.method() });
+        });
+
+        await page.goto('/?mode=demo');
+        await page.waitForLoadState('networkidle');
+        await expect(page.locator('script[data-qr-code-library]')).toHaveCount(0);
+
+        await page.getByRole('button', { name: 'Start rehearsal: Standing' }).click();
+        await expect(page.locator('#member-standing-content')).toContainText('Demo organizer (fictional)');
+        await page.getByRole('button', { name: 'Continue to Action Cards' }).click();
+        await expect(page.locator('.member-action-card')).toHaveCount(4);
+        await page.getByRole('button', { name: 'Continue to Review Preview' }).click();
+        await expect(page.locator('.organizer-review-row-select')).toHaveCount(4);
+        await page.getByRole('button', { name: 'Continue to receipt and evidence explanation' }).click();
+        await expect(page.locator('#facilitator-evidence-explanation')).toHaveAttribute('open', '');
+
+        const externalRequests = observedRequests.filter((request) => new URL(request.url).origin !== localOrigin);
+        expect(externalRequests).toEqual([]);
+        expect(observedRequests.some((request) => request.url.includes('cdnjs.cloudflare.com'))).toBeFalsy();
+        expect(observedRequests.some((request) => request.url.includes('qrcodejs'))).toBeFalsy();
+
+        const fixtureRequests = observedRequests.filter((request) => {
+            const url = new URL(request.url);
+            return url.pathname.startsWith('/fixtures/icn-organizer-demo/');
+        });
+        expect(fixtureRequests.length).toBeGreaterThan(0);
+        expect(fixtureRequests.every((request) => (
+            request.method === 'GET' && new URL(request.url).origin === localOrigin
+        ))).toBeTruthy();
+        expect(fixtureRequests.some((request) => request.url.endsWith('/standing.json'))).toBeTruthy();
+        expect(fixtureRequests.some((request) => request.url.endsWith('/action-cards.json'))).toBeTruthy();
+        expect(fixtureRequests.some((request) => request.url.endsWith('/preview-review.pending-publish-summary.json'))).toBeTruthy();
+        expect(fixtureRequests.some((request) => request.url.endsWith('/pending-publish-summary.json'))).toBeTruthy();
+
+        const walkthrough = page.locator('#facilitator-walkthrough');
+        await expect(walkthrough).toContainText('COMMITTED FICTIONAL FIXTURES');
+        await expect(walkthrough).toContainText('READ-ONLY');
+        await expect(walkthrough).toContainText('NON-MUTATING');
+        await expect(walkthrough).toContainText('No receipt or evidence packet is created');
+    });
+
     test('continues the four-step story with forward Tab from each destination heading', async ({ page }) => {
         await page.goto('/?mode=demo');
         const writeRequests = [];

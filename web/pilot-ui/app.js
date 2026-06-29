@@ -6530,6 +6530,45 @@ async function generateKeypair() {
 // QR Login System
 // ============================================================================
 
+const QR_CODE_LIBRARY_URL = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+const QR_CODE_LIBRARY_INTEGRITY = 'sha384-3zSEDfvllQohrq0PHL1fOXJuC/jSOO34H46t6UQfobFOmxE5BpjjaIJY5F2/bMnU';
+let qrCodeLibraryPromise = null;
+
+function loadQrCodeLibrary() {
+    if (typeof window.QRCode === 'function') return Promise.resolve(window.QRCode);
+    if (DEMO_MODE === 'demo') {
+        return Promise.reject(new Error('QR sign-in is not used in fixture-backed demo mode.'));
+    }
+    if (qrCodeLibraryPromise) return qrCodeLibraryPromise;
+
+    const failedScript = document.querySelector('script[data-qr-code-library="qrcodejs-1.0.0"]');
+    if (failedScript) failedScript.remove();
+
+    qrCodeLibraryPromise = new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = QR_CODE_LIBRARY_URL;
+        script.integrity = QR_CODE_LIBRARY_INTEGRITY;
+        script.crossOrigin = 'anonymous';
+        script.referrerPolicy = 'no-referrer';
+        script.dataset.qrCodeLibrary = 'qrcodejs-1.0.0';
+        script.addEventListener('load', () => {
+            if (typeof window.QRCode === 'function') {
+                resolve(window.QRCode);
+                return;
+            }
+            qrCodeLibraryPromise = null;
+            reject(new Error('QR sign-in support loaded without a QRCode implementation.'));
+        }, { once: true });
+        script.addEventListener('error', () => {
+            qrCodeLibraryPromise = null;
+            reject(new Error('Unable to load QR sign-in support.'));
+        }, { once: true });
+        document.head.appendChild(script);
+    });
+
+    return qrCodeLibraryPromise;
+}
+
 // QR Login State
 const qrLoginState = {
     sessionId: null,
@@ -6564,9 +6603,15 @@ async function showQrLogin() {
     // Show modal with loading state
     qrLoginModal?.classList.remove('hidden');
     qrCodeContainer.innerHTML = '<p class="loading">Generating QR code...</p>';
-    qrLoginStatus.textContent = 'Creating login session...';
+    qrLoginStatus.textContent = 'Loading QR sign-in support...';
 
     try {
+        // qrcodejs remains SRI-pinned but is deferred until this non-demo
+        // feature is explicitly requested. Demo mode is rejected above and
+        // therefore never performs the external library request.
+        await loadQrCodeLibrary();
+        qrLoginStatus.textContent = 'Creating login session...';
+
         // Create session on gateway
         const response = await fetch(`${gatewayUrl}/v1/sessions`, {
             method: 'POST',
