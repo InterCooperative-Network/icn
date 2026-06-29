@@ -40,7 +40,8 @@
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Security Documentation</h1>
 <p>Comprehensive security documentation, threat models, audit reports, and hardening guides.</p>
-<p><strong>Last Updated</strong>: 2026-02-10<br><strong>Security Status</strong>: Historical assessment snapshot (as of 2025-12-18)</p>
+<p><strong>Last Updated</strong>: 2026-06-29
+<strong>Security Status</strong>: Historical assessment snapshot (as of 2025-12-18)</p>
 <h2>🚨 Quick Links</h2>
 <ul>
 <li><strong><a href="https://github.com/InterCooperative-Network/icn/blob/main/FINAL_SECURITY_STATUS">FINAL_SECURITY_STATUS.md</a></strong> - Production readiness assessment ⭐</li>
@@ -58,6 +59,10 @@ View source on GitHub →
 <li>SDIS-specific security documentation</li>
 <li>Testing and validation procedures</li>
 </ul>
+<h2>Code scanning configuration audit (2026-06-29)</h2>
+<p>A live repository audit found that GitHub CodeQL <strong>default setup</strong> is configured. GitHub dynamically analyzes Actions, JavaScript/TypeScript, Python, and Rust for pull requests and the default branch, with a weekly schedule and the default query suite. The repository does not contain a repo-owned <code>.github/workflows/codeql.yml</code> advanced setup workflow.</p>
+<p>No advanced workflow was added by this audit. The current default setup already provides the repository&#39;s observed language and event coverage. GitHub&#39;s <a href="https://docs.github.com/en/code-security/concepts/code-scanning/setup-types" target="_blank" rel="noopener">setup guidance</a> reserves advanced setup for cases that need more granular control, and <a href="https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/configure-code-scanning/configuring-advanced-setup-for-code-scanning" target="_blank" rel="noopener">switching from default to advanced setup</a> requires a coordinated repository-settings change. Adding an advanced workflow while leaving default setup active would not create a clean, independently reviewable transition.</p>
+<p>If maintainers later choose repo-owned configuration or the <code>security-extended</code> query suite, treat that as a coordinated settings-and-workflow change. Alert triage remains separate. This point-in-time audit did not change repository settings, branch protection, runtime behavior, or any CodeQL alert, and it makes no claim about vulnerability remediation, hardening completion, or readiness.</p>
 <h2>📊 Production Security</h2>
 <h3>Status Snapshot</h3>
 <table>
