@@ -327,14 +327,16 @@ Continuous integration and delivery:
 
 Security documentation, threat models, and audit reports.
 
+These links include historical reports, current scanning notes, and point-in-time triage records. They do not by themselves establish current production readiness, vulnerability remediation status, deployment approval, or security hardening completion.
+
 ### Security Documentation (`security/`)
 
-**Production Security:**
-- [FINAL_SECURITY_STATUS.md](security/FINAL_SECURITY_STATUS.md) - Production readiness assessment ✅
-- [COMPREHENSIVE_SECURITY_IMPROVEMENTS.md](security/COMPREHENSIVE_SECURITY_IMPROVEMENTS.md) - Security overview
-- [SECURITY_FIXES_2025-12-18.md](security/SECURITY_FIXES_2025-12-18.md) - Detailed vulnerability fixes
+**Historical security assessments and references:**
+- [FINAL_SECURITY_STATUS.md](security/FINAL_SECURITY_STATUS.md) - Historical assessment snapshot; not current readiness evidence
+- [COMPREHENSIVE_SECURITY_IMPROVEMENTS.md](security/COMPREHENSIVE_SECURITY_IMPROVEMENTS.md) - Historical improvements report
+- [SECURITY_FIXES_2025-12-18.md](security/SECURITY_FIXES_2025-12-18.md) - Historical fix record; current status requires verification
 - [SECURITY_TESTING_GUIDE.md](security/SECURITY_TESTING_GUIDE.md) - Testing procedures
-- [production-hardening.md](security/production-hardening.md) - Production hardening measures
+- [production-hardening.md](security/production-hardening.md) - Historical hardening reference
 
 **Threat Models & Audits:**
 - [threat-model.md](security/threat-model.md) - Comprehensive threat analysis
