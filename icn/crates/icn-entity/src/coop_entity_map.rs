@@ -134,6 +134,38 @@ pub enum CoopEntityBindingProvenance {
     UnknownLegacy,
 }
 
+impl CoopEntityBindingProvenance {
+    /// Whether this provenance is **trusted** for *resolving* a `coop_id` to its
+    /// bound [`EntityId`] (i.e. for treating the binding as usable evidence for
+    /// enforce/issue-class purposes).
+    ///
+    /// Trusted: [`Activation`](Self::Activation),
+    /// [`OperatorBackfill`](Self::OperatorBackfill),
+    /// [`Surrogate`](Self::Surrogate), and
+    /// [`GovernanceReceipt`](Self::GovernanceReceipt) — each records a concrete,
+    /// accountable origin for the binding. **Fail-closed:**
+    /// [`UnknownLegacy`](Self::UnknownLegacy) — a pre-provenance binding, none
+    /// recorded, or an unrecognized future variant — is **never** trusted.
+    ///
+    /// This is the canonical predicate for "is this binding trustworthy enough to
+    /// act on as evidence". The gateway resolver keeps an enforcement-local copy
+    /// (`icn-gateway::coop_entity_resolver::provenance_is_trusted_for_resolution`)
+    /// that MUST classify the same set; the two are pinned by tests on each side.
+    /// Trust here gates only whether a binding may be *used as evidence* — a
+    /// mapping still confers **zero** authority on its own (see the module docs):
+    /// it never says what a caller is allowed to do, only which entity an
+    /// identifier denotes.
+    pub fn is_trusted_for_resolution(&self) -> bool {
+        match self {
+            CoopEntityBindingProvenance::Activation
+            | CoopEntityBindingProvenance::OperatorBackfill
+            | CoopEntityBindingProvenance::Surrogate
+            | CoopEntityBindingProvenance::GovernanceReceipt { .. } => true,
+            CoopEntityBindingProvenance::UnknownLegacy => false,
+        }
+    }
+}
+
 /// A `coop_id ↔ EntityId` binding together with its [`CoopEntityBindingProvenance`].
 ///
 /// Returned by the provenance-aware reads. The `coop_id` is preserved byte-for-byte
@@ -773,6 +805,25 @@ mod tests {
 
     fn coop_eid(slug: &str) -> EntityId {
         EntityId::cooperative(slug).unwrap()
+    }
+
+    // ------------------------------------------------------------------
+    // Provenance trust set (canonical predicate; pinned)
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn provenance_trust_set_is_pinned() {
+        use CoopEntityBindingProvenance as P;
+        // Trusted: every recorded, accountable origin.
+        assert!(P::Activation.is_trusted_for_resolution());
+        assert!(P::OperatorBackfill.is_trusted_for_resolution());
+        assert!(P::Surrogate.is_trusted_for_resolution());
+        assert!(P::GovernanceReceipt {
+            receipt_id: "receipt-1".into()
+        }
+        .is_trusted_for_resolution());
+        // Fail-closed: the legacy/unknown sentinel is never trusted.
+        assert!(!P::UnknownLegacy.is_trusted_for_resolution());
     }
 
     // ------------------------------------------------------------------
