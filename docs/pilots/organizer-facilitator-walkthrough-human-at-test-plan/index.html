@@ -1,0 +1,557 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Organizer facilitator walkthrough human AT test plan and evidence template | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>pilots</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>organizer facilitator walkthrough human at test plan</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/pilots/organizer-facilitator-walkthrough-human-at-test-plan.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Organizer facilitator walkthrough human AT test plan and evidence template</h1>
+<h2>Status and purpose</h2>
+<p><strong>Blank test plan and evidence template only. No human assistive-technology testing is recorded by this document.</strong></p>
+<p>Use this template for a real human session against <code>web/pilot-ui/?mode=demo</code>. It defines the minimum credible first assistive-technology (AT) smoke session for the four-step organizer facilitator walkthrough:</p>
+<ol>
+<li>Standing</li>
+<li>Action Cards</li>
+<li>Review Preview</li>
+<li>receipt/evidence explanation</li>
+</ol>
+<p>The target remains a committed-fixture, read-only, demo-mode, non-mutating surface with L2 evidence only. Tracking issue <a href="https://github.com/InterCooperative-Network/icn/issues/2041" target="_blank" rel="noopener">#2041</a> remains open for actual human AT execution.</p>
+<h2>Evidence boundary</h2>
+<p>The <a href="https://github.com/InterCooperative-Network/icn/blob/main/organizer-facilitator-walkthrough-accessibility-pass">partial accessibility evidence record</a> contains automated and browser-assisted observations such as Playwright keyboard events, axe results, accessibility-tree inspection, forced-color emulation, and reflow approximations. Those checks can establish useful structural evidence, but they cannot establish what a person hears, understands, or can operate with real AT.</p>
+<table>
+<thead>
+<tr>
+<th>Evidence type</th>
+<th>What it can support</th>
+<th>What it cannot establish</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Automated tests (<code>axe</code>, linters)</td>
+<td>Detect covered rule violations and regressions</td>
+<td>Human comprehension, announcement quality, or task usability</td>
+</tr>
+<tr>
+<td>Browser-assisted tests (Playwright, accessibility tree, emulation)</td>
+<td>Inspect structure, focus targets, and simulated conditions</td>
+<td>Real screen-reader speech, human keyboard use, or actual graphical-browser zoom review</td>
+</tr>
+<tr>
+<td>Human AT session</td>
+<td>Record one person&#39;s observations with named tools and conditions</td>
+<td>Full accessibility, legal conformance, or readiness for every user and environment</td>
+</tr>
+</tbody></table>
+<p>This template becomes one human AT evidence record only after a real tester fills it in during a named device/browser/AT session. An untouched or example-filled copy is not evidence.</p>
+<h2>Privacy and recording rules</h2>
+<ul>
+<li>Use a tester role or anonymized identifier unless the tester explicitly consents to attribution.</li>
+<li>Do not record disability, medical, accommodation, contact, or other private details in public git or public issue comments.</li>
+<li>Record observations, barriers, tool versions, and repo-safe artifact names; keep recordings or private session notes outside the public repository unless every participant has approved publication.</li>
+<li>Do not convert an unrun check into a pass. Use <strong>Not run</strong> or <strong>Blocked</strong> and state why.</li>
+</ul>
+<h2>Session record</h2>
+<p>Fill every applicable field before starting.</p>
+<table>
+<thead>
+<tr>
+<th>Environment detail</th>
+<th>Recorded value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Tester role/name or anonymized identifier</td>
+<td></td>
+</tr>
+<tr>
+<td>Session date and time zone</td>
+<td></td>
+</tr>
+<tr>
+<td>Commit SHA</td>
+<td></td>
+</tr>
+<tr>
+<td>PR or branch, if applicable</td>
+<td></td>
+</tr>
+<tr>
+<td>URL tested</td>
+<td></td>
+</tr>
+<tr>
+<td>OS and version</td>
+<td></td>
+</tr>
+<tr>
+<td>Browser and version</td>
+<td></td>
+</tr>
+<tr>
+<td>Assistive technology and version</td>
+<td></td>
+</tr>
+<tr>
+<td>Screen-reader/browser pair selected</td>
+<td></td>
+</tr>
+<tr>
+<td>Input mode (keyboard, screen-reader commands, switch, voice, touch)</td>
+<td></td>
+</tr>
+<tr>
+<td>Device type (desktop, laptop, phone, tablet)</td>
+<td></td>
+</tr>
+<tr>
+<td>Device/model details needed to reproduce the result</td>
+<td></td>
+</tr>
+<tr>
+<td>Browser zoom level</td>
+<td></td>
+</tr>
+<tr>
+<td>Theme (light/dark) and contrast mode</td>
+<td></td>
+</tr>
+<tr>
+<td>Language/locale, if relevant</td>
+<td></td>
+</tr>
+<tr>
+<td>Display resolution or viewport, if known</td>
+<td></td>
+</tr>
+<tr>
+<td>Audio output used for screen-reader review</td>
+<td></td>
+</tr>
+<tr>
+<td>Repo-safe evidence artifact names/links</td>
+<td></td>
+</tr>
+</tbody></table>
+<h2>Minimum credible human AT smoke pass</h2>
+<p>The minimum credible smoke pass is one real human session that performs all of the following. Its outcome applies only to the named tester, tools, device, and conditions in the session record; it is not a full accessibility outcome. Record <strong>Pass</strong>, <strong>Pass with follow-up</strong>, <strong>Fail</strong>, <strong>Blocked</strong>, or <strong>Not run</strong> for each item. Use <strong>Fail</strong> when the activity ran and the requirement was not met, and <strong>Blocked</strong> when a barrier prevented the activity from finishing.</p>
+<table>
+<thead>
+<tr>
+<th>Required activity</th>
+<th>Session result</th>
+<th>Observation or evidence pointer</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>One named screen-reader/browser pair. Prefer NVDA with Firefox or Chrome on Windows, or VoiceOver with Safari on macOS, when available.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>A human keyboard walkthrough using physical input, not Playwright-dispatched events.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Actual 200% browser zoom in a graphical browser, not CSS scaling or viewport emulation.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Light-theme and dark-theme review; record when the surface or platform does not expose one of these modes.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>The tester can identify the demo, fixture, read-only, and non-mutating boundaries.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>The tester can complete all four walkthrough steps without sighted mouse use.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>The tester can explain that no participant data, assignment, review decision, or gateway state changed.</td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>The tester can explain that receipts/evidence were described, not created or exported.</td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<p>Record the overall session as <strong>Pass</strong> only when every required activity ran and met its requirement. Use <strong>Pass with follow-up</strong> only when every required activity ran and the remaining observations are non-blocking and linked to follow-up work. Use <strong>Fail</strong>, <strong>Blocked</strong>, or <strong>Not run</strong> when any required activity has that outcome. If a required activity is unavailable, do not substitute automation; the partial session can still be useful evidence, but it is not a record of the minimum smoke pass defined here.</p>
+<h2>Setup</h2>
+<p>Serve the committed pilot UI locally from <code>web/pilot-ui/</code>, then open the demo URL in the recorded graphical browser. One example is:</p>
+<pre><code class="language-bash">cd web/pilot-ui
+python3 -m http.server 8000 --bind 127.0.0.1
+</code></pre>
+<p>Open <code>http://127.0.0.1:8000/?mode=demo</code>. Confirm the tested URL and commit SHA in the session record. Do not add credentials or connect the fixture walkthrough to a live gateway for this test.</p>
+<p>Before beginning:</p>
+<ul>
+<li>enable the named screen reader and confirm its speech output with ordinary browser content;</li>
+<li>set browser zoom to 100% for the walkthrough unless a step below says otherwise;</li>
+<li>close unrelated tabs and notifications that could confuse announcements;</li>
+<li>agree on whether the facilitator may provide task prompts, while avoiding hints about the expected answer;</li>
+<li>confirm that the tester can stop the session at any time.</li>
+</ul>
+<h2>Tester task script</h2>
+<p>Read the task prompts without describing where controls are located. Record the tester&#39;s words or a concise paraphrase in the observation fields.</p>
+<table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Tester task</th>
+<th>Result and observation</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>Open <code>web/pilot-ui/?mode=demo</code>.</td>
+<td></td>
+</tr>
+<tr>
+<td>2</td>
+<td>Identify whether the page is demo/fixture/read-only.</td>
+<td></td>
+</tr>
+<tr>
+<td>3</td>
+<td>Start the facilitator walkthrough.</td>
+<td></td>
+</tr>
+<tr>
+<td>4</td>
+<td>Complete Standing.</td>
+<td></td>
+</tr>
+<tr>
+<td>5</td>
+<td>Complete Action Cards.</td>
+<td></td>
+</tr>
+<tr>
+<td>6</td>
+<td>Complete Review Preview.</td>
+<td></td>
+</tr>
+<tr>
+<td>7</td>
+<td>Complete the receipt/evidence explanation.</td>
+<td></td>
+</tr>
+<tr>
+<td>8</td>
+<td>Explain what, if anything, was actually changed.</td>
+<td></td>
+</tr>
+<tr>
+<td>9</td>
+<td>Explain whether receipts/evidence were actually created or only explained.</td>
+<td></td>
+</tr>
+</tbody></table>
+<p>Repeat the task at actual 200% browser zoom in the graphical browser. Review both light and dark platform/browser themes. If the surface does not adapt to a theme setting, record that fact and assess the rendered state that is actually available.</p>
+<h2>Detailed evidence template</h2>
+<p>Use the result vocabulary from the minimum-session table. Record direct observations rather than inferred conformance.</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Pass/fail status</th>
+<th>Human observation</th>
+<th>Repo-safe evidence pointer</th>
+<th>Follow-up issue</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Screen-reader announcement clarity</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Heading and landmark navigation</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Button names, disabled state, and current-step state</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Live-region/status update timing and clarity</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Focus order and visible focus</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>No keyboard trap or required sighted mouse use</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Actual 200% zoom and reflow</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Light/dark theme and contrast/high-contrast mode</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Cognitive and plain-language clarity</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Fixture/read-only/non-mutating boundary clarity</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Receipt/evidence explanation versus creation boundary</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Blockers</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+<tr>
+<td>Follow-up issues</td>
+<td></td>
+<td></td>
+<td></td>
+<td></td>
+</tr>
+</tbody></table>
+<h3>Step-by-step notes</h3>
+<h4>Initial page and walkthrough start</h4>
+<ul>
+<li>What was announced on load?</li>
+<li>Could the tester identify the main navigation, walkthrough region, and current demo boundary?</li>
+<li>How did the tester find and activate “Start rehearsal: Standing”?</li>
+<li>Notes:</li>
+</ul>
+<h4>Standing</h4>
+<ul>
+<li>Was the destination heading announced?</li>
+<li>Were fixture identity and standing understandable without technical detail?</li>
+<li>Could the tester continue without sighted mouse help?</li>
+<li>Notes:</li>
+</ul>
+<h4>Action Cards</h4>
+<ul>
+<li>Were card names, authority, required action, risk, date boundary, and expected-receipt language understandable?</li>
+<li>Were technical values secondary to plain-language content?</li>
+<li>Could the tester continue without sighted mouse help?</li>
+<li>Notes:</li>
+</ul>
+<h4>Review Preview</h4>
+<ul>
+<li>Were row selection, selected state, disabled review choices, and wrapper/row statuses announced clearly?</li>
+<li>Was it clear that inspecting choices records nothing?</li>
+<li>Could the tester continue without sighted mouse help?</li>
+<li>Notes:</li>
+</ul>
+<h4>Receipt/evidence explanation</h4>
+<ul>
+<li>Was the expanded explanation and focus change announced?</li>
+<li>Could the tester distinguish expected evidence categories from issued receipts or exported evidence?</li>
+<li>Notes:</li>
+</ul>
+<h3>Tester summary in their own words</h3>
+<ul>
+<li>What did this walkthrough let you do?</li>
+<li>What changed as a result of the walkthrough?</li>
+<li>Were any receipts or evidence packets created?</li>
+<li>What was confusing or difficult?</li>
+<li>What would you change first?</li>
+</ul>
+<h2>Recommended later sessions</h2>
+<p>These are recommended after the minimum first session; they do not become implied results of that first record.</p>
+<ul>
+<li>VoiceOver with Safari on macOS</li>
+<li>TalkBack with Chrome on Android</li>
+<li>mobile touch exploration and coarse-pointer use on physical hardware</li>
+<li>switch-control scanning and activation</li>
+<li>voice-control naming and activation</li>
+<li>low-vision review, including magnification and high-contrast preferences</li>
+<li>cognitive-comprehension review with minimal facilitator prompting</li>
+<li>translation/localization review with expanded or translated copy</li>
+<li>additional screen-reader/browser combinations, including NVDA with both Firefox and Chrome</li>
+</ul>
+<h2>Session disposition</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Recorded value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Minimum-session outcome (Pass / Pass with follow-up / Fail / Blocked / Not run)</td>
+<td></td>
+</tr>
+<tr>
+<td>Critical blockers</td>
+<td></td>
+</tr>
+<tr>
+<td>Follow-up issue URLs</td>
+<td></td>
+</tr>
+<tr>
+<td>Tester confirmation or anonymized sign-off</td>
+<td></td>
+</tr>
+<tr>
+<td>Facilitator/reviewer</td>
+<td></td>
+</tr>
+<tr>
+<td>Date recorded</td>
+<td></td>
+</tr>
+</tbody></table>
+<p>The session disposition summarizes this one record. It does not promote the surface to a readiness state or replace the twelve-category <a href="/docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE">organizer/member accessibility gate</a>.</p>
+<h2>Nonclaims</h2>
+<ul>
+<li>A completed template is one human AT evidence record, not full accessibility completion.</li>
+<li>The template itself is not human AT evidence.</li>
+<li>Browser-assisted, Playwright, and axe tests do not replace human AT testing.</li>
+<li>This does not make the surface organizer-ready, member-ready, pilot-ready, production-ready, or live-federated.</li>
+<li>This does not complete #2041.</li>
+<li>This does not complete Phase 2.</li>
+<li>This does not complete #1727 or #1746.</li>
+<li>This does not claim #2082 or #2113 completion.</li>
+<li>This does not add mutation, persistence, assignment persistence, DID binding, receipt creation, evidence export, or live sync.</li>
+<li>The target surface remains fixture-backed, read-only, demo-mode, non-mutating, and L2 evidence only.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
