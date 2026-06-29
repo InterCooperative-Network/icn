@@ -13,6 +13,7 @@ Production runbooks for ICN daemon operations.
 | [Troubleshooting](./05-troubleshooting.md) | Common issues and fixes |
 | [Secrets Rotation](./06-secrets-rotation.md) | Rotating keys, passphrases, certificates |
 | [Pilot Vertical Slice Smoke](./07-pilot-vertical-slice-smoke.md) | Verify decision→effect→ledger linkage in one command |
+| [Treasury Entity-Auth Enforce-Mode](./treasury-entity-auth-enforce-mode-runbook.md) | Rehearse/verify the off-by-default treasury entity-auth enforce mode before any real enablement |
 
 ## Quick Reference
 

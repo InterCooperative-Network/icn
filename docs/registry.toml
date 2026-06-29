@@ -2733,6 +2733,15 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["operators"]
 
+[docs."docs/guides/operations/runbooks/treasury-entity-auth-enforce-mode-runbook.md"]
+category = "operations"
+status = "living"
+title = "Treasury Entity-Auth Enforce-Mode Runbook"
+description = "Rehearse/verify the off-by-default treasury entity-auth enforce mode (ICN_TREASURY_ENTITY_AUTH_MODE=enforce-trusted-resolver) before any real enablement"
+last_updated = "2026-06-29"
+owner = "matt"
+audiences = ["operators"]
+
 # ============================================================================
 # GUIDES — Developer
 # ============================================================================
