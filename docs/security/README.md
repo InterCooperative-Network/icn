@@ -2,7 +2,7 @@
 
 Comprehensive security documentation, threat models, audit reports, and hardening guides.
 
-**Last Updated**: 2026-02-10  
+**Last Updated**: 2026-06-29
 **Security Status**: Historical assessment snapshot (as of 2025-12-18)
 
 ## 🚨 Quick Links
@@ -21,6 +21,14 @@ This directory contains all security-related documentation for ICN, including:
 - Hardening guides and best practices
 - SDIS-specific security documentation
 - Testing and validation procedures
+
+## Code scanning configuration audit (2026-06-29)
+
+A live repository audit found that GitHub CodeQL **default setup** is configured. GitHub dynamically analyzes Actions, JavaScript/TypeScript, Python, and Rust for pull requests and the default branch, with a weekly schedule and the default query suite. The repository does not contain a repo-owned `.github/workflows/codeql.yml` advanced setup workflow.
+
+No advanced workflow was added by this audit. The current default setup already provides the repository's observed language and event coverage. GitHub's [setup guidance](https://docs.github.com/en/code-security/concepts/code-scanning/setup-types) reserves advanced setup for cases that need more granular control, and [switching from default to advanced setup](https://docs.github.com/en/code-security/how-tos/find-and-fix-code-vulnerabilities/configure-code-scanning/configuring-advanced-setup-for-code-scanning) requires a coordinated repository-settings change. Adding an advanced workflow while leaving default setup active would not create a clean, independently reviewable transition.
+
+If maintainers later choose repo-owned configuration or the `security-extended` query suite, treat that as a coordinated settings-and-workflow change. Alert triage remains separate. This point-in-time audit did not change repository settings, branch protection, runtime behavior, or any CodeQL alert, and it makes no claim about vulnerability remediation, hardening completion, or readiness.
 
 ## 📊 Production Security
 
