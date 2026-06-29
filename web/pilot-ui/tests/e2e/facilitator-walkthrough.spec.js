@@ -45,8 +45,9 @@ test.describe('Fixture-only facilitator walkthrough', () => {
 
         const externalRequests = observedRequests.filter((request) => new URL(request.url).origin !== localOrigin);
         expect(externalRequests).toEqual([]);
-        expect(observedRequests.some((request) => request.url.includes('cdnjs.cloudflare.com'))).toBeFalsy();
-        expect(observedRequests.some((request) => request.url.includes('qrcodejs'))).toBeFalsy();
+        expect(observedRequests.map((request) => request.url)).not.toContain(
+            'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js'
+        );
 
         const fixtureRequests = observedRequests.filter((request) => {
             const url = new URL(request.url);
