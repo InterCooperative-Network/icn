@@ -1,0 +1,326 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Treasury Entity-Auth Enforce-Mode Runbook | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>guides</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>operations</span><span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>runbooks</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>treasury entity auth enforce mode runbook</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/guides/operations/runbooks/treasury-entity-auth-enforce-mode-runbook.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Treasury Entity-Auth Enforce-Mode Runbook</h1>
+<p>Operator runbook for rehearsing and verifying the treasury entity-auth gate in
+<strong>enforcement</strong> mode (<code>ICN_TREASURY_ENTITY_AUTH_MODE=enforce-trusted-resolver</code>) <strong>before any
+real enablement</strong>.</p>
+<h2>Status &amp; scope</h2>
+<ul>
+<li><strong>Status:</strong> operational / forward-use runbook.</li>
+<li><strong>Not default-enabled.</strong> The shipped default is <code>ObserveOnly</code>; nothing in this runbook turns
+enforcement on by default.</li>
+<li><strong>Not a production enablement authorization.</strong> This document tells an operator how to
+rehearse the mode safely; it does not authorize enabling it on any real/partner deployment.</li>
+<li><strong>Applies only to the treasury route family</strong> (the <code>treasury</code> API handlers in
+<code>icn-gateway</code>). It does not describe any other route family.</li>
+<li><strong>Requires #2254 or later</strong> (the route-level consumption of the gate decision). On code
+before #2254 the env var only selects the <em>measurement</em> mode and never denies.</li>
+<li><strong><code>#2082</code> remains open</strong> — the canonical persisted <code>coop_id ↔ EntityId</code> mapping/backfill is
+not complete, and this runbook does not change that.</li>
+</ul>
+<h2>1. Purpose</h2>
+<p><code>ICN_TREASURY_ENTITY_AUTH_MODE=enforce-trusted-resolver</code> makes the treasury routes <strong>consume
+the entity-auth gate decision inline</strong> on the request path:</p>
+<ul>
+<li>The default <code>ObserveOnly</code> preserves the flat <code>require_coop_access</code> route behavior exactly —
+the entity-aware observation runs as a detached, fire-and-forget task and can never deny.</li>
+<li>Explicit enforce mode returns <strong>403</strong> <strong>only</strong> when <code>decide_treasury_gate(...)</code> returns
+<code>WouldDeny</code>. When it returns <code>ProceedUnchanged</code>, the route proceeds exactly as the flat
+guard decided.</li>
+<li>Entity membership is the authority signal. A resolver / <code>CoopEntityMap</code> mapping is a
+<em>target-evidence / trust qualifier</em> only — never authority on its own.</li>
+</ul>
+<p>This runbook tells an operator how to <strong>rehearse and verify</strong> the mode in a controlled
+environment before considering any real enablement.</p>
+<h2>2. Preconditions (before any rehearsal)</h2>
+<ul>
+<li>Running code includes <strong>#2254 or later</strong> (confirm the deployed commit).</li>
+<li>Operator understands this is <strong>treasury-only</strong> and changes only the treasury route family.</li>
+<li><strong>Test/dev environment only</strong>, unless a separate, explicit authorization exists for anything
+beyond that.</li>
+<li>A <strong>known trusted resolver / provenance source</strong> is available (a provenance-aware
+<code>CoopEntityMap</code> wired through the gateway), or the operator accepts that without one the
+gate has no trusted basis and enforcement will fail closed.</li>
+<li>Test data covers, at minimum:<ul>
+<li>a <strong>verified trusted member-allow</strong> path (trusted basis + membership target verified +
+affirmative member);</li>
+<li>a <strong>non-member deny</strong> path;</li>
+<li>a <strong>resolver-only / mapping-only</strong> path (a mapping exists but membership evidence does not
+verify the resolved target);</li>
+<li>an <strong><code>UnknownLegacy</code> / unprovenanced</strong> path;</li>
+<li>an <strong>observation-error</strong> path (e.g. an unavailable <code>EntityManager</code>), if feasible.</li>
+</ul>
+</li>
+<li>A <strong>rollback path is known</strong> (see §8).</li>
+<li><strong>Logs/metrics collection is available</strong> to observe the gate decisions.</li>
+<li><strong>No private partner data</strong> is used unless a separate approval exists.</li>
+</ul>
+<h2>3. How to enable for a rehearsal</h2>
+<p>Set the env var for the rehearsal process only (shell/session or the dev/test service unit —
+<strong>not</strong> a production deploy manifest):</p>
+<pre><code class="language-bash">ICN_TREASURY_ENTITY_AUTH_MODE=enforce-trusted-resolver
+</code></pre>
+<p>Roll back by unsetting:</p>
+<pre><code class="language-bash">unset ICN_TREASURY_ENTITY_AUTH_MODE
+</code></pre>
+<p>or by selecting observe-only explicitly:</p>
+<pre><code class="language-bash">ICN_TREASURY_ENTITY_AUTH_MODE=observe-only
+</code></pre>
+<blockquote>
+<p><strong>Do not add this env var to production deploy manifests.</strong> Keep it scoped to the rehearsal
+process. Restart the relevant service after changing the value so it is re-read.</p>
+</blockquote>
+<h2>4. Expected behavior matrix (env value → mode)</h2>
+<p>The parser is fail-safe: only the explicit enforce tokens select enforcement; everything else
+resolves to <code>ObserveOnly</code>. Matching trims whitespace and is case-insensitive.</p>
+<table>
+<thead>
+<tr>
+<th>Env value</th>
+<th>Mode</th>
+<th>Route effect</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>(missing / unset)</td>
+<td><code>ObserveOnly</code></td>
+<td>no new denial</td>
+</tr>
+<tr>
+<td>empty / whitespace-only</td>
+<td><code>ObserveOnly</code></td>
+<td>no new denial</td>
+</tr>
+<tr>
+<td><code>observe</code> / <code>observe-only</code> / <code>observe_only</code></td>
+<td><code>ObserveOnly</code></td>
+<td>no new denial</td>
+</tr>
+<tr>
+<td><code>enforce-trusted-resolver</code> / <code>enforce_trusted_resolver</code></td>
+<td><code>EnforceTrustedResolver</code></td>
+<td>deny only on <code>WouldDeny</code></td>
+</tr>
+<tr>
+<td>anything else (typo, bare <code>enforce</code>, <code>enforcetrustedresolver</code>, <code>true</code>, <code>1</code>, <code>on</code>)</td>
+<td><code>ObserveOnly</code></td>
+<td>no new denial (logs a <code>warn!</code>)</td>
+</tr>
+</tbody></table>
+<p>There is <strong>no fuzzy match toward enforcement</strong> — an unrecognized value never enables denial.</p>
+<h2>5. Treasury route behavior matrix (under each mode)</h2>
+<table>
+<thead>
+<tr>
+<th>Case</th>
+<th><code>EnforceTrustedResolver</code></th>
+<th><code>ObserveOnly</code> (default)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Trusted basis + verified membership target + member allow</td>
+<td><strong>proceed</strong></td>
+<td>unchanged</td>
+</tr>
+<tr>
+<td>Non-member against trusted target</td>
+<td><strong>403</strong> (<code>NotMember</code>)</td>
+<td>unchanged</td>
+</tr>
+<tr>
+<td>Resolver mapping alone, membership evidence does not verify the resolved target</td>
+<td><strong>403</strong> (<code>ResolverOnlyTargetUnverified</code> / <code>AgreeTargetUnverified</code>)</td>
+<td>unchanged</td>
+</tr>
+<tr>
+<td><code>UnknownLegacy</code> / unprovenanced / gossip-originated basis</td>
+<td><strong>403</strong> (<code>UntrustedResolution</code>)</td>
+<td>unchanged</td>
+</tr>
+<tr>
+<td>Legacy/resolver <code>EntityId</code> disagreement (migration collision)</td>
+<td><strong>403</strong> (<code>ResolverConflict</code>)</td>
+<td>unchanged</td>
+</tr>
+<tr>
+<td>Indeterminate membership (data gap)</td>
+<td><strong>403</strong> (<code>IndeterminateMembership</code>)</td>
+<td>unchanged</td>
+</tr>
+<tr>
+<td>Observation / resolver error</td>
+<td><strong>403</strong> (<code>ObservationError</code>)</td>
+<td>unchanged</td>
+</tr>
+</tbody></table>
+<p>Under <code>ObserveOnly</code>, <strong>every</strong> case above leaves route allow/deny <strong>byte-identical</strong> to the
+flat <code>require_coop_access</code> guard — the gate is measured, never enforced. Under enforcement, the
+route denies <strong>exactly</strong> when <code>decide_treasury_gate</code> returns <code>WouldDeny</code>; the resolver mapping
+is only a trust qualifier + target verifier, never authority.</p>
+<h2>6. Verification checklist</h2>
+<ul>
+<li>Confirm the <strong>current mode</strong> from logs/observation output (the gate logs under the
+<code>entity_authz_gate</code> / <code>entity_authz_observe</code> targets).</li>
+<li>Run the <strong>allow-path smoke</strong> (verified trusted member) → expect the route to proceed.</li>
+<li>Run the <strong>deny-path smoke</strong> (non-member / untrusted basis) → expect <strong>403</strong>.</li>
+<li>Confirm denied requests return <strong>403 before any treasury mutation</strong> (no budget/deposit/spend
+side effect on a denied request).</li>
+<li>Confirm a <strong>successful</strong> route still emits/records the normal observation evidence.</li>
+<li>Confirm a <strong>denied</strong> route leaves <strong>no treasury mutation</strong>.</li>
+<li>Confirm <strong>rollback to <code>ObserveOnly</code></strong> restores the baseline (no new denials).</li>
+<li>Record, in your rehearsal notes: commit SHA, config value, test-data class, result, and
+operator identity.</li>
+</ul>
+<h2>7. Rollback</h2>
+<ul>
+<li><code>unset ICN_TREASURY_ENTITY_AUTH_MODE</code> (or set <code>observe-only</code>).</li>
+<li>Restart the relevant service if needed so the value is re-read.</li>
+<li>Re-run the baseline allow path.</li>
+<li>Confirm <strong>no new denials</strong> after rollback.</li>
+<li>Preserve logs/evidence from the failed rehearsal for follow-up.</li>
+</ul>
+<h2>8. Prohibited use</h2>
+<ul>
+<li>Do <strong>not</strong> enable in production.</li>
+<li>Do <strong>not</strong> enable for partner / private data without separate, explicit approval.</li>
+<li>Do <strong>not</strong> use this runbook to claim <code>#2082</code> is complete.</li>
+<li>Do <strong>not</strong> treat resolver mappings as authority.</li>
+<li>Do <strong>not</strong> bypass the flat-guard assumptions without separate review.</li>
+<li>Do <strong>not</strong> extend this pattern to other route families without comparable target-aware
+evidence.</li>
+</ul>
+<h2>9. Nonclaims</h2>
+<ul>
+<li>This does not complete <code>#2082</code>.</li>
+<li>This does not complete entity-aware authorization.</li>
+<li>This does not retire the flat <code>require_coop_access</code> baseline by default.</li>
+<li>This does not make resolver mappings authority.</li>
+<li>This does not trust <code>UnknownLegacy</code>, gossip-originated rows, or unprovenanced mappings.</li>
+<li>This does not issue positive <code>entity_id</code> / <code>entity_type</code> token claims.</li>
+<li>This does not make ICN production-ready, pilot-ready, organizer-ready, member-ready, or
+live-federated.</li>
+<li>This does not complete Phase 2.</li>
+<li>This does not complete <code>#2041</code>.</li>
+<li>This does not claim <code>#2113</code> completion.</li>
+<li>This does not change CodeQL setup or alert state.</li>
+</ul>
+<h2>10. Follow-ups</h2>
+<ul>
+<li>Create an actual <strong>rehearsal evidence template</strong> if one is not already present (commit SHA /
+config value / test-data class / result / operator).</li>
+<li>Decide whether to add <strong>non-env route tests via dependency injection</strong> in a later code PR
+(the current tests are env-free pure-decision tests; no env-var route tests exist, to avoid
+global <code>std::env</code> races).</li>
+<li>Extend the consume-the-decision pattern to other route families <strong>only</strong> when each has
+comparable target-aware evidence.</li>
+<li><code>#2082</code> mapping/backfill closure remains a separate track.</li>
+</ul>
+<h2>Related</h2>
+<ul>
+<li><code>icn/crates/icn-gateway/src/authority.rs</code> — <code>parse_treasury_entity_auth_mode</code>,
+<code>active_treasury_entity_auth_mode</code>, <code>decide_treasury_gate</code>,
+<code>treasury_gate_enforcement_denial</code>.</li>
+<li><code>icn/crates/icn-gateway/src/api/treasury.rs</code> — <code>observe_treasury</code> /
+<code>observe_treasury_by_did</code> (mode-branching route helpers).</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/04-security-incident">Security Incident</a> · <a href="https://github.com/InterCooperative-Network/icn/blob/main/05-troubleshooting">Troubleshooting</a></li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
