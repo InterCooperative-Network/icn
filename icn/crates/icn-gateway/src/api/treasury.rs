@@ -390,84 +390,78 @@ fn observe_coop_entity_resolver(req: &HttpRequest) -> Arc<dyn CoopEntityResolver
         .unwrap_or_else(|| Arc::new(UnwiredCoopEntityResolver))
 }
 
-/// Like [`observe_treasury`], but keyed by the **owning treasury's `treasury_did`**
-/// rather than a path `coop_id`. Used by `get_budget`, which fetches a budget by a
-/// globally-keyed `budget_id`: the budget may belong to a different cooperative than
-/// the path `coop_id` (the flat guard only checks the path coop). Observing against
-/// the path coop would record the entity decision for the wrong entity. Resolving
-/// from the budget's own `treasury_did` makes the observation reflect the budget's
-/// real owner — so a cross-coop budget read surfaces as a genuine `flat_allow_entity_deny`
-/// instead of a misleading `agree_allow`. The treasury is loaded **inside** the
-/// detached task (off the request hot path). (RFC-0018 observe mode, ADR-0035.)
-async fn observe_treasury_by_did(
+/// Object-context binding decision for a globally-keyed budget (#2085): does the path
+/// coop's treasury (if any) own the budget? Compares the path treasury's `treasury_did`
+/// against the budget's. Returns `false` when the path coop has no treasury OR the dids
+/// differ — both MUST surface as the same generic `NotFound`, and this decision MUST run
+/// before any enforce-capable entity-auth so that an `EnforceTrustedResolver` denial can
+/// never run against (and thereby reveal the existence/ownership of) a foreign budget.
+fn path_owns_budget(path_treasury_did: Option<&Did>, budget_treasury_did: &Did) -> bool {
+    path_treasury_did == Some(budget_treasury_did)
+}
+
+/// Whether the foreign-budget owner probe records observe-mode divergence telemetry for
+/// the given mode. `true` only for `ObserveOnly` — there the probe is detached and can
+/// never affect a route outcome. Under `EnforceTrustedResolver` it is `false`: an
+/// enforce-capable owner gate must NOT run before the ownership mask, or it could deny
+/// and thereby 403-leak the foreign budget's existence/ownership.
+fn budget_owner_probe_records_in_mode(mode: TreasuryEntityAuthMode) -> bool {
+    matches!(mode, TreasuryEntityAuthMode::ObserveOnly)
+}
+
+/// Observe-mode divergence telemetry for a FOUND-but-foreign (or path-coop-has-no-treasury)
+/// budget that `get_budget` is about to mask as a generic `NotFound`
+/// (`docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md` §4.11 item 5: "keep observe-mode /
+/// divergence recording firing **before** the enforced denial, so cross-context attempts
+/// stay visible as divergence rather than vanishing").
+///
+/// Records **only** under `ObserveOnly`: it resolves the budget's OWN owning treasury and
+/// fires the existing detached, fire-and-forget entity observation (so a cross-context
+/// probe stays visible — e.g. `flat_allow_entity_deny`). Under `EnforceTrustedResolver` it
+/// records NOTHING — running an enforce-capable gate against the foreign owner could deny
+/// and thereby leak its existence/ownership; the caller's response is the same generic
+/// `NotFound` either way. Returns `()`; it can never deny, change the response status, or
+/// add request-path latency.
+fn observe_foreign_budget_probe_if_observe_only(
     req: &HttpRequest,
     entity_mgr: &web::Data<Arc<EntityManager>>,
     treasury_mgr: &web::Data<Arc<GatewayTreasuryManager>>,
-    treasury_did: &Did,
+    owner_treasury_did: &Did,
     action: EntityAction,
-) -> Result<()> {
+) {
+    if !budget_owner_probe_records_in_mode(active_treasury_entity_auth_mode()) {
+        return;
+    }
     let Some(claims) = get_claims(req) else {
-        return Ok(());
+        return;
     };
     let Ok(caller_did) = claims.sub.parse::<Did>() else {
-        return Ok(());
+        return;
     };
     let caller = EntityId::from_did(&caller_did);
 
     let entity_mgr = entity_mgr.get_ref().clone();
     let treasury_mgr = treasury_mgr.get_ref().clone();
-    let treasury_did = treasury_did.clone();
+    let owner_treasury_did = owner_treasury_did.clone();
     let resolver = observe_coop_entity_resolver(req);
-
-    match active_treasury_entity_auth_mode() {
-        // A2e ENFORCE (operator-gated, off by default): resolve the budget's owning treasury
-        // and consume the gate decision INLINE, before returning the budget. A `WouldDeny`
-        // (including the fail-closed case where the owning treasury cannot be resolved, so no
-        // trusted target exists) denies with the existing forbidden pattern (403);
-        // `ProceedUnchanged` proceeds. This enforces against the budget's REAL owning entity,
-        // not the path coop.
-        TreasuryEntityAuthMode::EnforceTrustedResolver => {
-            let (target, coop_id) = match treasury_mgr.get_treasury(&treasury_did).await {
-                Ok(Some(t)) => (t.entity_id().cloned(), t.coop_id.clone()),
-                _ => (None, String::new()),
-            };
-            let outcome = evaluate_treasury_entity_access(
-                resolver.as_ref(),
-                &entity_mgr,
-                &caller,
-                target.as_ref(),
-                &coop_id,
-                action,
-            )
-            .await;
-            match treasury_gate_enforcement_denial(outcome.decision) {
-                Some(err) => Err(err),
-                None => Ok(()),
-            }
-        }
-        // OBSERVE (default): resolve the owning treasury and observe off the hot path; the
-        // result is discarded and never denies (byte-identical to the pre-A2e behavior).
-        TreasuryEntityAuthMode::ObserveOnly => {
-            actix_web::rt::spawn(async move {
-                // Resolve the budget's owning treasury off the hot path; observe against
-                // its stored entity_id (and its own coop_id for the fallback projection).
-                let (target, coop_id) = match treasury_mgr.get_treasury(&treasury_did).await {
-                    Ok(Some(t)) => (t.entity_id().cloned(), t.coop_id.clone()),
-                    _ => (None, String::new()),
-                };
-                let _ = observe_treasury_entity_access(
-                    resolver.as_ref(),
-                    &entity_mgr,
-                    &caller,
-                    target.as_ref(),
-                    &coop_id,
-                    action,
-                )
-                .await;
-            });
-            Ok(())
-        }
-    }
+    actix_web::rt::spawn(async move {
+        // Resolve the budget's OWN owning treasury off the hot path; observe against its
+        // stored entity_id (and its own coop_id for the fallback projection). Discarded —
+        // observe mode never denies, so masking the response as NotFound is unaffected.
+        let (target, coop_id) = match treasury_mgr.get_treasury(&owner_treasury_did).await {
+            Ok(Some(t)) => (t.entity_id().cloned(), t.coop_id.clone()),
+            _ => (None, String::new()),
+        };
+        let _ = observe_treasury_entity_access(
+            resolver.as_ref(),
+            &entity_mgr,
+            &caller,
+            target.as_ref(),
+            &coop_id,
+            action,
+        )
+        .await;
+    });
 }
 
 #[get("/{coop_id}")]
@@ -496,7 +490,9 @@ pub async fn get_treasury_status(
         )));
     };
 
-    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    // RFC-0018/A2e treasury entity-auth seam:
+    // default ObserveOnly preserves flat require_coop_access behavior;
+    // explicit EnforceTrustedResolver may deny here before treasury work proceeds.
     observe_treasury(
         &req,
         &entity_mgr,
@@ -580,7 +576,9 @@ pub(crate) async fn do_get_treasury_position(
         )));
     };
 
-    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    // RFC-0018/A2e treasury entity-auth seam:
+    // default ObserveOnly preserves flat require_coop_access behavior;
+    // explicit EnforceTrustedResolver may deny here before treasury work proceeds.
     observe_treasury(
         &req,
         &entity_mgr,
@@ -639,7 +637,9 @@ pub async fn get_treasury_nonce(
         )));
     };
 
-    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    // RFC-0018/A2e treasury entity-auth seam:
+    // default ObserveOnly preserves flat require_coop_access behavior;
+    // explicit EnforceTrustedResolver may deny here before treasury work proceeds.
     observe_treasury(
         &req,
         &entity_mgr,
@@ -698,7 +698,9 @@ pub async fn list_budgets(
         )));
     };
 
-    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    // RFC-0018/A2e treasury entity-auth seam:
+    // default ObserveOnly preserves flat require_coop_access behavior;
+    // explicit EnforceTrustedResolver may deny here before treasury work proceeds.
     observe_treasury(
         &req,
         &entity_mgr,
@@ -768,38 +770,53 @@ pub async fn get_budget(
         return Err(GatewayError::NotFound("Budget not found".to_string()));
     };
 
-    // RFC-0018 observe mode (ADR-0035): observe against the budget's OWN treasury
-    // (resolved from budget.treasury_did inside a detached task), not the path coop
-    // — the budget is globally keyed and may belong to a different cooperative.
-    // Observation-only; the flat require_coop_access guard above stays authoritative.
-    // This fires BEFORE the ownership enforcement below so a cross-coop attempt
-    // still registers (as flat_allow_entity_deny) even though it is then denied.
-    observe_treasury_by_did(
-        &req,
-        &entity_mgr,
-        &treasury_mgr,
-        &budget.treasury_did,
-        EntityAction::TreasuryRead,
-    )
-    .await?;
-
-    // #2085: object-context binding in the flat-authz regime. The budget was
-    // fetched by a globally-keyed id; require it to belong to the treasury of the
-    // path coop before returning it. A foreign (or path-coop-has-no-treasury)
-    // budget is reported as NotFound — the same shape as a missing budget — so the
-    // caller cannot distinguish "exists elsewhere" from "does not exist." The flat
-    // require_coop_access guard above remains authoritative; this only ties the
-    // loaded object to the request path (no entity-auth enforcement; see #2081).
+    // #2085 + A2e: object-context binding MUST run BEFORE any enforce-capable
+    // entity-auth. The budget was fetched by a globally-keyed id; bind it to the path
+    // coop's treasury first. A foreign budget — or a path coop with no treasury — is
+    // reported as the SAME generic NotFound as a missing budget, so the caller cannot
+    // distinguish "exists elsewhere" from "does not exist". Crucially, ordering the
+    // bind first means the entity-auth seam below (which may DENY under explicit
+    // EnforceTrustedResolver) never runs against a foreign owner — so an enforce-mode
+    // 403 can never leak the existence/ownership of another coop's budget. Entity-auth
+    // runs only after the loaded object is proven to belong to the path coop.
     let path_treasury = treasury_mgr
         .get_treasury_by_coop(&coop_id)
         .await
         .map_err(|e| GatewayError::InternalError(e.to_string()))?;
-    let owns_budget = path_treasury
-        .as_ref()
-        .is_some_and(|t| t.treasury_did == budget.treasury_did);
-    if !owns_budget {
+    let path_owns = path_owns_budget(
+        path_treasury.as_ref().map(|t| &t.treasury_did),
+        &budget.treasury_did,
+    );
+    let Some(path_treasury) = path_treasury.filter(|_| path_owns) else {
+        // Foreign / no-path-treasury budget: mask as the SAME generic NotFound (#1642
+        // enumeration-safe). Per ABUSE_CASE_HARDENING_STRATEGY §4.11 item 5, keep
+        // observe-mode divergence recording firing BEFORE the masked denial so a
+        // cross-context probe stays visible (e.g. `flat_allow_entity_deny`) — but ONLY in
+        // ObserveOnly, where it is detached and can never deny or affect this response.
+        // Under EnforceTrustedResolver this records nothing (an enforce-capable
+        // foreign-owner gate could 403-leak existence); the response is the same NotFound.
+        observe_foreign_budget_probe_if_observe_only(
+            &req,
+            &entity_mgr,
+            &treasury_mgr,
+            &budget.treasury_did,
+            EntityAction::TreasuryRead,
+        );
         return Err(GatewayError::NotFound("Budget not found".to_string()));
-    }
+    };
+
+    // RFC-0018/A2e treasury entity-auth seam, now object-bound to the path coop:
+    // default ObserveOnly preserves flat require_coop_access behavior; explicit
+    // EnforceTrustedResolver may deny here before the budget is returned. The target is
+    // the path coop's treasury entity, which (post-binding) IS the budget's owner.
+    observe_treasury(
+        &req,
+        &entity_mgr,
+        path_treasury.entity_id(),
+        &coop_id,
+        EntityAction::TreasuryRead,
+    )
+    .await?;
 
     let response = BudgetDetailResponse {
         id: budget.id.clone(),
@@ -892,7 +909,9 @@ pub async fn create_budget(
         ))
     })?;
 
-    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    // RFC-0018/A2e treasury entity-auth seam:
+    // default ObserveOnly preserves flat require_coop_access behavior;
+    // explicit EnforceTrustedResolver may deny here before treasury work proceeds.
     observe_treasury(
         &req,
         &entity_mgr,
@@ -995,7 +1014,9 @@ pub async fn list_spending_rules(
         return Ok(HttpResponse::Ok().json(response));
     };
 
-    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    // RFC-0018/A2e treasury entity-auth seam:
+    // default ObserveOnly preserves flat require_coop_access behavior;
+    // explicit EnforceTrustedResolver may deny here before treasury work proceeds.
     observe_treasury(
         &req,
         &entity_mgr,
@@ -1078,7 +1099,9 @@ pub async fn get_audit_trail(
         return Ok(HttpResponse::Ok().json(response));
     };
 
-    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    // RFC-0018/A2e treasury entity-auth seam:
+    // default ObserveOnly preserves flat require_coop_access behavior;
+    // explicit EnforceTrustedResolver may deny here before treasury work proceeds.
     observe_treasury(
         &req,
         &entity_mgr,
@@ -1170,7 +1193,9 @@ pub async fn deposit_to_treasury(
             GatewayError::NotFound(format!("Treasury not found for cooperative: {coop_id}"))
         })?;
 
-    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    // RFC-0018/A2e treasury entity-auth seam:
+    // default ObserveOnly preserves flat require_coop_access behavior;
+    // explicit EnforceTrustedResolver may deny here before treasury work proceeds.
     observe_treasury(
         &req,
         &entity_mgr,
@@ -1315,7 +1340,9 @@ pub(crate) async fn do_propose_spend(
         ))
     })?;
 
-    // RFC-0018 observe mode (ADR-0035): flat guard above remains authoritative.
+    // RFC-0018/A2e treasury entity-auth seam:
+    // default ObserveOnly preserves flat require_coop_access behavior;
+    // explicit EnforceTrustedResolver may deny here before treasury work proceeds.
     observe_treasury(
         &req,
         &entity_mgr,
@@ -1567,10 +1594,56 @@ mod tests {
         assert_eq!(resp.status(), actix_web::http::StatusCode::FORBIDDEN);
     }
 
+    /// Regression for the enforce-mode object-binding ordering (post-#2254): the
+    /// `get_budget` object-context binding (`path_owns_budget`) decides ownership purely
+    /// from the path treasury vs the budget's `treasury_did`, and the handler runs it
+    /// BEFORE the (enforce-capable) entity-auth seam. A foreign budget — and a path coop
+    /// with no treasury — must read as NOT owned, so the handler returns generic NotFound
+    /// before any `EnforceTrustedResolver` denial can run against (and thereby reveal) the
+    /// foreign owner. Pure + env-free, so it cannot race the global `ICN_TREASURY_ENTITY_AUTH_MODE`.
+    ///
+    /// Nested in its own module so the built-in `#[test]` is not shadowed by this test
+    /// module's `use actix_web::test` (the actix attribute requires `async`).
+    mod path_binding_precedes_entity_auth {
+        use super::super::{budget_owner_probe_records_in_mode, path_owns_budget};
+        use crate::authority::TreasuryEntityAuthMode;
+        use icn_identity::KeyPair;
+
+        #[test]
+        fn path_owns_budget_masks_foreign_and_missing() {
+            let a = KeyPair::generate().unwrap().did().clone();
+            let b = KeyPair::generate().unwrap().did().clone();
+            // Own budget: path treasury present and the dids match -> owned (entity-auth
+            // may then run against the path coop's own treasury).
+            assert!(path_owns_budget(Some(&a), &a));
+            // Foreign budget: path treasury present but dids differ -> NOT owned -> generic
+            // NotFound, BEFORE any enforce-capable entity-auth (no 403 existence/ownership leak).
+            assert!(!path_owns_budget(Some(&a), &b));
+            // #2085: path coop has no treasury at all -> NOT owned -> generic NotFound.
+            assert!(!path_owns_budget(None, &a));
+        }
+
+        /// The pre-mask divergence probe records ONLY under ObserveOnly (detached, never
+        /// denies). Under EnforceTrustedResolver it records nothing — an enforce-capable
+        /// foreign-owner gate must not run before the ownership mask, or it could 403-leak
+        /// the foreign budget's existence (ABUSE_CASE_HARDENING_STRATEGY §4.11 item 5).
+        #[test]
+        fn foreign_budget_probe_records_only_in_observe_only() {
+            assert!(budget_owner_probe_records_in_mode(
+                TreasuryEntityAuthMode::ObserveOnly
+            ));
+            assert!(!budget_owner_probe_records_in_mode(
+                TreasuryEntityAuthMode::EnforceTrustedResolver
+            ));
+        }
+    }
+
     /// #2085: a caller authorized for coop-a must not retrieve coop-b's budget
     /// through the globally-keyed budget id. The flat guard checks only the path
     /// coop; the budget is fetched by a global id and must be proven to belong to
-    /// the path coop's treasury before it is returned.
+    /// the path coop's treasury before it is returned. Post-#2254 this binding runs
+    /// BEFORE the enforce-capable entity-auth seam, so the foreign budget is masked as
+    /// NotFound even when explicit enforce mode would otherwise 403 against its owner.
     #[actix_web::test]
     async fn test_get_budget_cross_coop_read_denied() {
         let treasury_mgr = actor_backed_treasury_manager();
