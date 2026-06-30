@@ -342,6 +342,17 @@ enum ApplianceCommands {
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
+
+    /// Verify an emitted appliance manifest against artifacts on disk (fail-closed).
+    VerifyManifest {
+        /// Path to the manifest JSON file to verify.
+        manifest: PathBuf,
+
+        /// Root directory for resolving relative image / base / binary source
+        /// paths (defaults to the current directory).
+        #[arg(long)]
+        root: Option<PathBuf>,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -10592,6 +10603,21 @@ fn handle_appliance_command(cmd: ApplianceCommands) -> Result<()> {
             } else {
                 println!("{content}");
             }
+        }
+        ApplianceCommands::VerifyManifest { manifest, root } => {
+            let content = std::fs::read_to_string(&manifest)
+                .with_context(|| format!("Failed to read manifest {}", manifest.display()))?;
+            let parsed = ApplianceManifest::from_json_str(&content)
+                .with_context(|| format!("Invalid appliance manifest {}", manifest.display()))?;
+            let root = root.unwrap_or_else(|| PathBuf::from("."));
+            parsed.verify(&root).with_context(|| {
+                format!("manifest verification failed for {}", manifest.display())
+            })?;
+            println!(
+                "OK: appliance manifest verified — image + base + {} binaries re-hashed (root {})",
+                parsed.built_binaries.len(),
+                root.display()
+            );
         }
     }
 
