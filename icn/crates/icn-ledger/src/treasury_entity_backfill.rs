@@ -62,9 +62,12 @@ pub enum TreasuryEntityIdBackfillAction {
     /// Skipped: the bound `EntityId` is not a well-formed cooperative entity
     /// (a flat `coop_id` denotes a cooperative target — RFC-0018). Fail closed.
     SkippedNonCooperativeEntity,
-    /// Skipped: the binding's reverse index does not unambiguously confirm this
-    /// `coop_id` — it points to a *different* `coop_id`, or is *missing* (a
-    /// one-sided / inconsistent store). Fail closed.
+    /// Skipped: the binding is ambiguous or conflicting and cannot safely confirm
+    /// this `coop_id`'s target. Covers: a reverse index pointing to a *different*
+    /// `coop_id`; a *missing* reverse (a one-sided / inconsistent store); or a
+    /// *projectable* `coop_id` whose strict legacy projection differs from the
+    /// trusted binding's target (the resolver would treat that as a conflict).
+    /// Fail closed.
     SkippedAmbiguousBinding,
     /// Skipped: a storage read error prevented establishing safety. Fail closed.
     SkippedStorageError,
@@ -307,9 +310,36 @@ fn plan_target(
         }
     }
 
+    // Resolver/legacy-projection conflict guard. If `target.coop_id` is itself
+    // strictly projectable to a cooperative EntityId — same reject-not-normalize
+    // semantics as the gateway's legacy fallback, which delegates to
+    // `EntityId::cooperative` (used directly here to avoid an icn-gateway
+    // dependency / layering violation) — and that projection DIFFERS from the
+    // trusted binding's target, the gateway resolver classifies the same
+    // condition as `Disagree`/`ResolverConflict`, NOT a trusted target. Do not
+    // bless a treasury `entity_id` the auth gate would treat as a conflict: fail
+    // closed. A NON-projectable `coop_id` (e.g. a default `coop:<uuid>`, or an
+    // uppercase/underscore id) has no legacy projection to disagree with, so the
+    // resolver-only / surrogate case below stays eligible.
+    if let Ok(projected) = EntityId::cooperative(&target.coop_id) {
+        if projected != binding.entity_id {
+            return make(
+                TreasuryEntityIdBackfillAction::SkippedAmbiguousBinding,
+                Some(binding.entity_id.clone()),
+                format!(
+                    "coop_id projects to {} but the trusted binding resolves to {} — the resolver would treat this as a conflict; fail closed",
+                    projected.as_str(),
+                    binding.entity_id.as_str()
+                ),
+                None,
+            );
+        }
+    }
+
     // Eligible: a trusted, non-ambiguous, cooperative binding for a legacy
-    // treasury that currently has no entity_id. READ-ONLY — report the intent;
-    // populate nothing.
+    // treasury that currently has no entity_id. The binding either matches the
+    // legacy projection of `coop_id` or `coop_id` is non-projectable (resolver-
+    // only / surrogate). READ-ONLY — report the intent; populate nothing.
     let resolved = binding.entity_id.as_str().to_string();
     make(
         TreasuryEntityIdBackfillAction::WouldPopulate,
@@ -578,6 +608,66 @@ mod tests {
             TreasuryEntityIdBackfillAction::SkippedAmbiguousBinding
         );
         assert!(entry.reason.contains("no reverse binding"));
+    }
+
+    #[test]
+    fn skipped_when_projectable_coop_id_conflicts_with_binding() {
+        // `food-coop` is itself strictly projectable to `cooperative:food-coop`,
+        // but the trusted map binds it to a DIFFERENT cooperative (`other-coop`)
+        // with a matching reverse index. The gateway resolver would call this a
+        // Disagree/ResolverConflict, so the planner must NOT bless it — fail
+        // closed as SkippedAmbiguousBinding.
+        let map = InMemoryCoopEntityMap::new();
+        map.bind_resolved_with_provenance(
+            "food-coop",
+            &coop_eid("other-coop"),
+            CoopEntityBindingProvenance::Activation,
+        )
+        .unwrap();
+        // Sanity: the binding is trusted with a matching reverse, so only the
+        // projection-conflict guard can skip it.
+        assert_eq!(
+            map.coop_for_entity(&coop_eid("other-coop")).unwrap(),
+            Some("food-coop".to_string())
+        );
+
+        let plan = plan_treasury_entity_id_backfill(vec![target("food-coop", None)], &map);
+        assert_eq!(
+            plan.would_populate, 0,
+            "must not populate when the projectable coop_id disagrees with the binding"
+        );
+        assert_eq!(plan.skipped_ambiguous_binding, 1);
+        let entry = one(&plan);
+        assert_eq!(
+            entry.action,
+            TreasuryEntityIdBackfillAction::SkippedAmbiguousBinding
+        );
+        assert_eq!(entry.resolved_entity_id, Some(coop_eid("other-coop")));
+        assert!(entry.reason.contains("conflict"));
+    }
+
+    #[test]
+    fn would_populate_when_non_projectable_coop_id_has_trusted_surrogate() {
+        // `coop_A` is NON-projectable (uppercase + underscore), so there is no
+        // legacy projection to disagree with. A trusted surrogate binding with a
+        // matching reverse is the resolver-only case and stays eligible.
+        let map = InMemoryCoopEntityMap::new();
+        let surrogate = coop_eid("coop-legacy-deadbeef0123");
+        map.bind_resolved_with_provenance(
+            "coop_A",
+            &surrogate,
+            CoopEntityBindingProvenance::OperatorBackfill,
+        )
+        .unwrap();
+        // `coop_A` must not be strictly projectable (else this would be a conflict).
+        assert!(EntityId::cooperative("coop_A").is_err());
+
+        let plan = plan_treasury_entity_id_backfill(vec![target("coop_A", None)], &map);
+        assert_eq!(plan.would_populate, 1);
+        assert_eq!(plan.skipped_ambiguous_binding, 0);
+        let entry = one(&plan);
+        assert_eq!(entry.action, TreasuryEntityIdBackfillAction::WouldPopulate);
+        assert_eq!(entry.resolved_entity_id, Some(surrogate));
     }
 
     #[test]
