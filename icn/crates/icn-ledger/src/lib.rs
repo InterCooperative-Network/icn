@@ -80,6 +80,7 @@ pub mod settlement;
 #[allow(missing_docs)]
 pub mod sync;
 pub mod treasury;
+pub mod treasury_entity_backfill;
 pub mod types;
 pub mod use_access;
 
@@ -113,6 +114,10 @@ pub use sync::{deserialize_sync_message, ledger_topic, serialize_sync_message, L
 pub use treasury::{
     ApprovalType, BudgetStatus, PaginatedAuditTrail, SpendingRule, Treasury, TreasuryAuditRecord,
     TreasuryBudget, TreasuryManager, TreasuryOperation, VelocityLimit, VelocityWindow,
+};
+pub use treasury_entity_backfill::{
+    plan_treasury_entity_id_backfill, TreasuryEntityIdBackfillAction,
+    TreasuryEntityIdBackfillEntry, TreasuryEntityIdBackfillPlan, TreasuryEntityIdBackfillTarget,
 };
 pub use types::{
     AccountBalances, AccountDelta, ContentHash, CreditLimit, Currency, Dispute, DisputeOutcome,
