@@ -109,6 +109,49 @@ else
     printf '%s\n' "$SECRET_HITS" >&2
 fi
 
+# 6. typed manifest emit/verify round-trip (skip-aware / opt-in)
+#
+# Proves the typed appliance manifest path (`icnctl appliance emit-manifest`
+# #2259 + `verify-manifest` #2260, wired into build-image.sh #2261) still honors
+# its contract — without building a real image. To keep this script lightweight
+# it does NOT build Rust by default: it reuses a prebuilt icnctl when one exists
+# and otherwise SKIPs (not a failure). When ICN_APPLIANCE_CHECK_TYPED_MANIFEST=1
+# the check is REQUIRED and icnctl is rebuilt from current source first, so the
+# round-trip can never pass/fail against a stale prebuilt binary (old emit/verify
+# code left in target/ by an earlier checkout or cache).
+section "typed manifest emit/verify round-trip"
+ROUNDTRIP="$APPLIANCE_DIR/manifest-roundtrip-check.sh"
+REPO_ROOT="$(cd "$APPLIANCE_DIR/../.." && pwd)"
+ICNCTL_BIN=""
+if [ "${ICN_APPLIANCE_CHECK_TYPED_MANIFEST:-0}" = "1" ]; then
+    # Required mode: rebuild icnctl from CURRENT source before selecting it. A
+    # preexisting target/ artifact is intentionally NOT reused, so the round-trip
+    # always exercises current emit/verify code. --release matches build-image.sh,
+    # which ships the release binary.
+    printf '  ..   building icnctl --release from current source (ICN_APPLIANCE_CHECK_TYPED_MANIFEST=1)\n'
+    if ( cd "$REPO_ROOT/icn" && cargo build -p icnctl --release >/dev/null 2>&1 ); then
+        ICNCTL_BIN="$REPO_ROOT/icn/target/release/icnctl"
+    fi
+else
+    # Default mode: reuse a prebuilt icnctl if present; never force a Rust build.
+    for cand in "$REPO_ROOT/icn/target/release/icnctl" "$REPO_ROOT/icn/target/debug/icnctl"; do
+        [ -x "$cand" ] && ICNCTL_BIN="$cand" && break
+    done
+fi
+if [ -n "$ICNCTL_BIN" ] && [ -x "$ICNCTL_BIN" ]; then
+    if bash "$ROUNDTRIP" "$ICNCTL_BIN"; then
+        ok "typed manifest round-trip ($ICNCTL_BIN)"
+    else
+        bad "typed manifest round-trip"
+    fi
+elif [ "${ICN_APPLIANCE_CHECK_TYPED_MANIFEST:-0}" = "1" ]; then
+    bad "typed manifest round-trip required (ICN_APPLIANCE_CHECK_TYPED_MANIFEST=1) but the icnctl --release build failed"
+else
+    printf '  SKIP typed manifest round-trip — no prebuilt icnctl found\n'
+    printf '       enable it: (cd icn && cargo build -p icnctl) then re-run, or\n'
+    printf '       force it:  ICN_APPLIANCE_CHECK_TYPED_MANIFEST=1 bash %s\n' "$0"
+fi
+
 # Summary
 printf '\n[check] passed=%d failed=%d\n' "$passed" "$failed"
 [ "$failed" -eq 0 ]
