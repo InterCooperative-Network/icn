@@ -319,9 +319,11 @@ enum ApplianceCommands {
         #[arg(long, default_value = "qcow2")]
         image_format: String,
 
-        /// Mark the image as a non-production dev artifact.
+        /// Opt out of the default non-production posture. The appliance build
+        /// path only produces unsigned, non-immutable dev images, so a manifest
+        /// records `non_production: true` unless this is explicitly set.
         #[arg(long)]
-        non_production: bool,
+        production: bool,
 
         /// Mark the image as a signed release artifact.
         #[arg(long)]
@@ -10520,7 +10522,7 @@ fn handle_appliance_command(cmd: ApplianceCommands) -> Result<()> {
             appliance_id,
             arch,
             image_format,
-            non_production,
+            production,
             signed,
             immutable,
             demo_profile,
@@ -10562,7 +10564,8 @@ fn handle_appliance_command(cmd: ApplianceCommands) -> Result<()> {
                 git_commit,
                 build_timestamp_utc: build_timestamp,
                 built_binaries,
-                non_production,
+                // Default to the honest dev posture; --production opts out.
+                non_production: !production,
                 signed,
                 immutable,
                 demo_profile,
