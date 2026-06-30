@@ -1,5 +1,5 @@
 ---
-id: "0036"
+id: "0084"
 title: "Controlled treasury entity-id backfill apply contract"
 status: "proposed"
 date: "2026-06-30"
@@ -18,7 +18,13 @@ references:
   - "GitHub #2082 (mapping/backfill lane), #2258 (planner), #2262 (read-only report), #2081 (treasury enforcement cutover — deferred)"
 ---
 
-# ADR-0036: Controlled treasury entity-id backfill apply contract
+# ADR-0084: Controlled treasury entity-id backfill apply contract
+
+> **Note on ADR id:** numbered `0084` (next free issued id) because `ADR-0036`
+> and the `0021`–`0082` tranche are reserved candidate ids in
+> `ops/coordination/adr_candidates.yaml` (e.g. `0036` = "Federation Agreement
+> Support"). ADR-0083 skipped past the same reserved block for the same reason.
+> This is **not** the reserved federation-agreement ADR.
 
 ## Status
 
@@ -59,16 +65,28 @@ posture stays read-only.
 ### 1. Why apply is not authorization-neutral
 
 `treasury.entity_id()` is read by the treasury entity-auth gate
-(`require_entity_access`, ADR-0035). Under the observe-only mode that ships today
-(`ICN_TREASURY_ENTITY_AUTH_MODE` default), the gate records an observation and
-changes no route outcome, so populating `entity_id` is invisible to callers.
-Under the enforce mode (`EnforceTrustedResolver`, the #2081 cutover — **not
-enabled**), the stored `entity_id` becomes the membership/authority *target* the
-gate evaluates against. Changing a treasury from `entity_id: None` to
+(`require_entity_access`, ADR-0035). Under the observe-only mode that is the
+**default** (`ICN_TREASURY_ENTITY_AUTH_MODE` unset / `observe-only`), the gate
+records an observation and changes no route outcome, so populating `entity_id` is
+invisible to callers.
+
+The enforce mode (`ICN_TREASURY_ENTITY_AUTH_MODE=enforce-trusted-resolver`) is
+**already reachable** in any dev/test process that sets the env var — it landed
+with #2254, and `icn-gateway/src/api/treasury.rs` branches on
+`active_treasury_entity_auth_mode()` and, under
+`TreasuryEntityAuthMode::EnforceTrustedResolver`, denies a `WouldDeny` outcome with
+HTTP 403 via `treasury_gate_enforcement_denial` (the enforce-mode runbook, #2255,
+documents this). So enforce mode is **not the default and not the production #2081
+cutover** (that cutover stays deferred) — but it is *reachable today*, not
+*unreachable*.
+
+Under enforce mode the stored `entity_id` becomes the membership/authority
+*target* the gate evaluates against. Changing a treasury from `entity_id: None` to
 `Some(entity_id)` therefore changes *which entity's* membership graph an enforced
-request is checked against. That is an authorization-relevant mutation, so apply
-must be explicit, controlled, reviewable, auditable, and gated — never a silent or
-implicit side effect of a report or any other command.
+request is checked against — and an apply could already trigger that change in any
+process running the enforce-mode env var. That is an authorization-relevant
+mutation, so apply must be explicit, controlled, reviewable, auditable, and gated —
+never a silent or implicit side effect of a report or any other command.
 
 ### 2. Authority doctrine (unchanged, restated as a hard invariant)
 
