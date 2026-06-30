@@ -229,6 +229,19 @@ bash deploy/appliance/build-image.sh --real
 # -> $ICN_APPLIANCE_OUTPUT_DIR/icn-appliance-0.0.1-dev-amd64.manifest.json
 ```
 
+The manifest is produced by the Rust-owned typed emitter
+(`icnctl appliance emit-manifest`) rather than hand-written JSON, and the build
+immediately re-verifies it with the fail-closed verifier
+(`icnctl appliance verify-manifest --root <repo root>`), which re-hashes the
+image, the base image, and each built binary and rejects any posture
+contradiction. A failed emit or verify aborts the build. The manifest records
+the honest dev posture (`non_production: true`, `signed: false`,
+`immutable: false`), and `base_image_sha256` is always the actual SHA-256 of the
+staged base image — the optional `ICN_APPLIANCE_BASE_SHA256` env var only gates
+the pre-build base-image checksum check, it does not feed the manifest. The
+image remains an unsigned, mutable, local dev artifact: not production, not
+reproducible, not partner-distributable.
+
 Boot smoke the image:
 
 ```bash
