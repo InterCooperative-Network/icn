@@ -303,8 +303,9 @@ enum ApplianceCommands {
         #[arg(long)]
         build_timestamp: String,
 
-        /// A built binary as `IN_PATH=SOURCE=FILE` (repeatable).
-        #[arg(long = "binary", value_name = "IN_PATH=SOURCE=FILE")]
+        /// A built binary as `IN_PATH=SOURCE=FILE` (repeatable; at least one is
+        /// required — a manifest with no binary attestations is not valid).
+        #[arg(long = "binary", value_name = "IN_PATH=SOURCE=FILE", required = true)]
         binaries: Vec<String>,
 
         /// Appliance identifier.
@@ -319,9 +320,9 @@ enum ApplianceCommands {
         #[arg(long, default_value = "qcow2")]
         image_format: String,
 
-        /// Opt out of the default non-production posture. The appliance build
-        /// path only produces unsigned, non-immutable dev images, so a manifest
-        /// records `non_production: true` unless this is explicitly set.
+        /// Declare production posture (`non_production: false`). Requires
+        /// `--signed` and `--immutable` and a non-demo image; otherwise the
+        /// build path produces unsigned dev images recorded `non_production: true`.
         #[arg(long)]
         production: bool,
 
@@ -10528,6 +10529,14 @@ fn handle_appliance_command(cmd: ApplianceCommands) -> Result<()> {
             demo_profile,
             output,
         } => {
+            // A production manifest must declare real release posture. The build
+            // path only produces unsigned, non-immutable dev images, so fail
+            // closed unless --production is paired with --signed and --immutable
+            // on a non-demo image.
+            if production && (!signed || !immutable || demo_profile) {
+                bail!("--production requires --signed and --immutable and not --demo-profile");
+            }
+
             let hash_file = |p: &std::path::Path| -> Result<String> {
                 // Stream the artifact through SHA-256 rather than reading it into
                 // memory: real appliance images (QCOW2/raw) are multi-GB.
@@ -10564,7 +10573,8 @@ fn handle_appliance_command(cmd: ApplianceCommands) -> Result<()> {
                 git_commit,
                 build_timestamp_utc: build_timestamp,
                 built_binaries,
-                // Default to the honest dev posture; --production opts out.
+                // Defaults to the honest dev posture; --production (gated above)
+                // is the only way to record false.
                 non_production: !production,
                 signed,
                 immutable,
