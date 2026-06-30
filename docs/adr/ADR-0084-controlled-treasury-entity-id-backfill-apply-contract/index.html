@@ -1,0 +1,269 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR-0084: Controlled treasury entity-id backfill apply contract | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0084 controlled treasury entity id backfill apply contract</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0084-controlled-treasury-entity-id-backfill-apply-contract.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ADR-0084: Controlled treasury entity-id backfill apply contract</h1>
+<blockquote>
+<p><strong>Note on ADR id:</strong> numbered <code>0084</code> (next free issued id) because <code>ADR-0036</code>
+and the <code>0021</code>–<code>0082</code> tranche are reserved candidate ids in
+<code>ops/coordination/adr_candidates.yaml</code> (e.g. <code>0036</code> = &quot;Federation Agreement
+Support&quot;). ADR-0083 skipped past the same reserved block for the same reason.
+This is <strong>not</strong> the reserved federation-agreement ADR.</p>
+</blockquote>
+<h2>Status</h2>
+<p><code>proposed</code> — design/decision artifact only. <strong>No implementation.</strong> This ADR
+specifies the safety contract that any future <em>mutating</em> treasury <code>entity_id</code>
+backfill apply path MUST satisfy, written <strong>before</strong> that apply code, so the
+contract constrains the implementation rather than being reconstructed after it.
+It amends ADR-0035 (which landed <code>require_entity_access</code> plus treasury
+<em>observe</em> mode) on the apply side; it does not change ADR-0035&#39;s decision.
+<code>implementation_status: proposed</code> — nothing here is built.</p>
+<h2>Context</h2>
+<p>The #2082 lane establishes a canonical, persisted, reversible <code>coop_id ↔ EntityId</code>
+mapping/backfill so that entity-aware authorization (ADR-0035, RFC-0018) can be
+applied to coop-namespaced endpoints whose treasuries carry no stored <code>entity_id</code>.
+Two read-only rungs have landed:</p>
+<ul>
+<li><strong>#2258</strong> — <code>TreasuryManager::plan_entity_id_backfill</code> classifies, fail-closed,
+which legacy treasuries (<code>entity_id: None</code>) <em>could</em> be populated from a trusted,
+non-ambiguous binding. It writes nothing.</li>
+<li><strong>#2262</strong> — <code>icnctl treasury entity-backfill-report [--json]</code> surfaces that
+planner against real persisted state, never collapsing persisted treasuries to
+<code>total: 0</code>, and creating no store.</li>
+</ul>
+<p>The next step in the lane would be a <em>mutating</em> apply that populates
+<code>treasury.entity_id</code>. That step is the first one that is <strong>not</strong>
+authorization-neutral, so its safety contract must be fixed first. This ADR is
+that contract. It does not authorize writing any apply code.</p>
+<h2>Decision</h2>
+<p>A future controlled apply path MAY populate <code>treasury.entity_id</code> for eligible
+legacy treasuries <strong>only</strong> under the contract below. Until a later, separately
+reviewed implementation PR adopts this contract, no apply exists and the default
+posture stays read-only.</p>
+<h3>1. Why apply is not authorization-neutral</h3>
+<p><code>treasury.entity_id()</code> is read by the treasury entity-auth gate
+(<code>require_entity_access</code>, ADR-0035). Under the observe-only mode that is the
+<strong>default</strong> (<code>ICN_TREASURY_ENTITY_AUTH_MODE</code> unset / <code>observe-only</code>), the gate
+records an observation and changes no route outcome, so populating <code>entity_id</code> is
+invisible to callers.</p>
+<p>The enforce mode (<code>ICN_TREASURY_ENTITY_AUTH_MODE=enforce-trusted-resolver</code>) is
+<strong>already reachable</strong> in any dev/test process that sets the env var — it landed
+with #2254, and <code>icn-gateway/src/api/treasury.rs</code> branches on
+<code>active_treasury_entity_auth_mode()</code> and, under
+<code>TreasuryEntityAuthMode::EnforceTrustedResolver</code>, denies a <code>WouldDeny</code> outcome with
+HTTP 403 via <code>treasury_gate_enforcement_denial</code> (the enforce-mode runbook, #2255,
+documents this). So enforce mode is <strong>not the default and not the production #2081
+cutover</strong> (that cutover stays deferred) — but it is <em>reachable today</em>, not
+<em>unreachable</em>.</p>
+<p>Under enforce mode the stored <code>entity_id</code> becomes the membership/authority
+<em>target</em> the gate evaluates against. Changing a treasury from <code>entity_id: None</code> to
+<code>Some(entity_id)</code> therefore changes <em>which entity&#39;s</em> membership graph an enforced
+request is checked against — and an apply could already trigger that change in any
+process running the enforce-mode env var. That is an authorization-relevant
+mutation, so apply must be explicit, controlled, reviewable, auditable, and gated —
+never a silent or implicit side effect of a report or any other command.</p>
+<h3>2. Authority doctrine (unchanged, restated as a hard invariant)</h3>
+<p>A <code>coop_id ↔ EntityId</code> mapping grants <strong>zero</strong> authority. It is a reversible name
+binding that identifies <em>which entity</em> an identifier denotes; it never says what a
+caller may do. A trusted binding is a <strong>target verifier</strong>, not a permission.
+Authorization continues to derive from membership, roles, capabilities, mandates,
+charters, governance decisions, receipts, and execution evidence. Apply populates
+an identity target; it grants nothing.</p>
+<h3>3. Preconditions for any future apply</h3>
+<ul>
+<li>A report / dry-run MUST be available and is the default; apply is never the
+default action.</li>
+<li>Apply MUST operate <strong>only</strong> on <code>WouldPopulate</code> rows from
+<code>TreasuryManager::plan_entity_id_backfill</code>. Every fail-closed class the planner
+already encodes MUST be skipped, never coerced:
+<code>SkippedAlreadyHasEntityId</code>, <code>SkippedNoMapping</code>, <code>SkippedUntrustedProvenance</code>,
+<code>SkippedNonCooperativeEntity</code>, <code>SkippedAmbiguousBinding</code>, <code>SkippedStorageError</code>.</li>
+<li>Apply MUST require <strong>trusted provenance</strong> as defined by the canonical predicate
+<code>CoopEntityBindingProvenance::is_trusted_for_resolution()</code>
+(<code>icn/crates/icn-entity/src/coop_entity_map.rs</code>): <code>Activation</code>,
+<code>OperatorBackfill</code>, <code>Surrogate</code>, <code>GovernanceReceipt { receipt_id }</code>.</li>
+<li>Apply MUST <strong>never</strong> trust <code>UnknownLegacy</code> (pre-provenance, unrecorded, or an
+unrecognized future variant — also the <code>serde(other)</code> fail-closed catch-all).</li>
+<li>Apply MUST NOT create a missing store as a side effect (mirrors #2262).</li>
+<li>Apply MUST NOT normalize a <code>coop_id</code> (no <code>coop_A → coop-a</code>); the original
+<code>coop_id</code> is preserved byte-for-byte, exactly as bound.</li>
+</ul>
+<h3>4. Operator confirmation contract</h3>
+<ul>
+<li>The default of any apply-capable command MUST be read-only / dry-run / report.</li>
+<li>A mutation MUST require an explicit <code>--apply</code> flag.</li>
+<li>When the plan contains any <code>would_populate &gt; 0</code>, apply SHOULD require a second,
+unambiguous confirmation (a distinct flag or an exact confirmation phrase) so a
+mutation cannot be a single-flag accident.</li>
+<li>Human output MUST state plainly that a mutation will occur / occurred and how
+many rows it affects; JSON output MUST be machine-auditable.</li>
+<li>Apply MUST emit enough plan detail (the same shape as the report, before and
+after, or an explicit per-row result list) to compare intended vs applied.</li>
+<li>No hidden mutation on a missing store; an absent store is reported, not created.</li>
+</ul>
+<h3>5. Apply transaction and failure contract</h3>
+<ul>
+<li>Apply mutates <strong>only</strong> the <code>entity_id</code> field of eligible treasury rows. It MUST
+NOT mutate the <code>coop_id ↔ EntityId</code> map in this rung, and MUST NOT touch
+membership, roles, capabilities, auth configuration, or enforcement mode.</li>
+<li>Apply MUST be <strong>idempotent</strong>: a re-run over already-populated rows is a no-op
+(those rows classify <code>SkippedAlreadyHasEntityId</code>).</li>
+<li>Partial-failure behavior MUST be explicit. Either all eligible writes are
+transactional (all-or-nothing), or per-row results are reported with clear
+partial-success semantics that name exactly which rows changed.</li>
+<li>Storage errors MUST fail closed.</li>
+</ul>
+<h3>6. Reversibility, rollback, and audit expectations</h3>
+<ul>
+<li>Apply output MUST include a per-row before/after (<code>coop_id</code>, <code>treasury_did</code>,
+<code>entity_id: None → Some(...)</code>, provenance, result).</li>
+<li>A durable audit artifact SHOULD be produced if a repo-native pattern fits at
+implementation time; this ADR does not mandate a specific schema.</li>
+<li>Rollback is <strong>out of scope</strong> for this contract and MUST NOT be implicit or
+automatic. Because the binding is reversible and the pre-state (<code>None</code>) is
+recorded in the apply output, a future rollback can be specified separately; it
+is not authorized here.</li>
+</ul>
+<h3>7. Relationship to #2081</h3>
+<p>The #2081 treasury enforcement cutover remains <strong>blocked</strong> and is untouched by
+this ADR. This contract does not flip enforcement, does not make existing
+observations clean, and does not assert that the mapping/observation evidence is
+sufficient for enforcement. Enforcement may be <em>considered</em> only after a
+controlled apply built to this contract exists, has produced evidence, and its
+observation metrics are understood — a later, separate decision.</p>
+<h2>Non-goals</h2>
+<ul>
+<li>No code. No <code>--apply</code>. No mutation. No new schema (a later implementation PR may
+justify one on its own merits).</li>
+<li>No enforcement-default change; no gateway behavior change; no #2081 cutover.</li>
+<li>Does not close #2082 (the lane stays open).</li>
+<li>No token / payment / wallet / balance / currency framing; ICN is democratic
+institutional infrastructure / a Coordination OS, and this is an identity-target
+binding for settlement-constraint authorization, not an economic instrument.</li>
+<li>No production-readiness, pilot-readiness, live-federation, or
+security-completion claim.</li>
+</ul>
+<h2>Validation checklist for the later implementation PR</h2>
+<p>When apply is built to this contract, it MUST demonstrate:</p>
+<ul>
+<li>report/dry-run available and is the default; dry-run writes nothing;</li>
+<li>apply writes only <code>WouldPopulate</code> rows;</li>
+<li>idempotent re-run is a no-op;</li>
+<li>no store creation on a missing store;</li>
+<li>untrusted (<code>UnknownLegacy</code>) provenance skipped;</li>
+<li>ambiguous binding skipped;</li>
+<li>already-populated skipped;</li>
+<li>non-cooperative entity skipped;</li>
+<li>storage error fails closed;</li>
+<li><code>coop_id</code> preserved byte-for-byte (no normalization);</li>
+<li>enforcement mode unchanged; #2081 untouched.</li>
+</ul>
+<h2>Consequences</h2>
+<ul>
+<li>The mutating rung now has a fixed safety envelope before any code exists, so the
+implementation PR is a conformance exercise, not a design negotiation.</li>
+<li>The fail-closed planner taxonomy (#2258) and the read-only report (#2262) are
+promoted from convenience to <strong>contract</strong>: apply is defined entirely in terms of
+the planner&#39;s <code>WouldPopulate</code> set and the canonical provenance-trust predicate.</li>
+<li>The doctrine that mapping grants zero authority is preserved end to end: apply
+binds an identity target, never a permission, and enforcement stays a separate,
+later, deferred decision (#2081).</li>
+<li>Cost: one more decision rung before mutation. Accepted deliberately — populating
+an authorization-relevant field warrants a written contract first.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
