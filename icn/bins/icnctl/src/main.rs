@@ -288,6 +288,34 @@ enum TreasuryMaintenanceCommands {
         #[arg(long)]
         json: bool,
     },
+
+    /// Controlled apply (ADR-0084): populate `entity_id` on the legacy treasuries
+    /// the read-only report classifies as would-populate (#2082 lane). Dry-run by
+    /// default — a mutation requires BOTH `--apply` and, when any row would be
+    /// populated, `--confirm-apply`.
+    ///
+    /// Mutates **only** the `entity_id` field of eligible rows from the trusted,
+    /// non-ambiguous binding; preserves each `coop_id` byte-for-byte; never writes
+    /// the `coop_id` ↔ `EntityId` map; creates no store; and changes no
+    /// enforcement mode or auth configuration. Populating `entity_id` is
+    /// authorization-relevant under `ICN_TREASURY_ENTITY_AUTH_MODE=enforce-trusted-resolver`
+    /// (the stored `entity_id` is the membership target), but a mapping grants no
+    /// authority. Reads/writes the ledger and reads the cooperative store
+    /// directly, so run it with the daemon stopped (it holds an exclusive lock).
+    EntityBackfillApply {
+        /// Perform the mutation. Without this flag the command is a dry run
+        /// (identical to `entity-backfill-report`) and writes nothing.
+        #[arg(long)]
+        apply: bool,
+        /// Second, explicit confirmation. REQUIRED in addition to `--apply` when
+        /// any treasury would be populated, so a mutation cannot be a single-flag
+        /// accident. Ignored in dry-run mode.
+        #[arg(long)]
+        confirm_apply: bool,
+        /// Emit machine-readable JSON instead of a human-readable summary.
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -2185,6 +2213,11 @@ fn handle_treasury_maintenance_command(
         TreasuryMaintenanceCommands::EntityBackfillReport { json } => {
             treasury_entity_backfill_report(data_dir, json)
         }
+        TreasuryMaintenanceCommands::EntityBackfillApply {
+            apply,
+            confirm_apply,
+            json,
+        } => treasury_entity_backfill_apply(data_dir, json, apply, confirm_apply),
     }
 }
 
@@ -2283,6 +2316,14 @@ fn render_treasury_entity_backfill_plan(
         "treasury entity_id backfill plan (read-only; a mapping grants no authority, nothing was written)"
     );
     println!();
+    print_treasury_backfill_plan_body(plan);
+    Ok(())
+}
+
+/// Print the counter breakdown and per-row classification of a read-only
+/// [`icn_ledger::TreasuryEntityIdBackfillPlan`] (shared by the report renderer
+/// and the apply renderers).
+fn print_treasury_backfill_plan_body(plan: &icn_ledger::TreasuryEntityIdBackfillPlan) {
     println!("  total:                          {}", plan.total);
     println!("  would_populate:                 {}", plan.would_populate);
     println!(
@@ -2319,6 +2360,217 @@ fn render_treasury_entity_backfill_plan(
                 "    [{:?}] coop_id={} treasury_did={} — {}",
                 entry.action, entry.coop_id, did, entry.reason
             );
+        }
+    }
+}
+
+/// Controlled, mutating apply of the treasury `entity_id` backfill (ADR-0084,
+/// #2082 lane).
+///
+/// Dry-run by default (identical to `entity-backfill-report`): it renders the
+/// read-only plan and writes nothing. A mutation requires BOTH `--apply` and,
+/// when any row would be populated, a second `--confirm-apply` — so a write
+/// cannot be a single-flag accident. The apply populates **only** the
+/// `entity_id` field of the planner's `WouldPopulate` rows from the trusted,
+/// non-ambiguous binding, preserves each `coop_id` byte-for-byte, never writes
+/// the `coop_id` ↔ `EntityId` map, creates no store, and changes no enforcement
+/// mode or auth configuration. A mapping grants no authority — it binds an
+/// identity target only. Mirrors the read-only report's store handling: a
+/// missing store is reported, never materialized on disk (apply included).
+fn treasury_entity_backfill_apply(
+    data_dir: &Path,
+    json: bool,
+    apply: bool,
+    confirm_apply: bool,
+) -> Result<()> {
+    use icn_entity::{CoopEntityMap, InMemoryCoopEntityMap, SledCoopEntityMap};
+    use icn_ledger::TreasuryManager;
+    use icn_store::Store;
+    use std::sync::Arc;
+
+    let ledger_store_path = get_store_path(data_dir).join("ledger");
+
+    // Read-only contract — apply included: never create a database. A missing
+    // ledger store means there are no persisted treasuries, so there is nothing
+    // to apply; report an empty plan rather than materializing a store on disk.
+    if !ledger_store_path.exists() {
+        if !json {
+            eprintln!(
+                "No ledger store found at {} — nothing to apply (nothing was created).",
+                ledger_store_path.display()
+            );
+        }
+        let empty = TreasuryManager::new().plan_entity_id_backfill(&InMemoryCoopEntityMap::new());
+        let mode = if apply { "apply (no-op)" } else { "dry-run" };
+        return render_treasury_entity_backfill_apply_plan(&empty, json, mode);
+    }
+
+    let ledger_store: Arc<dyn Store> = Arc::new(SledStore::open(&ledger_store_path).with_context(
+        || {
+            format!(
+                "Failed to open ledger store at {} (stop the daemon first; it holds an exclusive lock)",
+                ledger_store_path.display()
+            )
+        },
+    )?);
+    let mut treasury_mgr = TreasuryManager::with_store(ledger_store)
+        .context("Failed to hydrate treasuries from the ledger store")?;
+
+    let coop_store_path = get_store_path(data_dir).join("cooperative");
+
+    // The canonical map lives in the cooperative store. When it is absent we must
+    // NOT collapse to `total: 0` (that would hide persisted treasuries): classify
+    // every hydrated treasury against an explicit empty map, so each safely
+    // surfaces as `skipped_no_mapping` and nothing is eligible. Never create the
+    // cooperative store (apply included).
+    let map: Box<dyn CoopEntityMap> = if coop_store_path.exists() {
+        let coop_store = SledStore::open(&coop_store_path).with_context(|| {
+            format!(
+                "Failed to open cooperative store at {} (stop the daemon first; it holds an exclusive lock)",
+                coop_store_path.display()
+            )
+        })?;
+        // Share one Db with the canonical map, exactly as the daemon does in
+        // init_coop — no separate database is opened. Apply never writes the map.
+        let db = Arc::new(coop_store.db().clone());
+        Box::new(SledCoopEntityMap::new(db))
+    } else {
+        if !json {
+            eprintln!(
+                "No cooperative store found at {} — every persisted treasury is reported as \
+                 skipped_no_mapping (nothing was created).",
+                coop_store_path.display()
+            );
+        }
+        Box::new(InMemoryCoopEntityMap::new())
+    };
+
+    // Plan first (read-only) — both to render a dry run and to gate confirmation.
+    let plan = treasury_mgr.plan_entity_id_backfill(map.as_ref());
+
+    if !apply {
+        // Dry-run: render the plan; mutate nothing.
+        return render_treasury_entity_backfill_apply_plan(&plan, json, "dry-run");
+    }
+
+    // Apply requested. When any row would be populated, require the second,
+    // explicit confirmation — `--apply` alone is never sufficient to mutate.
+    if plan.would_populate > 0 && !confirm_apply {
+        render_treasury_entity_backfill_apply_plan(&plan, json, "apply-requires-confirmation")?;
+        bail!(
+            "{} treasury row(s) would be populated — refusing to mutate without --confirm-apply. \
+             Re-run with `--apply --confirm-apply` to proceed. Populating entity_id is \
+             authorization-relevant under ICN_TREASURY_ENTITY_AUTH_MODE=enforce-trusted-resolver \
+             (the stored entity_id is the membership target); a mapping still grants no authority.",
+            plan.would_populate
+        );
+    }
+
+    // Confirmed (or nothing eligible): perform the controlled apply.
+    let report = treasury_mgr.apply_entity_id_backfill(map.as_ref());
+    render_treasury_entity_backfill_apply_report(&report, json)?;
+    if report.had_failures() {
+        bail!(
+            "treasury entity-id backfill --apply did not fully complete: {} applied, {} failed \
+             (left unchanged, fail closed) — see report above",
+            report.applied,
+            report.failed,
+        );
+    }
+    Ok(())
+}
+
+/// Render a dry-run or refused apply (no mutation): the read-only plan plus an
+/// explicit `mode`. JSON: `{ "mode": ..., "plan": <plan> }`.
+fn render_treasury_entity_backfill_apply_plan(
+    plan: &icn_ledger::TreasuryEntityIdBackfillPlan,
+    json: bool,
+    mode: &str,
+) -> Result<()> {
+    if json {
+        let out = serde_json::json!({ "mode": mode, "plan": plan });
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&out)
+                .context("Failed to serialize the treasury backfill plan as JSON")?
+        );
+        return Ok(());
+    }
+
+    println!(
+        "treasury entity_id backfill [{mode}] (a mapping grants no authority; nothing was written)"
+    );
+    println!();
+    print_treasury_backfill_plan_body(plan);
+    Ok(())
+}
+
+/// Render the result of a mutating apply. JSON: `{ "mode": "apply", "report":
+/// <apply report> }`. Human output states plainly that a mutation occurred and
+/// gives a per-row before/after audit.
+fn render_treasury_entity_backfill_apply_report(
+    report: &icn_ledger::TreasuryEntityIdBackfillApplyReport,
+    json: bool,
+) -> Result<()> {
+    use icn_ledger::TreasuryEntityIdBackfillApplyOutcome;
+
+    if json {
+        let out = serde_json::json!({ "mode": "apply", "report": report });
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&out)
+                .context("Failed to serialize the treasury backfill apply report as JSON")?
+        );
+        return Ok(());
+    }
+
+    println!(
+        "treasury entity_id backfill [apply] — MUTATING (a mapping grants no authority; coop_id preserved exactly)"
+    );
+    println!();
+    println!(
+        "  applied (entity_id populated + persisted): {}",
+        report.applied
+    );
+    println!(
+        "  failed (left unchanged, fail closed):      {}",
+        report.failed
+    );
+    println!();
+    println!("  classification (read-only plan):");
+    print_treasury_backfill_plan_body(&report.plan);
+
+    if !report.entries.is_empty() {
+        println!();
+        println!("  applied detail (entity_id before -> after):");
+        for entry in &report.entries {
+            let did = entry.treasury_did.as_deref().unwrap_or("-");
+            let before = entry
+                .entity_id_before
+                .as_ref()
+                .map(|e| e.as_str())
+                .unwrap_or("none");
+            let after = entry
+                .entity_id_after
+                .as_ref()
+                .map(|e| e.as_str())
+                .unwrap_or("-");
+            let outcome = match entry.outcome {
+                TreasuryEntityIdBackfillApplyOutcome::Populated => "populated",
+                TreasuryEntityIdBackfillApplyOutcome::Failed => "failed",
+            };
+            print!(
+                "    [{outcome}] coop_id={} treasury_did={} entity_id: {before} -> {after}",
+                entry.coop_id, did
+            );
+            if let Some(prov) = &entry.provenance {
+                print!(" (provenance: {prov:?})");
+            }
+            print!(" — {}", entry.reason);
+            if let Some(err) = &entry.error {
+                print!(" [error: {err}]");
+            }
+            println!();
         }
     }
 

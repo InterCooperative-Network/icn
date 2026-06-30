@@ -258,6 +258,19 @@ pub struct TreasuryManager {
     surplus_allocations: HashMap<String, SurplusAllocation>,
 }
 
+/// Outcome of the contract-bound treasury `entity_id` backfill storage seam
+/// ([`TreasuryManager::populate_treasury_entity_id`], ADR-0084).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TreasuryEntityIdPopulateResult {
+    /// `entity_id` was populated (`None → Some`) and persisted.
+    Populated,
+    /// The treasury already carried an `entity_id`; nothing was changed
+    /// (idempotent guard — apply never overwrites an existing identity target).
+    AlreadyPopulated,
+    /// No treasury is registered for this `coop_id`; nothing was changed.
+    TreasuryNotFound,
+}
+
 impl TreasuryManager {
     /// Create a new treasury manager (in-memory only)
     pub fn new() -> Self {
@@ -1036,6 +1049,63 @@ impl TreasuryManager {
         let value = treasury_did.to_string();
         store.put(key.as_bytes(), value.as_bytes())?;
         Ok(())
+    }
+
+    /// Storage seam for the controlled treasury `entity_id` backfill **apply**
+    /// (ADR-0084, #2082 lane). Populates the `entity_id` of the single legacy
+    /// treasury registered for `coop_id` and persists it, **preserving `coop_id`
+    /// byte-for-byte**: only the `entity_id` field changes, and the `coop_id →
+    /// treasury` index is untouched (the key is unchanged).
+    ///
+    /// A `coop_id ↔ EntityId` mapping grants **zero** authority — this writes an
+    /// identity *target*, never a permission. The method is `pub(crate)` on
+    /// purpose: only the contract-bound
+    /// [`TreasuryManager::apply_entity_id_backfill`] orchestrator — which
+    /// restricts mutation to the planner's `WouldPopulate` rows — may reach it,
+    /// never an external caller with an arbitrary `(coop_id, entity_id)` pair.
+    ///
+    /// Fail-closed and idempotent:
+    /// - a treasury that already carries an `entity_id` is left untouched
+    ///   ([`AlreadyPopulated`](TreasuryEntityIdPopulateResult::AlreadyPopulated));
+    /// - a missing treasury is a no-op
+    ///   ([`TreasuryNotFound`](TreasuryEntityIdPopulateResult::TreasuryNotFound));
+    /// - the durable write happens **before** the in-memory commit, so a storage
+    ///   error returns `Err` with both the store and the cache left unchanged.
+    pub(crate) fn populate_treasury_entity_id(
+        &mut self,
+        coop_id: &str,
+        entity_id: EntityId,
+    ) -> Result<TreasuryEntityIdPopulateResult> {
+        // Resolve the (1:1) treasury for this exact coop_id. The coop_id is the
+        // lookup key, used verbatim — never normalized.
+        let Some(treasury_did) = self.coop_treasuries.get(coop_id).cloned() else {
+            return Ok(TreasuryEntityIdPopulateResult::TreasuryNotFound);
+        };
+        let Some(existing) = self.treasuries.get(&treasury_did) else {
+            return Ok(TreasuryEntityIdPopulateResult::TreasuryNotFound);
+        };
+
+        // Idempotent: never overwrite an already-populated identity target.
+        if existing.entity_id.is_some() {
+            return Ok(TreasuryEntityIdPopulateResult::AlreadyPopulated);
+        }
+
+        // Populate entity_id only; coop_id (and every other field) is carried
+        // through unchanged.
+        let mut updated = existing.clone();
+        updated.entity_id = Some(entity_id);
+        debug_assert_eq!(
+            updated.coop_id, existing.coop_id,
+            "apply must preserve coop_id byte-for-byte"
+        );
+
+        // Persist first: a storage failure must leave the durable store and the
+        // in-memory cache consistent (both unchanged) — fail closed.
+        if let Some(ref store) = self.store {
+            self.persist_treasury(&updated, store)?;
+        }
+        self.treasuries.insert(treasury_did, updated);
+        Ok(TreasuryEntityIdPopulateResult::Populated)
     }
 }
 

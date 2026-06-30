@@ -37,8 +37,8 @@
 //! binding, a non-cooperative or malformed target, an ambiguous reverse binding,
 //! or a storage read error — is **skipped** (fail closed).
 
-use crate::treasury::{Treasury, TreasuryManager};
-use icn_entity::{CoopEntityMap, EntityId};
+use crate::treasury::{Treasury, TreasuryEntityIdPopulateResult, TreasuryManager};
+use icn_entity::{CoopEntityBindingProvenance, CoopEntityMap, EntityId};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -371,6 +371,267 @@ fn treasury_to_target(treasury: &Treasury) -> TreasuryEntityIdBackfillTarget {
         coop_id: treasury.coop_id().to_string(),
         treasury_did: Some(treasury.treasury_did.to_string()),
         current_entity_id: treasury.entity_id().cloned(),
+    }
+}
+
+// =====================================================================
+// Controlled, mutating apply (ADR-0084).
+// =====================================================================
+
+/// What the apply did to a single eligible (`WouldPopulate`) treasury row.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TreasuryEntityIdBackfillApplyOutcome {
+    /// `entity_id` was populated from the trusted binding (`None → Some`) and
+    /// persisted.
+    Populated,
+    /// The row was eligible per the plan but the apply did **not** complete (a
+    /// pre-write binding re-verification mismatch, a storage write error, or an
+    /// inconsistent state at write time). The treasury was left unchanged — fail
+    /// closed.
+    Failed,
+}
+
+/// Per-row audit for the rows the apply acted on (the planner's `WouldPopulate`
+/// set). `entity_id_before`/`entity_id_after` make the mutation explicit and
+/// reversible to inspect; the full fail-closed classification of *every* row
+/// lives in the embedded [`TreasuryEntityIdBackfillApplyReport::plan`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TreasuryEntityIdBackfillApplyEntry {
+    /// The treasury's flat `coop_id`, preserved byte-for-byte (the map key).
+    pub coop_id: String,
+    /// The treasury DID, for operator-facing identification.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub treasury_did: Option<String>,
+    /// What the apply did to this row.
+    pub outcome: TreasuryEntityIdBackfillApplyOutcome,
+    /// The treasury's `entity_id` before the apply. `None` for a legacy row (the
+    /// only kind eligible), surfaced explicitly for a before/after audit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_id_before: Option<EntityId>,
+    /// The treasury's `entity_id` after a successful apply (`Some` only for
+    /// [`Populated`](TreasuryEntityIdBackfillApplyOutcome::Populated)).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub entity_id_after: Option<EntityId>,
+    /// Trust provenance of the binding used (present once a trusted binding was
+    /// re-verified for this row).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance: Option<CoopEntityBindingProvenance>,
+    /// A short, human-readable explanation of the outcome.
+    pub reason: String,
+    /// The underlying storage/map error string when one prevented the write.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
+}
+
+/// Aggregate, auditable result of a controlled treasury `entity_id` backfill
+/// **apply** (ADR-0084).
+///
+/// Embeds the read-only [`plan`](Self::plan) verbatim (the same shape the
+/// `entity-backfill-report` emits, with the full fail-closed classification and
+/// counters) and adds the apply-specific outcome: how many `WouldPopulate` rows
+/// were populated, how many failed closed, and a per-row before/after audit.
+///
+/// Invariant: `applied + failed == plan.would_populate` — every eligible row is
+/// either populated or flagged failed; no eligible row is silently dropped.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TreasuryEntityIdBackfillApplyReport {
+    /// The read-only plan this apply was derived from (full classification +
+    /// counters; `total`, `would_populate`, and every `skipped_*` bucket).
+    pub plan: TreasuryEntityIdBackfillPlan,
+    /// Rows whose `entity_id` was populated from a trusted binding and persisted.
+    pub applied: usize,
+    /// Eligible rows that did not complete (re-verification mismatch or storage
+    /// error); each was left unchanged — fail closed.
+    pub failed: usize,
+    /// Per-row audit for the rows the apply acted on, in plan order.
+    pub entries: Vec<TreasuryEntityIdBackfillApplyEntry>,
+}
+
+impl TreasuryEntityIdBackfillApplyReport {
+    /// True when an apply did not fully complete (any eligible row failed to
+    /// persist). Callers (e.g. the CLI) gate a non-zero exit on this.
+    pub fn had_failures(&self) -> bool {
+        self.failed > 0
+    }
+}
+
+impl TreasuryManager {
+    /// Controlled, mutating **apply** of the treasury `entity_id` backfill
+    /// (ADR-0084, #2082 lane).
+    ///
+    /// Populates `entity_id` for **exactly** the legacy treasuries the read-only
+    /// [`plan_entity_id_backfill`](Self::plan_entity_id_backfill) classifies as
+    /// [`WouldPopulate`](TreasuryEntityIdBackfillAction::WouldPopulate), and skips
+    /// every fail-closed class unchanged (`SkippedAlreadyHasEntityId`,
+    /// `SkippedNoMapping`, `SkippedUntrustedProvenance`,
+    /// `SkippedNonCooperativeEntity`, `SkippedAmbiguousBinding`,
+    /// `SkippedStorageError`). Apply is defined entirely in terms of the planner's
+    /// `WouldPopulate` set — it never re-derives or relaxes eligibility.
+    ///
+    /// Each eligible row is re-verified against the canonical map immediately
+    /// before mutation: the binding must still resolve to the planned target with
+    /// trusted provenance, else the row fails closed and is left unchanged. The
+    /// mutation touches only `entity_id` (`None → Some`); the `coop_id` is
+    /// preserved byte-for-byte, the map is never written, and membership, roles,
+    /// capabilities, auth configuration, and enforcement mode are untouched. A
+    /// mapping grants **zero** authority — this writes an identity target only.
+    ///
+    /// Idempotent: a re-run re-classifies already-populated rows as
+    /// `SkippedAlreadyHasEntityId`, so they never re-populate. Storage errors fail
+    /// closed (per-row, since the treasury store has no all-or-nothing batch over
+    /// rows): the affected row is reported `failed` and left unchanged.
+    pub fn apply_entity_id_backfill(
+        &mut self,
+        map: &dyn CoopEntityMap,
+    ) -> TreasuryEntityIdBackfillApplyReport {
+        // Authoritative read-only classification first. Apply is defined ENTIRELY
+        // in terms of this plan's WouldPopulate set (ADR-0084 §3).
+        let plan = self.plan_entity_id_backfill(map);
+
+        let mut entries: Vec<TreasuryEntityIdBackfillApplyEntry> = Vec::new();
+        let mut applied = 0usize;
+        let mut failed = 0usize;
+
+        for row in &plan.entries {
+            // Every fail-closed class is skipped, never coerced. Their full
+            // classification is preserved in the embedded plan.
+            if row.action != TreasuryEntityIdBackfillAction::WouldPopulate {
+                continue;
+            }
+
+            let coop_id = row.coop_id.clone();
+            let treasury_did = row.treasury_did.clone();
+
+            // The planner only assigns WouldPopulate with a resolved cooperative
+            // target; defend against a malformed row rather than unwrap.
+            let Some(resolved) = row.resolved_entity_id.clone() else {
+                failed += 1;
+                entries.push(TreasuryEntityIdBackfillApplyEntry {
+                    coop_id,
+                    treasury_did,
+                    outcome: TreasuryEntityIdBackfillApplyOutcome::Failed,
+                    entity_id_before: None,
+                    entity_id_after: None,
+                    provenance: None,
+                    reason: "eligible row carried no resolved entity_id; not applied (fail closed)"
+                        .into(),
+                    error: None,
+                });
+                continue;
+            };
+
+            // Re-verify the trusted binding immediately before mutating. On the
+            // CLI path the daemon is stopped, so this matches the plan exactly; it
+            // is a defensive fail-closed re-check AND the source of the audited
+            // provenance. Anything but an exact, trusted match for the planned
+            // target fails closed — nothing is written.
+            let provenance = match map.binding_for_coop(&coop_id) {
+                Ok(Some(binding))
+                    if binding.entity_id == resolved
+                        && binding.provenance.is_trusted_for_resolution() =>
+                {
+                    binding.provenance
+                }
+                Ok(_) => {
+                    failed += 1;
+                    entries.push(TreasuryEntityIdBackfillApplyEntry {
+                        coop_id,
+                        treasury_did,
+                        outcome: TreasuryEntityIdBackfillApplyOutcome::Failed,
+                        entity_id_before: None,
+                        entity_id_after: None,
+                        provenance: None,
+                        reason: "binding no longer a trusted match for the planned target; \
+                                 not applied (fail closed)"
+                            .into(),
+                        error: None,
+                    });
+                    continue;
+                }
+                Err(e) => {
+                    failed += 1;
+                    entries.push(TreasuryEntityIdBackfillApplyEntry {
+                        coop_id,
+                        treasury_did,
+                        outcome: TreasuryEntityIdBackfillApplyOutcome::Failed,
+                        entity_id_before: None,
+                        entity_id_after: None,
+                        provenance: None,
+                        reason: "map re-read failed; cannot confirm a safe binding (fail closed)"
+                            .into(),
+                        error: Some(e.to_string()),
+                    });
+                    continue;
+                }
+            };
+
+            // Mutate exactly one row: entity_id None -> Some(resolved), coop_id
+            // preserved byte-for-byte, persisted before the in-memory commit.
+            match self.populate_treasury_entity_id(&coop_id, resolved.clone()) {
+                Ok(TreasuryEntityIdPopulateResult::Populated) => {
+                    applied += 1;
+                    let after = resolved.as_str().to_string();
+                    entries.push(TreasuryEntityIdBackfillApplyEntry {
+                        coop_id,
+                        treasury_did,
+                        outcome: TreasuryEntityIdBackfillApplyOutcome::Populated,
+                        entity_id_before: None,
+                        entity_id_after: Some(resolved),
+                        provenance: Some(provenance),
+                        reason: format!("populated entity_id from trusted binding to {after}"),
+                        error: None,
+                    });
+                }
+                // Unreachable on the single-writer CLI path (we hold &mut self
+                // between plan and apply, so state cannot change underneath), but
+                // flagged fail-closed rather than silently dropped.
+                Ok(other) => {
+                    failed += 1;
+                    let reason = match other {
+                        TreasuryEntityIdPopulateResult::AlreadyPopulated => {
+                            "treasury already carried an entity_id at write time; \
+                             not applied (fail closed)"
+                        }
+                        TreasuryEntityIdPopulateResult::TreasuryNotFound => {
+                            "treasury not found at write time; not applied (fail closed)"
+                        }
+                        TreasuryEntityIdPopulateResult::Populated => unreachable!(),
+                    };
+                    entries.push(TreasuryEntityIdBackfillApplyEntry {
+                        coop_id,
+                        treasury_did,
+                        outcome: TreasuryEntityIdBackfillApplyOutcome::Failed,
+                        entity_id_before: None,
+                        entity_id_after: None,
+                        provenance: Some(provenance),
+                        reason: reason.into(),
+                        error: None,
+                    });
+                }
+                Err(e) => {
+                    failed += 1;
+                    entries.push(TreasuryEntityIdBackfillApplyEntry {
+                        coop_id,
+                        treasury_did,
+                        outcome: TreasuryEntityIdBackfillApplyOutcome::Failed,
+                        entity_id_before: None,
+                        entity_id_after: None,
+                        provenance: Some(provenance),
+                        reason: "storage write failed; treasury left unchanged (fail closed)"
+                            .into(),
+                        error: Some(e.to_string()),
+                    });
+                }
+            }
+        }
+
+        TreasuryEntityIdBackfillApplyReport {
+            plan,
+            applied,
+            failed,
+            entries,
+        }
     }
 }
 
@@ -820,5 +1081,444 @@ mod tests {
         assert_eq!(entry.action, TreasuryEntityIdBackfillAction::WouldPopulate);
         assert_eq!(entry.resolved_entity_id, Some(coop_eid("food-coop")));
         assert!(entry.treasury_did.is_some(), "treasury_did is surfaced");
+    }
+
+    // ==================================================================
+    // Controlled apply (ADR-0084).
+    // ==================================================================
+
+    /// Build an in-memory manager holding one legacy treasury (`entity_id: None`)
+    /// per `coop_id`, registered through the real `register_treasury` path.
+    fn legacy_manager_with(coops: &[&str]) -> TreasuryManager {
+        use icn_identity::KeyPair;
+        let mut mgr = TreasuryManager::new();
+        let creator = KeyPair::generate().unwrap().did().clone();
+        for coop in coops {
+            let treasury_did = KeyPair::generate().unwrap().did().clone();
+            mgr.register_treasury(
+                treasury_did,
+                coop.to_string(),
+                "USD".to_string(),
+                creator.clone(),
+                None,
+            )
+            .unwrap();
+        }
+        mgr
+    }
+
+    /// A map double that yields a trusted, non-ambiguous binding (so the row
+    /// plans as `WouldPopulate`) yet makes `bind_resolved` `unreachable!` — proving
+    /// the apply NEVER writes the map.
+    struct ReadOnlyEligibleMap {
+        coop_id: String,
+        entity_id: EntityId,
+    }
+    impl CoopEntityMap for ReadOnlyEligibleMap {
+        fn bind_resolved(&self, _: &str, _: &EntityId) -> Result<(), CoopEntityMapError> {
+            unreachable!("apply must never write the coop_id <-> EntityId map");
+        }
+        fn entity_for_coop(&self, _: &str) -> Result<Option<EntityId>, CoopEntityMapError> {
+            Ok(None)
+        }
+        fn coop_for_entity(&self, _: &EntityId) -> Result<Option<String>, CoopEntityMapError> {
+            Ok(Some(self.coop_id.clone()))
+        }
+        fn binding_for_coop(
+            &self,
+            coop_id: &str,
+        ) -> Result<Option<CoopEntityBinding>, CoopEntityMapError> {
+            Ok(Some(CoopEntityBinding {
+                coop_id: coop_id.to_string(),
+                entity_id: self.entity_id.clone(),
+                provenance: CoopEntityBindingProvenance::Activation,
+            }))
+        }
+    }
+
+    /// A map double that returns a trusted binding on the FIRST `binding_for_coop`
+    /// read (planning ⇒ `WouldPopulate`) and a storage error on the SECOND (the
+    /// apply's pre-write re-verification) — exercising the fail-closed write guard.
+    struct ReVerifyFailMap {
+        coop_id: String,
+        entity_id: EntityId,
+        binding_calls: std::cell::Cell<u32>,
+    }
+    impl CoopEntityMap for ReVerifyFailMap {
+        fn bind_resolved(&self, _: &str, _: &EntityId) -> Result<(), CoopEntityMapError> {
+            unreachable!("apply must never write the coop_id <-> EntityId map");
+        }
+        fn entity_for_coop(&self, _: &str) -> Result<Option<EntityId>, CoopEntityMapError> {
+            Ok(None)
+        }
+        fn coop_for_entity(&self, _: &EntityId) -> Result<Option<String>, CoopEntityMapError> {
+            Ok(Some(self.coop_id.clone()))
+        }
+        fn binding_for_coop(
+            &self,
+            coop_id: &str,
+        ) -> Result<Option<CoopEntityBinding>, CoopEntityMapError> {
+            let n = self.binding_calls.get();
+            self.binding_calls.set(n + 1);
+            if n == 0 {
+                Ok(Some(CoopEntityBinding {
+                    coop_id: coop_id.to_string(),
+                    entity_id: self.entity_id.clone(),
+                    provenance: CoopEntityBindingProvenance::Activation,
+                }))
+            } else {
+                Err(CoopEntityMapError::Storage(
+                    "re-verify read failed".to_string(),
+                ))
+            }
+        }
+    }
+
+    #[test]
+    fn apply_populates_only_would_populate_rows() {
+        let mut mgr = legacy_manager_with(&["food-coop", "legacy-coop", "no-map-coop"]);
+        let map = InMemoryCoopEntityMap::new();
+        // food-coop: trusted Activation -> eligible.
+        map.bind_resolved_with_provenance(
+            "food-coop",
+            &coop_eid("food-coop"),
+            CoopEntityBindingProvenance::Activation,
+        )
+        .unwrap();
+        // legacy-coop: plain bind -> UnknownLegacy -> untrusted.
+        map.bind_resolved("legacy-coop", &coop_eid("legacy-coop"))
+            .unwrap();
+        // no-map-coop: nothing.
+
+        let report = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(report.plan.would_populate, 1);
+        assert_eq!(report.applied, 1);
+        assert_eq!(report.failed, 0);
+        // Invariant: every eligible row is either populated or flagged failed.
+        assert_eq!(report.applied + report.failed, report.plan.would_populate);
+
+        // Only the trusted row is populated; the others are untouched.
+        assert_eq!(
+            mgr.get_treasury_by_coop("food-coop").unwrap().entity_id(),
+            Some(&coop_eid("food-coop"))
+        );
+        assert!(mgr
+            .get_treasury_by_coop("legacy-coop")
+            .unwrap()
+            .entity_id()
+            .is_none());
+        assert!(mgr
+            .get_treasury_by_coop("no-map-coop")
+            .unwrap()
+            .entity_id()
+            .is_none());
+
+        // The apply audit lists only the row it acted on.
+        assert_eq!(report.entries.len(), 1);
+        assert_eq!(
+            report.entries[0].outcome,
+            TreasuryEntityIdBackfillApplyOutcome::Populated
+        );
+        assert_eq!(report.entries[0].entity_id_before, None);
+        assert_eq!(
+            report.entries[0].entity_id_after,
+            Some(coop_eid("food-coop"))
+        );
+        assert!(report.entries[0].provenance.is_some());
+        assert!(!report.had_failures());
+    }
+
+    #[test]
+    fn apply_is_idempotent_on_rerun() {
+        let mut mgr = legacy_manager_with(&["food-coop"]);
+        let map = InMemoryCoopEntityMap::new();
+        map.bind_resolved_with_provenance(
+            "food-coop",
+            &coop_eid("food-coop"),
+            CoopEntityBindingProvenance::Activation,
+        )
+        .unwrap();
+
+        let first = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(first.applied, 1);
+        assert_eq!(
+            mgr.get_treasury_by_coop("food-coop").unwrap().entity_id(),
+            Some(&coop_eid("food-coop"))
+        );
+
+        // Re-run: the row now classifies SkippedAlreadyHasEntityId and is a no-op.
+        let second = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(second.applied, 0);
+        assert_eq!(second.failed, 0);
+        assert_eq!(second.plan.would_populate, 0);
+        assert_eq!(second.plan.skipped_already_has_entity_id, 1);
+        assert!(second.entries.is_empty());
+        assert_eq!(
+            mgr.get_treasury_by_coop("food-coop").unwrap().entity_id(),
+            Some(&coop_eid("food-coop"))
+        );
+    }
+
+    #[test]
+    fn apply_skips_already_populated_row() {
+        use icn_identity::KeyPair;
+        let mut mgr = TreasuryManager::new();
+        let creator = KeyPair::generate().unwrap().did().clone();
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
+        mgr.register_treasury_with_entity(
+            treasury_did,
+            coop_eid("food-coop"),
+            "USD".to_string(),
+            creator,
+            None,
+        )
+        .unwrap();
+        let map = InMemoryCoopEntityMap::new();
+        map.bind_resolved_with_provenance(
+            "food-coop",
+            &coop_eid("food-coop"),
+            CoopEntityBindingProvenance::Activation,
+        )
+        .unwrap();
+
+        let report = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(report.applied, 0);
+        assert_eq!(report.plan.skipped_already_has_entity_id, 1);
+        assert!(report.entries.is_empty());
+    }
+
+    #[test]
+    fn apply_skips_untrusted_provenance() {
+        let mut mgr = legacy_manager_with(&["food-coop"]);
+        let map = InMemoryCoopEntityMap::new();
+        // Plain bind reads back as the fail-closed UnknownLegacy sentinel.
+        map.bind_resolved("food-coop", &coop_eid("food-coop"))
+            .unwrap();
+        let report = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(report.applied, 0);
+        assert_eq!(report.plan.skipped_untrusted_provenance, 1);
+        assert!(mgr
+            .get_treasury_by_coop("food-coop")
+            .unwrap()
+            .entity_id()
+            .is_none());
+    }
+
+    #[test]
+    fn apply_skips_no_mapping() {
+        let mut mgr = legacy_manager_with(&["food-coop"]);
+        let map = InMemoryCoopEntityMap::new();
+        let report = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(report.applied, 0);
+        assert_eq!(report.plan.skipped_no_mapping, 1);
+        assert!(mgr
+            .get_treasury_by_coop("food-coop")
+            .unwrap()
+            .entity_id()
+            .is_none());
+    }
+
+    #[test]
+    fn apply_skips_non_cooperative_entity() {
+        let mut mgr = legacy_manager_with(&["food-coop"]);
+        let map = StubMap {
+            binding: |coop_id| {
+                Ok(Some(CoopEntityBinding {
+                    coop_id: coop_id.to_string(),
+                    entity_id: EntityId::community("some-community").unwrap(),
+                    provenance: CoopEntityBindingProvenance::Activation,
+                }))
+            },
+            reverse: |_| Ok(None),
+        };
+        let report = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(report.applied, 0);
+        assert_eq!(report.plan.skipped_non_cooperative_entity, 1);
+        assert!(mgr
+            .get_treasury_by_coop("food-coop")
+            .unwrap()
+            .entity_id()
+            .is_none());
+    }
+
+    #[test]
+    fn apply_skips_ambiguous_reverse_mismatch() {
+        let mut mgr = legacy_manager_with(&["food-coop"]);
+        let map = StubMap {
+            binding: |coop_id| {
+                Ok(Some(CoopEntityBinding {
+                    coop_id: coop_id.to_string(),
+                    entity_id: EntityId::cooperative("food-coop").unwrap(),
+                    provenance: CoopEntityBindingProvenance::Activation,
+                }))
+            },
+            // Reverse points to a different coop_id -> ambiguous.
+            reverse: |_| Ok(Some("other-coop".to_string())),
+        };
+        let report = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(report.applied, 0);
+        assert_eq!(report.plan.skipped_ambiguous_binding, 1);
+        assert!(mgr
+            .get_treasury_by_coop("food-coop")
+            .unwrap()
+            .entity_id()
+            .is_none());
+    }
+
+    #[test]
+    fn apply_preserves_coop_id_byte_for_byte() {
+        // A non-mappable legacy id bound to a surrogate whose identifier DIFFERS
+        // from the coop_id: proves apply sets entity_id without deriving/rewriting
+        // coop_id.
+        let coop_id = "coop:550e8400-e29b-41d4-a716-446655440000";
+        let surrogate = coop_eid("coop-legacy-deadbeef0123");
+        let mut mgr = legacy_manager_with(&[coop_id]);
+        let map = InMemoryCoopEntityMap::new();
+        map.bind_resolved_with_provenance(
+            coop_id,
+            &surrogate,
+            CoopEntityBindingProvenance::OperatorBackfill,
+        )
+        .unwrap();
+
+        let report = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(report.applied, 1);
+        let treasury = mgr.get_treasury_by_coop(coop_id).unwrap();
+        assert_eq!(
+            treasury.coop_id(),
+            coop_id,
+            "coop_id must be preserved byte-for-byte"
+        );
+        assert_eq!(treasury.entity_id(), Some(&surrogate));
+        assert_ne!(
+            surrogate.identifier(),
+            coop_id,
+            "surrogate identifier differs from coop_id (no derivation)"
+        );
+    }
+
+    #[test]
+    fn apply_persists_entity_id_and_survives_reload() {
+        use icn_identity::KeyPair;
+        use icn_store::{SledStore, Store};
+        use std::sync::Arc;
+        use tempfile::TempDir;
+
+        let tmp = TempDir::new().unwrap();
+        // One shared Arc/Db reused on reopen — no second SledStore::open, no lock
+        // contention.
+        let store: Arc<dyn Store> = Arc::new(SledStore::open(tmp.path()).unwrap());
+        let creator = KeyPair::generate().unwrap().did().clone();
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
+
+        {
+            let mut mgr = TreasuryManager::with_store(store.clone()).unwrap();
+            mgr.register_treasury(
+                treasury_did,
+                "food-coop".to_string(),
+                "USD".to_string(),
+                creator,
+                None,
+            )
+            .unwrap();
+            let map = InMemoryCoopEntityMap::new();
+            map.bind_resolved_with_provenance(
+                "food-coop",
+                &coop_eid("food-coop"),
+                CoopEntityBindingProvenance::Activation,
+            )
+            .unwrap();
+            let report = mgr.apply_entity_id_backfill(&map);
+            assert_eq!(report.applied, 1);
+            assert_eq!(
+                mgr.get_treasury_by_coop("food-coop").unwrap().entity_id(),
+                Some(&coop_eid("food-coop"))
+            );
+        }
+
+        // Reopen from the same store: the populated entity_id is durable.
+        let reopened = TreasuryManager::with_store(store).unwrap();
+        let treasury = reopened.get_treasury_by_coop("food-coop").unwrap();
+        assert_eq!(treasury.entity_id(), Some(&coop_eid("food-coop")));
+        assert_eq!(treasury.coop_id(), "food-coop");
+    }
+
+    #[test]
+    fn apply_report_json_includes_before_after_and_provenance() {
+        let mut mgr = legacy_manager_with(&["food-coop"]);
+        let map = InMemoryCoopEntityMap::new();
+        map.bind_resolved_with_provenance(
+            "food-coop",
+            &coop_eid("food-coop"),
+            CoopEntityBindingProvenance::Activation,
+        )
+        .unwrap();
+        let report = mgr.apply_entity_id_backfill(&map);
+
+        let v: serde_json::Value = serde_json::to_value(&report).unwrap();
+        assert_eq!(v["applied"].as_u64(), Some(1));
+        assert_eq!(v["failed"].as_u64(), Some(0));
+        // The embedded plan carries the full report-shape classification.
+        assert_eq!(v["plan"]["would_populate"].as_u64(), Some(1));
+        let entry = &v["entries"][0];
+        assert_eq!(entry["outcome"].as_str(), Some("populated"));
+        assert_eq!(entry["coop_id"].as_str(), Some("food-coop"));
+        assert!(entry["entity_id_after"].as_str().is_some());
+        // entity_id_before is None -> omitted from JSON.
+        assert!(entry.get("entity_id_before").is_none());
+        // Provenance of the trusted binding is surfaced for audit.
+        assert!(entry.get("provenance").is_some());
+    }
+
+    #[test]
+    fn apply_never_writes_the_map() {
+        // `coop_A` is non-projectable, so no projection-conflict skip; the stub
+        // yields a trusted binding with a matching reverse -> WouldPopulate. The
+        // stub's bind_resolved is `unreachable!`, so a successful apply proves the
+        // map is never written.
+        let coop_id = "coop_A";
+        let surrogate = coop_eid("coop-legacy-deadbeef0123");
+        let mut mgr = legacy_manager_with(&[coop_id]);
+        let map = ReadOnlyEligibleMap {
+            coop_id: coop_id.to_string(),
+            entity_id: surrogate.clone(),
+        };
+
+        let report = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(report.applied, 1);
+        assert_eq!(
+            mgr.get_treasury_by_coop(coop_id).unwrap().entity_id(),
+            Some(&surrogate)
+        );
+    }
+
+    #[test]
+    fn apply_fails_closed_on_reverify_storage_error() {
+        let coop_id = "coop_A"; // non-projectable: no projection-conflict at plan time.
+        let surrogate = coop_eid("coop-legacy-deadbeef0123");
+        let mut mgr = legacy_manager_with(&[coop_id]);
+        let map = ReVerifyFailMap {
+            coop_id: coop_id.to_string(),
+            entity_id: surrogate,
+            binding_calls: std::cell::Cell::new(0),
+        };
+
+        let report = mgr.apply_entity_id_backfill(&map);
+        // Planned eligible, but the apply re-verify hit a storage error.
+        assert_eq!(report.plan.would_populate, 1);
+        assert_eq!(report.applied, 0);
+        assert_eq!(report.failed, 1);
+        assert!(report.had_failures());
+        // Fail closed: the treasury is left unchanged.
+        assert!(mgr
+            .get_treasury_by_coop(coop_id)
+            .unwrap()
+            .entity_id()
+            .is_none());
+        assert_eq!(
+            report.entries[0].outcome,
+            TreasuryEntityIdBackfillApplyOutcome::Failed
+        );
+        assert!(report.entries[0].error.is_some());
     }
 }
