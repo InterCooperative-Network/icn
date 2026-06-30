@@ -456,6 +456,84 @@ impl TreasuryEntityIdBackfillApplyReport {
     }
 }
 
+/// Outcome of the apply-time re-verification of a trusted, non-ambiguous binding.
+enum ApplyReverify {
+    /// Still a trusted, non-ambiguous match for the planned target; carries the
+    /// audited binding provenance.
+    Ok(CoopEntityBindingProvenance),
+    /// No longer eligible — do not write. Carries an operator-facing `reason` and
+    /// an optional underlying map error string.
+    FailClosed {
+        reason: String,
+        error: Option<String>,
+    },
+}
+
+/// Re-validate, **immediately before a write**, that `coop_id` still has a
+/// trusted, non-ambiguous binding to exactly `resolved` — the SAME forward
+/// binding + provenance + reverse-index requirement the read-only planner uses
+/// (`plan_target`). A [`CoopEntityMap`] that changed, or that exposes
+/// inconsistent forward/reverse indexes, between planning and the write must
+/// fail closed here and never mutate (the stored `entity_id` would otherwise be
+/// ambiguous). Read-only — performs only `binding_for_coop` / `coop_for_entity`
+/// reads and binds/normalizes nothing.
+fn reverify_trusted_non_ambiguous_binding(
+    map: &dyn CoopEntityMap,
+    coop_id: &str,
+    resolved: &EntityId,
+) -> ApplyReverify {
+    // Forward binding must still resolve to the planned target with trusted
+    // provenance.
+    let provenance = match map.binding_for_coop(coop_id) {
+        Ok(Some(binding))
+            if &binding.entity_id == resolved && binding.provenance.is_trusted_for_resolution() =>
+        {
+            binding.provenance
+        }
+        Ok(_) => {
+            return ApplyReverify::FailClosed {
+                reason: "binding no longer a trusted match for the planned target; \
+                         not applied (fail closed)"
+                    .into(),
+                error: None,
+            };
+        }
+        Err(e) => {
+            return ApplyReverify::FailClosed {
+                reason: "map re-read failed; cannot confirm a safe binding (fail closed)".into(),
+                error: Some(e.to_string()),
+            };
+        }
+    };
+
+    // Reverse index must still point byte-for-byte back to THIS coop_id (the
+    // planner's non-ambiguity requirement). A reverse that was deleted, repointed
+    // to a different coop_id, or errors fails closed — the forward binding alone
+    // does not confirm the target is unambiguous.
+    match map.coop_for_entity(resolved) {
+        Ok(Some(reverse)) if reverse == coop_id => ApplyReverify::Ok(provenance),
+        Ok(reverse_opt) => {
+            let detail = match reverse_opt {
+                Some(reverse) => format!("now points to a different coop_id ({reverse:?})"),
+                None => "is missing".to_string(),
+            };
+            ApplyReverify::FailClosed {
+                reason: format!(
+                    "reverse binding {detail}; no longer points to this coop_id; \
+                     not applied (fail closed)"
+                ),
+                error: None,
+            }
+        }
+        Err(e) => ApplyReverify::FailClosed {
+            reason: "reverse-index re-read failed; cannot confirm the binding is unambiguous \
+                     (fail closed)"
+                .into(),
+            error: Some(e.to_string()),
+        },
+    }
+}
+
 impl TreasuryManager {
     /// Controlled, mutating **apply** of the treasury `entity_id` backfill
     /// (ADR-0084, #2082 lane).
@@ -521,19 +599,17 @@ impl TreasuryManager {
                 continue;
             };
 
-            // Re-verify the trusted binding immediately before mutating. On the
-            // CLI path the daemon is stopped, so this matches the plan exactly; it
-            // is a defensive fail-closed re-check AND the source of the audited
-            // provenance. Anything but an exact, trusted match for the planned
-            // target fails closed — nothing is written.
-            let provenance = match map.binding_for_coop(&coop_id) {
-                Ok(Some(binding))
-                    if binding.entity_id == resolved
-                        && binding.provenance.is_trusted_for_resolution() =>
-                {
-                    binding.provenance
-                }
-                Ok(_) => {
+            // Re-verify the FULL trusted, non-ambiguous binding immediately before
+            // mutating — the same forward binding + provenance + reverse-index
+            // check the planner uses. On the CLI path the daemon is stopped, so
+            // this matches the plan exactly; it is a defensive fail-closed re-check
+            // that also sources the audited provenance. A map that changed, or that
+            // exposes inconsistent forward/reverse indexes between planning and the
+            // write, fails closed here — nothing is written.
+            let provenance = match reverify_trusted_non_ambiguous_binding(map, &coop_id, &resolved)
+            {
+                ApplyReverify::Ok(provenance) => provenance,
+                ApplyReverify::FailClosed { reason, error } => {
                     failed += 1;
                     entries.push(TreasuryEntityIdBackfillApplyEntry {
                         coop_id,
@@ -542,25 +618,8 @@ impl TreasuryManager {
                         entity_id_before: None,
                         entity_id_after: None,
                         provenance: None,
-                        reason: "binding no longer a trusted match for the planned target; \
-                                 not applied (fail closed)"
-                            .into(),
-                        error: None,
-                    });
-                    continue;
-                }
-                Err(e) => {
-                    failed += 1;
-                    entries.push(TreasuryEntityIdBackfillApplyEntry {
-                        coop_id,
-                        treasury_did,
-                        outcome: TreasuryEntityIdBackfillApplyOutcome::Failed,
-                        entity_id_before: None,
-                        entity_id_after: None,
-                        provenance: None,
-                        reason: "map re-read failed; cannot confirm a safe binding (fail closed)"
-                            .into(),
-                        error: Some(e.to_string()),
+                        reason,
+                        error,
                     });
                     continue;
                 }
@@ -1520,5 +1579,153 @@ mod tests {
             TreasuryEntityIdBackfillApplyOutcome::Failed
         );
         assert!(report.entries[0].error.is_some());
+    }
+
+    /// How the reverse index has drifted by the time the apply re-verifies it.
+    enum ReverseDrift {
+        /// The reverse binding was deleted.
+        Missing,
+        /// The reverse binding now points to a different coop_id.
+        Different(String),
+        /// The reverse lookup errors.
+        Error,
+    }
+
+    /// A map double whose forward binding stays trusted but whose reverse index
+    /// DRIFTS between the planner pass and the apply re-verify pass: the first
+    /// `coop_for_entity` call (planning) returns the matching coop_id (so the row
+    /// plans as `WouldPopulate`), and every later call (the apply re-verify)
+    /// returns the drifted reverse. `bind_resolved` is `unreachable!` — apply must
+    /// never write the map.
+    struct ReverseDriftMap {
+        coop_id: String,
+        entity_id: EntityId,
+        coop_for_entity_calls: std::cell::Cell<u32>,
+        drift: ReverseDrift,
+    }
+    impl CoopEntityMap for ReverseDriftMap {
+        fn bind_resolved(&self, _: &str, _: &EntityId) -> Result<(), CoopEntityMapError> {
+            unreachable!("apply must never write the coop_id <-> EntityId map");
+        }
+        fn entity_for_coop(&self, _: &str) -> Result<Option<EntityId>, CoopEntityMapError> {
+            Ok(None)
+        }
+        fn coop_for_entity(&self, _: &EntityId) -> Result<Option<String>, CoopEntityMapError> {
+            let n = self.coop_for_entity_calls.get();
+            self.coop_for_entity_calls.set(n + 1);
+            if n == 0 {
+                // Planner pass: matching reverse -> WouldPopulate.
+                Ok(Some(self.coop_id.clone()))
+            } else {
+                // Apply re-verify pass: the reverse has drifted.
+                match &self.drift {
+                    ReverseDrift::Missing => Ok(None),
+                    ReverseDrift::Different(other) => Ok(Some(other.clone())),
+                    ReverseDrift::Error => Err(CoopEntityMapError::Storage(
+                        "reverse index unreadable".to_string(),
+                    )),
+                }
+            }
+        }
+        fn binding_for_coop(
+            &self,
+            coop_id: &str,
+        ) -> Result<Option<CoopEntityBinding>, CoopEntityMapError> {
+            Ok(Some(CoopEntityBinding {
+                coop_id: coop_id.to_string(),
+                entity_id: self.entity_id.clone(),
+                provenance: CoopEntityBindingProvenance::Activation,
+            }))
+        }
+    }
+
+    #[test]
+    fn apply_fails_closed_when_reverse_binding_missing_at_write() {
+        // Plan classifies WouldPopulate (matching reverse at plan time), but the
+        // reverse index is deleted before the apply write -> fail closed.
+        let coop_id = "coop_A"; // non-projectable: no projection-conflict at plan time.
+        let surrogate = coop_eid("coop-legacy-deadbeef0123");
+        let mut mgr = legacy_manager_with(&[coop_id]);
+        let map = ReverseDriftMap {
+            coop_id: coop_id.to_string(),
+            entity_id: surrogate,
+            coop_for_entity_calls: std::cell::Cell::new(0),
+            drift: ReverseDrift::Missing,
+        };
+
+        let report = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(
+            report.plan.would_populate, 1,
+            "planner classified the row WouldPopulate"
+        );
+        assert_eq!(report.applied, 0);
+        assert_eq!(report.failed, 1);
+        assert!(report.had_failures());
+        // Fail closed: the treasury is left unchanged.
+        assert!(mgr
+            .get_treasury_by_coop(coop_id)
+            .unwrap()
+            .entity_id()
+            .is_none());
+        let entry = &report.entries[0];
+        assert_eq!(entry.outcome, TreasuryEntityIdBackfillApplyOutcome::Failed);
+        assert!(entry.reason.contains("reverse binding"));
+    }
+
+    #[test]
+    fn apply_fails_closed_when_reverse_binding_repointed_at_write() {
+        // Plan classifies WouldPopulate, but the reverse index now points to a
+        // DIFFERENT coop_id before the apply write -> fail closed.
+        let coop_id = "coop_A";
+        let surrogate = coop_eid("coop-legacy-deadbeef0123");
+        let mut mgr = legacy_manager_with(&[coop_id]);
+        let map = ReverseDriftMap {
+            coop_id: coop_id.to_string(),
+            entity_id: surrogate,
+            coop_for_entity_calls: std::cell::Cell::new(0),
+            drift: ReverseDrift::Different("other-coop".to_string()),
+        };
+
+        let report = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(report.plan.would_populate, 1);
+        assert_eq!(report.applied, 0);
+        assert_eq!(report.failed, 1);
+        assert!(mgr
+            .get_treasury_by_coop(coop_id)
+            .unwrap()
+            .entity_id()
+            .is_none());
+        let entry = &report.entries[0];
+        assert_eq!(entry.outcome, TreasuryEntityIdBackfillApplyOutcome::Failed);
+        assert!(entry.reason.contains("different coop_id"));
+    }
+
+    #[test]
+    fn apply_fails_closed_when_reverse_lookup_errors_at_write() {
+        // Plan classifies WouldPopulate, but the reverse lookup errors during the
+        // apply re-verify -> fail closed with the error surfaced.
+        let coop_id = "coop_A";
+        let surrogate = coop_eid("coop-legacy-deadbeef0123");
+        let mut mgr = legacy_manager_with(&[coop_id]);
+        let map = ReverseDriftMap {
+            coop_id: coop_id.to_string(),
+            entity_id: surrogate,
+            coop_for_entity_calls: std::cell::Cell::new(0),
+            drift: ReverseDrift::Error,
+        };
+
+        let report = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(report.plan.would_populate, 1);
+        assert_eq!(report.applied, 0);
+        assert_eq!(report.failed, 1);
+        assert!(mgr
+            .get_treasury_by_coop(coop_id)
+            .unwrap()
+            .entity_id()
+            .is_none());
+        let entry = &report.entries[0];
+        assert_eq!(entry.outcome, TreasuryEntityIdBackfillApplyOutcome::Failed);
+        assert!(entry.error.is_some());
+        assert!(entry.reason.contains("reverse-index"));
     }
 }
