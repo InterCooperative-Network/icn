@@ -10507,7 +10507,7 @@ fn handle_api_command(cmd: ApiCommands) -> Result<()> {
 /// records them in an [`icn_appliance::ApplianceManifest`]. This is the typed
 /// replacement for the JSON heredoc in `deploy/appliance/build-image.sh`.
 fn handle_appliance_command(cmd: ApplianceCommands) -> Result<()> {
-    use icn_appliance::{sha256_hex, ApplianceManifest, BinaryRecord, MANIFEST_VERSION};
+    use icn_appliance::{sha256_file_hex, ApplianceManifest, BinaryRecord, MANIFEST_VERSION};
 
     match cmd {
         ApplianceCommands::EmitManifest {
@@ -10527,9 +10527,9 @@ fn handle_appliance_command(cmd: ApplianceCommands) -> Result<()> {
             output,
         } => {
             let hash_file = |p: &std::path::Path| -> Result<String> {
-                let bytes =
-                    std::fs::read(p).with_context(|| format!("Failed to read {}", p.display()))?;
-                Ok(sha256_hex(&bytes))
+                // Stream the artifact through SHA-256 rather than reading it into
+                // memory: real appliance images (QCOW2/raw) are multi-GB.
+                sha256_file_hex(p).with_context(|| format!("Failed to hash {}", p.display()))
             };
 
             let image_sha256 = hash_file(&image)?;

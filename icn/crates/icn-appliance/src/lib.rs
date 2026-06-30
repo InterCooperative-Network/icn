@@ -15,5 +15,5 @@ pub mod hash;
 pub mod manifest;
 
 pub use error::ApplianceError;
-pub use hash::sha256_hex;
+pub use hash::{sha256_file_hex, sha256_hex};
 pub use manifest::{ApplianceManifest, BinaryRecord, MANIFEST_VERSION};

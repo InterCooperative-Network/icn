@@ -77,3 +77,36 @@ fn manifest_rejects_unknown_fields() {
         "unknown fields must be rejected, not silently ignored"
     );
 }
+
+#[test]
+fn sha256_file_hex_matches_known_vector() {
+    use std::io::Write;
+    let mut f = tempfile::NamedTempFile::new().expect("temp file");
+    f.write_all(b"abc").expect("write");
+    assert_eq!(
+        icn_appliance::sha256_file_hex(f.path()).expect("hash file"),
+        "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+    );
+}
+
+#[test]
+fn sha256_file_hex_matches_byte_helper_across_buffer_boundaries() {
+    use std::io::Write;
+    // ~250 KB spans multiple streaming read buffers, proving the chunk loop
+    // produces the same digest as the one-shot byte helper.
+    let data = b"icn appliance image bytes \x00\x01\x02 across a buffer".repeat(5000);
+    let mut f = tempfile::NamedTempFile::new().expect("temp file");
+    f.write_all(&data).expect("write");
+    assert_eq!(
+        icn_appliance::sha256_file_hex(f.path()).expect("hash file"),
+        sha256_hex(&data)
+    );
+}
+
+#[test]
+fn sha256_file_hex_errors_on_missing_file() {
+    assert!(
+        icn_appliance::sha256_file_hex("/nonexistent/icn-appliance/missing.qcow2").is_err(),
+        "missing file must return a clean error"
+    );
+}
