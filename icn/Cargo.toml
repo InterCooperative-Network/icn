@@ -38,6 +38,7 @@ members = [
     "crates/icn-authz",
     "crates/icn-baseline-lock",
     "crates/icn-boundary",
+    "crates/icn-appliance",
     "apps/charter",
     "apps/governance",
     "apps/membership",
@@ -163,6 +164,7 @@ icn-api = { path = "crates/icn-api" }
 icn-naming = { path = "crates/icn-naming" }
 icn-authz = { path = "crates/icn-authz" }
 icn-baseline-lock = { path = "crates/icn-baseline-lock" }
+icn-appliance = { path = "crates/icn-appliance" }
 icn-boundary = { path = "crates/icn-boundary" }
 icn-commons = { path = "crates/icn-commons" }
 

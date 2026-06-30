@@ -2828,6 +2828,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "icn-appliance"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "icn-authz"
 version = "0.1.0"
 dependencies = [
@@ -3913,6 +3924,7 @@ dependencies = [
  "clap_complete",
  "dirs",
  "hex",
+ "icn-appliance",
  "icn-ccl",
  "icn-coop",
  "icn-core",
