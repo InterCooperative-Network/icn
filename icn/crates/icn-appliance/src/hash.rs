@@ -45,3 +45,23 @@ pub fn sha256_file_hex(path: impl AsRef<Path>) -> Result<String, ApplianceError>
 fn to_hex(bytes: &[u8]) -> String {
     bytes.iter().map(|b| format!("{b:02x}")).collect()
 }
+
+/// Fail-closed: stream-hash the file at `path` and compare to `expected`
+/// (lowercase hex SHA-256).
+///
+/// Returns [`ApplianceError::MissingArtifact`] when the file is missing or
+/// unreadable, and [`ApplianceError::HashMismatch`] when the digest differs.
+pub fn verify_file_hash(path: &Path, expected: &str) -> Result<(), ApplianceError> {
+    let actual = sha256_file_hex(path).map_err(|e| ApplianceError::MissingArtifact {
+        path: path.display().to_string(),
+        detail: e.to_string(),
+    })?;
+    if actual != expected {
+        return Err(ApplianceError::HashMismatch {
+            path: path.display().to_string(),
+            expected: expected.to_string(),
+            found: actual,
+        });
+    }
+    Ok(())
+}

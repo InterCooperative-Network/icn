@@ -1,8 +1,11 @@
 //! The wire-stable appliance build manifest.
 
+use std::path::{Path, PathBuf};
+
 use serde::{Deserialize, Serialize};
 
 use crate::error::ApplianceError;
+use crate::hash::verify_file_hash;
 
 /// Current schema version of [`ApplianceManifest`]. Bump only on a
 /// schema-breaking change to the field set.
@@ -90,5 +93,61 @@ impl ApplianceManifest {
             });
         }
         Ok(manifest)
+    }
+
+    /// Fail-closed structural and posture checks that need no filesystem access.
+    ///
+    /// Rejects an unsupported `manifest_version`, an empty `built_binaries`, and
+    /// any production claim (`non_production == false`) not backed by a signed,
+    /// immutable, non-demo posture.
+    pub fn check_posture(&self) -> Result<(), ApplianceError> {
+        if self.manifest_version != MANIFEST_VERSION {
+            return Err(ApplianceError::UnsupportedVersion {
+                found: self.manifest_version,
+                expected: MANIFEST_VERSION,
+            });
+        }
+        if self.built_binaries.is_empty() {
+            return Err(ApplianceError::EmptyBinaries);
+        }
+        if !self.non_production && (!self.signed || !self.immutable || self.demo_profile) {
+            return Err(ApplianceError::PostureContradiction {
+                detail:
+                    "non_production=false requires signed=true, immutable=true, demo_profile=false"
+                        .to_string(),
+            });
+        }
+        Ok(())
+    }
+
+    /// Fail-closed verification of an emitted manifest against artifacts on disk.
+    ///
+    /// Runs [`Self::check_posture`], then re-hashes the recorded image, base
+    /// image, and each binary's `source` (resolved relative to `root` when not
+    /// absolute) with streaming SHA-256, failing closed on any missing artifact
+    /// or hash mismatch. This re-checks already-emitted inputs; it makes no
+    /// production-readiness, signed-release, or immutability claim.
+    pub fn verify(&self, root: &Path) -> Result<(), ApplianceError> {
+        self.check_posture()?;
+        verify_file_hash(&resolve(root, &self.image_path), &self.image_sha256)?;
+        verify_file_hash(
+            &resolve(root, &self.base_image_path),
+            &self.base_image_sha256,
+        )?;
+        for binary in &self.built_binaries {
+            verify_file_hash(&resolve(root, &binary.source), &binary.sha256)?;
+        }
+        Ok(())
+    }
+}
+
+/// Resolve a recorded path against `root`: absolute paths are used as-is,
+/// relative paths are joined onto `root`.
+fn resolve(root: &Path, recorded: &str) -> PathBuf {
+    let p = Path::new(recorded);
+    if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        root.join(p)
     }
 }
