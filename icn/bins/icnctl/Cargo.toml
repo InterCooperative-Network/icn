@@ -44,6 +44,7 @@ qrcode = "0.14"
 image = { version = "0.25", default-features = false, features = ["png"] }
 
 # ICN crates
+icn-appliance.workspace = true
 icn-core.workspace = true
 icn-identity.workspace = true
 icn-crypto-pq = { workspace = true, optional = true }

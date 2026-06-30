@@ -187,6 +187,10 @@ enum Commands {
     #[command(subcommand)]
     Api(ApiCommands),
 
+    /// Appliance image build manifest (emit a wire-stable build manifest)
+    #[command(subcommand)]
+    Appliance(ApplianceCommands),
+
     /// Economic receipt chain queries
     #[command(subcommand)]
     Receipts(ReceiptCommands),
@@ -272,6 +276,68 @@ enum ApiCommands {
         /// Output format: yaml or json
         #[arg(short, long, default_value = "yaml")]
         format: String,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ApplianceCommands {
+    /// Emit a wire-stable appliance build manifest (JSON) to stdout or a file.
+    EmitManifest {
+        /// Version label for this image build.
+        #[arg(long = "image-version")]
+        version: String,
+
+        /// Built image file to hash and record.
+        #[arg(long)]
+        image: PathBuf,
+
+        /// Base OS image file to hash and record.
+        #[arg(long)]
+        base_image: PathBuf,
+
+        /// Git commit the build was produced from.
+        #[arg(long)]
+        git_commit: String,
+
+        /// Build timestamp (RFC 3339 UTC).
+        #[arg(long)]
+        build_timestamp: String,
+
+        /// A built binary as `IN_PATH=SOURCE=FILE` (repeatable).
+        #[arg(long = "binary", value_name = "IN_PATH=SOURCE=FILE")]
+        binaries: Vec<String>,
+
+        /// Appliance identifier.
+        #[arg(long, default_value = "icn-appliance-dev")]
+        appliance_id: String,
+
+        /// Target architecture.
+        #[arg(long, default_value = "amd64")]
+        arch: String,
+
+        /// Emitted image format.
+        #[arg(long, default_value = "qcow2")]
+        image_format: String,
+
+        /// Mark the image as a non-production dev artifact.
+        #[arg(long)]
+        non_production: bool,
+
+        /// Mark the image as a signed release artifact.
+        #[arg(long)]
+        signed: bool,
+
+        /// Mark the image as immutable (A-B updates, rollback).
+        #[arg(long)]
+        immutable: bool,
+
+        /// Mark the image as carrying the DEV/DEMO profile payload.
+        #[arg(long)]
+        demo_profile: bool,
+
+        /// Output file path (defaults to stdout).
+        #[arg(short, long)]
+        output: Option<PathBuf>,
     },
 }
 
@@ -2604,6 +2670,7 @@ async fn main() -> Result<()> {
         }
 
         Commands::Api(api_cmd) => handle_api_command(api_cmd)?,
+        Commands::Appliance(app_cmd) => handle_appliance_command(app_cmd)?,
 
         Commands::Receipts(receipt_cmd) => {
             handle_receipt_command(receipt_cmd).await?;
@@ -10427,6 +10494,90 @@ fn handle_api_command(cmd: ApiCommands) -> Result<()> {
                 println!("OpenAPI specification written to {}", path.display());
             } else {
                 print!("{content}");
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Emit a wire-stable appliance build manifest (JSON) to stdout or a file.
+///
+/// Hashes the built image, base image, and each built binary with SHA-256 and
+/// records them in an [`icn_appliance::ApplianceManifest`]. This is the typed
+/// replacement for the JSON heredoc in `deploy/appliance/build-image.sh`.
+fn handle_appliance_command(cmd: ApplianceCommands) -> Result<()> {
+    use icn_appliance::{sha256_hex, ApplianceManifest, BinaryRecord, MANIFEST_VERSION};
+
+    match cmd {
+        ApplianceCommands::EmitManifest {
+            version,
+            image,
+            base_image,
+            git_commit,
+            build_timestamp,
+            binaries,
+            appliance_id,
+            arch,
+            image_format,
+            non_production,
+            signed,
+            immutable,
+            demo_profile,
+            output,
+        } => {
+            let hash_file = |p: &std::path::Path| -> Result<String> {
+                let bytes =
+                    std::fs::read(p).with_context(|| format!("Failed to read {}", p.display()))?;
+                Ok(sha256_hex(&bytes))
+            };
+
+            let image_sha256 = hash_file(&image)?;
+            let base_image_sha256 = hash_file(&base_image)?;
+
+            let mut built_binaries = Vec::with_capacity(binaries.len());
+            for spec in &binaries {
+                let parts: Vec<&str> = spec.split('=').collect();
+                if parts.len() != 3 {
+                    bail!("--binary expects IN_PATH=SOURCE=FILE, got: {spec}");
+                }
+                let sha256 = hash_file(std::path::Path::new(parts[2]))?;
+                built_binaries.push(BinaryRecord {
+                    path: parts[0].to_string(),
+                    source: parts[1].to_string(),
+                    sha256,
+                });
+            }
+
+            let manifest = ApplianceManifest {
+                manifest_version: MANIFEST_VERSION,
+                appliance_id,
+                version,
+                arch,
+                image_format,
+                image_path: image.display().to_string(),
+                image_sha256,
+                base_image_path: base_image.display().to_string(),
+                base_image_sha256,
+                git_commit,
+                build_timestamp_utc: build_timestamp,
+                built_binaries,
+                non_production,
+                signed,
+                immutable,
+                demo_profile,
+            };
+
+            let content = manifest
+                .to_json_pretty()
+                .context("Failed to serialize appliance manifest")?;
+
+            if let Some(path) = output {
+                std::fs::write(&path, format!("{content}\n"))
+                    .with_context(|| format!("Failed to write to {}", path.display()))?;
+                println!("Appliance manifest written to {}", path.display());
+            } else {
+                println!("{content}");
             }
         }
     }
