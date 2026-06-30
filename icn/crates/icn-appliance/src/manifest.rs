@@ -76,8 +76,19 @@ impl ApplianceManifest {
         Ok(serde_json::to_string_pretty(self)?)
     }
 
-    /// Parse from a JSON string, rejecting unknown fields.
+    /// Parse from a JSON string, rejecting unknown fields and unsupported
+    /// schema versions.
+    ///
+    /// Fails closed when `manifest_version` is not [`MANIFEST_VERSION`]: a reader
+    /// must never silently accept a manifest whose schema it does not understand.
     pub fn from_json_str(s: &str) -> Result<Self, ApplianceError> {
-        Ok(serde_json::from_str(s)?)
+        let manifest: Self = serde_json::from_str(s)?;
+        if manifest.manifest_version != MANIFEST_VERSION {
+            return Err(ApplianceError::UnsupportedVersion {
+                found: manifest.manifest_version,
+                expected: MANIFEST_VERSION,
+            });
+        }
+        Ok(manifest)
     }
 }

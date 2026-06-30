@@ -110,3 +110,15 @@ fn sha256_file_hex_errors_on_missing_file() {
         "missing file must return a clean error"
     );
 }
+
+#[test]
+fn manifest_rejects_unsupported_version() {
+    // A v1-shaped manifest carrying a different schema version must fail closed:
+    // an older reader must never silently accept a schema it does not understand.
+    let json = sample().to_json_pretty().expect("serialize");
+    let bumped = json.replacen("\"manifest_version\": 1", "\"manifest_version\": 2", 1);
+    assert!(
+        ApplianceManifest::from_json_str(&bumped).is_err(),
+        "manifest_version != MANIFEST_VERSION must be rejected"
+    );
+}
