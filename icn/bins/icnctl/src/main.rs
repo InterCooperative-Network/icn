@@ -147,6 +147,10 @@ enum Commands {
     #[command(subcommand)]
     Coop(CoopMaintenanceCommands),
 
+    /// Treasury read-only maintenance queries
+    #[command(subcommand)]
+    Treasury(TreasuryMaintenanceCommands),
+
     /// Gateway authentication (get JWT tokens)
     #[command(subcommand)]
     Auth(AuthCommands),
@@ -260,6 +264,27 @@ enum CoopMaintenanceCommands {
         #[arg(long, conflicts_with = "apply")]
         dry_run: bool,
         /// Emit machine-readable JSON instead of a human-readable table.
+        #[arg(long)]
+        json: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum TreasuryMaintenanceCommands {
+    /// Read-only plan of which legacy treasuries (`entity_id: None`) could have
+    /// their `entity_id` populated from a trusted, non-ambiguous `coop_id` ↔
+    /// `EntityId` binding (#2082 lane). Writes nothing.
+    ///
+    /// Hydrates treasuries from the local ledger store and classifies each as
+    /// would-populate, already-bound, no-mapping, untrusted-provenance,
+    /// non-cooperative-entity, ambiguous-binding, or storage-error against the
+    /// canonical [`icn_entity::CoopEntityMap`]. Surfaces the already-merged
+    /// planner — it never populates `entity_id`, binds nothing, normalizes
+    /// nothing, and changes no authorization state (a mapping grants no
+    /// authority). Reads the ledger and cooperative stores directly, so run it
+    /// with the daemon stopped (the daemon holds an exclusive lock).
+    EntityBackfillReport {
+        /// Emit machine-readable JSON instead of a human-readable summary.
         #[arg(long)]
         json: bool,
     },
@@ -2152,6 +2177,154 @@ fn handle_coop_maintenance_command(cmd: CoopMaintenanceCommands, data_dir: &Path
     }
 }
 
+fn handle_treasury_maintenance_command(
+    cmd: TreasuryMaintenanceCommands,
+    data_dir: &Path,
+) -> Result<()> {
+    match cmd {
+        TreasuryMaintenanceCommands::EntityBackfillReport { json } => {
+            treasury_entity_backfill_report(data_dir, json)
+        }
+    }
+}
+
+/// Render a read-only treasury `entity_id` backfill plan (#2082 lane).
+///
+/// This hydrates persisted treasuries from the local ledger store and runs the
+/// already-merged [`icn_ledger::TreasuryManager::plan_entity_id_backfill`] against
+/// the canonical [`icn_entity::CoopEntityMap`], using only read operations. It
+/// performs **no writes**, never populates `treasury.entity_id`, binds nothing,
+/// normalizes nothing, and changes no authorization state — a mapping is a name
+/// binding only and grants no authority. Mutation belongs to a later, separately
+/// reviewed rung (populating `entity_id` is not authorization-neutral under the
+/// treasury entity-auth gate).
+fn treasury_entity_backfill_report(data_dir: &Path, json: bool) -> Result<()> {
+    use icn_entity::{InMemoryCoopEntityMap, SledCoopEntityMap};
+    use icn_ledger::TreasuryManager;
+    use icn_store::Store;
+    use std::sync::Arc;
+
+    let ledger_store_path = get_store_path(data_dir).join("ledger");
+
+    // Read-only contract: never create a database. A missing ledger store means
+    // there are no persisted treasuries to inspect — report an empty plan rather
+    // than materializing a store on disk.
+    if !ledger_store_path.exists() {
+        if !json {
+            eprintln!(
+                "No ledger store found at {} — reporting an empty plan (nothing was created).",
+                ledger_store_path.display()
+            );
+        }
+        let empty = TreasuryManager::new().plan_entity_id_backfill(&InMemoryCoopEntityMap::new());
+        return render_treasury_entity_backfill_plan(&empty, json);
+    }
+
+    let ledger_store: Arc<dyn Store> = Arc::new(SledStore::open(&ledger_store_path).with_context(
+        || {
+            format!(
+                "Failed to open ledger store at {} (stop the daemon first; it holds an exclusive lock)",
+                ledger_store_path.display()
+            )
+        },
+    )?);
+    let treasury_mgr = TreasuryManager::with_store(ledger_store)
+        .context("Failed to hydrate treasuries from the ledger store")?;
+
+    let coop_store_path = get_store_path(data_dir).join("cooperative");
+
+    // The canonical map lives in the cooperative store. When it is absent we must
+    // NOT collapse to `total: 0` (that would hide persisted treasuries): classify
+    // every hydrated treasury against an explicit empty map, so each safely
+    // surfaces as `skipped_no_mapping`. Never create the cooperative store.
+    let plan = if coop_store_path.exists() {
+        let coop_store = SledStore::open(&coop_store_path).with_context(|| {
+            format!(
+                "Failed to open cooperative store at {} (stop the daemon first; it holds an exclusive lock)",
+                coop_store_path.display()
+            )
+        })?;
+        // Share one Db with the canonical map, exactly as the daemon does in
+        // init_coop — no separate database is opened.
+        let db = Arc::new(coop_store.db().clone());
+        let map = SledCoopEntityMap::new(db);
+        treasury_mgr.plan_entity_id_backfill(&map)
+    } else {
+        if !json {
+            eprintln!(
+                "No cooperative store found at {} — every persisted treasury is reported as \
+                 skipped_no_mapping (nothing was created).",
+                coop_store_path.display()
+            );
+        }
+        treasury_mgr.plan_entity_id_backfill(&InMemoryCoopEntityMap::new())
+    };
+
+    render_treasury_entity_backfill_plan(&plan, json)
+}
+
+/// Print a [`icn_ledger::TreasuryEntityIdBackfillPlan`] as JSON or a human
+/// summary. The per-row `action` is one of the planner's fail-closed outcomes;
+/// the report only surfaces them and never relaxes a skip.
+fn render_treasury_entity_backfill_plan(
+    plan: &icn_ledger::TreasuryEntityIdBackfillPlan,
+    json: bool,
+) -> Result<()> {
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(plan)
+                .context("Failed to serialize the treasury backfill plan as JSON")?
+        );
+        return Ok(());
+    }
+
+    println!(
+        "treasury entity_id backfill plan (read-only; a mapping grants no authority, nothing was written)"
+    );
+    println!();
+    println!("  total:                          {}", plan.total);
+    println!("  would_populate:                 {}", plan.would_populate);
+    println!(
+        "  skipped_already_has_entity_id:  {}",
+        plan.skipped_already_has_entity_id
+    );
+    println!(
+        "  skipped_no_mapping:             {}",
+        plan.skipped_no_mapping
+    );
+    println!(
+        "  skipped_untrusted_provenance:   {}",
+        plan.skipped_untrusted_provenance
+    );
+    println!(
+        "  skipped_non_cooperative_entity: {}",
+        plan.skipped_non_cooperative_entity
+    );
+    println!(
+        "  skipped_ambiguous_binding:      {}",
+        plan.skipped_ambiguous_binding
+    );
+    println!(
+        "  skipped_storage_error:          {}",
+        plan.skipped_storage_error
+    );
+
+    if !plan.entries.is_empty() {
+        println!();
+        println!("  entries:");
+        for entry in &plan.entries {
+            let did = entry.treasury_did.as_deref().unwrap_or("-");
+            println!(
+                "    [{:?}] coop_id={} treasury_did={} — {}",
+                entry.action, entry.coop_id, did, entry.reason
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// Render a read-only `coop_id` ↔ `EntityId` mapping inventory (#2082 lane).
 ///
 /// This opens the existing cooperative sled store, lists the stored
@@ -2644,6 +2817,9 @@ async fn main() -> Result<()> {
         } => handle_init_coop_command(&data_dir, name, members, yes, no_start).await?,
 
         Commands::Coop(coop_cmd) => handle_coop_maintenance_command(coop_cmd, &data_dir)?,
+        Commands::Treasury(treasury_cmd) => {
+            handle_treasury_maintenance_command(treasury_cmd, &data_dir)?
+        }
 
         Commands::Auth(auth_cmd) => handle_auth_command(auth_cmd, &data_dir).await?,
 
