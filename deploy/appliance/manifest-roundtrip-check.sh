@@ -43,8 +43,23 @@ fails=0
 pass() { printf '    ok   %s\n' "$*"; }
 fail() { fails=$((fails + 1)); printf '    FAIL %s\n' "$*" >&2; }
 
-WORK="$(mktemp -d)"
-cleanup() { rm -rf "$WORK"; }
+# Fail closed if the temp dir cannot be created: without this, WORK stays empty
+# and later setup paths would expand to /bin, /image.qcow2, /wrongroot, etc. — a
+# root-run invocation could then write outside the intended throwaway dir.
+WORK="$(mktemp -d)" || {
+    printf 'manifest-roundtrip: mktemp -d failed (is TMPDIR writable?)\n' >&2
+    exit 1
+}
+if [ -z "${WORK:-}" ] || [ ! -d "$WORK" ]; then
+    printf 'manifest-roundtrip: temp dir was not created\n' >&2
+    exit 1
+fi
+cleanup() {
+    # Only remove the throwaway dir we actually created; never an empty path or /.
+    if [ -n "${WORK:-}" ] && [ "$WORK" != "/" ] && [ -d "$WORK" ]; then
+        rm -rf "$WORK"
+    fi
+}
 trap cleanup EXIT
 
 # ---- throwaway stand-in artifacts (NOT a real image or real binaries) -------
