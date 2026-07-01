@@ -144,12 +144,27 @@ The only legitimate trust relationship this path can ever have with the map is
 read-only trusted-binding consultation** — at `CreateTreasury` time, if (and only
 if) a trusted, structurally consistent binding already exists for the byte-exact
 `coop_id` (trusted provenance via `is_trusted_for_resolution()`, reverse index
-agrees byte-for-byte, target is a well-formed cooperative `EntityId`), pass it via
-`register_treasury_with_entity`; otherwise `entity_id: None` exactly as today. The
-map is **never written**, no provenance is recorded, and a missing/untrusted/
-ambiguous/malformed binding degrades silently to today's behavior. This mirrors
-#2266's populate-from-recorded-binding and ADR-0084's re-verification discipline,
-and leaves rows without bindings to the existing backfill chain.
+agrees byte-for-byte, target is a well-formed cooperative `EntityId`), populate the
+treasury's `entity_id` from that binding; otherwise `entity_id: None` exactly as
+today. The map is **never written**, no provenance is recorded, and a
+missing/untrusted/ambiguous/malformed binding degrades silently to today's
+behavior. This mirrors #2266's populate-from-recorded-binding and ADR-0084's
+re-verification discipline, and leaves rows without bindings to the existing
+backfill chain.
+
+**Registration path constraint (coop_id preservation).** The implementation MUST
+NOT use `TreasuryManager::register_treasury_with_entity` for this: that API derives
+the treasury row's `coop_id` from `entity_id.identifier()`
+(`icn-ledger/src/treasury.rs` ~L400-408), so for a trusted **surrogate** (or any
+binding where `entity_id.identifier() != coop_id`) it would file the treasury under
+the surrogate slug instead of the original legacy `coop_id` — breaking byte-for-byte
+preservation and `get_treasury_by_coop`/reverse-audit consistency. The slice must
+instead use the **two-step path activation already uses**: plain
+`register_treasury(...)` with the byte-exact original `coop_id`, then populate
+`entity_id` from the trusted binding through the existing fail-closed populate seam
+(the `populate_entity_id_at_activation`-class primitive: byte-for-byte `coop_id`
+re-check + entity-uniqueness guard), or an equivalent new `coop_id`-preserving
+registration helper with the same checks.
 
 Note the deliberate divergence from activation: the slice has **no no-map projection
 fallback**. Activation may project when no map is wired because it is the
@@ -164,7 +179,11 @@ lane):
 
 1. Trusted binding (each of `Activation`, `OperatorBackfill`, `Surrogate`,
    `GovernanceReceipt`) → treasury registered with that binding's `EntityId`;
-   `coop_id` preserved byte-for-byte.
+   `coop_id` preserved byte-for-byte. **Must include a surrogate case where
+   `entity_id.identifier() != coop_id`**: the treasury row keeps the original
+   legacy `coop_id` (and `get_treasury_by_coop(legacy_id)` still resolves), with
+   `entity_id` set to the surrogate — proving the registration path is
+   `coop_id`-preserving (see §5's registration-path constraint).
 2. `UnknownLegacy` / missing provenance → `entity_id: None` (fail-closed, no error).
 3. Reverse-index mismatch or one-sided binding → `entity_id: None`.
 4. Non-cooperative or malformed target → `entity_id: None`.
