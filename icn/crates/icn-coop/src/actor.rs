@@ -499,9 +499,11 @@ impl CoopActor {
                     // slug — the same trusted, reject-not-normalize projection the
                     // Activation-provenance map binding (below) records, so the two
                     // agree. A non-projectable coop_id keeps entity_id: None (no
-                    // guessing); it is surrogate-bound and backfilled later. This
-                    // sets an identity target only: it grants no authority and does
-                    // not change enforcement mode/defaults.
+                    // guessing) here — the map bind below reports NotMappable — and
+                    // may later be surrogate-bound only through an explicit operator
+                    // workflow, never automatically on this path. This sets an
+                    // identity target only: it grants no authority and does not
+                    // change enforcement mode/defaults.
                     match project_coop_id(&coop_id) {
                         Ok(entity_id) => {
                             treasury_guard
@@ -1924,6 +1926,20 @@ mod tests {
         assert_eq!(treasury.coop_id, coop.id);
         assert_eq!(treasury.currency, "HOURS");
         assert!(treasury.is_active);
+
+        // spawn_with_treasury wires a TreasuryManager but NO coop/entity map:
+        // activation still populates entity_id for a projectable coop_id by direct
+        // projection alone (no map store required, none written, no authority
+        // granted), and the legacy coop_id is preserved byte-for-byte.
+        let expected = EntityId::cooperative("activate-ledger-coop").unwrap();
+        assert_eq!(treasury.entity_id(), Some(&expected));
+        assert_eq!(treasury.coop_id(), "activate-ledger-coop");
+        assert_eq!(
+            guard
+                .get_treasury_by_entity(&expected)
+                .map(|t| t.coop_id().to_string()),
+            Some("activate-ledger-coop".to_string())
+        );
     }
 
     #[tokio::test]
@@ -2118,9 +2134,10 @@ mod tests {
     // A treasury created during activation is born with the SAME cooperative
     // EntityId the Activation-provenance map binding records — but ONLY when the
     // coop_id directly projects to a cooperative slug (reject-not-normalize). A
-    // non-projectable coop_id keeps entity_id: None (no guessing); it is bound via
-    // a surrogate and backfilled later. Population sets an identity target only and
-    // grants no authority; enforcement mode/defaults are untouched.
+    // non-projectable coop_id keeps entity_id: None (no guessing) here and may later
+    // be surrogate-bound only through an explicit operator workflow, never
+    // automatically on this path. Population sets an identity target only and grants
+    // no authority; enforcement mode/defaults are untouched.
 
     // A1: a projectable coop_id => the activation treasury is born with entity_id,
     // its legacy coop_id is preserved byte-for-byte, and it agrees with the map.
