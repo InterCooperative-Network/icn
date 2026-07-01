@@ -47,7 +47,9 @@ What the handlers do **not** do:
 - **No overlap with activation**: since #2266, cooperative activation creates the
   treasury itself (register `entity_id: None` → commit activation → record the
   `Activation`-provenance map binding **last** → populate the treasury `entity_id`
-  from that recorded binding). A coop that went through activation therefore already
+  from that recorded binding; when **no map is wired**, activation instead uses the
+  pure reject-not-normalize projection — `icn-coop/src/actor.rs` ~L587-591 — because
+  there is no map to disagree with). A coop that went through activation therefore already
   has a treasury, and `CreateTreasury` is **rejected** for it (tests pin this on both
   paths). `CreateTreasury` consequently fires only for cooperatives that have **not**
   been activated — exactly the population for which **no trusted binding exists**.
@@ -81,10 +83,14 @@ mode trusts. Two failure shapes matter:
 
 - **Projection without provenance.** `project_coop_id` is pure and reject-not-
   normalize, but a projection performed by `CreateTreasury` carries no accountable
-  origin. #2266's review (P2#1) already established the rule for activation: treasury
-  `entity_id` may be populated **only from a successful trusted map binding**, never
-  from a bare projection racing ahead of the binding. `CreateTreasury` owns no
-  binding at all, so a bare projection here is strictly worse.
+  origin. #2266's review (P2#1) established the rule for the **map-wired** activation
+  path: treasury `entity_id` may be populated **only from the successfully recorded
+  binding**, never from a bare projection racing ahead of the bind. (The **no-map**
+  activation path does populate from pure projection — `icn-coop/src/actor.rs`
+  ~L587-591 — which is tolerable *there* only because activation is the authoritative
+  institutional act and there is no map for the projection to disagree with.)
+  `CreateTreasury` is not that act and owns no binding, so this document deliberately
+  holds it to the **stricter** rule: no projection fallback at all — see §5.
 - **Silent trust creation.** If `CreateTreasury` wrote a map binding itself, that
   binding's provenance would be a lie — the path is not activation, not an operator
   backfill, not a surrogate allocation, and holds no governance receipt. Every
@@ -144,6 +150,11 @@ map is **never written**, no provenance is recorded, and a missing/untrusted/
 ambiguous/malformed binding degrades silently to today's behavior. This mirrors
 #2266's populate-from-recorded-binding and ADR-0084's re-verification discipline,
 and leaves rows without bindings to the existing backfill chain.
+
+Note the deliberate divergence from activation: the slice has **no no-map projection
+fallback**. Activation may project when no map is wired because it is the
+authoritative institutional act; `CreateTreasury` is not, so with no map — or no
+trusted binding — the result is `entity_id: None`, full stop (required test 5).
 
 ## 6. Required tests before any implementation PR may mutate `entity_id`
 
