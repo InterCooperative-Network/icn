@@ -454,6 +454,60 @@ impl CoopActor {
         let coop = self.store.get_cooperative(&coop_id)?;
         let (mut coop, treasury_id) = self.lifecycle.activate(coop, charter_hash).await?;
 
+        // Non-authoritative name binding (#2082): record the canonical
+        // `coop_id ↔ EntityId` mapping when a map is wired. Done BEFORE treasury
+        // registration so a new treasury can be born with EXACTLY the EntityId the
+        // Activation-provenance bind durably recorded — never one the bind then
+        // refuses. A binding grants NO authority; a bind failure (NotMappable /
+        // Conflict / StorageError, including the common default `coop:<uuid>` case)
+        // is reported but never fails activation.
+        let bound_entity_id: Option<EntityId> = if let Some(ref map) = self.coop_entity_map {
+            match bind_coop_entity_map_activation(map.as_ref(), &coop_id) {
+                EntityMapBindOutcome::Mapped(entity_id) => {
+                    tracing::info!(
+                        target: "coop_entity_bind",
+                        coop_id = %coop_id,
+                        entity_id = %entity_id,
+                        outcome = "mapped",
+                        "bound coop_id to cooperative EntityId during activation (name binding only; grants no authority)"
+                    );
+                    Some(entity_id)
+                }
+                EntityMapBindOutcome::NotMappable(reason) => {
+                    tracing::info!(
+                        target: "coop_entity_bind",
+                        coop_id = %coop_id,
+                        outcome = "not_mappable",
+                        reason = %reason,
+                        "coop_id is not a mappable cooperative EntityId slug; left unbound; activation unaffected"
+                    );
+                    None
+                }
+                EntityMapBindOutcome::Conflict(reason) => {
+                    tracing::error!(
+                        target: "coop_entity_bind",
+                        coop_id = %coop_id,
+                        outcome = "conflict",
+                        reason = %reason,
+                        "coop_id/entity mapping conflict during activation; binding skipped; activation NOT failed"
+                    );
+                    None
+                }
+                EntityMapBindOutcome::StorageError(reason) => {
+                    tracing::error!(
+                        target: "coop_entity_bind",
+                        coop_id = %coop_id,
+                        outcome = "storage_error",
+                        reason = %reason,
+                        "coop_entity_map bind failed during activation; binding skipped; activation NOT failed"
+                    );
+                    None
+                }
+            }
+        } else {
+            None
+        };
+
         // Assign treasury DID onto cooperative if not already set (idempotency guard).
         // This must happen before persisting so the saved record is complete.
         if coop.treasury_did.is_none() {
@@ -495,17 +549,24 @@ impl CoopActor {
                     let mut treasury_guard = treasury_mgr.write().await;
 
                     // #2082: a treasury is born with its canonical cooperative
-                    // EntityId when the coop_id directly projects to a cooperative
-                    // slug — the same trusted, reject-not-normalize projection the
-                    // Activation-provenance map binding (below) records, so the two
-                    // agree. A non-projectable coop_id keeps entity_id: None (no
-                    // guessing) here — the map bind below reports NotMappable — and
-                    // may later be surrogate-bound only through an explicit operator
-                    // workflow, never automatically on this path. This sets an
-                    // identity target only: it grants no authority and does not
+                    // EntityId. When a map is wired, use ONLY the EntityId the
+                    // Activation-provenance bind above actually recorded, so
+                    // treasury.entity_id() can never disagree with the map — a
+                    // Conflict / StorageError / NotMappable bind falls back to legacy
+                    // entity_id: None. When no map is wired, birth from the pure
+                    // reject-not-normalize projection directly (there is no map to
+                    // disagree with). A non-projectable coop_id keeps entity_id: None
+                    // (no guessing) and may later be surrogate-bound only through an
+                    // explicit operator workflow, never automatically here. This sets
+                    // an identity target only: it grants no authority and does not
                     // change enforcement mode/defaults.
-                    match project_coop_id(&coop_id) {
-                        Ok(entity_id) => {
+                    let entity_id = if self.coop_entity_map.is_some() {
+                        bound_entity_id
+                    } else {
+                        project_coop_id(&coop_id).ok()
+                    };
+                    match entity_id {
+                        Some(entity_id) => {
                             treasury_guard
                                 .register_treasury_with_entity(
                                     treasury_did.clone(),
@@ -516,7 +577,7 @@ impl CoopActor {
                                 )
                                 .map_err(|e| crate::CoopError::Ledger(e.to_string()))?;
                         }
-                        Err(_) => {
+                        None => {
                             treasury_guard
                                 .register_treasury(
                                     treasury_did.clone(),
@@ -540,43 +601,6 @@ impl CoopActor {
         }
 
         self.store.save_cooperative(&coop)?;
-
-        // Non-authoritative name binding (#2082 PR2): record the canonical
-        // `coop_id ↔ EntityId` mapping when a map is wired. A binding grants NO
-        // authority, and a bind failure — including the common NotMappable case
-        // for default `coop:<uuid>` ids — is reported but never fails activation.
-        if let Some(ref map) = self.coop_entity_map {
-            match bind_coop_entity_map_activation(map.as_ref(), &coop_id) {
-                EntityMapBindOutcome::Mapped(entity_id) => tracing::info!(
-                    target: "coop_entity_bind",
-                    coop_id = %coop_id,
-                    entity_id = %entity_id,
-                    outcome = "mapped",
-                    "bound coop_id to cooperative EntityId during activation (name binding only; grants no authority)"
-                ),
-                EntityMapBindOutcome::NotMappable(reason) => tracing::info!(
-                    target: "coop_entity_bind",
-                    coop_id = %coop_id,
-                    outcome = "not_mappable",
-                    reason = %reason,
-                    "coop_id is not a mappable cooperative EntityId slug; left unbound; activation unaffected"
-                ),
-                EntityMapBindOutcome::Conflict(reason) => tracing::error!(
-                    target: "coop_entity_bind",
-                    coop_id = %coop_id,
-                    outcome = "conflict",
-                    reason = %reason,
-                    "coop_id/entity mapping conflict during activation; binding skipped; activation NOT failed"
-                ),
-                EntityMapBindOutcome::StorageError(reason) => tracing::error!(
-                    target: "coop_entity_bind",
-                    coop_id = %coop_id,
-                    outcome = "storage_error",
-                    reason = %reason,
-                    "coop_entity_map bind failed during activation; binding skipped; activation NOT failed"
-                ),
-            }
-        }
 
         tracing::info!(
             coop_id = %coop.id,
@@ -2223,6 +2247,51 @@ mod tests {
             None,
             "a non-mappable id must not be bound"
         );
+    }
+
+    // A3: when a map is wired but the Activation bind is refused (here: a pre-seeded
+    // Conflict), the treasury must NOT be born with a projected entity_id it would
+    // then disagree with — it falls back to entity_id: None. Activation still
+    // succeeds. (Guards against the gateway trusting a stored treasury entity_id that
+    // the canonical map never recorded.)
+    #[tokio::test]
+    async fn test_activation_does_not_populate_entity_id_when_map_bind_conflicts() {
+        let (handle, treasury_mgr, map) = spawn_test_actor_with_treasury_and_map();
+        let founder = create_test_did();
+
+        // Pre-seed a conflicting binding: conflict-coop -> a DIFFERENT cooperative
+        // entity, so the activation bind (conflict-coop -> its own projection) is
+        // refused as Conflict.
+        let decoy = EntityId::cooperative("decoy-entity").unwrap();
+        map.bind_resolved("conflict-coop", &decoy).unwrap();
+
+        let coop = handle
+            .create_cooperative(
+                Some("conflict-coop".to_string()),
+                "Conflict Coop".to_string(),
+                CoopType::Worker,
+                founder,
+            )
+            .await
+            .unwrap();
+        let activated = handle
+            .activate_cooperative(coop.id.clone(), "charter".to_string())
+            .await
+            .unwrap();
+        // A refused bind must never fail activation.
+        assert_eq!(activated.id, coop.id);
+
+        let guard = treasury_mgr.read().await;
+        let treasury = guard
+            .get_treasury_by_coop("conflict-coop")
+            .expect("treasury registered at activation");
+        assert!(
+            treasury.entity_id().is_none(),
+            "a refused (Conflict) map bind must not populate treasury entity_id"
+        );
+        assert_eq!(treasury.coop_id(), "conflict-coop");
+        // The pre-seeded (conflicting) binding is untouched; our coop was never bound.
+        assert_eq!(map.entity_for_coop("conflict-coop").unwrap(), Some(decoy));
     }
 
     // === bind_coop_entity_map outcome helper (pure, no actor) ===
