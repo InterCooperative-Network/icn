@@ -655,6 +655,10 @@ impl TreasuryManager {
                         TreasuryEntityIdPopulateResult::TreasuryNotFound => {
                             "treasury not found at write time; not applied (fail closed)"
                         }
+                        TreasuryEntityIdPopulateResult::EntityIdConflict => {
+                            "target entity_id is already bound to a different treasury; \
+                             not applied (fail closed)"
+                        }
                         TreasuryEntityIdPopulateResult::Populated => unreachable!(),
                     };
                     entries.push(TreasuryEntityIdBackfillApplyEntry {
@@ -1727,5 +1731,157 @@ mod tests {
         assert_eq!(entry.outcome, TreasuryEntityIdBackfillApplyOutcome::Failed);
         assert!(entry.error.is_some());
         assert!(entry.reason.contains("reverse-index"));
+    }
+
+    // ------------------------------------------------------------------
+    // Entity-index integrity after a (surrogate) backfill apply (Codex P2).
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn apply_surrogate_backfill_indexes_entity_lookup() {
+        // A surrogate backfill: legacy coop_id "coop:<uuid>" bound to a surrogate
+        // whose identifier differs from the coop_id. After apply, entity-keyed
+        // lookup must find the treasury while the legacy coop_id is preserved.
+        let coop_id = "coop:550e8400-e29b-41d4-a716-446655440000";
+        let surrogate = coop_eid("coop-legacy-deadbeef0123");
+        let mut mgr = legacy_manager_with(&[coop_id]);
+        let map = InMemoryCoopEntityMap::new();
+        map.bind_resolved_with_provenance(
+            coop_id,
+            &surrogate,
+            CoopEntityBindingProvenance::OperatorBackfill,
+        )
+        .unwrap();
+
+        assert_eq!(mgr.apply_entity_id_backfill(&map).applied, 1);
+
+        let by_entity = mgr
+            .get_treasury_by_entity(&surrogate)
+            .expect("entity index finds the backfilled treasury");
+        assert_eq!(by_entity.coop_id(), coop_id, "legacy coop_id preserved");
+        assert_eq!(by_entity.entity_id(), Some(&surrogate));
+        // The original coop-keyed lookup still resolves under the legacy coop_id.
+        assert_eq!(
+            mgr.get_treasury_by_coop(coop_id).unwrap().entity_id(),
+            Some(&surrogate)
+        );
+    }
+
+    #[test]
+    fn apply_surrogate_backfill_blocks_duplicate_entity_registration() {
+        use icn_identity::KeyPair;
+        let coop_id = "coop:550e8400-e29b-41d4-a716-446655440000";
+        let surrogate = coop_eid("coop-legacy-deadbeef0123");
+        let mut mgr = legacy_manager_with(&[coop_id]);
+        let map = InMemoryCoopEntityMap::new();
+        map.bind_resolved_with_provenance(
+            coop_id,
+            &surrogate,
+            CoopEntityBindingProvenance::OperatorBackfill,
+        )
+        .unwrap();
+        assert_eq!(mgr.apply_entity_id_backfill(&map).applied, 1);
+
+        // A later entity-based registration for the SAME surrogate entity must be
+        // rejected, even though its derived coop_id differs from the backfilled
+        // treasury's legacy coop_id.
+        let creator = KeyPair::generate().unwrap().did().clone();
+        let new_did = KeyPair::generate().unwrap().did().clone();
+        let result = mgr.register_treasury_with_entity(
+            new_did,
+            surrogate.clone(),
+            "USD".to_string(),
+            creator,
+            None,
+        );
+        assert!(
+            result.is_err(),
+            "duplicate entity registration must be rejected"
+        );
+        // No second treasury was created for the entity.
+        assert_eq!(
+            mgr.get_treasury_by_entity(&surrogate).unwrap().coop_id(),
+            coop_id
+        );
+    }
+
+    #[test]
+    fn apply_surrogate_backfill_entity_index_survives_reload() {
+        use icn_identity::KeyPair;
+        use icn_store::{SledStore, Store};
+        use std::sync::Arc;
+        use tempfile::TempDir;
+
+        let coop_id = "coop:550e8400-e29b-41d4-a716-446655440000";
+        let surrogate = coop_eid("coop-legacy-deadbeef0123");
+        let tmp = TempDir::new().unwrap();
+        let store: Arc<dyn Store> = Arc::new(SledStore::open(tmp.path()).unwrap());
+        let creator = KeyPair::generate().unwrap().did().clone();
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
+
+        {
+            let mut mgr = TreasuryManager::with_store(store.clone()).unwrap();
+            mgr.register_treasury(
+                treasury_did,
+                coop_id.to_string(),
+                "USD".to_string(),
+                creator,
+                None,
+            )
+            .unwrap();
+            let map = InMemoryCoopEntityMap::new();
+            map.bind_resolved_with_provenance(
+                coop_id,
+                &surrogate,
+                CoopEntityBindingProvenance::OperatorBackfill,
+            )
+            .unwrap();
+            assert_eq!(mgr.apply_entity_id_backfill(&map).applied, 1);
+        }
+
+        // Reopen: the entity index is rebuilt from persisted rows.
+        let mut reopened = TreasuryManager::with_store(store).unwrap();
+        let by_entity = reopened
+            .get_treasury_by_entity(&surrogate)
+            .expect("entity index rebuilt on hydration");
+        assert_eq!(by_entity.coop_id(), coop_id);
+        assert_eq!(by_entity.entity_id(), Some(&surrogate));
+
+        // Duplicate entity registration is still rejected after reload.
+        let creator2 = KeyPair::generate().unwrap().did().clone();
+        let did2 = KeyPair::generate().unwrap().did().clone();
+        assert!(reopened
+            .register_treasury_with_entity(did2, surrogate, "USD".to_string(), creator2, None)
+            .is_err());
+    }
+
+    #[test]
+    fn failed_apply_does_not_index_entity() {
+        use icn_identity::KeyPair;
+        // Reverse binding drifts to missing at write -> apply fails closed. The
+        // entity must NOT be indexed, and duplicate protection must not be
+        // spuriously inserted.
+        let coop_id = "coop_A";
+        let surrogate = coop_eid("coop-legacy-deadbeef0123");
+        let mut mgr = legacy_manager_with(&[coop_id]);
+        let map = ReverseDriftMap {
+            coop_id: coop_id.to_string(),
+            entity_id: surrogate.clone(),
+            coop_for_entity_calls: std::cell::Cell::new(0),
+            drift: ReverseDrift::Missing,
+        };
+
+        let report = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(report.applied, 0);
+        assert_eq!(report.failed, 1);
+        // The entity was not indexed (lookup misses).
+        assert!(mgr.get_treasury_by_entity(&surrogate).is_none());
+        // And a fresh entity registration for that surrogate is NOT blocked (no
+        // spurious index entry was left behind).
+        let creator = KeyPair::generate().unwrap().did().clone();
+        let did = KeyPair::generate().unwrap().did().clone();
+        assert!(mgr
+            .register_treasury_with_entity(did, surrogate, "USD".to_string(), creator, None)
+            .is_ok());
     }
 }

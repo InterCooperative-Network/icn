@@ -229,6 +229,14 @@ pub struct TreasuryManager {
     /// Index: coop_id -> treasury DID
     coop_treasuries: HashMap<String, Did>,
 
+    /// Index: entity_id -> treasury DID (only for treasuries with
+    /// `entity_id: Some(...)`). Kept alongside `coop_treasuries` so entity-keyed
+    /// lookup and uniqueness work even when a treasury's legacy `coop_id` differs
+    /// from `entity_id.identifier()` — e.g. a surrogate backfill where
+    /// `coop:<uuid>` is bound to `coop-legacy-*`. The legacy `coop_id` is never
+    /// rewritten; this is an additional index, not a replacement.
+    entity_treasuries: HashMap<EntityId, Did>,
+
     /// Velocity limits by ID
     velocity_limits: HashMap<String, VelocityLimit>,
 
@@ -269,6 +277,10 @@ pub(crate) enum TreasuryEntityIdPopulateResult {
     AlreadyPopulated,
     /// No treasury is registered for this `coop_id`; nothing was changed.
     TreasuryNotFound,
+    /// The target `EntityId` is already indexed to a *different* treasury;
+    /// populating would violate entity uniqueness. Nothing was changed (fail
+    /// closed).
+    EntityIdConflict,
 }
 
 impl TreasuryManager {
@@ -282,6 +294,7 @@ impl TreasuryManager {
             spending_rules: HashMap::new(),
             treasury_rules: HashMap::new(),
             coop_treasuries: HashMap::new(),
+            entity_treasuries: HashMap::new(),
             velocity_limits: HashMap::new(),
             treasury_velocity_limits: HashMap::new(),
             velocity_windows: HashMap::new(),
@@ -305,6 +318,7 @@ impl TreasuryManager {
             spending_rules: HashMap::new(),
             treasury_rules: HashMap::new(),
             coop_treasuries: HashMap::new(),
+            entity_treasuries: HashMap::new(),
             velocity_limits: HashMap::new(),
             treasury_velocity_limits: HashMap::new(),
             velocity_windows: HashMap::new(),
@@ -389,6 +403,14 @@ impl TreasuryManager {
             bail!("Treasury already exists for DID: {treasury_did}");
         }
 
+        // Reject a duplicate by the EXACT entity, not just by its derived coop_id.
+        // A surrogate-backfilled treasury keeps its legacy `coop_id` (which differs
+        // from `entity_id.identifier()`), so the coop_id check alone would miss it
+        // and allow a second treasury for the same entity. Check the entity index.
+        if self.entity_treasuries.contains_key(&entity_id) {
+            bail!("Treasury already exists for entity: {entity_id}");
+        }
+
         if self.coop_treasuries.contains_key(&coop_id) {
             bail!("Treasury already exists for entity: {entity_id}");
         }
@@ -411,6 +433,8 @@ impl TreasuryManager {
             .insert(treasury_did.clone(), treasury.clone());
         self.coop_treasuries
             .insert(coop_id.clone(), treasury_did.clone());
+        self.entity_treasuries
+            .insert(entity_id.clone(), treasury_did.clone());
         self.treasury_budgets
             .insert(treasury_did.clone(), Vec::new());
         self.treasury_rules.insert(treasury_did.clone(), Vec::new());
@@ -433,6 +457,17 @@ impl TreasuryManager {
     pub fn get_treasury_by_coop(&self, coop_id: &str) -> Option<&Treasury> {
         self.coop_treasuries
             .get(coop_id)
+            .and_then(|did| self.treasuries.get(did))
+    }
+
+    /// Get treasury by owning `EntityId`.
+    ///
+    /// Uses the dedicated entity index, so it finds treasuries whose `entity_id`
+    /// was populated by a surrogate backfill (where the legacy `coop_id` differs
+    /// from `entity_id.identifier()`) — not just those where they happen to match.
+    pub fn get_treasury_by_entity(&self, entity_id: &EntityId) -> Option<&Treasury> {
+        self.entity_treasuries
+            .get(entity_id)
             .and_then(|did| self.treasuries.get(did))
     }
 
@@ -935,6 +970,24 @@ impl TreasuryManager {
                 continue;
             }
             if let Ok(treasury) = serde_json::from_slice::<Treasury>(&value) {
+                // Rebuild the entity index for rows that carry an entity_id
+                // (including surrogate-backfilled ones). A persisted store with two
+                // treasuries bound to the SAME entity_id is inconsistent: fail
+                // closed rather than silently keep one.
+                if let Some(entity_id) = treasury.entity_id.clone() {
+                    if let Some(existing_did) = self.entity_treasuries.get(&entity_id) {
+                        if existing_did != &treasury.treasury_did {
+                            bail!(
+                                "Treasury store inconsistency: entity_id {entity_id} is bound to \
+                                 two treasuries ({existing_did} and {}); refusing to hydrate \
+                                 (fail closed)",
+                                treasury.treasury_did
+                            );
+                        }
+                    }
+                    self.entity_treasuries
+                        .insert(entity_id, treasury.treasury_did.clone());
+                }
                 self.coop_treasuries
                     .insert(treasury.coop_id.clone(), treasury.treasury_did.clone());
                 self.treasury_budgets
@@ -1090,10 +1143,24 @@ impl TreasuryManager {
             return Ok(TreasuryEntityIdPopulateResult::AlreadyPopulated);
         }
 
+        // Entity uniqueness: the target EntityId must not already be indexed to a
+        // DIFFERENT treasury. A surrogate-backfilled row keeps its legacy coop_id,
+        // so the coop_id index cannot catch an entity collision — check the entity
+        // index and fail closed on a conflict.
+        if let Some(other_did) = self.entity_treasuries.get(&entity_id) {
+            if other_did != &treasury_did {
+                return Ok(TreasuryEntityIdPopulateResult::EntityIdConflict);
+            }
+            // Already indexed to THIS treasury (inconsistent with the entity_id:
+            // None checked above, but treat as an idempotent no-op rather than
+            // re-indexing).
+            return Ok(TreasuryEntityIdPopulateResult::AlreadyPopulated);
+        }
+
         // Populate entity_id only; coop_id (and every other field) is carried
         // through unchanged.
         let mut updated = existing.clone();
-        updated.entity_id = Some(entity_id);
+        updated.entity_id = Some(entity_id.clone());
         debug_assert_eq!(
             updated.coop_id, existing.coop_id,
             "apply must preserve coop_id byte-for-byte"
@@ -1104,7 +1171,10 @@ impl TreasuryManager {
         if let Some(ref store) = self.store {
             self.persist_treasury(&updated, store)?;
         }
-        self.treasuries.insert(treasury_did, updated);
+        // Commit in-memory only after a durable write: update the treasury cache
+        // and the entity index together so they stay consistent.
+        self.treasuries.insert(treasury_did.clone(), updated);
+        self.entity_treasuries.insert(entity_id, treasury_did);
         Ok(TreasuryEntityIdPopulateResult::Populated)
     }
 }
@@ -1995,5 +2065,79 @@ mod tests {
 
         assert_eq!(share1.accumulated_surplus, 1000);
         assert_eq!(share2.accumulated_surplus, 500);
+    }
+
+    // ------------------------------------------------------------------
+    // Entity-id index / uniqueness (Codex P2: preserve entity uniqueness).
+    // ------------------------------------------------------------------
+
+    #[test]
+    fn register_treasury_with_entity_rejects_duplicate_entity() {
+        let mut mgr = TreasuryManager::new();
+        let creator = test_did("creator");
+        let entity = EntityId::cooperative("food-coop").unwrap();
+
+        // Normal registration (coop_id == entity_id.identifier()) works and is
+        // entity-indexed.
+        mgr.register_treasury_with_entity(
+            test_did("t1"),
+            entity.clone(),
+            "USD".to_string(),
+            creator.clone(),
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            mgr.get_treasury_by_entity(&entity).unwrap().coop_id(),
+            "food-coop"
+        );
+
+        // A second registration for the same entity is rejected (no second row).
+        let result = mgr.register_treasury_with_entity(
+            test_did("t2"),
+            entity,
+            "USD".to_string(),
+            creator,
+            None,
+        );
+        assert!(result.is_err(), "duplicate entity registration must reject");
+    }
+
+    #[test]
+    fn hydration_fails_closed_on_duplicate_entity_id() {
+        use icn_store::{SledStore, Store};
+        use std::sync::Arc;
+        use tempfile::TempDir;
+
+        let tmp = TempDir::new().unwrap();
+        let store: Arc<dyn Store> = Arc::new(SledStore::open(tmp.path()).unwrap());
+        let entity = EntityId::cooperative("food-coop").unwrap();
+        let creator = test_did("creator");
+
+        // Seed TWO persisted treasuries bound to the SAME entity_id (different DIDs
+        // and coop_ids) — an inconsistent store.
+        let t1 = Treasury::new_with_entity(
+            test_did("t1"),
+            entity.clone(),
+            "USD".to_string(),
+            creator.clone(),
+            None,
+        );
+        let mut t2 =
+            Treasury::new_with_entity(test_did("t2"), entity, "USD".to_string(), creator, None);
+        t2.coop_id = "coop:other".to_string(); // same entity, distinct coop_id
+
+        for t in [&t1, &t2] {
+            let key = format!("{}{}", TREASURY_PREFIX, t.treasury_did);
+            store
+                .put(key.as_bytes(), &serde_json::to_vec(t).unwrap())
+                .unwrap();
+        }
+
+        // Hydration must fail closed rather than silently keep one mapping.
+        assert!(
+            TreasuryManager::with_store(store).is_err(),
+            "hydration must fail closed on a duplicate entity_id in the store"
+        );
     }
 }

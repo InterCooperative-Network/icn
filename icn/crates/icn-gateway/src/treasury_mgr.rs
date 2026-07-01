@@ -197,10 +197,22 @@ impl GatewayTreasuryManager {
 
     /// Get treasury by entity ID
     ///
-    /// Looks up a treasury using its associated entity ID.
+    /// Looks up a treasury through the manager's entity index, so it finds rows
+    /// whose `entity_id` was populated by a surrogate backfill (where the legacy
+    /// `coop_id` differs from `entity_id.identifier()`) rather than assuming
+    /// `entity_id.identifier() == coop_id`.
     pub async fn get_treasury_by_entity(&self, entity_id: &EntityId) -> Result<Option<Treasury>> {
-        // Entity ID's identifier matches the coop_id
-        self.get_treasury_by_coop(entity_id.identifier()).await
+        if let Some(ref handle) = self.treasury_handle {
+            let mgr = handle.read().await;
+            return Ok(mgr.get_treasury_by_entity(entity_id).cloned());
+        }
+
+        // Standalone mode
+        if let Some(ref standalone) = self.standalone {
+            return Ok(standalone.get_treasury_by_entity(entity_id).cloned());
+        }
+
+        Ok(None)
     }
 
     // ============================================================================
