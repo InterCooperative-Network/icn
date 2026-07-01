@@ -246,6 +246,24 @@ enum CoopMaintenanceCommands {
         preview_surrogates: bool,
     },
 
+    /// Read-only report of `UnknownLegacy` / untrusted `coop_id` ↔ `EntityId`
+    /// bindings that would be repair candidates (#2082 lane). Writes nothing.
+    ///
+    /// Looks inside the *bound* rows and classifies each stored cooperative ID
+    /// as trusted, not-bound, untrusted-provenance (`UnknownLegacy`),
+    /// reverse-mismatch, malformed-target, or storage-error — and, for each
+    /// candidate, names the class of evidence a repair would require. It never
+    /// upgrades trust, binds, normalizes, or writes anything: `UnknownLegacy`
+    /// stays untrusted until an explicit, evidence-bearing workflow repairs it,
+    /// and a mapping grants no authority. Reads the local cooperative store
+    /// directly, so run it with the daemon stopped (it holds an exclusive lock).
+    #[command(name = "entity-unknown-legacy-report")]
+    UnknownLegacyReport {
+        /// Emit machine-readable JSON instead of a human-readable table.
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Controlled surrogate backfill: bind each non-mappable cooperative ID
     /// (e.g. the default `coop:<uuid>`) to its deterministic surrogate
     /// `EntityId` (#2082 lane). Dry-run by default — writes require `--apply`.
@@ -2197,6 +2215,9 @@ fn handle_coop_maintenance_command(cmd: CoopMaintenanceCommands, data_dir: &Path
             json,
             preview_surrogates,
         } => coop_entity_report(data_dir, json, preview_surrogates),
+        CoopMaintenanceCommands::UnknownLegacyReport { json } => {
+            coop_entity_unknown_legacy_report(data_dir, json)
+        }
         CoopMaintenanceCommands::EntityBackfillSurrogates {
             apply,
             dry_run: _,
@@ -2722,6 +2743,136 @@ fn render_coop_entity_inventory(
                 print!(" ({err})");
             }
             println!();
+        }
+    }
+
+    Ok(())
+}
+
+/// Render a read-only `UnknownLegacy` / untrusted repair-candidate report over
+/// the local cooperative store (#2082 lane).
+///
+/// Sources the stored cooperative ids and runs the read-only
+/// [`icn_entity::report_unknown_legacy`] against the canonical
+/// [`icn_entity::CoopEntityMap`], using only read operations. It performs **no
+/// writes**, never upgrades an `UnknownLegacy` binding to trusted, binds
+/// nothing, normalizes nothing, and changes no authorization state — a mapping
+/// grants no authority. Reads the cooperative store directly, so run it with the
+/// daemon stopped (it holds an exclusive lock).
+fn coop_entity_unknown_legacy_report(data_dir: &Path, json: bool) -> Result<()> {
+    use icn_coop::CoopStore;
+    use icn_entity::{report_unknown_legacy, SledCoopEntityMap, UnknownLegacyReport};
+    use std::sync::Arc;
+
+    let coop_store_path = get_store_path(data_dir).join("cooperative");
+
+    // Read-only contract: never create a database. A missing store is reported
+    // as an empty report rather than being materialized on disk.
+    if !coop_store_path.exists() {
+        if !json {
+            eprintln!(
+                "No cooperative store found at {} — reporting an empty report (nothing was created).",
+                coop_store_path.display()
+            );
+        }
+        return render_unknown_legacy_report(&UnknownLegacyReport::default(), json);
+    }
+
+    let sled_store = SledStore::open(&coop_store_path).with_context(|| {
+        format!(
+            "Failed to open cooperative store at {} (stop the daemon first; it holds an exclusive lock)",
+            coop_store_path.display()
+        )
+    })?;
+
+    // Share one Db between the cooperative store and the canonical map, exactly
+    // as the daemon does in init_coop — no separate database is opened.
+    let db = Arc::new(sled_store.db().clone());
+    let coop_store = CoopStore::new(db.clone());
+    let map = SledCoopEntityMap::new(db);
+
+    let coop_ids: Vec<String> = coop_store
+        .list_cooperatives()
+        .context("Failed to list cooperatives from the store")?
+        .into_iter()
+        .map(|coop| coop.id)
+        .collect();
+
+    // Read-only classification: no binds, no normalization, no trust upgrade.
+    let report = report_unknown_legacy(coop_ids, &map);
+    render_unknown_legacy_report(&report, json)
+}
+
+/// Print an [`icn_entity::UnknownLegacyReport`] as JSON or a human table.
+///
+/// The human table lists only the repair *candidates* (trusted and not-bound
+/// rows are summarized in the counts), and states the evidence class each repair
+/// would require — it never claims the report confers authority or readiness.
+fn render_unknown_legacy_report(
+    report: &icn_entity::UnknownLegacyReport,
+    json: bool,
+) -> Result<()> {
+    use icn_entity::{RepairEvidence, UnknownLegacyStatus};
+
+    if json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(report)
+                .context("Failed to serialize the report as JSON")?
+        );
+        return Ok(());
+    }
+
+    println!(
+        "UnknownLegacy / untrusted coop_id <-> EntityId repair candidates \
+         (read-only; a mapping grants no authority; UnknownLegacy stays untrusted \
+         until an explicit evidence-bearing repair)"
+    );
+    println!();
+    println!("  total:                {}", report.total);
+    println!("  trusted:              {}", report.trusted);
+    println!("  not_bound:            {}", report.not_bound);
+    println!("  untrusted_provenance: {}", report.untrusted_provenance);
+    println!("  reverse_mismatch:     {}", report.reverse_mismatch);
+    println!("  malformed_target:     {}", report.malformed_target);
+    println!("  storage_error:        {}", report.storage_error);
+    println!("  repair_candidates:    {}", report.repair_candidates);
+
+    let candidates: Vec<_> = report
+        .entries
+        .iter()
+        .filter(|e| e.status.is_repair_candidate())
+        .collect();
+    if !candidates.is_empty() {
+        println!();
+        println!("  repair candidates (not repaired; evidence required):");
+        for entry in candidates {
+            let status = match entry.status {
+                UnknownLegacyStatus::UntrustedProvenance => "untrusted_provenance",
+                UnknownLegacyStatus::ReverseMismatch => "reverse_mismatch",
+                UnknownLegacyStatus::MalformedTarget => "malformed_target",
+                UnknownLegacyStatus::StorageError => "storage_error",
+                // Non-candidates are filtered out above.
+                UnknownLegacyStatus::Trusted | UnknownLegacyStatus::NotBound => "",
+            };
+            let evidence = match entry.required_evidence {
+                RepairEvidence::None => "none",
+                RepairEvidence::AccountableProvenanceAttestation => {
+                    "accountable_provenance_attestation"
+                }
+                RepairEvidence::BindingDisambiguation => "binding_disambiguation",
+                RepairEvidence::CorrectedCooperativeTarget => "corrected_cooperative_target",
+                RepairEvidence::StoreIntegrityRepair => "store_integrity_repair",
+            };
+            print!("    [{status}] {}", entry.coop_id);
+            if let Some(bound) = &entry.bound_entity_id {
+                print!(" -> {}", bound.as_str());
+            }
+            print!(" (evidence: {evidence}");
+            if let Some(detail) = &entry.detail {
+                print!("; {detail}");
+            }
+            println!(")");
         }
     }
 
