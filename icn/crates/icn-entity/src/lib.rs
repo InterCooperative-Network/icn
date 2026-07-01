@@ -80,6 +80,7 @@ pub mod coop_entity_backfill;
 pub mod coop_entity_inventory;
 pub mod coop_entity_map;
 pub mod coop_entity_surrogate;
+pub mod coop_entity_unknown_legacy;
 pub mod entity;
 pub mod error;
 pub mod handle;
@@ -105,6 +106,10 @@ pub use coop_entity_map::{
 };
 pub use coop_entity_surrogate::{
     propose_surrogate_entity_id, SURROGATE_DOMAIN_V1, SURROGATE_PREFIX,
+};
+pub use coop_entity_unknown_legacy::{
+    report_unknown_legacy, RepairEvidence, UnknownLegacyEntry, UnknownLegacyReport,
+    UnknownLegacyStatus,
 };
 pub use entity::{
     AccountId, AccountReference, CommunityProfile, CooperativeEntity, CooperativeProfile, EntityId,
