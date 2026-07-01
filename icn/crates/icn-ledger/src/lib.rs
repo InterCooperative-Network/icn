@@ -117,7 +117,9 @@ pub use treasury::{
 };
 pub use treasury_entity_backfill::{
     plan_treasury_entity_id_backfill, TreasuryEntityIdBackfillAction,
-    TreasuryEntityIdBackfillEntry, TreasuryEntityIdBackfillPlan, TreasuryEntityIdBackfillTarget,
+    TreasuryEntityIdBackfillApplyEntry, TreasuryEntityIdBackfillApplyOutcome,
+    TreasuryEntityIdBackfillApplyReport, TreasuryEntityIdBackfillEntry,
+    TreasuryEntityIdBackfillPlan, TreasuryEntityIdBackfillTarget,
 };
 pub use types::{
     AccountBalances, AccountDelta, ContentHash, CreditLimit, Currency, Dispute, DisputeOutcome,
