@@ -39,6 +39,7 @@
 
 use crate::treasury::{Treasury, TreasuryEntityIdPopulateResult, TreasuryManager};
 use icn_entity::{CoopEntityBindingProvenance, CoopEntityMap, EntityId};
+use icn_identity::Did;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 
@@ -625,9 +626,35 @@ impl TreasuryManager {
                 }
             };
 
-            // Mutate exactly one row: entity_id None -> Some(resolved), coop_id
-            // preserved byte-for-byte, persisted before the in-memory commit.
-            match self.populate_treasury_entity_id(&coop_id, resolved.clone()) {
+            // Resolve the planned treasury DID carried by this plan row. The write
+            // MUST target this exact DID — not whichever row currently wins the
+            // coop_id index — so a duplicate/inconsistent coop_id cannot mutate the
+            // wrong row or leave the audit disagreeing with the write. A missing or
+            // malformed DID fails closed.
+            let planned_did = match treasury_did.as_deref().map(Did::from_str) {
+                Some(Ok(did)) => did,
+                _ => {
+                    failed += 1;
+                    entries.push(TreasuryEntityIdBackfillApplyEntry {
+                        coop_id,
+                        treasury_did,
+                        outcome: TreasuryEntityIdBackfillApplyOutcome::Failed,
+                        entity_id_before: None,
+                        entity_id_after: None,
+                        provenance: Some(provenance),
+                        reason: "plan row carried no valid treasury DID; not applied (fail closed)"
+                            .into(),
+                        error: None,
+                    });
+                    continue;
+                }
+            };
+
+            // Mutate exactly one row by its planned DID: entity_id None ->
+            // Some(resolved), coop_id re-verified byte-for-byte, persisted before
+            // the in-memory commit.
+            match self.populate_treasury_entity_id_for_did(&planned_did, &coop_id, resolved.clone())
+            {
                 Ok(TreasuryEntityIdPopulateResult::Populated) => {
                     applied += 1;
                     let after = resolved.as_str().to_string();
@@ -653,7 +680,12 @@ impl TreasuryManager {
                              not applied (fail closed)"
                         }
                         TreasuryEntityIdPopulateResult::TreasuryNotFound => {
-                            "treasury not found at write time; not applied (fail closed)"
+                            "planned treasury DID not found at write time; \
+                             not applied (fail closed)"
+                        }
+                        TreasuryEntityIdPopulateResult::CoopIdMismatch => {
+                            "planned treasury DID no longer matches the planned coop_id; \
+                             not applied (fail closed)"
                         }
                         TreasuryEntityIdPopulateResult::EntityIdConflict => {
                             "target entity_id is already bound to a different treasury; \
@@ -1883,5 +1915,46 @@ mod tests {
         assert!(mgr
             .register_treasury_with_entity(did, surrogate, "USD".to_string(), creator, None)
             .is_ok());
+    }
+
+    #[test]
+    fn apply_writes_and_audits_the_planned_treasury_did() {
+        use icn_identity::KeyPair;
+        // End-to-end: the row the audit reports as populated is the exact treasury
+        // DID the planner carried, and that same DID's row is the one mutated.
+        let mut mgr = TreasuryManager::new();
+        let creator = KeyPair::generate().unwrap().did().clone();
+        let treasury_did = KeyPair::generate().unwrap().did().clone();
+        mgr.register_treasury(
+            treasury_did.clone(),
+            "food-coop".to_string(),
+            "USD".to_string(),
+            creator,
+            None,
+        )
+        .unwrap();
+        let map = InMemoryCoopEntityMap::new();
+        map.bind_resolved_with_provenance(
+            "food-coop",
+            &coop_eid("food-coop"),
+            CoopEntityBindingProvenance::Activation,
+        )
+        .unwrap();
+
+        let report = mgr.apply_entity_id_backfill(&map);
+        assert_eq!(report.applied, 1);
+
+        // The exact planned DID's row was mutated.
+        assert_eq!(
+            mgr.get_treasury(&treasury_did).unwrap().entity_id(),
+            Some(&coop_eid("food-coop"))
+        );
+        // The audit entry names that same DID (write target == planned == audited).
+        let entry = report
+            .entries
+            .iter()
+            .find(|e| e.outcome == TreasuryEntityIdBackfillApplyOutcome::Populated)
+            .expect("a populated entry");
+        assert_eq!(entry.treasury_did.as_deref(), Some(treasury_did.as_str()));
     }
 }

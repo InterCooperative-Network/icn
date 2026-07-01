@@ -267,7 +267,7 @@ pub struct TreasuryManager {
 }
 
 /// Outcome of the contract-bound treasury `entity_id` backfill storage seam
-/// ([`TreasuryManager::populate_treasury_entity_id`], ADR-0084).
+/// ([`TreasuryManager::populate_treasury_entity_id_for_did`], ADR-0084).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum TreasuryEntityIdPopulateResult {
     /// `entity_id` was populated (`None → Some`) and persisted.
@@ -275,8 +275,13 @@ pub(crate) enum TreasuryEntityIdPopulateResult {
     /// The treasury already carried an `entity_id`; nothing was changed
     /// (idempotent guard — apply never overwrites an existing identity target).
     AlreadyPopulated,
-    /// No treasury is registered for this `coop_id`; nothing was changed.
+    /// No treasury is registered for the planned `treasury_did`; nothing was
+    /// changed.
     TreasuryNotFound,
+    /// The planned `treasury_did` resolves to a treasury whose `coop_id` no
+    /// longer matches the planned `coop_id` byte-for-byte (rows/index drifted);
+    /// nothing was changed (fail closed).
+    CoopIdMismatch,
     /// The target `EntityId` is already indexed to a *different* treasury;
     /// populating would violate entity uniqueness. Nothing was changed (fail
     /// closed).
@@ -988,6 +993,21 @@ impl TreasuryManager {
                     self.entity_treasuries
                         .insert(entity_id, treasury.treasury_did.clone());
                 }
+                // A persisted store with two treasuries sharing one coop_id is
+                // inconsistent: fail closed rather than silently collapse them into
+                // a single last-writer-wins index entry (which the apply path would
+                // then mutate ambiguously).
+                if let Some(existing_did) = self.coop_treasuries.get(&treasury.coop_id) {
+                    if existing_did != &treasury.treasury_did {
+                        bail!(
+                            "Treasury store inconsistency: coop_id {} is bound to two \
+                             treasuries ({existing_did} and {}); refusing to hydrate \
+                             (fail closed)",
+                            treasury.coop_id,
+                            treasury.treasury_did
+                        );
+                    }
+                }
                 self.coop_treasuries
                     .insert(treasury.coop_id.clone(), treasury.treasury_did.clone());
                 self.treasury_budgets
@@ -1105,38 +1125,52 @@ impl TreasuryManager {
     }
 
     /// Storage seam for the controlled treasury `entity_id` backfill **apply**
-    /// (ADR-0084, #2082 lane). Populates the `entity_id` of the single legacy
-    /// treasury registered for `coop_id` and persists it, **preserving `coop_id`
-    /// byte-for-byte**: only the `entity_id` field changes, and the `coop_id →
-    /// treasury` index is untouched (the key is unchanged).
+    /// (ADR-0084, #2082 lane). Populates the `entity_id` of the treasury
+    /// identified by the **planned `treasury_did`** and persists it, **preserving
+    /// `coop_id` byte-for-byte**: only the `entity_id` field changes.
+    ///
+    /// The write targets the exact planned DID — never whichever row currently
+    /// wins the `coop_id → DID` index — so a store whose index no longer points
+    /// at the planned treasury (e.g. an inconsistent/duplicate `coop_id`) cannot
+    /// mutate the wrong row or leave the audit disagreeing with the write.
+    /// `expected_coop_id` is re-verified against the located row byte-for-byte; a
+    /// mismatch fails closed.
     ///
     /// A `coop_id ↔ EntityId` mapping grants **zero** authority — this writes an
     /// identity *target*, never a permission. The method is `pub(crate)` on
     /// purpose: only the contract-bound
     /// [`TreasuryManager::apply_entity_id_backfill`] orchestrator — which
     /// restricts mutation to the planner's `WouldPopulate` rows — may reach it,
-    /// never an external caller with an arbitrary `(coop_id, entity_id)` pair.
+    /// never an external caller with an arbitrary target.
     ///
     /// Fail-closed and idempotent:
+    /// - a missing planned DID is a no-op
+    ///   ([`TreasuryNotFound`](TreasuryEntityIdPopulateResult::TreasuryNotFound));
+    /// - a located row whose `coop_id` differs from `expected_coop_id` fails
+    ///   closed ([`CoopIdMismatch`](TreasuryEntityIdPopulateResult::CoopIdMismatch));
     /// - a treasury that already carries an `entity_id` is left untouched
     ///   ([`AlreadyPopulated`](TreasuryEntityIdPopulateResult::AlreadyPopulated));
-    /// - a missing treasury is a no-op
-    ///   ([`TreasuryNotFound`](TreasuryEntityIdPopulateResult::TreasuryNotFound));
+    /// - a target `EntityId` already bound to a different treasury fails closed
+    ///   ([`EntityIdConflict`](TreasuryEntityIdPopulateResult::EntityIdConflict));
     /// - the durable write happens **before** the in-memory commit, so a storage
     ///   error returns `Err` with both the store and the cache left unchanged.
-    pub(crate) fn populate_treasury_entity_id(
+    pub(crate) fn populate_treasury_entity_id_for_did(
         &mut self,
-        coop_id: &str,
+        treasury_did: &Did,
+        expected_coop_id: &str,
         entity_id: EntityId,
     ) -> Result<TreasuryEntityIdPopulateResult> {
-        // Resolve the (1:1) treasury for this exact coop_id. The coop_id is the
-        // lookup key, used verbatim — never normalized.
-        let Some(treasury_did) = self.coop_treasuries.get(coop_id).cloned() else {
+        // Locate by the EXACT planned DID — never by the coop_id index winner.
+        let Some(existing) = self.treasuries.get(treasury_did) else {
             return Ok(TreasuryEntityIdPopulateResult::TreasuryNotFound);
         };
-        let Some(existing) = self.treasuries.get(&treasury_did) else {
-            return Ok(TreasuryEntityIdPopulateResult::TreasuryNotFound);
-        };
+
+        // The located row must still carry the exact coop_id the planner
+        // classified, byte-for-byte. A mismatch means the rows/index drifted since
+        // planning; fail closed rather than mutate a different identity.
+        if existing.coop_id != expected_coop_id {
+            return Ok(TreasuryEntityIdPopulateResult::CoopIdMismatch);
+        }
 
         // Idempotent: never overwrite an already-populated identity target.
         if existing.entity_id.is_some() {
@@ -1148,7 +1182,7 @@ impl TreasuryManager {
         // so the coop_id index cannot catch an entity collision — check the entity
         // index and fail closed on a conflict.
         if let Some(other_did) = self.entity_treasuries.get(&entity_id) {
-            if other_did != &treasury_did {
+            if other_did != treasury_did {
                 return Ok(TreasuryEntityIdPopulateResult::EntityIdConflict);
             }
             // Already indexed to THIS treasury (inconsistent with the entity_id:
@@ -1162,7 +1196,7 @@ impl TreasuryManager {
         let mut updated = existing.clone();
         updated.entity_id = Some(entity_id.clone());
         debug_assert_eq!(
-            updated.coop_id, existing.coop_id,
+            updated.coop_id, expected_coop_id,
             "apply must preserve coop_id byte-for-byte"
         );
 
@@ -1174,7 +1208,8 @@ impl TreasuryManager {
         // Commit in-memory only after a durable write: update the treasury cache
         // and the entity index together so they stay consistent.
         self.treasuries.insert(treasury_did.clone(), updated);
-        self.entity_treasuries.insert(entity_id, treasury_did);
+        self.entity_treasuries
+            .insert(entity_id, treasury_did.clone());
         Ok(TreasuryEntityIdPopulateResult::Populated)
     }
 }
@@ -2139,5 +2174,109 @@ mod tests {
             TreasuryManager::with_store(store).is_err(),
             "hydration must fail closed on a duplicate entity_id in the store"
         );
+    }
+
+    #[test]
+    fn hydration_fails_closed_on_duplicate_coop_id() {
+        use icn_store::{SledStore, Store};
+        use std::sync::Arc;
+        use tempfile::TempDir;
+
+        let tmp = TempDir::new().unwrap();
+        let store: Arc<dyn Store> = Arc::new(SledStore::open(tmp.path()).unwrap());
+        let creator = test_did("creator");
+
+        // Two legacy treasuries (entity_id: None) sharing ONE coop_id, different
+        // DIDs — an inconsistent store. Must fail closed rather than silently
+        // collapse into one last-writer-wins coop index entry.
+        let t1 = Treasury::new(
+            test_did("t1"),
+            "food-coop".to_string(),
+            "USD".to_string(),
+            creator.clone(),
+            None,
+        );
+        let t2 = Treasury::new(
+            test_did("t2"),
+            "food-coop".to_string(),
+            "USD".to_string(),
+            creator,
+            None,
+        );
+        for t in [&t1, &t2] {
+            let key = format!("{}{}", TREASURY_PREFIX, t.treasury_did);
+            store
+                .put(key.as_bytes(), &serde_json::to_vec(t).unwrap())
+                .unwrap();
+        }
+
+        assert!(
+            TreasuryManager::with_store(store).is_err(),
+            "hydration must fail closed on a duplicate coop_id in the store"
+        );
+    }
+
+    #[test]
+    fn populate_entity_id_writes_the_planned_did() {
+        let mut mgr = TreasuryManager::new();
+        let creator = test_did("creator");
+        let did = test_did("t1");
+        mgr.register_treasury(
+            did.clone(),
+            "coop:xyz".to_string(),
+            "USD".to_string(),
+            creator,
+            None,
+        )
+        .unwrap();
+        let entity = EntityId::cooperative("coop-legacy-abcd").unwrap();
+
+        let result = mgr
+            .populate_treasury_entity_id_for_did(&did, "coop:xyz", entity.clone())
+            .unwrap();
+        assert_eq!(result, TreasuryEntityIdPopulateResult::Populated);
+
+        // The exact planned DID's row was mutated; coop_id preserved byte-for-byte.
+        let t = mgr.get_treasury(&did).unwrap();
+        assert_eq!(t.entity_id(), Some(&entity));
+        assert_eq!(t.coop_id(), "coop:xyz");
+        // Entity index resolves to that same row.
+        assert_eq!(
+            mgr.get_treasury_by_entity(&entity).unwrap().coop_id(),
+            "coop:xyz"
+        );
+    }
+
+    #[test]
+    fn populate_entity_id_fails_closed_on_coop_id_mismatch_or_missing_did() {
+        let mut mgr = TreasuryManager::new();
+        let creator = test_did("creator");
+        let did = test_did("t1");
+        mgr.register_treasury(
+            did.clone(),
+            "coop:xyz".to_string(),
+            "USD".to_string(),
+            creator,
+            None,
+        )
+        .unwrap();
+        let entity = EntityId::cooperative("coop-legacy-abcd").unwrap();
+
+        // Planned coop_id no longer matches the located row's coop_id -> fail
+        // closed, nothing written, entity not indexed.
+        let mismatch = mgr
+            .populate_treasury_entity_id_for_did(&did, "coop:WRONG", entity.clone())
+            .unwrap();
+        assert_eq!(mismatch, TreasuryEntityIdPopulateResult::CoopIdMismatch);
+        assert!(mgr.get_treasury(&did).unwrap().entity_id().is_none());
+        assert!(mgr.get_treasury_by_entity(&entity).is_none());
+
+        // A DID that is not registered -> TreasuryNotFound, nothing written.
+        let ghost = test_did("ghost");
+        let notfound = mgr
+            .populate_treasury_entity_id_for_did(&ghost, "coop:xyz", entity.clone())
+            .unwrap();
+        assert_eq!(notfound, TreasuryEntityIdPopulateResult::TreasuryNotFound);
+        assert!(mgr.get_treasury_by_entity(&entity).is_none());
     }
 }
