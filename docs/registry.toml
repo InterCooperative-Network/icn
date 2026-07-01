@@ -1349,6 +1349,15 @@ last_updated = "2026-06-26"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/design/create-treasury-entity-id-semantics.md"]
+category = "design"
+status = "draft"
+title = "CreateTreasury — Treasury entity_id Trust Semantics"
+description = "Trust-semantics audit/design for the CreateTreasury message path (icn-coop actor + apps/membership coop_core duplicate): no production caller, no authority gate, no CoopEntityMap integration, entity_id None today. Pins why the path must never populate entity_id by bare projection or write map provenance, and defines the single safe future slice (read-only trusted-binding consultation mirroring #2266 activation-populate and the ADR-0084 re-verification discipline) plus the tests any implementation PR requires. Mapping stays zero-authority; UnknownLegacy stays untrusted. Design only — no runtime change (#2082; #2081/#2080 untouched)"
+last_updated = "2026-07-01"
+owner = "matt"
+audiences = ["architects", "developers"]
+
 [docs."docs/design/README.md"]
 category = "reference"
 status = "canonical"
