@@ -266,10 +266,13 @@ pub struct TreasuryManager {
     surplus_allocations: HashMap<String, SurplusAllocation>,
 }
 
-/// Outcome of the contract-bound treasury `entity_id` backfill storage seam
-/// ([`TreasuryManager::populate_treasury_entity_id_for_did`], ADR-0084).
+/// Outcome of the treasury `entity_id` populate storage seam
+/// ([`TreasuryManager::populate_treasury_entity_id_for_did`]). Reached by the
+/// contract-bound operator backfill (ADR-0084) and by activation-time population
+/// ([`TreasuryManager::populate_entity_id_at_activation`], #2082); both go through
+/// the same fail-closed write.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum TreasuryEntityIdPopulateResult {
+pub enum TreasuryEntityIdPopulateResult {
     /// `entity_id` was populated (`None → Some`) and persisted.
     Populated,
     /// The treasury already carried an `entity_id`; nothing was changed
@@ -1137,11 +1140,13 @@ impl TreasuryManager {
     /// mismatch fails closed.
     ///
     /// A `coop_id ↔ EntityId` mapping grants **zero** authority — this writes an
-    /// identity *target*, never a permission. The method is `pub(crate)` on
-    /// purpose: only the contract-bound
-    /// [`TreasuryManager::apply_entity_id_backfill`] orchestrator — which
-    /// restricts mutation to the planner's `WouldPopulate` rows — may reach it,
-    /// never an external caller with an arbitrary target.
+    /// identity *target*, never a permission. The method stays `pub(crate)`:
+    /// external callers reach this seam only through the contract-bound
+    /// [`TreasuryManager::apply_entity_id_backfill`] orchestrator (which restricts
+    /// mutation to the planner's `WouldPopulate` rows) or the activation-time
+    /// [`TreasuryManager::populate_entity_id_at_activation`] wrapper — both pass a
+    /// target derived from a trusted binding, never an arbitrary one. The
+    /// fail-closed checks below hold regardless of caller.
     ///
     /// Fail-closed and idempotent:
     /// - a missing planned DID is a no-op
@@ -1211,6 +1216,27 @@ impl TreasuryManager {
         self.entity_treasuries
             .insert(entity_id, treasury_did.clone());
         Ok(TreasuryEntityIdPopulateResult::Populated)
+    }
+
+    /// Activation-time entry point (#2082) to the fail-closed `entity_id` populate
+    /// seam ([`populate_treasury_entity_id_for_did`](Self::populate_treasury_entity_id_for_did)).
+    ///
+    /// A cooperative's treasury is registered with `entity_id: None`, its
+    /// activation record is committed, the canonical `coop_id ↔ EntityId` binding is
+    /// recorded, and only then is this called to populate the treasury from the
+    /// EntityId that binding produced (or the direct projection when no map store is
+    /// wired). It verifies `coop_id` byte-for-byte, never overwrites an existing
+    /// target, and enforces entity uniqueness — so a treasury never carries an
+    /// identity the map did not record. It sets an identity *target* only and grants
+    /// no authority; the caller must not fail activation on a non-`Populated`
+    /// outcome (the operator backfill can complete it later).
+    pub fn populate_entity_id_at_activation(
+        &mut self,
+        treasury_did: &Did,
+        expected_coop_id: &str,
+        entity_id: EntityId,
+    ) -> Result<TreasuryEntityIdPopulateResult> {
+        self.populate_treasury_entity_id_for_did(treasury_did, expected_coop_id, entity_id)
     }
 }
 

@@ -8,7 +8,7 @@ use icn_entity::{
 use icn_gossip::GossipActor;
 use icn_governance::charter::FounderSignature;
 use icn_identity::Did;
-use icn_ledger::TreasuryManager;
+use icn_ledger::{TreasuryEntityIdPopulateResult, TreasuryManager};
 use std::sync::Arc;
 use tokio::sync::{mpsc, oneshot, RwLock};
 use tracing::{debug, info, warn};
@@ -454,13 +454,80 @@ impl CoopActor {
         let coop = self.store.get_cooperative(&coop_id)?;
         let (mut coop, treasury_id) = self.lifecycle.activate(coop, charter_hash).await?;
 
-        // Non-authoritative name binding (#2082): record the canonical
-        // `coop_id ↔ EntityId` mapping when a map is wired. Done BEFORE treasury
-        // registration so a new treasury can be born with EXACTLY the EntityId the
-        // Activation-provenance bind durably recorded — never one the bind then
-        // refuses. A binding grants NO authority; a bind failure (NotMappable /
-        // Conflict / StorageError, including the common default `coop:<uuid>` case)
-        // is reported but never fails activation.
+        // Deterministic ledger treasury DID for this cooperative — used both for
+        // registration below and for the post-commit entity_id populate.
+        let ledger_treasury_did = {
+            let anchor = crate::lifecycle::derive_treasury_anchor(&coop_id);
+            let mut anchor_32 = [0u8; 32];
+            anchor_32[..16].copy_from_slice(&anchor);
+            Did::from_anchor_id(&anchor_32)
+        };
+
+        // Assign treasury DID onto cooperative if not already set (idempotency guard).
+        // This must happen before persisting so the saved record is complete.
+        if coop.treasury_did.is_none() {
+            let treasury_did_str = crate::lifecycle::derive_treasury_did(&coop_id);
+
+            coop.assign_treasury(treasury_did_str.clone())
+                .map_err(crate::CoopError::Governance)?;
+
+            // Register the treasury in the ledger with entity_id: None. The canonical
+            // entity_id is populated AFTER activation commits (below), so neither the
+            // trusted map binding nor this treasury's identity target is written
+            // before the activation record and treasury side effects have succeeded.
+            if let Some(ref treasury_mgr) = self.treasury_manager {
+                // Idempotency guard: if treasury is already registered (e.g. a prior activation
+                // attempt crashed after register_treasury but before save_cooperative), skip
+                // registration so that retries do not fail forever.
+                let already_registered = {
+                    let guard = treasury_mgr.read().await;
+                    guard.get_treasury_by_coop(&coop_id).is_some()
+                };
+
+                if already_registered {
+                    tracing::info!(
+                        coop_id = %coop_id,
+                        treasury_did = %ledger_treasury_did,
+                        "Treasury already registered in ledger; skipping duplicate registration"
+                    );
+                } else {
+                    let created_by = self
+                        .store
+                        .list_members(&coop_id)
+                        .ok()
+                        .and_then(|members| members.first().map(|m| m.did.clone()))
+                        .unwrap_or_else(|| ledger_treasury_did.clone());
+
+                    let mut treasury_guard = treasury_mgr.write().await;
+                    treasury_guard
+                        .register_treasury(
+                            ledger_treasury_did.clone(),
+                            coop_id.clone(),
+                            "HOURS".to_string(),
+                            created_by,
+                            Some(format!("Treasury for cooperative {}", coop_id)),
+                        )
+                        .map_err(|e| crate::CoopError::Ledger(e.to_string()))?;
+
+                    tracing::info!(
+                        coop_id = %coop_id,
+                        treasury_id = %treasury_id,
+                        treasury_did = %ledger_treasury_did,
+                        "Registered treasury in ledger during activation"
+                    );
+                }
+            }
+        }
+
+        self.store.save_cooperative(&coop)?;
+
+        // Activation record + treasury row are now committed. Record the canonical
+        // `coop_id ↔ EntityId` name binding LAST (#2082): a trusted
+        // Activation-provenance row must never be durably written before activation
+        // commits, so a failed activation cannot leave trusted evidence for a
+        // cooperative that never activated. A binding grants NO authority; a bind
+        // failure (NotMappable / Conflict / StorageError, incl. the common default
+        // `coop:<uuid>` case) is reported, never failing activation.
         let bound_entity_id: Option<EntityId> = if let Some(ref map) = self.coop_entity_map {
             match bind_coop_entity_map_activation(map.as_ref(), &coop_id) {
                 EntityMapBindOutcome::Mapped(entity_id) => {
@@ -508,99 +575,51 @@ impl CoopActor {
             None
         };
 
-        // Assign treasury DID onto cooperative if not already set (idempotency guard).
-        // This must happen before persisting so the saved record is complete.
-        if coop.treasury_did.is_none() {
-            let treasury_did_str = crate::lifecycle::derive_treasury_did(&coop_id);
-
-            coop.assign_treasury(treasury_did_str.clone())
-                .map_err(crate::CoopError::Governance)?;
-
-            // Register treasury account in ledger if treasury manager is available
-            if let Some(ref treasury_mgr) = self.treasury_manager {
-                let anchor = crate::lifecycle::derive_treasury_anchor(&coop_id);
-                let mut anchor_32 = [0u8; 32];
-                anchor_32[..16].copy_from_slice(&anchor);
-                let treasury_did = Did::from_anchor_id(&anchor_32);
-
-                // Idempotency guard: if treasury is already registered (e.g. a prior activation
-                // attempt crashed after register_treasury but before save_cooperative), skip
-                // registration so that retries do not fail forever.
-                let already_registered = {
-                    let guard = treasury_mgr.read().await;
-                    guard.get_treasury_by_coop(&coop_id).is_some()
-                };
-
-                if already_registered {
-                    tracing::info!(
-                        coop_id = %coop_id,
-                        treasury_did = %treasury_did,
-                        "Treasury already registered in ledger; skipping duplicate registration"
-                    );
-                } else {
-                    let created_by = self
-                        .store
-                        .list_members(&coop_id)
-                        .ok()
-                        .and_then(|members| members.first().map(|m| m.did.clone()))
-                        .unwrap_or_else(|| treasury_did.clone());
-
-                    let description = Some(format!("Treasury for cooperative {}", coop_id));
-                    let mut treasury_guard = treasury_mgr.write().await;
-
-                    // #2082: a treasury is born with its canonical cooperative
-                    // EntityId. When a map is wired, use ONLY the EntityId the
-                    // Activation-provenance bind above actually recorded, so
-                    // treasury.entity_id() can never disagree with the map — a
-                    // Conflict / StorageError / NotMappable bind falls back to legacy
-                    // entity_id: None. When no map is wired, birth from the pure
-                    // reject-not-normalize projection directly (there is no map to
-                    // disagree with). A non-projectable coop_id keeps entity_id: None
-                    // (no guessing) and may later be surrogate-bound only through an
-                    // explicit operator workflow, never automatically here. This sets
-                    // an identity target only: it grants no authority and does not
-                    // change enforcement mode/defaults.
-                    let entity_id = if self.coop_entity_map.is_some() {
-                        bound_entity_id
-                    } else {
-                        project_coop_id(&coop_id).ok()
-                    };
-                    match entity_id {
-                        Some(entity_id) => {
-                            treasury_guard
-                                .register_treasury_with_entity(
-                                    treasury_did.clone(),
-                                    entity_id,
-                                    "HOURS".to_string(),
-                                    created_by,
-                                    description,
-                                )
-                                .map_err(|e| crate::CoopError::Ledger(e.to_string()))?;
-                        }
-                        None => {
-                            treasury_guard
-                                .register_treasury(
-                                    treasury_did.clone(),
-                                    coop_id.clone(),
-                                    "HOURS".to_string(),
-                                    created_by,
-                                    description,
-                                )
-                                .map_err(|e| crate::CoopError::Ledger(e.to_string()))?;
-                        }
-                    }
-
-                    tracing::info!(
-                        coop_id = %coop_id,
-                        treasury_id = %treasury_id,
-                        treasury_did = %treasury_did,
-                        "Registered treasury in ledger during activation"
-                    );
-                }
+        // Populate the just-committed treasury's entity_id from the trusted binding
+        // (#2082). When a map is wired, use ONLY the EntityId the bind actually
+        // recorded (Mapped) — a Conflict/StorageError/NotMappable bind leaves the
+        // treasury entity_id: None, so it can never disagree with the map. When no
+        // map is wired, use the pure reject-not-normalize projection (there is no map
+        // to disagree with). The populate is idempotent and fail-closed (byte-for-byte
+        // coop_id check + entity-uniqueness guard); a skip or failure never fails the
+        // already-committed activation — the #2265 operator backfill can complete it
+        // later. This sets an identity target only: it grants no authority.
+        let entity_id_to_populate: Option<EntityId> = if self.coop_entity_map.is_some() {
+            bound_entity_id
+        } else {
+            project_coop_id(&coop_id).ok()
+        };
+        if let (Some(entity_id), Some(treasury_mgr)) =
+            (entity_id_to_populate, self.treasury_manager.as_ref())
+        {
+            let mut treasury_guard = treasury_mgr.write().await;
+            match treasury_guard.populate_entity_id_at_activation(
+                &ledger_treasury_did,
+                &coop_id,
+                entity_id,
+            ) {
+                Ok(TreasuryEntityIdPopulateResult::Populated) => tracing::info!(
+                    target: "coop_entity_bind",
+                    coop_id = %coop_id,
+                    treasury_did = %ledger_treasury_did,
+                    "populated treasury entity_id from trusted activation binding (identity target only; grants no authority)"
+                ),
+                Ok(other) => tracing::info!(
+                    target: "coop_entity_bind",
+                    coop_id = %coop_id,
+                    treasury_did = %ledger_treasury_did,
+                    outcome = ?other,
+                    "treasury entity_id not populated at activation (idempotent/fail-closed skip); activation unaffected"
+                ),
+                Err(e) => tracing::error!(
+                    target: "coop_entity_bind",
+                    coop_id = %coop_id,
+                    treasury_did = %ledger_treasury_did,
+                    error = %e,
+                    "treasury entity_id populate failed at activation; left None (backfillable); activation NOT failed"
+                ),
             }
         }
-
-        self.store.save_cooperative(&coop)?;
 
         tracing::info!(
             coop_id = %coop.id,
@@ -2122,8 +2141,8 @@ mod tests {
         assert!(treasury.is_active);
 
         // Activation now populates treasury entity_id from the trusted, projectable
-        // binding (#2082): the treasury is born with the same cooperative EntityId
-        // that the Activation-provenance map binding records.
+        // binding (#2082): once activation commits, the treasury carries the same
+        // cooperative EntityId that the Activation-provenance map binding records.
         let entity = EntityId::cooperative("treasury-coop").unwrap();
         assert_eq!(treasury.entity_id(), Some(&entity));
 
@@ -2155,16 +2174,18 @@ mod tests {
 
     // === Activation-time treasury entity_id population (#2082) ===
     //
-    // A treasury created during activation is born with the SAME cooperative
-    // EntityId the Activation-provenance map binding records — but ONLY when the
-    // coop_id directly projects to a cooperative slug (reject-not-normalize). A
-    // non-projectable coop_id keeps entity_id: None (no guessing) here and may later
-    // be surrogate-bound only through an explicit operator workflow, never
-    // automatically on this path. Population sets an identity target only and grants
-    // no authority; enforcement mode/defaults are untouched.
+    // A treasury registered during activation is populated (after the activation
+    // record commits) with the SAME cooperative EntityId the Activation-provenance
+    // map binding records — but ONLY when the coop_id directly projects to a
+    // cooperative slug (reject-not-normalize). A non-projectable coop_id keeps
+    // entity_id: None (no guessing) here and may later be surrogate-bound only
+    // through an explicit operator workflow, never automatically on this path.
+    // Population sets an identity target only and grants no authority; enforcement
+    // mode/defaults are untouched.
 
-    // A1: a projectable coop_id => the activation treasury is born with entity_id,
-    // its legacy coop_id is preserved byte-for-byte, and it agrees with the map.
+    // A1: a projectable coop_id => the activation treasury is populated with
+    // entity_id, its legacy coop_id is preserved byte-for-byte, and it agrees with
+    // the map.
     #[tokio::test]
     async fn test_activation_populates_treasury_entity_id_for_projectable_coop_id() {
         let (handle, treasury_mgr, map) = spawn_test_actor_with_treasury_and_map();
@@ -2250,7 +2271,7 @@ mod tests {
     }
 
     // A3: when a map is wired but the Activation bind is refused (here: a pre-seeded
-    // Conflict), the treasury must NOT be born with a projected entity_id it would
+    // Conflict), the treasury must NOT be populated with a projected entity_id it would
     // then disagree with — it falls back to entity_id: None. Activation still
     // succeeds. (Guards against the gateway trusting a stored treasury entity_id that
     // the canonical map never recorded.)
