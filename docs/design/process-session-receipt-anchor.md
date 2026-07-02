@@ -117,14 +117,19 @@ crosses the gateway only through the opaque cascade.
   coupling gate results to opened sessions is a separate, explicit future
   decision (§7).
 - **Duplicate-open semantics (recommendation):** one opening per
-  `(domain_id, session_id)`. A second open with byte-identical fields (and thus
-  an identical `record_hash`) is an **idempotent success** returning the
-  existing receipt — safe retry. A second open with *any* differing field is
-  **rejected** (fail-closed conflict; no overwrite, no second receipt). This
-  mirrors the bind-idempotency discipline the `coop_id ↔ EntityId` lane
-  established and keeps the anchor append-only in the only sense that matters:
-  at most one opening fact per session. Re-opening, closing, and lifecycle
-  states are out of scope.
+  `(domain_id, session_id)`. Idempotency is pinned to the **stable identity
+  fields, not the timestamp**: a second open for an already-opened
+  `(domain_id, session_id)` by the **same `opened_by`** is an **idempotent
+  success that returns the original receipt** (original `opened_at` and
+  `record_hash` preserved — the recorded fact is the first opening; the retry
+  is never restamped). A second open by a **different `opened_by`** is
+  **rejected** (fail-closed conflict; no overwrite, no second receipt). Pinning
+  idempotency to byte-identical fields would be illusory: a manager that stamps
+  `opened_at` at record time turns any post-timeout client retry in a later
+  second into a spurious conflict. This keeps the anchor append-only in the
+  only sense that matters — at most one opening fact per session — while making
+  retries actually safe. Re-opening, closing, and lifecycle states are out of
+  scope.
 
 ## 7. Query / read behavior
 
@@ -146,9 +151,10 @@ crosses the gateway only through the opaque cascade.
    under the gate-result tag) hash differently.
 3. Empty `session_id` rejected; 4. empty `domain_id` rejected (manager-level,
    mirroring the landed validation).
-5. Duplicate open: byte-identical re-open is idempotent (same receipt, no second
-   record); any differing field is rejected fail-closed with the original
-   untouched.
+5. Duplicate open: a retry by the same `opened_by` at a **later timestamp**
+   returns the original receipt unchanged (idempotent — no restamp, no second
+   record); a second open by a different `opened_by` is rejected fail-closed
+   with the original untouched.
 6. Backend/storage failure fails closed — no receipt returned, no partial
    write.
 7. No kernel import widening — gateway sees the receipt only through the opaque
