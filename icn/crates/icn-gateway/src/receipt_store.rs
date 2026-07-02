@@ -1917,7 +1917,8 @@ impl ReceiptStore {
                     } else {
                         return Err(ConflictableTransactionError::Abort(format!(
                             "opaque_unique_marker_corrupt: expected 32-byte \
-                             record_hash marker, found {} bytes. class={class}",
+                             record_hash marker, found {} bytes. \
+                             class={class}, key1={key1}, key2={key2:?}",
                             existing.len()
                         )));
                     }

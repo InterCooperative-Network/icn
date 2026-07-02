@@ -5945,7 +5945,8 @@ impl GovernanceManager {
 
         match store.put_process_session_opened(&receipt).map_err(|e| {
             anyhow::anyhow!(
-                "Failed to persist process session opened receipt for session {session_id}: {e}"
+                "Failed to persist process session opened receipt for session {session_id} in domain {}: {e}",
+                domain_id.0
             )
         })? {
             crate::receipt_backend::SessionOpenedPersist::Inserted => {

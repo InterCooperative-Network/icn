@@ -3201,7 +3201,7 @@ pub async fn open_process_session<E: GovernanceEventEmitter + Clone + 'static>(
         }
         Err(e) => {
             let msg = e.to_string();
-            if msg.contains("process_session_open_conflict") {
+            if msg.starts_with("process_session_open_conflict") {
                 Err(ApiError::Conflict(msg))
             } else {
                 Err(anyhow_to_api(e))
