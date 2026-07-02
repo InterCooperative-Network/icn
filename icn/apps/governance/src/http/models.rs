@@ -66,8 +66,8 @@ fn default_weight() -> f64 {
 /// **Fails closed on unknown fields** (`deny_unknown_fields`): a client that
 /// posts extra fields alongside `gate_kind`/`result` is rejected with 400
 /// rather than having them silently discarded, so this surface's contract is
-/// enforced by rejection, not omission (mirrors the `RecordDecisionRequest`
-/// hardening in PR #2282).
+/// enforced by rejection, not omission — clients cannot smuggle extra process
+/// semantics into a gate-result recording.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RecordProcessGateResultRequest {
@@ -96,7 +96,8 @@ pub struct RecordProcessGateResultRequest {
 /// posts extra fields (e.g. a raw body, or decision semantics) alongside
 /// `entry_kind`/`body_hash` is rejected with 400 rather than having them
 /// silently discarded, so this surface's contract is enforced by rejection,
-/// not omission (mirrors the `RecordDecisionRequest` hardening in PR #2282).
+/// not omission — clients cannot smuggle extra deliberation or decision
+/// semantics into a deliberation-entry recording.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RecordDeliberationEntryRequest {
