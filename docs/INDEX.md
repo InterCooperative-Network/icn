@@ -148,6 +148,7 @@ Feature designs, proposals, and evolution plans:
 - [coop-id-entity-resolver.md](design/coop-id-entity-resolver.md) - Governed coop_id → EntityId resolver seam (design only)
 - [create-treasury-entity-id-semantics.md](design/create-treasury-entity-id-semantics.md) - CreateTreasury treasury entity_id trust semantics (design/audit only)
 - [membership-coop-core-map-parity.md](design/membership-coop-core-map-parity.md) - apps/membership coop_core map-parity contract, #2082 gap 12b (design/audit only)
+- [process-session-receipt-anchor.md](design/process-session-receipt-anchor.md) - ProcessSessionOpenedReceipt anchor contract, #1748/#2141 process spine (design/audit only)
 - [institution-in-a-box.md](design/institution-in-a-box.md) - Organizational templates
 
 **Economics (`design/economics/`):**
