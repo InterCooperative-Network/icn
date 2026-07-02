@@ -150,6 +150,7 @@ Feature designs, proposals, and evolution plans:
 - [membership-coop-core-map-parity.md](design/membership-coop-core-map-parity.md) - apps/membership coop_core map-parity contract, #2082 gap 12b (design/audit only)
 - [process-session-receipt-anchor.md](design/process-session-receipt-anchor.md) - ProcessSessionOpenedReceipt anchor contract, #1748/#2141 process spine (design/audit only)
 - [deliberation-entry-recorded-receipt.md](design/deliberation-entry-recorded-receipt.md) - DeliberationEntryRecordedReceipt contract, #1748/#2141 process spine; Q3 taxonomy blocker triaged (design/audit only)
+- [deliberation-entry-kind-taxonomy.md](design/deliberation-entry-kind-taxonomy.md) - Q3 decision: closed ADR-controlled entry_kind enum, ten-kind v1 list + discriminant rule (design decision only)
 - [institution-in-a-box.md](design/institution-in-a-box.md) - Organizational templates
 
 **Economics (`design/economics/`):**
