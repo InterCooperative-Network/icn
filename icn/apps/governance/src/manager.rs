@@ -2740,6 +2740,24 @@ pub enum DeliberationEntryRecordOutcome {
     AlreadyRecorded(icn_governance::DeliberationEntryRecordedReceipt),
 }
 
+/// Outcome of [`GovernanceManager::record_decision`] (#2280 contract +
+/// #2281 Q4 decision). Both variants are successes; the fail-closed
+/// mismatch conflict surfaces as an `Err` with stable prefix
+/// `decision_recorded_conflict`, and recording against a session with no
+/// recorded opening surfaces as an `Err` with stable prefix
+/// `decision_recorded_session_not_opened`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DecisionRecordOutcome {
+    /// This call recorded the decision: the receipt is the newly persisted
+    /// recorded-decision fact.
+    Recorded(icn_governance::DecisionRecordedReceipt),
+    /// The decision was already recorded with the **same** stable identity
+    /// (`recorded_by`, `body_hash`); carries the **original** persisted
+    /// receipt (original `recorded_at` / `record_hash` — a retry is never
+    /// restamped).
+    AlreadyRecorded(icn_governance::DecisionRecordedReceipt),
+}
+
 /// Action items are always managed locally (not gossiped) and can use either
 /// in-memory or Sled-backed persistent storage.
 pub struct GovernanceManager {
@@ -6197,6 +6215,180 @@ impl GovernanceManager {
         store
             .list_deliberation_entries_for_session_in_domain(&domain_id.0, session_id)
             .map_err(|e| anyhow::anyhow!("Failed to list deliberation entries: {e}"))
+    }
+
+    /// Record one decision against an **already-opened** process session
+    /// and persist the [`icn_governance::DecisionRecordedReceipt`] — the
+    /// fourth `ProcessTransitionReceipt` class, per the merged
+    /// `docs/design/decision-recorded-receipt.md` contract (#2280) and the
+    /// `docs/design/decision-recorded-q4-decision.md` Q4 decision (#2281).
+    ///
+    /// **This records a generic recorded-decision fact** — parallel to and
+    /// never touching the proposal/vote `GovernanceDecisionReceipt`
+    /// lineage, its typed store, effect dispatch, or action cards. No
+    /// outcome, tally, vote, proposal, mandate, or deciding-body data
+    /// enters this path (#2281 Axes A–C).
+    ///
+    /// **Session precondition (fail-closed, no silent creation):** the
+    /// `(domain_id, session_id)` pair must have a persisted
+    /// `ProcessSessionOpenedReceipt`; otherwise this returns an error with
+    /// stable prefix `decision_recorded_session_not_opened` and writes
+    /// nothing. The observe-then-write pair is safe without an atomic
+    /// cross-check because session openings are permanent append-only
+    /// facts — a session observed open stays open. Deliberation entries
+    /// are NOT a precondition: whether a charter requires deliberation
+    /// before deciding is gate/charter territory, not substrate shape.
+    ///
+    /// **At most one decision exists per
+    /// `(domain_id, session_id, decision_id)`**, enforced atomically by
+    /// the receipt backend inside its storage transaction:
+    ///
+    /// - first record → [`DecisionRecordOutcome::Recorded`];
+    /// - retry with identical stable identity (`recorded_by` +
+    ///   `body_hash`) → [`DecisionRecordOutcome::AlreadyRecorded`]
+    ///   carrying the **original** receipt unchanged (never restamped;
+    ///   `recorded_at`/`record_hash` are not identity inputs);
+    /// - same `decision_id` with a **different** `recorded_by` or
+    ///   `body_hash` → fail-closed error (stable prefix
+    ///   `decision_recorded_conflict`); the original is untouched and no
+    ///   second receipt exists.
+    ///
+    /// The decision body is never seen by this method — callers supply
+    /// only its 32-byte `body_hash` fingerprint. Like the sibling process
+    /// classes, this method **requires** a wired receipt store: uniqueness
+    /// is a durable property that cannot be faked in memory.
+    ///
+    /// Recording a decision records an institutional fact; it grants
+    /// **zero** authority. `recorded_by` is the authenticated caller —
+    /// recorder evidence, not decider identity and not proof of
+    /// entitlement; route-level authorization is the HTTP layer's concern
+    /// and charter legitimacy is upstream.
+    pub fn record_decision(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        decision_id: &str,
+        recorded_by: &Did,
+        body_hash: [u8; 32],
+    ) -> Result<DecisionRecordOutcome> {
+        // Whitespace-only ids are rejected alongside empty ones: a caller
+        // bypassing the HTTP layer must not mint receipts with
+        // visually-empty identifiers or whitespace storage keys.
+        if domain_id.0.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_decision: domain_id must be non-empty and non-whitespace"
+            ));
+        }
+        if session_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_decision: session_id must be non-empty and non-whitespace"
+            ));
+        }
+        if decision_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_decision: decision_id must be non-empty and non-whitespace"
+            ));
+        }
+        let recorded_by_str = recorded_by.to_string();
+        if recorded_by_str.is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_decision: recorded_by must be non-empty"
+            ));
+        }
+        let store = self.receipt_store.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "record_decision: a receipt store is required — decision \
+                 uniqueness is enforced at the storage layer and cannot be \
+                 faked in memory"
+            )
+        })?;
+
+        // Session precondition: decisions attach only to a recorded
+        // opening. No silent session creation, ever.
+        let opened = store
+            .get_process_session_opened(&domain_id.0, session_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_decision: failed to read session-open state for \
+                     session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        if opened.is_none() {
+            return Err(anyhow::anyhow!(
+                "decision_recorded_session_not_opened: session {session_id} in domain {} \
+                 has no recorded opening; refusing to record a decision against an \
+                 unanchored session",
+                domain_id.0
+            ));
+        }
+
+        let now = icn_time::current_timestamp_secs();
+        let receipt = icn_governance::DecisionRecordedReceipt::new(
+            domain_id.0.clone(),
+            session_id.to_string(),
+            decision_id.to_string(),
+            recorded_by_str.clone(),
+            now,
+            body_hash,
+        );
+
+        match store.put_decision_recorded(&receipt).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to persist decision receipt for decision {decision_id} in \
+                 session {session_id} in domain {}: {e}",
+                domain_id.0
+            )
+        })? {
+            crate::receipt_backend::DecisionRecordedPersist::Inserted => {
+                Ok(DecisionRecordOutcome::Recorded(receipt))
+            }
+            crate::receipt_backend::DecisionRecordedPersist::Existing(original) => {
+                if original.recorded_by == recorded_by_str && original.body_hash == body_hash {
+                    Ok(DecisionRecordOutcome::AlreadyRecorded(original))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "decision_recorded_conflict: decision {decision_id} in session \
+                         {session_id} in domain {} was already recorded with a different \
+                         recorder or body hash; refusing to overwrite",
+                        domain_id.0
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Retrieve the persisted decision receipt for a
+    /// `(domain_id, session_id, decision_id)`, or `None` when no decision
+    /// has been recorded. Read-only.
+    pub fn get_decision_recorded(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        decision_id: &str,
+    ) -> Result<Option<icn_governance::DecisionRecordedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(None);
+        };
+        store
+            .get_decision_recorded(&domain_id.0, session_id, decision_id)
+            .map_err(|e| anyhow::anyhow!("Failed to read decision receipt: {e}"))
+    }
+
+    /// List all decision receipts recorded against one
+    /// `(domain_id, session_id)` anchor, in the store's deterministic
+    /// chronological `(recorded_at, record_hash)` order. Read-only.
+    pub fn list_decisions_recorded_in_domain(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+    ) -> Result<Vec<icn_governance::DecisionRecordedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(vec![]);
+        };
+        store
+            .list_decisions_recorded_for_session_in_domain(&domain_id.0, session_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list decision receipts: {e}"))
     }
 
     // ========================================================================

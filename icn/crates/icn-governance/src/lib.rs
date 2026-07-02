@@ -141,9 +141,9 @@ pub use message::{GovernanceMessage, ProposalOutcome, TallySnapshot};
 pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, GovernanceRule};
 pub use proof::{
     ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, ActionItemCompletionReceiptV2Error,
-    ActionItemTransition, DeliberationEntryKind, DeliberationEntryRecordedReceipt,
-    GovernanceDecisionAttestation, GovernanceDecisionReceipt, GovernanceDecisionReceiptV2,
-    GovernanceDecisionReceiptV2Error, GovernanceDecisionReceiptV3,
+    ActionItemTransition, DecisionRecordedReceipt, DeliberationEntryKind,
+    DeliberationEntryRecordedReceipt, GovernanceDecisionAttestation, GovernanceDecisionReceipt,
+    GovernanceDecisionReceiptV2, GovernanceDecisionReceiptV2Error, GovernanceDecisionReceiptV3,
     GovernanceDecisionReceiptV3Error, GovernanceProof, GovernanceProofV2, MandateGrantRef,
     MandateGrantRefError, MandateGrantRefTarget, MeetingAttendanceReceipt,
     MeetingAttendanceReceiptV2, MeetingAttendanceReceiptV2Error, MeetingAttendanceTransition,

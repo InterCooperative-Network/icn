@@ -3,9 +3,10 @@
 
 use icn_governance::{
     ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, AuthorityGrant, AuthorityGrantId,
-    DeliberationEntryRecordedReceipt, GovernanceDecisionReceipt, GovernanceDecisionReceiptV3,
-    Grantee, Mandate, MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, ProcessGateKind,
-    ProcessGateResultReceipt, ProcessSessionOpenedReceipt, Timestamp,
+    DecisionRecordedReceipt, DeliberationEntryRecordedReceipt, GovernanceDecisionReceipt,
+    GovernanceDecisionReceiptV3, Grantee, Mandate, MeetingAttendanceReceipt,
+    MeetingAttendanceReceiptV2, ProcessGateKind, ProcessGateResultReceipt,
+    ProcessSessionOpenedReceipt, Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -79,6 +80,48 @@ pub enum DeliberationEntryPersist {
     /// Carries the original persisted receipt (original `recorded_at` /
     /// `record_hash` — never restamped).
     Existing(DeliberationEntryRecordedReceipt),
+}
+
+/// Class string for `DecisionRecordedReceipt` opaque storage (#2280
+/// contract + #2281 Q4 decision). Chosen in the apps layer so the gateway
+/// never sees the typed name. Deliberately distinct from the proposal/vote
+/// lineage's typed persistence and from `GOVERNANCE_DECISION_V3_CLASS` —
+/// the two decision lineages never share stores.
+const DECISION_RECORDED_CLASS: &str = "decision_recorded";
+
+/// Build the injective composite `key1` binding a recorded decision to its
+/// `(domain_id, session_id)` anchor in opaque storage.
+///
+/// Sibling of [`deliberation_entry_composite_key1`] with the identical
+/// netstring-style encoding (decimal length of `domain_id`, a colon, then
+/// the two ids concatenated), kept as a separate function so each class's
+/// key derivation is independently anchored by its own anti-aliasing test.
+/// The length prefix delimits `domain_id` exactly, so `("ab","c")` and
+/// `("a","bc")` can never produce the same key, and two domains sharing a
+/// `session_id` scan different `key1` prefixes.
+pub fn decision_recorded_composite_key1(domain_id: &str, session_id: &str) -> String {
+    format!("{}:{domain_id}{session_id}", domain_id.len())
+}
+
+/// Outcome of persisting a [`DecisionRecordedReceipt`] through
+/// [`GovernanceReceiptBackend::put_decision_recorded`].
+///
+/// The backend enforces at most one decision per
+/// `(domain_id, session_id, decision_id)` **atomically at the storage
+/// layer** (same `put_opaque_if_absent` primitive as the sibling process
+/// classes). The caller (the manager) turns `Existing` into either a
+/// same-identity idempotent success or a fail-closed conflict — stable
+/// identity is `recorded_by` + `body_hash` (per #2280 §4 as confirmed by
+/// #2281; `recorded_at`/`record_hash` are NOT identity inputs).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DecisionRecordedPersist {
+    /// This call won the insert: the receipt is now the one persisted
+    /// decision for its `(domain_id, session_id, decision_id)`.
+    Inserted,
+    /// A decision already existed for this triple; nothing was written.
+    /// Carries the original persisted receipt (original `recorded_at` /
+    /// `record_hash` — never restamped).
+    Existing(DecisionRecordedReceipt),
 }
 
 /// Class string for `MeetingAttendanceReceiptV2` opaque storage (#1868).
@@ -965,6 +1008,118 @@ pub trait GovernanceReceiptBackend: Send + Sync {
             out.push(serde_json::from_slice(&bytes).map_err(|e| {
                 format!("deserialize DeliberationEntryRecordedReceipt in list: {e}")
             })?);
+        }
+        Ok(out)
+    }
+
+    /// Persist a [`DecisionRecordedReceipt`] — the fourth
+    /// `ProcessTransitionReceipt` class (#2280 contract, #2281 Q4
+    /// decision) — enforcing **at most one decision per
+    /// `(domain_id, session_id, decision_id)` atomically at the storage
+    /// layer**.
+    ///
+    /// **Default routes through opaque storage** under class
+    /// `"decision_recorded"` with
+    /// `key1 =` [`decision_recorded_composite_key1`] (the injective
+    /// `(domain_id, session_id)` composite) and `key2 = decision_id`, via
+    /// [`Self::put_opaque_if_absent`]. On a lost insert the original
+    /// persisted receipt is hydrated and returned as
+    /// [`DecisionRecordedPersist::Existing`]; the caller decides
+    /// idempotency vs conflict from `recorded_by` + `body_hash`. A backend
+    /// that does not implement opaque storage fails closed with the
+    /// `opaque_storage_not_implemented` sentinel.
+    ///
+    /// This class never touches the typed proposal/vote
+    /// [`GovernanceDecisionReceipt`] persistence — the two decision
+    /// lineages are parallel and share nothing (#2281 Axis B).
+    ///
+    /// The session-open precondition (a decision may only be recorded
+    /// against an already-opened session) is the manager's responsibility,
+    /// not this method's — the backend persists what it is handed.
+    ///
+    /// A receipt records a fact; it grants no authority.
+    fn put_decision_recorded(
+        &self,
+        receipt: &DecisionRecordedReceipt,
+    ) -> Result<DecisionRecordedPersist, String> {
+        let payload = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize DecisionRecordedReceipt: {e}"))?;
+        let key1 = decision_recorded_composite_key1(&receipt.domain_id, &receipt.session_id);
+        let existing = self.put_opaque_if_absent(
+            DECISION_RECORDED_CLASS,
+            &key1,
+            Some(&receipt.decision_id),
+            receipt.recorded_at,
+            receipt.record_hash,
+            &payload,
+        )?;
+        match existing {
+            None => Ok(DecisionRecordedPersist::Inserted),
+            Some(_winning_hash) => {
+                let original = self
+                    .get_decision_recorded(
+                        &receipt.domain_id,
+                        &receipt.session_id,
+                        &receipt.decision_id,
+                    )?
+                    .ok_or_else(|| {
+                        // The unique marker says a decision exists but the
+                        // payload cannot be hydrated — surface loudly
+                        // rather than minting a second decision.
+                        "decision_recorded_inconsistent: unique marker present \
+                         but no persisted decision payload could be read"
+                            .to_string()
+                    })?;
+                Ok(DecisionRecordedPersist::Existing(original))
+            }
+        }
+    }
+
+    /// Retrieve the persisted [`DecisionRecordedReceipt`] for a
+    /// `(domain_id, session_id, decision_id)`, or `None` when no decision
+    /// has been recorded. Same key convention as
+    /// [`Self::put_decision_recorded`]; at most one decision exists per
+    /// triple (uniqueness is enforced on write).
+    fn get_decision_recorded(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+        decision_id: &str,
+    ) -> Result<Option<DecisionRecordedReceipt>, String> {
+        let key1 = decision_recorded_composite_key1(domain_id, session_id);
+        let payload = self.get_latest_opaque(DECISION_RECORDED_CLASS, &key1, Some(decision_id))?;
+        match payload {
+            Some(bytes) => {
+                Ok(Some(serde_json::from_slice(&bytes).map_err(|e| {
+                    format!("deserialize DecisionRecordedReceipt: {e}")
+                })?))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// List all decision receipts recorded against one
+    /// `(domain_id, session_id)` anchor.
+    ///
+    /// **Ordering is the opaque store's deterministic chronological order —
+    /// sorted by `(recorded_at, record_hash)` — NOT arrival/insertion
+    /// order** (same contract as the sibling process classes). Because
+    /// `key1` is the injective domain+session composite, two domains
+    /// sharing a `session_id` can never mix here — no payload-side
+    /// filtering is needed.
+    fn list_decisions_recorded_for_session_in_domain(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+    ) -> Result<Vec<DecisionRecordedReceipt>, String> {
+        let key1 = decision_recorded_composite_key1(domain_id, session_id);
+        let payloads = self.list_opaque_for(DECISION_RECORDED_CLASS, &key1)?;
+        let mut out = Vec::with_capacity(payloads.len());
+        for bytes in payloads {
+            out.push(
+                serde_json::from_slice(&bytes)
+                    .map_err(|e| format!("deserialize DecisionRecordedReceipt in list: {e}"))?,
+            );
         }
         Ok(out)
     }
