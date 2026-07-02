@@ -3060,7 +3060,6 @@ dependencies = [
  "icn-kernel-api",
  "icn-ledger",
  "icn-ledger-actor",
- "icn-membership-app",
  "icn-naming",
  "icn-net",
  "icn-obs",
