@@ -163,11 +163,22 @@ here decides `ProcessTargetRef` polymorphism.
 
 When Matt scopes the implementation rung (and not before):
 
+- **Decision consequence — `entry_kind` joins duplicate identity.** The
+  merged #2277 contract pinned idempotency/conflict to
+  `(domain_id, session_id, entry_id)` + `author` + `body_hash` because
+  `entry_kind` did not yet exist. Now that it does, it participates: an
+  idempotent retry requires the **same** `entry_kind` as well; a duplicate
+  with the same `entry_id`, `author`, and `body_hash` but a **different**
+  `entry_kind` is a fail-closed `deliberation_entry_conflict` (HTTP 409),
+  never a silent return of the original receipt — otherwise a kind mismatch
+  whose canonical hash differs would be swallowed as a retry.
 - Implement `DeliberationEntryRecordedReceipt` per the merged #2277 contract
   with `entry_kind` added as decided here. The implementation PR should make
   the minimal contract-sync edit to
   `docs/design/deliberation-entry-recorded-receipt.md` §4 (add the
-  `entry_kind` row and remove the blocker language), citing this document.
+  `entry_kind` row, extend the duplicate/idempotency/conflict semantics to
+  include `entry_kind` per the bullet above, and remove the blocker
+  language), citing this document.
 - Canonical hash layout for v1 (golden vector required): domain tag
   `icn:gov:deliberation_entry_recorded:v1`, then length-prefixed (u64 LE)
   `domain_id`, `session_id`, `entry_id`, `author`, then **one `entry_kind`
@@ -175,6 +186,10 @@ When Matt scopes the implementation rung (and not before):
   `body_hash` appended raw as a fixed 32-byte field (no length prefix, per
   the #2277 contract as amended in review).
 - Tests the implementation must add beyond the #2277 §8 matrix:
+  - duplicate identity includes `entry_kind`: same
+    `(domain_id, session_id, entry_id, author, body_hash)` with a different
+    `entry_kind` → `deliberation_entry_conflict` / 409, original untouched;
+    identical including `entry_kind` → the ORIGINAL receipt, never restamped;
   - discriminant stability: the §4 table's kind→byte mapping asserted
     exhaustively (a match-arm change breaks a test, not just a hash);
   - each distinct kind produces a distinct `record_hash` for otherwise
