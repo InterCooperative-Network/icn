@@ -1,0 +1,370 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ProcessSession Receipt Anchor — Design/Audit Contract | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>process session receipt anchor</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/process-session-receipt-anchor.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ProcessSession Receipt Anchor — Design/Audit Contract</h1>
+<p><strong>Status</strong>: draft — design / audit (implementation contract, not implementation)
+<strong>Truth class</strong>: descriptive
+<strong>Canonical</strong>: no — current implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last Reviewed</strong>: 2026-07-02
+<strong>Source basis</strong>: read against <code>main</code> @ <code>3e387b1f</code>. Code anchors were verified at that commit — re-verify before relying on exact numbers.
+<strong>Related</strong>: issues #1748 (Institutional Process Substrate milestone) · #2141 (vertical institutional spine control) · #2144 / PR #1755 (first <code>ProcessTransitionReceipt</code> class, landed) · <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a> (receipt envelope, Layer 2) · <code>ops/ideas/framing/institutional-process-substrate.md</code> (idea-0019 framing brief) · <code>ops/ideas/dogfood/institutional-process-substrate-mvp.md</code></p>
+<blockquote>
+<p><strong>This document defines the implementation contract for the next
+institutional-process receipt slice — a <code>ProcessSessionOpenedReceipt</code> anchor —
+before any code touches this area.</strong> It changes no runtime behavior. Receipts
+record institutional facts; they grant no authority, and nothing in this design
+makes opening a session a permission.</p>
+</blockquote>
+<h2>1. Current implementation audit (verified at <code>3e387b1f</code>)</h2>
+<p>What exists:</p>
+<ul>
+<li><strong><code>ProcessGateResultReceipt</code></strong> (<code>icn-governance/src/proof.rs</code> ~L2091+) — the
+first <code>ProcessTransitionReceipt</code> class (ADR-0026 Layer 2), landed by #2144/PR
+#1755. Closed six-variant <code>ProcessGateKind</code>, closed <code>Pass</code>/<code>Fail</code> result,
+blake3 canonical <code>record_hash</code> under domain-separation tag
+<code>icn:gov:process_gate_result:v1</code> (length-prefixed strings, ordinal-hashed
+enums), equality anchored to <code>record_hash</code>.</li>
+<li><strong><code>GovernanceManager::record_process_gate_result</code></strong> (<code>apps/governance/src/manager.rs</code>
+~L5794+) — validates non-empty <code>session_id</code>, constructs the receipt, persists
+through <code>GovernanceReceiptBackend::put_process_gate_result</code>
+(<code>apps/governance/src/receipt_backend.rs</code>), fail-closed on backend rejection;
+append-only; re-records of the same <code>(session_id, gate_kind)</code> accumulate and
+are read back ordered by <code>recorded_at</code>.</li>
+<li><strong>HTTP surface</strong> — <code>POST /domains/{domain_id}/process-sessions/{session_id}/gate-results</code>
+(<code>apps/governance/src/http/configure.rs</code> ~L684), with runtime-proof tests
+(<code>process_gate_result_receipt_runtime_slice.rs</code>, <code>process_gate_result_http_route.rs</code>).</li>
+<li><strong>Opaque persistence</strong> (#1757–#1759) — gate-result receipts flow into the
+gateway&#39;s sled-backed opaque <code>ReceiptStore</code> cascade without widening
+<code>icn-gateway</code>&#39;s typed governance imports (meaning firewall preserved).</li>
+</ul>
+<p>What does <strong>not</strong> exist:</p>
+<ul>
+<li><code>session_id</code> is <strong>caller-provided opaque text</strong>. The manager&#39;s own doc-comment
+states the runtime &quot;does not (yet) model the surrounding <code>ProcessSession</code> as a
+stored object.&quot;</li>
+<li>No <code>ProcessSessionOpenedReceipt</code> (or any of the other six receipt classes the
+framing brief names).</li>
+<li>No stored or read-model <code>ProcessSession</code> object; no session lifecycle; no
+charter/CCL-governed gate sequencing at this layer; no full process runtime.</li>
+</ul>
+<h2>2. Problem</h2>
+<p>Gate-result receipts can exist for a <code>session_id</code> that nothing ever opened. The
+identifier is a convention between callers, not an institutional record: there
+is no receipt attesting <em>who opened this process run, in which domain, when</em>.
+Every later spine object the framing brief binds to a session — deliberation
+entries, decision records, mutation plans, evidence packets, the privacy/
+visibility run and the accessibility gate that #1748 still lists as open — needs
+a stable anchor to attach to. Without a session-open receipt, evidence export
+has no starting boundary and cross-session audit reconstruction depends on
+string discipline rather than recorded fact.</p>
+<h2>3. Proposed next slice</h2>
+<p>Design first (this document), then one narrow future implementation PR:
+introduce <strong><code>ProcessSessionOpenedReceipt</code></strong> as the second
+<code>ProcessTransitionReceipt</code> class under the existing ADR-0026 Layer 2 envelope —
+generic, domain-bound, mirroring the landed gate-result pattern end to end
+(proof type → manager seam → receipt backend → opaque cascade → HTTP route →
+runtime-proof tests). No stored <code>ProcessSession</code> object in this slice (see §11);
+no workflow engine; no charter/CCL evaluator; no NYCN-specific semantics in
+generic core.</p>
+<h2>4. Proposed <code>ProcessSessionOpenedReceipt</code> contract</h2>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Semantics</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>session_id</code></td>
+<td><code>String</code></td>
+<td>The identifier this receipt anchors. Non-empty; byte-preserved; still opaque to the runtime.</td>
+</tr>
+<tr>
+<td><code>domain_id</code></td>
+<td><code>String</code></td>
+<td>Governance domain the session is scoped to. Non-empty; bound into the canonical hash.</td>
+</tr>
+<tr>
+<td><code>opened_by</code></td>
+<td><code>String</code> (DID)</td>
+<td>The authenticated caller of the manager method. Actor evidence only — see §5.</td>
+</tr>
+<tr>
+<td><code>opened_at</code></td>
+<td><code>u64</code></td>
+<td>Unix-seconds timestamp.</td>
+</tr>
+<tr>
+<td><code>record_hash</code></td>
+<td><code>[u8; 32]</code></td>
+<td>blake3 canonical hash of the fields above under a new domain tag <code>icn:gov:process_session_opened:v1</code>, using the landed length-prefix convention. Equality anchors here.</td>
+</tr>
+</tbody></table>
+<p><strong>Deliberately deferred fields</strong> (mark as deferred in the implementation PR&#39;s
+doc-comments; do not invent):</p>
+<ul>
+<li><code>target_ref</code> — the framing brief binds a session to one <code>ProcessTargetRef</code>,
+but #1748&#39;s Q1 (target-ref polymorphism) is unresolved. <strong>This document is the
+written deferral for this slice</strong>: the first anchor receipt carries no target
+reference; adding one after Q1 resolves is an additive v2 in the established
+receipt-versioning pattern (see <code>ActionItemCompletionReceipt</code> v1→v2).</li>
+<li><code>purpose</code> / <code>process_kind</code> — no closed taxonomy exists anywhere in the landed
+docs; a free-text field would invite NYCN-specific vocabulary into generic
+core. Deferred until a closed, charter-derived taxonomy is specified.</li>
+<li><code>metadata_hash</code> — no landed Layer 2 receipt carries one; not introduced here.</li>
+</ul>
+<h2>5. Authority discipline</h2>
+<p>Opening a process session <strong>records institutional process context; it grants
+nothing</strong>. <code>opened_by</code> is evidence of which authenticated actor recorded the
+opening — it is not proof the actor was <em>entitled</em> to open it. Whether an
+opening was <em>institutionally</em> legitimate is a charter/policy question evaluated
+by future charter/CCL gates, exactly as gate-result legitimacy is today.
+<strong>Route-level caller gating is a separate, mandatory matter:</strong> the open route
+MUST mirror the gate-result route&#39;s existing authorization posture
+(<code>governance:write</code> scope plus domain membership, with a 403 non-member
+rejection test) — because duplicate opens are sticky per
+<code>(domain_id, session_id)</code>, an ungated route would let any authenticated
+outsider preempt a session id in someone else&#39;s domain and force the legitimate
+opener into a conflict. Route authorization gates who may <em>record</em> the fact; the
+recorded receipt still grants no authority. <code>domain_id</code> must
+be bound into the canonical hash (the landed anti-aliasing rule: identical
+fields under different domains must hash differently). No kernel import widens:
+the receipt lives in <code>icn-governance</code>, is emitted in <code>apps/governance</code>, and
+crosses the gateway only through the opaque cascade.</p>
+<h2>6. Storage / persistence discipline</h2>
+<ul>
+<li>Mirror the gate-result path: a <code>GovernanceReceiptBackend::put_process_session_opened</code>
+trait method with a fail-closed default (same <code>opaque_storage_not_implemented</code>
+sentinel discipline), routed into the sled-backed opaque cascade keyed by
+<code>(domain_id, session_id)</code>.</li>
+<li><strong>Backend errors fail closed</strong> — the manager surfaces the error; no receipt is
+returned that was not durably accepted.</li>
+<li><strong>No silent session creation.</strong> <code>record_process_gate_result</code> continues to
+accept opaque <code>session_id</code>s and does <strong>not</strong> implicitly open sessions;
+coupling gate results to opened sessions is a separate, explicit future
+decision (§7).</li>
+<li><strong>Duplicate-open semantics (recommendation):</strong> one opening per
+<code>(domain_id, session_id)</code>. Idempotency is pinned to the <strong>stable identity
+fields, not the timestamp</strong>: a second open for an already-opened
+<code>(domain_id, session_id)</code> by the <strong>same <code>opened_by</code></strong> is an <strong>idempotent
+success that returns the original receipt</strong> (original <code>opened_at</code> and
+<code>record_hash</code> preserved — the recorded fact is the first opening; the retry
+is never restamped). A second open by a <strong>different <code>opened_by</code></strong> is
+<strong>rejected</strong> (fail-closed conflict; no overwrite, no second receipt). Pinning
+idempotency to byte-identical fields would be illusory: a manager that stamps
+<code>opened_at</code> at record time turns any post-timeout client retry in a later
+second into a spurious conflict. This keeps the anchor append-only in the
+only sense that matters — at most one opening fact per session — while making
+retries actually safe. Re-opening, closing, and lifecycle states are out of
+scope.</li>
+<li><strong>Uniqueness must be atomic in the store, not check-then-write above it.</strong>
+The existing opaque <code>ReceiptStore::put_opaque</code> is write-once per
+<code>(class, record_hash)</code> but deliberately <em>appends</em> distinct hashes under the
+same <code>(class, key1, key2)</code> chain — so a read-check followed by a put cannot
+enforce &quot;one opening&quot;: two authorized opens racing on the same
+<code>(domain_id, session_id)</code> (different <code>opened_at</code> ⇒ different hashes) would
+both persist. The backend method MUST enforce <code>(domain_id, session_id)</code>
+uniqueness <strong>inside the storage transaction</strong> (insert-if-absent /
+compare-and-swap on the session-open key, or an equivalent unique index), so
+concurrent opens serialize to exactly one persisted opening and the loser
+receives the §6 idempotent-success or conflict outcome — never a second
+receipt.</li>
+</ul>
+<h2>7. Query / read behavior</h2>
+<ul>
+<li>Retrieval: by exact <code>(domain_id, session_id)</code> → at most one
+<code>ProcessSessionOpenedReceipt</code>, through a backend <code>get_process_session_opened</code>
+mirror of the existing gate-result reads.</li>
+<li><strong>Domain-scoped gate-result reads (required by this contract):</strong> the current
+opaque adapter indexes gate results by <code>session_id</code> alone
+(<code>receipt_backend.rs</code> keys <code>key1 = receipt.session_id</code>; listing is by
+<code>session_id</code> only), so two domains reusing the same <code>session_id</code> would mix
+evidence in any session-anchored export. The implementation PR MUST add a
+<strong>domain-scoped gate-result read</strong> (keyed by <code>(domain_id, session_id)</code>,
+filtering on the receipt&#39;s hash-bound <code>domain_id</code>) and session-anchored
+consumers (future evidence export) MUST use it. The legacy
+<code>(session_id, gate_kind)</code> methods are retained unchanged for compatibility;
+globally-unique session ids are NOT assumed.</li>
+<li><strong>Backwards compatibility is mandatory:</strong> existing gate-result recording and
+<code>(session_id, gate_kind)</code> queries remain byte-identical in behavior. Gate
+results remain recordable for sessions with no open-receipt in this slice.</li>
+<li>A future opt-in follow-up (not this slice, not decided here) may let charters
+require an opened session before gate results are accepted; that is a policy
+gate, not a storage default.</li>
+</ul>
+<h2>8. Test matrix for the future implementation PR</h2>
+<ol>
+<li>Canonical hash stable — fixed inputs produce a pinned <code>record_hash</code>
+(golden-value test, as the gate-result tests do).</li>
+<li>Domain separation — identical fields under a different <code>domain_id</code> (and
+under the gate-result tag) hash differently.</li>
+<li>Empty <code>session_id</code> rejected; 4. empty <code>domain_id</code> rejected (manager-level,
+mirroring the landed validation).</li>
+<li>Duplicate open: a retry by the same <code>opened_by</code> at a <strong>later timestamp</strong>
+returns the original receipt unchanged (idempotent — no restamp, no second
+record); a second open by a different <code>opened_by</code> is rejected fail-closed
+with the original untouched.</li>
+<li>Backend/storage failure fails closed — no receipt returned, no partial
+write.</li>
+<li>No kernel import widening — gateway sees the receipt only through the opaque
+cascade (compile-level assurance plus the existing firewall CI gates).</li>
+<li>No NYCN-specific vocabulary in the generic type or its errors.</li>
+<li>Existing <code>record_process_gate_result</code> behavior unchanged (its runtime-proof
+suite passes unmodified).</li>
+<li>HTTP route proof mirroring <code>process_gate_result_http_route.rs</code> (e.g.
+<code>POST /domains/{domain_id}/process-sessions/{session_id}/open</code>), with
+authenticated-caller <code>opened_by</code> extraction <strong>and the gate-result route&#39;s
+authorization posture: <code>governance:write</code> + domain membership, including a
+403 non-member rejection test</strong> (§5).</li>
+<li>Domain-scoped gate-result read: gate results recorded under the same
+<code>session_id</code> in two different domains do <strong>not</strong> mix in the new
+<code>(domain_id, session_id)</code>-scoped read (§7); the legacy
+<code>(session_id, gate_kind)</code> reads are byte-identical in behavior.</li>
+<li>Concurrent duplicate-open race: two simultaneous authorized opens for the
+same <code>(domain_id, session_id)</code> serialize to <strong>exactly one persisted
+receipt</strong> (atomic insert-if-absent, §6); the loser observes the idempotent
+success (same opener) or the fail-closed conflict (different opener) —
+never a second stored opening.</li>
+<li>Docs/claim lint clean — no readiness overclaim, vocabulary gates pass.</li>
+</ol>
+<h2>9. Explicit non-goals</h2>
+<p>No full process runtime; no deliberation, decision, mutation-plan, or
+evidence-packet objects or receipts; no mutation authorization; no evidence
+export; no accessibility-gate completion; no privacy/redaction run; no
+charter/CCL evaluator or sequencing; no <code>ProcessSession</code> lifecycle states; no
+#1748 closure; no #2141 closure; no #2081/#2080/#2274 work; no
+production/pilot/member/organizer/live-federation/Phase-2 claims.</p>
+<h2>10. Relationship to #1748&#39;s open gates</h2>
+<p>This slice does not close any of #1748&#39;s remaining open gates (gate (a) was
+already satisfied before this document — see below). It <em>enables</em> two of them: the
+privacy/visibility evidence-export run and the real accessibility-gate run both
+need a session anchor to scope their evidence. Note for the #1748 record: gate
+(a) (&quot;at least one receipt class emitted at runtime&quot;) was already satisfied by
+#2144/PR #1755 — the issue&#39;s checklist can be truth-synced independently of this
+design. §4&#39;s <code>target_ref</code> deferral is offered as the written Q1 deferral #1748
+asks for, scoped to this slice.</p>
+<h2>11. Recommendation</h2>
+<p><strong>Option A — <code>ProcessSessionOpenedReceipt</code> only — is recommended.</strong></p>
+<ul>
+<li>Option B (receipt <strong>plus</strong> a minimal stored <code>ProcessSession</code> object) imports
+lifecycle-state management (&quot;opened, deliberating, decided…&quot;) ahead of any
+consumer that reads it. The framing brief is explicit that a session is a
+named context, not a workflow engine; until a deliberation or decision slice
+actually needs to <em>read</em> session state, a stored object is speculative
+surface. Under Option A, <strong>the persisted receipt itself is the session
+anchor</strong> — duplicate-open semantics (§6) already give &quot;does this session
+exist?&quot; as a receipt-store lookup, with no second source of truth to keep
+consistent.</li>
+<li>Option C (update #1748&#39;s status/checkboxes first, since #2144 satisfied the
+literal first-receipt gate) is worth doing but is not an implementation
+direction — it is folded in here as §10&#39;s note and can ride any next PR that
+touches #1748.</li>
+<li>Option A keeps the implementation to the proven &quot;one receipt class ≈ one
+focused change in <code>apps/governance</code> + one proof type in <code>icn-governance</code>&quot;
+footprint (#1748&#39;s own sizing), with the full test matrix of §8.</li>
+</ul>
+<h2>12. Validation (this document&#39;s PR)</h2>
+<ul>
+<li>Frontmatter + <code>docs/registry.toml</code> entry + <code>docs/INDEX.md</code> link per
+<a href="/docs/reference/project-index/docs-control-map">docs-control-map — Adding a new doc</a>.</li>
+<li><code>python3 docs/scripts/doc_control_check.py</code> and <code>scripts/check-state-lag.py</code>
+run locally before commit; vocabulary scan clean.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
