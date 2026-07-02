@@ -97,8 +97,16 @@ doc-comments; do not invent):
 Opening a process session **records institutional process context; it grants
 nothing**. `opened_by` is evidence of which authenticated actor recorded the
 opening — it is not proof the actor was *entitled* to open it. Whether an
-opening was legitimate is a charter/policy question evaluated by future
-charter/CCL gates, exactly as gate-result legitimacy is today. `domain_id` must
+opening was *institutionally* legitimate is a charter/policy question evaluated
+by future charter/CCL gates, exactly as gate-result legitimacy is today.
+**Route-level caller gating is a separate, mandatory matter:** the open route
+MUST mirror the gate-result route's existing authorization posture
+(`governance:write` scope plus domain membership, with a 403 non-member
+rejection test) — because duplicate opens are sticky per
+`(domain_id, session_id)`, an ungated route would let any authenticated
+outsider preempt a session id in someone else's domain and force the legitimate
+opener into a conflict. Route authorization gates who may *record* the fact; the
+recorded receipt still grants no authority. `domain_id` must
 be bound into the canonical hash (the landed anti-aliasing rule: identical
 fields under different domains must hash differently). No kernel import widens:
 the receipt lives in `icn-governance`, is emitted in `apps/governance`, and
@@ -136,6 +144,16 @@ crosses the gateway only through the opaque cascade.
 - Retrieval: by exact `(domain_id, session_id)` → at most one
   `ProcessSessionOpenedReceipt`, through a backend `get_process_session_opened`
   mirror of the existing gate-result reads.
+- **Domain-scoped gate-result reads (required by this contract):** the current
+  opaque adapter indexes gate results by `session_id` alone
+  (`receipt_backend.rs` keys `key1 = receipt.session_id`; listing is by
+  `session_id` only), so two domains reusing the same `session_id` would mix
+  evidence in any session-anchored export. The implementation PR MUST add a
+  **domain-scoped gate-result read** (keyed by `(domain_id, session_id)`,
+  filtering on the receipt's hash-bound `domain_id`) and session-anchored
+  consumers (future evidence export) MUST use it. The legacy
+  `(session_id, gate_kind)` methods are retained unchanged for compatibility;
+  globally-unique session ids are NOT assumed.
 - **Backwards compatibility is mandatory:** existing gate-result recording and
   `(session_id, gate_kind)` queries remain byte-identical in behavior. Gate
   results remain recordable for sessions with no open-receipt in this slice.
@@ -164,8 +182,14 @@ crosses the gateway only through the opaque cascade.
    suite passes unmodified).
 10. HTTP route proof mirroring `process_gate_result_http_route.rs` (e.g.
     `POST /domains/{domain_id}/process-sessions/{session_id}/open`), with
-    authenticated-caller `opened_by` extraction.
-11. Docs/claim lint clean — no readiness overclaim, vocabulary gates pass.
+    authenticated-caller `opened_by` extraction **and the gate-result route's
+    authorization posture: `governance:write` + domain membership, including a
+    403 non-member rejection test** (§5).
+11. Domain-scoped gate-result read: gate results recorded under the same
+    `session_id` in two different domains do **not** mix in the new
+    `(domain_id, session_id)`-scoped read (§7); the legacy
+    `(session_id, gate_kind)` reads are byte-identical in behavior.
+12. Docs/claim lint clean — no readiness overclaim, vocabulary gates pass.
 
 ## 9. Explicit non-goals
 
