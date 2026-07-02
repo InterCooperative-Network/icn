@@ -145,6 +145,8 @@ Feature designs, proposals, and evolution plans:
 - [razeto-integration-design.md](design/razeto-integration-design.md) - Razeto model integration
 - [social-recovery-design.md](design/social-recovery-design.md) - Social recovery mechanisms
 - [entity-dissolution.md](design/entity-dissolution.md) & [entity-dissolution-example.md](design/entity-dissolution-example.md) - Entity lifecycle
+- [coop-id-entity-resolver.md](design/coop-id-entity-resolver.md) - Governed coop_id → EntityId resolver seam (design only)
+- [create-treasury-entity-id-semantics.md](design/create-treasury-entity-id-semantics.md) - CreateTreasury treasury entity_id trust semantics (design/audit only)
 - [institution-in-a-box.md](design/institution-in-a-box.md) - Organizational templates
 
 **Economics (`design/economics/`):**
