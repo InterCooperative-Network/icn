@@ -11,8 +11,10 @@
 > `DeliberationEntryRecordedReceipt` recording that one deliberation entry was
 > recorded against an already-opened process session. Receipts record
 > institutional facts. They grant zero authority. This document decides what
-> the implementation must do; it is not the implementation, and it names one
-> explicit implementation blocker (§10, Q3).
+> the implementation must do; it is not the implementation. It originally
+> named one explicit implementation blocker (§10, Q3) — **decided by #2278**
+> (`docs/design/deliberation-entry-kind-taxonomy.md`); §4 carries the
+> contract-sync notes the implementation follows.
 
 ## 1. Current implementation audit (verified at `5e1b7c97`)
 
@@ -109,32 +111,33 @@ Fields — the narrowest safe set, all Q3-independent:
 | `session_id` | string | caller-opaque; meaningful only with `domain_id` |
 | `entry_id` | string | caller-supplied opaque identifier; unique within `(domain_id, session_id)` |
 | `author` | string (DID) | authenticated actor evidence; grants nothing (§5) |
+| `entry_kind` | closed enum | #2278 v1 taxonomy (ten kinds, `resolution` deferred); hash-only `u8` discriminant, serde `snake_case` wire — see `deliberation-entry-kind-taxonomy.md` |
 | `recorded_at` | u64 | record-time stamp; NOT part of identity (§4 duplicates) |
 | `body_hash` | 32 bytes | content fingerprint of the entry body; the body itself is never stored (§6 privacy) |
 | `record_hash` | 32 bytes | canonical blake3 over the above under the domain tag |
 
 Canonical hashing follows the landed convention exactly: domain tag first,
-every string field length-prefixed (u64 LE) to prevent aliasing, `body_hash`
-appended raw as a fixed 32-byte field — **no length prefix**, because the
-landed convention length-prefixes only variable-length fields (see
-`MandateGrantRef::compute_ref_hash`, which appends its fixed 32-byte
-`decision_hash` and 16-byte UUID without prefixes; a fixed-size field cannot
-alias) — and `recorded_at` as LE bytes; equality anchored to `record_hash`.
+every string field length-prefixed (u64 LE) to prevent aliasing, then one
+explicit `u8` discriminant byte for `entry_kind` (per #2278), `recorded_at`
+as LE bytes, and `body_hash` appended raw as a fixed 32-byte field — **no
+length prefix**, because the landed convention length-prefixes only
+variable-length fields (see `MandateGrantRef::compute_ref_hash`, which
+appends its fixed 32-byte `decision_hash` and 16-byte UUID without prefixes;
+a fixed-size field cannot alias). Equality anchored to `record_hash`.
 
 **Deliberately absent fields:**
 
-- **`entry_kind` — blocked on Q3, not omitted by preference.** The framing
-  brief's closed-taxonomy list (`question`, `concern`, `objection`,
-  `amendment`, `blocker`, `facilitator_summary`, `resolution`,
-  `privacy_review`, `accessibility_review`, `conflict_signal`, `record_only`)
-  is explicitly "candidates (not a commitment)", and framing-brief open
-  question 3 — closed taxonomy locked by an ADR vs charter-extensible — is
-  unresolved. The two branches produce **different canonical hash layouts**
-  (ordinal-hashed closed enum, as in the gate-result taxonomy, vs
-  length-prefixed string with namespace discipline). A `:v1` layout cannot be
-  pinned without deciding Q3, and deciding Q3 silently inside this design
-  rung would smuggle an ADR-scale decision past review. §10 triages this; §11
-  draws the consequence.
+- **`entry_kind` — DECIDED (contract-sync note, post-#2278).** This field
+  was originally blocked on Q3: the closed-vs-charter-extensible branches
+  produce different canonical hash layouts, so `:v1` could not be pinned
+  without deciding it, and deciding it silently inside this design rung
+  would have smuggled an ADR-scale decision past review. The decision
+  landed as `docs/design/deliberation-entry-kind-taxonomy.md` (#2278):
+  closed, ADR-controlled enum, explicit `u8` discriminants 0–9 for the
+  ten-kind v1 list (`resolution` deferred as Q4-ambiguous), hash-only
+  discriminant with serde `snake_case` wire form, append-only evolution,
+  retired kinds decodable forever. `entry_kind` is now a v1 field (table
+  above) and **participates in duplicate identity** (below).
 - **`parent_entry_id` — deferred in writing.** Threading implies
   discussion-structure semantics that belong to a future read-model, not to
   the recorded fact. Adding it later is a new field in a new tag version, not
@@ -159,11 +162,13 @@ only, where there is no legacy behavior to preserve.
 idempotency pinned to stable identity fields, never to the timestamp):
 
 - Same `(domain_id, session_id, entry_id)` **and** same `author` **and** same
-  `body_hash` → idempotent retry: return the ORIGINAL receipt (original
+  `body_hash` **and** same `entry_kind` (post-#2278: the kind participates in
+  stable identity) → idempotent retry: return the ORIGINAL receipt (original
   `recorded_at` and `record_hash`, never restamped).
-- Same `(domain_id, session_id, entry_id)` with a **different `author` or
-  different `body_hash`** → fail-closed conflict, stable prefix
-  `deliberation_entry_conflict`, surfaced as HTTP 409.
+- Same `(domain_id, session_id, entry_id)` with a **different `author`,
+  `body_hash`, or `entry_kind`** → fail-closed conflict, stable prefix
+  `deliberation_entry_conflict`, surfaced as HTTP 409 — a kind mismatch whose
+  canonical hash differs must never be swallowed as a retry.
 - Uniqueness must be atomic under concurrency, reusing the landed
   `put_opaque_if_absent` unique-marker pattern (§6). This design PR does not
   implement it.
