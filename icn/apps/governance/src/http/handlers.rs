@@ -3236,9 +3236,9 @@ pub async fn open_process_session<E: GovernanceEventEmitter + Clone + 'static>(
 /// Returns:
 /// - 200 with the persisted `DeliberationEntryRecordedReceipt` JSON
 ///   (first record AND same-identity retry).
-/// - 400 when `session_id`/`entry_id` is empty/whitespace, `entry_kind`
-///   is outside the closed taxonomy (serde rejects it), or `body_hash` is
-///   not 64 hex characters.
+/// - 400 when `domain_id`/`session_id`/`entry_id` is empty/whitespace,
+///   `entry_kind` is outside the closed taxonomy (serde rejects it), or
+///   `body_hash` is not 64 hex characters.
 /// - 401 when the bearer token is missing/invalid.
 /// - 403 when the token lacks `governance:write` or the caller is not a
 ///   member of the domain.
@@ -3258,6 +3258,9 @@ pub async fn record_deliberation_entry<E: GovernanceEventEmitter + Clone + 'stat
     let author = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (domain_id, session_id, entry_id) = path.into_inner();
+    if domain_id.trim().is_empty() {
+        return Err(err_bad("domain_id must be a non-empty path segment"));
+    }
     if session_id.trim().is_empty() {
         return Err(err_bad("session_id must be a non-empty path segment"));
     }

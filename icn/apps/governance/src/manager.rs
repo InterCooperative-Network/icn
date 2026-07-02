@@ -6069,19 +6069,22 @@ impl GovernanceManager {
         entry_kind: icn_governance::DeliberationEntryKind,
         body_hash: [u8; 32],
     ) -> Result<DeliberationEntryRecordOutcome> {
-        if domain_id.0.is_empty() {
+        // Whitespace-only ids are rejected alongside empty ones: a caller
+        // bypassing the HTTP layer must not mint receipts with
+        // visually-empty identifiers or whitespace storage keys.
+        if domain_id.0.trim().is_empty() {
             return Err(anyhow::anyhow!(
-                "record_deliberation_entry: domain_id must be non-empty"
+                "record_deliberation_entry: domain_id must be non-empty and non-whitespace"
             ));
         }
-        if session_id.is_empty() {
+        if session_id.trim().is_empty() {
             return Err(anyhow::anyhow!(
-                "record_deliberation_entry: session_id must be non-empty"
+                "record_deliberation_entry: session_id must be non-empty and non-whitespace"
             ));
         }
-        if entry_id.is_empty() {
+        if entry_id.trim().is_empty() {
             return Err(anyhow::anyhow!(
-                "record_deliberation_entry: entry_id must be non-empty"
+                "record_deliberation_entry: entry_id must be non-empty and non-whitespace"
             ));
         }
         let author_str = author.to_string();

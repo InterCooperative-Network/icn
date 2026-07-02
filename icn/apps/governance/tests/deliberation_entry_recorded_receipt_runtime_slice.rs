@@ -540,6 +540,29 @@ fn empty_ids_rejected() {
         .expect_err("empty session_id must be rejected");
     assert!(err.to_string().contains("session_id must be non-empty"));
 
+    // Whitespace-only ids are rejected at the manager layer too — callers
+    // outside the HTTP handler must not mint receipts with visually-empty
+    // identifiers or whitespace storage keys.
+    let err = mgr
+        .record_deliberation_entry(&coop_test(), "   ", "entry-x", &author, kind, [0u8; 32])
+        .expect_err("whitespace session_id must be rejected");
+    assert!(err.to_string().contains("session_id must be non-empty"));
+    let err = mgr
+        .record_deliberation_entry(&coop_test(), "session-x", "   ", &author, kind, [0u8; 32])
+        .expect_err("whitespace entry_id must be rejected");
+    assert!(err.to_string().contains("entry_id must be non-empty"));
+    let err = mgr
+        .record_deliberation_entry(
+            &GovernanceDomainId::new("   "),
+            "session-x",
+            "entry-x",
+            &author,
+            kind,
+            [0u8; 32],
+        )
+        .expect_err("whitespace domain_id must be rejected");
+    assert!(err.to_string().contains("domain_id must be non-empty"));
+
     let err = mgr
         .record_deliberation_entry(&coop_test(), "session-x", "", &author, kind, [0u8; 32])
         .expect_err("empty entry_id must be rejected");
@@ -861,19 +884,20 @@ fn gate_results_still_neither_require_nor_create_sessions() {
         .expect("gate results must not require an opened session");
     assert_eq!(receipt.session_id, "session-unopened");
     // ...and must NOT have silently created a session-open record or a
-    // deliberation entry.
+    // deliberation entry. The entry check goes through the manager's list
+    // API (backed by list_opaque_for over the composite key1), which
+    // covers EVERY entry_id under the session anchor — a point
+    // chain_len(..., key2) probe could miss an entry stored under a
+    // different entry_id.
     assert!(mgr
         .get_process_session_opened(&domain, "session-unopened")
         .unwrap()
         .is_none());
-    assert_eq!(
-        store.chain_len(
-            "deliberation_entry_recorded",
-            &entry_key1("coop:test", "session-unopened"),
-            None
-        ),
-        0
-    );
+    assert!(mgr
+        .list_deliberation_entries_in_domain(&domain, "session-unopened")
+        .unwrap()
+        .is_empty());
+    let _ = &store; // chain-level probes are exercised by the other tests
 }
 
 // ============================================================================
