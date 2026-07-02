@@ -700,6 +700,14 @@ where
             )
             .route(web::post().to(handlers::record_deliberation_entry::<E>)),
         )
+        // ── Decision record (#2280/#2281 — fourth
+        //    ProcessTransitionReceipt class) ─────────────────────────────
+        .service(
+            web::resource(
+                "/domains/{domain_id}/process-sessions/{session_id}/decisions/{decision_id}/record",
+            )
+            .route(web::post().to(handlers::record_decision::<E>)),
+        )
         // ── Institutional domain policy adoption (#2142 — gated adoption) ──
         .service(
             web::resource("/domains/{domain_id}/domain-policy/adopt")

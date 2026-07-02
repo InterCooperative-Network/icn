@@ -93,6 +93,35 @@ pub struct RecordDeliberationEntryRequest {
 }
 
 // ============================================================================
+// Decision recording (#2280/#2281 — fourth ProcessTransitionReceipt class)
+// ============================================================================
+
+/// Request body for
+/// `POST /gov/domains/{domain_id}/process-sessions/{session_id}/decisions/{decision_id}/record`.
+///
+/// `body_hash` is the 64-hex-character blake3 fingerprint of the decision
+/// body — **the body itself is never sent to or stored by this surface**.
+/// Per the #2281 Q4 decision this request deliberately carries **no other
+/// field**: no decision kind, no outcome, no tally, no deciding-body
+/// handle — the receipt records a generic recorded-decision fact, parallel
+/// to (never converging with) the proposal/vote decision lineage. The
+/// `domain_id`, `session_id`, and `decision_id` come from the path, and
+/// the recorder comes from the authenticated token — not the body.
+///
+/// **Fails closed on unknown fields** (`deny_unknown_fields`): a client
+/// that posts `body_hash` alongside `outcome`, `proposal_id`, `decider`,
+/// or a raw body field is rejected with 400 rather than having the extra
+/// fields silently discarded. The #2281 boundary — no decision
+/// semantics/body cross this surface — is thereby enforced by rejection,
+/// not by omission.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RecordDecisionRequest {
+    /// 64-hex-character content fingerprint of the decision body.
+    pub body_hash: String,
+}
+
+// ============================================================================
 // Institutional domain policy adoption (#2142 — gated DomainPolicy adoption)
 // ============================================================================
 

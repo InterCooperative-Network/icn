@@ -2571,6 +2571,146 @@ impl DeliberationEntryRecordedReceipt {
     }
 }
 
+/// Cross-node deterministic receipt recording that one decision was
+/// recorded against an already-opened process session.
+///
+/// The fourth `ProcessTransitionReceipt` class (ADR-0026 Layer 2), after
+/// [`ProcessGateResultReceipt`] (#2144), [`ProcessSessionOpenedReceipt`]
+/// (#2276), and [`DeliberationEntryRecordedReceipt`] (#2279), per the
+/// merged `docs/design/decision-recorded-receipt.md` contract (#2280) and
+/// the `docs/design/decision-recorded-q4-decision.md` Q4 decision (#2281).
+///
+/// **This is a generic recorded-decision fact — parallel to and explicitly
+/// non-convergent with the proposal/vote [`GovernanceDecisionReceipt`]
+/// lineage (`icn:gov:decision:v1/v2/v3`).** Per the Q4 decision it carries
+/// no outcome, no tally, no vote data, no proposal reference, no mandate
+/// attestation, and no deciding-body handle; the decision body is
+/// fingerprinted by a caller-supplied 32-byte `body_hash` and **never
+/// stored**. The receipt witnesses that a decision artifact was recorded —
+/// not what it says, and not that it was valid, binding, quorum-backed, or
+/// executable.
+///
+/// **`recorded_by` is recorder evidence, not decider identity.** The actor
+/// who records a decision (facilitator, secretary, clerk) is routinely not
+/// the deciding body; who decided, in what role, by what rule is future
+/// `HumanDecisionSet` read-model territory, deliberately outside this
+/// type.
+///
+/// **At most one decision exists per `(domain_id, session_id,
+/// decision_id)`** — the receipt backend enforces uniqueness atomically at
+/// the storage layer. A retry with identical stable identity
+/// (`recorded_by`, `body_hash`) returns this original receipt unchanged
+/// (never restamped); any mismatch fails closed. `recorded_at` and the
+/// derived `record_hash` are **not** identity inputs.
+///
+/// Recording a decision records an institutional fact; it grants **zero**
+/// authority. Equality is anchored to `record_hash`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DecisionRecordedReceipt {
+    /// Governance domain the session (and this decision) is scoped to.
+    pub domain_id: String,
+    /// Identifier of the already-opened process session this decision
+    /// attaches to. Caller-provided, treated as opaque, meaningful only
+    /// together with `domain_id` (session ids are not globally unique).
+    pub session_id: String,
+    /// Caller-supplied opaque identifier for this decision, unique within
+    /// `(domain_id, session_id)` — uniqueness is enforced at the storage
+    /// layer, not assumed of the id. Multiple decisions per session are
+    /// permitted at the substrate layer; how many an institution allows
+    /// is charter policy, not substrate shape.
+    pub decision_id: String,
+    /// DID of the authenticated actor who recorded the fact — recorder
+    /// evidence, deliberately NOT named `decider`, `author`, or
+    /// `approver` (#2281 Axis C).
+    pub recorded_by: String,
+    /// Unix-seconds the decision was recorded. Not part of duplicate
+    /// identity — a retry never restamps.
+    pub recorded_at: u64,
+    /// Caller-supplied 32-byte content fingerprint of the decision body.
+    /// The body itself is never stored in the receipt.
+    pub body_hash: Hash,
+    /// blake3 canonical record hash binding the fields above.
+    pub record_hash: Hash,
+}
+
+impl PartialEq for DecisionRecordedReceipt {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_hash == other.record_hash
+    }
+}
+
+impl Eq for DecisionRecordedReceipt {}
+
+impl DecisionRecordedReceipt {
+    /// Domain separation tag for canonical decision-recorded record
+    /// hashes. Distinct from every other receipt-family tag — and in
+    /// particular it must NEVER converge with the proposal/vote lineage's
+    /// `icn:gov:decision:v1/v2/v3` tags: that lineage records a
+    /// proposal/vote outcome; this class records the generic institutional
+    /// fact that a session's decision was recorded (#2281 Axis B —
+    /// parallel, non-convergent).
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:decision_recorded:v1";
+
+    /// Build a new receipt and compute its canonical `record_hash`.
+    pub fn new(
+        domain_id: String,
+        session_id: String,
+        decision_id: String,
+        recorded_by: String,
+        recorded_at: u64,
+        body_hash: Hash,
+    ) -> Self {
+        let record_hash = Self::compute_record_hash(
+            &domain_id,
+            &session_id,
+            &decision_id,
+            &recorded_by,
+            recorded_at,
+            &body_hash,
+        );
+        Self {
+            domain_id,
+            session_id,
+            decision_id,
+            recorded_by,
+            recorded_at,
+            body_hash,
+            record_hash,
+        }
+    }
+
+    /// Compute the canonical record hash from the input fields.
+    ///
+    /// Layout (per #2280 §4, confirmed unchanged by the #2281 Q4
+    /// decision): [`Self::DOMAIN_TAG`] first; each string field
+    /// length-prefixed (u64 LE); then `recorded_at` as LE bytes; then
+    /// `body_hash` appended **raw as a fixed 32-byte field with no length
+    /// prefix** (the landed convention length-prefixes only
+    /// variable-length fields — a fixed-size field cannot alias). No
+    /// discriminant byte: this class has no kind/outcome taxonomy in
+    /// `:v1` (#2281 Axis A).
+    pub fn compute_record_hash(
+        domain_id: &str,
+        session_id: &str,
+        decision_id: &str,
+        recorded_by: &str,
+        recorded_at: u64,
+        body_hash: &Hash,
+    ) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        for field in [domain_id, session_id, decision_id, recorded_by] {
+            hasher.update(&(field.len() as u64).to_le_bytes());
+            hasher.update(field.as_bytes());
+        }
+        hasher.update(&recorded_at.to_le_bytes());
+        hasher.update(body_hash);
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+}
+
 // ============================================================================
 // Mandate grant reference (#1868 step 2 primitive — wire form only)
 // ============================================================================
@@ -3911,6 +4051,229 @@ mod tests {
             assert!(
                 !lower.contains(forbidden),
                 "DeliberationEntryRecordedReceipt JSON must not contain `{forbidden}`; got: {json}"
+            );
+        }
+    }
+
+    // ============================================================================
+    // DecisionRecordedReceipt (fourth ProcessTransitionReceipt class —
+    // the #2280 contract + #2281 Q4 decision)
+    // ============================================================================
+
+    fn sample_decision_recorded_receipt() -> DecisionRecordedReceipt {
+        DecisionRecordedReceipt::new(
+            "domain-food-coop".to_string(),
+            "session-alpha".to_string(),
+            "decision-001".to_string(),
+            "did:icn:recorder-1".to_string(),
+            1_750_000_000,
+            [9u8; 32],
+        )
+    }
+
+    #[test]
+    fn decision_recorded_golden_vector() {
+        // Golden canonical hash vector: pins the FULL v1 layout (domain tag,
+        // length-prefixed strings, recorded_at LE, raw fixed 32-byte
+        // body_hash — no discriminant byte; this class has no kind/outcome
+        // taxonomy per the #2281 Q4 decision). Any layout change breaks
+        // this test and requires a new tag version, not an edit here.
+        let r = sample_decision_recorded_receipt();
+        assert_eq!(
+            hex32(&r.record_hash),
+            "029e5bacabf04dce4a593164a36a7a52469fcfeb66737026de3daa9cd14e6b44",
+            "canonical v1 hash layout drifted"
+        );
+    }
+
+    #[test]
+    fn decision_recorded_record_hash_determinism() {
+        let r1 = sample_decision_recorded_receipt();
+        let r2 = sample_decision_recorded_receipt();
+        assert_eq!(r1.record_hash, r2.record_hash);
+        assert_ne!(r1.record_hash, [0u8; 32]);
+        assert_eq!(r1, r2);
+    }
+
+    #[test]
+    fn decision_recorded_record_hash_changes_per_field() {
+        // Each field independently changes the hash.
+        let base = sample_decision_recorded_receipt();
+        let variants = [
+            DecisionRecordedReceipt::new(
+                "domain-other".to_string(),
+                base.session_id.clone(),
+                base.decision_id.clone(),
+                base.recorded_by.clone(),
+                base.recorded_at,
+                base.body_hash,
+            ),
+            DecisionRecordedReceipt::new(
+                base.domain_id.clone(),
+                "session-other".to_string(),
+                base.decision_id.clone(),
+                base.recorded_by.clone(),
+                base.recorded_at,
+                base.body_hash,
+            ),
+            DecisionRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                "decision-other".to_string(),
+                base.recorded_by.clone(),
+                base.recorded_at,
+                base.body_hash,
+            ),
+            DecisionRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.decision_id.clone(),
+                "did:icn:recorder-other".to_string(),
+                base.recorded_at,
+                base.body_hash,
+            ),
+            DecisionRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.decision_id.clone(),
+                base.recorded_by.clone(),
+                base.recorded_at + 1,
+                base.body_hash,
+            ),
+            DecisionRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.decision_id.clone(),
+                base.recorded_by.clone(),
+                base.recorded_at,
+                [10u8; 32],
+            ),
+        ];
+        for (i, v) in variants.iter().enumerate() {
+            assert_ne!(
+                base.record_hash, v.record_hash,
+                "variant {i} must change the record hash"
+            );
+        }
+    }
+
+    #[test]
+    fn decision_recorded_tag_separates_from_other_families() {
+        // Family separation from the three landed governance process
+        // classes.
+        assert_ne!(
+            DecisionRecordedReceipt::DOMAIN_TAG,
+            ProcessSessionOpenedReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            DecisionRecordedReceipt::DOMAIN_TAG,
+            ProcessGateResultReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            DecisionRecordedReceipt::DOMAIN_TAG,
+            DeliberationEntryRecordedReceipt::DOMAIN_TAG
+        );
+        // The proposal/vote decision lineage records a DIFFERENT fact
+        // (outcome/tally of a vote over a proposal, seeding effect
+        // dispatch). Per the #2281 Q4 decision the two lineages are
+        // parallel and must NEVER converge tags — not v1, v2, or v3.
+        assert_ne!(
+            DecisionRecordedReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            DecisionRecordedReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceiptV2::DOMAIN_TAG
+        );
+        assert_ne!(
+            DecisionRecordedReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceiptV3::DOMAIN_TAG
+        );
+        let decision = sample_decision_recorded_receipt();
+        let entry = sample_deliberation_entry_receipt();
+        assert_ne!(decision.record_hash, entry.record_hash);
+    }
+
+    #[test]
+    fn decision_recorded_length_prefix_prevents_field_shifting() {
+        // Shifting bytes between adjacent string fields must change the
+        // hash — the length prefix delimits each field exactly.
+        let a = DecisionRecordedReceipt::compute_record_hash(
+            "ab",
+            "c",
+            "decision-001",
+            "did:icn:r",
+            1,
+            &[0u8; 32],
+        );
+        let b = DecisionRecordedReceipt::compute_record_hash(
+            "a",
+            "bc",
+            "decision-001",
+            "did:icn:r",
+            1,
+            &[0u8; 32],
+        );
+        assert_ne!(a, b, "domain/session byte shift must change the hash");
+        let c = DecisionRecordedReceipt::compute_record_hash("d", "s", "xy", "z", 1, &[0u8; 32]);
+        let d = DecisionRecordedReceipt::compute_record_hash("d", "s", "x", "yz", 1, &[0u8; 32]);
+        assert_ne!(
+            c, d,
+            "decision_id/recorded_by byte shift must change the hash"
+        );
+    }
+
+    #[test]
+    fn decision_recorded_serde_roundtrip_and_payload_audit() {
+        // Round-trip preserves everything (equality anchored to
+        // record_hash), and the persisted payload carries ONLY the v1
+        // field set — no body, and none of the proposal/vote lineage's
+        // fields (#2281 Axis A/B payload audit).
+        let r = sample_decision_recorded_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let back: DecisionRecordedReceipt = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(r, back);
+        assert_eq!(back.recorded_at, r.recorded_at);
+        assert_eq!(back.recorded_by, r.recorded_by);
+        let value: serde_json::Value = serde_json::from_str(&json).expect("value");
+        let obj = value.as_object().expect("object");
+        let expected: std::collections::BTreeSet<&str> = [
+            "domain_id",
+            "session_id",
+            "decision_id",
+            "recorded_by",
+            "recorded_at",
+            "body_hash",
+            "record_hash",
+        ]
+        .into_iter()
+        .collect();
+        let actual: std::collections::BTreeSet<&str> = obj.keys().map(|k| k.as_str()).collect();
+        assert_eq!(
+            actual, expected,
+            "payload must carry exactly the v1 field set — no body, no \
+             outcome/tally/vote/proposal/mandate field"
+        );
+    }
+
+    #[test]
+    fn decision_recorded_no_prohibited_vocabulary() {
+        let r = sample_decision_recorded_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let lower = json.to_lowercase();
+        for forbidden in [
+            // regulated-finance vocabulary (same list as the sibling
+            // process-receipt tests)
+            "wallet", "balance", "currency", "payment", "withdraw", "deposit",
+            // proposal/vote lineage vocabulary — that lineage records a
+            // different fact and must not leak into this payload
+            "proposal", "vote", "tally", "outcome", "quorum", "mandate",
+            // authority-flavored actor names rejected by #2281 Axis C
+            "decider", "approver",
+        ] {
+            assert!(
+                !lower.contains(forbidden),
+                "DecisionRecordedReceipt JSON must not contain `{forbidden}`; got: {json}"
             );
         }
     }
