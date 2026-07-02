@@ -115,8 +115,11 @@ Fields — the narrowest safe set, all Q3-independent:
 
 Canonical hashing follows the landed convention exactly: domain tag first,
 every string field length-prefixed (u64 LE) to prevent aliasing, `body_hash`
-appended with a length prefix, `recorded_at` as LE bytes; equality anchored
-to `record_hash`.
+appended raw as a fixed 32-byte field — **no length prefix**, because the
+landed convention length-prefixes only variable-length fields (see
+`MandateGrantRef::compute_ref_hash`, which appends its fixed 32-byte
+`decision_hash` and 16-byte UUID without prefixes; a fixed-size field cannot
+alias) — and `recorded_at` as LE bytes; equality anchored to `record_hash`.
 
 **Deliberately absent fields:**
 
@@ -223,9 +226,15 @@ idempotency pinned to stable identity fields, never to the timestamp):
 
 ## 7. Query / read behavior
 
-- Primary read: list entry receipts for `(domain_id, session_id)` in
-  insertion order. Never list by `session_id` alone — session ids are not
-  globally unique (#2276 pinned this; same rule here).
+- Primary read: list entry receipts for `(domain_id, session_id)` in the
+  store's **deterministic chronological order** — sorted by
+  `(recorded_at, record_hash)`, which is what `list_opaque_for` returns
+  today. This is explicitly NOT arrival/insertion order: entries sharing a
+  `recorded_at` second order by `record_hash`. If strict insertion order
+  ever becomes contractually required (e.g. deliberation replay), that
+  needs an explicit sequence field — deferred alongside threading (§4); no
+  consumer in this slice requires it. Never list by `session_id` alone —
+  session ids are not globally unique (#2276 pinned this; same rule here).
 - Point read: get one entry receipt by `(domain_id, session_id, entry_id)`.
 - Reads return receipts (ids, author, timestamps, hashes) — never body
   content, which the store does not hold.
@@ -268,7 +277,9 @@ idempotency pinned to stable identity fields, never to the timestamp):
     byte-identical semantics); existing gate-result behavior unchanged
     (still neither requires nor creates sessions).
 15. Domain-scoped entry list does not mix two domains sharing a
-    `session_id`.
+    `session_id`; list order is deterministic `(recorded_at, record_hash)`
+    and stable across re-reads, including the same-`recorded_at` hash-tiebreak
+    case (documented as chronological order, not arrival order).
 16. Route: 200 on member record; idempotent retry returns identical body;
     409 different-author; 403 non-member with nothing persisted; 400
     whitespace ids.
