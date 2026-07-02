@@ -1,0 +1,339 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>`CreateTreasury` — Treasury `entity_id` Trust Semantics | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>create treasury entity id semantics</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/create-treasury-entity-id-semantics.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1><code>CreateTreasury</code> — Treasury <code>entity_id</code> Trust Semantics</h1>
+<p><strong>Status</strong>: draft — design / audit (trust-semantics definition, not implementation)
+<strong>Truth class</strong>: descriptive
+<strong>Canonical</strong>: no — current implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last Reviewed</strong>: 2026-07-01
+<strong>Source basis</strong>: read against <code>main</code> @ <code>d37d7d43</code> (#2267). Code anchors/line numbers were verified at that commit — re-verify before relying on exact numbers.
+<strong>Related</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/coop-id-entity-resolver">coop-id-entity-resolver.md</a> (resolver seam) · <a href="/docs/adr/ADR-0084-controlled-treasury-entity-id-backfill-apply-contract">ADR-0084</a> (controlled apply contract) · <a href="/docs/adr/ADR-0035-entity-aware-request-authorization">ADR-0035</a> · <a href="/docs/rfcs/RFC-0018-entity-aware-request-authorization">RFC-0018</a> · issues #2082 (this lane), #2081 (blocked, untouched), #2080 (separate, untouched)</p>
+<blockquote>
+<p><strong>This document defines trust semantics for a path that must not be casually mutated.</strong>
+It answers what the <code>CreateTreasury</code> message path is, what authority it carries today,
+why it must not populate treasury <code>entity_id</code> by projection, and what single future
+implementation slice would be safe. It changes <strong>no</strong> code behavior. A
+<code>coop_id ↔ EntityId</code> mapping binds an identity target only — it grants <strong>zero</strong>
+membership, role, capability, mandate, standing, or permission.</p>
+</blockquote>
+<h2>1. Current behavior (verified at <code>d37d7d43</code>)</h2>
+<p><code>CreateTreasury</code> exists twice, as near-identical duplicates on two parallel actor paths:</p>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Message</th>
+<th>Handler</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>icn/crates/icn-coop/src/actor.rs</code></td>
+<td><code>CoopMessage::CreateTreasury</code> (~L226, dispatch ~L409)</td>
+<td><code>handle_create_treasury</code> (~L732)</td>
+</tr>
+<tr>
+<td><code>icn/apps/membership/src/coop_core/actor.rs</code></td>
+<td><code>CoopMessage::CreateTreasury</code> (~L122, dispatch ~L288)</td>
+<td><code>handle_create_treasury</code> (~L484)</td>
+</tr>
+</tbody></table>
+<p>Both handlers do exactly this:</p>
+<ol>
+<li>Verify the cooperative exists in the store (<code>get_cooperative</code>).</li>
+<li>Reject if <code>coop.treasury_did</code> is already set (<code>&quot;already has a treasury&quot;</code>).</li>
+<li>Derive the treasury DID deterministically from the flat <code>coop_id</code>
+(<code>derive_treasury_did</code> / <code>derive_treasury_anchor</code>).</li>
+<li>Assign the treasury to the cooperative and, if a <code>TreasuryManager</code> is wired,
+register the treasury in the ledger via the <strong>plain</strong> <code>register_treasury(...)</code> —
+i.e. <strong><code>entity_id: None</code></strong>, with a default settlement unit and the first listed
+member as <code>created_by</code>.</li>
+<li>Save and announce.</li>
+</ol>
+<p>What the handlers do <strong>not</strong> do:</p>
+<ul>
+<li><strong>No <code>CoopEntityMap</code> interaction of any kind</strong> — no read, no bind, no provenance.</li>
+<li><strong>No lifecycle-state gate</strong> — only &quot;exists&quot; and &quot;no treasury yet&quot;; a merely
+proposed (non-activated) cooperative qualifies.</li>
+<li><strong>No authority gate at the actor layer</strong> — the caller is whatever holds the actor
+handle. There is <strong>no production caller today</strong>: no gateway route, RPC method, or
+binary invokes <code>create_treasury</code> (verified by repo-wide search at <code>d37d7d43</code>);
+it is reachable only through the actor handle API and is exercised by tests.</li>
+<li><strong>No overlap with activation</strong>: since #2266, cooperative activation creates the
+treasury itself (register <code>entity_id: None</code> → commit activation → record the
+<code>Activation</code>-provenance map binding <strong>last</strong> → populate the treasury <code>entity_id</code>
+from that recorded binding; when <strong>no map is wired</strong>, activation instead uses the
+pure reject-not-normalize projection — <code>icn-coop/src/actor.rs</code> ~L587-591 — because
+there is no map to disagree with). A coop that went through activation therefore already
+has a treasury, and <code>CreateTreasury</code> is <strong>rejected</strong> for it (tests pin this on both
+paths). <code>CreateTreasury</code> consequently fires only for cooperatives that have <strong>not</strong>
+been activated — exactly the population for which <strong>no trusted binding exists</strong>.</li>
+</ul>
+<h3>1.1 Which institutional act is this?</h3>
+<p>None, currently. Activation is the institutional act that owns treasury creation and
+the only act that may record <code>Activation</code> provenance (&quot;only the node that
+authoritatively activated may write <code>Activation</code>&quot; — the trust assertion documented at
+<code>icn-coop/src/actor.rs</code> ~L79). <code>CreateTreasury</code> as wired today is <strong>library/test
+scaffolding</strong>: a handle-level surface with no authority basis, no governance receipt,
+and no accountable origin for any identity claim it might make. That is precisely why
+it must stay <code>entity_id: None</code> until this document&#39;s semantics are implemented.</p>
+<h3>1.2 The sibling gap (out of scope here, recorded for #2082)</h3>
+<p><code>apps/membership</code> <code>coop_core</code> has <strong>no</strong> <code>CoopEntityMap</code> integration at all — its
+activation path does not record an <code>Activation</code> binding either (verified: zero
+matches for <code>CoopEntityMap</code> / <code>bind_coop_entity_map</code> / <code>register_treasury_with_entity</code>
+under <code>icn/apps/membership/</code> at <code>d37d7d43</code>). That is #2082 gap 12b, a separate
+activation-parity rung; this document only notes that any <code>CreateTreasury</code> slice must
+either land on <strong>both</strong> actor copies or explicitly sequence them.</p>
+<h2>2. Problem</h2>
+<p>A treasury row&#39;s <code>entity_id</code> is authorization-relevant under the (off-by-default)
+<code>enforce-trusted-resolver</code> mode: it is the membership <em>target</em> the entity-auth gate
+verifies against. Populating it from an unaccountable source would let an unwired,
+authority-free scaffolding path mint the identity target that a future enforcement
+mode trusts. Two failure shapes matter:</p>
+<ul>
+<li><strong>Projection without provenance.</strong> <code>project_coop_id</code> is pure and reject-not-
+normalize, but a projection performed by <code>CreateTreasury</code> carries no accountable
+origin. #2266&#39;s review (P2#1) established the rule for the <strong>map-wired</strong> activation
+path: treasury <code>entity_id</code> may be populated <strong>only from the successfully recorded
+binding</strong>, never from a bare projection racing ahead of the bind. (The <strong>no-map</strong>
+activation path does populate from pure projection — <code>icn-coop/src/actor.rs</code>
+~L587-591 — which is tolerable <em>there</em> only because activation is the authoritative
+institutional act and there is no map for the projection to disagree with.)
+<code>CreateTreasury</code> is not that act and owns no binding, so this document deliberately
+holds it to the <strong>stricter</strong> rule: no projection fallback at all — see §5.</li>
+<li><strong>Silent trust creation.</strong> If <code>CreateTreasury</code> wrote a map binding itself, that
+binding&#39;s provenance would be a lie — the path is not activation, not an operator
+backfill, not a surrogate allocation, and holds no governance receipt. Every
+trusted <code>CoopEntityBindingProvenance</code> variant records a concrete accountable
+origin this path does not have.</li>
+</ul>
+<h2>3. Non-goals</h2>
+<ul>
+<li>No change to <code>CreateTreasury</code> behavior in this document or its PR.</li>
+<li>No treasury mutation, no map mutation, no provenance write.</li>
+<li>No new authority gate design for treasury creation itself (who may create a
+treasury is an institutional-act question for a future governance slice; this
+document only pins the <em>identity-target</em> semantics).</li>
+<li>No gateway enforcement, route-default, or token-issuance change (#2081 and #2080
+remain untouched and blocked/separate respectively).</li>
+<li>No #2082 closure.</li>
+</ul>
+<h2>4. Trust sources available / not available to this path</h2>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Available?</th>
+<th>Why / why not</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Activation</code> provenance</td>
+<td><strong>No</strong></td>
+<td><code>CreateTreasury</code> is not activation and must never impersonate it.</td>
+</tr>
+<tr>
+<td><code>OperatorBackfill</code> provenance</td>
+<td><strong>No</strong></td>
+<td>It is not an operator-run backfill command.</td>
+</tr>
+<tr>
+<td><code>Surrogate</code> provenance</td>
+<td><strong>No</strong></td>
+<td>It performs no surrogate allocation.</td>
+</tr>
+<tr>
+<td><code>GovernanceReceipt</code> provenance</td>
+<td><strong>No</strong> (today)</td>
+<td>No governance decision flows into this path.</td>
+</tr>
+<tr>
+<td><strong>Reading an existing trusted binding</strong></td>
+<td><strong>Yes</strong></td>
+<td><code>binding_for_coop</code> + <code>is_trusted_for_resolution()</code> + reverse-index agreement + cooperative well-formedness — the same fail-closed discipline the ADR-0084 planner (<code>WouldPopulate</code>) and #2266 activation-populate already use.</td>
+</tr>
+</tbody></table>
+<p>The only legitimate trust relationship this path can ever have with the map is
+<strong>read-only consumption of a binding somebody accountable already recorded.</strong></p>
+<h2>5. Options considered</h2>
+<ol>
+<li><strong>Reject projectable <code>coop_id</code>s without a trusted binding.</strong> Rejected: couples
+treasury <em>existence</em> to mapping state, which is authority-adjacent creep — the
+mapping would start gating what an institution can do, violating zero-authority.
+Also changes behavior on a surface with no production caller, for no safety gain
+(<code>entity_id</code> stays <code>None</code> either way).</li>
+<li><strong>Require an existing trusted map binding as a creation precondition.</strong> Rejected
+for the same coupling reason: a legacy cooperative without a binding could no
+longer receive a treasury at all.</li>
+<li><strong>Create a pending/untrusted <code>entity_id</code> target.</strong> Rejected: violates the
+fail-closed doctrine. ADR-0084 §3 forbids trusting <code>UnknownLegacy</code>; a
+&quot;provisional&quot; treasury <code>entity_id</code> is indistinguishable from a trusted one to
+every consumer that reads the row. There is no such thing as a safely-untrusted
+populated target.</li>
+<li><strong>Remain <code>entity_id: None</code>; let the evidence-bearing backfill path handle it.</strong>
+<strong>Current state, and the correct default.</strong> The ADR-0084 planner/report/apply
+chain already covers rows created this way, fail-closed.</li>
+</ol>
+<p><strong>Recommended future slice (the only mutation later allowed):</strong> option 4 <strong>plus
+read-only trusted-binding consultation</strong> — at <code>CreateTreasury</code> time, if (and only
+if) a trusted, structurally consistent binding already exists for the byte-exact
+<code>coop_id</code> (trusted provenance via <code>is_trusted_for_resolution()</code>, reverse index
+agrees byte-for-byte, target is a well-formed cooperative <code>EntityId</code>), populate the
+treasury&#39;s <code>entity_id</code> from that binding; otherwise <code>entity_id: None</code> exactly as
+today. The map is <strong>never written</strong>, no provenance is recorded, and a
+missing/untrusted/ambiguous/malformed binding degrades silently to today&#39;s
+behavior. This mirrors #2266&#39;s populate-from-recorded-binding and ADR-0084&#39;s
+re-verification discipline, and leaves rows without bindings to the existing
+backfill chain.</p>
+<p><strong>Registration path constraint (coop_id preservation).</strong> The implementation MUST
+NOT use <code>TreasuryManager::register_treasury_with_entity</code> for this: that API derives
+the treasury row&#39;s <code>coop_id</code> from <code>entity_id.identifier()</code>
+(<code>icn-ledger/src/treasury.rs</code> ~L400-408), so for a trusted <strong>surrogate</strong> (or any
+binding where <code>entity_id.identifier() != coop_id</code>) it would file the treasury under
+the surrogate slug instead of the original legacy <code>coop_id</code> — breaking byte-for-byte
+preservation and <code>get_treasury_by_coop</code>/reverse-audit consistency. The slice must
+instead use the <strong>two-step path activation already uses</strong>: plain
+<code>register_treasury(...)</code> with the byte-exact original <code>coop_id</code>, then populate
+<code>entity_id</code> from the trusted binding through the existing fail-closed populate seam
+(the <code>populate_entity_id_at_activation</code>-class primitive: byte-for-byte <code>coop_id</code>
+re-check + entity-uniqueness guard), or an equivalent new <code>coop_id</code>-preserving
+registration helper with the same checks.</p>
+<p>Note the deliberate divergence from activation: the slice has <strong>no no-map projection
+fallback</strong>. Activation may project when no map is wired because it is the
+authoritative institutional act; <code>CreateTreasury</code> is not, so with no map — or no
+trusted binding — the result is <code>entity_id: None</code>, full stop (required test 5).</p>
+<h2>6. Required tests before any implementation PR may mutate <code>entity_id</code></h2>
+<p>An implementation PR is acceptable only with all of the following, on <strong>both</strong> actor
+copies (or with the membership copy explicitly sequenced as a follow-up in the same
+lane):</p>
+<ol>
+<li>Trusted binding (each of <code>Activation</code>, <code>OperatorBackfill</code>, <code>Surrogate</code>,
+<code>GovernanceReceipt</code>) → treasury registered with that binding&#39;s <code>EntityId</code>;
+<code>coop_id</code> preserved byte-for-byte. <strong>Must include a surrogate case where
+<code>entity_id.identifier() != coop_id</code></strong>: the treasury row keeps the original
+legacy <code>coop_id</code> (and <code>get_treasury_by_coop(legacy_id)</code> still resolves), with
+<code>entity_id</code> set to the surrogate — proving the registration path is
+<code>coop_id</code>-preserving (see §5&#39;s registration-path constraint).</li>
+<li><code>UnknownLegacy</code> / missing provenance → <code>entity_id: None</code> (fail-closed, no error).</li>
+<li>Reverse-index mismatch or one-sided binding → <code>entity_id: None</code>.</li>
+<li>Non-cooperative or malformed target → <code>entity_id: None</code>.</li>
+<li>No map configured → <code>entity_id: None</code> (no store created).</li>
+<li><strong>No map write in any branch</strong> (a write-through test double must prove no
+<code>bind_*</code> call occurs).</li>
+<li>Post-activation <code>CreateTreasury</code> rejection unchanged.</li>
+<li>Entity-id uniqueness conflict (binding&#39;s <code>EntityId</code> already owned by another
+treasury) → fail-closed error, no partial write (the #2265 <code>EntityIdConflict</code>
+discipline).</li>
+</ol>
+<h2>7. Explicit non-claims</h2>
+<p>This document and its PR claim <strong>none</strong> of the following: any code behavior change;
+any treasury, map, or provenance mutation; any enforcement or default route-outcome
+change; any positive <code>entity_id</code>/<code>entity_type</code> token issuance; #2081 progress or
+readiness; #2080 progress; #2082 closure; mapping-as-authority (a binding never
+grants membership, role, capability, mandate, standing, or permission); trust of
+<code>UnknownLegacy</code> (it remains untrusted unless a future evidence-bearing workflow
+repairs it); production, pilot, member, organizer, or live-federation readiness;
+Phase 2 completion.</p>
+<h2>8. Validation</h2>
+<ul>
+<li>Frontmatter + <code>docs/registry.toml</code> entry + <code>docs/INDEX.md</code> link added per
+<a href="/docs/reference/project-index/docs-control-map">docs-control-map — Adding a new doc</a>.</li>
+<li><code>python3 docs/scripts/doc_control_check.py</code> run locally before commit.</li>
+<li>Vocabulary: settlement/allocation language only; no prohibited terms.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
