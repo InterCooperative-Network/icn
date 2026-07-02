@@ -3142,6 +3142,74 @@ pub async fn record_process_gate_result<E: GovernanceEventEmitter + Clone + 'sta
     Ok(HttpResponse::Ok().json(receipt))
 }
 
+/// POST /gov/domains/{domain_id}/process-sessions/{session_id}/open
+/// — Record that a process session was opened and return the persisted
+/// [`icn_governance::ProcessSessionOpenedReceipt`] (the #2275 session
+/// anchor; second `ProcessTransitionReceipt` class, ADR-0026 Layer 2).
+///
+/// Mounts `GovernanceManager::record_process_session_opened` over HTTP.
+/// The backend enforces at most one opening per `(domain_id, session_id)`
+/// atomically at the storage layer; a retry by the same authenticated
+/// opener returns the ORIGINAL receipt unchanged (idempotent — the
+/// response is byte-identical to the first success), and an open by a
+/// different actor is refused with 409 (fail-closed; the original stays
+/// untouched). Opening records institutional process context and grants
+/// zero authority; `opened_by` is the authenticated caller as actor
+/// evidence, not proof of permission.
+///
+/// Authorization mirrors the gate-result write surface exactly (per the
+/// #2275 contract): the existing `governance:write` scope plus domain
+/// membership for the caller — sticky duplicate-open semantics would
+/// otherwise let an authenticated outsider preempt a session id in
+/// someone else's domain. This handler composes those existing gates and
+/// changes no authorization decision.
+///
+/// Returns:
+/// - 200 with the persisted `ProcessSessionOpenedReceipt` JSON (first
+///   open AND same-opener retry).
+/// - 400 when `session_id` is empty/whitespace.
+/// - 401 when the bearer token is missing/invalid.
+/// - 403 when the token lacks `governance:write` or the caller is not a
+///   member of the domain.
+/// - 404 when the domain does not exist.
+/// - 409 when the session was already opened by a different actor.
+pub async fn open_process_session<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    path: web::Path<(String, String)>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let opened_by = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    let (domain_id, session_id) = path.into_inner();
+    if session_id.trim().is_empty() {
+        return Err(err_bad("session_id must be a non-empty path segment"));
+    }
+    let domain = GovernanceDomainId(domain_id);
+
+    // Reuse the existing domain-membership gate; do not introduce a new
+    // authorization regime.
+    check_domain_membership(&ctx, &domain, &opened_by).await?;
+
+    match ctx
+        .manager
+        .record_process_session_opened(&domain, &session_id, &opened_by)
+    {
+        Ok(crate::manager::ProcessSessionOpenOutcome::Opened(receipt))
+        | Ok(crate::manager::ProcessSessionOpenOutcome::AlreadyOpened(receipt)) => {
+            Ok(HttpResponse::Ok().json(receipt))
+        }
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.contains("process_session_open_conflict") {
+                Err(ApiError::Conflict(msg))
+            } else {
+                Err(anyhow_to_api(e))
+            }
+        }
+    }
+}
+
 /// Map the persisted domain-policy adoption seam error onto the governance
 /// HTTP error taxonomy. Fail-closed: only a clearly-authorization or
 /// clearly-client problem maps to 403/404; everything else (missing store,

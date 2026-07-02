@@ -191,6 +191,21 @@ const OPAQUE_BY_KEY_PREFIX: &[u8] = b"receipt:opaque:by_key:";
 /// range.
 const OPAQUE_HASH_BIND_PREFIX: &[u8] = b"receipt:opaque:hash_bind:";
 
+/// Unique-marker prefix for opaque receipt classes that enforce **at most
+/// one entry per `(class, key1, key2_opt)` triple** (`put_opaque_if_absent`).
+///
+/// Layout per entry:
+///   `<prefix><len-prefixed class><len-prefixed key1><key2 tag-encoding>` →
+///   32-byte `record_hash` of the winning entry.
+///
+/// The marker is a **point key** (no `recorded_at`, no `record_hash` in the
+/// key), so its existence can be checked and set inside a single sled
+/// transaction — sled transactions support point reads only, which is why
+/// the append-chain secondary index cannot express uniqueness by itself.
+/// Prefix is distinct from the other opaque prefixes so entries cannot
+/// alias any other range.
+const OPAQUE_UNIQUE_PREFIX: &[u8] = b"receipt:opaque:unique:";
+
 /// Receipt storage service for governance and economic chain artifacts.
 ///
 /// Stores receipts by canonical hash for cross-node deterministic lookup.
@@ -1847,6 +1862,109 @@ impl ReceiptStore {
             })
     }
 
+    /// Build the unique-marker key for a `(class, key1, key2_opt)` triple.
+    /// See `OPAQUE_UNIQUE_PREFIX` for layout.
+    fn opaque_unique_key(class: &str, key1: &str, key2: Option<&str>) -> Vec<u8> {
+        let mut k = OPAQUE_UNIQUE_PREFIX.to_vec();
+        k.extend_from_slice(&Self::len_prefixed(class.as_bytes()));
+        k.extend_from_slice(&Self::len_prefixed(key1.as_bytes()));
+        k.extend_from_slice(&Self::opaque_key2_encode(key2));
+        k
+    }
+
+    /// Persist an opaque receipt payload for a `(class, key1, key2_opt)`
+    /// triple **only if no prior entry exists for that triple** — the
+    /// insert-if-absent primitive required by the #2275 session-anchor
+    /// contract.
+    ///
+    /// Returns `Ok(None)` when this call won the insert (the payload, the
+    /// hash-bind entry, the secondary index entry, and the unique marker
+    /// all land in one sled transaction). Returns
+    /// `Ok(Some(existing_record_hash))` when a unique marker already
+    /// exists for the triple — in that case **nothing is written**, and
+    /// the returned hash identifies the winning entry (hydratable via
+    /// `get_latest_opaque`, of which there is exactly one for the triple).
+    ///
+    /// The absence check and the insert happen **inside the same sled
+    /// transaction** on the point-keyed unique marker, so two concurrent
+    /// writers racing on the same triple serialize: exactly one wins;
+    /// the loser observes `Some(winner_hash)`. This is precisely the
+    /// property the append-chain [`Self::put_opaque`] deliberately does
+    /// NOT have (its chain accumulates distinct hashes per triple).
+    pub fn put_opaque_if_absent(
+        &self,
+        class: &str,
+        key1: &str,
+        key2: Option<&str>,
+        recorded_at: u64,
+        record_hash: [u8; 32],
+        payload: &[u8],
+    ) -> Result<Option<[u8; 32]>, String> {
+        let unique_key = Self::opaque_unique_key(class, key1, key2);
+        let primary_key = Self::opaque_primary_key(class, &record_hash);
+        let by_key = Self::opaque_by_key_key(class, key1, key2, recorded_at, &record_hash);
+        let bind_key = Self::opaque_hash_bind_key(class, &record_hash);
+        let bind_value = Self::opaque_hash_bind_value(key1, key2, recorded_at);
+
+        self.db
+            .transaction(|tx| {
+                // Uniqueness gate: a marker for this triple means an
+                // opening already won. Return its hash; write nothing.
+                if let Some(existing) = tx.get(unique_key.as_slice())? {
+                    let mut winner = [0u8; 32];
+                    if existing.len() == 32 {
+                        winner.copy_from_slice(&existing);
+                    } else {
+                        return Err(ConflictableTransactionError::Abort(format!(
+                            "opaque_unique_marker_corrupt: expected 32-byte \
+                             record_hash marker, found {} bytes. class={class}",
+                            existing.len()
+                        )));
+                    }
+                    return Ok(Some(winner));
+                }
+
+                // Won the insert: land marker + primary + bind +
+                // secondary index atomically, with the same
+                // write-once-by-hash discipline as `put_opaque`.
+                if let Some(existing) = tx.get(primary_key.as_slice())? {
+                    if existing.as_ref() != payload {
+                        return Err(ConflictableTransactionError::Abort(format!(
+                            "opaque_record_hash_collision: \
+                             same (class, record_hash) primary key already \
+                             stores different payload bytes; refusing to \
+                             overwrite. class={class}, hash={}",
+                            hex::encode(record_hash)
+                        )));
+                    }
+                } else {
+                    tx.insert(primary_key.as_slice(), payload)?;
+                }
+                if let Some(existing_bind) = tx.get(bind_key.as_slice())? {
+                    if existing_bind.as_ref() != bind_value.as_slice() {
+                        return Err(ConflictableTransactionError::Abort(format!(
+                            "opaque_record_hash_index_collision: \
+                             same (class, record_hash) is already bound to \
+                             a different (key1, key2, recorded_at) tuple. \
+                             class={class}, hash={}",
+                            hex::encode(record_hash)
+                        )));
+                    }
+                } else {
+                    tx.insert(bind_key.as_slice(), bind_value.as_slice())?;
+                }
+                tx.insert(by_key.as_slice(), b"")?;
+                tx.insert(unique_key.as_slice(), &record_hash)?;
+                Ok::<Option<[u8; 32]>, ConflictableTransactionError<String>>(None)
+            })
+            .map_err(|e: TransactionError<String>| match e {
+                TransactionError::Abort(msg) => msg,
+                TransactionError::Storage(s) => {
+                    format!("sled put_opaque_if_absent tx storage: {s}")
+                }
+            })
+    }
+
     /// Retrieve the latest opaque payload for a
     /// `(class, key1, key2_opt)` triple, where "latest" means the
     /// entry with the largest `recorded_at`.
@@ -2288,6 +2406,26 @@ impl GovernanceReceiptBackend for ReceiptStore {
         payload: &[u8],
     ) -> Result<(), String> {
         ReceiptStore::put_opaque(self, class, key1, key2, recorded_at, record_hash, payload)
+    }
+
+    fn put_opaque_if_absent(
+        &self,
+        class: &str,
+        key1: &str,
+        key2: Option<&str>,
+        recorded_at: u64,
+        record_hash: [u8; 32],
+        payload: &[u8],
+    ) -> Result<Option<[u8; 32]>, String> {
+        ReceiptStore::put_opaque_if_absent(
+            self,
+            class,
+            key1,
+            key2,
+            recorded_at,
+            record_hash,
+            payload,
+        )
     }
 
     fn get_latest_opaque(
@@ -4397,5 +4535,133 @@ mod tests {
             .unwrap();
         assert_eq!(chain.len(), 1);
         assert_eq!(chain[0], b"trait-routed payload");
+    }
+
+    // ========================================================================
+    // put_opaque_if_absent — atomic uniqueness (#2275 session-anchor)
+    // ========================================================================
+
+    #[test]
+    fn put_opaque_if_absent_first_insert_wins() {
+        let store = ReceiptStore::new(temp_db());
+        let h = [7u8; 32];
+        let won = store
+            .put_opaque_if_absent(
+                "unique_class",
+                "domain-a",
+                Some("session-1"),
+                100,
+                h,
+                b"first",
+            )
+            .unwrap();
+        assert_eq!(won, None, "first insert must win");
+        let latest = store
+            .get_latest_opaque("unique_class", "domain-a", Some("session-1"))
+            .unwrap()
+            .expect("winning payload persisted");
+        assert_eq!(latest, b"first");
+    }
+
+    #[test]
+    fn put_opaque_if_absent_second_writer_loses_and_writes_nothing() {
+        let store = ReceiptStore::new(temp_db());
+        let h1 = [1u8; 32];
+        let h2 = [2u8; 32];
+        assert_eq!(
+            store
+                .put_opaque_if_absent(
+                    "unique_class",
+                    "domain-a",
+                    Some("session-1"),
+                    100,
+                    h1,
+                    b"first"
+                )
+                .unwrap(),
+            None
+        );
+        // A later writer with a DIFFERENT hash/payload/timestamp must lose:
+        // it observes the winner's hash and persists nothing.
+        let lost = store
+            .put_opaque_if_absent(
+                "unique_class",
+                "domain-a",
+                Some("session-1"),
+                200,
+                h2,
+                b"second",
+            )
+            .unwrap();
+        assert_eq!(
+            lost,
+            Some(h1),
+            "loser must observe the winner's record_hash"
+        );
+        let latest = store
+            .get_latest_opaque("unique_class", "domain-a", Some("session-1"))
+            .unwrap()
+            .expect("winner still present");
+        assert_eq!(latest, b"first", "loser must not have written a payload");
+        let chain = store.list_opaque_for("unique_class", "domain-a").unwrap();
+        assert_eq!(chain.len(), 1, "exactly one persisted entry for the triple");
+    }
+
+    #[test]
+    fn put_opaque_if_absent_triples_are_independent() {
+        // Different key2 (session) or key1 (domain) => independent uniqueness.
+        let store = ReceiptStore::new(temp_db());
+        assert_eq!(
+            store
+                .put_opaque_if_absent("unique_class", "domain-a", Some("s1"), 1, [1u8; 32], b"a")
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            store
+                .put_opaque_if_absent("unique_class", "domain-a", Some("s2"), 1, [2u8; 32], b"b")
+                .unwrap(),
+            None
+        );
+        assert_eq!(
+            store
+                .put_opaque_if_absent("unique_class", "domain-b", Some("s1"), 1, [3u8; 32], b"c")
+                .unwrap(),
+            None
+        );
+    }
+
+    #[test]
+    fn put_opaque_if_absent_concurrent_race_has_exactly_one_winner() {
+        use std::sync::Arc;
+        let store = Arc::new(ReceiptStore::new(temp_db()));
+        let mut handles = Vec::new();
+        for i in 0..8u8 {
+            let s = Arc::clone(&store);
+            handles.push(std::thread::spawn(move || {
+                let mut h = [0u8; 32];
+                h[0] = i + 1;
+                s.put_opaque_if_absent(
+                    "race_class",
+                    "domain-r",
+                    Some("session-r"),
+                    100 + u64::from(i),
+                    h,
+                    format!("payload-{i}").as_bytes(),
+                )
+                .unwrap()
+            }));
+        }
+        let results: Vec<Option<[u8; 32]>> =
+            handles.into_iter().map(|h| h.join().unwrap()).collect();
+        let winners = results.iter().filter(|r| r.is_none()).count();
+        assert_eq!(winners, 1, "exactly one concurrent open may win");
+        // Every loser observed the same winning hash.
+        let losing_hashes: Vec<[u8; 32]> = results.iter().filter_map(|r| *r).collect();
+        assert_eq!(losing_hashes.len(), 7);
+        assert!(losing_hashes.windows(2).all(|w| w[0] == w[1]));
+        // Exactly one persisted entry exists for the triple.
+        let chain = store.list_opaque_for("race_class", "domain-r").unwrap();
+        assert_eq!(chain.len(), 1);
     }
 }
