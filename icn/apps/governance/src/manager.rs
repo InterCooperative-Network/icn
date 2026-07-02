@@ -2722,6 +2722,24 @@ pub enum ProcessSessionOpenOutcome {
     AlreadyOpened(icn_governance::ProcessSessionOpenedReceipt),
 }
 
+/// Outcome of [`GovernanceManager::record_deliberation_entry`] (#2277
+/// contract + #2278 Q3 decision). Both variants are successes; the
+/// fail-closed mismatch conflict surfaces as an `Err` with stable prefix
+/// `deliberation_entry_conflict`, and recording against a session with no
+/// recorded opening surfaces as an `Err` with stable prefix
+/// `deliberation_entry_session_not_opened`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DeliberationEntryRecordOutcome {
+    /// This call recorded the entry: the receipt is the newly persisted
+    /// deliberation-entry fact.
+    Recorded(icn_governance::DeliberationEntryRecordedReceipt),
+    /// The entry was already recorded with the **same** stable identity
+    /// (`author`, `body_hash`, `entry_kind`); carries the **original**
+    /// persisted receipt (original `recorded_at` / `record_hash` — a retry
+    /// is never restamped).
+    AlreadyRecorded(icn_governance::DeliberationEntryRecordedReceipt),
+}
+
 /// Action items are always managed locally (not gossiped) and can use either
 /// in-memory or Sled-backed persistent storage.
 pub struct GovernanceManager {
@@ -5999,6 +6017,183 @@ impl GovernanceManager {
         store
             .list_process_gate_results_for_session_in_domain(&domain_id.0, session_id)
             .map_err(|e| anyhow::anyhow!("Failed to list domain-scoped gate results: {e}"))
+    }
+
+    /// Record one deliberation entry against an **already-opened** process
+    /// session and persist the
+    /// [`icn_governance::DeliberationEntryRecordedReceipt`] — the third
+    /// `ProcessTransitionReceipt` class, per the merged
+    /// `docs/design/deliberation-entry-recorded-receipt.md` contract
+    /// (#2277) and the `docs/design/deliberation-entry-kind-taxonomy.md`
+    /// Q3 decision (#2278).
+    ///
+    /// **Session precondition (fail-closed, no silent creation):** the
+    /// `(domain_id, session_id)` pair must have a persisted
+    /// `ProcessSessionOpenedReceipt`; otherwise this returns an error with
+    /// stable prefix `deliberation_entry_session_not_opened` and writes
+    /// nothing. The observe-then-write pair is safe without an atomic
+    /// cross-check because session openings are permanent append-only
+    /// facts — a session observed open stays open. Gate-result recording
+    /// ([`Self::record_process_gate_result`]) is unchanged: it neither
+    /// requires nor silently creates opened sessions.
+    ///
+    /// **At most one entry exists per `(domain_id, session_id, entry_id)`**,
+    /// enforced atomically by the receipt backend inside its storage
+    /// transaction:
+    ///
+    /// - first record → [`DeliberationEntryRecordOutcome::Recorded`];
+    /// - retry with identical stable identity (`author` + `body_hash` +
+    ///   `entry_kind`) → [`DeliberationEntryRecordOutcome::AlreadyRecorded`]
+    ///   carrying the **original** receipt unchanged (never restamped);
+    /// - same `entry_id` with a **different** `author`, `body_hash`, or
+    ///   `entry_kind` → fail-closed error (stable prefix
+    ///   `deliberation_entry_conflict`); the original is untouched and no
+    ///   second receipt exists.
+    ///
+    /// The deliberation body is never seen by this method — callers supply
+    /// only its 32-byte `body_hash` fingerprint. Like session opening, this
+    /// method **requires** a wired receipt store: uniqueness is a durable
+    /// property that cannot be faked in memory.
+    ///
+    /// Recording an entry records an institutional fact; it grants **zero**
+    /// authority. `author` is the authenticated caller — actor evidence,
+    /// not proof of entitlement; route-level authorization is the HTTP
+    /// layer's concern and charter legitimacy is upstream.
+    #[allow(clippy::too_many_arguments)]
+    pub fn record_deliberation_entry(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        entry_id: &str,
+        author: &Did,
+        entry_kind: icn_governance::DeliberationEntryKind,
+        body_hash: [u8; 32],
+    ) -> Result<DeliberationEntryRecordOutcome> {
+        if domain_id.0.is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_deliberation_entry: domain_id must be non-empty"
+            ));
+        }
+        if session_id.is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_deliberation_entry: session_id must be non-empty"
+            ));
+        }
+        if entry_id.is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_deliberation_entry: entry_id must be non-empty"
+            ));
+        }
+        let author_str = author.to_string();
+        if author_str.is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_deliberation_entry: author must be non-empty"
+            ));
+        }
+        let store = self.receipt_store.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "record_deliberation_entry: a receipt store is required — \
+                 entry uniqueness is enforced at the storage layer and \
+                 cannot be faked in memory"
+            )
+        })?;
+
+        // Session precondition: entries attach only to a recorded opening.
+        // No silent session creation, ever.
+        let opened = store
+            .get_process_session_opened(&domain_id.0, session_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_deliberation_entry: failed to read session-open state for \
+                     session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        if opened.is_none() {
+            return Err(anyhow::anyhow!(
+                "deliberation_entry_session_not_opened: session {session_id} in domain {} \
+                 has no recorded opening; refusing to record a deliberation entry against \
+                 an unanchored session",
+                domain_id.0
+            ));
+        }
+
+        let now = icn_time::current_timestamp_secs();
+        let receipt = icn_governance::DeliberationEntryRecordedReceipt::new(
+            domain_id.0.clone(),
+            session_id.to_string(),
+            entry_id.to_string(),
+            author_str.clone(),
+            entry_kind,
+            now,
+            body_hash,
+        );
+
+        match store
+            .put_deliberation_entry_recorded(&receipt)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to persist deliberation entry receipt for entry {entry_id} in \
+                 session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })? {
+            crate::receipt_backend::DeliberationEntryPersist::Inserted => {
+                Ok(DeliberationEntryRecordOutcome::Recorded(receipt))
+            }
+            crate::receipt_backend::DeliberationEntryPersist::Existing(original) => {
+                if original.author == author_str
+                    && original.body_hash == body_hash
+                    && original.entry_kind == entry_kind
+                {
+                    Ok(DeliberationEntryRecordOutcome::AlreadyRecorded(original))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "deliberation_entry_conflict: entry {entry_id} in session \
+                         {session_id} in domain {} was already recorded with a different \
+                         author, body hash, or entry kind; refusing to overwrite",
+                        domain_id.0
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Retrieve the persisted deliberation-entry receipt for a
+    /// `(domain_id, session_id, entry_id)`, or `None` when no entry has
+    /// been recorded. Read-only.
+    pub fn get_deliberation_entry(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        entry_id: &str,
+    ) -> Result<Option<icn_governance::DeliberationEntryRecordedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(None);
+        };
+        store
+            .get_deliberation_entry_recorded(&domain_id.0, session_id, entry_id)
+            .map_err(|e| anyhow::anyhow!("Failed to read deliberation entry receipt: {e}"))
+    }
+
+    /// List the deliberation-entry receipts recorded against one
+    /// `(domain_id, session_id)` anchor, in the store's deterministic
+    /// chronological order — `(recorded_at, record_hash)`, NOT
+    /// arrival/insertion order. Two domains sharing a `session_id` never
+    /// mix (the storage key binds the domain). Read-only; returns receipts
+    /// (hashes and provenance), never deliberation bodies, which are not
+    /// stored.
+    pub fn list_deliberation_entries_in_domain(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+    ) -> Result<Vec<icn_governance::DeliberationEntryRecordedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(vec![]);
+        };
+        store
+            .list_deliberation_entries_for_session_in_domain(&domain_id.0, session_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list deliberation entries: {e}"))
     }
 
     // ========================================================================

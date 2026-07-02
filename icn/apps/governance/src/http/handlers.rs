@@ -3210,6 +3210,101 @@ pub async fn open_process_session<E: GovernanceEventEmitter + Clone + 'static>(
     }
 }
 
+/// POST /gov/domains/{domain_id}/process-sessions/{session_id}/deliberation-entries/{entry_id}/record
+/// — Record one deliberation entry against an already-opened process
+/// session and return the persisted
+/// [`icn_governance::DeliberationEntryRecordedReceipt`] (the third
+/// `ProcessTransitionReceipt` class, ADR-0026 Layer 2; #2277 contract +
+/// #2278 Q3 taxonomy decision).
+///
+/// Mounts `GovernanceManager::record_deliberation_entry` over HTTP. The
+/// request carries only the closed-taxonomy `entry_kind` and the 64-hex
+/// `body_hash` fingerprint — **the deliberation body is never sent to,
+/// stored by, or returned from this surface**. The backend enforces at
+/// most one entry per `(domain_id, session_id, entry_id)` atomically at
+/// the storage layer; a retry with identical stable identity (`author` +
+/// `body_hash` + `entry_kind`) returns the ORIGINAL receipt unchanged
+/// (idempotent — byte-identical response), and any mismatch is refused
+/// with 409 (fail-closed; the original stays untouched). Recording grants
+/// zero authority; `author` is the authenticated caller as actor
+/// evidence, not proof of entitlement.
+///
+/// Authorization mirrors the session-open surface exactly: the existing
+/// `governance:write` scope plus domain membership for the caller. No new
+/// capability is introduced.
+///
+/// Returns:
+/// - 200 with the persisted `DeliberationEntryRecordedReceipt` JSON
+///   (first record AND same-identity retry).
+/// - 400 when `session_id`/`entry_id` is empty/whitespace, `entry_kind`
+///   is outside the closed taxonomy (serde rejects it), or `body_hash` is
+///   not 64 hex characters.
+/// - 401 when the bearer token is missing/invalid.
+/// - 403 when the token lacks `governance:write` or the caller is not a
+///   member of the domain.
+/// - 404 when the domain does not exist, or when the session has no
+///   recorded opening (`deliberation_entry_session_not_opened`) — the
+///   referenced anchor is absent, mirroring the existing missing-domain
+///   mapping; nothing is written and no session is silently created.
+/// - 409 when the entry was already recorded with a different author,
+///   body hash, or entry kind.
+pub async fn record_deliberation_entry<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+    path: web::Path<(String, String, String)>,
+    req: web::Json<RecordDeliberationEntryRequest>,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let author = parse_did(&claims.sub, "Invalid DID in token")?;
+
+    let (domain_id, session_id, entry_id) = path.into_inner();
+    if session_id.trim().is_empty() {
+        return Err(err_bad("session_id must be a non-empty path segment"));
+    }
+    if entry_id.trim().is_empty() {
+        return Err(err_bad("entry_id must be a non-empty path segment"));
+    }
+    // body_hash: exactly 32 bytes, hex-encoded. The body itself never
+    // crosses this boundary.
+    let body_hash_bytes = hex::decode(req.body_hash.trim())
+        .map_err(|e| err_bad(format!("body_hash must be hex: {e}")))?;
+    let body_hash: [u8; 32] = body_hash_bytes
+        .try_into()
+        .map_err(|_| err_bad("body_hash must be exactly 32 bytes (64 hex characters)"))?;
+    let domain = GovernanceDomainId(domain_id);
+
+    // Reuse the existing domain-membership gate; do not introduce a new
+    // authorization regime.
+    check_domain_membership(&ctx, &domain, &author).await?;
+
+    match ctx.manager.record_deliberation_entry(
+        &domain,
+        &session_id,
+        &entry_id,
+        &author,
+        req.entry_kind,
+        body_hash,
+    ) {
+        Ok(crate::manager::DeliberationEntryRecordOutcome::Recorded(receipt))
+        | Ok(crate::manager::DeliberationEntryRecordOutcome::AlreadyRecorded(receipt)) => {
+            Ok(HttpResponse::Ok().json(receipt))
+        }
+        Err(e) => {
+            let msg = e.to_string();
+            if msg.starts_with("deliberation_entry_conflict") {
+                Err(ApiError::Conflict(msg))
+            } else if msg.starts_with("deliberation_entry_session_not_opened") {
+                // The referenced session anchor is absent — map to 404 like
+                // the missing-domain case (absent referenced resource), not
+                // 409 (which this surface reserves for identity conflicts).
+                Err(ApiError::NotFound(msg))
+            } else {
+                Err(anyhow_to_api(e))
+            }
+        }
+    }
+}
+
 /// Map the persisted domain-policy adoption seam error onto the governance
 /// HTTP error taxonomy. Fail-closed: only a clearly-authorization or
 /// clearly-client problem maps to 403/404; everything else (missing store,

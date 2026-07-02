@@ -7,7 +7,9 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use icn_governance::{BootstrapEntityType, ProcessGateKind, ProcessGateResult};
+use icn_governance::{
+    BootstrapEntityType, DeliberationEntryKind, ProcessGateKind, ProcessGateResult,
+};
 
 // ============================================================================
 // Domain
@@ -66,6 +68,28 @@ pub struct RecordProcessGateResultRequest {
     pub gate_kind: ProcessGateKind,
     /// Pass/fail result of the gate evaluation (`"pass"` | `"fail"`).
     pub result: ProcessGateResult,
+}
+
+// ============================================================================
+// Deliberation entries (#2277/#2278 — third ProcessTransitionReceipt class)
+// ============================================================================
+
+/// Request body for
+/// `POST /gov/domains/{domain_id}/process-sessions/{session_id}/deliberation-entries/{entry_id}/record`.
+///
+/// `entry_kind` is the closed `icn_governance` taxonomy
+/// ([`DeliberationEntryKind`], the #2278 v1 list); an out-of-taxonomy value
+/// is rejected by JSON deserialization (400) rather than silently coerced.
+/// `body_hash` is the 64-hex-character blake3 fingerprint of the entry body
+/// — **the body itself is never sent to or stored by this surface**. The
+/// `domain_id`, `session_id`, and `entry_id` come from the path, and the
+/// author comes from the authenticated token — not the body.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RecordDeliberationEntryRequest {
+    /// Closed-taxonomy entry kind being recorded (e.g. `"question"`).
+    pub entry_kind: DeliberationEntryKind,
+    /// 64-hex-character content fingerprint of the entry body.
+    pub body_hash: String,
 }
 
 // ============================================================================

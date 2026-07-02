@@ -215,12 +215,28 @@ def governance_candidates() -> list[dict]:
         return out
     rel = GOV_CONFIGURE.relative_to(ROOT).as_posix()
     current_lit = ""
+    pending_resource_open = False
     for i, line in enumerate(GOV_CONFIGURE.read_text(encoding="utf-8", errors="replace").splitlines()):
         # The nearest preceding (or same-line) `web::resource("…")` literal owns
         # the `.route(...)` ops that follow it, until the next resource.
         res = RESOURCE_RE.findall(line)
         if res:
             current_lit = res[-1]
+            pending_resource_open = False
+        elif pending_resource_open:
+            # rustfmt splits long registrations across lines:
+            #     web::resource(
+            #         "/very/long/path",
+            #     )
+            # The bare string literal on the line after the opener is the
+            # resource path; without this carry the following `.route(...)`
+            # would be mispaired with the PREVIOUS resource literal.
+            lit = re.match(r'\s*"([^"]*)",?\s*$', line)
+            if lit:
+                current_lit = lit.group(1)
+            pending_resource_open = False
+        if line.rstrip().endswith("web::resource("):
+            pending_resource_open = True
         for m in GOV_OP_RE.finditer(line):
             out.append({
                 "verb": m.group(1).upper(),

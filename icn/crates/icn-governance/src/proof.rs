@@ -2366,6 +2366,211 @@ impl ProcessSessionOpenedReceipt {
     }
 }
 
+/// Closed taxonomy of deliberation-entry kinds — the v1 list decided by the
+/// `docs/design/deliberation-entry-kind-taxonomy.md` Q3 decision (#2278),
+/// per the `docs/design/deliberation-entry-recorded-receipt.md` contract
+/// (#2277).
+///
+/// The taxonomy is closed and ADR-controlled: the runtime never emits a
+/// kind not listed here. `resolution` is deliberately deferred (it straddles
+/// the input/outcome boundary — Q4 / `DecisionRecord` territory), and no
+/// approve/vote/outcome kind may ever be added by discriminant append.
+///
+/// **Evolution rule (#2278):** never reorder variants; never reuse
+/// discriminants (see [`deliberation_entry_kind_ordinal`]); additions
+/// require an ADR/addendum and take the next unused discriminant;
+/// **never delete a variant that has ever shipped in an emitted receipt** —
+/// retirement is emission-side only (the recording API stops accepting the
+/// kind), while the variant, its serde string, and its discriminant mapping
+/// stay in code indefinitely so historical receipts remain decodable and
+/// their `record_hash` remains recomputable for audit replay. No kind is
+/// currently retired.
+///
+/// Serde wire form is stable `snake_case` strings (the landed gate-receipt
+/// pattern); the `u8` discriminant exists only inside the canonical hash
+/// and is never the persisted wire encoding. An unknown string fails serde
+/// deserialization closed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeliberationEntryKind {
+    /// A question posed into deliberation.
+    Question,
+    /// A concern raised without rising to an objection.
+    Concern,
+    /// A recorded objection.
+    Objection,
+    /// A proposed amendment to the matter under deliberation.
+    Amendment,
+    /// A blocking statement (the vocabulary-firewall example kind).
+    Blocker,
+    /// A facilitator's summary of deliberation so far (non-decisional).
+    FacilitatorSummary,
+    /// A privacy-review input — the privacy gate's deliberation-side handle.
+    PrivacyReview,
+    /// An accessibility-review input — the accessibility gate's
+    /// deliberation-side handle.
+    AccessibilityReview,
+    /// A conflict-of-interest signal for conflict routing.
+    ConflictSignal,
+    /// A semantically neutral institutional note ("an entry was recorded").
+    RecordOnly,
+}
+
+/// Map [`DeliberationEntryKind`] to its explicit, hand-assigned `u8`
+/// discriminant for canonical hashing — the #2278 discriminant table.
+///
+/// **Never reorder. Never reuse.** Discriminant `10` is reserved for a
+/// future `resolution` kind if #2278's deferral is ever lifted by
+/// ADR/addendum. This match is deliberately exhaustive with literal values
+/// (no derived ordinals) so any drift breaks a test, not just a hash.
+fn deliberation_entry_kind_ordinal(kind: DeliberationEntryKind) -> u8 {
+    match kind {
+        DeliberationEntryKind::Question => 0,
+        DeliberationEntryKind::Concern => 1,
+        DeliberationEntryKind::Objection => 2,
+        DeliberationEntryKind::Amendment => 3,
+        DeliberationEntryKind::Blocker => 4,
+        DeliberationEntryKind::FacilitatorSummary => 5,
+        DeliberationEntryKind::PrivacyReview => 6,
+        DeliberationEntryKind::AccessibilityReview => 7,
+        DeliberationEntryKind::ConflictSignal => 8,
+        DeliberationEntryKind::RecordOnly => 9,
+    }
+}
+
+/// Cross-node deterministic receipt recording that one deliberation entry
+/// was recorded against an already-opened process session.
+///
+/// The third `ProcessTransitionReceipt` class (ADR-0026 Layer 2), after
+/// [`ProcessGateResultReceipt`] (#2144) and [`ProcessSessionOpenedReceipt`]
+/// (#2276), per the merged `docs/design/deliberation-entry-recorded-receipt.md`
+/// contract (#2277) and the `docs/design/deliberation-entry-kind-taxonomy.md`
+/// Q3 decision (#2278).
+///
+/// **The deliberation body is never stored.** The receipt carries only a
+/// caller-supplied 32-byte `body_hash` content fingerprint; where the body
+/// lives and who may read it are visibility-policy questions outside this
+/// type. The receipt proves an entry existed — not that all audiences may
+/// read it. This type is not a stored `DeliberationThread`, not a
+/// discussion system, and carries no approve/vote/outcome semantics.
+///
+/// **At most one entry exists per `(domain_id, session_id, entry_id)`** —
+/// the receipt backend enforces uniqueness atomically at the storage layer.
+/// A retry with identical stable identity (`author`, `entry_kind`,
+/// `body_hash`) returns this original receipt unchanged (never restamped);
+/// any mismatch fails closed.
+///
+/// Recording a deliberation entry records an institutional fact; it grants
+/// **zero** authority. `author` is actor evidence, not proof of
+/// entitlement — whether the actor was institutionally supposed to
+/// deliberate is a charter/policy question upstream of this type.
+///
+/// Equality is anchored to `record_hash`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DeliberationEntryRecordedReceipt {
+    /// Governance domain the session (and this entry) is scoped to.
+    pub domain_id: String,
+    /// Identifier of the already-opened process session this entry attaches
+    /// to. Caller-provided, treated as opaque, meaningful only together
+    /// with `domain_id` (session ids are not globally unique).
+    pub session_id: String,
+    /// Caller-supplied opaque identifier for this entry, unique within
+    /// `(domain_id, session_id)` — uniqueness is enforced at the storage
+    /// layer, not assumed of the id.
+    pub entry_id: String,
+    /// DID of the authenticated actor the entry is attributed to.
+    pub author: String,
+    /// Closed-taxonomy kind of this entry (#2278 v1 list).
+    pub entry_kind: DeliberationEntryKind,
+    /// Unix-seconds the entry was recorded. Not part of duplicate
+    /// identity — a retry never restamps.
+    pub recorded_at: u64,
+    /// Caller-supplied 32-byte content fingerprint of the entry body. The
+    /// body itself is never stored in the receipt.
+    pub body_hash: Hash,
+    /// blake3 canonical record hash binding the fields above.
+    pub record_hash: Hash,
+}
+
+impl PartialEq for DeliberationEntryRecordedReceipt {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_hash == other.record_hash
+    }
+}
+
+impl Eq for DeliberationEntryRecordedReceipt {}
+
+impl DeliberationEntryRecordedReceipt {
+    /// Domain separation tag for canonical deliberation-entry-recorded
+    /// record hashes. Distinct from every other receipt-family tag —
+    /// including the test-only `icn:baseline:deliberation_entry:v1`
+    /// fixture lineage, which is not prior art for this class.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:deliberation_entry_recorded:v1";
+
+    /// Build a new receipt and compute its canonical `record_hash`.
+    pub fn new(
+        domain_id: String,
+        session_id: String,
+        entry_id: String,
+        author: String,
+        entry_kind: DeliberationEntryKind,
+        recorded_at: u64,
+        body_hash: Hash,
+    ) -> Self {
+        let record_hash = Self::compute_record_hash(
+            &domain_id,
+            &session_id,
+            &entry_id,
+            &author,
+            entry_kind,
+            recorded_at,
+            &body_hash,
+        );
+        Self {
+            domain_id,
+            session_id,
+            entry_id,
+            author,
+            entry_kind,
+            recorded_at,
+            body_hash,
+            record_hash,
+        }
+    }
+
+    /// Compute the canonical record hash from the input fields.
+    ///
+    /// Layout (per #2277 as amended in review + #2278): [`Self::DOMAIN_TAG`]
+    /// first; each string field length-prefixed (u64 LE); then **one
+    /// explicit `u8` discriminant byte** for `entry_kind`
+    /// ([`deliberation_entry_kind_ordinal`]); then `recorded_at` as LE
+    /// bytes; then `body_hash` appended **raw as a fixed 32-byte field with
+    /// no length prefix** (the landed convention length-prefixes only
+    /// variable-length fields — a fixed-size field cannot alias).
+    pub fn compute_record_hash(
+        domain_id: &str,
+        session_id: &str,
+        entry_id: &str,
+        author: &str,
+        entry_kind: DeliberationEntryKind,
+        recorded_at: u64,
+        body_hash: &Hash,
+    ) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        for field in [domain_id, session_id, entry_id, author] {
+            hasher.update(&(field.len() as u64).to_le_bytes());
+            hasher.update(field.as_bytes());
+        }
+        hasher.update(&[deliberation_entry_kind_ordinal(entry_kind)]);
+        hasher.update(&recorded_at.to_le_bytes());
+        hasher.update(body_hash);
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+}
+
 // ============================================================================
 // Mandate grant reference (#1868 step 2 primitive — wire form only)
 // ============================================================================
@@ -3416,6 +3621,296 @@ mod tests {
                 !lower.contains(forbidden),
                 "ProcessSessionOpenedReceipt JSON must not contain regulated-finance vocabulary; \
                  found `{forbidden}` in: {json}"
+            );
+        }
+    }
+
+    // ============================================================================
+    // DeliberationEntryRecordedReceipt (third ProcessTransitionReceipt class —
+    // the #2277 contract + #2278 Q3 taxonomy decision)
+    // ============================================================================
+
+    fn sample_deliberation_entry_receipt() -> DeliberationEntryRecordedReceipt {
+        DeliberationEntryRecordedReceipt::new(
+            "domain-food-coop".to_string(),
+            "session-alpha".to_string(),
+            "entry-001".to_string(),
+            "did:icn:member-1".to_string(),
+            DeliberationEntryKind::Question,
+            1_750_000_000,
+            [7u8; 32],
+        )
+    }
+
+    fn hex32(bytes: &[u8; 32]) -> String {
+        bytes.iter().map(|b| format!("{b:02x}")).collect()
+    }
+
+    #[test]
+    fn deliberation_entry_golden_vector() {
+        // Golden canonical hash vector: pins the FULL v1 layout (domain tag,
+        // length-prefixed strings, one entry_kind discriminant byte,
+        // recorded_at LE, raw fixed 32-byte body_hash). Any layout change
+        // breaks this test and requires a new tag version, not an edit here.
+        let r = sample_deliberation_entry_receipt();
+        assert_eq!(
+            hex32(&r.record_hash),
+            "6d2fcb3bd03f6aa67eb4ccd89e7a17086c5cb4775c034eeeb7c2a79633583fcc",
+            "canonical v1 hash layout drifted"
+        );
+    }
+
+    #[test]
+    fn deliberation_entry_record_hash_determinism() {
+        let r1 = sample_deliberation_entry_receipt();
+        let r2 = sample_deliberation_entry_receipt();
+        assert_eq!(r1.record_hash, r2.record_hash);
+        assert_ne!(r1.record_hash, [0u8; 32]);
+        assert_eq!(r1, r2);
+    }
+
+    #[test]
+    fn deliberation_entry_record_hash_changes_per_field() {
+        // Each identity field independently changes the hash.
+        let base = sample_deliberation_entry_receipt();
+        let variants = [
+            DeliberationEntryRecordedReceipt::new(
+                "domain-other".to_string(),
+                base.session_id.clone(),
+                base.entry_id.clone(),
+                base.author.clone(),
+                base.entry_kind,
+                base.recorded_at,
+                base.body_hash,
+            ),
+            DeliberationEntryRecordedReceipt::new(
+                base.domain_id.clone(),
+                "session-other".to_string(),
+                base.entry_id.clone(),
+                base.author.clone(),
+                base.entry_kind,
+                base.recorded_at,
+                base.body_hash,
+            ),
+            DeliberationEntryRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                "entry-other".to_string(),
+                base.author.clone(),
+                base.entry_kind,
+                base.recorded_at,
+                base.body_hash,
+            ),
+            DeliberationEntryRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.entry_id.clone(),
+                "did:icn:member-other".to_string(),
+                base.entry_kind,
+                base.recorded_at,
+                base.body_hash,
+            ),
+            DeliberationEntryRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.entry_id.clone(),
+                base.author.clone(),
+                DeliberationEntryKind::Concern,
+                base.recorded_at,
+                base.body_hash,
+            ),
+            DeliberationEntryRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.entry_id.clone(),
+                base.author.clone(),
+                base.entry_kind,
+                base.recorded_at + 1,
+                base.body_hash,
+            ),
+            DeliberationEntryRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.entry_id.clone(),
+                base.author.clone(),
+                base.entry_kind,
+                base.recorded_at,
+                [8u8; 32],
+            ),
+        ];
+        for (i, v) in variants.iter().enumerate() {
+            assert_ne!(
+                base.record_hash, v.record_hash,
+                "variant {i} must change the record hash"
+            );
+        }
+    }
+
+    #[test]
+    fn deliberation_entry_tag_separates_from_other_families() {
+        // Family separation from the two landed governance process classes.
+        assert_ne!(
+            DeliberationEntryRecordedReceipt::DOMAIN_TAG,
+            ProcessSessionOpenedReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            DeliberationEntryRecordedReceipt::DOMAIN_TAG,
+            ProcessGateResultReceipt::DOMAIN_TAG
+        );
+        // The test-only icn-baseline-lock fixture DAG has a namesake variant
+        // under `icn:baseline:deliberation_entry:v1` — a different lineage
+        // (its payload is an approval vote) that is NOT prior art for this
+        // class. The tags must never converge.
+        assert_ne!(
+            DeliberationEntryRecordedReceipt::DOMAIN_TAG,
+            b"icn:baseline:deliberation_entry:v1" as &[u8]
+        );
+        let entry = sample_deliberation_entry_receipt();
+        let opened = sample_session_opened_receipt();
+        assert_ne!(entry.record_hash, opened.record_hash);
+    }
+
+    #[test]
+    fn deliberation_entry_kind_discriminants_are_stable() {
+        // The #2278 discriminant table, asserted exhaustively with literal
+        // values. Never reorder; never reuse; discriminant 10 is reserved
+        // for a future `resolution` kind if #2278's deferral is lifted.
+        // Retirement of a kind is emission-side only: this mapping (and the
+        // serde string) must stay in code forever so historical receipts
+        // remain decodable and audit replay can recompute hashes.
+        let table: [(DeliberationEntryKind, u8); 10] = [
+            (DeliberationEntryKind::Question, 0),
+            (DeliberationEntryKind::Concern, 1),
+            (DeliberationEntryKind::Objection, 2),
+            (DeliberationEntryKind::Amendment, 3),
+            (DeliberationEntryKind::Blocker, 4),
+            (DeliberationEntryKind::FacilitatorSummary, 5),
+            (DeliberationEntryKind::PrivacyReview, 6),
+            (DeliberationEntryKind::AccessibilityReview, 7),
+            (DeliberationEntryKind::ConflictSignal, 8),
+            (DeliberationEntryKind::RecordOnly, 9),
+        ];
+        for (kind, expected) in table {
+            assert_eq!(
+                deliberation_entry_kind_ordinal(kind),
+                expected,
+                "discriminant for {kind:?} drifted"
+            );
+        }
+    }
+
+    #[test]
+    fn deliberation_entry_kind_serde_snake_case_roundtrip() {
+        // Wire form is stable snake_case strings (landed gate-receipt
+        // pattern); the discriminant is hash-only, never persisted.
+        let expected: [(DeliberationEntryKind, &str); 10] = [
+            (DeliberationEntryKind::Question, "\"question\""),
+            (DeliberationEntryKind::Concern, "\"concern\""),
+            (DeliberationEntryKind::Objection, "\"objection\""),
+            (DeliberationEntryKind::Amendment, "\"amendment\""),
+            (DeliberationEntryKind::Blocker, "\"blocker\""),
+            (
+                DeliberationEntryKind::FacilitatorSummary,
+                "\"facilitator_summary\"",
+            ),
+            (DeliberationEntryKind::PrivacyReview, "\"privacy_review\""),
+            (
+                DeliberationEntryKind::AccessibilityReview,
+                "\"accessibility_review\"",
+            ),
+            (DeliberationEntryKind::ConflictSignal, "\"conflict_signal\""),
+            (DeliberationEntryKind::RecordOnly, "\"record_only\""),
+        ];
+        for (kind, wire) in expected {
+            let json = serde_json::to_string(&kind).expect("serialize kind");
+            assert_eq!(json, wire);
+            let back: DeliberationEntryKind = serde_json::from_str(&json).expect("roundtrip");
+            assert_eq!(back, kind);
+        }
+    }
+
+    #[test]
+    fn deliberation_entry_kind_unknown_string_fails_closed() {
+        for bad in [
+            "\"resolution\"",
+            "\"approve\"",
+            "\"vote\"",
+            "\"outcome\"",
+            "\"decision\"",
+            "\"unknown_kind\"",
+            "\"\"",
+        ] {
+            assert!(
+                serde_json::from_str::<DeliberationEntryKind>(bad).is_err(),
+                "kind {bad} must fail closed at deserialization"
+            );
+        }
+    }
+
+    #[test]
+    fn deliberation_entry_length_prefix_prevents_field_shifting() {
+        // "ab" + "c" vs "a" + "bc" across adjacent string fields must not
+        // alias (length-prefixed field binding).
+        let r1 = DeliberationEntryRecordedReceipt::new(
+            "ab".to_string(),
+            "c".to_string(),
+            "e".to_string(),
+            "did:icn:x".to_string(),
+            DeliberationEntryKind::RecordOnly,
+            1,
+            [1u8; 32],
+        );
+        let r2 = DeliberationEntryRecordedReceipt::new(
+            "a".to_string(),
+            "bc".to_string(),
+            "e".to_string(),
+            "did:icn:x".to_string(),
+            DeliberationEntryKind::RecordOnly,
+            1,
+            [1u8; 32],
+        );
+        assert_ne!(r1.record_hash, r2.record_hash);
+    }
+
+    #[test]
+    fn deliberation_entry_serde_roundtrip_and_no_body_field() {
+        let r = sample_deliberation_entry_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let back: DeliberationEntryRecordedReceipt =
+            serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(r, back);
+        assert_eq!(back.entry_kind, r.entry_kind);
+        // Privacy discipline: the receipt carries a body_hash fingerprint
+        // and no body content field of any name.
+        let value: serde_json::Value = serde_json::from_str(&json).expect("value");
+        let obj = value.as_object().expect("object");
+        assert!(obj.contains_key("body_hash"));
+        for forbidden in ["body", "content", "text", "message"] {
+            assert!(
+                !obj.contains_key(forbidden),
+                "receipt JSON must not carry a `{forbidden}` field"
+            );
+        }
+    }
+
+    #[test]
+    fn deliberation_entry_no_prohibited_vocabulary() {
+        let r = sample_deliberation_entry_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let lower = json.to_lowercase();
+        for forbidden in [
+            // regulated-finance vocabulary (same list as the session-open
+            // receipt test)
+            "wallet", "balance", "currency", "payment", "withdraw", "deposit",
+            // chat/social-media/moderation vocabulary — this receipt records
+            // institutional facts, not a discussion platform
+            "chat", "comment", "moderat", "follower", "upvote",
+            // outcome semantics belong to Q4 / DecisionRecord, never here
+            "approve", "vote", "outcome",
+        ] {
+            assert!(
+                !lower.contains(forbidden),
+                "DeliberationEntryRecordedReceipt JSON must not contain `{forbidden}`; got: {json}"
             );
         }
     }
