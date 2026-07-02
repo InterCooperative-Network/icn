@@ -62,7 +62,14 @@ fn default_weight() -> f64 {
 /// rejected by JSON deserialization (400) rather than silently coerced. The
 /// `session_id` and `domain_id` come from the path, and the recording actor
 /// comes from the authenticated token — not the body.
+///
+/// **Fails closed on unknown fields** (`deny_unknown_fields`): a client that
+/// posts extra fields alongside `gate_kind`/`result` is rejected with 400
+/// rather than having them silently discarded, so this surface's contract is
+/// enforced by rejection, not omission (mirrors the `RecordDecisionRequest`
+/// hardening in PR #2282).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RecordProcessGateResultRequest {
     /// Closed-taxonomy gate kind being recorded (e.g. `"privacy_review"`).
     pub gate_kind: ProcessGateKind,
@@ -84,7 +91,14 @@ pub struct RecordProcessGateResultRequest {
 /// — **the body itself is never sent to or stored by this surface**. The
 /// `domain_id`, `session_id`, and `entry_id` come from the path, and the
 /// author comes from the authenticated token — not the body.
+///
+/// **Fails closed on unknown fields** (`deny_unknown_fields`): a client that
+/// posts extra fields (e.g. a raw body, or decision semantics) alongside
+/// `entry_kind`/`body_hash` is rejected with 400 rather than having them
+/// silently discarded, so this surface's contract is enforced by rejection,
+/// not omission (mirrors the `RecordDecisionRequest` hardening in PR #2282).
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RecordDeliberationEntryRequest {
     /// Closed-taxonomy entry kind being recorded (e.g. `"question"`).
     pub entry_kind: DeliberationEntryKind,

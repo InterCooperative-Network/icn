@@ -587,3 +587,45 @@ async fn record_route_bad_inputs_rejected_400() {
         0
     );
 }
+
+#[actix_web::test]
+async fn record_route_rejects_unknown_fields_400() {
+    // The request contract carries only `entry_kind`/`body_hash`; the path and
+    // token supply everything else, and the body itself never crosses this
+    // surface. `#[serde(deny_unknown_fields)]` makes an extra field (a raw
+    // body, or smuggled decision semantics) fail closed with 400 rather than
+    // be silently discarded, so the contract is enforced by rejection.
+    let h = make_harness();
+    let caller = fresh_did();
+    let domain =
+        seed_domain_with_members(&h.ctx.manager, std::slice::from_ref(&caller), "test-coop").await;
+    open_session(&h.ctx.manager, &domain, "session-deny", &caller);
+    let app = gate_app!(h.ctx.clone(), &caller);
+
+    for extra in [
+        serde_json::json!({ "entry_kind": "question", "body_hash": hex_body_hash(1), "body": "raw text" }),
+        serde_json::json!({ "entry_kind": "question", "body_hash": hex_body_hash(1), "outcome": "accepted" }),
+        serde_json::json!({ "entry_kind": "question", "body_hash": hex_body_hash(1), "foo": 1 }),
+    ] {
+        let resp = test::call_service(
+            &app,
+            test::TestRequest::post()
+                .uri(&record_uri(&domain.0, "session-deny", "entry-deny"))
+                .set_json(&extra)
+                .to_request(),
+        )
+        .await;
+        assert_eq!(
+            resp.status(),
+            StatusCode::BAD_REQUEST,
+            "unknown request field must 400, got {} for {extra}",
+            resp.status()
+        );
+    }
+    assert_eq!(
+        h.receipts
+            .entry_count(&domain.0, "session-deny", "entry-deny"),
+        0,
+        "nothing persisted for rejected unknown-field requests"
+    );
+}
