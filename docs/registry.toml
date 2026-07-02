@@ -1367,6 +1367,15 @@ last_updated = "2026-07-02"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/design/deliberation-entry-recorded-receipt.md"]
+category = "design"
+status = "draft"
+title = "DeliberationEntryRecordedReceipt — Design/Audit Contract"
+description = "Implementation contract for the third ProcessTransitionReceipt class (#1748/#2141): a DeliberationEntryRecordedReceipt recording one deliberation entry as an institutional fact against an already-opened (domain_id, session_id) anchor (#2276), with caller-opaque entry_id, body_hash-only content fingerprint (the body is never stored), stable-identity retry idempotency, fail-closed different-author/body conflict, and atomic per-entry uniqueness via the landed put_opaque_if_absent pattern. Audits current state (no DeliberationEntryRecordedReceipt, no stored DeliberationThread; disambiguates the test-only icn-baseline-lock namesake), keeps entries free of chat/moderation/vote semantics, and triages framing-brief Q3 (entry_kind taxonomy) as the explicit implementation blocker — recommendation Option C: a narrow Q3 taxonomy decision rung before any implementation. Receipts record facts and grant no authority. Design only — no runtime change (Refs #1748, #2141; no closure claims)"
+last_updated = "2026-07-02"
+owner = "matt"
+audiences = ["architects", "developers"]
+
 [docs."docs/design/membership-coop-core-map-parity.md"]
 category = "design"
 status = "draft"
