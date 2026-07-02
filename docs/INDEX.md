@@ -151,6 +151,7 @@ Feature designs, proposals, and evolution plans:
 - [process-session-receipt-anchor.md](design/process-session-receipt-anchor.md) - ProcessSessionOpenedReceipt anchor contract, #1748/#2141 process spine (design/audit only)
 - [deliberation-entry-recorded-receipt.md](design/deliberation-entry-recorded-receipt.md) - DeliberationEntryRecordedReceipt contract, #1748/#2141 process spine; Q3 taxonomy blocker triaged (design/audit only)
 - [deliberation-entry-kind-taxonomy.md](design/deliberation-entry-kind-taxonomy.md) - Q3 decision: closed ADR-controlled entry_kind enum, ten-kind v1 list + discriminant rule (design decision only)
+- [decision-recorded-receipt.md](design/decision-recorded-receipt.md) - DecisionRecordedReceipt contract, #1748/#2141 process spine; Q4 boundary blocker triaged (design/audit only)
 - [institution-in-a-box.md](design/institution-in-a-box.md) - Organizational templates
 
 **Economics (`design/economics/`):**
