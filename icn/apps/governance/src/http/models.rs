@@ -107,7 +107,15 @@ pub struct RecordDeliberationEntryRequest {
 /// to (never converging with) the proposal/vote decision lineage. The
 /// `domain_id`, `session_id`, and `decision_id` come from the path, and
 /// the recorder comes from the authenticated token — not the body.
+///
+/// **Fails closed on unknown fields** (`deny_unknown_fields`): a client
+/// that posts `body_hash` alongside `outcome`, `proposal_id`, `decider`,
+/// or a raw body field is rejected with 400 rather than having the extra
+/// fields silently discarded. The #2281 boundary — no decision
+/// semantics/body cross this surface — is thereby enforced by rejection,
+/// not by omission.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RecordDecisionRequest {
     /// 64-hex-character content fingerprint of the decision body.
     pub body_hash: String,

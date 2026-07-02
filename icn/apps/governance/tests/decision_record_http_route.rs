@@ -501,6 +501,47 @@ async fn record_route_bad_inputs_400() {
 }
 
 #[actix_web::test]
+async fn record_route_rejects_unknown_decision_semantics_fields_400() {
+    // The #2281 boundary is enforced by rejection, not omission: a client
+    // that smuggles decision semantics (outcome / proposal_id / decider) or
+    // a raw body alongside body_hash must be refused with 400, not silently
+    // accepted with the extras discarded. Backed by
+    // `#[serde(deny_unknown_fields)]` on `RecordDecisionRequest`.
+    let h = make_harness();
+    let caller = fresh_did();
+    let domain =
+        seed_domain_with_members(&h.ctx.manager, std::slice::from_ref(&caller), "test-coop").await;
+    open_session(&h.ctx.manager, &domain, "session-deny", &caller);
+    let app = gate_app!(h.ctx.clone(), &caller);
+
+    for extra in [
+        serde_json::json!({ "body_hash": hex_body_hash(9), "outcome": "accepted" }),
+        serde_json::json!({ "body_hash": hex_body_hash(9), "proposal_id": "prop-1" }),
+        serde_json::json!({ "body_hash": hex_body_hash(9), "decider": "did:icn:x" }),
+        serde_json::json!({ "body_hash": hex_body_hash(9), "body": "raw text" }),
+    ] {
+        let req = test::TestRequest::post()
+            .uri(&record_uri(&domain.0, "session-deny", "decision-deny"))
+            .set_json(&extra)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(
+            resp.status(),
+            StatusCode::BAD_REQUEST,
+            "unknown decision-semantics field must 400, got {} for {extra}",
+            resp.status()
+        );
+    }
+
+    assert_eq!(
+        h.receipts
+            .decision_count(&domain.0, "session-deny", "decision-deny"),
+        0,
+        "nothing persisted for rejected unknown-field requests"
+    );
+}
+
+#[actix_web::test]
 async fn record_route_unopened_session_404_nothing_persisted() {
     let h = make_harness();
     let caller = fresh_did();
