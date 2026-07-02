@@ -1367,6 +1367,15 @@ last_updated = "2026-07-02"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/design/decision-recorded-q4-decision.md"]
+category = "design"
+status = "draft"
+title = "DecisionRecordedReceipt Q4 decision — recorded fact vs proposal/vote lineage"
+description = "Q4 decision document unblocking DecisionRecordedReceipt implementation (#1748/#2141, merged contract #2280): decides all four Q4 branches — (A) v1 stays an opaque body_hash-only recorded-decision fact (no typed DecisionRecord/HumanDecisionSet payload; the brief positions HumanDecisionSet as a read-model); (B) parallel with explicit non-convergence to the load-bearing proposal/vote GovernanceDecisionReceipt lineage icn:gov:decision:v1/v2/v3 (effect dispatch, mandate/authority-grant indexes, action cards) — the spine names but does not absorb it; any future reference is v2-or-later after its own ADR; (C) no deciding-body handle in v1, recorded_by stays recorder-not-decider; (D) resolution stays deferred out of DeliberationEntryKind v1 with discriminant 10 reserved. Hash-layout consequence: none — the merged #2280 contract is implementation-ready as written. Design decision only — no runtime change (Refs #1748, #2141; no closure claims)"
+last_updated = "2026-07-02"
+owner = "matt"
+audiences = ["architects", "developers"]
+
 [docs."docs/design/decision-recorded-receipt.md"]
 category = "design"
 status = "draft"
