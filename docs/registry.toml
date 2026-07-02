@@ -1358,6 +1358,15 @@ last_updated = "2026-07-01"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/design/process-session-receipt-anchor.md"]
+category = "design"
+status = "draft"
+title = "ProcessSession Receipt Anchor — Design/Audit Contract"
+description = "Implementation contract for the second ProcessTransitionReceipt class (#1748/#2141): a ProcessSessionOpenedReceipt anchoring caller-opaque session_ids to a recorded opening fact (domain-bound blake3 hash, ADR-0026 Layer 2, mirrors the landed #2144 ProcessGateResultReceipt pattern end to end). Audits current state (session_id opaque, no stored ProcessSession, no lifecycle), pins duplicate-open idempotency/conflict semantics, defers target_ref (Q1) and purpose taxonomy in writing, and recommends receipt-only anchoring (no stored session object) with the required test matrix. Receipts record facts and grant no authority. Design only — no runtime change (Refs #1748, #2141; no closure claims)"
+last_updated = "2026-07-02"
+owner = "matt"
+audiences = ["architects", "developers"]
+
 [docs."docs/design/membership-coop-core-map-parity.md"]
 category = "design"
 status = "draft"
