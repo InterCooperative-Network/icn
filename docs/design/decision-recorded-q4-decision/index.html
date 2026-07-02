@@ -1,0 +1,414 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>DecisionRecordedReceipt Q4 decision — recorded fact vs proposal/vote lineage | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>decision recorded q4 decision</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/decision-recorded-q4-decision.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>DecisionRecordedReceipt Q4 decision — recorded fact vs proposal/vote lineage</h1>
+<p><strong>Status</strong>: draft — design / audit decision (not runtime implementation)
+<strong>Truth class</strong>: descriptive
+<strong>Canonical</strong>: no — current implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last Reviewed</strong>: 2026-07-02
+<strong>Source basis</strong>: read against <code>main</code> @ <code>2b2622ca</code>. Code anchors were verified at that commit — re-verify before relying on exact numbers.
+<strong>Related</strong>: issues #1748 (Institutional Process Substrate milestone) · #2141 (vertical institutional spine control) · PR #2280 (merged <code>DecisionRecordedReceipt</code> design/audit contract, <code>docs/design/decision-recorded-receipt.md</code>) · PR #2278 (Q3 taxonomy decision, <code>docs/design/deliberation-entry-kind-taxonomy.md</code> — the sibling decision-doc pattern) · <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a> (receipt envelope, Layer 2) · <a href="/docs/adr/ADR-0014-constitutional-object-model">ADR-0014</a> (decision-receipt provenance) · <code>ops/ideas/framing/institutional-process-substrate.md</code> (idea-0019 framing brief; open question Q4) · <code>docs/spec/effect-dispatch-contract.md</code> (effect dispatch keyed on the proposal/vote lineage)</p>
+<blockquote>
+<p>Narrow decision document closing framing-brief open question Q4 for the
+<code>DecisionRecordedReceipt</code> slice only. The merged #2280 contract pinned the
+Q4-independent skeleton and blocked implementation on four Q4 branches:
+(a) decision representation, (b) reference posture toward the
+proposal/vote <code>GovernanceDecisionReceipt</code> lineage, (c) deciding-body
+handle, (d) the fate of the deferred <code>resolution</code> deliberation kind. This
+document decides all four. It decides nothing else: no runtime change, no
+new receipt fields, no proposal/vote migration. Receipts record
+institutional facts. They grant zero authority.</p>
+</blockquote>
+<h2>1. Problem</h2>
+<p>PR #2280 defined the fourth <code>ProcessTransitionReceipt</code> class,
+<code>DecisionRecordedReceipt</code> (proposed tag <code>icn:gov:decision_recorded:v1</code>),
+and deliberately refused to pin its runtime <code>:v1</code> layout until Q4 is
+decided. The framing brief&#39;s Q4, verbatim:</p>
+<blockquote>
+<p>How does <code>HumanDecisionSet</code> relate to the existing proposal/vote
+machinery? Is the existing path one specialization of
+<code>HumanDecisionSet</code>, or a parallel surface that the spine names but does
+not absorb?</p>
+</blockquote>
+<p>The question is live because ICN already has a decision receipt: the
+proposal/vote <code>GovernanceDecisionReceipt</code> lineage under
+<code>icn:gov:decision:v1/v2/v3</code>. If the process-spine class silently absorbed,
+referenced, or duplicated that lineage, it would either fork a load-bearing
+audit chain or become proposal/vote outcome machinery by accident — the
+exact failure the #2280 audit warns against. And the decision must land
+before implementation: every unresolved branch changes the <code>:v1</code> canonical
+hash layout or the class&#39;s lineage relationships, and the landed rule (from
+the #2278 review cycle) is that hash-participating structure is decided in
+writing before a tag is pinned, never silently in an implementation PR.</p>
+<h2>2. Prior-art audit (verified at <code>2b2622ca</code>)</h2>
+<p><strong>The proposal/vote decision lineage — outcome machinery, load-bearing.</strong>
+<code>icn/crates/icn-governance/src/proof.rs</code>: <code>GovernanceDecisionReceipt</code>
+(~L226, tag <code>icn:gov:decision:v1</code> ~L251) carries <code>proposal_id</code>,
+<code>domain_id</code>, <code>outcome</code> (Accepted / Rejected / NoQuorum), <code>vote_tally</code>,
+<code>vote_hash</code>, and the canonical <code>decision_hash</code>;
+<code>GovernanceDecisionReceiptV2</code> (~L541, <code>:v2</code>) adds
+<code>capability_scope_presented</code> and the frozen mandate-attestation taxonomy;
+<code>GovernanceDecisionReceiptV3</code> (~L820, <code>:v3</code>) adds the <code>ProcessAuthorized</code>
+attestation mode; <code>GovernanceDecisionAttestation</code> (~L1037,
+<code>icn:gov:attest:v1</code>) is the node-local witness. Downstream, this lineage is
+structural: <code>decision_hash</code> is the load-bearing identifier of the effect
+dispatch chain (<code>docs/spec/effect-dispatch-contract.md</code>: decision →
+<code>InstitutionalEffectRecord</code> → <code>EffectManifest</code> → subsystem dispatch); the
+gateway <code>ReceiptStore</code> keeps secondary indexes of <strong>mandates and authority
+grants by <code>decision_hash</code></strong> (<code>icn/crates/icn-gateway/src/receipt_store.rs</code>
+~L80–84) plus lookups by <code>proposal_id</code> and <code>domain_id</code>; action cards
+(contract: <a href="/docs/adr/ADR-0027-action-card-contract">ADR-0027</a>; the
+surface ADR-0020 promised, with the end-to-end proposal/vote proof-loop
+verification recorded at ADR-0020 step 7) close the proposal/vote proof
+loop against it; ADR-0014 records its
+authority posture (&quot;authoritative for &#39;the decision happened,&#39; but it does
+not itself bind authority-to-execute&quot;). This is outcome/tally/proposal
+lineage — a <em>specific decision rule</em> (vote over a proposal) with its
+consequences wired in. It is not, and was never designed as, the generic
+recorded-decision fact of the process spine.</p>
+<p><strong>The process-transition receipt lineage — recorded facts, landed.</strong>
+Three classes, all wired end to end through the opaque cascade:
+<code>ProcessGateResultReceipt</code> (<code>icn:gov:process_gate_result:v1</code>, #2144/#1755),
+<code>ProcessSessionOpenedReceipt</code> (<code>icn:gov:process_session_opened:v1</code>,
+#2275/#2276), <code>DeliberationEntryRecordedReceipt</code>
+(<code>icn:gov:deliberation_entry_recorded:v1</code>, #2277/#2278/#2279). All are
+body-blind or content-fingerprinting, session-or-domain-anchored,
+idempotent-on-stable-identity, fail-closed on conflict, and grant zero
+authority. The #2278 taxonomy decision already operated the Q4 firewall
+inside this lineage: no approve/vote/outcome kind may enter
+<code>DeliberationEntryKind</code> by append — &quot;an outcome-bearing kind is a semantic
+boundary change requiring its own design decision (and almost certainly a
+different receipt class: <code>DecisionRecord</code> / <code>HumanDecisionSet</code> territory)&quot;
+— and <code>resolution</code> was deferred with discriminant <code>10</code> reserved.</p>
+<p><strong>The framing brief&#39;s own definitions.</strong> <code>HumanDecisionSet</code> is &quot;the
+structured set of decision moments inside one <code>ProcessSession</code>: who
+decided, in what role, by what rule (vote threshold, consensus, mandate
+from a parent body, delegated authority, emergency authority, etc.), with
+what tally or attestation, and over which proposed outcome&quot; — and the
+brief&#39;s dogfood sketch positions it explicitly as <strong>&quot;a read-model that
+names who decided by what rule with what tally or attestation.&quot;</strong>
+<code>DecisionRecord</code> is &quot;the persisted, signed artifact that names the chosen
+outcome and binds it to the deliberation that produced it.&quot; The brief also
+separates deciding from doing: &quot;a decision is <strong>not</strong> a mutation. A
+decision authorizes a mutation&quot; — with <code>ActivationRequest</code> as the explicit
+boundary crossing.</p>
+<p><strong>No <code>DecisionRecordedReceipt</code> runtime exists.</strong> The strings
+<code>DecisionRecordedReceipt</code> and <code>decision_recorded</code> appear nowhere under
+<code>icn/</code> at <code>2b2622ca</code>. The only definitions are the merged #2280 contract
+and status/backlog references.</p>
+<h2>3. The four Q4 axes — options and decision</h2>
+<h3>Axis A — representation of the recorded decision in <code>:v1</code></h3>
+<p>Options considered:</p>
+<ol>
+<li><strong>Opaque recorded-decision fact</strong> — <code>body_hash</code> fingerprint only, no
+typed outcome/kind field. <strong>CHOSEN.</strong></li>
+<li>Typed <code>DecisionRecord</code> in the receipt — outcome enum / chosen-outcome
+naming inside the receipt payload. Rejected: the framing brief&#39;s
+<code>DecisionRecord</code> &quot;names the chosen outcome&quot;; putting outcome naming in
+the receipt makes the receipt the outcome artifact, which is exactly
+the semantic boundary #2278 §7 placed outside the process-input
+lineage, and it drags outcome-taxonomy design (accepted? adopted?
+consensus-reached? deferred?) into a hash layout before any consumer
+exists.</li>
+<li>Typed <code>HumanDecisionSet</code> in the receipt — who/role/rule/tally
+structure. Rejected: the brief itself positions <code>HumanDecisionSet</code> as
+a <strong>read-model</strong>, not a receipt payload; embedding it would freeze
+who-decided-by-what-rule semantics (idea-0020 <code>AuthorityBasis</code>
+territory) into a v1 hash before that design exists.</li>
+<li>Hybrid (opaque body + minimal typed outcome flag). Rejected: inherits
+the objections to 2 at reduced fidelity — a one-bit outcome is still
+outcome machinery, still hash-participating, still undesigned.</li>
+</ol>
+<p><strong>Decision A: <code>:v1</code> records an opaque recorded-decision fact.</strong> The
+receipt witnesses that a decision artifact was recorded — attributed
+(<code>recorded_by</code>), timestamped (<code>recorded_at</code>), content-fingerprinted
+(<code>body_hash</code>) — and nothing about what the decision says. The
+outcome-naming content lives in the (never-stored, fingerprinted) decision
+body; structured who/rule/tally legibility arrives later as a read-model
+or a future tag version, not in this hash layout.</p>
+<h3>Axis B — relationship to <code>GovernanceDecisionReceipt</code></h3>
+<p>Options considered:</p>
+<ol>
+<li>Absorb — make the proposal/vote lineage a specialization of the
+process-spine class. Rejected: <code>icn:gov:decision:v1/v2/v3</code> is
+load-bearing (effect dispatch keying, mandate and authority-grant
+indexes by <code>decision_hash</code>, action-card proof loops, 20+ documented
+callers); absorbing means retagging or adapter-wrapping live audit
+chains for zero consumer benefit.</li>
+<li>Reference — an optional field carrying the lineage&#39;s <code>decision_hash</code>
+when a session&#39;s decision came from a proposal/vote. Rejected <strong>for
+<code>:v1</code></strong>: an optional hash-participating field is still a layout
+commitment, and it pre-answers the posture question inside a receipt
+slice instead of an ADR. A session whose decision was produced by a
+proposal/vote can already be evidenced without a receipt field: the
+decision body (fingerprinted by <code>body_hash</code>) can name the
+<code>proposal_id</code>/<code>decision_hash</code>, and read-models can join the two
+lineages at the app layer.</li>
+<li><strong>Parallel with explicit non-convergence. CHOSEN.</strong></li>
+<li>Conversion/adapters now. Rejected as premature: no consumer exists;
+adapters without consumers are speculative surface.</li>
+</ol>
+<p><strong>Decision B: the answer to the framing brief&#39;s question is &quot;a parallel
+surface that the spine names but does not absorb.&quot;</strong> The proposal/vote
+path stays exactly what it is — one concrete, heavily-wired decision rule
+with its own receipt lineage. <code>DecisionRecordedReceipt</code> records the
+generic institutional fact that a process session&#39;s decision was recorded,
+whatever rule produced it. The two lineages never converge tags, never
+share fields, never share stores. Any future formal reference or adapter
+between them is a <code>:v2</code>-or-later change (or a separate adapter class)
+requiring its own explicit ADR — never a silent addition to <code>:v1</code>.</p>
+<h3>Axis C — deciding-body handle in <code>:v1</code></h3>
+<p>Options considered:</p>
+<ol>
+<li><strong>No deciding-body field in v1. CHOSEN.</strong></li>
+<li>Opaque <code>deciding_body_ref</code> string. Rejected: even an opaque ref bakes
+&quot;there is a single nameable deciding body&quot; into the hash layout —
+which is false for consensus processes, delegated chains, and
+emergency authority — and it reads as an authority claim the receipt
+explicitly does not make.</li>
+<li>Typed body/member/quorum structure. Rejected: this is
+<code>HumanDecisionSet</code> by another name (Axis A, option 3).</li>
+<li>Defer to future <code>HumanDecisionSet</code> work. <strong>This is the same choice as
+1, stated forward</strong>: when idea-0020/<code>HumanDecisionSet</code> design lands, it
+composes with this receipt as a read-model or future tag version.</li>
+</ol>
+<p><strong>Decision C: <code>recorded_by</code> remains the only actor field in <code>:v1</code>, and it
+remains recorder evidence — not <code>decider</code>, not <code>author</code>, not <code>approver</code>.</strong>
+Who decided, in what role, by what rule is deferred to the
+<code>HumanDecisionSet</code> read-model / idea-0020 lane, exactly where the framing
+brief puts it.</p>
+<h3>Axis D — fate of the deferred <code>resolution</code> deliberation kind</h3>
+<p>Options considered:</p>
+<ol>
+<li><strong>Keep deferred (discriminant <code>10</code> stays reserved). CHOSEN.</strong></li>
+<li>Add <code>resolution</code> to <code>DeliberationEntryKind</code> v1 now. Rejected: #2278
+deferred it precisely because it straddles the input/outcome boundary;
+nothing about this decision sharpens the <em>input</em> reading, and v1 kind
+appends require their own ADR/addendum anyway.</li>
+<li>Move it to decision territory as a typed decision kind. Rejected:
+Axis A chose no typed decision kinds in <code>:v1</code>; and with
+<code>DecisionRecordedReceipt</code> existing, &quot;the resolution of the matter&quot; is
+naturally the content of a recorded decision body — no new kind
+needed to express it.</li>
+<li>App-layer mapping only. <strong>Already legal and unaffected</strong>: the #2278
+vocabulary firewall lets charters map institutional vocabulary (e.g.
+&quot;proposed resolution offered into deliberation&quot;) onto existing input
+kinds such as <code>amendment</code> or <code>record_only</code> at the app layer, with no
+core change. This decision reaffirms that path and adds nothing to
+core.</li>
+</ol>
+<p><strong>Decision D: <code>resolution</code> stays deferred and MUST NOT be added to
+<code>DeliberationEntryKind</code> v1.</strong> The outcome reading of &quot;resolution&quot; now has
+a home (the recorded decision&#39;s fingerprinted body); the input reading
+(&quot;resolution offered&quot;) remains expressible via app-layer mapping. A sharp
+input-only <code>resolution</code> kind may still be appended later via the #2278
+evolution rule if a real consumer demonstrates the need — this document
+neither performs nor forecloses that append.</p>
+<h2>4. Decision summary</h2>
+<p><strong>Option A — <code>DecisionRecordedReceipt</code> <code>:v1</code> is a generic recorded-decision
+fact, parallel to and explicitly non-convergent with
+<code>GovernanceDecisionReceipt</code>.</strong></p>
+<p>Binding consequences:</p>
+<ul>
+<li><code>:v1</code> stays body-hash-only. No vote, proposal, tally, outcome,
+quorum, or effect-dispatch field — ever, in this tag version.</li>
+<li><code>:v1</code> uses <code>recorded_by</code> (recorder evidence), never <code>decider</code>,
+<code>author</code>, or <code>approver</code>.</li>
+<li><code>:v1</code> carries no deciding-body handle.</li>
+<li><code>:v1</code> carries exactly the merged #2280 §4 field set — <code>domain_id</code>,
+<code>session_id</code>, caller-opaque <code>decision_id</code>, <code>recorded_by</code>, <code>recorded_at</code>,
+<code>body_hash</code>, <code>record_hash</code> — and nothing else.</li>
+<li><strong>Stable duplicate identity is narrower than the field set</strong>, exactly as
+#2280 §4 pins it: same <code>(domain_id, session_id, decision_id)</code> + same
+<code>recorded_by</code> + same <code>body_hash</code> → idempotent retry returning the
+ORIGINAL receipt. <code>recorded_at</code> and the derived <code>record_hash</code> are <strong>not</strong>
+identity inputs — a retry never fails, restamps, or conflicts merely
+because time moved; a mismatch on <code>recorded_by</code> or <code>body_hash</code> is a
+fail-closed <code>decision_recorded_conflict</code> 409.</li>
+<li>The relationship to <code>GovernanceDecisionReceipt</code> stays <strong>out of the v1
+hash layout entirely</strong>. <code>icn:gov:decision_recorded:v1</code> and
+<code>icn:gov:decision:v1/v2/v3</code> never converge, never share fields, never
+share typed stores.</li>
+<li>Any future reference to the proposal/vote lineage, deciding-body
+handle, or typed outcome is a <code>:v2</code>-or-later tag version or a separate
+adapter class, after its own explicit ADR — and per #2280&#39;s
+contract-sync instruction, any such hash-participating field joins
+stable duplicate identity (mismatch = fail-closed 409, never a silent
+idempotent return).</li>
+<li><code>resolution</code> remains deferred out of <code>DeliberationEntryKind</code> v1;
+discriminant <code>10</code> stays reserved.</li>
+</ul>
+<h2>5. Hash-layout consequence</h2>
+<p><strong>No change to #2280. The merged contract is implementation-ready as
+written.</strong> This decision adds zero fields, removes zero fields, and
+changes zero encodings: the <code>:v1</code> canonical layout is exactly #2280 §4
+(domain tag first; string fields length-prefixed u64 LE; <code>recorded_at</code> LE;
+<code>body_hash</code> raw fixed-32 with no length prefix; equality anchored to
+<code>record_hash</code>). #2280 does not need revision, amendment, or a
+contract-sync edit — its &quot;deliberately absent&quot; list is hereby confirmed
+absent for <code>:v1</code>, and its §4 contract-sync instruction (Q4-added fields
+join duplicate identity) now applies to any <strong>future</strong> tag version rather
+than to <code>:v1</code>. There are no silent layout changes available to the
+implementation PR: it implements #2280 §4–§8 byte-for-byte or it stops and
+comes back to design.</p>
+<h2>6. Boundaries (what this receipt is and is not)</h2>
+<ul>
+<li><code>DecisionRecordedReceipt</code> records that a decision fact was recorded
+against an opened process session. That is all.</li>
+<li>It does <strong>not</strong> prove the decision was valid, binding, voted, approved,
+quorum-backed, authorized, legitimate, or effect-dispatched. Bindingness
+and authority are future charter/policy/<code>HumanDecisionSet</code>/idea-0020
+work; the deciding→doing boundary stays with the framing brief&#39;s
+<code>ActivationRequest</code> concept and the future <code>ActivationCrossedReceipt</code>
+class, neither of which this document touches.</li>
+<li>The proposal/vote lineage — <code>GovernanceDecisionReceipt</code> v1/v2/v3,
+attestations, effect dispatch, mandate/authority-grant indexes, action
+cards — remains intact, separate, and untouched.</li>
+<li>Receipts record institutional facts. They grant zero authority.</li>
+</ul>
+<h2>7. Implementation instruction</h2>
+<p>With Q4 decided as above, the implementation blocker recorded in #2280
+§10/§11 is cleared. The next PR in this lane may implement
+<code>DecisionRecordedReceipt</code> <strong>exactly</strong> from the merged #2280 contract
+(§4–§8) plus this document — one focused PR, mirroring how #2279
+implemented #2277 + #2278. Required tests beyond #2280&#39;s §8 matrix
+(restated here as binding):</p>
+<ol>
+<li>Family-tag separation from <code>icn:gov:decision:v1</code>, <code>:v2</code>, and <code>:v3</code>
+(identical field bytes, different hashes), with a comment stating the
+lineages must never converge.</li>
+<li>Payload audit: no proposal, vote, tally, outcome, quorum, mandate, or
+effect-dispatch field anywhere in the persisted payload.</li>
+<li><code>recorded_by</code> semantics: recorder evidence only; participates in
+stable duplicate identity; distinct recorders on the same
+<code>decision_id</code> are a fail-closed conflict.</li>
+<li><code>body_hash</code> only: raw body never persisted; fixed-32, no length
+prefix, per the landed convention.</li>
+<li>Duplicate/idempotency/conflict behavior per #2280 §4 (original-return
+on stable-identity retry; <code>decision_recorded_conflict</code> 409 otherwise).</li>
+<li>Session-open precondition (<code>decision_recorded_session_not_opened</code>,
+404; no silent session creation).</li>
+<li>No <code>resolution</code> kind creep: <code>DeliberationEntryKind</code> remains exactly
+the #2278 ten-kind list; discriminant <code>10</code> remains unassigned.</li>
+<li>Existing <code>GovernanceDecisionReceipt</code> v1/v2/v3 behavior byte-identical
+(typed store, effect dispatch, action-card suites untouched and
+green).</li>
+<li>Existing process receipts unchanged (session-open, gate-result,
+deliberation-entry suites green, byte-identical semantics).</li>
+</ol>
+<h2>8. Explicit non-goals</h2>
+<p>No runtime implementation in this PR. No <code>DecisionRecordedReceipt</code> code,
+route, proof type, backend method, manager method, or generated-inventory
+change. No <code>HumanDecisionSet</code> runtime or read-model implementation. No
+proposal/vote migration, retagging, or adapter. No effect-dispatch
+changes. No action-card triggers. No activation-crossed / mutation-plan /
+mutation-applied / evidence-packet classes. No served-OpenAPI or SDK
+publication. No privacy/redaction evidence export; no accessibility-gate
+run. No #1748 closure; no #2141 closure; no #2081/#2080/#2274 work. No
+process-runtime, Phase-2, production, pilot, member/organizer-readiness,
+live-federation, or service-hosting claims.</p>
+<h2>9. Validation (this document&#39;s PR)</h2>
+<p>Docs-only change set: this file, a <code>docs/registry.toml</code> row, a
+<code>docs/INDEX.md</code> link, and the regenerated <code>docs/DOCUMENT_REGISTRY.md</code>
+(regeneration after registry row additions is required by that file&#39;s
+header). Validation: <code>git diff --check</code>, <code>python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml</code>
+(no new warnings), <code>python3 scripts/check-state-lag.py</code>. No route,
+OpenAPI, or generated-inventory files are touched, so none are
+regenerated.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
