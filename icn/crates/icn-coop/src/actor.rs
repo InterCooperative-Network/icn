@@ -3,7 +3,8 @@ use crate::{
     LifecycleManager, Member, MemberRole, MembershipManager, Result,
 };
 use icn_entity::{
-    project_coop_id, CoopEntityBindingProvenance, CoopEntityMap, CoopEntityMapError, EntityId,
+    project_coop_id, report_unknown_legacy, CoopEntityBindingProvenance, CoopEntityMap,
+    CoopEntityMapError, EntityId, UnknownLegacyStatus,
 };
 use icn_gossip::GossipActor;
 use icn_governance::charter::FounderSignature;
@@ -121,6 +122,35 @@ pub fn bind_coop_entity_map_activation(
         .map(|()| entity_id)
     });
     bind_outcome(result)
+}
+
+/// Read-only trusted-binding consultation for `CreateTreasury` (#2082 rung 12a,
+/// `docs/design/create-treasury-entity-id-semantics.md`).
+///
+/// Returns `Some(EntityId)` **only** when the canonical map already holds a
+/// binding of the byte-exact `coop_id` that is trusted
+/// ([`is_trusted_for_resolution`](CoopEntityBindingProvenance::is_trusted_for_resolution)),
+/// reverse-consistent (the reverse index points back at this `coop_id`
+/// byte-for-byte), and targets a well-formed cooperative [`EntityId`]. Every
+/// other state — not bound, `UnknownLegacy`/missing provenance, reverse
+/// mismatch, malformed or non-cooperative target, storage error — yields
+/// `None`, fail-closed. Delegates the classification to the single-sourced
+/// [`report_unknown_legacy`] discipline (#2267) so `CreateTreasury` can never
+/// drift from the operator report's definition of "trusted".
+///
+/// Never writes the map, never projects (`CreateTreasury` is not an
+/// institutional act and has no projection fallback), and grants no authority.
+fn trusted_binding_for_creation(
+    map: &(dyn CoopEntityMap + Send + Sync),
+    coop_id: &str,
+) -> Option<EntityId> {
+    let report = report_unknown_legacy(vec![coop_id.to_string()], map);
+    let entry = report.entries.into_iter().next()?;
+    if entry.status == UnknownLegacyStatus::Trusted {
+        entry.bound_entity_id
+    } else {
+        None
+    }
 }
 
 pub struct CoopActor {
@@ -782,6 +812,48 @@ impl CoopActor {
                 treasury_did = %treasury_did,
                 "Created treasury account in ledger for cooperative"
             );
+
+            // #2082 rung 12a (docs/design/create-treasury-entity-id-semantics.md):
+            // read-only trusted-binding consultation. CreateTreasury is not an
+            // institutional act and owns no provenance, so — deliberately stricter
+            // than activation — there is NO projection fallback: only a trusted,
+            // reverse-consistent, well-formed cooperative binding that already
+            // exists for the byte-exact coop_id populates entity_id, through the
+            // same fail-closed seam the two-step above registered under the
+            // original coop_id (never register_treasury_with_entity). The map is
+            // never written; a non-Populated outcome never fails creation (the
+            // operator backfill can complete it later); a mapping grants zero
+            // authority.
+            if let Some(ref map) = self.coop_entity_map {
+                if let Some(entity_id) = trusted_binding_for_creation(map.as_ref(), coop_id) {
+                    match treasury_guard.populate_entity_id_at_creation(
+                        &treasury_did,
+                        coop_id,
+                        entity_id,
+                    ) {
+                        Ok(TreasuryEntityIdPopulateResult::Populated) => tracing::info!(
+                            target: "coop_entity_bind",
+                            coop_id = %coop_id,
+                            treasury_did = %treasury_did,
+                            "populated treasury entity_id from existing trusted binding at CreateTreasury (identity target only; grants no authority)"
+                        ),
+                        Ok(other) => tracing::info!(
+                            target: "coop_entity_bind",
+                            coop_id = %coop_id,
+                            treasury_did = %treasury_did,
+                            outcome = ?other,
+                            "treasury entity_id not populated at CreateTreasury (idempotent/fail-closed skip); creation unaffected"
+                        ),
+                        Err(e) => tracing::error!(
+                            target: "coop_entity_bind",
+                            coop_id = %coop_id,
+                            treasury_did = %treasury_did,
+                            error = %e,
+                            "treasury entity_id populate failed at CreateTreasury; left None (backfillable); creation NOT failed"
+                        ),
+                    }
+                }
+            }
         }
 
         // Save updated cooperative
@@ -2514,6 +2586,411 @@ mod tests {
             binding.provenance,
             CoopEntityBindingProvenance::UnknownLegacy,
             "gossip-sourced bind must NOT record trusted Activation provenance"
+        );
+    }
+
+    // === CreateTreasury read-only trusted-binding consultation (#2082 rung 12a) ===
+    //
+    // Per docs/design/create-treasury-entity-id-semantics.md: at CreateTreasury
+    // time the canonical map is consulted READ-ONLY. Only a trusted,
+    // reverse-consistent, well-formed cooperative binding of the byte-exact
+    // coop_id populates the treasury entity_id — via the coop_id-preserving
+    // two-step (plain register_treasury, then the fail-closed populate seam),
+    // NEVER register_treasury_with_entity. Every other state (not bound,
+    // UnknownLegacy/missing provenance, reverse mismatch, malformed or
+    // non-cooperative target, storage error, no map) leaves entity_id: None.
+    // No projection fallback. The map is never written. A mapping grants zero
+    // authority.
+
+    /// Read-only wrapper: delegates every read to the inner map, panics on any
+    /// write. Proves CreateTreasury never writes through the map (the trait's
+    /// default `bind_exact`/`bind_projected`/`bind_resolved_with_provenance`
+    /// all funnel into `bind_resolved`).
+    struct ReadOnlyNoBindMap {
+        inner: Arc<InMemoryCoopEntityMap>,
+    }
+
+    impl CoopEntityMap for ReadOnlyNoBindMap {
+        fn bind_resolved(
+            &self,
+            _: &str,
+            _: &EntityId,
+        ) -> std::result::Result<(), CoopEntityMapError> {
+            unreachable!("CreateTreasury must never write the coop-entity map");
+        }
+        fn entity_for_coop(
+            &self,
+            coop_id: &str,
+        ) -> std::result::Result<Option<EntityId>, CoopEntityMapError> {
+            self.inner.entity_for_coop(coop_id)
+        }
+        fn coop_for_entity(
+            &self,
+            e: &EntityId,
+        ) -> std::result::Result<Option<String>, CoopEntityMapError> {
+            self.inner.coop_for_entity(e)
+        }
+        fn binding_for_coop(
+            &self,
+            coop_id: &str,
+        ) -> std::result::Result<Option<icn_entity::CoopEntityBinding>, CoopEntityMapError>
+        {
+            self.inner.binding_for_coop(coop_id)
+        }
+        fn binding_for_entity(
+            &self,
+            e: &EntityId,
+        ) -> std::result::Result<Option<icn_entity::CoopEntityBinding>, CoopEntityMapError>
+        {
+            self.inner.binding_for_entity(e)
+        }
+    }
+
+    /// Caller-controlled read-only double for states a real atomic map cannot
+    /// produce (reverse mismatch, malformed target, duplicate-target). Panics on
+    /// any write.
+    struct FakeBindingMap {
+        binding: Option<icn_entity::CoopEntityBinding>,
+        reverse: Option<String>,
+    }
+
+    impl CoopEntityMap for FakeBindingMap {
+        fn bind_resolved(
+            &self,
+            _: &str,
+            _: &EntityId,
+        ) -> std::result::Result<(), CoopEntityMapError> {
+            unreachable!("CreateTreasury must never write the coop-entity map");
+        }
+        fn entity_for_coop(
+            &self,
+            _: &str,
+        ) -> std::result::Result<Option<EntityId>, CoopEntityMapError> {
+            Ok(self.binding.as_ref().map(|b| b.entity_id.clone()))
+        }
+        fn coop_for_entity(
+            &self,
+            _: &EntityId,
+        ) -> std::result::Result<Option<String>, CoopEntityMapError> {
+            Ok(self.reverse.clone())
+        }
+        fn binding_for_coop(
+            &self,
+            _: &str,
+        ) -> std::result::Result<Option<icn_entity::CoopEntityBinding>, CoopEntityMapError>
+        {
+            Ok(self.binding.clone())
+        }
+    }
+
+    /// Lying double for the entity-uniqueness conflict test: reports a trusted,
+    /// reverse-consistent binding of EVERY queried coop_id to the SAME EntityId
+    /// (structurally impossible in a real atomic map). Reaches the populate
+    /// seam's EntityIdConflict guard.
+    struct DupTargetMap {
+        entity: EntityId,
+        last_queried: std::sync::Mutex<String>,
+    }
+
+    impl CoopEntityMap for DupTargetMap {
+        fn bind_resolved(
+            &self,
+            _: &str,
+            _: &EntityId,
+        ) -> std::result::Result<(), CoopEntityMapError> {
+            unreachable!("CreateTreasury must never write the coop-entity map");
+        }
+        fn entity_for_coop(
+            &self,
+            _: &str,
+        ) -> std::result::Result<Option<EntityId>, CoopEntityMapError> {
+            Ok(Some(self.entity.clone()))
+        }
+        fn coop_for_entity(
+            &self,
+            _: &EntityId,
+        ) -> std::result::Result<Option<String>, CoopEntityMapError> {
+            Ok(Some(self.last_queried.lock().unwrap().clone()))
+        }
+        fn binding_for_coop(
+            &self,
+            coop_id: &str,
+        ) -> std::result::Result<Option<icn_entity::CoopEntityBinding>, CoopEntityMapError>
+        {
+            *self.last_queried.lock().unwrap() = coop_id.to_string();
+            Ok(Some(icn_entity::CoopEntityBinding {
+                coop_id: coop_id.to_string(),
+                entity_id: self.entity.clone(),
+                provenance: CoopEntityBindingProvenance::Activation,
+            }))
+        }
+    }
+
+    /// Spawn an actor over a fresh store with a treasury manager and an
+    /// arbitrary read-only map double.
+    fn spawn_test_actor_with_treasury_and_custom_map(
+        map: CoopEntityMapHandle,
+    ) -> (CoopHandle, TreasuryManagerHandle) {
+        let store = create_test_store();
+        let treasury_mgr = Arc::new(RwLock::new(icn_ledger::TreasuryManager::new()));
+        let tx = CoopActor::spawn_with_treasury_and_map(
+            store,
+            None,
+            Some(treasury_mgr.clone()),
+            Some(map),
+        );
+        (CoopHandle::new(tx), treasury_mgr)
+    }
+
+    /// Create a (non-activated) coop and its treasury; return the created coop id.
+    async fn create_coop_and_treasury(handle: &CoopHandle, id: Option<&str>) -> String {
+        let founder = create_test_did();
+        let coop = handle
+            .create_cooperative(
+                id.map(|s| s.to_string()),
+                "Consult Coop".to_string(),
+                CoopType::Worker,
+                founder,
+            )
+            .await
+            .unwrap();
+        handle.create_treasury(coop.id.clone()).await.unwrap();
+        coop.id
+    }
+
+    // CT1/CT2/CT4: each trusted provenance populates entity_id via the
+    // consultation; coop_id preserved byte-for-byte; the map is never written
+    // (ReadOnlyNoBindMap panics on any bind).
+    #[tokio::test]
+    async fn test_create_treasury_populates_from_each_trusted_provenance() {
+        for (idx, provenance) in [
+            CoopEntityBindingProvenance::Activation,
+            CoopEntityBindingProvenance::OperatorBackfill,
+            CoopEntityBindingProvenance::GovernanceReceipt {
+                receipt_id: "receipt-xyz".to_string(),
+            },
+        ]
+        .into_iter()
+        .enumerate()
+        {
+            let coop_id = format!("trusted-coop-{idx}");
+            let inner = Arc::new(InMemoryCoopEntityMap::new());
+            let entity = EntityId::cooperative(&coop_id).unwrap();
+            inner
+                .bind_resolved_with_provenance(&coop_id, &entity, provenance.clone())
+                .unwrap();
+            let map: CoopEntityMapHandle = Arc::new(ReadOnlyNoBindMap { inner });
+            let (handle, treasury_mgr) = spawn_test_actor_with_treasury_and_custom_map(map);
+
+            let created = create_coop_and_treasury(&handle, Some(&coop_id)).await;
+            assert_eq!(created, coop_id, "coop id preserved byte-for-byte");
+
+            let guard = treasury_mgr.read().await;
+            let treasury = guard
+                .get_treasury_by_coop(&coop_id)
+                .expect("treasury registered under the original coop_id");
+            assert_eq!(treasury.coop_id, coop_id);
+            assert_eq!(
+                treasury.entity_id(),
+                Some(&entity),
+                "trusted {provenance:?} binding must populate entity_id"
+            );
+        }
+    }
+
+    // CT3: a trusted Surrogate binding whose EntityId identifier DIVERGES from
+    // the legacy coop_id. The treasury row must keep the original legacy coop_id
+    // (proving register_treasury_with_entity was not used), remain reachable via
+    // get_treasury_by_coop(original), and carry the surrogate entity_id.
+    #[tokio::test]
+    async fn test_create_treasury_surrogate_binding_preserves_legacy_coop_id() {
+        let inner = Arc::new(InMemoryCoopEntityMap::new());
+        let map: CoopEntityMapHandle = Arc::new(ReadOnlyNoBindMap {
+            inner: inner.clone(),
+        });
+        let (handle, treasury_mgr) = spawn_test_actor_with_treasury_and_custom_map(map);
+
+        // Default-generated id is the legacy `coop:<uuid>` shape (non-mappable).
+        let founder = create_test_did();
+        let coop = handle
+            .create_cooperative(None, "Legacy Coop".to_string(), CoopType::Worker, founder)
+            .await
+            .unwrap();
+        let legacy_id = coop.id.clone();
+        assert!(legacy_id.starts_with("coop:"), "legacy id, got {legacy_id}");
+
+        let surrogate = EntityId::cooperative("icnsur-legacy-coop").unwrap();
+        assert_ne!(
+            surrogate.identifier(),
+            legacy_id.as_str(),
+            "divergent surrogate: identifier != legacy coop_id"
+        );
+        inner
+            .bind_resolved_with_provenance(
+                &legacy_id,
+                &surrogate,
+                CoopEntityBindingProvenance::Surrogate,
+            )
+            .unwrap();
+
+        handle.create_treasury(legacy_id.clone()).await.unwrap();
+
+        let guard = treasury_mgr.read().await;
+        let treasury = guard
+            .get_treasury_by_coop(&legacy_id)
+            .expect("treasury must stay filed under the ORIGINAL legacy coop_id");
+        assert_eq!(
+            treasury.coop_id, legacy_id,
+            "byte-for-byte legacy coop_id (register_treasury_with_entity would \
+             have filed it under the surrogate slug)"
+        );
+        assert_eq!(treasury.entity_id(), Some(&surrogate));
+        assert!(
+            guard.get_treasury_by_coop(surrogate.identifier()).is_none(),
+            "no row may appear under the surrogate slug"
+        );
+    }
+
+    // CT5: an UnknownLegacy (plain bind, no provenance) binding is untrusted:
+    // treasury is created, entity_id stays None, no error, map unwritten.
+    #[tokio::test]
+    async fn test_create_treasury_unknown_legacy_binding_left_none() {
+        let inner = Arc::new(InMemoryCoopEntityMap::new());
+        let entity = EntityId::cooperative("legacyish-coop").unwrap();
+        inner.bind_resolved("legacyish-coop", &entity).unwrap(); // no provenance
+        let map: CoopEntityMapHandle = Arc::new(ReadOnlyNoBindMap { inner });
+        let (handle, treasury_mgr) = spawn_test_actor_with_treasury_and_custom_map(map);
+
+        let coop_id = create_coop_and_treasury(&handle, Some("legacyish-coop")).await;
+
+        let guard = treasury_mgr.read().await;
+        let treasury = guard.get_treasury_by_coop(&coop_id).unwrap();
+        assert_eq!(
+            treasury.entity_id(),
+            None,
+            "UnknownLegacy must stay untrusted: entity_id left None"
+        );
+    }
+
+    // CT6: a reverse-mismatched (cross-linked) binding is unsafe regardless of
+    // trusted provenance: entity_id stays None.
+    #[tokio::test]
+    async fn test_create_treasury_reverse_mismatch_left_none() {
+        let entity = EntityId::cooperative("mismatch-coop").unwrap();
+        let map: CoopEntityMapHandle = Arc::new(FakeBindingMap {
+            binding: Some(icn_entity::CoopEntityBinding {
+                coop_id: "mismatch-coop".to_string(),
+                entity_id: entity,
+                provenance: CoopEntityBindingProvenance::Activation,
+            }),
+            reverse: Some("other-coop".to_string()),
+        });
+        let (handle, treasury_mgr) = spawn_test_actor_with_treasury_and_custom_map(map);
+
+        let coop_id = create_coop_and_treasury(&handle, Some("mismatch-coop")).await;
+
+        let guard = treasury_mgr.read().await;
+        assert_eq!(
+            guard.get_treasury_by_coop(&coop_id).unwrap().entity_id(),
+            None,
+            "reverse mismatch is ambiguous/unsafe: entity_id left None"
+        );
+    }
+
+    // CT7: a well-formed but NON-COOPERATIVE target (community) is unsafe:
+    // entity_id stays None.
+    #[tokio::test]
+    async fn test_create_treasury_non_cooperative_target_left_none() {
+        let community = EntityId::community("some-community").unwrap();
+        let map: CoopEntityMapHandle = Arc::new(FakeBindingMap {
+            binding: Some(icn_entity::CoopEntityBinding {
+                coop_id: "commtarget-coop".to_string(),
+                entity_id: community,
+                provenance: CoopEntityBindingProvenance::OperatorBackfill,
+            }),
+            reverse: Some("commtarget-coop".to_string()),
+        });
+        let (handle, treasury_mgr) = spawn_test_actor_with_treasury_and_custom_map(map);
+
+        let coop_id = create_coop_and_treasury(&handle, Some("commtarget-coop")).await;
+
+        let guard = treasury_mgr.read().await;
+        assert_eq!(
+            guard.get_treasury_by_coop(&coop_id).unwrap().entity_id(),
+            None,
+            "non-cooperative target is unsafe: entity_id left None"
+        );
+    }
+
+    // CT8: NO map configured => entity_id stays None even for a perfectly
+    // mappable coop_id — CreateTreasury has NO projection fallback (deliberately
+    // stricter than activation).
+    #[tokio::test]
+    async fn test_create_treasury_no_map_no_projection_fallback() {
+        let (handle, treasury_mgr) = spawn_test_actor_with_treasury(); // no map
+        let coop_id = create_coop_and_treasury(&handle, Some("mappable-coop")).await;
+
+        let guard = treasury_mgr.read().await;
+        let treasury = guard.get_treasury_by_coop(&coop_id).unwrap();
+        assert_eq!(treasury.coop_id, "mappable-coop");
+        assert_eq!(
+            treasury.entity_id(),
+            None,
+            "no map => None; a projection fallback here would mint an identity \
+             target with no accountable origin"
+        );
+    }
+
+    // CT9: post-activation CreateTreasury rejection is unchanged with map wired.
+    #[tokio::test]
+    async fn test_create_treasury_post_activation_rejection_unchanged_with_map() {
+        let (handle, _mgr, _map) = spawn_test_actor_with_treasury_and_map();
+        let founder = create_test_did();
+        let coop = handle
+            .create_cooperative(
+                Some("already-coop".to_string()),
+                "Already Coop".to_string(),
+                CoopType::Worker,
+                founder,
+            )
+            .await
+            .unwrap();
+        handle
+            .activate_cooperative(coop.id.clone(), "charter".to_string())
+            .await
+            .unwrap();
+        let result = handle.create_treasury(coop.id).await;
+        assert!(
+            result.is_err(),
+            "CreateTreasury after activation must still be rejected"
+        );
+    }
+
+    // CT10: entity-uniqueness conflict fails closed at the populate seam
+    // (#2265 EntityIdConflict discipline): the second treasury is created but
+    // its entity_id stays None; the first row is untouched; no partial write.
+    #[tokio::test]
+    async fn test_create_treasury_entity_conflict_fails_closed() {
+        let shared = EntityId::cooperative("shared-target").unwrap();
+        let map: CoopEntityMapHandle = Arc::new(DupTargetMap {
+            entity: shared.clone(),
+            last_queried: std::sync::Mutex::new(String::new()),
+        });
+        let (handle, treasury_mgr) = spawn_test_actor_with_treasury_and_custom_map(map);
+
+        let first = create_coop_and_treasury(&handle, Some("conflict-a")).await;
+        let second = create_coop_and_treasury(&handle, Some("conflict-b")).await;
+
+        let guard = treasury_mgr.read().await;
+        let a = guard.get_treasury_by_coop(&first).unwrap();
+        assert_eq!(a.entity_id(), Some(&shared), "first claim wins");
+        let b = guard.get_treasury_by_coop(&second).unwrap();
+        assert_eq!(b.coop_id, "conflict-b", "second row exists, coop_id intact");
+        assert_eq!(
+            b.entity_id(),
+            None,
+            "duplicate target must fail closed (EntityIdConflict): entity_id \
+             left None, no partial write"
         );
     }
 }

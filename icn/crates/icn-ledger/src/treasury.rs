@@ -1238,6 +1238,32 @@ impl TreasuryManager {
     ) -> Result<TreasuryEntityIdPopulateResult> {
         self.populate_treasury_entity_id_for_did(treasury_did, expected_coop_id, entity_id)
     }
+
+    /// Creation-time entry point (#2082, `CreateTreasury`) to the same fail-closed
+    /// `entity_id` populate seam
+    /// ([`populate_treasury_entity_id_for_did`](Self::populate_treasury_entity_id_for_did)).
+    ///
+    /// Used by the coop_id-preserving two-step defined in
+    /// `docs/design/create-treasury-entity-id-semantics.md`: the treasury is first
+    /// registered with the plain `register_treasury` under the byte-exact original
+    /// `coop_id` (never `register_treasury_with_entity`, which would re-derive the
+    /// `coop_id` from `entity_id.identifier()` and mis-file surrogate-bound rows),
+    /// then this populates `entity_id` from an **already-recorded trusted binding**
+    /// the caller consulted read-only. Unlike activation there is no projection
+    /// fallback: no trusted binding means the caller never reaches this method.
+    /// Same guarantees as the activation entry point: byte-for-byte `coop_id`
+    /// verification, never overwrites an existing target, entity uniqueness
+    /// enforced. It sets an identity *target* only and grants no authority; the
+    /// caller must not fail treasury creation on a non-`Populated` outcome (the
+    /// operator backfill can complete it later).
+    pub fn populate_entity_id_at_creation(
+        &mut self,
+        treasury_did: &Did,
+        expected_coop_id: &str,
+        entity_id: EntityId,
+    ) -> Result<TreasuryEntityIdPopulateResult> {
+        self.populate_treasury_entity_id_for_did(treasury_did, expected_coop_id, entity_id)
+    }
 }
 
 impl Default for TreasuryManager {
