@@ -2271,6 +2271,102 @@ fn gate_result_ordinal(result: ProcessGateResult) -> u8 {
 }
 
 // ============================================================================
+// Process session opened receipts (ADR-0026 Layer 2 — second
+// `ProcessTransitionReceipt` class; the session anchor defined by the merged
+// `docs/design/process-session-receipt-anchor.md` contract)
+// ============================================================================
+
+/// Cross-node deterministic session-open receipt for a process session.
+///
+/// Sits alongside [`ProcessGateResultReceipt`] in ADR-0026 Layer 2. Records
+/// the *fact* that a process session was opened in a governance domain —
+/// which authenticated actor recorded the opening (`opened_by`), in which
+/// `domain_id`, and when. This is the anchor the rest of the `idea-0019`
+/// process spine (deliberation entries, decision records, evidence export)
+/// can attach to: without it, `session_id` is only a naming convention
+/// between callers.
+///
+/// **At most one opening exists per `(domain_id, session_id)`** — the
+/// receipt backend enforces uniqueness atomically at the storage layer. A
+/// same-opener retry returns this original receipt unchanged (never
+/// restamped); a different-opener duplicate fails closed.
+///
+/// Opening a session records institutional process context; it grants
+/// **zero** authority. `opened_by` is actor evidence, not proof of
+/// permission — whether the opening was institutionally legitimate is a
+/// charter/policy question upstream of this type. This type does **not**
+/// implement a `ProcessSession` object, a lifecycle, or a process runtime.
+///
+/// Equality is anchored to `record_hash`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ProcessSessionOpenedReceipt {
+    /// Identifier for the process session this opening anchors.
+    /// Caller-provided, treated as opaque by the runtime, preserved
+    /// byte-for-byte.
+    pub session_id: String,
+    /// Governance domain the session is scoped to.
+    pub domain_id: String,
+    /// DID of the actor who recorded this opening. The authenticated
+    /// caller of the manager method that emitted the receipt.
+    pub opened_by: String,
+    /// Unix-seconds the opening was recorded.
+    pub opened_at: u64,
+    /// blake3 canonical record hash binding the fields above.
+    pub record_hash: Hash,
+}
+
+impl PartialEq for ProcessSessionOpenedReceipt {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_hash == other.record_hash
+    }
+}
+
+impl Eq for ProcessSessionOpenedReceipt {}
+
+impl ProcessSessionOpenedReceipt {
+    /// Domain separation tag for canonical process-session-opened record
+    /// hashes. Distinct from the process-gate-result and every other
+    /// receipt-family tag so a record can never collide across receipt
+    /// types.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:process_session_opened:v1";
+
+    /// Build a new receipt and compute its canonical `record_hash`.
+    pub fn new(session_id: String, domain_id: String, opened_by: String, opened_at: u64) -> Self {
+        let record_hash = Self::compute_record_hash(&session_id, &domain_id, &opened_by, opened_at);
+        Self {
+            session_id,
+            domain_id,
+            opened_by,
+            opened_at,
+            record_hash,
+        }
+    }
+
+    /// Compute the canonical record hash from the input fields.
+    ///
+    /// String inputs are length-prefixed (u64 LE) under
+    /// [`Self::DOMAIN_TAG`] so no two distinct field bindings can
+    /// produce the same hash.
+    pub fn compute_record_hash(
+        session_id: &str,
+        domain_id: &str,
+        opened_by: &str,
+        opened_at: u64,
+    ) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        for field in [session_id, domain_id, opened_by] {
+            hasher.update(&(field.len() as u64).to_le_bytes());
+            hasher.update(field.as_bytes());
+        }
+        hasher.update(&opened_at.to_le_bytes());
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+}
+
+// ============================================================================
 // Mandate grant reference (#1868 step 2 primitive — wire form only)
 // ============================================================================
 
@@ -3187,6 +3283,138 @@ mod tests {
             assert!(
                 !lower.contains(forbidden),
                 "ProcessGateResultReceipt JSON must not contain regulated-finance vocabulary; \
+                 found `{forbidden}` in: {json}"
+            );
+        }
+    }
+
+    // ============================================================================
+    // ProcessSessionOpenedReceipt (second ProcessTransitionReceipt class —
+    // the #2275 session-anchor contract)
+    // ============================================================================
+
+    fn sample_session_opened_receipt() -> ProcessSessionOpenedReceipt {
+        ProcessSessionOpenedReceipt::new(
+            "session-alpha".to_string(),
+            "domain-food-coop".to_string(),
+            "did:icn:steward-1".to_string(),
+            1_750_000_000,
+        )
+    }
+
+    #[test]
+    fn process_session_opened_record_hash_determinism() {
+        let r1 = sample_session_opened_receipt();
+        let r2 = sample_session_opened_receipt();
+        assert_eq!(r1.record_hash, r2.record_hash);
+        assert_ne!(r1.record_hash, [0u8; 32]);
+        assert_eq!(r1, r2);
+    }
+
+    #[test]
+    fn process_session_opened_record_hash_changes_with_session_id() {
+        let r1 = sample_session_opened_receipt();
+        let r2 = ProcessSessionOpenedReceipt::new(
+            "different-session".to_string(),
+            r1.domain_id.clone(),
+            r1.opened_by.clone(),
+            r1.opened_at,
+        );
+        assert_ne!(r1.record_hash, r2.record_hash);
+    }
+
+    #[test]
+    fn process_session_opened_record_hash_changes_with_domain_id() {
+        // The anti-aliasing rule: identical fields under different domains
+        // must hash differently (domain binding lives in the canonical hash).
+        let r1 = sample_session_opened_receipt();
+        let r2 = ProcessSessionOpenedReceipt::new(
+            r1.session_id.clone(),
+            "domain-other".to_string(),
+            r1.opened_by.clone(),
+            r1.opened_at,
+        );
+        assert_ne!(r1.record_hash, r2.record_hash);
+    }
+
+    #[test]
+    fn process_session_opened_record_hash_changes_with_opened_by() {
+        let r1 = sample_session_opened_receipt();
+        let r2 = ProcessSessionOpenedReceipt::new(
+            r1.session_id.clone(),
+            r1.domain_id.clone(),
+            "did:icn:steward-other".to_string(),
+            r1.opened_at,
+        );
+        assert_ne!(r1.record_hash, r2.record_hash);
+    }
+
+    #[test]
+    fn process_session_opened_record_hash_changes_with_opened_at() {
+        let r1 = sample_session_opened_receipt();
+        let r2 = ProcessSessionOpenedReceipt::new(
+            r1.session_id.clone(),
+            r1.domain_id.clone(),
+            r1.opened_by.clone(),
+            r1.opened_at + 1,
+        );
+        assert_ne!(r1.record_hash, r2.record_hash);
+    }
+
+    #[test]
+    fn process_session_opened_tag_separates_from_gate_result_family() {
+        // Receipt-family domain separation: even a contrived field overlap
+        // cannot make a session-open hash collide with a gate-result hash,
+        // because the two families hash under distinct domain tags.
+        assert_ne!(
+            ProcessSessionOpenedReceipt::DOMAIN_TAG,
+            ProcessGateResultReceipt::DOMAIN_TAG
+        );
+        let opened = sample_session_opened_receipt();
+        let gate = sample_gate_receipt();
+        assert_ne!(opened.record_hash, gate.record_hash);
+    }
+
+    #[test]
+    fn process_session_opened_length_prefix_prevents_field_shifting() {
+        // "ab" + "c" vs "a" + "bc" across the session/domain boundary must
+        // not alias (length-prefixed field binding).
+        let r1 = ProcessSessionOpenedReceipt::new(
+            "ab".to_string(),
+            "c".to_string(),
+            "did:icn:x".to_string(),
+            1,
+        );
+        let r2 = ProcessSessionOpenedReceipt::new(
+            "a".to_string(),
+            "bc".to_string(),
+            "did:icn:x".to_string(),
+            1,
+        );
+        assert_ne!(r1.record_hash, r2.record_hash);
+    }
+
+    #[test]
+    fn process_session_opened_serde_roundtrip() {
+        let r = sample_session_opened_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let back: ProcessSessionOpenedReceipt = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(r, back);
+        assert_eq!(back.session_id, r.session_id);
+        assert_eq!(back.opened_by, r.opened_by);
+    }
+
+    #[test]
+    fn process_session_opened_no_regulated_finance_vocabulary() {
+        let r = sample_session_opened_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let lower = json.to_lowercase();
+        for forbidden in [
+            "wallet", "balance", "currency", "payment", "token", "withdraw", "deposit",
+        ] {
+            assert!(
+                !lower.contains(forbidden),
+                "ProcessSessionOpenedReceipt JSON must not contain regulated-finance vocabulary; \
                  found `{forbidden}` in: {json}"
             );
         }

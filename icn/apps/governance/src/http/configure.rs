@@ -686,6 +686,12 @@ where
             web::resource("/domains/{domain_id}/process-sessions/{session_id}/gate-results")
                 .route(web::post().to(handlers::record_process_gate_result::<E>)),
         )
+        // ── Process session open (#2275 — session anchor, second
+        //    ProcessTransitionReceipt class) ─────────────────────────────
+        .service(
+            web::resource("/domains/{domain_id}/process-sessions/{session_id}/open")
+                .route(web::post().to(handlers::open_process_session::<E>)),
+        )
         // ── Institutional domain policy adoption (#2142 — gated adoption) ──
         .service(
             web::resource("/domains/{domain_id}/domain-policy/adopt")

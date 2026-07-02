@@ -2707,6 +2707,21 @@ pub type GovernanceHandle = Arc<dyn GovernanceOps + Send + Sync>;
 /// delegations) are initialized but unused - all operations delegate to the
 /// daemon's GovernanceActor. They exist for standalone testing fallback.
 ///
+/// Outcome of [`GovernanceManager::record_process_session_opened`] (#2275
+/// session-anchor contract). Both variants are successes; the fail-closed
+/// different-opener conflict surfaces as an `Err` with stable prefix
+/// `process_session_open_conflict`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProcessSessionOpenOutcome {
+    /// This call recorded the opening: the receipt is the newly persisted
+    /// session anchor.
+    Opened(icn_governance::ProcessSessionOpenedReceipt),
+    /// The session was already opened by the **same** actor; carries the
+    /// **original** persisted receipt (original `opened_at` /
+    /// `record_hash` — a retry is never restamped).
+    AlreadyOpened(icn_governance::ProcessSessionOpenedReceipt),
+}
+
 /// Action items are always managed locally (not gossiped) and can use either
 /// in-memory or Sled-backed persistent storage.
 pub struct GovernanceManager {
@@ -5858,6 +5873,132 @@ impl GovernanceManager {
         }
 
         Ok(receipt)
+    }
+
+    /// Record that a process session was **opened** in a governance domain
+    /// and persist the [`icn_governance::ProcessSessionOpenedReceipt`] — the
+    /// second `ProcessTransitionReceipt` class, the session anchor defined
+    /// by the merged `docs/design/process-session-receipt-anchor.md`
+    /// contract (#2275).
+    ///
+    /// **At most one opening exists per `(domain_id, session_id)`**, enforced
+    /// atomically by the receipt backend inside its storage transaction:
+    ///
+    /// - first open → [`ProcessSessionOpenOutcome::Opened`] with the newly
+    ///   persisted receipt;
+    /// - retry by the **same** `opened_by` (any later timestamp) →
+    ///   [`ProcessSessionOpenOutcome::AlreadyOpened`] carrying the
+    ///   **original** receipt unchanged (original `opened_at` /
+    ///   `record_hash`; never restamped) — safe retry;
+    /// - open by a **different** `opened_by` → fail-closed error (stable
+    ///   prefix `process_session_open_conflict`); the original is untouched
+    ///   and no second receipt exists.
+    ///
+    /// Unlike [`Self::record_process_gate_result`], this method **requires**
+    /// a wired receipt store: uniqueness is a durable property, and
+    /// returning an unpersisted receipt would fake an anchor that nothing
+    /// enforces. Gate-result recording is unchanged — it neither requires
+    /// nor silently creates an opened session (charter-gated coupling is a
+    /// future, separate decision).
+    ///
+    /// Opening a session records institutional process context; it grants
+    /// **zero** authority. `opened_by` is the authenticated caller — actor
+    /// evidence, not proof of permission; route-level authorization is the
+    /// HTTP layer's concern and charter legitimacy is upstream.
+    pub fn record_process_session_opened(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        opened_by: &Did,
+    ) -> Result<ProcessSessionOpenOutcome> {
+        if session_id.is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_process_session_opened: session_id must be non-empty"
+            ));
+        }
+        if domain_id.0.is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_process_session_opened: domain_id must be non-empty"
+            ));
+        }
+        let opened_by_str = opened_by.to_string();
+        if opened_by_str.is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_process_session_opened: opened_by must be non-empty"
+            ));
+        }
+        let store = self.receipt_store.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "record_process_session_opened: a receipt store is required — \
+                 session-open uniqueness is enforced at the storage layer and \
+                 cannot be faked in memory"
+            )
+        })?;
+
+        let now = icn_time::current_timestamp_secs();
+        let receipt = icn_governance::ProcessSessionOpenedReceipt::new(
+            session_id.to_string(),
+            domain_id.0.clone(),
+            opened_by_str.clone(),
+            now,
+        );
+
+        match store.put_process_session_opened(&receipt).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to persist process session opened receipt for session {session_id} in domain {}: {e}",
+                domain_id.0
+            )
+        })? {
+            crate::receipt_backend::SessionOpenedPersist::Inserted => {
+                Ok(ProcessSessionOpenOutcome::Opened(receipt))
+            }
+            crate::receipt_backend::SessionOpenedPersist::Existing(original) => {
+                if original.opened_by == opened_by_str {
+                    Ok(ProcessSessionOpenOutcome::AlreadyOpened(original))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "process_session_open_conflict: session {session_id} in domain {} \
+                         was already opened by a different actor; refusing to overwrite \
+                         or re-anchor",
+                        domain_id.0
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Retrieve the persisted session-open receipt for a
+    /// `(domain_id, session_id)`, or `None` when the session has no
+    /// recorded opening. Read-only.
+    pub fn get_process_session_opened(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+    ) -> Result<Option<icn_governance::ProcessSessionOpenedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(None);
+        };
+        store
+            .get_process_session_opened(&domain_id.0, session_id)
+            .map_err(|e| anyhow::anyhow!("Failed to read process session opened receipt: {e}"))
+    }
+
+    /// List the gate-result receipts for a process session **within one
+    /// governance domain**, oldest-first — the #2275 domain-scoped read.
+    /// Filters on the receipt's hash-bound `domain_id`; two domains reusing
+    /// the same `session_id` never mix. Legacy per-session reads are
+    /// unchanged. Read-only.
+    pub fn list_process_gate_results_in_domain(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+    ) -> Result<Vec<icn_governance::ProcessGateResultReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(vec![]);
+        };
+        store
+            .list_process_gate_results_for_session_in_domain(&domain_id.0, session_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list domain-scoped gate results: {e}"))
     }
 
     // ========================================================================

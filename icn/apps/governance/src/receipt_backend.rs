@@ -5,7 +5,7 @@ use icn_governance::{
     ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, AuthorityGrant, AuthorityGrantId,
     GovernanceDecisionReceipt, GovernanceDecisionReceiptV3, Grantee, Mandate,
     MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, ProcessGateKind,
-    ProcessGateResultReceipt, Timestamp,
+    ProcessGateResultReceipt, ProcessSessionOpenedReceipt, Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -15,6 +15,29 @@ use crate::institutional_effect::InstitutionalEffectRecord;
 /// Class string for `ProcessGateResultReceipt` opaque storage. Chosen
 /// in the apps layer so the gateway never sees the typed name.
 const PROCESS_GATE_RESULT_CLASS: &str = "process_gate_result";
+
+/// Class string for `ProcessSessionOpenedReceipt` opaque storage (#2275
+/// session-anchor contract). Chosen in the apps layer so the gateway never
+/// sees the typed name.
+const PROCESS_SESSION_OPENED_CLASS: &str = "process_session_opened";
+
+/// Outcome of persisting a [`ProcessSessionOpenedReceipt`] through
+/// [`GovernanceReceiptBackend::put_process_session_opened`].
+///
+/// The backend enforces at most one opening per `(domain_id, session_id)`
+/// **atomically at the storage layer** (per the #2275 contract). The caller
+/// (the manager) turns `Existing` into either a same-opener idempotent
+/// success or a different-opener fail-closed conflict.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SessionOpenedPersist {
+    /// This call won the insert: the receipt is now the one persisted
+    /// opening for its `(domain_id, session_id)`.
+    Inserted,
+    /// An opening already existed for this `(domain_id, session_id)`;
+    /// nothing was written. Carries the original persisted receipt
+    /// (original `opened_at` / `record_hash` — never restamped).
+    Existing(ProcessSessionOpenedReceipt),
+}
 
 /// Class string for `MeetingAttendanceReceiptV2` opaque storage (#1868).
 /// Chosen in the apps layer so the gateway persists v2 attendance evidence
@@ -698,6 +721,105 @@ pub trait GovernanceReceiptBackend: Send + Sync {
         Ok(out)
     }
 
+    /// List the [`ProcessGateResultReceipt`]s persisted for a process
+    /// session **within one governance domain**, oldest-first by
+    /// `recorded_at` (the #2275 domain-scoped read).
+    ///
+    /// The opaque gate-result index is keyed by `session_id` alone, so two
+    /// domains reusing the same `session_id` share one storage chain. This
+    /// read filters on the receipt's **hash-bound `domain_id`** so
+    /// session-anchored consumers (future evidence export) can never mix
+    /// evidence across domains. It does **not** assume globally unique
+    /// session ids and does **not** alter the legacy
+    /// [`Self::list_process_gate_results_for_session`] /
+    /// [`Self::get_latest_process_gate_result`] reads, which remain
+    /// byte-identical in behavior.
+    fn list_process_gate_results_for_session_in_domain(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+    ) -> Result<Vec<ProcessGateResultReceipt>, String> {
+        let all = self.list_process_gate_results_for_session(session_id)?;
+        Ok(all
+            .into_iter()
+            .filter(|r| r.domain_id == domain_id)
+            .collect())
+    }
+
+    /// Persist a [`ProcessSessionOpenedReceipt`] — the #2275 session
+    /// anchor — enforcing **at most one opening per
+    /// `(domain_id, session_id)` atomically at the storage layer**.
+    ///
+    /// **Default routes through opaque storage** under class
+    /// `"process_session_opened"` with `key1 = receipt.domain_id`,
+    /// `key2 = Some(receipt.session_id)`, via
+    /// [`Self::put_opaque_if_absent`] (an insert-if-absent primitive; the
+    /// plain append-chain [`Self::put_opaque`] cannot enforce uniqueness —
+    /// two racing opens with different `opened_at` values would both
+    /// persist). On a lost insert the original persisted receipt is
+    /// hydrated and returned as [`SessionOpenedPersist::Existing`]; the
+    /// caller decides idempotency vs conflict from `opened_by`. A backend
+    /// that does not implement opaque storage fails closed with the
+    /// `opaque_storage_not_implemented` sentinel.
+    ///
+    /// A receipt records a fact; it grants no authority.
+    fn put_process_session_opened(
+        &self,
+        receipt: &ProcessSessionOpenedReceipt,
+    ) -> Result<SessionOpenedPersist, String> {
+        let payload = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize ProcessSessionOpenedReceipt: {e}"))?;
+        let existing = self.put_opaque_if_absent(
+            PROCESS_SESSION_OPENED_CLASS,
+            &receipt.domain_id,
+            Some(&receipt.session_id),
+            receipt.opened_at,
+            receipt.record_hash,
+            &payload,
+        )?;
+        match existing {
+            None => Ok(SessionOpenedPersist::Inserted),
+            Some(_winning_hash) => {
+                let original = self
+                    .get_process_session_opened(&receipt.domain_id, &receipt.session_id)?
+                    .ok_or_else(|| {
+                        // The unique marker says an opening exists but the
+                        // payload cannot be hydrated — surface loudly
+                        // rather than minting a second opening.
+                        "process_session_opened_inconsistent: unique marker present \
+                         but no persisted opening payload could be read"
+                            .to_string()
+                    })?;
+                Ok(SessionOpenedPersist::Existing(original))
+            }
+        }
+    }
+
+    /// Retrieve the persisted [`ProcessSessionOpenedReceipt`] for a
+    /// `(domain_id, session_id)`, or `None` when the session has no
+    /// recorded opening.
+    ///
+    /// **Default routes through opaque storage.** Same key convention as
+    /// [`Self::put_process_session_opened`]. At most one entry exists per
+    /// pair (uniqueness is enforced on write), so "latest" and "the"
+    /// opening coincide.
+    fn get_process_session_opened(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+    ) -> Result<Option<ProcessSessionOpenedReceipt>, String> {
+        let payload =
+            self.get_latest_opaque(PROCESS_SESSION_OPENED_CLASS, domain_id, Some(session_id))?;
+        match payload {
+            Some(bytes) => {
+                Ok(Some(serde_json::from_slice(&bytes).map_err(|e| {
+                    format!("deserialize ProcessSessionOpenedReceipt: {e}")
+                })?))
+            }
+            None => Ok(None),
+        }
+    }
+
     // ========================================================================
     // Opaque storage primitive (Stage 1b of architecture orchestration plan)
     //
@@ -749,6 +871,40 @@ pub trait GovernanceReceiptBackend: Send + Sync {
              this backend inherits the fail-closed default for \
              put_opaque. Override the method to opt in to durable \
              opaque storage, or handle this error at the caller."
+            .to_string())
+    }
+
+    /// Persist an opaque receipt payload for a `(class, key1, key2_opt)`
+    /// triple **only if no entry exists for that triple yet** — the
+    /// insert-if-absent primitive the #2275 session-anchor contract
+    /// requires. Returns `Ok(None)` when this call won the insert, or
+    /// `Ok(Some(existing_record_hash))` when an entry already existed
+    /// (in which case **nothing is written**).
+    ///
+    /// Unlike [`Self::put_opaque`] — whose chain deliberately appends
+    /// distinct hashes under the same triple — implementations MUST
+    /// enforce the absence check and the insert **atomically inside the
+    /// storage transaction** (insert-if-absent / compare-and-swap or an
+    /// equivalent unique index). A check-then-write above the store is
+    /// not acceptable: two concurrent writers with different
+    /// `recorded_at` values would both persist.
+    ///
+    /// **Fail-closed default.** A backend that has not opted in returns
+    /// `Err` with stable sentinel `opaque_storage_not_implemented`.
+    fn put_opaque_if_absent(
+        &self,
+        _class: &str,
+        _key1: &str,
+        _key2: Option<&str>,
+        _recorded_at: u64,
+        _record_hash: [u8; 32],
+        _payload: &[u8],
+    ) -> Result<Option<[u8; 32]>, String> {
+        Err("opaque_storage_not_implemented: \
+             this backend inherits the fail-closed default for \
+             put_opaque_if_absent. Override the method to opt in to \
+             durable opaque storage with atomic uniqueness, or handle \
+             this error at the caller."
             .to_string())
     }
 
