@@ -1,0 +1,254 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>`apps/membership` `coop_core` — Map-Parity Contract (#2082 gap 12b) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>membership coop core map parity</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/membership-coop-core-map-parity.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1><code>apps/membership</code> <code>coop_core</code> — Map-Parity Contract (#2082 gap 12b)</h1>
+<p><strong>Status</strong>: draft — design / audit (parity contract, not implementation)
+<strong>Truth class</strong>: descriptive
+<strong>Canonical</strong>: no — current implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last Reviewed</strong>: 2026-07-02
+<strong>Source basis</strong>: read against <code>main</code> @ <code>480f294a</code> (#2271). Code anchors were verified at that commit — re-verify before relying on exact numbers.
+<strong>Related</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/create-treasury-entity-id-semantics">create-treasury-entity-id-semantics.md</a> (the 12a contract this extends) · <a href="https://github.com/InterCooperative-Network/icn/blob/main/coop-id-entity-resolver">coop-id-entity-resolver.md</a> · <a href="/docs/adr/ADR-0084-controlled-treasury-entity-id-backfill-apply-contract">ADR-0084</a> · issues #2082 (this lane), #2081 (blocked, untouched), #2080 (separate, untouched)</p>
+<blockquote>
+<p><strong>This document defines the last #2082 structural gap (12b) and the decision it
+actually requires.</strong> It audits whether the <code>apps/membership</code> <code>coop_core</code> actor is a
+live path at all, what parity with <code>icn-coop</code> would mean, and whether parity or
+deprecation is the right spend. It changes <strong>no</strong> code behavior. A
+<code>coop_id ↔ EntityId</code> mapping binds an identity target only — it grants <strong>zero</strong>
+membership, role, capability, mandate, standing, or permission.</p>
+</blockquote>
+<h2>1. Liveness audit (verified at <code>480f294a</code>)</h2>
+<p><strong>The membership <code>coop_core</code> actor has no production caller.</strong> Verified:</p>
+<ul>
+<li>The only workspace dependent of <code>icn-membership-app</code> is <code>icn-core</code> — and only in
+<strong><code>[dev-dependencies]</code></strong> (<code>icn/crates/icn-core/Cargo.toml</code> ~L69, under the
+dev-dependencies section).</li>
+<li>The only Rust consumer is
+<code>icn/crates/icn-core/tests/vertical_slice_integration.rs</code> (spawns
+<code>icn_membership_app::coop_core::actor::CoopActor</code> as its coop fixture).</li>
+<li><code>icn-core/src/**</code>, the daemon (<code>icnd</code>), and the supervisor contain <strong>zero</strong>
+references. No gateway route, RPC method, or binary reaches this actor.</li>
+</ul>
+<p><strong>Classification: a test-harness fixture</strong>, not a live, duplicated, or transitional
+production path. It is a near-copy of <code>icn-coop</code>&#39;s actor frozen at a pre-#2104
+level of the #2082 lane.</p>
+<h2>2. Divergence from <code>icn-coop</code> (the actual gap)</h2>
+<table>
+<thead>
+<tr>
+<th>Behavior</th>
+<th><code>icn-coop</code> (current)</th>
+<th>membership <code>coop_core</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Activation-time map binding (<code>Activation</code> provenance)</td>
+<td>✅ #2104/#2193 (<code>bind_coop_entity_map_activation</code>)</td>
+<td>❌ none</td>
+</tr>
+<tr>
+<td>Activation-time treasury <code>entity_id</code> population</td>
+<td>✅ #2266 (recorded-binding first; projection only when no map)</td>
+<td>❌ none — plain <code>register_treasury</code>, <code>entity_id: None</code> (~L328-370)</td>
+</tr>
+<tr>
+<td><code>CreateTreasury</code> trusted-binding consultation</td>
+<td>✅ #2271 (read-only; no projection fallback)</td>
+<td>❌ none (~L484+; plain <code>register_treasury</code>)</td>
+</tr>
+<tr>
+<td><code>icn-entity</code> dependency / <code>CoopEntityMap</code> integration</td>
+<td>✅</td>
+<td>❌ none at all (<code>Cargo.toml</code> verified)</td>
+</tr>
+<tr>
+<td>Post-activation <code>CreateTreasury</code> rejection</td>
+<td>✅</td>
+<td>✅ (same guard; tests pin it)</td>
+</tr>
+</tbody></table>
+<p>Consequence: the <strong>vertical-slice integration test exercises stale #2082 semantics</strong>
+— cooperatives activated through the fixture produce treasuries with no identity
+target and no <code>Activation</code> binding, silently diverging from what the production
+(<code>icn-coop</code>) path now does.</p>
+<h2>3. Non-goals</h2>
+<ul>
+<li>No code change in this document or its PR.</li>
+<li>No new authority gate design (who may create/activate is out of scope).</li>
+<li>No gateway enforcement, route-default, or token-issuance change (#2081/#2080
+remain untouched, blocked and separate respectively).</li>
+<li>No #2082 closure.</li>
+</ul>
+<h2>4. Dependency boundary</h2>
+<p>Adding <code>icn-entity</code> to <code>icn-membership-app</code> is <em>permissible</em> — apps are
+domain-specific (the meaning firewall constrains kernel crates, not apps), and the
+app already pulls <code>icn-entity</code> transitively through <code>icn-ledger</code>. It is not
+<em>architecturally blocked</em>; it is a question of whether the spend is justified for
+a dev-dependency fixture. That is the real decision below.</p>
+<h2>5. The decision: parity vs. deprecate/redirect</h2>
+<p><strong>Option A — full parity implementation.</strong> Add <code>icn-entity</code>, a
+<code>CoopEntityMapHandle</code> field + spawn variant, activation binding
+(<code>Activation</code>-provenance, local-authoritative only), activation-time populate
+(recorded-binding first), and <code>CreateTreasury</code> consultation (12a semantics
+verbatim), plus the full test matrix (§7). Cost: duplicating ~4 merged rungs of
+identity-mapping logic into a second copy whose only caller is one integration
+test — and every future #2082-lane change pays the duplication tax again.</p>
+<p><strong>Option B — deprecate/redirect (recommended).</strong> Migrate
+<code>vertical_slice_integration.rs</code> to spawn <code>icn_coop::CoopActor</code> (already a
+workspace crate; the fixture usage is constructor + handle calls, which the
+<code>icn-coop</code> handle also provides), then freeze or remove the <code>coop_core</code> duplicate.
+The vertical-slice test then exercises the <em>real</em> production path — including the
+#2104/#2266/#2271 semantics — instead of a stale copy. Cost: a test-migration PR
+plus whatever <code>coop_core</code> types the membership app&#39;s own modules still use
+(audit required: <code>types.rs</code>/<code>store.rs</code> may be consumed by membership&#39;s non-actor
+code even if the actor is not).</p>
+<p><strong>Option C — labeled fixture.</strong> Keep the duplicate, add a prominent module-doc
+caveat that it is a fixture without #2082 parity. Cost: the vertical-slice test
+keeps validating divergent semantics; the &quot;gap&quot; never closes, only gets a sign.</p>
+<p><strong>Recommendation: Option B.</strong> Parity (A) would wire identity-target mapping into a
+test fixture — effort that produces no production behavior and a standing
+duplication tax. Deprecation (B) closes gap 12b <em>by removing the parallel path</em>,
+makes the flagship integration test cover the true semantics, and is the only
+option after which #2082&#39;s structural scope is genuinely complete. Option C is
+acceptable only as a stopgap if (B)&#39;s type-usage audit finds heavy internal
+coupling. <strong>The choice between A and B is Matt&#39;s call</strong>; this document defines
+both contracts so either next PR is mechanical.</p>
+<h2>6. Required parity slices (only if Option A is chosen)</h2>
+<p>Strict order, one PR each, mirroring the merged lane:</p>
+<ol>
+<li><strong>Activation-time map binding</strong> — mirror <code>bind_coop_entity_map_activation</code>:
+local authoritative activation records <code>Activation</code> provenance; the gossip
+mirror stays unprovenanced; a bind failure never fails activation.</li>
+<li><strong>Activation-time treasury <code>entity_id</code> population</strong> — mirror #2266&#39;s ordering
+(register <code>None</code> → commit → bind LAST → populate from the recorded binding;
+pure projection only when no map is wired).</li>
+<li><strong><code>CreateTreasury</code> trusted-binding consultation</strong> — the 12a contract verbatim
+(<a href="https://github.com/InterCooperative-Network/icn/blob/main/create-treasury-entity-id-semantics">create-treasury-entity-id-semantics.md</a>):
+read-only consult, coop_id-preserving two-step, <strong>no</strong>
+<code>register_treasury_with_entity</code>, <strong>no</strong> projection fallback, <code>UnknownLegacy</code>
+and all structurally-unsafe states stay <code>entity_id: None</code>, map never written.</li>
+</ol>
+<h2>7. Required test matrix before any Option-A implementation PR</h2>
+<p>The 12a matrix, re-run against the membership actor: each trusted provenance
+populates (incl. a divergent-surrogate case proving legacy <code>coop_id</code> preservation
+and no row under the surrogate slug); <code>UnknownLegacy</code>/missing provenance, reverse
+mismatch, malformed/non-cooperative target → <code>None</code>; no-map → <code>None</code> (no
+projection fallback at creation); post-activation rejection unchanged; duplicate
+entity target → fail-closed <code>EntityIdConflict</code>, no partial write; plus read-only
+test doubles that panic on any <code>bind_*</code> call (no-map-write proof), and the
+activation-ordering tests from #2266.</p>
+<p>For <strong>Option B</strong>, the required tests are instead: the migrated vertical-slice
+test passes against <code>icn_coop::CoopActor</code> with byte-identical assertions (plus
+the now-reachable entity_id assertions), and a build proving nothing else
+consumed the removed/frozen actor.</p>
+<h2>8. Out of scope / explicit non-claims</h2>
+<p>This document and its PR claim <strong>none</strong> of the following: any code behavior
+change; any map, treasury, or provenance mutation; any gateway/default
+enforcement or route-outcome change; any positive token issuance; #2081 progress
+(remains blocked); #2080 progress (remains separate); #2082 closure (requires
+explicit authorization); trust of <code>UnknownLegacy</code> (untrusted unless a future
+evidence-bearing workflow repairs it); mapping-as-authority; production, pilot,
+member, organizer, or live-federation readiness; Phase 2 completion.</p>
+<h2>9. Validation</h2>
+<ul>
+<li>Frontmatter + <code>docs/registry.toml</code> entry + <code>docs/INDEX.md</code> link added per
+<a href="/docs/reference/project-index/docs-control-map">docs-control-map — Adding a new doc</a>.</li>
+<li><code>python3 docs/scripts/doc_control_check.py</code> run locally before commit.</li>
+<li>Vocabulary: settlement/allocation language only; no prohibited terms.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
