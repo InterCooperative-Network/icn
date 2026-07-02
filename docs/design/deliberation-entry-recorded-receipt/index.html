@@ -50,8 +50,10 @@ View source on GitHub →
 <code>DeliberationEntryRecordedReceipt</code> recording that one deliberation entry was
 recorded against an already-opened process session. Receipts record
 institutional facts. They grant zero authority. This document decides what
-the implementation must do; it is not the implementation, and it names one
-explicit implementation blocker (§10, Q3).</p>
+the implementation must do; it is not the implementation. It originally
+named one explicit implementation blocker (§10, Q3) — <strong>decided by #2278</strong>
+(<code>docs/design/deliberation-entry-kind-taxonomy.md</code>); §4 carries the
+contract-sync notes the implementation follows.</p>
 </blockquote>
 <h2>1. Current implementation audit (verified at <code>5e1b7c97</code>)</h2>
 <ul>
@@ -164,6 +166,11 @@ tag; must hash-separate from both <code>icn:gov:process_session_opened:v1</code>
 <td>authenticated actor evidence; grants nothing (§5)</td>
 </tr>
 <tr>
+<td><code>entry_kind</code></td>
+<td>closed enum</td>
+<td>#2278 v1 taxonomy (ten kinds, <code>resolution</code> deferred); hash-only <code>u8</code> discriminant, serde <code>snake_case</code> wire — see <code>deliberation-entry-kind-taxonomy.md</code></td>
+</tr>
+<tr>
 <td><code>recorded_at</code></td>
 <td>u64</td>
 <td>record-time stamp; NOT part of identity (§4 duplicates)</td>
@@ -180,26 +187,26 @@ tag; must hash-separate from both <code>icn:gov:process_session_opened:v1</code>
 </tr>
 </tbody></table>
 <p>Canonical hashing follows the landed convention exactly: domain tag first,
-every string field length-prefixed (u64 LE) to prevent aliasing, <code>body_hash</code>
-appended raw as a fixed 32-byte field — <strong>no length prefix</strong>, because the
-landed convention length-prefixes only variable-length fields (see
-<code>MandateGrantRef::compute_ref_hash</code>, which appends its fixed 32-byte
-<code>decision_hash</code> and 16-byte UUID without prefixes; a fixed-size field cannot
-alias) — and <code>recorded_at</code> as LE bytes; equality anchored to <code>record_hash</code>.</p>
+every string field length-prefixed (u64 LE) to prevent aliasing, then one
+explicit <code>u8</code> discriminant byte for <code>entry_kind</code> (per #2278), <code>recorded_at</code>
+as LE bytes, and <code>body_hash</code> appended raw as a fixed 32-byte field — <strong>no
+length prefix</strong>, because the landed convention length-prefixes only
+variable-length fields (see <code>MandateGrantRef::compute_ref_hash</code>, which
+appends its fixed 32-byte <code>decision_hash</code> and 16-byte UUID without prefixes;
+a fixed-size field cannot alias). Equality anchored to <code>record_hash</code>.</p>
 <p><strong>Deliberately absent fields:</strong></p>
 <ul>
-<li><strong><code>entry_kind</code> — blocked on Q3, not omitted by preference.</strong> The framing
-brief&#39;s closed-taxonomy list (<code>question</code>, <code>concern</code>, <code>objection</code>,
-<code>amendment</code>, <code>blocker</code>, <code>facilitator_summary</code>, <code>resolution</code>,
-<code>privacy_review</code>, <code>accessibility_review</code>, <code>conflict_signal</code>, <code>record_only</code>)
-is explicitly &quot;candidates (not a commitment)&quot;, and framing-brief open
-question 3 — closed taxonomy locked by an ADR vs charter-extensible — is
-unresolved. The two branches produce <strong>different canonical hash layouts</strong>
-(ordinal-hashed closed enum, as in the gate-result taxonomy, vs
-length-prefixed string with namespace discipline). A <code>:v1</code> layout cannot be
-pinned without deciding Q3, and deciding Q3 silently inside this design
-rung would smuggle an ADR-scale decision past review. §10 triages this; §11
-draws the consequence.</li>
+<li><strong><code>entry_kind</code> — DECIDED (contract-sync note, post-#2278).</strong> This field
+was originally blocked on Q3: the closed-vs-charter-extensible branches
+produce different canonical hash layouts, so <code>:v1</code> could not be pinned
+without deciding it, and deciding it silently inside this design rung
+would have smuggled an ADR-scale decision past review. The decision
+landed as <code>docs/design/deliberation-entry-kind-taxonomy.md</code> (#2278):
+closed, ADR-controlled enum, explicit <code>u8</code> discriminants 0–9 for the
+ten-kind v1 list (<code>resolution</code> deferred as Q4-ambiguous), hash-only
+discriminant with serde <code>snake_case</code> wire form, append-only evolution,
+retired kinds decodable forever. <code>entry_kind</code> is now a v1 field (table
+above) and <strong>participates in duplicate identity</strong> (below).</li>
 <li><strong><code>parent_entry_id</code> — deferred in writing.</strong> Threading implies
 discussion-structure semantics that belong to a future read-model, not to
 the recorded fact. Adding it later is a new field in a new tag version, not
@@ -223,11 +230,13 @@ only, where there is no legacy behavior to preserve.</p>
 idempotency pinned to stable identity fields, never to the timestamp):</p>
 <ul>
 <li>Same <code>(domain_id, session_id, entry_id)</code> <strong>and</strong> same <code>author</code> <strong>and</strong> same
-<code>body_hash</code> → idempotent retry: return the ORIGINAL receipt (original
+<code>body_hash</code> <strong>and</strong> same <code>entry_kind</code> (post-#2278: the kind participates in
+stable identity) → idempotent retry: return the ORIGINAL receipt (original
 <code>recorded_at</code> and <code>record_hash</code>, never restamped).</li>
-<li>Same <code>(domain_id, session_id, entry_id)</code> with a <strong>different <code>author</code> or
-different <code>body_hash</code></strong> → fail-closed conflict, stable prefix
-<code>deliberation_entry_conflict</code>, surfaced as HTTP 409.</li>
+<li>Same <code>(domain_id, session_id, entry_id)</code> with a <strong>different <code>author</code>,
+<code>body_hash</code>, or <code>entry_kind</code></strong> → fail-closed conflict, stable prefix
+<code>deliberation_entry_conflict</code>, surfaced as HTTP 409 — a kind mismatch whose
+canonical hash differs must never be swallowed as a retry.</li>
 <li>Uniqueness must be atomic under concurrency, reusing the landed
 <code>put_opaque_if_absent</code> unique-marker pattern (§6). This design PR does not
 implement it.</li>
