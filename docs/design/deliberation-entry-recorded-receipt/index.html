@@ -1,0 +1,477 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>DeliberationEntryRecordedReceipt — Design/Audit Contract | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>deliberation entry recorded receipt</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/deliberation-entry-recorded-receipt.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>DeliberationEntryRecordedReceipt — Design/Audit Contract</h1>
+<p><strong>Status</strong>: draft — design / audit (implementation contract, not implementation)
+<strong>Truth class</strong>: descriptive
+<strong>Canonical</strong>: no — current implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last Reviewed</strong>: 2026-07-02
+<strong>Source basis</strong>: read against <code>main</code> @ <code>5e1b7c97</code>. Code anchors were verified at that commit — re-verify before relying on exact numbers.
+<strong>Related</strong>: issues #1748 (Institutional Process Substrate milestone) · #2141 (vertical institutional spine control) · #2144 / PR #1755 (first <code>ProcessTransitionReceipt</code> class, landed) · PR #2275 / PR #2276 (second class — session anchor contract + implementation, landed) · <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a> (receipt envelope, Layer 2) · <code>ops/ideas/framing/institutional-process-substrate.md</code> (idea-0019 framing brief) · <code>ops/ideas/dogfood/institutional-process-substrate-mvp.md</code></p>
+<blockquote>
+<p>Contract for the third institutional-process receipt slice — a
+<code>DeliberationEntryRecordedReceipt</code> recording that one deliberation entry was
+recorded against an already-opened process session. Receipts record
+institutional facts. They grant zero authority. This document decides what
+the implementation must do; it is not the implementation, and it names one
+explicit implementation blocker (§10, Q3).</p>
+</blockquote>
+<h2>1. Current implementation audit (verified at <code>5e1b7c97</code>)</h2>
+<ul>
+<li><strong><code>ProcessGateResultReceipt</code> exists</strong> (first <code>ProcessTransitionReceipt</code>
+class; #2144 / PR #1755). <code>icn/crates/icn-governance/src/proof.rs</code> (~L2159),
+domain tag <code>icn:gov:process_gate_result:v1</code>, closed six-gate taxonomy hashed
+by ordinal, blake3 canonical hash with length-prefixed (u64 LE) string
+fields, equality anchored to <code>record_hash</code>.</li>
+<li><strong><code>ProcessSessionOpenedReceipt</code> exists</strong> (second class; contract PR #2275
+<code>31bb52b0</code>, implementation PR #2276 <code>5e1b7c97</code>). <code>proof.rs</code> (~L2302), domain
+tag <code>icn:gov:process_session_opened:v1</code>. It anchors a process session by
+<code>(domain_id, session_id)</code>: atomic uniqueness is enforced inside the storage
+transaction (gateway <code>ReceiptStore::put_opaque_if_absent</code>,
+<code>icn/crates/icn-gateway/src/receipt_store.rs</code> ~L1894, point-keyed unique
+marker <code>receipt:opaque:unique:</code> ~L207); a same-opener retry returns the
+ORIGINAL receipt (never restamped); a different-opener duplicate is a
+fail-closed conflict (stable prefix <code>process_session_open_conflict</code>,
+HTTP 409). Route <code>POST /gov/domains/{domain_id}/process-sessions/{session_id}/open</code>
+(<code>icn/apps/governance/src/http/configure.rs</code> ~L692) behind
+<code>governance:write</code> + domain membership (403 non-member). Backend read
+<code>get_process_session_opened</code> exists
+(<code>icn/apps/governance/src/receipt_backend.rs</code> ~L766/812).</li>
+<li><strong>Domain-scoped gate-result reads exist</strong>
+(<code>list_process_gate_results_for_session_in_domain</code>, <code>receipt_backend.rs</code>
+~L737): session ids are NOT globally unique; two domains sharing a
+<code>session_id</code> never mix.</li>
+<li><strong>No <code>DeliberationEntryRecordedReceipt</code> exists in the governance path.</strong> No
+proof type, no backend class, no route, no manager seam.</li>
+<li><strong>No stored <code>DeliberationThread</code> or <code>DeliberationEntry</code> runtime object
+exists.</strong> The names appear only in idea-0019/idea-0020 framing and dogfood
+documents (read-model fixture walks, explicitly &quot;not runtime&quot;) and in test
+documentation comments.</li>
+<li><strong>Name-collision audit — <code>icn-baseline-lock</code>.</strong>
+<code>icn/crates/icn-baseline-lock/src/receipt_types.rs</code> defines
+<code>BaselineReceiptBody::DeliberationEntryRecorded { member_pubkey, approve }</code>
+under domain tag <code>icn:baseline:deliberation_entry:v1</code>. That crate is a
+deterministic signed fixture DAG for the executable-baseline loop
+(test-only, per its own module doc), and its &quot;deliberation entry&quot; is in
+substance an approval vote consumed by a projector. It is <strong>not</strong> prior art
+for this class: different namespace (<code>icn:baseline:</code> vs <code>icn:gov:</code>),
+different envelope (hash-chained signed DAG vs ADR-0026 Layer 2 opaque
+cascade), different semantics. Two consequences bind this design: the
+governance class must NOT carry an approve/vote flag (decision recording is
+Q4 / <code>DecisionRecord</code> territory, §10), and the two domain tags must never
+converge.</li>
+<li><strong>No decision / mutation-plan / evidence-packet receipt ladder exists. No
+full process runtime exists.</strong> Gate-result recording neither requires nor
+silently creates opened sessions (#2276 preserved that).</li>
+</ul>
+<h2>2. Problem</h2>
+<p>Process sessions can now be opened as recorded institutional facts, and gate
+results can be recorded against session ids. But there is no generic receipt
+for recording <strong>deliberation input</strong>. Without one, any future
+<code>DecisionRecord</code> would claim to conclude a discussion the substrate never
+witnessed — the audit trail would begin at the decision, not at the
+institutional input that produced it.</p>
+<p>At the same time, generic ICN core must not become a chat system, a comments
+feature, a social feed, or moderation infrastructure. The framing brief is
+explicit: deliberation is a <strong>structured institutional record</strong>, not
+free-form text. The receipt slice must record that an entry was recorded —
+by whom, when, against which session, with which content fingerprint — and
+nothing more.</p>
+<h2>3. Proposed next slice</h2>
+<p>Introduce <strong><code>DeliberationEntryRecordedReceipt</code></strong> as the third
+<code>ProcessTransitionReceipt</code> class, mirroring the landed #2144 / #2276 pattern
+end to end (proof type → manager seam → backend trait method with fail-closed
+default → opaque storage cascade → HTTP route → runtime-proof tests):</p>
+<ul>
+<li><strong>Receipt-only.</strong> No stored <code>DeliberationThread</code> object, no stored
+<code>DeliberationEntry</code> object, no read-model beyond the session-scoped receipt
+list (§7). A thread read-model can come later when a consumer needs it; the
+receipt itself establishes the first audit trail.</li>
+<li><strong>Bound to <code>(domain_id, session_id)</code></strong> — the anchor #2276 created.</li>
+<li><strong>Requires an already-opened session</strong> (§4, precondition). No silent
+session creation.</li>
+<li><strong>No lifecycle, no decision outcome, no mutation authorization, no evidence
+export, no accessibility/privacy gate completion</strong> in this slice.</li>
+</ul>
+<h2>4. Proposed <code>DeliberationEntryRecordedReceipt</code> contract</h2>
+<p>Proposed domain tag: <strong><code>icn:gov:deliberation_entry_recorded:v1</code></strong> (new family
+tag; must hash-separate from both <code>icn:gov:process_session_opened:v1</code> and
+<code>icn:baseline:deliberation_entry:v1</code>).</p>
+<p>Fields — the narrowest safe set, all Q3-independent:</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>domain_id</code></td>
+<td>string</td>
+<td>governance domain; same posture as session-opened</td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td>string</td>
+<td>caller-opaque; meaningful only with <code>domain_id</code></td>
+</tr>
+<tr>
+<td><code>entry_id</code></td>
+<td>string</td>
+<td>caller-supplied opaque identifier; unique within <code>(domain_id, session_id)</code></td>
+</tr>
+<tr>
+<td><code>author</code></td>
+<td>string (DID)</td>
+<td>authenticated actor evidence; grants nothing (§5)</td>
+</tr>
+<tr>
+<td><code>recorded_at</code></td>
+<td>u64</td>
+<td>record-time stamp; NOT part of identity (§4 duplicates)</td>
+</tr>
+<tr>
+<td><code>body_hash</code></td>
+<td>32 bytes</td>
+<td>content fingerprint of the entry body; the body itself is never stored (§6 privacy)</td>
+</tr>
+<tr>
+<td><code>record_hash</code></td>
+<td>32 bytes</td>
+<td>canonical blake3 over the above under the domain tag</td>
+</tr>
+</tbody></table>
+<p>Canonical hashing follows the landed convention exactly: domain tag first,
+every string field length-prefixed (u64 LE) to prevent aliasing, <code>body_hash</code>
+appended raw as a fixed 32-byte field — <strong>no length prefix</strong>, because the
+landed convention length-prefixes only variable-length fields (see
+<code>MandateGrantRef::compute_ref_hash</code>, which appends its fixed 32-byte
+<code>decision_hash</code> and 16-byte UUID without prefixes; a fixed-size field cannot
+alias) — and <code>recorded_at</code> as LE bytes; equality anchored to <code>record_hash</code>.</p>
+<p><strong>Deliberately absent fields:</strong></p>
+<ul>
+<li><strong><code>entry_kind</code> — blocked on Q3, not omitted by preference.</strong> The framing
+brief&#39;s closed-taxonomy list (<code>question</code>, <code>concern</code>, <code>objection</code>,
+<code>amendment</code>, <code>blocker</code>, <code>facilitator_summary</code>, <code>resolution</code>,
+<code>privacy_review</code>, <code>accessibility_review</code>, <code>conflict_signal</code>, <code>record_only</code>)
+is explicitly &quot;candidates (not a commitment)&quot;, and framing-brief open
+question 3 — closed taxonomy locked by an ADR vs charter-extensible — is
+unresolved. The two branches produce <strong>different canonical hash layouts</strong>
+(ordinal-hashed closed enum, as in the gate-result taxonomy, vs
+length-prefixed string with namespace discipline). A <code>:v1</code> layout cannot be
+pinned without deciding Q3, and deciding Q3 silently inside this design
+rung would smuggle an ADR-scale decision past review. §10 triages this; §11
+draws the consequence.</li>
+<li><strong><code>parent_entry_id</code> — deferred in writing.</strong> Threading implies
+discussion-structure semantics that belong to a future read-model, not to
+the recorded fact. Adding it later is a new field in a new tag version, not
+a break.</li>
+<li><strong><code>target_ref</code> — stays deferred (Q1), exactly as #2275 deferred it.</strong>
+Entries bind to the session anchor only. Binding entries to targets would
+import Q1 into this slice.</li>
+<li><strong>No approve/vote/outcome flag of any kind</strong> (§1 baseline-lock contrast;
+Q4 territory).</li>
+</ul>
+<p><strong>Session precondition.</strong> Recording an entry requires that
+<code>get_process_session_opened(domain_id, session_id)</code> returns an existing
+opening receipt; otherwise fail closed with stable error prefix
+<code>deliberation_entry_session_not_opened</code>. This check is safe without an atomic
+cross-check: session openings are permanent append-only facts (never revoked,
+never overwritten), so observe-then-write is monotonic — a session observed
+open stays open. Gate-result recording keeps its landed semantics (neither
+requires nor creates sessions); the precondition applies to this new class
+only, where there is no legacy behavior to preserve.</p>
+<p><strong>Duplicate semantics</strong> (mirrors the #2275-revised identity rule —
+idempotency pinned to stable identity fields, never to the timestamp):</p>
+<ul>
+<li>Same <code>(domain_id, session_id, entry_id)</code> <strong>and</strong> same <code>author</code> <strong>and</strong> same
+<code>body_hash</code> → idempotent retry: return the ORIGINAL receipt (original
+<code>recorded_at</code> and <code>record_hash</code>, never restamped).</li>
+<li>Same <code>(domain_id, session_id, entry_id)</code> with a <strong>different <code>author</code> or
+different <code>body_hash</code></strong> → fail-closed conflict, stable prefix
+<code>deliberation_entry_conflict</code>, surfaced as HTTP 409.</li>
+<li>Uniqueness must be atomic under concurrency, reusing the landed
+<code>put_opaque_if_absent</code> unique-marker pattern (§6). This design PR does not
+implement it.</li>
+</ul>
+<h2>5. Authority discipline</h2>
+<ul>
+<li>Recording a deliberation entry <strong>grants zero authority</strong>. The receipt
+proves the institution recorded an input at a specific time attributed to a
+specific authenticated actor — nothing about whether the input must be
+heeded, counted, or acted on.</li>
+<li><code>author</code> is actor evidence, not entitlement. Whether an actor is <em>supposed</em>
+to deliberate in a given session is a charter/policy question, out of scope
+here (the framing brief places entry-kind requirements and speaker rules in
+charters, interpreted by apps and policy oracles).</li>
+<li>Route posture: mirror the session-open route exactly — <code>governance:write</code>
+scope + <code>check_domain_membership</code> (403 non-member), 400 on
+whitespace/empty ids, 409 on conflict. <strong>Do not invent a new production
+permission</strong>: no <code>deliberation:*</code> capability exists today, and creating one
+is a policy design question, not a receipt slice. A future narrower
+capability may replace <code>governance:write</code> here; that is explicitly future
+work.</li>
+</ul>
+<h2>6. Storage / persistence / privacy discipline</h2>
+<ul>
+<li><strong>Privacy: the receipt never stores the body.</strong> Deliberation entries can
+carry the most sensitive content the system records (objections, conflict
+signals, privacy reviews — framing brief, &quot;Privacy and boundary risks&quot;).
+The receipt stores a 32-byte <code>body_hash</code> fingerprint supplied by the
+caller; where the body lives (private overlay per #1730, app storage) and
+who may read it are visibility-policy questions this slice does not touch.
+The receipt proves an entry existed; it does not prove all audiences may
+read it. The privacy/redaction evidence-export run remains an open #1748
+gate, untouched by this slice.</li>
+<li><strong>Opaque cascade, fail closed.</strong> New apps-layer class constant
+(proposed: <code>deliberation_entry_recorded</code>) routed through the existing
+<code>GovernanceReceiptBackend</code> opaque methods with fail-closed defaults
+(<code>opaque_storage_not_implemented</code> sentinel posture unchanged). Backend
+errors abort recording; no partial writes; append-only; no overwrite.</li>
+<li><strong>Key layout — three logical dimensions over a two-key store.</strong> The opaque
+store keys on <code>(class, key1, key2)</code>. Entries need <code>(domain_id, session_id, entry_id)</code>. Recommended: <strong><code>key1</code> = injective composite of
+<code>(domain_id, session_id)</code></strong> — length-prefixed/netstring-style encoding
+(e.g. <code>&quot;{len(domain_id)}:{domain_id}{session_id}&quot;</code>), never bare
+concatenation — and <strong><code>key2</code> = <code>entry_id</code></strong>. This makes the session&#39;s entry
+list a single <code>list_opaque_for(class, key1)</code> call, makes cross-domain
+mixing impossible by construction, and lets the landed
+<code>put_opaque_if_absent</code> enforce per-entry uniqueness with no gateway change.
+The encoding MUST be injective (anti-aliasing test required: §8). The
+alternative — <code>key1 = domain_id</code> with payload-side session filtering, as
+the #2276 domain-scoped gate read does — is workable but scans every entry
+in the domain per session read; acceptable for gate results (small,
+legacy-keyed), wrong default for the class whose primary read is the
+per-session list.</li>
+<li><strong><code>entry_id</code> is caller-supplied and opaque</strong>, like <code>session_id</code>. A
+server-derived id was considered and rejected: deriving from <code>recorded_at</code>
+reproduces the restamp-on-retry trap #2275&#39;s review caught, and deriving
+from <code>(author, body_hash)</code> silently merges an author&#39;s distinct entries
+that share identical content. Collision resistance is therefore enforced at
+the storage layer (atomic uniqueness + conflict), not assumed of the id.</li>
+</ul>
+<h2>7. Query / read behavior</h2>
+<ul>
+<li>Primary read: list entry receipts for <code>(domain_id, session_id)</code> in the
+store&#39;s <strong>deterministic chronological order</strong> — sorted by
+<code>(recorded_at, record_hash)</code>, which is what <code>list_opaque_for</code> returns
+today. This is explicitly NOT arrival/insertion order: entries sharing a
+<code>recorded_at</code> second order by <code>record_hash</code>. If strict insertion order
+ever becomes contractually required (e.g. deliberation replay), that
+needs an explicit sequence field — deferred alongside threading (§4); no
+consumer in this slice requires it. Never list by <code>session_id</code> alone —
+session ids are not globally unique (#2276 pinned this; same rule here).</li>
+<li>Point read: get one entry receipt by <code>(domain_id, session_id, entry_id)</code>.</li>
+<li>Reads return receipts (ids, author, timestamps, hashes) — never body
+content, which the store does not hold.</li>
+<li>No cross-session feed, no per-author feed, no global timeline. A feed is a
+social-media shape; the institutional read is session-scoped.</li>
+<li>Future evidence export consumes the domain-scoped session read; export
+redaction discipline stays with the #1748 privacy gate, not this slice.</li>
+</ul>
+<h2>8. Test matrix for the future implementation PR</h2>
+<ol>
+<li>Canonical hash stable for a fixed input vector.</li>
+<li>Each identity field (<code>domain_id</code>, <code>session_id</code>, <code>entry_id</code>, <code>author</code>,
+<code>body_hash</code>) independently changes <code>record_hash</code>.</li>
+<li>Family-tag separation: identical field bytes under
+<code>icn:gov:process_session_opened:v1</code> and under
+<code>icn:gov:deliberation_entry_recorded:v1</code> produce different hashes; note in
+the test why <code>icn:baseline:deliberation_entry:v1</code> (test-only fixture DAG)
+is a different lineage and must never share a tag.</li>
+<li>Length-prefix anti-aliasing: shifting bytes between adjacent string fields
+changes the hash.</li>
+<li>Composite-key anti-aliasing at the storage layer: <code>(&quot;ab&quot;, &quot;c&quot;)</code> and
+<code>(&quot;a&quot;, &quot;bc&quot;)</code> as <code>(domain_id, session_id)</code> never collide in <code>key1</code>.</li>
+<li>Empty/whitespace <code>domain_id</code> / <code>session_id</code> / <code>entry_id</code> / <code>author</code>
+rejected before persistence.</li>
+<li>Raw body is never persisted: the stored payload round-trips to the receipt
+struct and contains only <code>body_hash</code>, no body field anywhere.</li>
+<li>Recording against a never-opened <code>(domain_id, session_id)</code> fails closed
+with <code>deliberation_entry_session_not_opened</code>; nothing persisted.</li>
+<li>Same-identity retry returns the ORIGINAL receipt: <code>recorded_at</code> and
+<code>record_hash</code> identical to the first insert; exactly one persisted record.</li>
+<li>Same <code>entry_id</code>, different <code>author</code> → <code>deliberation_entry_conflict</code> /
+409; original untouched.</li>
+<li>Same <code>entry_id</code> + <code>author</code>, different <code>body_hash</code> → conflict / 409;
+original untouched.</li>
+<li>Concurrent duplicate race (multi-thread, same identity): exactly one
+winner persisted; losers observe the winner.</li>
+<li>Backend failure fails closed; the manager surfaces the error; nothing
+half-written.</li>
+<li>Existing session-open behavior unchanged (its suite still green,
+byte-identical semantics); existing gate-result behavior unchanged
+(still neither requires nor creates sessions).</li>
+<li>Domain-scoped entry list does not mix two domains sharing a
+<code>session_id</code>; list order is deterministic <code>(recorded_at, record_hash)</code>
+and stable across re-reads, including the same-<code>recorded_at</code> hash-tiebreak
+case (documented as chronological order, not arrival order).</li>
+<li>Route: 200 on member record; idempotent retry returns identical body;
+409 different-author; 403 non-member with nothing persisted; 400
+whitespace ids.</li>
+<li>Vocabulary: receipt/docs/tests contain no settlement-prohibited terms,
+no chat/social-media/moderation vocabulary (no &quot;chat&quot;, &quot;comment&quot;,
+&quot;post&quot;, &quot;like&quot;, &quot;follower&quot;, &quot;moderate&quot; as API/field names), and no
+NYCN-specific vocabulary in generic core.</li>
+<li>Docs/claim lint clean (<code>doc_control_check.py</code>, state-lag guard).</li>
+</ol>
+<h2>9. Explicit non-goals</h2>
+<p>No runtime implementation in this PR. No stored <code>DeliberationThread</code> or
+<code>DeliberationEntry</code> object. No discussion system, no chat, no comments, no
+moderation, no social feed. No decision records, no mutation plans, no
+evidence packets, no action-card triggers. No accessibility/privacy gate
+completion. No charter/CCL sequencing. No #1748 closure; no #2141 closure; no
+#2081/#2080/#2274 work; no process-runtime, Phase-2, production, pilot,
+member/organizer-readiness, live-federation, service-hosting, or OpenAPI
+completeness claims.</p>
+<h2>10. Open-question triage (Q3, and its neighbors)</h2>
+<ul>
+<li><strong>Q3 — <code>DeliberationEntry</code> kind taxonomy: NEEDS A DESIGN DECISION; it is
+the implementation blocker for this class.</strong> Triage outcome: neither
+promote-to-RFC nor reject nor park — Q3 blocks this specific slice and
+must be closed first, narrowly. The decision required: <strong>(a)</strong> closed
+taxonomy locked by an ADR (enum, ordinal-hashed like the landed gate
+taxonomy, with an explicit append-only evolution rule), or <strong>(b)</strong>
+charter-extensible kinds (length-prefixed string, charter-namespace
+discipline, and a statement of what the accessibility/privacy gates may
+assume). The framing brief leans closed (&quot;the closed-taxonomy approach is
+deliberate&quot;) but explicitly withholds commitment; the tradeoff is real —
+closed is safer for accessibility/privacy gate handles, extensible is
+safer for institutional variation. The decision changes the <code>:v1</code> hash
+layout, so it precedes implementation, not follows it.</li>
+<li><strong>Q1 — <code>ProcessTargetRef</code> polymorphism: stays deferred</strong>, exactly as
+#2275 deferred it. This class binds to the session anchor only; no
+target_ref field (§4).</li>
+<li><strong>Q4 — <code>HumanDecisionSet</code> vs proposal/vote: untouched.</strong> This receipt
+records input facts, not approvals or outcomes. The baseline-lock fixture
+(whose &quot;deliberation entry&quot; carries an approve flag) is the cautionary
+contrast: folding decision semantics into entry recording would pre-answer
+Q4 by accident.</li>
+</ul>
+<h2>11. Recommendation</h2>
+<p><strong>Option C — defer implementation until Q3 is narrowly closed; everything
+else in this contract is implementation-ready.</strong></p>
+<ul>
+<li><strong>Option A</strong> (receipt-only <code>DeliberationEntryRecordedReceipt</code>, no stored
+thread) is the right implementation shape — but only after the Q3 decision
+pins the <code>entry_kind</code> representation. Shipping v1 without <code>entry_kind</code>
+was considered and rejected: the framing brief defines a deliberation
+entry as a <em>typed</em> entry (the kind is the handle the accessibility gate,
+privacy review, and conflict routing act on), so an untyped v1 would
+record the wrong fact and force a tag bump immediately after Q3 closes.
+Shipping a one-kind or free-string <code>entry_kind</code> was also rejected: both
+silently decide Q3 (closed-by-default or extensible-by-default
+respectively) without the decision being reviewed as such.</li>
+<li><strong>Option B</strong> (receipt + minimal thread read-model) is rejected for now: no
+consumer exists, and a read-model can be added later without changing the
+receipt.</li>
+<li><strong>Concrete next rung</strong>: a narrow Q3 decision document (small ADR or an
+addendum section to this contract, whichever review prefers) choosing
+closed-vs-extensible and, if closed, the initial kind list and evolution
+rule. After it lands, implementation proceeds as Option A in one focused
+PR against this contract (§4–§8), mirroring how #2276 implemented #2275.</li>
+</ul>
+<h2>12. Validation (this document&#39;s PR)</h2>
+<p>Docs-only change set: this file, a <code>docs/registry.toml</code> row, a
+<code>docs/INDEX.md</code> link, and the regenerated <code>docs/DOCUMENT_REGISTRY.md</code>
+(regeneration after registry row additions is required by that file&#39;s
+header). Validation: <code>git diff --check</code>, <code>python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml</code>
+(no new warnings), <code>python3 scripts/check-state-lag.py</code>. No route, OpenAPI,
+or generated-inventory files are touched, so none are regenerated.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
