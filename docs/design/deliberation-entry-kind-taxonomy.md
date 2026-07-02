@@ -122,8 +122,17 @@ Mirrors and tightens the landed `gate_kind_ordinal` pattern:
   not a discriminant edit.
 - **Unknown kinds fail closed**, at both boundaries: the recording API
   rejects a kind outside the enum (unrepresentable by construction in Rust),
-  and deserialization of a persisted payload with an unknown kind string is
-  an error, never a silent default.
+  and deserialization of a persisted payload with an unrecognized kind
+  fails, never silently defaulting. Encoding note, to prevent
+  implementation/test confusion: the `u8` discriminant exists **only inside
+  the canonical hash** — it is not the persisted wire encoding. Persisted
+  payloads follow the landed gate-receipt pattern (serde `snake_case`
+  string variants inside the opaque JSON payload), so the deserialization
+  failure mode is an unknown kind **string**; the discriminant byte cannot
+  be "unknown" at rest because it is recomputed from the typed kind at hash
+  time. If an implementation ever chose an ordinal wire encoding instead,
+  an unknown byte would fail closed the same way — but that is not the
+  landed pattern and not what this document instructs.
 - A **golden test vector** pins the full hash layout including the
   discriminant byte (§8).
 
