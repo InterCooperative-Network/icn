@@ -110,9 +110,17 @@ Mirrors and tightens the landed `gate_kind_ordinal` pattern:
 - Discriminants are **explicit** in a hand-written match (`u8`), exactly as
   pinned in §4. No `as u8` casts of compiler-assigned ordinals, no derive
   magic.
-- **Never reorder. Never reuse.** A removed kind (should that ever happen)
-  retires its discriminant permanently; the match arm goes away, the number
-  never comes back.
+- **Never reorder. Never reuse. Never delete a variant that was emitted.**
+  Retirement of a kind (should that ever happen) is an **emission-side**
+  act only: the recording API stops accepting the retired kind — rejected
+  by policy at the recording boundary, since it remains representable in
+  the enum — while the enum variant, its serde string form, and its
+  discriminant mapping stay in code **indefinitely**. Receipts are
+  append-only: historical payloads carrying the retired kind must remain
+  decodable, and their `record_hash` must remain recomputable for audit
+  replay, forever. The discriminant is never freed; a variant may only be
+  physically deleted if it provably never appeared in any emitted receipt,
+  and even then its discriminant stays burned.
 - **Adding a kind** requires an ADR or a reviewed addendum to this document,
   and takes the next unused discriminant (append-only). This is
   hash-compatible: existing receipts' hashes never change, because each
