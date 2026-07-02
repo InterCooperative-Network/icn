@@ -72,12 +72,27 @@ impl MembershipServiceImpl {
     }
 
     /// Compute a state change hash for an operation.
+    ///
+    /// This hash is contractually **cross-node deterministic**: two
+    /// independent nodes replaying the same governance decision (same
+    /// operation, entity, member, and `decision_receipt_id`) must produce
+    /// the same value — see
+    /// `crates/icn-core/tests/federated_two_node_pilot.rs`. It therefore
+    /// hashes only decision-derived inputs and **must never** include a
+    /// local execution wall-clock: `decision_receipt_id` is unique per
+    /// governance decision, so it (not a timestamp) supplies cross-decision
+    /// uniqueness. Mixing in `icn_time::current_timestamp_secs()` here made
+    /// the hash diverge across nodes whenever the seconds boundary ticked
+    /// between their executions (issue #2283). This mirrors
+    /// `KernelProtocolExecutor::compute_state_change_hash`, which hashes the
+    /// decision-carried `effective_at`, never a `now()` read. The
+    /// per-execution timestamp is still retained in `MembershipProvenance`
+    /// for audit; it just does not enter this fingerprint.
     fn compute_state_change_hash(
         operation: &str,
         entity_id: &str,
         member_did: &str,
         decision_receipt_id: &str,
-        timestamp: u64,
     ) -> String {
         let mut hasher = Sha256::new();
         hasher.update(b"membership:");
@@ -88,8 +103,6 @@ impl MembershipServiceImpl {
         hasher.update(member_did.as_bytes());
         hasher.update(b":");
         hasher.update(decision_receipt_id.as_bytes());
-        hasher.update(b":");
-        hasher.update(timestamp.to_le_bytes());
         let hash = hasher.finalize();
         hex::encode(&hash[..20]) // First 20 bytes for reasonable length
     }
@@ -180,7 +193,6 @@ impl MembershipService for MembershipServiceImpl {
                     &request.entity_id,
                     &request.member_did,
                     &request.decision_receipt_id,
-                    timestamp,
                 );
 
                 // Also maintain in-memory provenance index for fast lookups
@@ -279,7 +291,6 @@ impl MembershipService for MembershipServiceImpl {
                             &request.entity_id,
                             &request.member_did,
                             &request.decision_receipt_id,
-                            timestamp,
                         );
 
                         // Store provenance
@@ -378,7 +389,6 @@ impl MembershipService for MembershipServiceImpl {
                             &request.entity_id,
                             &request.member_did,
                             &request.decision_receipt_id,
-                            timestamp,
                         );
 
                         // Store provenance
@@ -510,7 +520,6 @@ impl MembershipService for MembershipServiceImpl {
                             &request.entity_id,
                             &request.member_did,
                             &request.decision_receipt_id,
-                            timestamp,
                         );
 
                         // Store provenance
@@ -632,7 +641,6 @@ impl MembershipService for MembershipServiceImpl {
                             &request.entity_id,
                             &request.member_did,
                             &request.decision_receipt_id,
-                            timestamp,
                         );
 
                         // Store provenance
@@ -1152,14 +1160,12 @@ mod tests {
             "entity-1",
             "did:icn:member1",
             "receipt-123",
-            1700000000,
         );
         let hash2 = MembershipServiceImpl::compute_state_change_hash(
             "add",
             "entity-1",
             "did:icn:member1",
             "receipt-123",
-            1700000000,
         );
         assert_eq!(hash1, hash2, "Same inputs should produce same hash");
     }
@@ -1171,18 +1177,42 @@ mod tests {
             "entity-1",
             "did:icn:member1",
             "receipt-123",
-            1700000000,
         );
         let hash2 = MembershipServiceImpl::compute_state_change_hash(
             "remove",
             "entity-1",
             "did:icn:member1",
             "receipt-123",
-            1700000000,
         );
         assert_ne!(
             hash1, hash2,
             "Different operations should produce different hashes"
+        );
+    }
+
+    #[test]
+    fn test_compute_state_change_hash_ignores_wall_clock() {
+        // Regression guard for issue #2283: the state-change hash is
+        // cross-node deterministic and must depend only on decision-derived
+        // inputs. The function no longer accepts a timestamp, so two calls
+        // with identical decision inputs — as two independent nodes would
+        // make while replaying the same decision at different wall-clock
+        // instants — always agree.
+        let a = MembershipServiceImpl::compute_state_change_hash(
+            "add",
+            "coop-sunrise-pilot",
+            "did:icn:member1",
+            "gov:membership:add:pilot:001",
+        );
+        let b = MembershipServiceImpl::compute_state_change_hash(
+            "add",
+            "coop-sunrise-pilot",
+            "did:icn:member1",
+            "gov:membership:add:pilot:001",
+        );
+        assert_eq!(
+            a, b,
+            "state-change hash must be independent of execution wall-clock (#2283)"
         );
     }
 }
