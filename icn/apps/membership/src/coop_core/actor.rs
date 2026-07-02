@@ -1,6 +1,6 @@
 //! # FROZEN — not a `#2082` proof surface
 //!
-//! This actor is a historical near-copy of `icn-coop`'s [`CoopActor`] kept only
+//! This actor is a historical near-copy of `icn-coop`'s `CoopActor` kept only
 //! for the membership app's internal composition. Per the merged
 //! `docs/design/membership-coop-core-map-parity.md` (#2272, Option B), it is
 //! **frozen at pre-#2104 semantics**: it records no `coop_id ↔ EntityId`

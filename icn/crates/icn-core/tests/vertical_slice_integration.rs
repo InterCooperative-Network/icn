@@ -170,9 +170,11 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
     // =========================================================================
     info!("── Step 2: Form Tool Library Cooperative ──");
 
+    // Keep the TempDir alive for the whole test: dropping it here would delete
+    // the sled backing directory while the DB is still open.
+    let coop_store_dir = tempfile::tempdir()?;
     let coop_store = {
-        let dir = tempfile::tempdir()?;
-        let db = sled::open(dir.path())?;
+        let db = sled::open(coop_store_dir.path())?;
         icn_coop::CoopStore::new(Arc::new(db))
     };
 

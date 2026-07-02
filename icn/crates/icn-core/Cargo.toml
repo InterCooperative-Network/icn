@@ -66,10 +66,6 @@ sha2 = "0.10"
 regex = "1.10"
 icn-governance.workspace = true
 icn-trust.workspace = true
-# Test-only (like icn-governance/icn-trust above): the vertical-slice
-# integration test exercises the real icn-coop actor (#2082 gap 12b, Option B).
-# The meaning firewall forbids domain crates in kernel src/, not in tests.
-icn-coop.workspace = true
 portpicker.workspace = true
 reqwest.workspace = true
 # rand_core 0.6 OsRng for ed25519-dalek 2.x interop in tests (dalek pins rand_core 0.6)
