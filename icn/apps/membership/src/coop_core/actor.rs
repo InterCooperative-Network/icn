@@ -1,3 +1,16 @@
+//! # FROZEN — not a `#2082` proof surface
+//!
+//! This actor is a historical near-copy of `icn-coop`'s `CoopActor` kept only
+//! for the membership app's internal composition. Per the merged
+//! `docs/design/membership-coop-core-map-parity.md` (#2272, Option B), it is
+//! **frozen at pre-#2104 semantics**: it records no `coop_id ↔ EntityId`
+//! binding at activation, populates no treasury `entity_id` (#2266), and
+//! performs no `CreateTreasury` trusted-binding consultation (#2271). Do not
+//! cite tests against this actor as evidence of current #2082 behavior — the
+//! vertical-slice integration test was redirected to `icn_coop::CoopActor` for
+//! exactly that reason. Do not extend this copy with mapping/identity logic;
+//! route new work through `icn-coop`.
+
 use super::error::Result;
 use super::lifecycle::{LifecycleEvent, LifecycleManager};
 use super::membership::MembershipManager;

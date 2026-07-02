@@ -66,7 +66,6 @@ sha2 = "0.10"
 regex = "1.10"
 icn-governance.workspace = true
 icn-trust.workspace = true
-icn-membership-app = { path = "../../apps/membership" }
 portpicker.workspace = true
 reqwest.workspace = true
 # rand_core 0.6 OsRng for ed25519-dalek 2.x interop in tests (dalek pins rand_core 0.6)

@@ -31,9 +31,14 @@ use icn_ledger::create_budget_allocation;
 use icn_ledger::entry::JournalEntryBuilder;
 use icn_ledger::treasury::TreasuryManager;
 use icn_ledger::Ledger;
-use icn_membership_app::coop_core::actor::CoopActor;
-use icn_membership_app::coop_core::handle::CoopHandle;
-use icn_membership_app::coop_core::types::{CoopType, MemberRole};
+// #2082 gap 12b (Option B, per docs/design/membership-coop-core-map-parity.md):
+// the vertical slice exercises the REAL icn-coop actor — the path that carries
+// the current #2082 semantics (#2104 activation binding, #2266 activation-time
+// treasury entity_id population, #2271 CreateTreasury trusted-binding
+// consultation) — instead of the frozen apps/membership coop_core fixture.
+use icn_coop::actor::CoopActor;
+use icn_coop::types::{CoopType, MemberRole};
+use icn_coop::CoopHandle;
 use icn_store::{SledStore, Store};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -165,10 +170,12 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
     // =========================================================================
     info!("── Step 2: Form Tool Library Cooperative ──");
 
+    // Keep the TempDir alive for the whole test: dropping it here would delete
+    // the sled backing directory while the DB is still open.
+    let coop_store_dir = tempfile::tempdir()?;
     let coop_store = {
-        let dir = tempfile::tempdir()?;
-        let db = sled::open(dir.path())?;
-        icn_membership_app::coop_core::store::CoopStore::new(Arc::new(db))
+        let db = sled::open(coop_store_dir.path())?;
+        icn_coop::CoopStore::new(Arc::new(db))
     };
 
     // Create treasury manager backed by ledger store
@@ -218,10 +225,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
         .activate_cooperative(coop.id.clone(), charter_hash)
         .await?;
 
-    assert_eq!(
-        activated.status,
-        icn_membership_app::coop_core::types::CoopStatus::Active
-    );
+    assert_eq!(activated.status, icn_coop::types::CoopStatus::Active);
     assert!(
         activated.treasury_did.is_some(),
         "Treasury DID should be assigned on activation"
@@ -244,7 +248,26 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
         assert_eq!(treasury.currency, "HOURS");
         assert!(treasury.is_active);
         info!("  Treasury registered in ledger: currency=HOURS, active=true");
+
+        // #2082: the real icn-coop activation path preserves the original
+        // coop_id byte-for-byte and populates the treasury's entity_id — here,
+        // with no CoopEntityMap wired, via the #2266 no-map pure
+        // reject-not-normalize projection ("tool-library" is a valid
+        // cooperative slug). An identity target only: it grants no authority.
+        assert_eq!(treasury.coop_id, coop.id, "byte-exact coop_id preserved");
+        assert_eq!(
+            treasury.entity_id().map(|e| e.as_str()),
+            Some("entity:icn:cooperative:tool-library"),
+            "activation populates treasury entity_id (#2266 semantics)"
+        );
     }
+
+    // #2082: post-activation CreateTreasury must still be rejected — activation
+    // already owns the treasury (guard unchanged by #2271).
+    assert!(
+        coop_handle.create_treasury(coop.id.clone()).await.is_err(),
+        "CreateTreasury after activation must be rejected"
+    );
 
     // =========================================================================
     // Step 4: Dave applies for membership → governance vote → approved
@@ -795,10 +818,7 @@ async fn test_tool_library_cooperative_vertical_slice() -> Result<()> {
 
     // Verify cooperative state
     let final_coop = coop_handle.get_cooperative(coop.id.clone()).await?;
-    assert_eq!(
-        final_coop.status,
-        icn_membership_app::coop_core::types::CoopStatus::Active
-    );
+    assert_eq!(final_coop.status, icn_coop::types::CoopStatus::Active);
     assert!(final_coop.treasury_did.is_some());
     info!("  Cooperative state: Active, treasury assigned");
 
