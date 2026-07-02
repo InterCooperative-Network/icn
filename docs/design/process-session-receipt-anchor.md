@@ -172,7 +172,8 @@ production/pilot/member/organizer/live-federation/Phase-2 claims.
 
 ## 10. Relationship to #1748's open gates
 
-This slice does not close any #1748 gate. It *enables* two of them: the
+This slice does not close any of #1748's remaining open gates (gate (a) was
+already satisfied before this document — see below). It *enables* two of them: the
 privacy/visibility evidence-export run and the real accessibility-gate run both
 need a session anchor to scope their evidence. Note for the #1748 record: gate
 (a) ("at least one receipt class emitted at runtime") was already satisfied by
