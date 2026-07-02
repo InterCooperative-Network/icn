@@ -1367,6 +1367,15 @@ last_updated = "2026-07-02"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/design/decision-recorded-receipt.md"]
+category = "design"
+status = "draft"
+title = "DecisionRecordedReceipt — Design/Audit Contract"
+description = "Implementation contract for the fourth ProcessTransitionReceipt class (#1748/#2141): a DecisionRecordedReceipt recording that one decision was recorded against an already-opened (domain_id, session_id) anchor, with caller-opaque decision_id, recorded_by as recorder-not-decider actor evidence, body_hash-only content fingerprint (the body is never stored), stable-identity retry idempotency, fail-closed conflict, and atomic per-decision uniqueness via the landed put_opaque_if_absent pattern. Audits current state (no DecisionRecordedReceipt anywhere; disambiguates the load-bearing proposal/vote GovernanceDecisionReceipt lineage icn:gov:decision:v1/v2/v3, which this class must never duplicate or converge with), keeps the receipt free of outcome/tally/vote/mandate semantics, and triages framing-brief Q4 (HumanDecisionSet/DecisionRecord vs proposal-vote boundary) as the explicit implementation blocker — recommendation Option C: a narrow Q4 decision rung before any implementation. Receipts record facts and grant no authority. Design only — no runtime change (Refs #1748, #2141; no closure claims)"
+last_updated = "2026-07-02"
+owner = "matt"
+audiences = ["architects", "developers"]
+
 [docs."docs/design/deliberation-entry-kind-taxonomy.md"]
 category = "design"
 status = "draft"
