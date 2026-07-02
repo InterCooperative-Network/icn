@@ -57,8 +57,11 @@ dispatch chain (`docs/spec/effect-dispatch-contract.md`: decision →
 `InstitutionalEffectRecord` → `EffectManifest` → subsystem dispatch); the
 gateway `ReceiptStore` keeps secondary indexes of **mandates and authority
 grants by `decision_hash`** (`icn/crates/icn-gateway/src/receipt_store.rs`
-~L80–84) plus lookups by `proposal_id` and `domain_id`; ADR-0020 action
-cards close the proposal/vote proof loop against it; ADR-0014 records its
+~L80–84) plus lookups by `proposal_id` and `domain_id`; action cards
+(contract: [ADR-0027](../adr/ADR-0027-action-card-contract.md); the
+surface ADR-0020 promised, with the end-to-end proposal/vote proof-loop
+verification recorded at ADR-0020 step 7) close the proposal/vote proof
+loop against it; ADR-0014 records its
 authority posture ("authoritative for 'the decision happened,' but it does
 not itself bind authority-to-execute"). This is outcome/tally/proposal
 lineage — a *specific decision rule* (vote over a proposal) with its
@@ -228,9 +231,16 @@ Binding consequences:
 - `:v1` uses `recorded_by` (recorder evidence), never `decider`,
   `author`, or `approver`.
 - `:v1` carries no deciding-body handle.
-- `:v1` identity content is exactly the merged #2280 §4 field set:
-  `domain_id`, `session_id`, caller-opaque `decision_id`, `recorded_by`,
-  `recorded_at`, `body_hash`, `record_hash`.
+- `:v1` carries exactly the merged #2280 §4 field set — `domain_id`,
+  `session_id`, caller-opaque `decision_id`, `recorded_by`, `recorded_at`,
+  `body_hash`, `record_hash` — and nothing else.
+- **Stable duplicate identity is narrower than the field set**, exactly as
+  #2280 §4 pins it: same `(domain_id, session_id, decision_id)` + same
+  `recorded_by` + same `body_hash` → idempotent retry returning the
+  ORIGINAL receipt. `recorded_at` and the derived `record_hash` are **not**
+  identity inputs — a retry never fails, restamps, or conflicts merely
+  because time moved; a mismatch on `recorded_by` or `body_hash` is a
+  fail-closed `decision_recorded_conflict` 409.
 - The relationship to `GovernanceDecisionReceipt` stays **out of the v1
   hash layout entirely**. `icn:gov:decision_recorded:v1` and
   `icn:gov:decision:v1/v2/v3` never converge, never share fields, never
