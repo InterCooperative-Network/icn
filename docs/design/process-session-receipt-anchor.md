@@ -138,6 +138,18 @@ crosses the gateway only through the opaque cascade.
   only sense that matters — at most one opening fact per session — while making
   retries actually safe. Re-opening, closing, and lifecycle states are out of
   scope.
+- **Uniqueness must be atomic in the store, not check-then-write above it.**
+  The existing opaque `ReceiptStore::put_opaque` is write-once per
+  `(class, record_hash)` but deliberately *appends* distinct hashes under the
+  same `(class, key1, key2)` chain — so a read-check followed by a put cannot
+  enforce "one opening": two authorized opens racing on the same
+  `(domain_id, session_id)` (different `opened_at` ⇒ different hashes) would
+  both persist. The backend method MUST enforce `(domain_id, session_id)`
+  uniqueness **inside the storage transaction** (insert-if-absent /
+  compare-and-swap on the session-open key, or an equivalent unique index), so
+  concurrent opens serialize to exactly one persisted opening and the loser
+  receives the §6 idempotent-success or conflict outcome — never a second
+  receipt.
 
 ## 7. Query / read behavior
 
@@ -189,7 +201,12 @@ crosses the gateway only through the opaque cascade.
     `session_id` in two different domains do **not** mix in the new
     `(domain_id, session_id)`-scoped read (§7); the legacy
     `(session_id, gate_kind)` reads are byte-identical in behavior.
-12. Docs/claim lint clean — no readiness overclaim, vocabulary gates pass.
+12. Concurrent duplicate-open race: two simultaneous authorized opens for the
+    same `(domain_id, session_id)` serialize to **exactly one persisted
+    receipt** (atomic insert-if-absent, §6); the loser observes the idempotent
+    success (same opener) or the fail-closed conflict (different opener) —
+    never a second stored opening.
+13. Docs/claim lint clean — no readiness overclaim, vocabulary gates pass.
 
 ## 9. Explicit non-goals
 
