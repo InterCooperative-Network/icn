@@ -71,13 +71,14 @@ impl MembershipServiceImpl {
         format!("{}:{}", entity_id, member_did)
     }
 
-    /// Compute a state change hash for an operation.
+    /// Compute a decision-identity hash for a membership operation.
     ///
-    /// This hash is contractually **cross-node deterministic**: two
-    /// independent nodes replaying the same governance decision (same
-    /// operation, entity, member, and `decision_receipt_id`) must produce
-    /// the same value — see
-    /// `crates/icn-core/tests/federated_two_node_pilot.rs`. It therefore
+    /// **What this fingerprints:** the decision-derived identity of the
+    /// operation — `operation`, `entity_id`, `member_did`, and
+    /// `decision_receipt_id`. It is contractually **cross-node
+    /// deterministic**: two independent nodes replaying the same governance
+    /// decision must produce the same value (see
+    /// `crates/icn-core/tests/federated_two_node_pilot.rs`). It therefore
     /// hashes only decision-derived inputs and **must never** include a
     /// local execution wall-clock: `decision_receipt_id` is unique per
     /// governance decision, so it (not a timestamp) supplies cross-decision
@@ -88,6 +89,22 @@ impl MembershipServiceImpl {
     /// decision-carried `effective_at`, never a `now()` read. The
     /// per-execution timestamp is still retained in `MembershipProvenance`
     /// for audit; it just does not enter this fingerprint.
+    ///
+    /// **What this does NOT fingerprint:** the persisted `Member` record
+    /// still carries node-local wall-clock audit fields (`joined_at` on add;
+    /// `removed_at`/`frozen_at`/`freeze_expires_at`/`unfrozen_at` metadata on
+    /// the other ops), so the durable record is not itself byte-identical
+    /// across nodes. This fingerprint is the decision-identity of the state
+    /// change, not a checksum of the full durable record. Making the durable
+    /// record fully deterministic requires a decision-carried `effective_at`
+    /// threaded through `MembershipEffect` (a schema change) — tracked in
+    /// issue #2286.
+    ///
+    /// Fields are **length-prefixed** (u64 LE length before each field), not
+    /// `:`-joined, so the input is injective: `member_did`, `entity_id`, and
+    /// `decision_receipt_id` may themselves contain `:` (DIDs are
+    /// `did:icn:…`), and a bare `:` separator would let distinct tuples
+    /// collide onto the same byte stream.
     fn compute_state_change_hash(
         operation: &str,
         entity_id: &str,
@@ -95,14 +112,11 @@ impl MembershipServiceImpl {
         decision_receipt_id: &str,
     ) -> String {
         let mut hasher = Sha256::new();
-        hasher.update(b"membership:");
-        hasher.update(operation.as_bytes());
-        hasher.update(b":");
-        hasher.update(entity_id.as_bytes());
-        hasher.update(b":");
-        hasher.update(member_did.as_bytes());
-        hasher.update(b":");
-        hasher.update(decision_receipt_id.as_bytes());
+        hasher.update(b"membership:v2:");
+        for field in [operation, entity_id, member_did, decision_receipt_id] {
+            hasher.update((field.len() as u64).to_le_bytes());
+            hasher.update(field.as_bytes());
+        }
         let hash = hasher.finalize();
         hex::encode(&hash[..20]) // First 20 bytes for reasonable length
     }
@@ -1213,6 +1227,22 @@ mod tests {
         assert_eq!(
             a, b,
             "state-change hash must be independent of execution wall-clock (#2283)"
+        );
+    }
+
+    #[test]
+    fn test_compute_state_change_hash_injective_across_colon_fields() {
+        // Regression guard for the injectivity gap: `member_did` /
+        // `entity_id` / `decision_receipt_id` can contain `:` (DIDs are
+        // `did:icn:…`). Under the old `:`-joined encoding these two tuples
+        // both serialized to `membership:add:e:did:icn:x:r` and collided;
+        // length-prefixing makes the input injective, so they must differ.
+        let a = MembershipServiceImpl::compute_state_change_hash("add", "e", "did:icn:x", "r");
+        let b = MembershipServiceImpl::compute_state_change_hash("add", "e:did", "icn:x", "r");
+        assert_ne!(
+            a, b,
+            "hash input must be injective — shifting a `:` boundary between \
+             adjacent fields must change the hash"
         );
     }
 }
