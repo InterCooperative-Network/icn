@@ -331,23 +331,24 @@ The implementation PR made the two open sub-decisions this contract left to
 it. Recorded here so the doc stays the audit trail.
 
 **Source of `effective_at` (§5): `ProposalAccepted.decided_at`.** The
-governance decision's own recorded time (`icn-kernel-api/src/events.rs`,
+governance decision's own recorded time
+(`icn/crates/icn-kernel-api/src/events.rs`,
 `SystemEvent::ProposalAccepted.decided_at`) is threaded through
-`translate_payload_to_effects` (`apps/governance/src/lib.rs` →
-`handlers/execution.rs`) into the four durable membership effects. It is
-sampled exactly once when the proposal is closed
-(`apps/governance/src/actor.rs`, `decided_at: now`), persisted in the close
-journal (`apps/governance/src/close_journal.rs` — "recovery reproduces the
-same `decided_at` rather than using restart time"), and gossiped in the
-event, so every node replaying the decision reads an identical value and
-never a local clock. It is the membership analogue of the protocol lane's
-decision-carried `effective_at`, and is unrelated to the deprecated
-proposal-level delayed-execution field (#282).
+`translate_payload_to_effects` (`icn/apps/governance/src/lib.rs` →
+`icn/apps/governance/src/handlers/execution.rs`) into the four durable
+membership effects. It is sampled exactly once when the proposal is closed
+(`icn/apps/governance/src/actor.rs`, `decided_at: now`), persisted in the
+close journal (`icn/apps/governance/src/close_journal.rs` — "recovery
+reproduces the same `decided_at` rather than using restart time"), and
+gossiped in the event, so every node replaying the decision reads an
+identical value and never a local clock. It is the membership analogue of
+the protocol lane's decision-carried `effective_at`, and is unrelated to the
+deprecated proposal-level delayed-execution field (#282).
 
 **Compatibility posture (§6): versioned `Option<u64>`, not fail-closed.**
 The audit found that membership effects are persisted in
 `ExecutionRecord.effects` and re-decoded on the crash-recovery convergence
-path (`icn-core/src/supervisor/decision_executor.rs`), so a bare
+path (`icn/crates/icn-core/src/supervisor/decision_executor.rs`), so a bare
 non-`default` field would break recovery of in-flight pre-upgrade decisions.
 The field is therefore `effective_at: Option<u64>` with `#[serde(default)]`:
 new decisions always carry `Some(decided_at)` (fully convergent); effects
@@ -364,3 +365,19 @@ callers), and the `membership:v2` `state_change_hash` layout (a regression
 test asserts the fingerprint is independent of `effective_at`). No schema
 exposed to OpenAPI/SDK (the kernel-api request/effect types carry no
 `ToSchema` derive and appear in neither the generated spec nor the SDK).
+
+**Scope of the convergence claim (metadata / raw bytes).** This PR makes the
+durable *logical* state converge — the timestamp fields plus the
+decision-derived metadata are identical across nodes replaying one decision.
+It does **not** claim the raw `save_member` byte stream is identical.
+`Member.metadata` is a `HashMap<String, String>` and `CoopStore::save_member`
+serializes the whole struct with postcard, so map iteration order (and thus
+the byte encoding) is not deterministic across processes even when the
+logical contents match. Accordingly the two-node test asserts a **normalized
+durable-state projection** (the §7-sanctioned option): typed fields compared
+directly, and `metadata` compared order-normalized (sorted), not as raw
+bytes. A true byte-level durable/audit/sync comparison would first require a
+canonical `Member` serialization (e.g. a `BTreeMap` metadata or a canonical
+encoder) — a separate concern from the timestamp determinism fixed here, and
+explicitly out of scope for #2286. The convergence claim in this lane is
+therefore scoped to the normalized projection, not raw record bytes.

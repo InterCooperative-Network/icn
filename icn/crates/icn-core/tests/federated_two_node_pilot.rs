@@ -389,13 +389,31 @@ async fn test_two_node_membership_add_determinism() -> Result<()> {
 
     // === ASSERT DURABLE RECORD CONVERGENCE (#2286) ===
     // The decision-identity fingerprint (state_change_hash) converging is not
-    // enough: the durable `Member` record must also be byte-identical across
+    // enough: the durable `Member` *logical* state must also converge across
     // nodes. Before #2286, `joined_at` was each node's local `Utc::now()` and
-    // diverged across a seconds boundary. Compare a normalized durable-state
-    // projection that includes the timestamp.
+    // diverged across a seconds boundary.
+    //
+    // We assert a NORMALIZED durable-state projection, not raw `save_member`
+    // bytes: `Member.metadata` is a `HashMap` and `save_member` postcard-encodes
+    // the whole struct, so map iteration order (and thus the byte stream) is not
+    // deterministic across processes even when the logical contents match. A
+    // byte-level guarantee would need a canonical `Member` encoding, which is a
+    // separate concern from the timestamp determinism under test here (see
+    // docs/design/membership-durable-timestamp-semantics.md §10).
     let member_a = coop_store_a.get_member("coop-sunrise-pilot", &member_did)?;
     let member_b = coop_store_b.get_member("coop-sunrise-pilot", &member_did)?;
 
+    // Order-normalized metadata so HashMap iteration order can't mask/forge a
+    // difference — this proves the *logical* metadata converges.
+    let sorted_metadata = |m: &icn_coop::Member| {
+        let mut kv: Vec<(String, String)> = m
+            .metadata
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        kv.sort();
+        kv
+    };
     let project = |m: &icn_coop::Member| {
         (
             m.joined_at,
@@ -404,12 +422,14 @@ async fn test_two_node_membership_add_determinism() -> Result<()> {
             m.tier.as_ref().map(|t| t.name.clone()),
             m.shares,
             m.capital_contribution,
+            sorted_metadata(m),
         )
     };
     assert_eq!(
         project(&member_a),
         project(&member_b),
-        "Durable Member records must converge across nodes replaying the same decision"
+        "Durable Member logical state (incl. order-normalized metadata) must \
+         converge across nodes replaying the same decision"
     );
 
     // And the durable timestamp must be the decision-carried `effective_at`, not a
