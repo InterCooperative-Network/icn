@@ -1412,6 +1412,15 @@ last_updated = "2026-07-02"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/design/membership-durable-timestamp-semantics.md"]
+category = "design"
+status = "draft"
+title = "Membership durable timestamp semantics — Design/Audit Contract"
+description = "Design/audit contract for #2286 after #2284 made membership state_change_hash a deterministic decision-identity fingerprint: durable Member records still persist node-local wall-clock (joined_at field; removed_at/frozen_at/freeze_expires_at/unfrozen_at metadata), so replaying the same governance decision on two nodes diverges in durable bytes. Decides the target semantics — deterministic durable timestamps via a decision-carried effective_at threaded through MembershipEffect/requests (mirroring the KernelProtocolExecutor SetParameter precedent, with the honest caveat that the protocol producer's value is currently degenerate 0 pending #282), local audit timestamps separated from durable convergence state, freeze_expires_at = effective_at + duration_secs, update-member needs no durable timestamp, membership:v2 hash layout unchanged. Names the serialized-effect compatibility choice (fail-closed vs versioned vs legacy-non-convergent) as an explicit future implementation decision — no serde(default) smuggling — plus the implementation PR's test obligations. Design only — no schema/runtime/OpenAPI/SDK change (Refs #2286, #2284, #2283; #2286 stays open)"
+last_updated = "2026-07-03"
+owner = "matt"
+audiences = ["architects", "developers"]
+
 [docs."docs/design/README.md"]
 category = "reference"
 status = "canonical"
