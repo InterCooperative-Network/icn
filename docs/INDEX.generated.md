@@ -276,6 +276,12 @@ Defines InstitutionalDomain as the governed operating jurisdiction and DomainPol
 
 **For:** `architects`, `developers`, `contributors` | **Updated:** 2026-05-14
 
+### 📋 **Draft** [Institutional Powers and Legitimacy Invariants](/docs/spec/institutional-powers.md)
+
+Design-level doctrine defining how ICN encodes institutional power so it cannot become unaccountable state/capital power. Names the legitimacy circuit (authority basis -> adopted policy -> bounded effect -> receipt -> challenge/repair path), the InstitutionalPowerEvent envelope, and four power classes (GovernancePower, ContributionPower, ProtectivePower, RepairPower) as the ICN reconciliations of governance, contribution/taxation, protective force, and justice/repair without sovereign extraction, police power, or carceral logic. States fail-closed legitimacy invariants and maps each circuit stage to existing seams (InstitutionalDomain, DomainPolicy, CCL policy registry, AuthorityGrant, Mandate, TypedScope, EffectManifest, KernelEffect, GovernanceDecisionReceipt, InstitutionalEffectRecord, EffectDispatchEvidence, challenge/reversal/counter-receipt). Docs-only design layer over the Effect Dispatch Contract; introduces no code/schema/CCL/route/runtime change. Refs RFC-0018, ADR-0014/0019/0025/0026/0027, #2061, #2080, #1868, #2082.
+
+**For:** `architects`, `developers`, `contributors` | **Updated:** 2026-06-25
+
 ### 📋 **Draft** [Member Shell v0](/docs/spec/member-shell-v0.md)
 
 Defines the ICN member shell as the primary participation surface at v0: mobile-first, offline-tolerant, accessibility-first, plain-language-first. The shell is an app-side rendering surface that consumes ADR-0020 /me/standing, ADR-0027 ActionCard schema, ADR-0026 receipts, the closed seven-string sync vocabulary from docs/spec/network-anti-entropy-proof-loops.md (#1829), and the closed seven-string placement vocabulary from docs/spec/compute-placement-policy.md (#1826), without redefining any of them. Names five hard boundary lines (vs steward cockpit #1795, vs node operator civic-role surface #1613, vs public website, vs institution-package skin, vs backend/runtime), ten design principles, a ten-surface information architecture (Home/Today, My Standing, Current Scope, Action Cards, Decisions/Governance, Receipts, Records/Artifacts, Privacy/Access, Sync/Offline status, Help/Challenge/Review/Exit), the ActionCard rendering contract (per-field requirements + closed card states), the standing surface contract, the ten-step signing/confirmation flow with reversibility/privacy/sync warnings, the three-tier receipt rendering (plain summary → explanation → formal record under details), offline/low-bandwidth behavior including draft-intent vs sent-waiting-for-receipt vs confirmed labeling, privacy and ScopedVault member affordances (existence + scope + access path only, never body content), the twelve-category accessibility gate inherited from ADR-0028 / docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md, a closed v0 member-facing status vocabulary (sync states + execution-scope strings + action-lifecycle strings + privacy/disclosure strings + receipt-class plain-language labels), eighteen-row failure/safety table, and three fixture-first dogfood slices (read-only standing+ActionCard+receipt+sync-delayed; signing flow rehearsal; offline/degraded sync rehearsal). No new endpoints, no platform decision, no native-app implementation, no schema redefinition, no new receipt classes. Advances #1818 — does not by itself close it. Defers the live UI implementation, the platform decision (iOS/Android/PWA/web), the signal_rule and obligation_lifecycle source-path enablement, the multilingual rendering integration, and the Layer 4 ProvenanceQuery consumption to named follow-ups.
@@ -375,6 +381,42 @@ Design for ICN's execution environment and compute resource management
 
 **For:** `architects`, `developers` | **Updated:** 2025-11-18
 
+### 📋 **Draft** [Governed coop_id to EntityId Resolver — Design Seam](/docs/design/coop-id-entity-resolver.md)
+
+Seam definition for the governed coop_id to EntityId resolver named as the keystone in the entity-aware authorization control map: contract, authority/governance, migration posture, fail-closed rules, and sequenced follow-up slices (consumes the #2082 CoopEntityMap store; mirrors the TokenAuthoritySource/DenyUntilWired issuance seam). Design only — no runtime change (#2061, #2080, #1868, #2082)
+
+**For:** `architects`, `developers` | **Updated:** 2026-06-26
+
+### 📋 **Draft** [CreateTreasury — Treasury entity_id Trust Semantics](/docs/design/create-treasury-entity-id-semantics.md)
+
+Trust-semantics audit/design for the CreateTreasury message path (icn-coop actor + apps/membership coop_core duplicate): no production caller, no authority gate, no CoopEntityMap integration, entity_id None today. Pins why the path must never populate entity_id by bare projection or write map provenance, and defines the single safe future slice (read-only trusted-binding consultation mirroring #2266 activation-populate and the ADR-0084 re-verification discipline) plus the tests any implementation PR requires. Mapping stays zero-authority; UnknownLegacy stays untrusted. Design only — no runtime change (#2082; #2081/#2080 untouched)
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-01
+
+### 📋 **Draft** [DecisionRecordedReceipt Q4 decision — recorded fact vs proposal/vote lineage](/docs/design/decision-recorded-q4-decision.md)
+
+Q4 decision document unblocking DecisionRecordedReceipt implementation (#1748/#2141, merged contract #2280): decides all four Q4 branches — (A) v1 stays an opaque body_hash-only recorded-decision fact (no typed DecisionRecord/HumanDecisionSet payload; the brief positions HumanDecisionSet as a read-model); (B) parallel with explicit non-convergence to the load-bearing proposal/vote GovernanceDecisionReceipt lineage icn:gov:decision:v1/v2/v3 (effect dispatch, mandate/authority-grant indexes, action cards) — the spine names but does not absorb it; any future reference is v2-or-later after its own ADR; (C) no deciding-body handle in v1, recorded_by stays recorder-not-decider; (D) resolution stays deferred out of DeliberationEntryKind v1 with discriminant 10 reserved. Hash-layout consequence: none — the merged #2280 contract is implementation-ready as written. Design decision only — no runtime change (Refs #1748, #2141; no closure claims)
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-02
+
+### 📋 **Draft** [DecisionRecordedReceipt — Design/Audit Contract](/docs/design/decision-recorded-receipt.md)
+
+Implementation contract for the fourth ProcessTransitionReceipt class (#1748/#2141): a DecisionRecordedReceipt recording that one decision was recorded against an already-opened (domain_id, session_id) anchor, with caller-opaque decision_id, recorded_by as recorder-not-decider actor evidence, body_hash-only content fingerprint (the body is never stored), stable-identity retry idempotency, fail-closed conflict, and atomic per-decision uniqueness via the landed put_opaque_if_absent pattern. Audits current state (no DecisionRecordedReceipt anywhere; disambiguates the load-bearing proposal/vote GovernanceDecisionReceipt lineage icn:gov:decision:v1/v2/v3, which this class must never duplicate or converge with), keeps the receipt free of outcome/tally/vote/mandate semantics, and triages framing-brief Q4 (HumanDecisionSet/DecisionRecord vs proposal-vote boundary) as the explicit implementation blocker — recommendation Option C: a narrow Q4 decision rung before any implementation. Receipts record facts and grant no authority. Design only — no runtime change (Refs #1748, #2141; no closure claims)
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-02
+
+### 📋 **Draft** [DeliberationEntry kind taxonomy — Q3 decision](/docs/design/deliberation-entry-kind-taxonomy.md)
+
+Q3 decision document unblocking DeliberationEntryRecordedReceipt implementation (#1748/#2141, merged contract #2277): chooses Option A — a closed, ADR-controlled entry_kind enum hashed by explicit u8 discriminant (the landed gate_kind_ordinal pattern) over charter-extensible strings, keeping institutional vocabulary mapped at the app layer per the framing-brief vocabulary firewall. Pins a scrutinized ten-kind v1 list with explicit discriminants (resolution deferred in writing as Q4-ambiguous), a never-reorder/never-reuse append-only evolution rule with fail-closed unknown kinds and a required golden vector, and the exact v1 hash layout instruction for the future implementation PR. Q1 target_ref stays deferred; no vote/approval/outcome kinds ever by append. Design decision only — no runtime change (Refs #1748, #2141; no closure claims)
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-02
+
+### 📋 **Draft** [DeliberationEntryRecordedReceipt — Design/Audit Contract](/docs/design/deliberation-entry-recorded-receipt.md)
+
+Implementation contract for the third ProcessTransitionReceipt class (#1748/#2141): a DeliberationEntryRecordedReceipt recording one deliberation entry as an institutional fact against an already-opened (domain_id, session_id) anchor (#2276), with caller-opaque entry_id, body_hash-only content fingerprint (the body is never stored), stable-identity retry idempotency, fail-closed different-author/body conflict, and atomic per-entry uniqueness via the landed put_opaque_if_absent pattern. Audits current state (no DeliberationEntryRecordedReceipt, no stored DeliberationThread; disambiguates the test-only icn-baseline-lock namesake), keeps entries free of chat/moderation/vote semantics, and triages framing-brief Q3 (entry_kind taxonomy) as the explicit implementation blocker — recommendation Option C: a narrow Q3 taxonomy decision rung before any implementation. Receipts record facts and grant no authority. Design only — no runtime change (Refs #1748, #2141; no closure claims)
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-02
+
 ### 📝 **Living** [ICN Deterministic Core Specification](/docs/design/deterministic-core.md)
 
 Specification for deterministic computation substrate ensuring reproducible state machines
@@ -422,6 +464,12 @@ Truth contract auditing all economics-related code against specification
 Maps economic operations against implementation state
 
 **For:** `architects` | **Updated:** 2026-03-10
+
+### 📋 **Draft** [Entity-Aware Authorization Control Map](/docs/design/entity-aware-auth-control-map.md)
+
+Migration control map for gateway authorization: flat coop_id guard vs entity-aware checks, observe-mode, fail-closed trusted issuance, and the coop_id to EntityId resolver keystone (#2061, #2080, #1868)
+
+**For:** `architects`, `developers` | **Updated:** 2026-06-26
 
 ### 📝 **Living** [Entity Dissolution: Before and After](/docs/design/entity-dissolution-example.md)
 
@@ -483,6 +531,18 @@ Design for managing multiple network endpoints with IPv6
 
 **For:** `architects`, `developers` | **Updated:** 2026-03-10
 
+### 📋 **Draft** [apps/membership coop_core — Map-Parity Contract (#2082 gap 12b)](/docs/design/membership-coop-core-map-parity.md)
+
+Design/audit contract for the last #2082 structural gap: the apps/membership coop_core actor is a test-harness fixture (icn-core dev-dependency; sole consumer is vertical_slice_integration.rs; no production caller) frozen pre-#2104 — no icn-entity dep, no CoopEntityMap integration, no activation binding/populate, no CreateTreasury consultation. Defines the divergence table, the parity-vs-deprecate decision (Option B deprecate/redirect recommended: migrate the vertical-slice test to icn_coop::CoopActor and freeze/remove the duplicate), the exact parity slices and test matrix if parity is chosen instead, and explicit non-claims. Mapping stays zero-authority; UnknownLegacy stays untrusted. Design only — no runtime change (#2082; #2081/#2080 untouched)
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-02
+
+### 📋 **Draft** [Membership durable timestamp semantics — Design/Audit Contract](/docs/design/membership-durable-timestamp-semantics.md)
+
+Design/audit contract for #2286 after #2284 made membership state_change_hash a deterministic decision-identity fingerprint: durable Member records still persist node-local wall-clock (joined_at field; removed_at/frozen_at/freeze_expires_at/unfrozen_at metadata), so replaying the same governance decision on two nodes diverges in durable bytes. Decides the target semantics — deterministic durable timestamps via a decision-carried effective_at threaded through MembershipEffect/requests (mirroring the KernelProtocolExecutor SetParameter precedent, with the honest caveat that the protocol producer's value is currently degenerate 0 pending #282), local audit timestamps separated from durable convergence state, freeze_expires_at = effective_at + duration_secs, update-member needs no durable timestamp, membership:v2 hash layout unchanged. Names the serialized-effect compatibility choice (fail-closed vs versioned vs legacy-non-convergent) as an explicit future implementation decision — no serde(default) smuggling — plus the implementation PR's test obligations. Design only — no schema/runtime/OpenAPI/SDK change (Refs #2286, #2284, #2283; #2286 stays open)
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-03
+
 ### 📋 **Draft** [Multi-Device Identity Design](/docs/design/multi-device-identity-design.md)
 
 Design for managing identity across multiple devices within a single agent
@@ -506,6 +566,12 @@ Design for platform abstractions and portability across systems
 Experimental post-quantum cryptography integration and migration strategy
 
 **For:** `architects`, `security` | **Updated:** 2026-03-10
+
+### 📋 **Draft** [ProcessSession Receipt Anchor — Design/Audit Contract](/docs/design/process-session-receipt-anchor.md)
+
+Implementation contract for the second ProcessTransitionReceipt class (#1748/#2141): a ProcessSessionOpenedReceipt anchoring caller-opaque session_ids to a recorded opening fact (domain-bound blake3 hash, ADR-0026 Layer 2, mirrors the landed #2144 ProcessGateResultReceipt pattern end to end). Audits current state (session_id opaque, no stored ProcessSession, no lifecycle), pins duplicate-open idempotency/conflict semantics, defers target_ref (Q1) and purpose taxonomy in writing, and recommends receipt-only anchoring (no stored session object) with the required test matrix. Receipts record facts and grant no authority. Design only — no runtime change (Refs #1748, #2141; no closure claims)
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-02
 
 ### 📋 **Draft** [Razeto Integration Design](/docs/design/razeto-integration-design.md)
 
@@ -1122,6 +1188,12 @@ Runbooks moved to docs/guides/operations/runbooks/ (tranche 3); use that path fo
 
 **For:** `operators` | **Updated:** 2026-03-26
 
+### 📝 **Living** [Organizer facilitator walkthrough human AT test plan and evidence template](/docs/pilots/organizer-facilitator-walkthrough-human-at-test-plan.md)
+
+Reusable, deliberately blank human assistive-technology smoke-test plan and repo-safe evidence template for the fixture-backed organizer facilitator walkthrough. Records the required tester, device, OS, browser, AT, input, zoom, theme, locale, task, observation, blocker, and follow-up fields; distinguishes automated/browser-assisted evidence from real human observations; and makes no claim that human AT testing or accessibility completion has occurred.
+
+**For:** `team`, `organizers`, `contributors`, `accessibility-testers` | **Updated:** 2026-06-29
+
 ### 📋 **Draft** [Pilot Proposal Template](/docs/pilots/pilot-proposal-template.md)
 
 Template for approaching potential pilot communities
@@ -1208,6 +1280,12 @@ Runbook for rotating cryptographic secrets
 Runbook for pilot deployment verification
 
 **For:** `operators` | **Updated:** 2026-03-10
+
+### 📝 **Living** [Treasury Entity-Auth Enforce-Mode Runbook](/docs/guides/operations/runbooks/treasury-entity-auth-enforce-mode-runbook.md)
+
+Rehearse/verify the off-by-default treasury entity-auth enforce mode (ICN_TREASURY_ENTITY_AUTH_MODE=enforce-trusted-resolver) before any real enablement
+
+**For:** `operators` | **Updated:** 2026-06-29
 
 ### 🔒 **Canonical** [Operations Directory README](/docs/operations/README.md)
 
@@ -1510,7 +1588,49 @@ Approach for hosted cooperative pilot deployments
 
 Guided browser/mobile-first rehearsal story: standing, action cards, action items, receipts, provenance, repo-safe evidence; organizer vs steward vs member paths; preview-before-mutation; CLI as operator layer only; follow-ups for UI/API/evidence contracts including the landed fixture-backed demo-mode bridge slice. Partner companion doc lives in NYCN repo.
 
-**For:** `team`, `organizers` | **Updated:** 2026-06-09
+**For:** `team`, `organizers` | **Updated:** 2026-06-28
+
+### 📝 **Living** [Organizer facilitator walkthrough accessibility evidence (partial)](/docs/pilots/organizer-facilitator-walkthrough-accessibility-pass.md)
+
+Partial browser-assisted accessibility evidence for the fixture-backed, read-only organizer facilitator walkthrough merged in #2239. Records keyboard focus-order, semantic-tree, forced-colors, reduced-motion, target-size, narrow/reflow, and network observations against the twelve-category organizer/member gate. Explicitly does not claim a human, screen-reader, switch-control, low-vision, legal-conformance, organizer-readiness, member-facing-readiness, pilot-readiness, mutation, receipt, or evidence-export pass. Keeps #2041/#1726/#1727/#1746 open and records the remaining named human/AT work.
+
+**For:** `team`, `organizers`, `contributors` | **Updated:** 2026-06-28
+
+### 📝 **Living** [Summit Ops Closeout Continuity Packet (generic ICN)](/docs/pilots/summit-ops-closeout-continuity-packet.md)
+
+Docs-only map of the Summit Ops 'close the loop' lifecycle stage: how a package turns post-event work (attendance summary, speaker/sponsor follow-up, reimbursements, accessibility lessons, incident closeout, volunteer appreciation, budget reconciliation, public recap, next-year continuity, evidence export, follow-up register) into repo-safe shapes and future ICN action-card/receipt/evidence candidates. L1 declared shapes / rehearsal-ready — not fixture-backed, not runtime proof; categorical/fictional only, no private data; no pilot-UI change (#2099 gates that).
+
+**For:** `team`, `organizers` | **Updated:** 2026-06-26
+
+### 📝 **Living** [Summit Ops Closeout Recap Fixture Shape (generic ICN)](/docs/pilots/summit-ops-closeout-recap-fixture-shape.md)
+
+Fixture-shape map (spec + validation recipe) for the exact schema-valid (action_item/complete, scope structure, fictional ids) Public Recap Draft Handoff ActionCard a future contributor could append to web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json, plus the matching demo Communications role + public_recap scope that commit must add to standing.json. Leaves the lane fixture-ready, NOT fixture-backed: no runtime fixture is committed and no pilot-UI file is touched (#2099 gates pilot-UI surface). Becomes L2 only after the card + standing are committed and the validation path (per-card schema + validate-rehearsal-shell-fixtures.py + Playwright e2e + Rehearsal Fixture Bundle gate) passes; public-safe categorical/fictional only, no real event data.
+
+**For:** `team`, `organizers` | **Updated:** 2026-06-26
+
+### 📝 **Living** [Summit Ops Lifecycle Package Map (generic ICN)](/docs/pilots/summit-ops-lifecycle-package-map.md)
+
+Generic ICN-side map of how an institution package (NYCN motivating example, 2026 Summit) carries an event's full lifecycle (plan/prepare/run/close) onto the ICN vertical spine, preserving the Google-live / NYCN-package / future-ICN-node boundary. Reuses existing status + proof-level vocabulary; docs-only; no live sync, no partner-repo mutation, no formal-pilot claim.
+
+**For:** `team`, `organizers` | **Updated:** 2026-06-26
+
+### 📝 **Living** [Summit Ops Registration Action-Card Proof Loop (generic ICN)](/docs/pilots/summit-ops-registration-action-card-proof-loop.md)
+
+First proof-loop child of the run-stage facilitator path: a fictional Registration Desk lane walked end-to-end through the ICN proof loop (source packet -> reviewed candidate -> ActionCard candidate -> authorized completion -> receipt candidate -> evidence export -> follow-up). The lane is fixture-backed (L2): a committed fictional schema-valid action_item/complete ActionCard the rehearsal shell loads and the e2e validates — a rehearsal-ready shape, NOT a runtime proof, not live NYCN action cards/receipts, not a node-hosted cockpit; fictional categorical examples only; no real attendee data.
+
+**For:** `team`, `organizers` | **Updated:** 2026-06-26
+
+### 📝 **Living** [Summit Ops Registration Fixture Shape (generic ICN)](/docs/pilots/summit-ops-registration-fixture-shape.md)
+
+Fixture-shape map (spec/rationale + validation recipe) for the exact schema-valid (action_item/complete, scope structure, fictional ids) registration ActionCard in web/pilot-ui/fixtures/icn-organizer-demo/action-cards.json, with the validation path (validate-rehearsal-shell-fixtures.py + the Playwright e2e + Rehearsal Fixture Bundle gate). The card has since been committed and validated, so the Registration Desk lane is fixture-backed (L2) — a committed fictional fixture, not a runtime proof; no real attendee data.
+
+**For:** `team`, `organizers` | **Updated:** 2026-06-26
+
+### 📝 **Living** [Summit Ops Run-Stage Facilitator Path (generic ICN)](/docs/pilots/summit-ops-run-stage-facilitator-path.md)
+
+First concrete child of the Summit Ops lifecycle map: a fixture-backed, no-terminal event-day facilitator path for the run stage, mapping ten generic event-day lanes onto future ICN action cards / receipts / evidence while keeping NYCN private operating detail at boundary level. Docs-only; no live sync, no partner-repo mutation, no node-hosted cockpit claim.
+
+**For:** `team`, `organizers` | **Updated:** 2026-06-26
 
 ### 📋 **Draft** [Agent Knowledge Architecture](/docs/planning/agent-knowledge-architecture.md)
 
@@ -1596,6 +1716,12 @@ GitHub Actions workflows, deploy paths, K3s smoke runbooks, monitoring; routing 
 
 **For:** `operators`, `contributors` | **Updated:** 2026-04-29
 
+### 📝 **Living** [Claim-Boundary Map](/docs/reference/project-index/claim-boundaries.md)
+
+Operational claim-boundary manual: disambiguates the architectural Meaning Firewall from the claim-discipline firewall, summarizes source precedence and status-vs-proof, tabulates forbidden collapses with their evidence and enforcement status, and gives a reusable inventory/PR claim-discipline checklist. Orientation, not a truth root. Defers to STATE.md and PHASE_PROGRESS.md for current truth.
+
+**For:** `all`, `team` | **Updated:** 2026-06-26
+
 ### 📝 **Living** [Current Truth Map](/docs/reference/project-index/current-truth-map.md)
 
 One-screen routing for what is real now, what is not, what gates remain — pointing at STATE.md and PHASE_PROGRESS.md for the per-PR record.
@@ -1624,7 +1750,7 @@ Source-linked index of the four canonical ICN invariant families (5 operational 
 
 Proof-level taxonomy (L0-L8) as shared claim-boundary vocabulary, plus a capability matrix for the current organizer-rehearsal path. Supports #1746 and narrows #1796. Orthogonal to the project-coverage-matrix status vocabulary. Defers to STATE.md and PHASE_PROGRESS.md for current truth.
 
-**For:** `all`, `team` | **Updated:** 2026-06-09
+**For:** `all`, `team` | **Updated:** 2026-06-26
 
 ### 📋 **Draft** [ICN Repo Atlas](/docs/reference/project-index/repo-atlas.md)
 
@@ -1725,6 +1851,24 @@ Trust establishment for first-time peer contact without certificates or CAs
 
 **For:** `security`, `developers` | **Updated:** 2026-03-10
 
+### 📝 **Living** [CodeQL Alert Triage (2026-06-29)](/docs/security/codeql-alert-triage-2026-06-29.md)
+
+Point-in-time static triage of CodeQL alerts #100 and #101, with an inventory of other open alerts
+
+**For:** `security`, `developers` | **Updated:** 2026-06-29
+
+### 📝 **Living** [CodeQL Gossip Nonce Triage (2026-06-29)](/docs/security/codeql-gossip-nonce-triage-2026-06-29.md)
+
+Point-in-time static triage of gossip nonce alerts #30 through #35
+
+**For:** `security`, `developers` | **Updated:** 2026-06-29
+
+### 📝 **Living** [CodeQL Triage Closeout (2026-06-29)](/docs/security/codeql-triage-closeout-2026-06-29.md)
+
+Point-in-time open-alert inventory, detailed remaining triage, and maintainer disposition checklist
+
+**For:** `security`, `developers` | **Updated:** 2026-06-29
+
 ### 📋 **Draft** [Phase 10C Security Analysis](/docs/security/phase-10c-security-analysis.md)
 
 Security analysis and hardening for multi-party contracts
@@ -1756,7 +1900,7 @@ Comprehensive threat model covering attack vectors, adversary capabilities, and 
 
 Living snapshot of repo layout, decisions, constraints, and current engineering status
 
-**For:** `developers`, `agents` | **Updated:** 2026-06-21
+**For:** `developers`, `agents` | **Updated:** 2026-06-26
 
 
 ## Strategy
@@ -1916,10 +2060,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 312
+**Total documents:** 336
 
 **By status:**
 - Active: 1
 - Canonical: 40
-- Draft: 72
-- Living: 199
+- Draft: 83
+- Living: 212
