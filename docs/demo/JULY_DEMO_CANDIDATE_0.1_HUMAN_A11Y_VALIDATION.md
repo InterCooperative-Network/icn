@@ -7,9 +7,18 @@ on purpose. Filling them in (with repo-safe evidence) is the work [#2041] tracks
 
 Target surface: the member-shell v0 reference client (`web/member-shell/`), the human surface
 of July Demo Candidate 0.1. DEV/DEMO member surface only — **not** a production or pilot
-accessibility certification.
+accessibility certification. As of the extension below, this packet covers all three fixture
+surfaces of that client:
 
-Commit this packet was prepared against: `origin/main` `2b148e72`.
+- `/member-shell/?mode=demo` (default demo),
+- `/member-shell/?mode=demo&set=community` (community proof-spine variant, #2084),
+- `/member-shell/?mode=demo&set=process-evidence` (organizer-steward process-evidence surface, #2291).
+
+Commit this packet was originally prepared against: `origin/main` `2b148e72`. **Extended
+(docs-only) for the process-evidence surface against `origin/main` `b28fbeb2` (#2291's merge
+commit).** The extension adds the two `?set=` surfaces to the setup/checklists and a
+process-evidence-specific checklist (§4G); it performs **no** new automated run and **no** human
+pass — see the "Not run in this PR" note in §4G and the non-claims in §8.
 
 ## 1. What is already proven (automated) vs what this packet owes (human)
 
@@ -28,6 +37,14 @@ committed `web/member-shell/a11y-walkthrough.cjs`):
 | Mobile 360px horizontal scroll / reduced-motion render | none / standing still visible |
 | i18n seam (`en`, `qps-ploc`, `ar`): locale resolve + `lang`/`dir` applied + fallback | smoke PASS (see §6E) |
 | WCAG contrast **math** on `shell.css` tokens (arithmetic only) | all 7 tokens ≥ AA, 7.0–17.0:1 (see §6C) |
+
+The **process-evidence surface** (`?mode=demo&set=process-evidence`, #2291) has its **own**
+automated floor recorded in
+[`JULY_DEMO_CANDIDATE_0.1_PROCESS_EVIDENCE_WALKTHROUGH.md`](JULY_DEMO_CANDIDATE_0.1_PROCESS_EVIDENCE_WALKTHROUGH.md)
+(axe-core **0 violations**, keyboard visible-focus, 200%-zoom render, mobile, reduced-motion; four
+receipts rendered) via the same committed harness (`MSHELL_SET=process-evidence`). `shell.css` is
+**unchanged** by #2291, so the §4C/§6C contrast-token table still applies to that surface. That
+automated floor is **not** the human/AT work this packet owes.
 
 **Automation verifies structure, not perception.** It cannot confirm that a real screen-reader
 *conveys* the flow understandably, that a switch user can *complete* the task, that focus is
@@ -58,10 +75,17 @@ are the four owed `ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md` categories this packe
 # from the repo root ( cd "$(git rev-parse --show-toplevel)" )
 ( cd web && python3 -m http.server 8099 --bind 127.0.0.1 & )   # serve the web/ root
 # then open in your browser:
-#   http://127.0.0.1:8099/member-shell/?mode=demo            (fixture mode, no JWT)
+#   http://127.0.0.1:8099/member-shell/?mode=demo                        (fixture mode, no JWT)
+#   http://127.0.0.1:8099/member-shell/?mode=demo&set=community          (community proof-spine variant, #2084)
+#   http://127.0.0.1:8099/member-shell/?mode=demo&set=process-evidence   (process-evidence surface, #2291 — see §4G)
 #   http://127.0.0.1:8099/member-shell/?mode=demo&lang=qps-ploc
 #   http://127.0.0.1:8099/member-shell/?mode=demo&lang=ar
 ```
+
+Run each owed-category checklist (§4A–§4F) against **each** surface above. The process-evidence
+surface additionally has the surface-specific checklist in **§4G** (its four-receipt evidence
+story, evidence-detail disclosures, proof-pointer language, steward-visible/member-redacted
+boundary, and read-only export summary panel).
 
 Fixture mode renders the participation spine as read views (standing → action cards →
 completion receipt → plain-language evidence) with no live mutation and nothing signed. The
@@ -127,6 +151,49 @@ fallback is Arabic.)*
 ### F. Reduced motion (supportive)
 - [ ] With `prefers-reduced-motion` set, the surface remains usable and content stays visible. → ___
 
+### G. Process-evidence surface (`?mode=demo&set=process-evidence`, #2291)
+
+> **Not run in this PR. This packet defines the test protocol and evidence fields only.**
+> No human, screen-reader, switch-control, or low-vision pass of the process-evidence surface has
+> been performed by filling this section in — every field below is blank on purpose. This surface
+> is the highest-value target for a human/AT pass because it is receipt- and provenance-dense
+> (gate §3.11): it renders four process-transition receipts as an evidence story, a
+> steward-visible / member-redacted privacy boundary, and a read-only evidence-summary export.
+> Open `http://127.0.0.1:8099/member-shell/?mode=demo&set=process-evidence` (fixture mode, no JWT).
+> Record AT name+version and input method per sub-group; verdicts use
+> **Pass** / **Pass with documented follow-up #\<issue\>** / **Blocked** / **N/A (reason)**.
+
+**G1. Orientation / fixture-vs-live boundary (3.2 / 3.11)** — AT used: ____________
+- [ ] The tester can identify the page as fixture / dev / demo and **not** live production (honesty banner "Fixture-backed demo — no live node, nothing signed." is perceivable non-visually, without parsing JSON). → ___
+- [ ] The illustrative-hash labeling ("illustrative fixture value — not a real blake3 binding") is perceivable, so the tester does not mistake the demo hashes for real bindings. → ___
+
+**G2. Screen-reader — the four-receipt evidence story (3.2 / 3.9)** — AT used: ____________
+- [ ] The tester can navigate to the process-evidence evidence story **without a mouse**. → ___
+- [ ] The screen reader announces the four-receipt sequence in a meaningful order (session opened → deliberation input recorded → decision recorded → gate result). → ___
+- [ ] The receipt names / plain-language summaries are understandable in context (the tester can tell **what happened, who recorded it, when it was recorded, and what proof pointer backs it**), without needing to read raw JSON. → ___
+- [ ] Each per-receipt "Show evidence detail" disclosure announces itself and expands / collapses correctly (native `<details>`; toggles with Enter/Space; Tab past it — not a trap). → ___
+
+**G3. Redaction / privacy boundary (3.2 / 3.11)** — AT used: ____________
+- [ ] The redaction notice communicates non-visually that the private deliberation body text is **not present** (the receipt stores a `body_hash` only) — the member/export view shows the redaction reason + proof pointer, not the text. → ___
+- [ ] The steward-visible summary vs member/export-redacted distinction ("What the steward body sees" vs "What members and the export see") comes across non-visually and is not confusing. → ___
+
+**G4. Proof-pointer language (3.11)** — AT used: ____________
+- [ ] The distinction between `record_hash` (proof pointer) and `body_hash` (proof-of-content; body never stored) makes sense to the tester — or note whether the copy needs to be clearer. → ___
+- [ ] Recorder DIDs are understood as "who recorded this fact", not "who decided"; raw identifiers are not read as prose/translatable. → ___
+
+**G5. Read-only export summary panel (3.11)** — AT used: ____________
+- [ ] The read-only export summary panel communicates that it is **not** generating, downloading, mutating, or copying an export (no phantom download/copy control is announced or reachable). → ___
+- [ ] The export summary (mode = fixture-only, classification = repo-safe, the recorded decisions, the "What this is not" non-claims) is understandable non-visually. → ___
+
+**G6. Low-vision / 200% zoom (3.3)** — external contrast tool: ____________
+- [ ] At 200% browser zoom, the tester retains access to the evidence story, the disclosure controls, the redaction notice, and the export summary (no clipping / loss of function). → ___
+- [ ] Focus outline remains visible at zoom; narrow-viewport reflow is clean. → ___
+- [ ] The external contrast tool confirms the rendered text on this surface meets the documented `shell.css` ratios (§4C table; `shell.css` unchanged by #2291). → ___
+
+**G7. Switch / non-pointer (3.5 / 3.9)** — input used: ____________
+- [ ] With switch-control software (or another non-keyboard, non-mouse input), navigation reaches the same controls — every receipt disclosure and the export-detail disclosure — in a sane order, all operable. → ___
+- [ ] No hover-only controls; touch targets ≥ ~44×44 CSS px where touch is expected. → ___
+
 ## 5. Evidence-recording rules (repo-safe)
 
 - Capture screenshots / a short screen-reader transcript per category. Keep binaries in your
@@ -154,12 +221,15 @@ fallback is Arabic.)*
 
 ## 7. After the human pass is complete
 
-1. Fill in §2 and every checklist item in §4 with a verdict + observation + evidence reference.
+1. Fill in §2 and every checklist item in §4 — including the process-evidence surface checklist
+   **§4G** — with a verdict + observation + evidence reference, for each of the three fixture surfaces.
 2. In [`JULY_DEMO_CANDIDATE_0.1_ACCESSIBILITY_WALKTHROUGH.md`](JULY_DEMO_CANDIDATE_0.1_ACCESSIBILITY_WALKTHROUGH.md)
+   §5 **and** in [`JULY_DEMO_CANDIDATE_0.1_PROCESS_EVIDENCE_WALKTHROUGH.md`](JULY_DEMO_CANDIDATE_0.1_PROCESS_EVIDENCE_WALKTHROUGH.md)
    §5, flip gate rows 3.2 / 3.3 / 3.5 / 3.9 from "Pass with documented follow-ups #2041" to
-   **Pass** (or Blocked, with the real reason), and update §9 "owed" and the surface-readiness
-   conclusion to match what was actually observed.
-3. Update [#2041] with the result and close it **only** if the gate categories genuinely pass.
+   **Pass** (or Blocked, with the real reason), and update the "owed" and surface-readiness
+   conclusions to match what was actually observed.
+3. Update [#2041] with the result and close it **only** if the gate categories genuinely pass
+   on all covered surfaces.
 
 ## 8. What must NOT be claimed until this packet is actually completed by a human
 

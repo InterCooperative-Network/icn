@@ -262,8 +262,11 @@ them.
 ## 9. Owed before "organizer-ready / pilot-ready"
 
 > The reproducible human-tester packet for the owed items below is in
-> [`JULY_DEMO_CANDIDATE_0.1_HUMAN_A11Y_VALIDATION.md`](JULY_DEMO_CANDIDATE_0.1_HUMAN_A11Y_VALIDATION.md).
-> It is a template, not a completed pass. This #2289 surface does **not** complete it.
+> [`JULY_DEMO_CANDIDATE_0.1_HUMAN_A11Y_VALIDATION.md`](JULY_DEMO_CANDIDATE_0.1_HUMAN_A11Y_VALIDATION.md),
+> whose **§4G** now carries the process-evidence-surface-specific human/AT protocol (the
+> four-receipt story, evidence-detail disclosures, proof-pointer language, steward/member
+> redaction boundary, and read-only export panel). It is a template, not a completed pass — this
+> surface does **not** complete it, and #2041 stays open until a human/AT run fills it in.
 
 - Screen-reader smoke (≥1 of VoiceOver/NVDA/Orca) + ≥1 non-mouse input (3.2 / 3.9). [#2041]
 - Human 200% browser-zoom + small-device pass (3.3 / 3.5 / 3.8). [#2041]
