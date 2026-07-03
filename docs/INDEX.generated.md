@@ -555,6 +555,12 @@ Design for peer-to-peer connectivity across NAT boundaries
 
 **For:** `architects`, `developers` | **Updated:** 2026-03-10
 
+### 📋 **Draft** [Organizer-steward evidence surface runtime dogfood — Design Contract](/docs/design/organizer-steward-evidence-surface-runtime-dogfood.md)
+
+Implementation-planning contract for #2289 (under #1748/#2141): turns the scoped human-operability slice into an implementation-ready contract for the receipt → surface → evidence/export tail of the vertical spine. Names the receipt path (the four already-landed ADR-0026 Layer 2 classes ProcessSessionOpenedReceipt → DeliberationEntryRecordedReceipt → DecisionRecordedReceipt → ProcessGateResultReceipt, no new class), the human surface (existing web/member-shell/ demo/live surface — plain-language summary + evidence-detail disclosure + fixture/dry-run/live boundary labeling, non-CLI), the evidence/export shape (a repo-safe contract-conformant fixture evidence summary mapped onto urn:icn:contract:rehearsal-evidence-export:v1; no new runtime EvidencePacket producer), a fixture-safe privacy/redaction model (one DeliberationEntry visible to the steward body, redacted from the member/export view, showing redaction reason + record_hash/body_hash proof pointer without leaking private text — honest because deliberation/decision receipts store body_hash only), and the accessibility-gate obligations (ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md §3.11 receipts/provenance/evidence access + §3.12 governance/action access, with #2041 human/AT categories kept visible-pending). Design only — no Rust/UI/schema/OpenAPI/SDK/receipt-class change (Refs #2289, #1748, #2141, #2041; no closure claims)
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-03
+
 ### 📋 **Draft** [Platform Layer Design](/docs/design/platform-layer-design.md)
 
 Design for platform abstractions and portability across systems
@@ -2060,10 +2066,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 336
+**Total documents:** 337
 
 **By status:**
 - Active: 1
 - Canonical: 40
-- Draft: 83
+- Draft: 84
 - Living: 212
