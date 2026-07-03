@@ -345,6 +345,12 @@ PR-time review checklist for any organizer- or member-facing surface (rehearsal 
 
 **For:** `architects`, `contributors`, `design` | **Updated:** 2026-05-05
 
+### 📋 **Draft** [ActivationCrossedReceipt — Design/Audit Contract](/docs/design/activation-crossed-receipt-runtime-dogfood.md)
+
+Design/audit contract for #2293 (under #1748/#2141): the candidate fifth ProcessTransitionReceipt rung, an ActivationCrossedReceipt witnessing that an already-recorded decision crossed the activation boundary (the framing spine's boundary between deciding and doing) with required ProcessGateResultReceipts observed as pass, before any later mutation/evidence work. Audits current state honestly (ActivationCrossedReceipt / ActivationRequest / Mutation* / EvidencePacket* are framing-only — no Rust seam whatsoever; the four landed classes ProcessSessionOpened/DeliberationEntryRecorded/DecisionRecorded/ProcessGateResult are the only runtime ProcessTransitionReceipts), proposes a candidate icn:gov:activation_crossed:v1 contract subject to implementation proof (session-anchored (domain_id, session_id), caller-opaque activation_id, recorder-not-crosser DID, body_hash-only fingerprint, put_opaque_if_absent idempotence with fail-closed conflict and session precondition), places it at ADR-0026 Layer 2 self-hashed (blake3 record_hash, no signature/merkle — naming the layering caveat), preserves the privacy boundary (no private body text), defers member-shell rendering, and names the three blockers that require a narrow decision rung before implementation: B1 decision→activation cross-receipt reference (the lane's first inter-receipt link), B2 gate-basis representation + whether a new ActivationRequest gate object / ProcessGateKind variant is needed (ADR-controlled taxonomy), and B3 caller-supplied crossed_at vs decision-carried effective_at. Recommendation Option C: land this contract, then a decision rung, then implementation. Design only — no Rust/UI/schema/OpenAPI/SDK/receipt-class change (Refs #2293, #1748, #2141, #2041, #2291, #2292; no closure claims)
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-03
+
 ### 📋 **Draft** [ICN Visual Asset Register](/docs/design/assets/ASSET_REGISTER.md)
 
 Live register of planned and tracked visual assets for ICN. One row per asset (VE-NNN). Indexes briefs in docs/design/assets/briefs/. Initial rows cover the closure loop, scope model, decision-to-receipt, member shell concept, kernel/app separation, federation, commons/compute, action card anatomy, receipt anatomy, steward cockpit, regulatory-safe state, and what ICN is / is not.
@@ -2066,10 +2072,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 337
+**Total documents:** 338
 
 **By status:**
 - Active: 1
 - Canonical: 40
-- Draft: 84
+- Draft: 85
 - Living: 212
