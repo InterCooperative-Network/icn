@@ -1,0 +1,427 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Membership durable timestamp semantics — Design/Audit Contract | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>membership durable timestamp semantics</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/membership-durable-timestamp-semantics.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Membership durable timestamp semantics — Design/Audit Contract</h1>
+<p><strong>Status</strong>: draft — design / audit contract (not runtime implementation)
+<strong>Truth class</strong>: descriptive
+<strong>Canonical</strong>: no — current implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last Reviewed</strong>: 2026-07-03
+<strong>Source basis</strong>: read against <code>main</code> @ <code>e8057cc6</code> (the #2284 merge commit). Code anchors were verified at that commit — re-verify before relying on exact line numbers.
+<strong>Related</strong>: issue #2286 (durable Member records persist node-local timestamps — the tracker this contract serves) · issue #2283 (closed — the <code>state_change_hash</code> determinism flake) · PR #2284 (merged — the narrow fingerprint fix) · <code>icn/crates/icn-core/tests/federated_two_node_pilot.rs</code> (the two-node determinism intent) · issue #282 (deprecated proposal-level delayed execution, cited below)</p>
+<blockquote>
+<p>Narrow decision document for #2286 only. It decides the <em>target semantics</em>
+for the durable membership timestamp fields after #2284 split the world
+into a deterministic decision-identity fingerprint and a still-divergent
+durable record. It changes nothing at runtime: no schema change, no
+effect change, no request change, no test change. The implementation is a
+future PR under #2286.</p>
+</blockquote>
+<h2>1. Status / truth class</h2>
+<ul>
+<li><strong>Status</strong>: draft design/audit contract.</li>
+<li><strong>Truth class</strong>: descriptive — this document describes verified current
+behavior and pins a target contract; it does not claim any of the target
+behavior exists yet.</li>
+<li>Canonical current-implementation truth remains <code>docs/STATE.md</code>,
+<code>docs/PHASE_PROGRESS.md</code>, and live code.</li>
+<li>Related: #2284, #2283, #2286, <code>federated_two_node_pilot</code>.</li>
+</ul>
+<h2>2. Current implementation audit (post-#2284)</h2>
+<p>All anchors verified at <code>main</code> @ <code>e8057cc6</code>.</p>
+<h3>2.1 The fingerprint is deterministic</h3>
+<p><code>MembershipServiceImpl::compute_state_change_hash</code>
+(<code>icn/crates/icn-core/src/services/membership_service.rs:108</code>) is now a
+<strong>decision-identity fingerprint</strong>: SHA-256 over the domain tag
+<code>membership:v2:</code> followed by four length-prefixed (u64 LE) fields —
+<code>operation</code>, <code>entity_id</code>, <code>member_did</code>, <code>decision_receipt_id</code>. It hashes
+only decision-derived inputs and contains no wall-clock read. Its own doc
+comment (same file, above the function) states the contract explicitly:
+cross-node deterministic, injective via length prefixes, and — quoting the
+part that motivates this document —</p>
+<blockquote>
+<p>the persisted <code>Member</code> record still carries node-local wall-clock audit
+fields (<code>joined_at</code> on add; <code>removed_at</code>/<code>frozen_at</code>/<code>freeze_expires_at</code>/
+<code>unfrozen_at</code> metadata on the other ops), so the durable record is not
+itself byte-identical across nodes. […] Making the durable record fully
+deterministic requires a decision-carried <code>effective_at</code> threaded through
+<code>MembershipEffect</code> (a schema change) — tracked in issue #2286.</p>
+</blockquote>
+<h3>2.2 The durable record is not deterministic</h3>
+<p>Every membership execution path still reads node-local wall-clock and
+persists it into the durable <code>Member</code> record
+(<code>icn/crates/icn-coop/src/types.rs:353</code> — <code>joined_at: DateTime&lt;Utc&gt;</code> is a
+first-class field; the other timestamps live in the string-keyed
+<code>metadata: HashMap&lt;String, String&gt;</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Operation</th>
+<th>Wall-clock read</th>
+<th>Durable write</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>add</td>
+<td><code>Member::new</code> → <code>joined_at: Utc::now()</code> (<code>icn-coop/src/types.rs:721</code>)</td>
+<td><code>joined_at</code> field</td>
+</tr>
+<tr>
+<td>remove</td>
+<td><code>current_timestamp_secs()</code> (<code>membership_service.rs:262</code>)</td>
+<td><code>metadata[&quot;removed_at&quot;]</code> (<code>:286</code>)</td>
+</tr>
+<tr>
+<td>freeze</td>
+<td><code>current_timestamp_secs()</code> (<code>membership_service.rs:469</code>)</td>
+<td><code>metadata[&quot;frozen_at&quot;]</code> (<code>:507</code>); <code>metadata[&quot;freeze_expires_at&quot;] = timestamp + duration_secs</code> (<code>:523–:527</code>)</td>
+</tr>
+<tr>
+<td>unfreeze</td>
+<td><code>current_timestamp_secs()</code> (<code>membership_service.rs:602</code>)</td>
+<td><code>metadata[&quot;unfrozen_at&quot;]</code> (<code>:635</code>); removes <code>freeze_expires_at</code> (<code>:636</code>)</td>
+</tr>
+<tr>
+<td>update</td>
+<td><code>current_timestamp_secs()</code> (<code>membership_service.rs:371</code>)</td>
+<td><strong>none</strong> — the read feeds only in-memory provenance</td>
+</tr>
+</tbody></table>
+<p>Two nodes replaying the same governance decision across a seconds boundary
+therefore persist different durable bytes, even though their
+<code>state_change_hash</code> values now agree.</p>
+<h3>2.3 Three distinct things, kept distinct</h3>
+<p>The audit confirms three separable notions that this contract must not
+conflate:</p>
+<ol>
+<li><strong>Decision-identity fingerprint convergence</strong> — <code>state_change_hash</code>
+(<code>membership:v2:</code> layout). Cross-node deterministic as of #2284. Its
+layout is pinned; this contract does not touch it.</li>
+<li><strong>Durable <code>Member</code> record byte convergence</strong> — NOT currently guaranteed;
+the subject of #2286 and of this contract.</li>
+<li><strong>Node-local audit metadata</strong> — <code>MembershipProvenance</code>
+(<code>membership_service.rs:36</code>), an in-memory <code>RwLock&lt;HashMap&gt;</code> holding a
+per-execution <code>timestamp</code>. It is not durable, not replicated, and not
+part of any convergence claim. It may legitimately stay node-local.</li>
+</ol>
+<h3>2.4 The effect and request schemas carry no timestamp</h3>
+<ul>
+<li><code>MembershipEffect</code> (<code>icn/crates/icn-kernel-api/src/effects.rs:191</code>) —
+<code>AddMember</code>/<code>RemoveMember</code>/<code>UpdateMember</code>/<code>FreezeMember</code>/<code>UnfreezeMember</code>
+— carries no <code>effective_at</code>. <code>FreezeMember</code> carries the decision-derived
+<code>duration_secs: Option&lt;u64&gt;</code>. The <code>decision_hash</code> fields use
+<code>#[serde(default)]</code>, the crate&#39;s existing add-a-field compatibility
+precedent.</li>
+<li>The service request structs (<code>icn/crates/icn-kernel-api/src/services.rs:1528</code>
+onward: <code>AddMemberRequest</code>, <code>RemoveMemberRequest</code>, <code>UpdateMemberRequest</code>,
+<code>FreezeMemberRequest</code>, <code>UnfreezeMemberRequest</code>) carry
+<code>decision_receipt_id</code> + <code>decision_hash</code> but no timestamp.</li>
+<li><code>KernelMembershipExecutor::execute_membership_operation</code>
+(<code>icn/crates/icn-core/src/supervisor/governance_executor.rs:1905</code>)
+converts effect → request 1:1; membership effects are produced in
+<code>icn/apps/governance/src/handlers/execution.rs</code> (<code>:594</code>/<code>:603</code> add/remove,
+<code>:108</code>/<code>:119</code> freeze/unfreeze).</li>
+</ul>
+<h3>2.5 The protocol precedent exists — with one honest caveat</h3>
+<p><code>ProtocolEffect::SetParameter</code> (<code>icn/crates/icn-kernel-api/src/effects.rs:249</code>)
+carries <code>effective_at: u64</code>, and <code>KernelProtocolExecutor::apply_protocol_change</code>
+(<code>governance_executor.rs:1038</code>) does exactly what this contract wants for
+membership: it persists the <strong>decision-carried</strong> timestamp into the durable
+record (<code>updated_param.updated_at = change.effective_at</code>) and its
+<code>compute_state_change_hash</code> (<code>:1017</code>) hashes <code>effective_at</code>, never a <code>now()</code>
+read. The two-node test (<code>federated_two_node_pilot.rs:539</code>) samples
+<code>effective_at</code> <strong>once</strong> and carries the same value to both nodes — the
+replication pattern in miniature.</p>
+<p><strong>Caveat</strong>: the production value is currently degenerate. The producer sets
+<code>effective_at: proposal.effective_at.unwrap_or(0)</code>
+(<code>icn/apps/governance/src/handlers/execution.rs:160</code>), and
+<code>ProtocolChangeProposal::effective_at</code> is deprecated/must-be-<code>None</code> pending
+delayed execution (#282) — so real protocol changes carry <code>0</code> today. That
+is still cross-node deterministic (every node sees the same <code>0</code>), which is
+the property being mirrored; but it means the precedent proves the
+<em>architecture</em> (decision-carried, sampled at most once, replicated as
+bytes), not a production-quality <em>source</em> for the timestamp value. The
+membership implementation must pick its source deliberately (§5).</p>
+<h3>2.6 What the existing test does and does not check</h3>
+<p><code>test_two_node_membership_add_determinism</code>
+(<code>icn/crates/icn-core/tests/federated_two_node_pilot.rs:287</code>) executes the
+same serialized <code>MembershipEffect::AddMember</code> on two independent nodes and
+compares only the extracted <code>state_change_hash</code> (plus an <code>is_member</code>
+liveness check). It never compares durable <code>Member</code> records — which is why
+#2284 could make it deterministic without touching the durable divergence.</p>
+<h2>3. Problem</h2>
+<p>Post-#2284, the convergence story is split: the <em>fingerprint</em> of a
+membership state change is cross-node deterministic, but the <em>durable state</em>
+it fingerprints is not, because five timestamp fields are read from local
+wall-clock at execution time. This matters because:</p>
+<ul>
+<li>The <code>federated_two_node_pilot</code> intent is replicated-state determinism:
+same decision in, same state out. A durable record that differs by
+execution instant silently breaks any future durable-state convergence
+check, state sync comparison, or byte-level audit across nodes.</li>
+<li>The AGENTS.md <strong>Determinism</strong> invariant (&quot;Protocol state transitions …
+must be deterministic. Same inputs → same outputs&quot;) is currently satisfied
+only for the hash, not for the state the hash stands in front of.</li>
+<li>Freeze expiry is <em>behavior</em>, not just bookkeeping: <code>freeze_expires_at</code>
+derives from the local read, so two nodes can disagree about <strong>when a
+member&#39;s suspension ends</strong> — a real divergence in effective membership
+state, not merely in audit trivia.</li>
+</ul>
+<p>It was correct not to fold this into #2284: fixing it requires a schema
+change to <code>MembershipEffect</code> and the request structs plus changes to every
+effect producer — a cross-cutting change with compatibility consequences,
+exactly what a one-function flake fix must not smuggle in. #2284&#39;s merge
+kept that boundary explicit; this contract exists so the boundary is
+decided deliberately rather than re-litigated inside an implementation
+patch.</p>
+<h2>4. Decision</h2>
+<p><strong>Deterministic durable timestamps via a decision-carried <code>effective_at</code>
+are the target semantics</strong> (option 1 of #2286). The audit found no
+architectural contradiction — the protocol executor already persists a
+decision-carried timestamp into its durable record, and <code>MembershipEffect</code>&#39;s
+<code>#[serde(default)] decision_hash</code> fields show the effect schema is designed
+to grow decision-derived fields.</p>
+<p>The contract:</p>
+<ol>
+<li><strong>Membership state treated as durable protocol state must be
+replay-deterministic across nodes.</strong> Two nodes executing the same
+governance decision must persist byte-identical durable membership
+convergence state — including its timestamps.</li>
+<li><strong>Local audit timestamps may still exist, but are separated from
+protocol/durable convergence state.</strong> The in-memory
+<code>MembershipProvenance.timestamp</code> stays node-local audit metadata. If any
+node-local execution instant is ever persisted, it must live in a
+clearly-labeled audit location excluded from every convergence
+comparison — never in the fields below.</li>
+<li><strong>The future implementation threads <code>effective_at</code> through membership
+effects/requests and uses it for the durable fields</strong>: <code>joined_at</code>,
+<code>removed_at</code>, <code>frozen_at</code>, <code>freeze_expires_at</code>, and <code>unfrozen_at</code>. No
+durable membership timestamp is sourced from <code>Utc::now()</code> /
+<code>current_timestamp_secs()</code> on the replay path.</li>
+<li><strong>The <code>state_change_hash</code> <code>membership:v2:</code> layout is unchanged by this
+contract.</strong> It is already deterministic and pinned by #2284; whether
+<code>effective_at</code> should ever join the fingerprint would be a separate
+explicit <code>membership:v3:</code> decision, which this document neither makes
+nor recommends.</li>
+</ol>
+<h2>5. Future implementation sketch (no code in this PR)</h2>
+<p>Likely surfaces, in dependency order:</p>
+<ul>
+<li><strong><code>MembershipEffect</code></strong> (<code>icn-kernel-api/src/effects.rs</code>): add
+<code>effective_at</code> to the variants that persist timestamps (<code>AddMember</code>,
+<code>RemoveMember</code>, <code>FreezeMember</code>, <code>UnfreezeMember</code>). Compatibility posture
+for old serialized effects is §6&#39;s decision.</li>
+<li><strong>Service request structs</strong> (<code>icn-kernel-api/src/services.rs</code>): mirror
+the field on <code>AddMemberRequest</code>, <code>RemoveMemberRequest</code>,
+<code>FreezeMemberRequest</code>, <code>UnfreezeMemberRequest</code>.</li>
+<li><strong>Effect producers</strong> (<code>icn/apps/governance/src/handlers/execution.rs</code>):
+stamp <code>effective_at</code> from a decision-derived source, sampled <strong>at most
+once per decision</strong> before fan-out, so every node receives identical
+bytes. The source is an open sub-decision for the implementation design:
+candidate anchors are the decision receipt&#39;s recorded timestamp, an
+activation-time value, or an explicit proposal-carried field. The
+invariant is source-independence per node — never a per-node <code>now()</code>.
+(The protocol lane&#39;s deprecated proposal-level <code>effective_at</code>, #282, is a
+cautionary sibling: don&#39;t resurrect that field accidentally; pick a
+source that exists on the decided path.)</li>
+<li><strong>Governance executor</strong> (<code>KernelMembershipExecutor</code>): pass the field
+through effect → request conversion.</li>
+<li><strong>Membership service</strong> (<code>MembershipServiceImpl</code>): use <code>effective_at</code> for
+<code>joined_at</code> (this requires the add path to stop relying on
+<code>Member::new</code>&#39;s internal <code>Utc::now()</code> — e.g. setting <code>joined_at</code>
+explicitly after construction, leaving <code>Member::new</code> itself untouched for
+non-governance callers, or a deliberate constructor-signature decision in
+the implementation PR), <code>removed_at</code>, <code>frozen_at</code>, <code>freeze_expires_at</code>,
+<code>unfrozen_at</code>.</li>
+<li><strong>Tests</strong>: <code>federated_two_node_pilot.rs</code> grows a durable-record
+comparison (§7).</li>
+<li><strong>OpenAPI/SDK</strong>: expected <strong>none</strong>, but the implementation PR must
+verify. The gateway&#39;s <code>AddMemberRequest</code>
+(<code>icn-gateway/src/models.rs:107</code>) is a different, non-governance shape
+(<code>did</code>/<code>role</code>/<code>display_name</code>) — the kernel-api request structs are not
+the OpenAPI surface. If any effect/request shape turns out to be exposed,
+the standard drift chain applies (OpenAPI regen + TS types).</li>
+</ul>
+<p><strong>Freeze expiration becomes deterministic for free</strong>: <code>duration_secs</code> is
+already decision-carried on <code>FreezeMember</code>, so
+<code>freeze_expires_at = effective_at + duration_secs</code> is a pure function of
+decision inputs. (Use saturating arithmetic; both are u64 seconds.)</p>
+<p><strong>Update-member needs no durable timestamp.</strong> The audit (§2.2) shows the
+update path persists no timestamp today — its wall-clock read feeds only
+the in-memory provenance map. There is nothing to make deterministic, and
+adding a new durable <code>updated_at</code> would be new surface, not determinism
+repair. <code>UpdateMember</code>/<code>UpdateMemberRequest</code> therefore do not need
+<code>effective_at</code> unless a durable update timestamp is deliberately introduced
+later — a separate decision.</p>
+<p><strong>Adjacent, explicitly out of scope</strong>: <code>icn-entity/src/membership.rs</code>
+(<code>joined_at: now</code> at <code>:99</code>, <code>updated_at</code> bumps throughout) shows the same
+wall-clock pattern on the entity-level membership record. It is a different
+store behind a different lane; this contract covers only the
+<code>MembershipService</code>/<code>CoopStore</code> path named by #2286. If entity-level
+durable convergence is ever claimed, that lane needs its own audit.</p>
+<h2>6. Compatibility and migration questions</h2>
+<p>Existing serialized <code>MembershipEffect</code> values (in stores, WALs, gossip
+replay, or fixtures) lack <code>effective_at</code>. The implementation PR must decide
+— explicitly, in its design section — one of:</p>
+<ol>
+<li><strong>Fail closed</strong>: replayed governance effects without <code>effective_at</code> are
+rejected on the convergence path. Strongest determinism; requires
+knowing whether any pre-schema effects legitimately still replay.</li>
+<li><strong>Versioned effect shapes</strong>: a v2 membership effect (mirroring how the
+hash layout was versioned <code>membership:v2:</code>), with v1 effects handled by
+an explicit legacy path.</li>
+<li><strong>Legacy local-timestamp behavior confined to clearly non-convergent
+legacy paths</strong>: old effects keep old behavior, but no convergence claim
+is ever made over records they produced.</li>
+</ol>
+<p>What the implementation must <strong>not</strong> do is silently default the field —
+<code>#[serde(default)]</code> on <code>effective_at</code> would stamp epoch-zero (or
+worse, a hidden <code>now()</code>) into durable records and smuggle the compatibility
+decision into a serde attribute. The <code>decision_hash</code> <code>#[serde(default)]</code>
+precedent is not automatically transferable: an empty-string hash degrades
+provenance, but a defaulted timestamp silently <em>fabricates</em> state. This
+document deliberately does not pick among the three options; it only
+requires that the choice be explicit, written down, and tested.</p>
+<h2>7. Test obligations for the implementation PR</h2>
+<p>The implementation PR is expected to carry at least:</p>
+<ul>
+<li><strong>Two-node durable-record comparison</strong>: extend the
+<code>federated_two_node_pilot</code> membership tests to compare durable <code>Member</code>
+records (or a normalized durable-state projection that includes the
+timestamp fields) across both nodes — not just <code>state_change_hash</code>.</li>
+<li><strong>Decision-carried persistence per operation</strong>: add/remove/freeze/
+unfreeze each persist exactly the decision-carried timestamp
+(<code>joined_at</code>/<code>removed_at</code>/<code>frozen_at</code>/<code>unfrozen_at</code> equal <code>effective_at</code>,
+not a node-local read).</li>
+<li><strong>Deterministic freeze expiration</strong>:
+<code>freeze_expires_at == effective_at + duration_secs</code> on every node.</li>
+<li><strong>Audit/convergence separation</strong>: if a local audit timestamp is retained
+anywhere durable, a test proves it is excluded from the durable
+convergence comparison.</li>
+<li><strong>Legacy behavior is explicit</strong>: whichever §6 option is chosen, a test
+pins it (missing <code>effective_at</code> → rejected, or versioned path taken, or
+legacy path marked non-convergent).</li>
+<li><strong>Fingerprint stability</strong>: <code>state_change_hash</code> for the existing
+<code>membership:v2:</code> layout is byte-for-byte unchanged by the implementation
+(regression against the #2284 contract).</li>
+</ul>
+<h2>8. Non-claims</h2>
+<ul>
+<li><strong>No schema change in this PR</strong> — <code>MembershipEffect</code>, the request
+structs, and <code>Member</code> are untouched.</li>
+<li><strong>No runtime behavior change</strong> — every timestamp is still read from
+local wall-clock exactly as audited in §2.</li>
+<li><strong>No OpenAPI/SDK change.</strong></li>
+<li><strong>No production, pilot, organizer-ready, member-ready, live-federation,
+or Phase 2 completion claim.</strong></li>
+<li><strong>No #1748/#2141 closure</strong> — both remain open; this lane is adjacent to,
+not part of, the process-receipt spine.</li>
+<li><strong>No #2081/#2080/#2274 progress.</strong></li>
+<li><strong>No durable timestamp implementation yet</strong> — this document is the
+decision, not the change.</li>
+</ul>
+<h2>9. Follow-up implementation issue / PR plan</h2>
+<p><strong>#2286 remains open as the implementation tracker.</strong> No child issue is
+proposed: the audit surfaced exactly one lane of work (thread
+<code>effective_at</code> through effect → request → executor → service, plus the §6
+compatibility choice and §7 tests), which fits a single design-first
+implementation PR referencing this contract. The one sub-decision that
+could justify a split — the <em>source</em> of <code>effective_at</code> on the deciding path
+(§5) — is small enough to be pinned in the implementation PR&#39;s design
+section; split it out only if it turns out to be contested.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
