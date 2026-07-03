@@ -365,6 +365,57 @@ implementation PR referencing this contract. The one sub-decision that
 could justify a split — the <em>source</em> of <code>effective_at</code> on the deciding path
 (§5) — is small enough to be pinned in the implementation PR&#39;s design
 section; split it out only if it turns out to be contested.</p>
+<h2>10. Implementation PR decision (<code>feat/membership-effective-at-durable-timestamps</code>)</h2>
+<p>The implementation PR made the two open sub-decisions this contract left to
+it. Recorded here so the doc stays the audit trail.</p>
+<p><strong>Source of <code>effective_at</code> (§5): <code>ProposalAccepted.decided_at</code>.</strong> The
+governance decision&#39;s own recorded time
+(<code>icn/crates/icn-kernel-api/src/events.rs</code>,
+<code>SystemEvent::ProposalAccepted.decided_at</code>) is threaded through
+<code>translate_payload_to_effects</code> (<code>icn/apps/governance/src/lib.rs</code> →
+<code>icn/apps/governance/src/handlers/execution.rs</code>) into the four durable
+membership effects. It is sampled exactly once when the proposal is closed
+(<code>icn/apps/governance/src/actor.rs</code>, <code>decided_at: now</code>), persisted in the
+close journal (<code>icn/apps/governance/src/close_journal.rs</code> — &quot;recovery
+reproduces the same <code>decided_at</code> rather than using restart time&quot;), and
+gossiped in the event, so every node replaying the decision reads an
+identical value and never a local clock. It is the membership analogue of
+the protocol lane&#39;s decision-carried <code>effective_at</code>, and is unrelated to the
+deprecated proposal-level delayed-execution field (#282).</p>
+<p><strong>Compatibility posture (§6): versioned <code>Option&lt;u64&gt;</code>, not fail-closed.</strong>
+The audit found that membership effects are persisted in
+<code>ExecutionRecord.effects</code> and re-decoded on the crash-recovery convergence
+path (<code>icn/crates/icn-core/src/supervisor/decision_executor.rs</code>), so a bare
+non-<code>default</code> field would break recovery of in-flight pre-upgrade decisions.
+The field is therefore <code>effective_at: Option&lt;u64&gt;</code> with <code>#[serde(default)]</code>:
+new decisions always carry <code>Some(decided_at)</code> (fully convergent); effects
+serialized before this field decode as <code>None</code> — <strong>not</strong> epoch zero — and the
+service falls back to the pre-#2286 node-local <code>current_timestamp_secs()</code>
+for the durable write, a path that is explicitly non-convergent and
+reachable only by legacy effects. No fabricated protocol time is ever
+written; <code>None</code> never means &quot;0&quot;.</p>
+<p><strong>Not changed:</strong> <code>UpdateMember</code>/<code>UpdateMemberRequest</code> (persist no durable
+timestamp), <code>Member::new</code> (a <code>with_joined_at_secs</code> seam sets <code>joined_at</code>
+after construction, leaving the constructor intact for non-governance
+callers), and the <code>membership:v2</code> <code>state_change_hash</code> layout (a regression
+test asserts the fingerprint is independent of <code>effective_at</code>). No schema
+exposed to OpenAPI/SDK (the kernel-api request/effect types carry no
+<code>ToSchema</code> derive and appear in neither the generated spec nor the SDK).</p>
+<p><strong>Scope of the convergence claim (metadata / raw bytes).</strong> This PR makes the
+durable <em>logical</em> state converge — the timestamp fields plus the
+decision-derived metadata are identical across nodes replaying one decision.
+It does <strong>not</strong> claim the raw <code>save_member</code> byte stream is identical.
+<code>Member.metadata</code> is a <code>HashMap&lt;String, String&gt;</code> and <code>CoopStore::save_member</code>
+serializes the whole struct with postcard, so map iteration order (and thus
+the byte encoding) is not deterministic across processes even when the
+logical contents match. Accordingly the two-node test asserts a <strong>normalized
+durable-state projection</strong> (the §7-sanctioned option): typed fields compared
+directly, and <code>metadata</code> compared order-normalized (sorted), not as raw
+bytes. A true byte-level durable/audit/sync comparison would first require a
+canonical <code>Member</code> serialization (e.g. a <code>BTreeMap</code> metadata or a canonical
+encoder) — a separate concern from the timestamp determinism fixed here, and
+explicitly out of scope for #2286. The convergence claim in this lane is
+therefore scoped to the normalized projection, not raw record bytes.</p>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
