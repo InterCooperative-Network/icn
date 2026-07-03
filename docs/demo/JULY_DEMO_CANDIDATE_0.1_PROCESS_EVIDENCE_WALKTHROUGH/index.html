@@ -1,0 +1,521 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>July Demo Candidate 0.1 — organizer-steward process-evidence surface walkthrough | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>demo</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>JULY DEMO CANDIDATE 0.1 PROCESS EVIDENCE WALKTHROUGH</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/demo/JULY_DEMO_CANDIDATE_0.1_PROCESS_EVIDENCE_WALKTHROUGH.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>July Demo Candidate 0.1 — organizer-steward process-evidence surface walkthrough</h1>
+<p><strong>Truth label.</strong> DEV/DEMO, fixture-mode, single-actor, fictional data. This document
+records an accessibility and rendered-browser review of the <strong>organizer-steward
+evidence surface</strong> (icn#2289) — a fixture-only, read-only view on the <strong>member-shell v0
+reference client</strong> (<code>web/member-shell/</code>), reached at <code>?mode=demo&amp;set=process-evidence</code>.
+It is <strong>proof of path, not deployment readiness</strong>. It is not production, not a pilot,
+not organizer-ready, not member-ready, not live federation, not NYCN activation, not
+Phase 2 completion, not real member/partner data, and makes no signed/partner claim.</p>
+<p>This surface reads the <strong>four already-landed ADR-0026 Layer 2 process-transition
+receipt classes</strong> (<code>icn/crates/icn-governance/src/proof.rs</code>) — no new receipt class is
+introduced, no Rust runtime is changed, and no OpenAPI/SDK is touched. It implements the
+design contract landed in <strong>#2290</strong>
+(<a href="/docs/design/organizer-steward-evidence-surface-runtime-dogfood">`docs/design/organizer-steward-evidence-surface-runtime-dogfood.md`</a>).</p>
+<h2>1. What was run, and what was not</h2>
+<table>
+<thead>
+<tr>
+<th>Path</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Rendered-browser walkthrough of the process-evidence view (<code>?mode=demo&amp;set=process-evidence</code>)</td>
+<td><strong>RUN</strong> (headless Chromium, this pass)</td>
+</tr>
+<tr>
+<td>Regression check of the pre-existing demos (<code>?mode=demo</code> and <code>?mode=demo&amp;set=community</code>)</td>
+<td><strong>RUN</strong> (this pass — both still pass; see §4)</td>
+</tr>
+<tr>
+<td>Automated WCAG scan (axe-core; tags <code>wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa</code>)</td>
+<td><strong>RUN</strong> (this pass)</td>
+</tr>
+<tr>
+<td>Keyboard-navigation + visible-focus trace</td>
+<td><strong>RUN</strong> (this pass)</td>
+</tr>
+<tr>
+<td>200% zoom (CSS), narrow/mobile reflow, reduced-motion render</td>
+<td><strong>RUN</strong> (this pass)</td>
+</tr>
+<tr>
+<td>i18n pseudo-locale coverage of the new evidence copy (<code>&amp;lang=qps-ploc</code>)</td>
+<td><strong>RUN</strong> (this pass — new copy is fully keyed; see §4)</td>
+</tr>
+<tr>
+<td>Repo-safe evidence-summary export schema validation (<code>urn:icn:contract:rehearsal-evidence-export:v1</code>)</td>
+<td><strong>RUN</strong> (this pass — validates; see §4)</td>
+</tr>
+<tr>
+<td><strong>Live</strong> gateway / real receipts</td>
+<td><strong>NOT run</strong> — this slice is fixture-only by design; the <code>ProcessGateResultReceipt</code> is fixture-simulated (a wire-shaped record), not a live gate run.</td>
+</tr>
+<tr>
+<td><strong>Screen-reader</strong> (VoiceOver/NVDA/Orca) smoke</td>
+<td><strong>NOT run</strong> — no AT in this headless environment. Remains <strong>owed</strong> (tracked in <strong>#2041</strong>).</td>
+</tr>
+<tr>
+<td><strong>Human</strong> low-vision / switch-control / low-end-device verification</td>
+<td><strong>NOT run</strong> — automated proxies only; human pass remains <strong>owed</strong> (<strong>#2041</strong>).</td>
+</tr>
+</tbody></table>
+<blockquote>
+<p>Participation access is architecture, not polish. This pass clears the automated and
+rendered-structural floor for the new evidence view <strong>and</strong> confirms the two existing
+demos still pass; the human AT pass (#2041) is explicitly recorded as still owed.</p>
+</blockquote>
+<h2>2. Method (reproducible, zero new dependencies)</h2>
+<ul>
+<li>Served the repo&#39;s <code>web/</code> directory statically (<code>python3 -m http.server 8099</code>), opened
+<code>…/member-shell/?mode=demo&amp;set=process-evidence</code>.</li>
+<li>Drove headless Chromium via Playwright + <code>@axe-core/playwright</code>, the <strong>declared
+devDependencies of <code>web/pilot-ui</code></strong> (<code>@axe-core/playwright</code> per #1735) — no new
+dependency stack is introduced.</li>
+<li><strong>Committed audit script:</strong> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/web/member-shell/a11y-walkthrough.cjs">`web/member-shell/a11y-walkthrough.cjs`</a>.
+For #2289 it gained one additive, backward-compatible hook: an optional <code>MSHELL_SET</code>
+env var appends <code>&amp;set=&lt;value&gt;</code> to the audited URL. <strong>Unset (the default) audits
+<code>?mode=demo</code> byte-for-byte as before</strong>, so the prior accessibility evidence is
+undisturbed. Reproduce:<pre><code>( cd web/pilot-ui &amp;&amp; npm ci &amp;&amp; npx playwright install chromium )
+( cd web &amp;&amp; python3 -m http.server 8099 --bind 127.0.0.1 &amp; )     # serve the web/ root on :8099
+# the new process-evidence view:
+MSHELL_SET=process-evidence NODE_PATH=web/pilot-ui/node_modules \
+  node web/member-shell/a11y-walkthrough.cjs http://127.0.0.1:8099 ./out
+# regression: the two pre-existing demos still pass (unset = default demo; community):
+NODE_PATH=web/pilot-ui/node_modules node web/member-shell/a11y-walkthrough.cjs http://127.0.0.1:8099 ./out-demo
+MSHELL_SET=community NODE_PATH=web/pilot-ui/node_modules \
+  node web/member-shell/a11y-walkthrough.cjs http://127.0.0.1:8099 ./out-community
+</code></pre>
+</li>
+<li><strong>Browser-revision provenance (honest):</strong> Playwright resolves its own pinned Chromium
+for the <em>installed</em> Playwright version, so the exact binary is <strong>environment-dependent,
+not a single pinned revision</strong>. This run used the lockfile-pinned <strong>Playwright 1.60.0 →
+chromium-1223</strong>. These are static-surface WCAG checks (semantic HTML, ARIA, contrast,
+focus); the 0-violation result is expected to be stable across recent Chromium
+revisions, but the recorded numbers below are specifically for 1.60.0/chromium-1223.</li>
+<li><strong>Schema validation:</strong> <code>python3 docs/scripts/validate-rehearsal-evidence.py web/member-shell/fixtures/process-evidence-export.json</code> (existing validator, no new
+tooling; Python 3.11+ + <code>jsonschema</code>).</li>
+<li>Fixtures consumed: <code>web/pilot-ui/fixtures/icn-organizer-demo/{standing,action-cards}.json</code>
+(reused, unchanged) and the two new member-shell-local fixtures
+<code>web/member-shell/fixtures/process-evidence-{receipts,export}.json</code> (fictional
+<code>did:icn:example-*-not-live</code>, illustrative <code>record_hash</code>/<code>body_hash</code>, nothing signed).</li>
+</ul>
+<h2>3. Rendered walkthrough — observed</h2>
+<p>The process-evidence view renders the <code>receipt → surface → evidence/export</code> tail of the
+vertical spine <strong>as read views</strong>: the four process-transition receipts in sequence, a
+fixture-safe privacy/redaction boundary, and a repo-safe evidence-summary export. No
+mutation is performed; no gateway is contacted.</p>
+<table>
+<thead>
+<tr>
+<th>Observation</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Honesty banner text (permanently visible)</td>
+<td><code>Fixture-backed demo — no live node, nothing signed.</code></td>
+</tr>
+<tr>
+<td>Standing pane visible; memberships / roles rendered</td>
+<td>yes (reused demo standing)</td>
+</tr>
+<tr>
+<td>Action cards pane visible</td>
+<td>yes (reused demo cards)</td>
+</tr>
+<tr>
+<td>Receipts pane: four process-transition receipts rendered in order</td>
+<td>yes — <strong>4 receipts</strong> (<code>ProcessSessionOpenedReceipt</code> → <code>DeliberationEntryRecordedReceipt</code> → <code>DecisionRecordedReceipt</code> → <code>ProcessGateResultReceipt</code>)</td>
+</tr>
+<tr>
+<td>Plain-language summary first; record fields under &quot;Show evidence detail&quot;</td>
+<td>yes (per receipt)</td>
+</tr>
+<tr>
+<td>Privacy/redaction boundary legible</td>
+<td>yes — the deliberation entry shows &quot;What the steward body sees&quot; (fictional summary) <strong>and</strong> &quot;What members and the export see&quot; (redaction reason + <code>record_hash</code>/<code>body_hash</code> proof pointers, no input text)</td>
+</tr>
+<tr>
+<td>Proof pointers labeled honestly</td>
+<td>yes — <code>record_hash</code> = proof pointer; <code>body_hash</code> = &quot;proof of content; the input itself is never stored&quot;; recorder DIDs labeled &quot;who recorded this fact, not who decided&quot;</td>
+</tr>
+<tr>
+<td>Evidence-summary export panel visible; read-only</td>
+<td>yes — renders <code>urn:icn:contract:rehearsal-evidence-export:v1</code>; <strong>no download/generate/copy control present</strong></td>
+</tr>
+<tr>
+<td>Landmarks present</td>
+<td><code>header, nav, main, footer</code></td>
+</tr>
+<tr>
+<td>Skip link present</td>
+<td>yes (<code>a.skip-link → #main</code>)</td>
+</tr>
+<tr>
+<td>Credential in URL (demo mode)</td>
+<td><strong>none</strong></td>
+</tr>
+<tr>
+<td>Mobile (360px) horizontal scroll</td>
+<td>none (clean reflow)</td>
+</tr>
+</tbody></table>
+<p>Screenshots (desktop, 200% zoom, mobile-360, reduced-motion) are archived in the artifact
+class (see §8). No credential, token, key, private IP/hostname, real name, or email
+appears in any screenshot or fixture (demo mode pastes nothing; all fixture data is
+fictional).</p>
+<h2>4. Automated check results</h2>
+<p>Process-evidence view (<code>?mode=demo&amp;set=process-evidence</code>), and the two regression runs:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Process-evidence</th>
+<th>Default <code>?mode=demo</code> (regression)</th>
+<th><code>&amp;set=community</code> (regression)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>axe-core</strong> (<code>wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa</code>)</td>
+<td><strong>0 violations</strong>, 27 passes</td>
+<td>0 violations, 27 passes</td>
+<td>0 violations, 27 passes</td>
+</tr>
+<tr>
+<td>Keyboard: focusables reached by Tab</td>
+<td>16</td>
+<td>16</td>
+<td>15</td>
+</tr>
+<tr>
+<td>Keyboard: <strong>every</strong> focused element had a visible outline</td>
+<td><strong>true</strong></td>
+<td>true</td>
+<td>true</td>
+</tr>
+<tr>
+<td>Receipts rendered</td>
+<td><strong>4</strong></td>
+<td>1</td>
+<td>1</td>
+</tr>
+<tr>
+<td>200% CSS zoom render</td>
+<td>no layout break</td>
+<td>no layout break</td>
+<td>no layout break</td>
+</tr>
+<tr>
+<td>Mobile (360px) horizontal scroll</td>
+<td>none</td>
+<td>none</td>
+<td>none</td>
+</tr>
+<tr>
+<td><code>prefers-reduced-motion: reduce</code> render</td>
+<td>standing pane renders</td>
+<td>renders</td>
+<td>renders</td>
+</tr>
+<tr>
+<td>Harness verdict</td>
+<td><code>REPORT_WRITTEN</code> (exit 0)</td>
+<td><code>REPORT_WRITTEN</code> (exit 0)</td>
+<td><code>REPORT_WRITTEN</code> (exit 0)</td>
+</tr>
+</tbody></table>
+<p>Additional checks this pass:</p>
+<table>
+<thead>
+<tr>
+<th>Check</th>
+<th>Result</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>i18n pseudo-locale coverage of new evidence copy (<code>&amp;lang=qps-ploc</code>)</td>
+<td><strong>Pass</strong> — new headings/labels render bracketed (e.g. <code>⟦Évídéncé súmmáry⟧</code>); no un-extracted English in the evidence view</td>
+</tr>
+<tr>
+<td>Evidence-summary export validates against <code>urn:icn:contract:rehearsal-evidence-export:v1</code></td>
+<td><strong>Pass</strong> (<code>OK: … validates</code>, exit 0)</td>
+</tr>
+<tr>
+<td>Receipt objects contain no <code>body</code>/<code>content</code>/<code>text</code> field (privacy discipline)</td>
+<td><strong>Pass</strong> — <code>body_hash</code> only</td>
+</tr>
+<tr>
+<td>No download/generate/copy/mutation control in the export section</td>
+<td><strong>Pass</strong> — 0 such controls</td>
+</tr>
+</tbody></table>
+<p>Automated scans are a floor, not a substitute for human AT testing. 0 axe violations
+means no machine-detectable WCAG failures on the rendered fixture view; it does not
+certify screen-reader comprehension or human low-vision usability.</p>
+<h2>5. Organizer / member accessibility gate — 12-category outcome</h2>
+<p>Per <code>docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</code> §5. Outcomes: <strong>Pass</strong> /
+<strong>Pass w/ follow-ups</strong> / <strong>Blocked</strong> / <strong>N/A</strong>. Applied to the process-evidence view.</p>
+<ul>
+<li><input checked="" disabled="" type="checkbox"> <strong>3.1 Language access</strong> — Pass. All new evidence copy is externalized through the
+i18n seam (#2043) and verified under the pseudo-locale (<code>&amp;lang=qps-ploc</code> brackets every
+new string); canonical terms (session, deliberation entry, decision, gate result,
+receipt, provenance, <code>record_hash</code>, <code>body_hash</code>) are paired with inline plain-language
+explanations. <strong>Still owed (separate lane, not blocking this English DEV/DEMO pass):</strong>
+real translations + human language-quality QA (the seam ships <code>en</code> + a pseudo-locale +
+an RTL fallback demo only; broader website multilingual is #1740).</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>3.2 Screen-reader / non-visual access</strong> — Pass with documented follow-ups (<strong>#2041</strong>).
+Semantic HTML, landmarks, headings, list views, <code>&lt;dl&gt;</code> key/value; the redaction boundary
+is conveyed with headings + text, not visuals. <strong>Real screen-reader testing not
+performed</strong> — owed (<strong>#2041</strong>).</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>3.3 Low-vision access</strong> — Pass with documented follow-ups (<strong>#2041</strong>). 200% CSS zoom
+rendered without layout break (screenshot); rem units throughout; contrast ratios
+documented per token in <code>shell.css</code> (reused, unchanged). <strong>Human low-vision + external
+contrast-audit-tool verification not performed</strong> — owed (<strong>#2041</strong>).</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>3.4 Color-independent meaning</strong> — Pass. Receipt status carries glyph + text; the
+redaction boundary is carried by headings and text (not color); axe found no
+color-contrast violations.</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>3.5 Keyboard / switch / non-pointer access</strong> — Pass with documented follow-ups (<strong>#2041</strong>).
+16 focusables reached by Tab, all with a visible focus outline; every evidence-detail
+and export-detail disclosure is a native <code>&lt;details&gt;</code>/<code>&lt;summary&gt;</code> (keyboard-reachable);
+no hover-only controls; targets ≥44px per <code>shell.css</code>. <strong>Switch-control software not
+exercised</strong> — owed (<strong>#2041</strong>).</li>
+<li><input disabled="" type="checkbox"> <strong>3.6 Captions, transcripts, non-audio access</strong> — N/A with reason: this view ships no
+audio/video/narration media.</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>3.7 Cognitive load and step complexity</strong> — Pass. Each receipt shows a plain-language
+summary first; record-level fields sit behind progressive disclosure. This surface is
+<strong>read-only</strong> — there is no confirm step and no mutation, so no irreversible action is
+offered.</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>3.8 Low-bandwidth / low-device access</strong> — Pass. Dependency-free static HTML/CSS/vanilla
+JS; the two new fixtures are small JSON files fetched over the same static path; no
+framework, build, animation, or autoplay added.</li>
+<li><input disabled="" type="checkbox"> <strong>3.9 Assistive-technology compatibility</strong> — Pass with documented follow-ups (<strong>#2041</strong>).
+Real HTML elements over <code>div[role]</code>; native <code>&lt;details&gt;</code>. <strong>AT exercised: none</strong> (headless
+environment). Owed (<strong>#2041</strong>).</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>3.10 Privacy-preserving accommodation path</strong> — Pass (with reason). No
+disability/medical/accommodation data is collected, rendered, or committed. The
+privacy/redaction boundary demonstrated here operates on <strong>fictional deliberation
+content only</strong>, and is honest by construction: the receipt stores a <code>body_hash</code> (a
+content fingerprint), never the input text, so the member/export view shows the proof
+pointer and redaction reason and nothing else.</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>3.11 Receipts, provenance, and evidence access</strong> — Pass. <strong>(Load-bearing for this
+surface.)</strong> Each receipt shows a plain-language summary before any raw structured data;
+the fixture maturity tier (&quot;Fixture-backed demo — nothing signed&quot;) is visible on screen,
+so a viewer can tell fixture-only apart <strong>without parsing JSON</strong>; proof surfaces are
+explained in plain language (<code>record_hash</code> = proof pointer; <code>body_hash</code> = proof of
+content, body never stored; recorder DIDs = who recorded, not who decided); the
+evidence-summary export is a read-only view of a repo-safe committed artifact.</li>
+<li><input checked="" disabled="" type="checkbox"> <strong>3.12 Governance and action access</strong> — Pass. The receipts state authority basis
+honestly in plain language (recorder-not-decider; the decision receipt &quot;asserts nothing
+about its standing&quot;; the gate receipt states <code>accessibility_review</code> = <code>pass</code>, labeled
+fixture-simulated). This slice is <strong>read-only with no confirm step</strong>, so the gate&#39;s
+&quot;mandate + receipt named before confirm&quot; requirement is N/A here — there is no action to
+confirm; the surface only reads receipts that already exist.</li>
+</ul>
+<p><strong>Surface readiness conclusion:</strong> the process-evidence view <strong>clears the automated +
+rendered-structural floor</strong> and the two pre-existing demos still pass; it is <strong>NOT
+organizer-ready / member-ready / pilot-ready</strong> until the owed human AT pass (3.2 / 3.9,
+and human 3.3 / 3.5) is completed. No category is hard-<strong>Blocked</strong>; the human-AT items
+(<strong>#2041</strong>) remain owed-follow-ups that gate the &quot;organizer-ready&quot; label.</p>
+<h2>6. Findings</h2>
+<pre><code>Finding: Real screen-reader / AT testing not performed.
+Evidence: §1, gate 3.2 / 3.9; headless environment with no VoiceOver/NVDA/Orca.
+Impact: Cannot honestly call this surface &quot;organizer-ready&quot; or &quot;pilot-ready&quot; without it.
+Recommendation: One human (or AT-equipped) pass with ≥1 screen reader + ≥1 non-mouse
+  input; tracked in #2041 — attach results there.
+Blocking? no (for DEV/DEMO review) / yes (for organizer-ready / pilot-ready labeling)
+</code></pre>
+<pre><code>Finding: Automated WCAG scan is clean (0 axe violations, 27 passes) on the process-
+  evidence render, and the two pre-existing demos still pass unchanged.
+Evidence: §4.
+Impact: Positive — machine-detectable WCAG floor is met and no regression was introduced.
+Recommendation: Keep axe in the loop; re-run (all three views) if member-shell markup changes.
+Blocking? no — verified okay.
+</code></pre>
+<pre><code>Finding: The ProcessGateResultReceipt is fixture-simulated, not a live gate run.
+Evidence: §1, §3; the receipt is a wire-shaped fixture record (gate_kind=accessibility_review,
+  result=pass) so the surface can carry a receipt-backed statement that the gate ran without
+  standing up a gateway.
+Impact: A reviewer could mistake the fixture gate receipt for a live-proven one.
+Recommendation: Keep the &quot;Fixture-backed demo — nothing signed&quot; banner prominent (it is) and
+  the illustrative-hash label on record_hash (it is); this doc states the fixture-simulated
+  provenance explicitly.
+Blocking? no — verified okay (banner + hash label already present).
+</code></pre>
+<pre><code>Finding: The privacy/redaction boundary is demonstrated on fictional content only.
+Evidence: §3, gate 3.10/3.11; receipts hold a body_hash only, no stored text exists to leak.
+Impact: Positive — honest by construction; the &quot;redacted&quot; view shows exactly what the receipt
+  actually holds (a hash + metadata), and the steward summary is clearly-fictional fixture context.
+Recommendation: Keep the two-audience framing (steward-visible vs member/export-redacted).
+Blocking? no — verified okay.
+</code></pre>
+<p>Classification: 1 important-follow-up (screen-reader/AT #2041), 3 verified-okay. <strong>No
+blockers</strong> for the DEV/DEMO review; the human-AT pass (#2041) gates the organizer-/pilot-
+ready label.</p>
+<h2>7. Interface review — does the UI keep the distinctions honest?</h2>
+<table>
+<thead>
+<tr>
+<th>Distinction</th>
+<th>Made clear?</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>DEV/DEMO posture</td>
+<td>yes — permanent honesty banner + footer reference-client disclaimer</td>
+</tr>
+<tr>
+<td>Fixture vs live-local mode</td>
+<td>yes — per-mode banner (&quot;Fixture-backed demo — no live node, nothing signed.&quot;)</td>
+</tr>
+<tr>
+<td>Illustrative vs canonical hash</td>
+<td>yes — <code>record_hash</code> labeled &quot;illustrative fixture value — not a real blake3 binding&quot; in demo mode</td>
+</tr>
+<tr>
+<td>Steward-visible vs member/export-redacted</td>
+<td>yes — the deliberation entry shows both, side by side, with the redaction reason + proof pointers</td>
+</tr>
+<tr>
+<td>Recorded fact vs decision authority</td>
+<td>yes — recorder-not-decider labeling; the decision receipt &quot;asserts nothing about its standing&quot;</td>
+</tr>
+<tr>
+<td>Fixture-simulated vs live gate</td>
+<td>yes — the gate receipt is labeled fixture-simulated in copy and in this doc</td>
+</tr>
+<tr>
+<td>Read-only view vs generated/downloaded export</td>
+<td>yes — the export panel is a read-only render of a committed fixture; no download/generate/copy control exists</td>
+</tr>
+<tr>
+<td>Proof of path vs production readiness</td>
+<td>yes — banner + footer + this doc&#39;s non-claims</td>
+</tr>
+</tbody></table>
+<h2>8. Artifacts</h2>
+<p>The audit <strong>script is committed</strong>: <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/web/member-shell/a11y-walkthrough.cjs">`web/member-shell/a11y-walkthrough.cjs`</a>
+— so the checks are runnable from committed materials (see §2). The committed <strong>fixtures</strong>
+(<code>web/member-shell/fixtures/process-evidence-{receipts,export}.json</code>) and the committed
+<strong>export</strong> (which validates against the rehearsal-evidence-export contract) are the
+repo-safe evidence. The <strong>screenshots</strong> and the <strong>axe/keyboard JSON reports</strong> for the three
+runs live in the operator&#39;s local artifact store under the artifact class
+<code>july-demo-process-evidence-&lt;date&gt;</code> — repo-safe (no credentials/keys/IPs) but kept out of
+the repo per the evidence-log convention (they are binary / machine output). This doc is
+the committed, shareable summary; the committed script + fixtures let a reviewer regenerate
+them.</p>
+<h2>9. Owed before &quot;organizer-ready / pilot-ready&quot;</h2>
+<blockquote>
+<p>The reproducible human-tester packet for the owed items below is in
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/JULY_DEMO_CANDIDATE_0.1_HUMAN_A11Y_VALIDATION">`JULY_DEMO_CANDIDATE_0.1_HUMAN_A11Y_VALIDATION.md`</a>.
+It is a template, not a completed pass. This #2289 surface does <strong>not</strong> complete it.</p>
+</blockquote>
+<ul>
+<li>Screen-reader smoke (≥1 of VoiceOver/NVDA/Orca) + ≥1 non-mouse input (3.2 / 3.9). [#2041]</li>
+<li>Human 200% browser-zoom + small-device pass (3.3 / 3.5 / 3.8). [#2041]</li>
+<li>External contrast-audit-tool confirmation of the documented ratios (3.3). [#2041]</li>
+<li>(Separate lanes, not this pass) real translations + human language QA (#1740); the
+broader human-operability spine (#1748 / #2141) remains open.</li>
+</ul>
+<hr>
+<p><em>Refs #2289. Refs #2290. Refs #1748. Refs #2141. Refs #2041.</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
