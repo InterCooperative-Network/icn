@@ -1,0 +1,414 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Organizer-steward evidence surface runtime dogfood — Design Contract | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>organizer steward evidence surface runtime dogfood</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/organizer-steward-evidence-surface-runtime-dogfood.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Organizer-steward evidence surface runtime dogfood — Design Contract</h1>
+<p><strong>Status</strong>: draft — design / implementation-planning contract (not runtime implementation)
+<strong>Truth class</strong>: descriptive
+<strong>Canonical</strong>: no — current implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last Reviewed</strong>: 2026-07-03
+<strong>Source basis</strong>: read against <code>main</code> @ <code>df9d8a50</code> (the #2288 merge commit and current <code>origin/main</code> tip). Code anchors and struct fields were verified at that commit — re-verify exact line numbers before relying on them.
+<strong>Related</strong>: issue #2289 (the scoped tracker this contract serves) · issue #1748 (Institutional Process Substrate milestone) · issue #2141 (vertical spine control) · issue #2041 (member-shell v0 human/AT accessibility pass) · <a href="https://github.com/InterCooperative-Network/icn/blob/main/ORGANIZER_MEMBER_ACCESSIBILITY_GATE">docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md</a> · <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/contracts/rehearsal-evidence-export.schema.json">docs/contracts/rehearsal-evidence-export.schema.json</a> · <a href="/docs/pilots/no-cli-organizer-member-rehearsal-workflow">docs/pilots/no-cli-organizer-member-rehearsal-workflow.md</a> · <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md</a></p>
+<blockquote>
+<p>Narrow implementation-planning document for #2289 only. It turns the scoped
+issue into an implementation-ready contract for the
+<code>receipt → surface → evidence/export</code> tail of the #1748 / #2141 vertical
+spine. It changes nothing at runtime: no Rust, no member-shell UI behavior,
+no schema, no OpenAPI/SDK, and no new receipt class. The surface itself is a
+future implementation PR under #2289.</p>
+</blockquote>
+<h2>1. Status / truth class</h2>
+<ul>
+<li><strong>Status</strong>: draft design contract.</li>
+<li><strong>Truth class</strong>: descriptive — this document describes verified current
+artifacts and pins a target slice contract for implementation planning; it
+does <strong>not</strong> claim any of the target surface behavior exists yet.</li>
+<li><strong>Canonical</strong> current-implementation truth remains <a href="/docs/STATE">docs/STATE.md</a>,
+<a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>, and live code. This doc is
+non-canonical for runtime truth.</li>
+<li>Related: #2289, #1748, #2141, #2041.</li>
+</ul>
+<h2>2. Purpose</h2>
+<p>Turn #2289 into an implementation-ready contract for the
+<code>receipt → surface → evidence/export</code> tail of the vertical spine
+(<code>package → domain → policy → binding → process/action → receipt → surface → evidence/export</code>,
+per <a href="/docs/architecture/ICN_OPERATING_MODEL">docs/architecture/ICN_OPERATING_MODEL.md</a>).</p>
+<p>Four process-transition receipt classes already land under ADR-0026 Layer 2
+(§4). The still-open portion of #1748 / #2141 is not more kernel receipt
+plumbing — it is making those already-landed receipts legible to a human
+organizer or steward on the existing member-shell surface, and exporting a
+repo-safe evidence summary, behind an accessibility gate and a fixture-safe
+privacy/visibility boundary. This document names the exact receipt path, human
+surface, fixture data, evidence/export shape, privacy/redaction model, and
+accessibility validation plan so the later implementation PR is a mechanical
+build, not a fresh design.</p>
+<h2>3. Non-claims</h2>
+<p>This contract, and the implementation PR it plans, make <strong>none</strong> of the following claims:</p>
+<ul>
+<li>not production;</li>
+<li>not pilot;</li>
+<li>not organizer-ready;</li>
+<li>not member-ready;</li>
+<li>not live federation;</li>
+<li>not NYCN activation;</li>
+<li>not Phase 2 completion;</li>
+<li>not real partner / private / attendee / sponsor / accommodation data;</li>
+<li>not a new receipt class (the slice reads the four existing classes only);</li>
+<li>not raw process-spine completion (<code>ActivationCrossedReceipt</code>,
+<code>MutationPlanRecordedReceipt</code>, <code>MutationAppliedReceipt</code>,
+<code>EvidencePacketProducedReceipt</code> remain unbuilt and out of scope);</li>
+<li>not #2081 / #2080 / #2274 progress;</li>
+<li>not a runtime <code>EvidencePacket</code> producer (none exists; see §7).</li>
+</ul>
+<p>Receipts record institutional facts and grant zero authority. Nothing here
+authorizes closing #1748, #2141, or #2041.</p>
+<h2>4. Existing grounded artifacts (verified this session)</h2>
+<p>All verified on <code>main</code> @ <code>df9d8a50</code>.</p>
+<p><strong>Receipt structs</strong> — defined in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/icn/crates/icn-governance/src/proof.rs">`icn/crates/icn-governance/src/proof.rs`</a>, each with its own blake3 <code>DOMAIN_TAG</code>, all already emitted, persisted, and retrievable:</p>
+<table>
+<thead>
+<tr>
+<th>Struct</th>
+<th>Domain tag</th>
+<th>Key fields (verified)</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ProcessSessionOpenedReceipt</code></td>
+<td><code>icn:gov:process_session_opened:v1</code></td>
+<td><code>session_id</code>, <code>domain_id</code>, <code>opened_by</code>, <code>opened_at</code>, <code>record_hash</code></td>
+</tr>
+<tr>
+<td><code>DeliberationEntryRecordedReceipt</code></td>
+<td><code>icn:gov:deliberation_entry_recorded:v1</code></td>
+<td><code>domain_id</code>, <code>session_id</code>, <code>entry_id</code>, <code>author</code>, <code>entry_kind</code>, <code>recorded_at</code>, <code>body_hash</code>, <code>record_hash</code></td>
+</tr>
+<tr>
+<td><code>DecisionRecordedReceipt</code></td>
+<td><code>icn:gov:decision_recorded:v1</code></td>
+<td><code>domain_id</code>, <code>session_id</code>, <code>decision_id</code>, <code>recorded_by</code>, <code>recorded_at</code>, <code>body_hash</code>, <code>record_hash</code></td>
+</tr>
+<tr>
+<td><code>ProcessGateResultReceipt</code></td>
+<td><code>icn:gov:process_gate_result:v1</code></td>
+<td><code>session_id</code>, <code>domain_id</code>, <code>gate_kind</code>, <code>result</code>, <code>recorded_by</code>, <code>recorded_at</code>, <code>record_hash</code></td>
+</tr>
+</tbody></table>
+<p>Note: the deliberation-entry and decision receipts store a <code>body_hash</code> only — the
+raw body is <strong>never stored</strong>. This is load-bearing for the privacy model (§8).</p>
+<p><strong>Surface</strong> — the member-shell v0 reference client:</p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/web/member-shell/">`web/member-shell/`</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/web/member-shell/index.html">`web/member-shell/index.html`</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/web/member-shell/shell.js">`web/member-shell/shell.js`</a> — has a <code>demo</code> / <code>live</code> mode boundary, holds rendered receipts in state as <code>{receipt, plainContext}</code>, and already labels a demo receipt hash as illustrative.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/web/member-shell/fixtures/">`web/member-shell/fixtures/`</a> — carries <code>demo-completion-receipt.json</code>, <code>community-completion-receipt.json</code>, <code>community-standing.json</code>, <code>community-action-cards.json</code>; the shared demo pack lives under <code>web/pilot-ui/fixtures/icn-organizer-demo/</code>.</li>
+</ul>
+<p><strong>Contracts / gate:</strong></p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/contracts/rehearsal-evidence-export.schema.json">`docs/contracts/rehearsal-evidence-export.schema.json`</a> — <code>urn:icn:contract:rehearsal-evidence-export:v1</code> (x-icn-status <code>rfc</code>).</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/contracts/preview-review.schema.json">`docs/contracts/preview-review.schema.json`</a> — <code>urn:icn:contract:preview-review:v1</code>.</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ORGANIZER_MEMBER_ACCESSIBILITY_GATE">`docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`</a> — 12 review categories §3.1–§3.12.</li>
+<li><a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">`docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md`</a> — the receipt/provenance envelope the four classes sit under (Layer 2). There is <strong>no</strong> single <code>ProcessTransitionReceipt</code> base trait/enum; the name is a conceptual family.</li>
+</ul>
+<p><strong>Read-model precedent</strong> — <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/ops/ideas/dogfood/institutional-process-substrate-mvp">`ops/ideas/dogfood/institutional-process-substrate-mvp.md`</a> composes spine shapes by hand and emits no receipt; per <code>ops/ideas/README.md</code> § &quot;Dogfood slice variants&quot; a read-model walk does not satisfy receipt-backed promotion thresholds. This slice is the <strong>surface</strong> variant over receipts that already emit — still fixture/local-safe, still not a promotion claim.</p>
+<h2>5. Chosen receipt path</h2>
+<p>The implementation PR renders exactly this sequence, using only the four
+existing classes (no new class):</p>
+<pre><code class="language-text">ProcessSessionOpenedReceipt
+  → DeliberationEntryRecordedReceipt
+  → DecisionRecordedReceipt
+  → ProcessGateResultReceipt
+</code></pre>
+<p>Contribution of each receipt to the organizer/steward evidence story:</p>
+<ol>
+<li><strong><code>ProcessSessionOpenedReceipt</code></strong> — anchors the story: <em>a process session was
+opened</em>, scoped to <code>(domain_id, session_id)</code>, by <code>opened_by</code> at <code>opened_at</code>.
+Establishes the &quot;who / where / when it started&quot; spine.</li>
+<li><strong><code>DeliberationEntryRecordedReceipt</code></strong> — <em>a deliberation input was recorded</em>
+against that session: <code>entry_kind</code>, <code>author</code>, <code>body_hash</code> (proof-of-content,
+not content). Establishes &quot;what was considered&quot;, with the private text held
+only as a hash.</li>
+<li><strong><code>DecisionRecordedReceipt</code></strong> — <em>a decision artifact was recorded</em> against the
+session: caller-opaque <code>decision_id</code>, <code>recorded_by</code> (recorder-not-decider),
+<code>body_hash</code>. Establishes &quot;what was decided as an institutional fact&quot; —
+without claiming validity, bindingness, quorum, or vote semantics.</li>
+<li><strong><code>ProcessGateResultReceipt</code></strong> — <em>a process gate result was recorded</em>:
+<code>gate_kind</code>, <code>result</code>, <code>recorded_by</code>. This is where the <strong>accessibility gate</strong>
+result attaches (§9), giving the evidence surface a receipt-backed statement
+that the gate ran.</li>
+</ol>
+<p>If audit during implementation proves this exact sequence is not reproducible
+from an existing local/fixture path, the PR narrows to the largest reproducible
+sub-sequence and records the gap — it does not invent a new receipt class to
+fill it (that would be a separate issue).</p>
+<h2>6. Human surface contract</h2>
+<p>The evidence story is exposed on the existing <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/web/member-shell/">`web/member-shell/`</a>
+surface (or a clearly-scoped sibling view inside it). No new framework, no build
+step, no runtime dependency. The surface must provide:</p>
+<ul>
+<li><strong>Plain-language summary</strong> first — a human reads <em>what happened</em> (session
+opened, entry recorded, decision recorded, gate result) before any raw
+structured data, honoring accessibility gate §3.11 &quot;understandable in summary
+form before drilling into raw structured data&quot;.</li>
+<li><strong>Evidence-detail disclosure</strong> — the record-level fields (<code>record_hash</code>,
+<code>*_id</code>, <code>body_hash</code>, <code>recorded_at</code>, <code>recorded_by</code>/<code>author</code>/<code>opened_by</code>) live
+behind a progressive-disclosure control, reusing the existing member-shell
+pattern of holding receipts as <code>{receipt, plainContext}</code> and labeling
+illustrative hashes.</li>
+<li><strong>Receipt / provenance fields</strong> shown honestly: <code>record_hash</code> as the proof
+pointer; <code>body_hash</code> labeled as <em>proof-of-content, body not stored</em>; recorder
+DIDs labeled as <em>who recorded this fact</em>, not <em>who decided</em>.</li>
+<li><strong>Fixture / dry-run / live-local boundary labeling</strong> — the surface must make
+the mode unmistakable (gate §3.11: a viewer must tell fictional / fixture-only
+/ dry-run / local-non-production / live apart <em>without parsing JSON</em>). This
+slice is <strong>fixture-only</strong>; the label says so.</li>
+<li><strong>Explicit non-CLI reader path</strong> — the browser member-shell is the reader; it
+contrasts with the existing CLI path (<code>icnctl receipts …</code>), which stays as-is.</li>
+<li><strong>No readiness claim</strong> — no copy asserts organizer-ready or member-ready; the
+surface is a dev/fixture evidence view.</li>
+</ul>
+<h2>7. Evidence / export contract</h2>
+<p>The slice produces a <strong>contract-conformant fixture export</strong> — an <em>evidence
+summary</em>, not a new runtime artifact class. It conforms to (maps onto)
+<code>urn:icn:contract:rehearsal-evidence-export:v1</code>
+(<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/contracts/rehearsal-evidence-export.schema.json">`docs/contracts/rehearsal-evidence-export.schema.json`</a>).</p>
+<p>Classification of what is produced:</p>
+<ul>
+<li>it is an <strong>evidence summary</strong> (human-facing plain-language digest), and</li>
+<li>a <strong>fixture export</strong> (fixture-only inputs), and</li>
+<li>a <strong>contract-conformant artifact</strong> (validates against the rehearsal-evidence-export schema).</li>
+</ul>
+<p>There is <strong>no runtime <code>EvidencePacket</code> producer</strong> today — the audit found only
+the fixture-level <code>EvidencePacket</code> struct in <code>icn/crates/icn-baseline-lock/src/evidence.rs</code>
+(not wired to these receipts) and the hand-composed read-model walk. This slice
+therefore composes the export from the rendered receipts; it does <strong>not</strong> claim
+or add an <code>EvidencePacketProducedReceipt</code>.</p>
+<p>Mapping the receipt-backed facts into the contract&#39;s required fields:</p>
+<table>
+<thead>
+<tr>
+<th>Contract field</th>
+<th>Source in this slice</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>rehearsal_mode</code></td>
+<td><code>fixture-only</code></td>
+</tr>
+<tr>
+<td><code>workflow_steps_completed</code></td>
+<td>derived from the §5 receipt sequence (e.g. <code>start</code>, <code>decide</code>, <code>surface-result</code>, <code>export-evidence</code>)</td>
+</tr>
+<tr>
+<td><code>decision_outcomes[]</code></td>
+<td><code>DecisionRecordedReceipt</code> + <code>ProcessGateResultReceipt</code>, using the schema&#39;s closed <code>category</code> enum</td>
+</tr>
+<tr>
+<td><code>source_material[]</code></td>
+<td>committed fixtures (<code>kind: committed-fixture</code>, basename only)</td>
+</tr>
+<tr>
+<td><code>preview_review_boundary.enforced</code></td>
+<td><code>true</code> (read-first, no mutation)</td>
+</tr>
+<tr>
+<td><code>mutation_boundary</code></td>
+<td><code>{ executed: false, target: &quot;none&quot; }</code></td>
+</tr>
+<tr>
+<td><code>privacy_review</code></td>
+<td>the §8 redaction boundary result</td>
+</tr>
+<tr>
+<td><code>export_safety_classification</code></td>
+<td><code>repo-safe</code></td>
+</tr>
+<tr>
+<td><code>non_claims</code></td>
+<td>the §3 non-claims</td>
+</tr>
+</tbody></table>
+<p>The export must honor the schema&#39;s <code>x-icn-must-not-include</code> list (no real names,
+emails, rolls, tokens, private paths, or fields implying pilot/production).</p>
+<h2>8. Privacy / visibility boundary</h2>
+<p>Modeled with <strong>fixture data only</strong>. The concrete fixture scenario for the
+implementation PR:</p>
+<ul>
+<li>one <code>DeliberationEntryRecordedReceipt</code> (fixture) is <strong>visible to the steward
+body</strong> in full plain-language summary;</li>
+<li>the <strong>same entry is redacted from the member / export view</strong>;</li>
+<li>the export and the member view show the <strong>redaction reason</strong> and a <strong>proof
+pointer</strong> (<code>record_hash</code>, and <code>body_hash</code> as proof-of-content) <strong>without
+leaking the private text</strong>.</li>
+</ul>
+<p>This is honest by construction: the deliberation-entry and decision receipts
+store <code>body_hash</code> only — the raw body is never in the receipt, so the &quot;redacted&quot;
+view is showing exactly what the receipt actually holds (a hash + metadata),
+while the &quot;steward&quot; view supplies the plain summary from fixture context. No
+real private text exists in any fixture; redaction is demonstrated on fictional
+content. This exercises the schema&#39;s <code>privacy_review</code> field and gate §3.11&#39;s
+fictional/fixture/live boundary labeling.</p>
+<h2>9. Accessibility gate</h2>
+<p>The implementation PR is gated by
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/ORGANIZER_MEMBER_ACCESSIBILITY_GATE">`docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`</a>.
+The 12-category checklist (§3.1–§3.12) is applied at PR time on the real
+surface and copied into the PR body with a per-category verdict
+(<code>Pass</code> | <code>Pass with documented follow-ups #&lt;issue&gt;</code> | <code>Blocked</code> | <code>N/A with reason</code>).</p>
+<p>Especially load-bearing for this surface:</p>
+<ul>
+<li><strong>§3.11 Receipts, provenance, and evidence access</strong> — receipts understandable
+in summary before raw drill-in; evidence packet status visibly distinguishes
+fictional / fixture-only / dry-run / local-non-production / live without
+parsing JSON; proof surfaces explained in plain language. The gate doc itself
+states §3.11 &quot;sits over&quot; the rehearsal-evidence-export rendering surfaces.</li>
+<li><strong>§3.12 Governance and action access</strong> — authority basis, status,
+reversibility, required decision, and consequence in plain language before any
+confirm step; receipt name stated pre-action.</li>
+</ul>
+<p>The gate outcome should attach as the <code>ProcessGateResultReceipt</code> in the §5
+sequence (<code>gate_kind</code> = the accessibility-review gate), so the evidence surface
+carries a receipt-backed statement that the gate ran.</p>
+<p><strong>#2041 interaction:</strong> the human / assistive-technology categories still owed on
+member-shell v0 — screen-reader (§3.2 / §3.9), low-vision 200% zoom (§3.3),
+switch input (§3.5) — remain <strong>visible as pending</strong> (<code>Pass with documented follow-ups #2041</code>) unless the implementation PR actually performs and records
+that human/AT pass. This slice does not silently mark them Pass, and does not
+close #2041.</p>
+<h2>10. Implementation PR plan (surfaces, not changed here)</h2>
+<p>The later implementation PR is expected to touch, at most:</p>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/web/member-shell/index.html">`web/member-shell/index.html`</a> — evidence-view markup (semantic HTML, landmarks, disclosure).</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/web/member-shell/shell.js">`web/member-shell/shell.js`</a> — render the §5 receipt sequence as <code>{receipt, plainContext}</code>, mode/boundary labeling, redaction handling.</li>
+<li><code>web/member-shell/fixtures/&lt;new fixture&gt;.json</code> — a new fixture pack carrying the four-receipt sequence (wire-shaped per <code>proof.rs</code>) plus the redaction scenario.</li>
+<li>a repo-safe evidence-summary export artifact conforming to the rehearsal-evidence-export contract (location per convention — likely alongside the fixture or under <code>docs/demo/</code>).</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/docs/demo/">`docs/demo/`</a> — a new or extended walkthrough doc recording the evidence surface (e.g. alongside <code>JULY_DEMO_CANDIDATE_0.1_ACCESSIBILITY_WALKTHROUGH.md</code>).</li>
+<li>smoke/test scripts only if an existing member-shell test convention (e.g. the Playwright/axe suite referenced by #2041/#2239) supports it.</li>
+</ul>
+<p>None of these files are modified by this design PR.</p>
+<h2>11. Validation obligations (for the later implementation PR)</h2>
+<ul>
+<li>the new fixture loads in member-shell (<code>?mode=demo</code>) without network;</li>
+<li>the evidence-detail disclosure is keyboard reachable with visible focus;</li>
+<li>redaction is visible and non-leaky (no private text in DOM, state, or export);</li>
+<li>the export validates against <code>urn:icn:contract:rehearsal-evidence-export:v1</code>
+if an existing validator is available (else a documented manual check);</li>
+<li>the accessibility gate checklist (§3.1–§3.12) is applied and pasted into the PR body;</li>
+<li>no production / pilot / live-federation / NYCN / Phase 2 claim in code, copy, or PR;</li>
+<li>#1748 / #2141 / #2041 remain open unless separately reviewed.</li>
+</ul>
+<h2>12. Open questions / explicit deferrals</h2>
+<ul>
+<li><strong>Exact fixture names</strong> — not fixed here; the implementation PR names them
+(recommend a single <code>process-evidence-*.json</code> pack mirroring the existing
+<code>*-completion-receipt.json</code> convention).</li>
+<li><strong>Schema validator</strong> — decide in the implementation PR whether to add a small
+validator (e.g. against the JSON Schema) or reuse an existing docs/contracts
+validation path; no new tooling should be introduced casually (AGENTS.md
+&quot;No new tooling&quot;).</li>
+<li><strong><code>ProcessGateResultReceipt</code> provenance</strong> — decide whether the gate receipt is
+<strong>fixture-simulated</strong> (a wire-shaped fixture record) or <strong>generated through an
+existing local path</strong>. Default assumption: fixture-simulated, since this slice
+is fixture-only and must not stand up a live gateway.</li>
+<li><strong>#2041 human/AT pass</strong> — decide whether the human assistive-technology pass is
+performed inside the implementation PR (and #2041 advanced only if actually
+executed) or remains a <strong>linked blocker</strong> with the pending categories marked
+<code>Pass with documented follow-ups #2041</code>. Default: linked blocker; do not close
+#2041 from the evidence-surface PR.</li>
+</ul>
+<hr>
+<p><em>Refs #2289. Refs #1748. Refs #2141. Refs #2041.</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
