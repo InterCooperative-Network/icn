@@ -53,10 +53,10 @@ Classification of every process-transition / activation / mutation / evidence te
 | `ProcessSessionOpenedReceipt` | **runtime (Rust)** | `icn/crates/icn-governance/src/proof.rs`; wired in `apps/governance/{manager,http/handlers,receipt_backend}`; `*_runtime_slice.rs` test |
 | `DeliberationEntryRecordedReceipt` | **runtime (Rust)** | `proof.rs` + app wiring + runtime slice |
 | `DecisionRecordedReceipt` | **runtime (Rust)** | `proof.rs` + app wiring + runtime slice |
-| `ProcessGateResultReceipt` | **runtime (Rust)** | `proof.rs`; also emitted from `icn-baseline-lock/src/receipt_emit.rs` |
+| `ProcessGateResultReceipt` | **runtime (Rust)** | `proof.rs`; wired in `apps/governance`. Note: `icn-baseline-lock/src/receipt_emit.rs` emits `BaselineProcessGateResultReceipt` — a baseline-lock **test stand-in** with a *separate type/domain tag*, **not** production governance emission of this class. |
 | `ActivationCrossedReceipt` | **docs/framing only** | framing + dogfood MVP + `decision-recorded-receipt.md` / `-q4-decision.md` (name candidate). **No Rust struct, tag, manager method, backend class constant, route, or test.** |
 | `ActivationRequest` (gate object) | **docs/framing only** | framing + dogfood MVP. No Rust gate object, no "activation authority", no "second-screen confirm" primitive. |
-| "activation crossed" / "activation boundary" (phrases) | **framing only / literal phrase absent** | concept expressed in framing as "the boundary between deciding and doing"; the literal string "activation boundary" has no hits. |
+| "activation crossed" / "activation boundary" (phrases) | **framing only / pre-contract audit found no seam** | concept expressed in framing as "the boundary between deciding and doing". Before this contract, the repo audit found no `activation boundary` runtime or documented seam outside those framing concepts; this design document — and the registry/index references generated from it — now introduces the design term for #2293. (The no-hit finding is stated as of the pre-contract audit, outside this document, so it stays true after merge.) |
 | `MutationPlanRecordedReceipt` | **docs/framing only** | framing/dogfood/STATE. No Rust. |
 | `MutationAppliedReceipt` | **docs/framing only** | framing notes it exists "only in concept" via existing action-item/governance receipt families; no dedicated class. |
 | `EvidencePacketProducedReceipt` | **docs/framing only** | framing/dogfood/STATE. No Rust; #2289 used a repo-safe *fixture* export summary, not a runtime producer. |
