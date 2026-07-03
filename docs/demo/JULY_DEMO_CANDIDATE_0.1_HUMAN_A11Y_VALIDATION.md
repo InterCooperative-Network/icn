@@ -168,7 +168,7 @@ fallback is Arabic.)*
 - [ ] The illustrative-hash labeling ("illustrative fixture value — not a real blake3 binding") is perceivable, so the tester does not mistake the demo hashes for real bindings. → ___
 
 **G2. Screen-reader — the four-receipt evidence story (3.2 / 3.9)** — AT used: ____________
-- [ ] The tester can navigate to the process-evidence evidence story **without a mouse**. → ___
+- [ ] The tester can navigate to the evidence story on the process-evidence surface **without a mouse**. → ___
 - [ ] The screen reader announces the four-receipt sequence in a meaningful order (session opened → deliberation input recorded → decision recorded → gate result). → ___
 - [ ] The receipt names / plain-language summaries are understandable in context (the tester can tell **what happened, who recorded it, when it was recorded, and what proof pointer backs it**), without needing to read raw JSON. → ___
 - [ ] Each per-receipt "Show evidence detail" disclosure announces itself and expands / collapses correctly (native `<details>`; toggles with Enter/Space; Tab past it — not a trap). → ___
