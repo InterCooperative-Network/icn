@@ -330,6 +330,40 @@ async fn record_process_gate_result_route_rejects_unknown_result() {
 }
 
 #[actix_web::test]
+async fn record_process_gate_result_route_rejects_unknown_fields() {
+    // The request contract carries only `gate_kind`/`result`; the path and
+    // token supply everything else. `#[serde(deny_unknown_fields)]` makes an
+    // extra field fail closed with 400 rather than be silently discarded, so
+    // the surface's contract is enforced by rejection, not omission.
+    let h = make_harness();
+    let caller = fresh_did();
+    let domain = seed_domain_with_member(&h.ctx.manager, &caller, "test-coop").await;
+    let app = gate_app!(h.ctx.clone(), &caller);
+
+    for extra in [
+        serde_json::json!({ "gate_kind": "privacy_review", "result": "pass", "outcome": "accepted" }),
+        serde_json::json!({ "gate_kind": "privacy_review", "result": "pass", "foo": 1 }),
+    ] {
+        let req = test::TestRequest::post()
+            .uri(&gate_results_uri(&domain.0, "session-http-deny"))
+            .set_json(&extra)
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(
+            resp.status(),
+            StatusCode::BAD_REQUEST,
+            "unknown request field must 400, got {} for {extra}",
+            resp.status()
+        );
+    }
+    assert_eq!(
+        h.receipts.total_count(),
+        0,
+        "nothing persisted for rejected unknown-field requests"
+    );
+}
+
+#[actix_web::test]
 async fn record_process_gate_result_route_rejects_whitespace_session_id() {
     // The handler's `session_id.trim().is_empty()` guard must reject a
     // whitespace-only session id (`%20`, which actix percent-decodes to a
