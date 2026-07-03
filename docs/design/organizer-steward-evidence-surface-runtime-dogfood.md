@@ -1,7 +1,7 @@
 # Organizer-steward evidence surface runtime dogfood — Design Contract
 
 **Status**: draft — design / implementation-planning contract (not runtime implementation)
-**Truth class**: descriptive / implementation-planning
+**Truth class**: descriptive
 **Canonical**: no — current implementation truth lives in [docs/STATE.md](../STATE.md) and [docs/PHASE_PROGRESS.md](../PHASE_PROGRESS.md)
 **Last Reviewed**: 2026-07-03
 **Source basis**: read against `main` @ `df9d8a50` (the #2288 merge commit and current `origin/main` tip). Code anchors and struct fields were verified at that commit — re-verify exact line numbers before relying on them.
@@ -17,9 +17,9 @@
 ## 1. Status / truth class
 
 - **Status**: draft design contract.
-- **Truth class**: descriptive / implementation-planning — this document describes
-  verified current artifacts and pins a target slice contract; it does **not**
-  claim any of the target surface behavior exists yet.
+- **Truth class**: descriptive — this document describes verified current
+  artifacts and pins a target slice contract for implementation planning; it
+  does **not** claim any of the target surface behavior exists yet.
 - **Canonical** current-implementation truth remains [docs/STATE.md](../STATE.md),
   [docs/PHASE_PROGRESS.md](../PHASE_PROGRESS.md), and live code. This doc is
   non-canonical for runtime truth.
