@@ -200,6 +200,17 @@ pub enum MembershipEffect {
         /// without recomputing from the receipt_id string.
         #[serde(default)]
         decision_hash: String,
+        /// Decision-carried effective time (Unix seconds) used for the durable
+        /// `joined_at` timestamp, so nodes replaying the same governance decision
+        /// persist identical records instead of each stamping local wall-clock
+        /// (issue #2286). Sourced from `ProposalAccepted.decided_at`.
+        ///
+        /// `Option` + `#[serde(default)]` for compatibility: effects serialized
+        /// before this field decode as `None` (a legacy, non-convergent path that
+        /// falls back to local time) rather than fabricating epoch-zero protocol
+        /// time. New governance decisions always carry `Some(decided_at)`.
+        #[serde(default)]
+        effective_at: Option<u64>,
     },
     /// Remove a member
     RemoveMember {
@@ -209,6 +220,10 @@ pub enum MembershipEffect {
         /// Canonical content hash of the governance decision payload.
         #[serde(default)]
         decision_hash: String,
+        /// Decision-carried effective time (Unix seconds) for the durable
+        /// `removed_at` timestamp. See `AddMember::effective_at` (#2286).
+        #[serde(default)]
+        effective_at: Option<u64>,
     },
     /// Change member role/tier
     UpdateMember {
@@ -226,6 +241,11 @@ pub enum MembershipEffect {
         /// Canonical content hash of the governance decision payload.
         #[serde(default)]
         decision_hash: String,
+        /// Decision-carried effective time (Unix seconds) for the durable
+        /// `frozen_at` timestamp; `freeze_expires_at = effective_at + duration_secs`.
+        /// See `AddMember::effective_at` (#2286).
+        #[serde(default)]
+        effective_at: Option<u64>,
     },
     /// Unfreeze member (restore rights)
     UnfreezeMember {
@@ -234,6 +254,10 @@ pub enum MembershipEffect {
         /// Canonical content hash of the governance decision payload.
         #[serde(default)]
         decision_hash: String,
+        /// Decision-carried effective time (Unix seconds) for the durable
+        /// `unfrozen_at` timestamp. See `AddMember::effective_at` (#2286).
+        #[serde(default)]
+        effective_at: Option<u64>,
     },
 }
 
@@ -927,11 +951,39 @@ mod tests {
             reason: "Policy violation".into(),
             duration_secs: Some(86400),
             decision_hash: String::new(),
+            effective_at: Some(1_700_000_000),
         };
 
         let json = serde_json::to_string(&effect).unwrap();
         assert!(json.contains("freeze_member"));
         assert!(json.contains("duration_secs"));
+        assert!(json.contains("effective_at"));
+    }
+
+    /// A membership effect serialized before `effective_at` existed must still
+    /// decode (as `None`), so persisted/in-flight effects survive the #2286 upgrade
+    /// on the crash-recovery path. `None` is an explicit legacy marker, never a
+    /// fabricated epoch-zero protocol timestamp.
+    #[test]
+    fn membership_effect_decodes_legacy_without_effective_at() {
+        let legacy = r#"{"action":"add_member","entity_id":"coop-1","member_did":"did:icn:bob","role":"worker","tier":"standard","decision_hash":"h"}"#;
+        match serde_json::from_str::<MembershipEffect>(legacy).unwrap() {
+            MembershipEffect::AddMember { effective_at, .. } => {
+                assert_eq!(effective_at, None, "legacy add_member must decode as None");
+            }
+            other => panic!("unexpected variant: {other:?}"),
+        }
+
+        let legacy_freeze = r#"{"action":"freeze_member","entity_id":"coop-1","member_did":"did:icn:bob","reason":"x","duration_secs":3600,"decision_hash":"h"}"#;
+        match serde_json::from_str::<MembershipEffect>(legacy_freeze).unwrap() {
+            MembershipEffect::FreezeMember { effective_at, .. } => {
+                assert_eq!(
+                    effective_at, None,
+                    "legacy freeze_member must decode as None"
+                );
+            }
+            other => panic!("unexpected variant: {other:?}"),
+        }
     }
 
     #[test]
@@ -1026,6 +1078,7 @@ mod tests {
                 role: "worker".into(),
                 tier: "standard".into(),
                 decision_hash: String::new(),
+                effective_at: None,
             }),
             KernelEffect::Membership(MembershipEffect::UpdateMember {
                 entity_id: "coop-1".into(),
@@ -1039,6 +1092,7 @@ mod tests {
                 reason: "Policy violation".into(),
                 duration_secs: Some(86400),
                 decision_hash: String::new(),
+                effective_at: None,
             }),
             KernelEffect::Protocol(ProtocolEffect::SetParameter {
                 parameter_name: "voting_period".into(),
@@ -1202,12 +1256,14 @@ mod tests {
                 role: "worker".into(),
                 tier: "standard".into(),
                 decision_hash: String::new(),
+                effective_at: Some(1_700_000_000),
             },
             MembershipEffect::RemoveMember {
                 entity_id: "e1".into(),
                 member_did: "did:icn:m1".into(),
                 reason: "Voluntary exit".into(),
                 decision_hash: String::new(),
+                effective_at: Some(1_700_000_001),
             },
             MembershipEffect::UpdateMember {
                 entity_id: "e1".into(),
@@ -1221,11 +1277,13 @@ mod tests {
                 reason: "Investigation".into(),
                 duration_secs: Some(3600),
                 decision_hash: String::new(),
+                effective_at: Some(1_700_000_002),
             },
             MembershipEffect::UnfreezeMember {
                 entity_id: "e1".into(),
                 member_did: "did:icn:m1".into(),
                 decision_hash: String::new(),
+                effective_at: Some(1_700_000_003),
             },
         ];
 

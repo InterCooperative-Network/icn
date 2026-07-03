@@ -1923,6 +1923,7 @@ impl KernelMembershipExecutor {
                     role,
                     tier,
                     decision_hash: effect_decision_hash,
+                    effective_at,
                 } => {
                     // Use the content hash carried in the effect when available;
                     // fall back to blake3(receipt_id) for effects without one.
@@ -1938,6 +1939,7 @@ impl KernelMembershipExecutor {
                         tier,
                         decision_receipt_id: receipt_id.to_string(),
                         decision_hash: resolved_hash,
+                        effective_at,
                     };
 
                     let result = service.add_member(request)?;
@@ -1966,6 +1968,7 @@ impl KernelMembershipExecutor {
                     member_did,
                     reason,
                     decision_hash: effect_decision_hash,
+                    effective_at,
                 } => {
                     let resolved_hash = if effect_decision_hash.is_empty() {
                         compute_decision_hash(receipt_id)
@@ -1978,6 +1981,7 @@ impl KernelMembershipExecutor {
                         reason,
                         decision_receipt_id: receipt_id.to_string(),
                         decision_hash: resolved_hash,
+                        effective_at,
                     };
 
                     let result = service.remove_member(request)?;
@@ -2043,6 +2047,7 @@ impl KernelMembershipExecutor {
                     reason,
                     duration_secs,
                     decision_hash: effect_decision_hash,
+                    effective_at,
                 } => {
                     let resolved_hash = if effect_decision_hash.is_empty() {
                         compute_decision_hash(receipt_id)
@@ -2056,6 +2061,7 @@ impl KernelMembershipExecutor {
                         duration_secs,
                         decision_receipt_id: receipt_id.to_string(),
                         decision_hash: resolved_hash,
+                        effective_at,
                     };
 
                     let result = service.freeze_member(request)?;
@@ -2084,6 +2090,7 @@ impl KernelMembershipExecutor {
                     entity_id,
                     member_did,
                     decision_hash: effect_decision_hash,
+                    effective_at,
                 } => {
                     let resolved_hash = if effect_decision_hash.is_empty() {
                         compute_decision_hash(receipt_id)
@@ -2095,6 +2102,7 @@ impl KernelMembershipExecutor {
                         member_did: member_did.clone(),
                         decision_receipt_id: receipt_id.to_string(),
                         decision_hash: resolved_hash,
+                        effective_at,
                     };
 
                     let result = service.unfreeze_member(request)?;

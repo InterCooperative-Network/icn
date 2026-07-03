@@ -43,6 +43,13 @@ impl fmt::Display for TranslationError {
 /// # Arguments
 /// * `payload` - The domain-specific proposal payload
 /// * `decision_receipt_id` - The receipt ID for audit linkage
+/// * `decision_hash` - Canonical governance decision hash for provenance
+/// * `domain_id` - Domain (entity) the decision applies to
+/// * `effective_at` - Decision-carried effective time (Unix seconds), sourced from
+///   `ProposalAccepted.decided_at`. Threaded into durable membership effects so nodes
+///   replaying the same decision persist identical timestamps instead of local
+///   wall-clock (#2286). Same value for every replaying node; sampled once at the
+///   decision boundary, never read per-node here.
 ///
 /// # Returns
 /// A vector of kernel effects (usually 1, but some proposals produce multiple)
@@ -51,6 +58,7 @@ pub fn translate_payload_to_effects(
     decision_receipt_id: &str,
     decision_hash: &str,
     domain_id: &str,
+    effective_at: u64,
 ) -> Result<Vec<KernelEffect>, TranslationError> {
     match payload {
         // Treasury proposals
@@ -97,7 +105,7 @@ pub fn translate_payload_to_effects(
 
         // Membership proposals
         ProposalPayload::Membership { action, member } => {
-            translate_membership_action(action, member, domain_id, decision_hash)
+            translate_membership_action(action, member, domain_id, decision_hash, effective_at)
         }
 
         ProposalPayload::FreezeMember {
@@ -111,6 +119,7 @@ pub fn translate_payload_to_effects(
                 reason: reason.clone(),
                 duration_secs: *duration_seconds,
                 decision_hash: decision_hash.to_string(),
+                effective_at: Some(effective_at),
             },
         )]),
 
@@ -120,6 +129,7 @@ pub fn translate_payload_to_effects(
                     entity_id: domain_id.to_string(),
                     member_did: member.to_string(),
                     decision_hash: decision_hash.to_string(),
+                    effective_at: Some(effective_at),
                 },
             )])
         }
@@ -586,6 +596,7 @@ fn translate_membership_action(
     member: &icn_identity::Did,
     domain_id: &str,
     decision_hash: &str,
+    effective_at: u64,
 ) -> Result<Vec<KernelEffect>, TranslationError> {
     use icn_governance::MembershipAction;
 
@@ -597,6 +608,7 @@ fn translate_membership_action(
                 role: String::new(),
                 tier: String::new(),
                 decision_hash: decision_hash.to_string(),
+                effective_at: Some(effective_at),
             },
         )]),
         MembershipAction::Remove => Ok(vec![KernelEffect::Membership(
@@ -605,6 +617,7 @@ fn translate_membership_action(
                 member_did: member.to_string(),
                 reason: String::new(),
                 decision_hash: decision_hash.to_string(),
+                effective_at: Some(effective_at),
             },
         )]),
     }
@@ -745,6 +758,7 @@ mod tests {
             "receipt-123",
             "decision-hash-123",
             "domain-translation-test",
+            1_700_000_000,
         )
         .expect("translation should succeed");
         assert_eq!(effects.len(), 1);
@@ -786,6 +800,7 @@ mod tests {
             "receipt-bond-001",
             "decision-hash-bond-001",
             "did:icn:zTreasury",
+            1_700_000_000,
         )
         .expect("BondIssuance must translate successfully");
 
@@ -832,6 +847,7 @@ mod tests {
             "receipt-abc",
             "decision-hash-abc",
             "domain-translation-test",
+            1_700_000_000,
         );
         let err = effects.expect_err("unsupported payload must be explicit");
         assert_eq!(err.kind, "payload");
@@ -861,6 +877,7 @@ mod tests {
             "receipt-redeem-001",
             "decision-hash-redeem-001",
             "did:icn:zTreasury",
+            1_700_000_000,
         )
         .expect("ShareRedemption must translate successfully");
 
@@ -942,6 +959,7 @@ mod tests {
                 "receipt-pilot",
                 "hash-pilot",
                 "domain-pilot",
+                1_700_000_000,
             )
             .expect("pilot treasury payloads should translate");
             assert!(
@@ -989,6 +1007,7 @@ mod tests {
             "receipt-alloc-1",
             "decision-hash-alloc-1",
             "domain-alloc",
+            1_700_000_000,
         )
         .expect("allocation should translate");
 
@@ -1098,6 +1117,7 @@ mod tests {
             "receipt-surplus-1",
             "hash-surplus-1",
             "domain-coop-x",
+            1_700_000_000,
         )
         .expect("surplus allocation should translate");
         assert_eq!(effects.len(), 1);
@@ -1136,9 +1156,14 @@ mod tests {
                 reason: "persistent imbalance violations".to_string(),
             },
         );
-        let effects =
-            translate_payload_to_effects(&payload, "receipt-tc-1", "hash-tc-1", "coop-alpha")
-                .expect("TerminateClearing should translate");
+        let effects = translate_payload_to_effects(
+            &payload,
+            "receipt-tc-1",
+            "hash-tc-1",
+            "coop-alpha",
+            1_700_000_000,
+        )
+        .expect("TerminateClearing should translate");
         assert_eq!(effects.len(), 1);
         match &effects[0] {
             KernelEffect::Federation(
@@ -1172,9 +1197,14 @@ mod tests {
                 reason: "governance misconduct".to_string(),
             },
         );
-        let effects =
-            translate_payload_to_effects(&payload, "receipt-rv-1", "hash-rv-1", "coop-alpha")
-                .expect("RevokeVouch should translate");
+        let effects = translate_payload_to_effects(
+            &payload,
+            "receipt-rv-1",
+            "hash-rv-1",
+            "coop-alpha",
+            1_700_000_000,
+        )
+        .expect("RevokeVouch should translate");
         assert_eq!(effects.len(), 1);
         match &effects[0] {
             KernelEffect::Federation(icn_kernel_api::effects::FederationEffect::RevokeVouch {
@@ -1219,9 +1249,14 @@ mod tests {
                 source_agreement_id: Some("agreement-direct-1".to_string()),
             },
         );
-        let effects =
-            translate_payload_to_effects(&payload, "receipt-ec-1", "hash-ec-1", "coop-alpha")
-                .expect("EstablishClearing should translate");
+        let effects = translate_payload_to_effects(
+            &payload,
+            "receipt-ec-1",
+            "hash-ec-1",
+            "coop-alpha",
+            1_700_000_000,
+        )
+        .expect("EstablishClearing should translate");
         assert_eq!(effects.len(), 1);
         match &effects[0] {
             KernelEffect::Federation(

@@ -1538,6 +1538,11 @@ pub struct AddMemberRequest {
     pub decision_receipt_id: String,
     /// Hash of the decision that authorized this addition
     pub decision_hash: String,
+    /// Decision-carried effective time (Unix seconds) for the durable `joined_at`
+    /// timestamp, so replaying the same decision converges across nodes (#2286).
+    /// `None` = legacy effect with no decision time → non-convergent local fallback.
+    #[serde(default)]
+    pub effective_at: Option<u64>,
 }
 
 /// Result of adding a member
@@ -1564,6 +1569,10 @@ pub struct RemoveMemberRequest {
     pub decision_receipt_id: String,
     /// Hash of the decision that authorized this removal
     pub decision_hash: String,
+    /// Decision-carried effective time (Unix seconds) for the durable `removed_at`
+    /// timestamp. See [`AddMemberRequest::effective_at`] (#2286).
+    #[serde(default)]
+    pub effective_at: Option<u64>,
 }
 
 /// Result of removing a member
@@ -1620,6 +1629,11 @@ pub struct FreezeMemberRequest {
     pub decision_receipt_id: String,
     /// Hash of the decision that authorized this freeze
     pub decision_hash: String,
+    /// Decision-carried effective time (Unix seconds) for the durable `frozen_at`
+    /// timestamp; `freeze_expires_at = effective_at + duration_secs`.
+    /// See [`AddMemberRequest::effective_at`] (#2286).
+    #[serde(default)]
+    pub effective_at: Option<u64>,
 }
 
 /// Result of freezing a member
@@ -1646,6 +1660,10 @@ pub struct UnfreezeMemberRequest {
     pub decision_receipt_id: String,
     /// Hash of the decision that authorized this unfreeze
     pub decision_hash: String,
+    /// Decision-carried effective time (Unix seconds) for the durable `unfrozen_at`
+    /// timestamp. See [`AddMemberRequest::effective_at`] (#2286).
+    #[serde(default)]
+    pub effective_at: Option<u64>,
 }
 
 /// Result of unfreezing a member

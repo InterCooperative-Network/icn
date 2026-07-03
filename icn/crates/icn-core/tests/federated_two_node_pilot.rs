@@ -296,6 +296,11 @@ async fn test_two_node_membership_add_determinism() -> Result<()> {
     let member_did = generate_test_did();
     let decision_receipt_id = DecisionReceiptId::new("gov:membership:add:pilot:001");
 
+    // Decision-carried effective time (same value replayed on both nodes). The
+    // durable `joined_at` must equal this on both nodes, not each node's local
+    // wall-clock (#2286).
+    let effective_at: u64 = 1_700_000_000;
+
     // Create the effect
     let effect = MembershipEffect::AddMember {
         entity_id: "coop-sunrise-pilot".to_string(),
@@ -303,6 +308,7 @@ async fn test_two_node_membership_add_determinism() -> Result<()> {
         role: "Worker".to_string(),
         tier: "Standard".to_string(),
         decision_hash: String::new(),
+        effective_at: Some(effective_at),
     };
 
     // === Node A Setup ===
@@ -381,7 +387,60 @@ async fn test_two_node_membership_add_determinism() -> Result<()> {
         hash_a, hash_b
     );
 
-    info!("✅ Membership add determinism verified");
+    // === ASSERT DURABLE RECORD CONVERGENCE (#2286) ===
+    // The decision-identity fingerprint (state_change_hash) converging is not
+    // enough: the durable `Member` *logical* state must also converge across
+    // nodes. Before #2286, `joined_at` was each node's local `Utc::now()` and
+    // diverged across a seconds boundary.
+    //
+    // We assert a NORMALIZED durable-state projection, not raw `save_member`
+    // bytes: `Member.metadata` is a `HashMap` and `save_member` postcard-encodes
+    // the whole struct, so map iteration order (and thus the byte stream) is not
+    // deterministic across processes even when the logical contents match. A
+    // byte-level guarantee would need a canonical `Member` encoding, which is a
+    // separate concern from the timestamp determinism under test here (see
+    // docs/design/membership-durable-timestamp-semantics.md §10).
+    let member_a = coop_store_a.get_member("coop-sunrise-pilot", &member_did)?;
+    let member_b = coop_store_b.get_member("coop-sunrise-pilot", &member_did)?;
+
+    // Order-normalized metadata so HashMap iteration order can't mask/forge a
+    // difference — this proves the *logical* metadata converges.
+    let sorted_metadata = |m: &icn_coop::Member| {
+        let mut kv: Vec<(String, String)> = m
+            .metadata
+            .iter()
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect();
+        kv.sort();
+        kv
+    };
+    let project = |m: &icn_coop::Member| {
+        (
+            m.joined_at,
+            format!("{:?}", m.role),
+            format!("{:?}", m.status),
+            m.tier.as_ref().map(|t| t.name.clone()),
+            m.shares,
+            m.capital_contribution,
+            sorted_metadata(m),
+        )
+    };
+    assert_eq!(
+        project(&member_a),
+        project(&member_b),
+        "Durable Member logical state (incl. order-normalized metadata) must \
+         converge across nodes replaying the same decision"
+    );
+
+    // And the durable timestamp must be the decision-carried `effective_at`, not a
+    // node-local clock read.
+    assert_eq!(
+        member_a.joined_at.timestamp(),
+        effective_at as i64,
+        "joined_at must equal the decision-carried effective_at"
+    );
+
+    info!("✅ Membership add determinism + durable record convergence verified");
     Ok(())
 }
 
@@ -693,6 +752,7 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
             role: "Coordinator".to_string(),
             tier: "Founding".to_string(),
             decision_hash: String::new(),
+            effective_at: Some(1_700_000_000),
         }),
         KernelEffect::NoOp {
             reason: "Resolution text recorded".to_string(),
@@ -885,6 +945,7 @@ async fn test_two_node_federation_reload_durability() -> Result<()> {
         role: "Worker".to_string(),
         tier: "Standard".to_string(),
         decision_hash: String::new(),
+        effective_at: Some(1_700_000_000),
     };
 
     // === Create persistent tempdirs for both nodes ===

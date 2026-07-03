@@ -150,6 +150,7 @@ where
             proposal_id,
             payload,
             domain_id,
+            decided_at,
             canonical_payload_hash,
             governance_decision_hash,
             ..
@@ -169,12 +170,15 @@ where
             // Deserialize payload
             match serde_json::from_value::<ProposalPayload>(payload.clone()) {
                 Ok(proposal_payload) => {
-                    // Translate to effects
+                    // Translate to effects. `decided_at` is the decision-carried
+                    // effective time (same for every node replaying this decision);
+                    // durable membership effects use it so records converge (#2286).
                     let effects = translate_payload_to_effects(
                         &proposal_payload,
                         &decision_receipt_id,
                         &decision_hash,
                         domain_id,
+                        *decided_at,
                     );
                     match effects {
                         Ok(effects) => {
