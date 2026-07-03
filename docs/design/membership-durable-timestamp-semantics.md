@@ -324,3 +324,43 @@ implementation PR referencing this contract. The one sub-decision that
 could justify a split — the *source* of `effective_at` on the deciding path
 (§5) — is small enough to be pinned in the implementation PR's design
 section; split it out only if it turns out to be contested.
+
+## 10. Implementation PR decision (`feat/membership-effective-at-durable-timestamps`)
+
+The implementation PR made the two open sub-decisions this contract left to
+it. Recorded here so the doc stays the audit trail.
+
+**Source of `effective_at` (§5): `ProposalAccepted.decided_at`.** The
+governance decision's own recorded time (`icn-kernel-api/src/events.rs`,
+`SystemEvent::ProposalAccepted.decided_at`) is threaded through
+`translate_payload_to_effects` (`apps/governance/src/lib.rs` →
+`handlers/execution.rs`) into the four durable membership effects. It is
+sampled exactly once when the proposal is closed
+(`apps/governance/src/actor.rs`, `decided_at: now`), persisted in the close
+journal (`apps/governance/src/close_journal.rs` — "recovery reproduces the
+same `decided_at` rather than using restart time"), and gossiped in the
+event, so every node replaying the decision reads an identical value and
+never a local clock. It is the membership analogue of the protocol lane's
+decision-carried `effective_at`, and is unrelated to the deprecated
+proposal-level delayed-execution field (#282).
+
+**Compatibility posture (§6): versioned `Option<u64>`, not fail-closed.**
+The audit found that membership effects are persisted in
+`ExecutionRecord.effects` and re-decoded on the crash-recovery convergence
+path (`icn-core/src/supervisor/decision_executor.rs`), so a bare
+non-`default` field would break recovery of in-flight pre-upgrade decisions.
+The field is therefore `effective_at: Option<u64>` with `#[serde(default)]`:
+new decisions always carry `Some(decided_at)` (fully convergent); effects
+serialized before this field decode as `None` — **not** epoch zero — and the
+service falls back to the pre-#2286 node-local `current_timestamp_secs()`
+for the durable write, a path that is explicitly non-convergent and
+reachable only by legacy effects. No fabricated protocol time is ever
+written; `None` never means "0".
+
+**Not changed:** `UpdateMember`/`UpdateMemberRequest` (persist no durable
+timestamp), `Member::new` (a `with_joined_at_secs` seam sets `joined_at`
+after construction, leaving the constructor intact for non-governance
+callers), and the `membership:v2` `state_change_hash` layout (a regression
+test asserts the fingerprint is independent of `effective_at`). No schema
+exposed to OpenAPI/SDK (the kernel-api request/effect types carry no
+`ToSchema` derive and appear in neither the generated spec nor the SDK).

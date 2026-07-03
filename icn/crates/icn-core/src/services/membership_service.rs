@@ -182,6 +182,16 @@ impl MembershipService for MembershipServiceImpl {
             member = member.with_tier(tier);
         }
 
+        // Durable `joined_at` is the decision-carried `effective_at`, so nodes
+        // replaying the same governance decision persist an identical record
+        // (#2286). Legacy effects without `effective_at` (`None`) keep
+        // `Member::new`'s node-local `Utc::now()` — the pre-#2286 behavior, which
+        // is non-convergent but only reachable by effects serialized before this
+        // field existed.
+        if let Some(effective_at) = request.effective_at {
+            member = member.with_joined_at_secs(effective_at);
+        }
+
         // Start as Active (governance already approved via proposal)
         member.status = MemberStatus::Active;
 
@@ -259,7 +269,12 @@ impl MembershipService for MembershipServiceImpl {
             "Processing remove member request"
         );
 
+        // Node-local wall-clock, retained only for the in-memory audit provenance.
         let timestamp = icn_time::current_timestamp_secs();
+        // Durable `removed_at` uses the decision-carried `effective_at` so records
+        // converge across nodes (#2286); legacy effects (`None`) fall back to the
+        // node-local `timestamp` — non-convergent, pre-#2286 behavior.
+        let durable_ts = request.effective_at.unwrap_or(timestamp);
 
         // Parse the member DID
         let did = match Self::parse_did(&request.member_did) {
@@ -283,7 +298,7 @@ impl MembershipService for MembershipServiceImpl {
                     .insert("removal_reason".to_string(), request.reason.clone());
                 member
                     .metadata
-                    .insert("removed_at".to_string(), timestamp.to_string());
+                    .insert("removed_at".to_string(), durable_ts.to_string());
                 // Governance provenance — enables cold-cache recovery after restart
                 member.metadata.insert(
                     "gov_decision_receipt_id".to_string(),
@@ -466,7 +481,12 @@ impl MembershipService for MembershipServiceImpl {
             "Processing freeze member request"
         );
 
+        // Node-local wall-clock, retained only for the in-memory audit provenance.
         let timestamp = icn_time::current_timestamp_secs();
+        // Durable `frozen_at`/`freeze_expires_at` use the decision-carried
+        // `effective_at` so records converge across nodes (#2286); legacy effects
+        // (`None`) fall back to the node-local `timestamp` — non-convergent.
+        let durable_ts = request.effective_at.unwrap_or(timestamp);
 
         // Parse the member DID
         let did = match Self::parse_did(&request.member_did) {
@@ -504,7 +524,7 @@ impl MembershipService for MembershipServiceImpl {
                     .insert("freeze_reason".to_string(), request.reason.clone());
                 member
                     .metadata
-                    .insert("frozen_at".to_string(), timestamp.to_string());
+                    .insert("frozen_at".to_string(), durable_ts.to_string());
                 // Governance provenance — enables cold-cache recovery after restart
                 member.metadata.insert(
                     "gov_decision_receipt_id".to_string(),
@@ -518,8 +538,9 @@ impl MembershipService for MembershipServiceImpl {
                     .metadata
                     .insert("gov_operation".to_string(), "freeze".to_string());
 
-                // Calculate expiration if duration specified
-                let expires_at = request.duration_secs.map(|d| timestamp + d);
+                // Calculate expiration if duration specified. Deterministic:
+                // freeze_expires_at = effective_at + duration_secs (saturating).
+                let expires_at = request.duration_secs.map(|d| durable_ts.saturating_add(d));
                 if let Some(exp) = expires_at {
                     member
                         .metadata
@@ -599,7 +620,12 @@ impl MembershipService for MembershipServiceImpl {
             "Processing unfreeze member request"
         );
 
+        // Node-local wall-clock, retained only for the in-memory audit provenance.
         let timestamp = icn_time::current_timestamp_secs();
+        // Durable `unfrozen_at` uses the decision-carried `effective_at` so records
+        // converge across nodes (#2286); legacy effects (`None`) fall back to the
+        // node-local `timestamp` — non-convergent, pre-#2286 behavior.
+        let durable_ts = request.effective_at.unwrap_or(timestamp);
 
         // Parse the member DID
         let did = match Self::parse_did(&request.member_did) {
@@ -632,7 +658,7 @@ impl MembershipService for MembershipServiceImpl {
                 member.status = MemberStatus::Active;
                 member
                     .metadata
-                    .insert("unfrozen_at".to_string(), timestamp.to_string());
+                    .insert("unfrozen_at".to_string(), durable_ts.to_string());
                 member.metadata.remove("freeze_expires_at");
                 // Governance provenance — enables cold-cache recovery after restart
                 member.metadata.insert(
@@ -798,6 +824,7 @@ mod tests {
             tier: "Standard".to_string(),
             decision_receipt_id: "gov:proposal:add-member:receipt:test-123".to_string(),
             decision_hash: "sha256:addtest12345".to_string(),
+            effective_at: Some(1_700_000_000),
         };
 
         let result = service
@@ -850,6 +877,7 @@ mod tests {
                 tier: "Founder".to_string(),
                 decision_receipt_id: "gov:proposal:add:receipt:reload-123".to_string(),
                 decision_hash: "sha256:reload-test-hash".to_string(),
+                effective_at: Some(1_700_000_000),
             };
 
             let result = service.add_member(request).expect("add_member failed");
@@ -918,6 +946,7 @@ mod tests {
                 tier: "Standard".to_string(),
                 decision_receipt_id: "gov:add:receipt:1".to_string(),
                 decision_hash: "sha256:add1".to_string(),
+                effective_at: Some(1_700_000_000),
             };
             let add_result = service.add_member(add_req).expect("add failed");
             assert!(add_result.success, "Add should succeed");
@@ -930,6 +959,7 @@ mod tests {
                 duration_secs: Some(86400),
                 decision_receipt_id: "gov:freeze:receipt:1".to_string(),
                 decision_hash: "sha256:freeze1".to_string(),
+                effective_at: Some(1_700_000_000),
             };
             let freeze_result = service.freeze_member(freeze_req).expect("freeze failed");
             assert!(freeze_result.success, "Freeze should succeed");
@@ -997,6 +1027,7 @@ mod tests {
                 tier: "Standard".to_string(),
                 decision_receipt_id: "gov:add:receipt:2".to_string(),
                 decision_hash: "sha256:add2".to_string(),
+                effective_at: Some(1_700_000_000),
             };
             service.add_member(add_req).expect("add failed");
 
@@ -1007,6 +1038,7 @@ mod tests {
                 reason: "Voluntary resignation".to_string(),
                 decision_receipt_id: "gov:remove:receipt:2".to_string(),
                 decision_hash: "sha256:remove2".to_string(),
+                effective_at: Some(1_700_000_000),
             };
             let remove_result = service.remove_member(remove_req).expect("remove failed");
             assert!(remove_result.success, "Remove should succeed");
@@ -1069,6 +1101,7 @@ mod tests {
                 tier: "Standard".to_string(),
                 decision_receipt_id: "gov:add:receipt:3".to_string(),
                 decision_hash: "sha256:add3".to_string(),
+                effective_at: Some(1_700_000_000),
             };
             service.add_member(add_req).expect("add failed");
 
@@ -1144,6 +1177,7 @@ mod tests {
             tier: "Standard".to_string(),
             decision_receipt_id: "gov:add:status".to_string(),
             decision_hash: "sha256:status".to_string(),
+            effective_at: Some(1_700_000_000),
         };
         service.add_member(add_req).expect("add failed");
 
@@ -1159,6 +1193,7 @@ mod tests {
             duration_secs: None,
             decision_receipt_id: "gov:freeze:status".to_string(),
             decision_hash: "sha256:freezestatus".to_string(),
+            effective_at: Some(1_700_000_000),
         };
         service.freeze_member(freeze_req).expect("freeze failed");
 
@@ -1243,6 +1278,178 @@ mod tests {
             a, b,
             "hash input must be injective — shifting a `:` boundary between \
              adjacent fields must change the hash"
+        );
+    }
+
+    // ==================================================================
+    // #2286 — durable timestamps come from decision-carried effective_at
+    // ==================================================================
+
+    const TEST_EFFECTIVE_AT: u64 = 1_700_000_000;
+
+    fn add_request(entity: &str, did: &str, effective_at: Option<u64>) -> AddMemberRequest {
+        AddMemberRequest {
+            entity_id: entity.to_string(),
+            member_did: did.to_string(),
+            role: "Worker".to_string(),
+            tier: "Standard".to_string(),
+            decision_receipt_id: "gov:add:eff".to_string(),
+            decision_hash: "sha256:add-eff".to_string(),
+            effective_at,
+        }
+    }
+
+    /// `Some(effective_at)` → durable `joined_at` is exactly that decision time,
+    /// not a node-local `Utc::now()`.
+    #[test]
+    fn add_member_joined_at_is_decision_effective_at() {
+        let (store, _t) = make_test_store();
+        let service = MembershipServiceImpl::new(store.clone());
+        let did = make_test_did();
+        let entity = "coop:eff-add";
+
+        service
+            .add_member(add_request(
+                entity,
+                &did.to_string(),
+                Some(TEST_EFFECTIVE_AT),
+            ))
+            .expect("add failed");
+
+        let m = store.get_member(entity, &did).expect("get_member");
+        assert_eq!(
+            m.joined_at.timestamp(),
+            TEST_EFFECTIVE_AT as i64,
+            "joined_at must be the decision-carried effective_at"
+        );
+    }
+
+    /// remove/freeze/unfreeze persist the decision-carried `effective_at` into their
+    /// durable metadata, and `freeze_expires_at = effective_at + duration_secs`.
+    #[test]
+    fn mutation_ops_persist_decision_effective_at() {
+        let (store, _t) = make_test_store();
+        let service = MembershipServiceImpl::new(store.clone());
+        let did = make_test_did();
+        let did_str = did.to_string();
+        let entity = "coop:eff-mut";
+        const DURATION: u64 = 3600;
+
+        service
+            .add_member(add_request(entity, &did_str, Some(TEST_EFFECTIVE_AT)))
+            .expect("add failed");
+
+        // Freeze → frozen_at == effective_at; freeze_expires_at == effective_at + duration.
+        let freeze = service
+            .freeze_member(FreezeMemberRequest {
+                entity_id: entity.to_string(),
+                member_did: did_str.clone(),
+                reason: "review".to_string(),
+                duration_secs: Some(DURATION),
+                decision_receipt_id: "gov:freeze:eff".to_string(),
+                decision_hash: "sha256:freeze-eff".to_string(),
+                effective_at: Some(TEST_EFFECTIVE_AT),
+            })
+            .expect("freeze failed");
+        assert_eq!(freeze.expires_at, Some(TEST_EFFECTIVE_AT + DURATION));
+        let frozen = store.get_member(entity, &did).expect("get_member");
+        assert_eq!(
+            frozen.metadata.get("frozen_at").map(String::as_str),
+            Some(TEST_EFFECTIVE_AT.to_string().as_str())
+        );
+        assert_eq!(
+            frozen.metadata.get("freeze_expires_at").map(String::as_str),
+            Some((TEST_EFFECTIVE_AT + DURATION).to_string().as_str()),
+            "freeze_expires_at must be effective_at + duration_secs"
+        );
+
+        // Unfreeze → unfrozen_at == effective_at.
+        service
+            .unfreeze_member(UnfreezeMemberRequest {
+                entity_id: entity.to_string(),
+                member_did: did_str.clone(),
+                decision_receipt_id: "gov:unfreeze:eff".to_string(),
+                decision_hash: "sha256:unfreeze-eff".to_string(),
+                effective_at: Some(TEST_EFFECTIVE_AT),
+            })
+            .expect("unfreeze failed");
+        let unfrozen = store.get_member(entity, &did).expect("get_member");
+        assert_eq!(
+            unfrozen.metadata.get("unfrozen_at").map(String::as_str),
+            Some(TEST_EFFECTIVE_AT.to_string().as_str())
+        );
+
+        // Remove → removed_at == effective_at.
+        service
+            .remove_member(RemoveMemberRequest {
+                entity_id: entity.to_string(),
+                member_did: did_str.clone(),
+                reason: "exit".to_string(),
+                decision_receipt_id: "gov:remove:eff".to_string(),
+                decision_hash: "sha256:remove-eff".to_string(),
+                effective_at: Some(TEST_EFFECTIVE_AT),
+            })
+            .expect("remove failed");
+        let removed = store.get_member(entity, &did).expect("get_member");
+        assert_eq!(
+            removed.metadata.get("removed_at").map(String::as_str),
+            Some(TEST_EFFECTIVE_AT.to_string().as_str())
+        );
+    }
+
+    /// Legacy effects (`effective_at: None`) fall back to node-local time — the
+    /// pre-#2286 behavior. This path is explicitly non-convergent, but must NOT
+    /// fabricate an epoch-zero protocol timestamp.
+    #[test]
+    fn legacy_none_effective_at_uses_local_time_not_epoch_zero() {
+        let (store, _t) = make_test_store();
+        let service = MembershipServiceImpl::new(store.clone());
+        let did = make_test_did();
+        let entity = "coop:eff-legacy";
+
+        service
+            .add_member(add_request(entity, &did.to_string(), None))
+            .expect("add failed");
+
+        let m = store.get_member(entity, &did).expect("get_member");
+        assert!(
+            m.joined_at.timestamp() > 1_600_000_000,
+            "legacy None must fall back to a real local timestamp, never epoch zero"
+        );
+    }
+
+    /// The `membership:v2` `state_change_hash` is a decision-identity fingerprint
+    /// and must be independent of `effective_at`: two adds differing only in
+    /// `effective_at` produce the same hash.
+    #[test]
+    fn state_change_hash_ignores_effective_at() {
+        let (store_a, _a) = make_test_store();
+        let (store_b, _b) = make_test_store();
+        let service_a = MembershipServiceImpl::new(store_a);
+        let service_b = MembershipServiceImpl::new(store_b);
+        let did = make_test_did();
+        let entity = "coop:eff-hash";
+
+        let hash_a = service_a
+            .add_member(add_request(
+                entity,
+                &did.to_string(),
+                Some(TEST_EFFECTIVE_AT),
+            ))
+            .expect("add a")
+            .state_change_hash;
+        let hash_b = service_b
+            .add_member(add_request(
+                entity,
+                &did.to_string(),
+                Some(TEST_EFFECTIVE_AT + 12345),
+            ))
+            .expect("add b")
+            .state_change_hash;
+
+        assert_eq!(
+            hash_a, hash_b,
+            "state_change_hash must not depend on effective_at (membership:v2 unchanged)"
         );
     }
 }

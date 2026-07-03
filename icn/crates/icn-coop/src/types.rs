@@ -732,6 +732,23 @@ impl Member {
         self
     }
 
+    /// Overwrite `joined_at` with a decision-carried effective time (Unix seconds).
+    ///
+    /// Governance-driven membership adds set `joined_at` from the decision's
+    /// `effective_at` rather than the node-local `Utc::now()` stamped by
+    /// [`Member::new`], so nodes replaying the same decision persist identical
+    /// durable records (issue #2286). `Member::new` is left intact for
+    /// non-governance callers.
+    ///
+    /// Deterministic and total: the same `secs` yields the same `DateTime` on every
+    /// node; an out-of-range value (unreachable for a real governance `decided_at`)
+    /// saturates to the representable bound rather than reading a local clock.
+    pub fn with_joined_at_secs(mut self, secs: u64) -> Self {
+        let clamped = i64::try_from(secs).unwrap_or(i64::MAX);
+        self.joined_at = DateTime::from_timestamp(clamped, 0).unwrap_or(DateTime::<Utc>::MAX_UTC);
+        self
+    }
+
     /// Set capital contribution
     pub fn with_capital(mut self, amount: u64) -> Self {
         self.capital_contribution = amount;

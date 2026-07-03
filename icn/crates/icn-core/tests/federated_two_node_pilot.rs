@@ -296,6 +296,11 @@ async fn test_two_node_membership_add_determinism() -> Result<()> {
     let member_did = generate_test_did();
     let decision_receipt_id = DecisionReceiptId::new("gov:membership:add:pilot:001");
 
+    // Decision-carried effective time (same value replayed on both nodes). The
+    // durable `joined_at` must equal this on both nodes, not each node's local
+    // wall-clock (#2286).
+    let effective_at: u64 = 1_700_000_000;
+
     // Create the effect
     let effect = MembershipEffect::AddMember {
         entity_id: "coop-sunrise-pilot".to_string(),
@@ -303,6 +308,7 @@ async fn test_two_node_membership_add_determinism() -> Result<()> {
         role: "Worker".to_string(),
         tier: "Standard".to_string(),
         decision_hash: String::new(),
+        effective_at: Some(effective_at),
     };
 
     // === Node A Setup ===
@@ -381,7 +387,40 @@ async fn test_two_node_membership_add_determinism() -> Result<()> {
         hash_a, hash_b
     );
 
-    info!("✅ Membership add determinism verified");
+    // === ASSERT DURABLE RECORD CONVERGENCE (#2286) ===
+    // The decision-identity fingerprint (state_change_hash) converging is not
+    // enough: the durable `Member` record must also be byte-identical across
+    // nodes. Before #2286, `joined_at` was each node's local `Utc::now()` and
+    // diverged across a seconds boundary. Compare a normalized durable-state
+    // projection that includes the timestamp.
+    let member_a = coop_store_a.get_member("coop-sunrise-pilot", &member_did)?;
+    let member_b = coop_store_b.get_member("coop-sunrise-pilot", &member_did)?;
+
+    let project = |m: &icn_coop::Member| {
+        (
+            m.joined_at,
+            format!("{:?}", m.role),
+            format!("{:?}", m.status),
+            m.tier.as_ref().map(|t| t.name.clone()),
+            m.shares,
+            m.capital_contribution,
+        )
+    };
+    assert_eq!(
+        project(&member_a),
+        project(&member_b),
+        "Durable Member records must converge across nodes replaying the same decision"
+    );
+
+    // And the durable timestamp must be the decision-carried `effective_at`, not a
+    // node-local clock read.
+    assert_eq!(
+        member_a.joined_at.timestamp(),
+        effective_at as i64,
+        "joined_at must equal the decision-carried effective_at"
+    );
+
+    info!("✅ Membership add determinism + durable record convergence verified");
     Ok(())
 }
 
@@ -693,6 +732,7 @@ async fn test_two_node_effect_batch_determinism() -> Result<()> {
             role: "Coordinator".to_string(),
             tier: "Founding".to_string(),
             decision_hash: String::new(),
+            effective_at: Some(1_700_000_000),
         }),
         KernelEffect::NoOp {
             reason: "Resolution text recorded".to_string(),
@@ -885,6 +925,7 @@ async fn test_two_node_federation_reload_durability() -> Result<()> {
         role: "Worker".to_string(),
         tier: "Standard".to_string(),
         decision_hash: String::new(),
+        effective_at: Some(1_700_000_000),
     };
 
     // === Create persistent tempdirs for both nodes ===

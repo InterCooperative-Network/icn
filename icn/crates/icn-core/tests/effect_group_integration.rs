@@ -181,6 +181,7 @@ async fn test_membership_add_member_provenance_chain() -> Result<()> {
         role: "Worker".to_string(),
         tier: "Standard".to_string(),
         decision_hash: String::new(),
+        effective_at: Some(1_700_000_000),
     };
 
     // Execute the membership operation
@@ -273,6 +274,7 @@ async fn test_membership_freeze_member_provenance_chain() -> Result<()> {
         tier: "Standard".to_string(),
         decision_receipt_id: "gov:membership:add:pre-freeze".to_string(),
         decision_hash: "hash-add".to_string(),
+        effective_at: Some(1_700_000_000),
     };
     membership_service.add_member(add_request)?;
 
@@ -287,6 +289,7 @@ async fn test_membership_freeze_member_provenance_chain() -> Result<()> {
         reason: "Policy violation under review".to_string(),
         duration_secs: Some(86400), // 24 hours
         decision_hash: String::new(),
+        effective_at: Some(1_700_000_000),
     };
 
     let outcome = executor
@@ -365,6 +368,7 @@ async fn test_membership_unfreeze_member_provenance_chain() -> Result<()> {
         tier: "Standard".to_string(),
         decision_receipt_id: "gov:add:pre-unfreeze".to_string(),
         decision_hash: "hash-add".to_string(),
+        effective_at: Some(1_700_000_000),
     })?;
     membership_service.freeze_member(FreezeMemberRequest {
         entity_id: "coop-unfreeze-test".to_string(),
@@ -373,6 +377,7 @@ async fn test_membership_unfreeze_member_provenance_chain() -> Result<()> {
         duration_secs: Some(3600),
         decision_receipt_id: "gov:freeze:pre-unfreeze".to_string(),
         decision_hash: "hash-freeze".to_string(),
+        effective_at: Some(1_700_000_000),
     })?;
 
     // Verify member is frozen
@@ -384,6 +389,7 @@ async fn test_membership_unfreeze_member_provenance_chain() -> Result<()> {
         entity_id: "coop-unfreeze-test".to_string(),
         member_did: member_did_str.clone(),
         decision_hash: String::new(),
+        effective_at: Some(1_700_000_000),
     };
 
     let outcome = executor
