@@ -155,6 +155,21 @@
     <ul id="receipts-list" class="card-list"></ul>
   </section>
 
+  <!-- #2289 Evidence summary / export (fixture-only, read-only). A read-only
+       rendering of the committed export fixture that conforms to
+       urn:icn:contract:rehearsal-evidence-export:v1. Shown only in the
+       ?mode=demo&set=process-evidence view. Nothing is generated, downloaded,
+       copied, or sent from this page. -->
+  <section id="evidence-export-section" hidden aria-labelledby="evidence-export-h">
+    <h2 id="evidence-export-h" data-i18n="evidence.export.heading">Evidence summary</h2>
+    <p class="explain" data-i18n="evidence.export.explain">
+      This is a repo-safe evidence summary of the process story above,
+      rendered read-only from a committed fixture. It is not generated,
+      downloaded, copied, or sent from this page.
+    </p>
+    <div id="evidence-export-body"></div>
+  </section>
+
   <!-- Help path: the spec requires a visible way to ask for help. -->
   <section id="help-section" aria-labelledby="help-h">
     <h2 id="help-h" data-i18n="help.heading">Need help?</h2>

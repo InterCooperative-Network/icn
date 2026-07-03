@@ -15,6 +15,13 @@
  * this static surface are not sensitive to recent Chromium revisions.
  *
  * Usage: node a11y-walkthrough.cjs <baseUrl> <outDir>   (default mode=demo / ?lang=en)
+ *
+ * Optional env var MSHELL_SET targets a demo variant by appending &set=<value>
+ * to the audited URL (icn#2289). Unset (the default) audits ?mode=demo exactly
+ * as before, so the documented reproduction command and its evidence are
+ * unchanged. Example, to audit the process-evidence evidence surface:
+ *   MSHELL_SET=process-evidence NODE_PATH=web/pilot-ui/node_modules \
+ *     node web/member-shell/a11y-walkthrough.cjs http://127.0.0.1:8099 ./out
  */
 const { chromium } = require('playwright');
 const { AxeBuilder } = require('@axe-core/playwright');
@@ -23,7 +30,11 @@ const { mkdirSync, writeFileSync } = require('node:fs');
 (async () => {
   const BASE = process.argv[2] || 'http://127.0.0.1:8099';
   const OUT = process.argv[3] || '.';
-  const URL = `${BASE}/member-shell/?mode=demo`;
+  // Optional demo variant (icn#2289). Unset → ?mode=demo, byte-for-byte the
+  // original default, so existing evidence is not disturbed.
+  const SET = process.env.MSHELL_SET
+    ? `&set=${encodeURIComponent(process.env.MSHELL_SET)}` : '';
+  const URL = `${BASE}/member-shell/?mode=demo${SET}`;
   mkdirSync(OUT, { recursive: true });
 
   const report = { url: URL, steps: {}, axe: {}, keyboard: {}, notes: [] };

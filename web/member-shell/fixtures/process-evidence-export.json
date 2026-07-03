@@ -1,0 +1,69 @@
+{
+  "schema_version": "0.1.0",
+  "recorded_at": "2026-07-03T00:00:00Z",
+  "rehearsal_label": "Fictional fixture-only process-evidence surface rehearsal — sample stewardship domain",
+  "rehearsal_mode": "fixture-only",
+  "audience_categories": ["steward", "member", "reviewer"],
+  "source_material": [
+    {
+      "kind": "committed-fixture",
+      "basename": "process-evidence-receipts.json",
+      "summary": "Fictional fixture pack of four process-transition receipts (session opened, deliberation entry recorded, decision recorded, accessibility-gate result). No real people and no real domain; all hashes are illustrative."
+    }
+  ],
+  "workflow_steps_completed": [
+    "start",
+    "decide",
+    "surface-result",
+    "export-evidence"
+  ],
+  "decision_outcomes": [
+    {
+      "category": "deferred",
+      "plain_summary": "A fictional stewardship decision was recorded against the sample session and left for a later rehearsal. The receipt records only that a decision artifact was recorded — by whom, when, and a content fingerprint — and asserts nothing about its standing."
+    },
+    {
+      "category": "approved",
+      "plain_summary": "The fixture accessibility-review gate recorded a pass result over the evidence surface. This reflects the fixture-simulated gate receipt, not a live gate run."
+    }
+  ],
+  "preview_review_boundary": {
+    "enforced": true,
+    "notes": "Read-first, no mutation: the surface renders committed receipts only; no write path is exercised."
+  },
+  "mutation_boundary": {
+    "executed": false,
+    "target": "none",
+    "notes": "Fixture-only rehearsal; no gateway contacted, no write attempted, no network egress."
+  },
+  "warnings": [
+    "The four process-transition receipt hashes are illustrative fixture values, not real blake3 bindings; nothing is signed.",
+    "This surface renders read views only; no live gateway, federation, or production posture is implied."
+  ],
+  "follow_ups": [
+    {
+      "title": "Human assistive-technology accessibility pass for member-shell v0 (screen-reader, low-vision zoom, switch input)",
+      "url": "https://github.com/InterCooperative-Network/icn/issues/2041"
+    }
+  ],
+  "privacy_review": {
+    "reviewer_role": "steward",
+    "status": "redactions-applied",
+    "notes": "One fictional deliberation input is shown to the steward body in summary and redacted from the member and export views; the receipt stores a body hash only, so there is no stored text to leak."
+  },
+  "accessibility_review": {
+    "reviewer_role": "reviewer",
+    "status": "reviewed-clean",
+    "notes": "The automated, structural accessibility floor (axe-core WCAG, keyboard reachability with visible focus, landmarks, 200% zoom render) was reviewed clean on this fixture surface. The human assistive-technology categories (screen-reader, low-vision, switch input) remain pending under icn#2041 and are not claimed here."
+  },
+  "export_safety_classification": "repo-safe",
+  "non_claims": [
+    "Not a production deployment.",
+    "Not a formally committed cooperative pilot.",
+    "Not a live federation, live Google Drive / Groups / Sheets sync, or any K3s / DNS / Forgejo mutation.",
+    "Not private-data handling; all material is fictional and repo-safe by construction.",
+    "Not organizer-ready or member-ready; this is a dev/fixture evidence view only.",
+    "Not a new receipt class; it reads the four existing ADR-0026 Layer 2 process-transition receipts only.",
+    "Not NYCN activation and not Phase 2 completion."
+  ]
+}

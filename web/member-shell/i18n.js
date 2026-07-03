@@ -267,7 +267,54 @@
       "launcher.ready": "Ready. Select Start local demo to load your standing.",
       "launcher.notConnected": "Not connected yet. Enter your local gateway address above.",
       "launcher.starting": "Starting the local demo…",
-      "launcher.startFailed": "Could not start the local demo ({error}). Use Connect manually instead, or check the launcher tunnel."
+      "launcher.startFailed": "Could not start the local demo ({error}). Use Connect manually instead, or check the launcher tunnel.",
+
+      // --- #2289 organizer-steward evidence surface (fixture-only) -------
+      // Renders the four already-landed ADR-0026 Layer 2 process-transition
+      // receipts as a plain-language evidence story, plus a repo-safe evidence
+      // summary. Fixture/dev only; nothing signed; read-only. No readiness is
+      // claimed and no new receipt class is introduced.
+      "evidence.process_session_opened.heading": "Process session opened",
+      "evidence.deliberation_entry_recorded.heading": "Deliberation input recorded",
+      "evidence.decision_recorded.heading": "Decision recorded",
+      "evidence.process_gate_result.heading": "Gate result recorded",
+
+      // Deliberation redaction demo (steward-visible vs member/export-redacted).
+      "evidence.redaction.stewardHeading": "What the steward body sees",
+      "evidence.redaction.memberHeading": "What members and the export see",
+      "evidence.redaction.notice": "Redacted here — the input text is not shown. {reason}",
+
+      // Evidence-detail key/value labels for the four receipt classes.
+      "evidence.kv.domainId": "Domain id",
+      "evidence.kv.sessionId": "Session id",
+      "evidence.kv.openedBy": "Opened by (who recorded this fact)",
+      "evidence.kv.recordedAt": "Recorded at (unix seconds)",
+      "evidence.kv.entryId": "Entry id",
+      "evidence.kv.author": "Author (who recorded this input)",
+      "evidence.kv.entryKind": "Entry kind",
+      "evidence.kv.bodyHash": "Content fingerprint (body hash — proof of content; the input itself is never stored)",
+      "evidence.kv.decisionId": "Decision id",
+      "evidence.kv.recordedBy": "Recorded by (who recorded this fact, not who decided)",
+      "evidence.kv.gateKind": "Gate kind",
+      "evidence.kv.gateResult": "Gate result",
+
+      // Evidence summary / export (read-only render of the committed fixture).
+      "evidence.export.heading": "Evidence summary",
+      "evidence.export.explain": "This is a repo-safe evidence summary of the process story above, rendered read-only from a committed fixture. It is not generated, downloaded, copied, or sent from this page.",
+      "evidence.export.summary": "This evidence summary describes a {mode} rehearsal and is classified {safety}.",
+      "evidence.export.readonly": "Read-only view of a committed fixture — the summary is not generated, downloaded, copied, or sent from this page.",
+      "evidence.export.outcomesHeading": "What the rehearsal recorded (plain language)",
+      "evidence.export.privacy": "Privacy review: {status}. {notes}",
+      "evidence.export.showDetail": "Show export detail",
+      "evidence.export.kv.contract": "Contract",
+      "evidence.export.kv.mode": "Rehearsal mode",
+      "evidence.export.kv.steps": "Workflow steps completed",
+      "evidence.export.kv.audiences": "Audience categories",
+      "evidence.export.kv.mutation": "Mutation",
+      "evidence.export.mutationNone": "None (read-only; nothing was changed)",
+      "evidence.export.kv.accessibility": "Accessibility review status",
+      "evidence.export.kv.safety": "Export safety classification",
+      "evidence.export.nonClaimsHeading": "What this is not"
     }
     // Additional languages are added here as a single entry — no code change.
     // Example: MESSAGES.fr = { "sync.synced": "Synchronisé", ... }

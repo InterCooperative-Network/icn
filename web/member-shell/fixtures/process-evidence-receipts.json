@@ -1,0 +1,91 @@
+{
+  "_note": "Fixture-only, dev-safe process-evidence pack for the organizer-steward evidence surface (icn#2289). Renders on web/member-shell/ at ?mode=demo&set=process-evidence. All four objects are wire-shaped per icn/crates/icn-governance/src/proof.rs (bare JSON, snake_case enums, 32-byte hashes as integer arrays). Every record_hash / body_hash below is an ILLUSTRATIVE fixture value — NOT a real blake3 binding; nothing is signed. All DIDs are fictional (example-…-not-live). No new receipt class: this reads the four existing ADR-0026 Layer 2 classes only. The deliberation body is never stored — the receipt carries a body_hash content fingerprint only, which is what makes the redaction demo honest.",
+  "domain_id": "demo.coop.stewardship",
+  "session_id": "demo-process-session-0001",
+  "sequence": [
+    {
+      "kind": "process_session_opened",
+      "plainContext": "This anchors the story: a process session was opened in a sample stewardship domain, so everything below is scoped to who opened it, where, and when.",
+      "receipt": {
+        "session_id": "demo-process-session-0001",
+        "domain_id": "demo.coop.stewardship",
+        "opened_by": "did:icn:example-steward-demo-not-live",
+        "opened_at": 1729900000,
+        "record_hash": [
+          11, 47, 162, 8, 205, 96, 7, 154,
+          33, 201, 5, 88, 119, 64, 240, 11,
+          73, 156, 29, 222, 47, 101, 134, 90,
+          3, 68, 175, 52, 199, 26, 145, 83
+        ]
+      }
+    },
+    {
+      "kind": "deliberation_entry_recorded",
+      "plainContext": "A deliberation input was recorded against the session. The input text itself is never stored — the receipt keeps only a content fingerprint (the body hash below).",
+      "memberVisibility": "redacted",
+      "stewardSummary": "Steward-body view (fictional fixture summary): a member recorded a concern that a planned meeting time would be hard to attend for some members. This one-line summary is fictional fixture context — it is not the stored input, which the receipt never holds.",
+      "redactionReason": "This deliberation input is shown to the steward body in summary form only. Members and the exported evidence see the proof pointer below, never the input text — because the receipt stores a content fingerprint (body hash), not the words.",
+      "receipt": {
+        "domain_id": "demo.coop.stewardship",
+        "session_id": "demo-process-session-0001",
+        "entry_id": "demo-deliberation-entry-0001",
+        "author": "did:icn:example-member-demo-not-live",
+        "entry_kind": "concern",
+        "recorded_at": 1729900600,
+        "body_hash": [
+          212, 9, 118, 64, 5, 33, 201, 88,
+          7, 154, 240, 11, 73, 26, 145, 83,
+          162, 8, 205, 96, 47, 101, 134, 90,
+          3, 68, 175, 52, 199, 156, 29, 222
+        ],
+        "record_hash": [
+          88, 3, 68, 175, 52, 199, 26, 145,
+          83, 11, 47, 162, 8, 205, 96, 7,
+          154, 33, 201, 5, 88, 119, 64, 240,
+          11, 73, 156, 29, 222, 47, 101, 134
+        ]
+      }
+    },
+    {
+      "kind": "decision_recorded",
+      "plainContext": "A decision artifact was recorded against the session. The receipt records that a decision was recorded — by whom it was recorded, when, and a content fingerprint — not its validity, its bindingness, or any count.",
+      "receipt": {
+        "domain_id": "demo.coop.stewardship",
+        "session_id": "demo-process-session-0001",
+        "decision_id": "demo-decision-0001",
+        "recorded_by": "did:icn:example-recorder-demo-not-live",
+        "recorded_at": 1729901200,
+        "body_hash": [
+          9, 9, 9, 9, 9, 9, 9, 9,
+          9, 9, 9, 9, 9, 9, 9, 9,
+          9, 9, 9, 9, 9, 9, 9, 9,
+          9, 9, 9, 9, 9, 9, 9, 9
+        ],
+        "record_hash": [
+          2, 158, 91, 172, 171, 240, 77, 206,
+          74, 89, 49, 100, 163, 106, 122, 82,
+          70, 159, 207, 235, 102, 115, 112, 38,
+          222, 58, 170, 156, 209, 78, 107, 68
+        ]
+      }
+    },
+    {
+      "kind": "process_gate_result",
+      "plainContext": "A process gate result was recorded: the accessibility-review gate ran over this surface and its result is pass. This is a fixture-simulated gate receipt, not a live gate run — it gives the evidence surface a receipt-backed statement that the gate ran.",
+      "receipt": {
+        "session_id": "demo-process-session-0001",
+        "domain_id": "demo.coop.stewardship",
+        "gate_kind": "accessibility_review",
+        "result": "pass",
+        "recorded_by": "did:icn:example-reviewer-demo-not-live",
+        "recorded_at": 1729901800,
+        "record_hash": [
+          160, 32, 7, 7, 7, 7, 7, 7,
+          7, 7, 7, 7, 7, 7, 7, 7,
+          7, 7, 7, 7, 7, 7, 7, 7,
+          7, 7, 7, 7, 7, 7, 32, 160
+        ]
+      }
+    }
+  ]
+}
