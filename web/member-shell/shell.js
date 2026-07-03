@@ -103,6 +103,15 @@
   var params = new URLSearchParams(window.location.search);
   var MODE = params.get("mode") === "demo" ? "demo" : "live";
 
+  // #2289 organizer-steward evidence surface. `?mode=demo&set=process-evidence`
+  // swaps the demo pack for a fixture-only, read-only evidence story over the
+  // four already-landed ADR-0026 Layer 2 process-transition receipts (session
+  // opened -> deliberation entry recorded -> decision recorded -> gate result)
+  // plus a repo-safe evidence-summary export. Fixture/dev only: nothing is live,
+  // every hash is illustrative (see the demo hash label), and the surface
+  // renders read views only — no download, no mutation. `set` is demo-only.
+  var SET = MODE === "demo" ? params.get("set") : null;
+
   // DEV/DEMO one-click launcher context. The local launcher
   // (deploy/appliance/scripts/open-proxmox-demo.sh) opens this page with
   // ?demo=launcher and forwards two loopback ports: the gateway to :18080 and
@@ -155,6 +164,14 @@
     FIXTURES.standing = "fixtures/community-standing.json";
     FIXTURES.cards = "fixtures/community-action-cards.json";
     FIXTURES.completionReceipt = "fixtures/community-completion-receipt.json";
+  }
+
+  // #2289 organizer-steward evidence surface (fixture-only). Keeps the demo
+  // standing + cards pack; adds the four-receipt process-evidence sequence and
+  // its repo-safe evidence-summary export (both member-shell-local fixtures).
+  if (SET === "process-evidence") {
+    FIXTURES.processEvidence = "fixtures/process-evidence-receipts.json";
+    FIXTURES.processEvidenceExport = "fixtures/process-evidence-export.json";
   }
 
   // ---------------------------------------------------------------------
@@ -608,8 +625,21 @@
   // ---------------------------------------------------------------------
   // Receipts (plain summary first; formal record under a disclosure)
   // ---------------------------------------------------------------------
-  function addReceipt(receipt, plainContext) {
-    state.receipts.push({ receipt: receipt, plainContext: plainContext });
+  // opts is optional. Existing callers (live completion + demo completion) pass
+  // no opts, so the entry keeps its original {receipt, plainContext} shape and
+  // renders through renderCompletionReceipt exactly as before. The #2289
+  // process-evidence pack passes opts.kind (one of the four process-transition
+  // classes) plus optional redaction metadata, routing to renderProcessReceipt.
+  // No existing behavior changes.
+  function addReceipt(receipt, plainContext, opts) {
+    var entry = { receipt: receipt, plainContext: plainContext };
+    if (opts) {
+      entry.kind = opts.kind;
+      entry.memberVisibility = opts.memberVisibility;
+      entry.stewardSummary = opts.stewardSummary;
+      entry.redactionReason = opts.redactionReason;
+    }
+    state.receipts.push(entry);
     renderReceipts();
   }
 
@@ -620,7 +650,9 @@
       list.appendChild(el("li", { text: t("receipts.none") }));
     } else {
       state.receipts.forEach(function (entry) {
-        list.appendChild(renderCompletionReceipt(entry.receipt, entry.plainContext));
+        list.appendChild(entry.kind
+          ? renderProcessReceipt(entry)
+          : renderCompletionReceipt(entry.receipt, entry.plainContext));
       });
     }
     show("receipts-section");
@@ -668,10 +700,164 @@
   }
 
   // ---------------------------------------------------------------------
+  // #2289 organizer-steward evidence surface (fixture-only, read-only).
+  // Renders one of the four ADR-0026 Layer 2 process-transition receipts
+  // (proof.rs) as a plain-language summary first, with the record-level fields
+  // under a progressive-disclosure "Show evidence detail" control. record_hash
+  // is the proof pointer; body_hash is labeled proof-of-content (the body is
+  // never stored). In demo mode the hashes are illustrative, mirroring the
+  // completion receipt's honesty label. No readiness is claimed.
+  // ---------------------------------------------------------------------
+  var PROCESS_RECEIPT_CLASS = {
+    process_session_opened: "ProcessSessionOpenedReceipt",
+    deliberation_entry_recorded: "DeliberationEntryRecordedReceipt",
+    decision_recorded: "DecisionRecordedReceipt",
+    process_gate_result: "ProcessGateResultReceipt"
+  };
+
+  // record_hash label mirrors renderCompletionReceipt's maturity-tier honesty:
+  // demo hashes are illustrative, only live may claim the canonical binding.
+  function recordHashRow(dl, hash) {
+    kvRow(dl, MODE === "demo"
+        ? t("receipt.kv.recordHashDemo")
+        : t("receipt.kv.recordHashLive"),
+      el("code", { text: hashToHex(hash) }));
+  }
+
+  function renderProcessReceipt(entry) {
+    var r = entry.receipt || {};
+    var kind = entry.kind;
+    var li = el("li");
+
+    li.appendChild(el("h3", { text: t("evidence." + kind + ".heading") }));
+    li.appendChild(el("p", {}, [
+      el("span", { class: "chip ok", text: "✓ " + t(SYNC.RECEIPT) })
+    ]));
+    // plainContext is a self-contained plain-language summary (the fixture
+    // supplies it per receipt); shown before any raw field per gate §3.11.
+    li.appendChild(el("p", { class: "muted", text: entry.plainContext || "" }));
+
+    // Deliberation-entry redaction demo (gate §3.11): show the steward-body
+    // view and the member/export view together so the privacy boundary is
+    // legible without leaking any private text. The steward summary is
+    // clearly-fictional fixture context; the receipt itself holds only a
+    // body_hash, so the member/export view can honestly show the proof pointer
+    // and the redaction reason and nothing else.
+    if (kind === "deliberation_entry_recorded" && entry.memberVisibility === "redacted") {
+      var red = el("div", { class: "redaction" });
+      red.appendChild(el("h4", { text: t("evidence.redaction.stewardHeading") }));
+      red.appendChild(el("p", { class: "muted", text: entry.stewardSummary || "" }));
+      red.appendChild(el("h4", { text: t("evidence.redaction.memberHeading") }));
+      red.appendChild(el("p", {
+        text: t("evidence.redaction.notice", { reason: (entry.redactionReason || "") })
+      }));
+      li.appendChild(red);
+    }
+
+    var details = el("details");
+    details.appendChild(el("summary", { text: t("receipt.showEvidence") }));
+    var dl = el("dl", { class: "kv" });
+    // Record class names are not translated (they are wire identifiers).
+    kvRow(dl, t("receipt.kv.recordClass"), PROCESS_RECEIPT_CLASS[kind] || String(kind));
+    kvRow(dl, t("evidence.kv.domainId"), String(r.domain_id || ""));
+    kvRow(dl, t("evidence.kv.sessionId"), String(r.session_id || ""));
+
+    if (kind === "process_session_opened") {
+      kvRow(dl, t("evidence.kv.openedBy"), el("code", { text: String(r.opened_by || "") }));
+      kvRow(dl, t("evidence.kv.recordedAt"), String(r.opened_at || ""));
+    } else if (kind === "deliberation_entry_recorded") {
+      kvRow(dl, t("evidence.kv.entryId"), String(r.entry_id || ""));
+      kvRow(dl, t("evidence.kv.author"), el("code", { text: String(r.author || "") }));
+      kvRow(dl, t("evidence.kv.entryKind"), String(r.entry_kind || ""));
+      kvRow(dl, t("evidence.kv.recordedAt"), String(r.recorded_at || ""));
+      kvRow(dl, t("evidence.kv.bodyHash"), el("code", { text: hashToHex(r.body_hash) }));
+    } else if (kind === "decision_recorded") {
+      kvRow(dl, t("evidence.kv.decisionId"), String(r.decision_id || ""));
+      kvRow(dl, t("evidence.kv.recordedBy"), el("code", { text: String(r.recorded_by || "") }));
+      kvRow(dl, t("evidence.kv.recordedAt"), String(r.recorded_at || ""));
+      kvRow(dl, t("evidence.kv.bodyHash"), el("code", { text: hashToHex(r.body_hash) }));
+    } else if (kind === "process_gate_result") {
+      kvRow(dl, t("evidence.kv.gateKind"), String(r.gate_kind || ""));
+      kvRow(dl, t("evidence.kv.gateResult"), String(r.result || ""));
+      kvRow(dl, t("evidence.kv.recordedBy"), el("code", { text: String(r.recorded_by || "") }));
+      kvRow(dl, t("evidence.kv.recordedAt"), String(r.recorded_at || ""));
+    }
+    recordHashRow(dl, r.record_hash);
+    details.appendChild(dl);
+    li.appendChild(details);
+    return li;
+  }
+
+  // Render the repo-safe evidence-summary export (conforms to
+  // urn:icn:contract:rehearsal-evidence-export:v1) as a READ-ONLY view of the
+  // committed fixture. The surface never generates, downloads, mutates, or
+  // copies an export — the committed JSON is the single source of truth.
+  function renderEvidenceExport(exp) {
+    exp = exp || {};
+    var body = byId("evidence-export-body");
+    clear(body);
+
+    body.appendChild(el("p", {
+      text: t("evidence.export.summary", {
+        mode: String(exp.rehearsal_mode || ""),
+        safety: String(exp.export_safety_classification || "")
+      })
+    }));
+    body.appendChild(el("p", { class: "muted", text: t("evidence.export.readonly") }));
+
+    var outcomes = exp.decision_outcomes || [];
+    if (outcomes.length) {
+      body.appendChild(el("h3", { text: t("evidence.export.outcomesHeading") }));
+      var oul = el("ul", { class: "card-list" });
+      outcomes.forEach(function (o) {
+        oul.appendChild(el("li", { text: String(o.plain_summary || "") }));
+      });
+      body.appendChild(oul);
+    }
+
+    if (exp.privacy_review) {
+      body.appendChild(el("p", {
+        text: t("evidence.export.privacy", {
+          status: String(exp.privacy_review.status || ""),
+          notes: String(exp.privacy_review.notes || "")
+        })
+      }));
+    }
+
+    var details = el("details");
+    details.appendChild(el("summary", { text: t("evidence.export.showDetail") }));
+    var dl = el("dl", { class: "kv" });
+    kvRow(dl, t("evidence.export.kv.contract"), "urn:icn:contract:rehearsal-evidence-export:v1");
+    kvRow(dl, t("evidence.export.kv.mode"), String(exp.rehearsal_mode || ""));
+    kvRow(dl, t("evidence.export.kv.steps"), (exp.workflow_steps_completed || []).join(", "));
+    kvRow(dl, t("evidence.export.kv.audiences"), (exp.audience_categories || []).join(", "));
+    kvRow(dl, t("evidence.export.kv.mutation"),
+      exp.mutation_boundary && exp.mutation_boundary.executed === false
+        ? t("evidence.export.mutationNone")
+        : String((exp.mutation_boundary && exp.mutation_boundary.target) || ""));
+    kvRow(dl, t("evidence.export.kv.accessibility"),
+      exp.accessibility_review ? String(exp.accessibility_review.status || "") : "");
+    kvRow(dl, t("evidence.export.kv.safety"), String(exp.export_safety_classification || ""));
+    details.appendChild(dl);
+    body.appendChild(details);
+
+    var nc = exp.non_claims || [];
+    if (nc.length) {
+      body.appendChild(el("h3", { text: t("evidence.export.nonClaimsHeading") }));
+      var ncul = el("ul", { class: "card-list" });
+      nc.forEach(function (c) { ncul.appendChild(el("li", { text: String(c) })); });
+      body.appendChild(ncul);
+    }
+
+    show("evidence-export-section");
+  }
+
+  // ---------------------------------------------------------------------
   // Demo mode: fixture-backed, nothing signed, no live node.
   // ---------------------------------------------------------------------
   function loadDemo() {
     setSyncChip(t(SYNC.VERIFYING), "neutral", t("demo.loadingFixture"));
+    if (SET === "process-evidence") { loadProcessEvidenceDemo(); return; }
     Promise.all([
       fetchJson(FIXTURES.standing),
       fetchJson(FIXTURES.cards),
@@ -685,6 +871,45 @@
       renderStanding(state.standing);
       renderCards(state.cards, state.standing, anchor);
       addReceipt(results[2], t("demo.receiptContext"));
+
+      setSyncChip(t(SYNC.SYNCED), "ok",
+        t("demo.syncedDetail", { when: fmtAbs(anchor) }));
+    }).catch(function (err) {
+      setSyncChip(t(SYNC.DEGRADED), "warn",
+        t("demo.loadFailed", { error: err.message }));
+    });
+  }
+
+  // #2289 organizer-steward evidence surface (fixture-only). Reuses the demo
+  // standing + cards render path, then renders the four-receipt process
+  // sequence and the repo-safe evidence-summary export. No network beyond the
+  // committed fixtures; nothing signed; read-only.
+  function loadProcessEvidenceDemo() {
+    Promise.all([
+      fetchJson(FIXTURES.standing),
+      fetchJson(FIXTURES.cards),
+      fetchJson(FIXTURES.processEvidence),
+      fetchJson(FIXTURES.processEvidenceExport)
+    ]).then(function (results) {
+      state.standing = results[0];
+      state.cards = results[1];
+      var pack = results[2] || {};
+      var exp = results[3];
+      var anchor = state.cards.generated_at || state.standing.generated_at;
+
+      renderIdentity(state.standing);
+      renderStanding(state.standing);
+      renderCards(state.cards, state.standing, anchor);
+
+      (pack.sequence || []).forEach(function (item) {
+        addReceipt(item.receipt, item.plainContext, {
+          kind: item.kind,
+          memberVisibility: item.memberVisibility,
+          stewardSummary: item.stewardSummary,
+          redactionReason: item.redactionReason
+        });
+      });
+      renderEvidenceExport(exp);
 
       setSyncChip(t(SYNC.SYNCED), "ok",
         t("demo.syncedDetail", { when: fmtAbs(anchor) }));
