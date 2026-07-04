@@ -345,6 +345,12 @@ PR-time review checklist for any organizer- or member-facing surface (rehearsal 
 
 **For:** `architects`, `contributors`, `design` | **Updated:** 2026-05-05
 
+### 📋 **Draft** [ActivationCrossedReceipt decision rung — B1/B2/B3](/docs/design/activation-crossed-receipt-decision-rung.md)
+
+Narrow decision document resolving the three implementation blockers named in the merged #2294 ActivationCrossedReceipt design contract (#2293, under #1748/#2141), mirroring the decision-recorded-q4-decision.md cadence — decide hash-participating structure in writing before the icn:gov:activation_crossed:v1 tag is pinned. B1 (decision→activation reference): the receipt carries both the caller-opaque decision_id and the content-addressed decision_record_hash of the DecisionRecordedReceipt it activates — the lane's first inter-receipt link — verified fail-closed (the decision must exist in-session), preserving ADR-0026 self-hashed Layer-2 semantics and replay convergence via put_opaque_if_absent. B2 (gate basis): reuse the closed six-variant ProcessGateKind unchanged (no new variant, no ActivationRequest gate object — a variant would be a Copy-enum breaking change and an ADR-controlled taxonomy change); the receipt carries a content-addressed gate_basis fingerprint over the sorted passed ProcessGateResultReceipt record_hashes, non-empty and verified fail-closed (each declared gate exists in-session and is Pass) without owning a required-set policy. B3 (timestamp): a single caller-supplied recorded_at, hashed but excluded from duplicate identity, byte-parallel with the four landed classes; no distinct crossed_at, no decision-carried effective_at (effective_at is membership-lane only); no wall-clock time is a cross-node identity input. Pins a consolidated candidate :v1 field layout, preconditions, and the implementation PR's validation matrix. Design only — no Rust/UI/schema/OpenAPI/SDK/receipt-class change; no member-shell change; no human/AT execution (Refs #2293, #2294, #1748, #2141, #2041; no closure claims)
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-04
+
 ### 📋 **Draft** [ActivationCrossedReceipt — Design/Audit Contract](/docs/design/activation-crossed-receipt-runtime-dogfood.md)
 
 Design/audit contract for #2293 (under #1748/#2141): the candidate fifth ProcessTransitionReceipt rung, an ActivationCrossedReceipt witnessing that an already-recorded decision crossed the activation boundary (the framing spine's boundary between deciding and doing) with required ProcessGateResultReceipts observed as pass, before any later mutation/evidence work. Audits current state honestly (ActivationCrossedReceipt / ActivationRequest / Mutation* / EvidencePacket* are framing-only — no Rust seam whatsoever; the four landed classes ProcessSessionOpened/DeliberationEntryRecorded/DecisionRecorded/ProcessGateResult are the only runtime ProcessTransitionReceipts), proposes a candidate icn:gov:activation_crossed:v1 contract subject to implementation proof (session-anchored (domain_id, session_id), caller-opaque activation_id, recorder-not-crosser DID, body_hash-only fingerprint, put_opaque_if_absent idempotence with fail-closed conflict and session precondition), places it at ADR-0026 Layer 2 self-hashed (blake3 record_hash, no signature/merkle — naming the layering caveat), preserves the privacy boundary (no private body text), defers member-shell rendering, and names the three blockers that require a narrow decision rung before implementation: B1 decision→activation cross-receipt reference (the lane's first inter-receipt link), B2 gate-basis representation + whether a new ActivationRequest gate object / ProcessGateKind variant is needed (ADR-controlled taxonomy), and B3 caller-supplied crossed_at vs decision-carried effective_at. Recommendation Option C: land this contract, then a decision rung, then implementation. Design only — no Rust/UI/schema/OpenAPI/SDK/receipt-class change (Refs #2293, #1748, #2141, #2041, #2291, #2292; no closure claims)
@@ -2072,10 +2078,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 338
+**Total documents:** 339
 
 **By status:**
 - Active: 1
 - Canonical: 40
-- Draft: 85
+- Draft: 86
 - Living: 212
