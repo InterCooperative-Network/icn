@@ -50,7 +50,7 @@
   "mutation_boundary": {
     "executed": false,
     "target": "none",
-    "notes": "Fixture-only rehearsal; no gateway contacted, no write attempted, no network egress. The activation crossing, the mutation-plan recording, the mutation-applied recording, and the evidence-packet-produced recording are all process facts, not mutations — recording that a packet was produced is not producing, delivering, accepting, auditing, or certifying it; evidence export and delivery remain deferred and are not part of this surface."
+    "notes": "Fixture-only rehearsal; no gateway contacted, no write attempted, no network egress. The activation crossing, the mutation-plan recording, the mutation-applied recording, and the evidence-packet-produced recording are all process facts, not mutations. The evidence-packet-produced receipt records that a redacted packet artifact was produced and content-addressed; it does not assert delivery, acceptance, audit certification, correctness, completeness, legal sufficiency, human/AT verification, or readiness. Evidence export and delivery remain deferred and are not part of this surface."
   },
   "warnings": [
     "The eight process-transition receipt hashes are illustrative fixture values, not real blake3 bindings; nothing is signed.",
