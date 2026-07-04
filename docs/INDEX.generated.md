@@ -561,6 +561,12 @@ Design for managing identity across multiple devices within a single agent
 
 **For:** `developers`, `architects` | **Updated:** 2026-03-10
 
+### 📋 **Draft** [MutationAppliedReceipt — Design/Audit Contract](/docs/design/mutation-applied-receipt.md)
+
+Design/audit contract for #2306 (under #1748/#2141): the candidate seventh ProcessTransitionReceipt rung, a MutationAppliedReceipt witnessing that a previously recorded mutation plan (MutationPlanRecordedReceipt, landed #2303) was applied, recorded after the plan. Audits current state honestly (MutationAppliedReceipt has no Rust seam — framing/docs only; the six landed classes ProcessSessionOpened/DeliberationEntryRecorded/DecisionRecorded/ProcessGateResult/ActivationCrossed/MutationPlanRecorded are the only runtime ProcessTransitionReceipts; icn-baseline-lock's EvidencePacket is a separate baseline-lock bundle, not this class). Proposes a candidate icn:gov:mutation_applied:v1 contract subject to implementation proof (session-anchored (domain_id, session_id), caller-opaque application_id, plan reference by plan_id + content-addressed plan_record_hash as the lane's third inter-receipt link verified fail-closed via get_mutation_plan_recorded, recorder-not-applier DID granting zero authority, result_hash-only fingerprint with the applied-result body never stored, applied_at hashed but excluded from identity, put_opaque_if_absent idempotence with fail-closed conflict and session precondition), places it at ADR-0026 Layer 2 self-hashed (blake3 record_hash, no signature/merkle — naming the layering caveat), preserves the meaning-firewall + privacy boundary (no kernel-readable operation/result model, no applied-result body text), defers member-shell rendering, and names blockers for a narrow decision rung before implementation: A1 plan→application reference posture, A2 application body/result representation, A3 applied_at timestamp semantics, A4 the applied-witness boundary vs execution/authority boundary. States runtime implementation cannot begin while any hash-participating blocker (A1/A2/A4) is unresolved. Recommendation Option C: land this contract, then a decision rung, then implementation. Explicitly stops at application-recorded — the receipt never executes, validates, authorizes, or rolls back a mutation; EvidencePacketProducedReceipt, action-card triggers, and any typed/kernel-readable result model are deferred. Design only — no Rust/UI/schema/OpenAPI/SDK/receipt-class change; no member-shell change; no human/AT execution (Refs #2306, #2305, #2303, #2302, #2300, #1748, #2141, #2041; no closure claims)
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-04
+
 ### 📋 **Draft** [MutationPlanRecordedReceipt decision rung — M1/M2/M3](/docs/design/mutation-plan-recorded-receipt-decision-rung.md)
 
 Narrow decision document resolving the three implementation blockers named in the merged #2300 MutationPlanRecordedReceipt design/audit contract (#2301, under #1748/#2141), mirroring the activation-crossed-receipt-decision-rung.md cadence — decide hash-participating structure in writing before the icn:gov:mutation_plan_recorded:v1 tag is pinned. M1 (plan→activation reference): the receipt carries both the caller-opaque activation_id and the content-addressed activation_record_hash of the ActivationCrossedReceipt it follows — the lane's second inter-receipt link — verified fail-closed (get_activation_crossed then record_hash compare; the referenced activation must exist in-session with a matching activation_id), with decision + gate basis inherited transitively through the activation rather than re-referenced in v1. M2 (plan-body representation): body_hash-only v1 (a caller-supplied 32-byte fingerprint; the MutationPlan body — operation list, target list, effect payload, or any typed operation model — is never stored, preserving the meaning firewall and privacy), no plan-kind taxonomy. M3 (timestamp): a single caller-supplied recorded_at, hashed but excluded from duplicate identity, byte-parallel with the five landed classes; no distinct planned_at; no wall-clock in cross-node identity. Pins a consolidated candidate :v1 field layout, preconditions, and the implementation PR's validation matrix. Design only — no Rust/UI/schema/OpenAPI/SDK/receipt-class change; no member-shell change; no human/AT execution (Refs #2301, #2299, #2300, #1748, #2141, #2041, #2296, #2298; no closure claims)
@@ -2090,10 +2096,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 341
+**Total documents:** 342
 
 **By status:**
 - Active: 1
 - Canonical: 40
-- Draft: 88
+- Draft: 89
 - Living: 212

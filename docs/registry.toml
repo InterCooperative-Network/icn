@@ -1448,6 +1448,15 @@ last_updated = "2026-07-03"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/design/mutation-applied-receipt.md"]
+category = "design"
+status = "draft"
+title = "MutationAppliedReceipt — Design/Audit Contract"
+description = "Design/audit contract for #2306 (under #1748/#2141): the candidate seventh ProcessTransitionReceipt rung, a MutationAppliedReceipt witnessing that a previously recorded mutation plan (MutationPlanRecordedReceipt, landed #2303) was applied, recorded after the plan. Audits current state honestly (MutationAppliedReceipt has no Rust seam — framing/docs only; the six landed classes ProcessSessionOpened/DeliberationEntryRecorded/DecisionRecorded/ProcessGateResult/ActivationCrossed/MutationPlanRecorded are the only runtime ProcessTransitionReceipts; icn-baseline-lock's EvidencePacket is a separate baseline-lock bundle, not this class). Proposes a candidate icn:gov:mutation_applied:v1 contract subject to implementation proof (session-anchored (domain_id, session_id), caller-opaque application_id, plan reference by plan_id + content-addressed plan_record_hash as the lane's third inter-receipt link verified fail-closed via get_mutation_plan_recorded, recorder-not-applier DID granting zero authority, result_hash-only fingerprint with the applied-result body never stored, applied_at hashed but excluded from identity, put_opaque_if_absent idempotence with fail-closed conflict and session precondition), places it at ADR-0026 Layer 2 self-hashed (blake3 record_hash, no signature/merkle — naming the layering caveat), preserves the meaning-firewall + privacy boundary (no kernel-readable operation/result model, no applied-result body text), defers member-shell rendering, and names blockers for a narrow decision rung before implementation: A1 plan→application reference posture, A2 application body/result representation, A3 applied_at timestamp semantics, A4 the applied-witness boundary vs execution/authority boundary. States runtime implementation cannot begin while any hash-participating blocker (A1/A2/A4) is unresolved. Recommendation Option C: land this contract, then a decision rung, then implementation. Explicitly stops at application-recorded — the receipt never executes, validates, authorizes, or rolls back a mutation; EvidencePacketProducedReceipt, action-card triggers, and any typed/kernel-readable result model are deferred. Design only — no Rust/UI/schema/OpenAPI/SDK/receipt-class change; no member-shell change; no human/AT execution (Refs #2306, #2305, #2303, #2302, #2300, #1748, #2141, #2041; no closure claims)"
+last_updated = "2026-07-04"
+owner = "matt"
+audiences = ["architects", "developers"]
+
 [docs."docs/design/mutation-plan-recorded-receipt.md"]
 category = "design"
 status = "draft"
