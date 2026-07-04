@@ -46,15 +46,16 @@ reference client</strong> (<code>web/member-shell/</code>), reached at <code>?mo
 It is <strong>proof of path, not deployment readiness</strong>. It is not production, not a pilot,
 not organizer-ready, not member-ready, not live federation, not NYCN activation, not
 Phase 2 completion, not real member/partner data, and makes no signed/partner claim.</p>
-<p>This surface reads the <strong>seven already-landed ADR-0026 Layer 2 process-transition
+<p>This surface reads the <strong>eight already-landed ADR-0026 Layer 2 process-transition
 receipt classes</strong> (<code>icn/crates/icn-governance/src/proof.rs</code>) — no new receipt class is
 introduced, no Rust runtime is changed, and no OpenAPI/SDK is touched. It implements the
 design contract landed in <strong>#2290</strong>
 (<a href="/docs/design/organizer-steward-evidence-surface-runtime-dogfood">`docs/design/organizer-steward-evidence-surface-runtime-dogfood.md`</a>);
 the fifth class (<code>ActivationCrossedReceipt</code>, landed in <strong>#2296</strong>) was added to this
 fixture/demo surface by <strong>#2297</strong>, the sixth (<code>MutationPlanRecordedReceipt</code>, landed
-in <strong>#2303</strong>) by <strong>#2304</strong>, and the seventh (<code>MutationAppliedReceipt</code>, landed in
-<strong>#2310</strong>) by <strong>#2311</strong>.</p>
+in <strong>#2303</strong>) by <strong>#2304</strong>, the seventh (<code>MutationAppliedReceipt</code>, landed in
+<strong>#2310</strong>) by <strong>#2311</strong>, and the eighth (<code>EvidencePacketProducedReceipt</code>, landed in
+<strong>#2318</strong>) by <strong>#2319</strong>.</p>
 <h2>1. What was run, and what was not</h2>
 <table>
 <thead>
@@ -146,7 +147,7 @@ tooling; Python 3.11+ + <code>jsonschema</code>).</li>
 </ul>
 <h2>3. Rendered walkthrough — observed</h2>
 <p>The process-evidence view renders the <code>receipt → surface → evidence/export</code> tail of the
-vertical spine <strong>as read views</strong>: the seven process-transition receipts in sequence, a
+vertical spine <strong>as read views</strong>: the eight process-transition receipts in sequence, a
 fixture-safe privacy/redaction boundary, and a repo-safe evidence-summary export. No
 mutation is performed; no gateway is contacted.</p>
 <table>
@@ -169,8 +170,8 @@ mutation is performed; no gateway is contacted.</p>
 <td>yes (reused demo cards)</td>
 </tr>
 <tr>
-<td>Receipts pane: seven process-transition receipts rendered in order</td>
-<td>yes — <strong>7 receipts</strong> (<code>ProcessSessionOpenedReceipt</code> → <code>DeliberationEntryRecordedReceipt</code> → <code>DecisionRecordedReceipt</code> → <code>ProcessGateResultReceipt</code> → <code>ActivationCrossedReceipt</code> → <code>MutationPlanRecordedReceipt</code> → <code>MutationAppliedReceipt</code>)</td>
+<td>Receipts pane: eight process-transition receipts rendered in order</td>
+<td>yes — <strong>8 receipts</strong> (<code>ProcessSessionOpenedReceipt</code> → <code>DeliberationEntryRecordedReceipt</code> → <code>DecisionRecordedReceipt</code> → <code>ProcessGateResultReceipt</code> → <code>ActivationCrossedReceipt</code> → <code>MutationPlanRecordedReceipt</code> → <code>MutationAppliedReceipt</code> → <code>EvidencePacketProducedReceipt</code>)</td>
 </tr>
 <tr>
 <td>Activation boundary legible (icn#2297)</td>
@@ -183,6 +184,10 @@ mutation is performed; no gateway is contacted.</p>
 <tr>
 <td>Mutation-applied boundary legible (icn#2311)</td>
 <td>yes — the mutation-applied receipt names the boundary plainly (&quot;the plan&#39;s application was recorded after the plan — an application fact&quot;) and distinguishes the states: the recorded decision, the activation crossing, the mutation plan recorded, the plan&#39;s application recorded here, and the later evidence-packet production that remains deferred. It shows the plan reference (<code>plan_id</code> + <code>plan_record_hash</code> proof pointer to the mutation-plan receipt above) and the result proof pointer (<code>result_hash</code>), never the applied-result body / operation list / target list / effect payload; <code>applied_by</code> is labeled &quot;who recorded the application — recorder / apply-witness, not the applier, approver, or authority holder&quot;; copy states it &quot;does not execute, authorize, validate, enforce, roll back, or prove the mutation correct&quot; and &quot;grants zero authority&quot;</td>
+</tr>
+<tr>
+<td>Evidence-packet-produced boundary legible (icn#2319)</td>
+<td>yes — the evidence-packet-produced receipt names the terminal boundary plainly (&quot;an evidence packet was produced and recorded here&quot;) and distinguishes the states: the recorded decision, the activation crossing, the mutation plan recorded, the plan&#39;s application recorded, the packet&#39;s production recorded here, and the explicit non-claim that producing is not delivering (&quot;does not assert delivery, acceptance, audit certification, human or assistive-technology verification, correctness, completeness, or legal sufficiency&quot;). It shows the applied reference (<code>mutation_application_id</code> + <code>mutation_applied_record_hash</code> proof pointer to the mutation-applied receipt above), the source-set commitment (<code>receipt_set_hash</code> — references, never bodies), the packet fingerprint (<code>packet_hash</code> — public/redacted artifact only, body never stored), and the redaction-profile fingerprint (<code>redaction_profile_hash</code> — profile body never stored, no completeness/sufficiency claim); <code>produced_by</code> is labeled &quot;who recorded this production fact — recorder / producer-witness, not an authority to produce, deliver, certify, or audit&quot;; copy states the receipt &quot;records a process fact and grants zero authority&quot;</td>
 </tr>
 <tr>
 <td>Plain-language summary first; record fields under &quot;Show evidence detail&quot;</td>
@@ -252,7 +257,7 @@ fictional).</p>
 </tr>
 <tr>
 <td>Receipts rendered</td>
-<td><strong>7</strong></td>
+<td><strong>8</strong></td>
 <td>1</td>
 <td>1</td>
 </tr>
@@ -474,16 +479,16 @@ surface does <strong>not</strong> complete it, and #2041 stays open until a huma
 <li>Human 200% browser-zoom + small-device pass (3.3 / 3.5 / 3.8). [#2041]</li>
 <li>External contrast-audit-tool confirmation of the documented ratios (3.3). [#2041]</li>
 <li>Extend the process-evidence human/AT packet (§4G of the human-a11y-validation doc) to
-cover the fifth, sixth, and seventh receipts (<code>ActivationCrossedReceipt</code>,
-<code>MutationPlanRecordedReceipt</code>, <code>MutationAppliedReceipt</code>) in the real human pass — the
-automated floor above now covers all seven, but §4G currently enumerates the four-receipt
-story; adding the activation, mutation-plan, and mutation-applied rows is owed, not done
-here. [#2041]</li>
+cover the fifth, sixth, seventh, and eighth receipts (<code>ActivationCrossedReceipt</code>,
+<code>MutationPlanRecordedReceipt</code>, <code>MutationAppliedReceipt</code>, <code>EvidencePacketProducedReceipt</code>)
+in the real human pass — the automated floor above now covers all eight, but §4G currently
+enumerates the four-receipt story; adding the activation, mutation-plan, mutation-applied,
+and evidence-packet-produced rows is owed, not done here. [#2041]</li>
 <li>(Separate lanes, not this pass) real translations + human language QA (#1740); the
 broader human-operability spine (#1748 / #2141) remains open.</li>
 </ul>
 <hr>
-<p><em>Refs #2289. Refs #2290. Refs #2291. Refs #2296. Refs #2297. Refs #2303. Refs #2304. Refs #2310. Refs #2311. Refs #1748. Refs #2141. Refs #2041.</em></p>
+<p><em>Refs #2289. Refs #2290. Refs #2291. Refs #2296. Refs #2297. Refs #2303. Refs #2304. Refs #2310. Refs #2311. Refs #2318. Refs #2319. Refs #1748. Refs #2141. Refs #2041.</em></p>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
