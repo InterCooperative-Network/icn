@@ -270,7 +270,7 @@
       "launcher.startFailed": "Could not start the local demo ({error}). Use Connect manually instead, or check the launcher tunnel.",
 
       // --- #2289 organizer-steward evidence surface (fixture-only) -------
-      // Renders the six already-landed ADR-0026 Layer 2 process-transition
+      // Renders the seven already-landed ADR-0026 Layer 2 process-transition
       // receipts as a plain-language evidence story, plus a repo-safe evidence
       // summary. Fixture/dev only; nothing signed; read-only. No readiness is
       // claimed and no new receipt class is introduced.
@@ -280,6 +280,7 @@
       "evidence.process_gate_result.heading": "Gate result recorded",
       "evidence.activation_crossed.heading": "Activation crossed",
       "evidence.mutation_plan_recorded.heading": "Mutation plan recorded",
+      "evidence.mutation_applied.heading": "Mutation applied",
 
       // Deliberation redaction demo (steward-visible vs member/export-redacted).
       "evidence.redaction.stewardHeading": "What the steward body sees",
@@ -302,7 +303,17 @@
       "evidence.mutationPlan.boundary.applicationDeferred": "Applying the plan — making any change — is not done here and remains deferred. Recording the plan is the boundary, not the change.",
       "evidence.mutationPlan.boundary.evidencePacketDeferred": "Producing an evidence packet from the plan is also not done here and remains deferred.",
 
-      // Evidence-detail key/value labels for the six receipt classes.
+      // Mutation-applied explainer (icn#2311): names the states plainly so an
+      // application-recorded fact is never read as executing/authorizing the
+      // mutation. Evidence-packet production stays deferred.
+      "evidence.mutationApplied.boundaryHeading": "What recording a mutation applied means here",
+      "evidence.mutationApplied.boundary.decision": "A decision was recorded (the decision receipt above) — who recorded it, when, and a content fingerprint.",
+      "evidence.mutationApplied.boundary.activation": "That recorded decision then crossed the activation boundary (the activation receipt above), with the required gate observed as passed.",
+      "evidence.mutationApplied.boundary.planRecorded": "A mutation plan was then recorded (the mutation-plan receipt above) — after activation, before any mutation was applied.",
+      "evidence.mutationApplied.boundary.applied": "The plan's application was then recorded here — an application fact. This receipt references the plan it applies and fingerprints the applied result as a content hash. It does not execute, authorize, validate, enforce, roll back, or prove the mutation correct; it does not expose the applied-result body; and it grants zero authority.",
+      "evidence.mutationApplied.boundary.evidencePacketDeferred": "Producing an evidence packet from the application is not done here and remains deferred.",
+
+      // Evidence-detail key/value labels for the seven receipt classes.
       "evidence.kv.domainId": "Domain id",
       "evidence.kv.sessionId": "Session id",
       "evidence.kv.openedBy": "Opened by (who recorded this fact)",
@@ -326,6 +337,12 @@
       "evidence.kv.activationRecordHash": "Referenced activation record hash (proof pointer to the activation crossing — not its text)",
       "evidence.kv.planBodyHash": "Plan content fingerprint (body hash — proof of content; the plan body is never stored)",
       "evidence.kv.planRecordedBy": "Recorded by (who recorded the plan, not the planner, approver, applier, or authority holder)",
+      "evidence.kv.applicationId": "Application id",
+      "evidence.kv.planRef": "Referenced plan id (the plan this application applies)",
+      "evidence.kv.planRecordHash": "Referenced plan record hash (proof pointer to the mutation-plan-recorded receipt — not its body)",
+      "evidence.kv.resultHash": "Applied-result fingerprint (result hash — proof of content; the applied-result body is never stored)",
+      "evidence.kv.appliedBy": "Applied by (who recorded the application — recorder / apply-witness, not the applier, approver, or authority holder)",
+      "evidence.kv.appliedAt": "Applied at (unix seconds)",
 
       // Evidence summary / export (read-only render of the committed fixture).
       "evidence.export.heading": "Evidence summary",
