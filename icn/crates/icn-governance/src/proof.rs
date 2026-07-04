@@ -3099,6 +3099,171 @@ impl MutationPlanRecordedReceipt {
     }
 }
 
+/// Seventh ADR-0026 Layer-2 `ProcessTransitionReceipt` class (per the #2307
+/// contract `docs/design/mutation-applied-receipt.md` + the #2308 A1/A2/A3/A4
+/// decision rung `docs/design/mutation-applied-receipt-decision-rung.md`).
+///
+/// Witnesses that a previously recorded **mutation plan was applied**, recorded
+/// after a [`MutationPlanRecordedReceipt`] for the same session. It records a
+/// **process fact and grants zero authority.** It is NOT a mutation-application
+/// engine: recording an application performs no domain-state mutation beyond
+/// persisting this receipt, and the receipt does not execute, authorize,
+/// validate, enforce, roll back, or prove the semantic correctness of the
+/// mutation (A4).
+///
+/// **A1 — plan reference.** The application names the plan it applies by BOTH
+/// its caller-opaque `plan_id` and the content-addressed `plan_record_hash`
+/// (the `record_hash` of the referenced `MutationPlanRecordedReceipt`). The
+/// reference is verified fail-closed before the application is recorded (the
+/// plan must exist in the same `(domain_id, session_id)` with a matching
+/// `plan_id`). The activation, decision, and gate basis are inherited
+/// transitively through the plan → activation chain and are NOT re-referenced.
+///
+/// **A2 — `result_hash`-only.** A caller-supplied 32-byte fingerprint of the
+/// application-result record; the applied-result body — its operation list,
+/// target list, effect payload, or any typed operation/result/effect model — is
+/// never stored (meaning firewall). Named distinctly from the plan's
+/// `body_hash` to mark the applied-result artifact. No application-kind
+/// taxonomy.
+///
+/// **A3 — a single `applied_at`**, hashed into `record_hash` but **excluded**
+/// from duplicate identity — identical treatment to the six landed classes'
+/// `recorded_at`. A retry never restamps.
+///
+/// **At most one application exists per `(domain_id, session_id,
+/// application_id)`** — the receipt backend enforces uniqueness atomically at
+/// the storage layer. A retry with identical stable identity (`plan_id`,
+/// `plan_record_hash`, `applied_by`, `result_hash`) returns this original
+/// receipt unchanged (never restamped); any mismatch fails closed.
+///
+/// `applied_by` is actor evidence — the recorder / apply-witness of the
+/// application, not an authority to apply or act ("recorder, not applier").
+/// Equality is anchored to `record_hash`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MutationAppliedReceipt {
+    /// Governance domain the session (and this application) is scoped to.
+    pub domain_id: String,
+    /// Identifier of the already-opened process session this application
+    /// attaches to. Caller-provided, treated as opaque, meaningful only
+    /// together with `domain_id` (session ids are not globally unique).
+    pub session_id: String,
+    /// Caller-supplied opaque identifier for this application, unique within
+    /// `(domain_id, session_id)` — uniqueness is enforced at the storage
+    /// layer, not assumed of the id.
+    pub application_id: String,
+    /// Caller-opaque `plan_id` of the [`MutationPlanRecordedReceipt`] this
+    /// application applies — the human/index handle (A1).
+    pub plan_id: String,
+    /// Content-addressed `record_hash` of that [`MutationPlanRecordedReceipt`]
+    /// — the cryptographic proof link (A1). Verified to exist in-session
+    /// before the application is recorded.
+    pub plan_record_hash: Hash,
+    /// DID of the authenticated actor who recorded the application — recorder /
+    /// apply-witness evidence, not an authority to apply or act. Grants zero
+    /// authority.
+    pub applied_by: String,
+    /// Caller-supplied 32-byte content fingerprint of the application-result
+    /// record (A2). The applied-result body itself is never stored in the
+    /// receipt.
+    pub result_hash: Hash,
+    /// Unix-seconds the application was applied. Not part of duplicate identity
+    /// — a retry never restamps (A3).
+    pub applied_at: u64,
+    /// blake3 canonical record hash binding the fields above.
+    pub record_hash: Hash,
+}
+
+impl PartialEq for MutationAppliedReceipt {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_hash == other.record_hash
+    }
+}
+
+impl Eq for MutationAppliedReceipt {}
+
+impl MutationAppliedReceipt {
+    /// Domain separation tag for canonical mutation-applied record hashes.
+    /// Distinct from every other receipt-family tag — and in particular it must
+    /// NEVER converge with `icn:gov:mutation_plan_recorded:v1`,
+    /// `icn:gov:activation_crossed:v1`, `icn:gov:decision_recorded:v1`,
+    /// `icn:gov:process_gate_result:v1`, or the proposal/vote
+    /// `icn:gov:decision:v1/v2/v3` lineage.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:mutation_applied:v1";
+
+    /// Build a new receipt and compute its canonical `record_hash`.
+    ///
+    /// `result_hash` is a caller-supplied fingerprint of the never-stored
+    /// application-result record (A2), mirroring how the plan/decision/
+    /// deliberation classes take a pre-computed body fingerprint.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        domain_id: String,
+        session_id: String,
+        application_id: String,
+        plan_id: String,
+        plan_record_hash: Hash,
+        applied_by: String,
+        result_hash: Hash,
+        applied_at: u64,
+    ) -> Self {
+        let record_hash = Self::compute_record_hash(
+            &domain_id,
+            &session_id,
+            &application_id,
+            &plan_id,
+            &plan_record_hash,
+            &applied_by,
+            &result_hash,
+            applied_at,
+        );
+        Self {
+            domain_id,
+            session_id,
+            application_id,
+            plan_id,
+            plan_record_hash,
+            applied_by,
+            result_hash,
+            applied_at,
+            record_hash,
+        }
+    }
+
+    /// Compute the canonical record hash from the input fields.
+    ///
+    /// Layout (per the #2307 contract as resolved by the #2308 A1/A2/A3/A4
+    /// decision rung §8): [`Self::DOMAIN_TAG`] first; each string field
+    /// length-prefixed (u64 LE) in order `domain_id`, `session_id`,
+    /// `application_id`, `plan_id`, `applied_by`; then `plan_record_hash` and
+    /// `result_hash` appended **raw as fixed 32-byte fields with no length
+    /// prefix** (fixed-size fields cannot alias); then `applied_at` as LE
+    /// bytes. No discriminant byte (this class has no kind taxonomy).
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_record_hash(
+        domain_id: &str,
+        session_id: &str,
+        application_id: &str,
+        plan_id: &str,
+        plan_record_hash: &Hash,
+        applied_by: &str,
+        result_hash: &Hash,
+        applied_at: u64,
+    ) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        for field in [domain_id, session_id, application_id, plan_id, applied_by] {
+            hasher.update(&(field.len() as u64).to_le_bytes());
+            hasher.update(field.as_bytes());
+        }
+        hasher.update(plan_record_hash);
+        hasher.update(result_hash);
+        hasher.update(&applied_at.to_le_bytes());
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+}
+
 // ============================================================================
 // Mandate grant reference (#1868 step 2 primitive — wire form only)
 // ============================================================================
@@ -5286,6 +5451,313 @@ mod tests {
             assert!(
                 !lower.contains(forbidden),
                 "MutationPlanRecordedReceipt JSON must not contain `{forbidden}`; got: {json}"
+            );
+        }
+    }
+
+    // ============================================================================
+    // MutationAppliedReceipt — seventh ProcessTransitionReceipt class (per the
+    // #2307 contract + #2308 A1/A2/A3/A4 decision rung)
+    // ============================================================================
+
+    fn sample_mutation_applied_receipt() -> MutationAppliedReceipt {
+        MutationAppliedReceipt::new(
+            "domain-food-coop".to_string(),
+            "session-alpha".to_string(),
+            "application-001".to_string(),
+            "plan-001".to_string(),
+            [7u8; 32],                        // plan_record_hash (A1 proof link)
+            "did:icn:recorder-1".to_string(), // recorder, not applier
+            [5u8; 32],                        // result_hash (A2 fingerprint)
+            1_750_000_000,
+        )
+    }
+
+    #[test]
+    fn mutation_applied_golden_vector() {
+        // Golden canonical hash vector: pins the FULL v1 layout (domain tag,
+        // length-prefixed strings domain_id/session_id/application_id/plan_id/
+        // applied_by, raw fixed 32-byte plan_record_hash then result_hash,
+        // applied_at LE — no discriminant byte). Any layout change breaks this
+        // test and requires a new tag version, not an edit here.
+        let r = sample_mutation_applied_receipt();
+        assert_eq!(
+            hex32(&r.record_hash),
+            "0a1c4ad25af114acc04242cafd85d08a52e9c0859541c6123c3a0aa6873a2227",
+            "canonical v1 hash layout drifted"
+        );
+    }
+
+    #[test]
+    fn mutation_applied_record_hash_determinism() {
+        let r1 = sample_mutation_applied_receipt();
+        let r2 = sample_mutation_applied_receipt();
+        assert_eq!(r1.record_hash, r2.record_hash);
+        assert_ne!(r1.record_hash, [0u8; 32]);
+        assert_eq!(r1, r2);
+    }
+
+    #[test]
+    fn mutation_applied_record_hash_changes_per_field() {
+        // Each field independently changes the hash — including
+        // plan_record_hash and result_hash (the A1/A2 links) and applied_at.
+        let base = sample_mutation_applied_receipt();
+        let variants = [
+            MutationAppliedReceipt::new(
+                "domain-other".to_string(),
+                base.session_id.clone(),
+                base.application_id.clone(),
+                base.plan_id.clone(),
+                base.plan_record_hash,
+                base.applied_by.clone(),
+                base.result_hash,
+                base.applied_at,
+            ),
+            MutationAppliedReceipt::new(
+                base.domain_id.clone(),
+                "session-other".to_string(),
+                base.application_id.clone(),
+                base.plan_id.clone(),
+                base.plan_record_hash,
+                base.applied_by.clone(),
+                base.result_hash,
+                base.applied_at,
+            ),
+            MutationAppliedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                "application-other".to_string(),
+                base.plan_id.clone(),
+                base.plan_record_hash,
+                base.applied_by.clone(),
+                base.result_hash,
+                base.applied_at,
+            ),
+            MutationAppliedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.application_id.clone(),
+                "plan-other".to_string(),
+                base.plan_record_hash,
+                base.applied_by.clone(),
+                base.result_hash,
+                base.applied_at,
+            ),
+            MutationAppliedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.application_id.clone(),
+                base.plan_id.clone(),
+                [8u8; 32],
+                base.applied_by.clone(),
+                base.result_hash,
+                base.applied_at,
+            ),
+            MutationAppliedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.application_id.clone(),
+                base.plan_id.clone(),
+                base.plan_record_hash,
+                "did:icn:applier-other".to_string(),
+                base.result_hash,
+                base.applied_at,
+            ),
+            MutationAppliedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.application_id.clone(),
+                base.plan_id.clone(),
+                base.plan_record_hash,
+                base.applied_by.clone(),
+                [6u8; 32],
+                base.applied_at,
+            ),
+            MutationAppliedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.application_id.clone(),
+                base.plan_id.clone(),
+                base.plan_record_hash,
+                base.applied_by.clone(),
+                base.result_hash,
+                base.applied_at + 1,
+            ),
+        ];
+        for (i, v) in variants.iter().enumerate() {
+            assert_ne!(
+                base.record_hash, v.record_hash,
+                "variant {i} must change the record hash"
+            );
+        }
+    }
+
+    #[test]
+    fn mutation_applied_tag_separates_from_other_families() {
+        // Family separation from the six landed process-transition classes.
+        assert_ne!(
+            MutationAppliedReceipt::DOMAIN_TAG,
+            ProcessSessionOpenedReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            MutationAppliedReceipt::DOMAIN_TAG,
+            ProcessGateResultReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            MutationAppliedReceipt::DOMAIN_TAG,
+            DeliberationEntryRecordedReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            MutationAppliedReceipt::DOMAIN_TAG,
+            DecisionRecordedReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            MutationAppliedReceipt::DOMAIN_TAG,
+            ActivationCrossedReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            MutationAppliedReceipt::DOMAIN_TAG,
+            MutationPlanRecordedReceipt::DOMAIN_TAG
+        );
+        // Must NEVER converge with the proposal/vote decision lineage.
+        assert_ne!(
+            MutationAppliedReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            MutationAppliedReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceiptV2::DOMAIN_TAG
+        );
+        assert_ne!(
+            MutationAppliedReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceiptV3::DOMAIN_TAG
+        );
+        let applied = sample_mutation_applied_receipt();
+        let plan = sample_mutation_plan_recorded_receipt();
+        assert_ne!(applied.record_hash, plan.record_hash);
+    }
+
+    #[test]
+    fn mutation_applied_length_prefix_prevents_field_shifting() {
+        // Shifting bytes between adjacent string fields must change the hash —
+        // the length prefix delimits each field exactly.
+        let a = MutationAppliedReceipt::compute_record_hash(
+            "ab",
+            "c",
+            "application-001",
+            "plan-001",
+            &[0u8; 32],
+            "did:icn:x",
+            &[0u8; 32],
+            1,
+        );
+        let b = MutationAppliedReceipt::compute_record_hash(
+            "a",
+            "bc",
+            "application-001",
+            "plan-001",
+            &[0u8; 32],
+            "did:icn:x",
+            &[0u8; 32],
+            1,
+        );
+        assert_ne!(a, b, "domain/session byte shift must change the hash");
+        let c = MutationAppliedReceipt::compute_record_hash(
+            "d",
+            "s",
+            "xy",
+            "z",
+            &[0u8; 32],
+            "did:icn:x",
+            &[0u8; 32],
+            1,
+        );
+        let d = MutationAppliedReceipt::compute_record_hash(
+            "d",
+            "s",
+            "x",
+            "yz",
+            &[0u8; 32],
+            "did:icn:x",
+            &[0u8; 32],
+            1,
+        );
+        assert_ne!(
+            c, d,
+            "application_id/plan_id byte shift must change the hash"
+        );
+    }
+
+    #[test]
+    fn mutation_applied_serde_roundtrip_and_payload_audit() {
+        // Round-trip preserves everything (equality anchored to record_hash),
+        // and the persisted payload carries ONLY the v1 field set — no applied
+        // result body, plan body, operation list, target, or effect payload.
+        let r = sample_mutation_applied_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let back: MutationAppliedReceipt = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(r, back);
+        assert_eq!(back.applied_at, r.applied_at);
+        assert_eq!(back.plan_record_hash, r.plan_record_hash);
+        assert_eq!(back.result_hash, r.result_hash);
+        let value: serde_json::Value = serde_json::from_str(&json).expect("value");
+        let obj = value.as_object().expect("object");
+        let expected: std::collections::BTreeSet<&str> = [
+            "domain_id",
+            "session_id",
+            "application_id",
+            "plan_id",
+            "plan_record_hash",
+            "applied_by",
+            "result_hash",
+            "applied_at",
+            "record_hash",
+        ]
+        .into_iter()
+        .collect();
+        let actual: std::collections::BTreeSet<&str> = obj.keys().map(|k| k.as_str()).collect();
+        assert_eq!(
+            actual, expected,
+            "payload must carry exactly the v1 field set — no applied-result body, \
+             plan body, operation list, target list, or effect payload"
+        );
+    }
+
+    #[test]
+    fn mutation_applied_no_prohibited_vocabulary() {
+        // "applied" is core vocabulary for this class (applied_by / applied_at),
+        // so it is NOT forbidden here. Instead this enforces the A4 boundary:
+        // no authority/execution overclaim leaks into the payload, and no
+        // regulated-finance or proposal/vote lineage vocabulary appears.
+        let r = sample_mutation_applied_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let lower = json.to_lowercase();
+        for forbidden in [
+            // regulated-finance vocabulary (same list as the sibling
+            // process-receipt tests)
+            "wallet",
+            "balance",
+            "currency",
+            "payment",
+            "withdraw",
+            "deposit",
+            // A4 no-overclaim: the receipt records a fact, it does not execute,
+            // authorize, verify, or roll back the mutation
+            "authorized",
+            "executed",
+            "verified",
+            "rolled back",
+            "roll back",
+            // proposal/vote lineage vocabulary
+            "proposal",
+            "vote",
+            "tally",
+            "quorum",
+            "mandate",
+        ] {
+            assert!(
+                !lower.contains(forbidden),
+                "MutationAppliedReceipt JSON must not contain `{forbidden}`; got: {json}"
             );
         }
     }
