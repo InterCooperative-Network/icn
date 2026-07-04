@@ -6577,8 +6577,18 @@ impl GovernanceManager {
                     domain_id.0
                 )
             })?;
+        // Index the in-scope gate results by `record_hash` once so each
+        // declared basis hash is an O(1) lookup rather than a linear scan
+        // (a session can accumulate many gate results over time). Distinct
+        // `record_hash`es are unique by construction, so the map is
+        // collision-free; iterating the declared list in order preserves the
+        // original first-failure error semantics.
+        let gate_index: HashMap<[u8; 32], icn_governance::ProcessGateResult> = gate_results
+            .iter()
+            .map(|g| (g.record_hash, g.result))
+            .collect();
         for declared in gate_result_hashes {
-            match gate_results.iter().find(|g| g.record_hash == *declared) {
+            match gate_index.get(declared) {
                 None => {
                     return Err(anyhow::anyhow!(
                         "activation_crossed_gate_not_found: a declared gate-result record_hash \
@@ -6587,8 +6597,8 @@ impl GovernanceManager {
                         domain_id.0
                     ));
                 }
-                Some(g) => {
-                    if g.result != icn_governance::ProcessGateResult::Pass {
+                Some(result) => {
+                    if *result != icn_governance::ProcessGateResult::Pass {
                         return Err(anyhow::anyhow!(
                             "activation_crossed_gate_not_passed: a declared gate-result in \
                              session {session_id} in domain {} did not pass; refusing to cross \
