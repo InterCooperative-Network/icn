@@ -278,13 +278,21 @@
       "evidence.deliberation_entry_recorded.heading": "Deliberation input recorded",
       "evidence.decision_recorded.heading": "Decision recorded",
       "evidence.process_gate_result.heading": "Gate result recorded",
+      "evidence.activation_crossed.heading": "Activation crossed",
 
       // Deliberation redaction demo (steward-visible vs member/export-redacted).
       "evidence.redaction.stewardHeading": "What the steward body sees",
       "evidence.redaction.memberHeading": "What members and the export see",
       "evidence.redaction.notice": "Redacted here — the input text is not shown. {reason}",
 
-      // Evidence-detail key/value labels for the four receipt classes.
+      // Activation-boundary explainer (icn#2297): names the three states plainly
+      // so the boundary is legible. Activation is not the change itself.
+      "evidence.activation.boundaryHeading": "What crossing the activation boundary means here",
+      "evidence.activation.boundary.decision": "A decision was recorded (the decision receipt above) — who recorded it, when, and a content fingerprint.",
+      "evidence.activation.boundary.crossing": "That recorded decision then crossed from decision toward later action planning, with the required gate observed as passed. This receipt records only that the crossing happened.",
+      "evidence.activation.boundary.deferred": "The later action planning itself — planning or applying any change — is not done here and remains deferred. Activation is the boundary, not the change; the receipt records a process fact and grants zero authority.",
+
+      // Evidence-detail key/value labels for the five receipt classes.
       "evidence.kv.domainId": "Domain id",
       "evidence.kv.sessionId": "Session id",
       "evidence.kv.openedBy": "Opened by (who recorded this fact)",
@@ -297,6 +305,12 @@
       "evidence.kv.recordedBy": "Recorded by (who recorded this fact, not who decided)",
       "evidence.kv.gateKind": "Gate kind",
       "evidence.kv.gateResult": "Gate result",
+      "evidence.kv.activationId": "Activation id",
+      "evidence.kv.decisionRef": "Activated decision id (the decision this crossing names)",
+      "evidence.kv.decisionRecordHash": "Activated decision record hash (proof pointer to the recorded decision — not its text)",
+      "evidence.kv.gateBasis": "Gate basis (fingerprint over the passed gate-result record hashes)",
+      "evidence.kv.declaredGate": "Passed gate in basis — {kind} ({result}) — record hash",
+      "evidence.kv.crossedBy": "Crossed by (who recorded the crossing, not an authority to act)",
 
       // Evidence summary / export (read-only render of the committed fixture).
       "evidence.export.heading": "Evidence summary",

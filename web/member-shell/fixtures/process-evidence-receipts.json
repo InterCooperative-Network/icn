@@ -1,5 +1,5 @@
 {
-  "_note": "Fixture-only, dev-safe process-evidence pack for the organizer-steward evidence surface (icn#2289). Renders on web/member-shell/ at ?mode=demo&set=process-evidence. All four objects are wire-shaped per icn/crates/icn-governance/src/proof.rs (bare JSON, snake_case enums, 32-byte hashes as integer arrays). Every record_hash / body_hash below is an ILLUSTRATIVE fixture value — NOT a real blake3 binding; nothing is signed. All DIDs are fictional (example-…-not-live). No new receipt class: this reads the four existing ADR-0026 Layer 2 classes only. The deliberation body is never stored — the receipt carries a body_hash content fingerprint only, which is what makes the redaction demo honest.",
+  "_note": "Fixture-only, dev-safe process-evidence pack for the organizer-steward evidence surface (icn#2289, extended for ActivationCrossedReceipt by icn#2297). Renders on web/member-shell/ at ?mode=demo&set=process-evidence. All five objects are wire-shaped per icn/crates/icn-governance/src/proof.rs (bare JSON, snake_case enums, 32-byte hashes as integer arrays). Every record_hash / body_hash / decision_record_hash / gate_basis below is an ILLUSTRATIVE fixture value — NOT a real blake3 binding; nothing is signed. All DIDs are fictional (example-…-not-live). No new receipt class: this reads the five existing ADR-0026 Layer 2 process-transition classes only (the fifth, ActivationCrossedReceipt, landed in icn#2296). The deliberation body is never stored — the receipt carries a body_hash content fingerprint only, which is what makes the redaction demo honest. The activation receipt carries no body at all: it references the recorded decision by decision_id + decision_record_hash and fingerprints the passed gate results as gate_basis; declaredGateBasis (a display-only sibling of the receipt, not a wire field) lists the passed gate-result record_hash(es) the fixture's gate_basis stands for.",
   "domain_id": "demo.coop.stewardship",
   "session_id": "demo-process-session-0001",
   "sequence": [
@@ -84,6 +84,48 @@
           7, 7, 7, 7, 7, 7, 7, 7,
           7, 7, 7, 7, 7, 7, 7, 7,
           7, 7, 7, 7, 7, 7, 32, 160
+        ]
+      }
+    },
+    {
+      "kind": "activation_crossed",
+      "plainContext": "The recorded decision crossed from decision toward later action planning. This records only that the boundary was crossed — with the required gate observed as passed — not the action itself. It is not a mutation, and mutation planning remains deferred. The receipt records a process fact and grants zero authority.",
+      "declaredGateBasis": [
+        {
+          "gate_kind": "accessibility_review",
+          "result": "pass",
+          "record_hash": [
+            160, 32, 7, 7, 7, 7, 7, 7,
+            7, 7, 7, 7, 7, 7, 7, 7,
+            7, 7, 7, 7, 7, 7, 7, 7,
+            7, 7, 7, 7, 7, 7, 32, 160
+          ]
+        }
+      ],
+      "receipt": {
+        "domain_id": "demo.coop.stewardship",
+        "session_id": "demo-process-session-0001",
+        "activation_id": "demo-activation-0001",
+        "decision_id": "demo-decision-0001",
+        "decision_record_hash": [
+          2, 158, 91, 172, 171, 240, 77, 206,
+          74, 89, 49, 100, 163, 106, 122, 82,
+          70, 159, 207, 235, 102, 115, 112, 38,
+          222, 58, 170, 156, 209, 78, 107, 68
+        ],
+        "gate_basis": [
+          7, 32, 160, 88, 12, 200, 45, 91,
+          3, 155, 71, 240, 64, 11, 33, 119,
+          5, 201, 40, 92, 47, 101, 134, 90,
+          29, 156, 73, 11, 68, 175, 52, 199
+        ],
+        "crossed_by": "did:icn:example-recorder-demo-not-live",
+        "recorded_at": 1729902400,
+        "record_hash": [
+          210, 44, 17, 88, 3, 155, 71, 92,
+          40, 201, 5, 33, 119, 240, 64, 11,
+          73, 156, 29, 8, 47, 101, 134, 90,
+          3, 68, 175, 52, 199, 26, 145, 7
         ]
       }
     }
