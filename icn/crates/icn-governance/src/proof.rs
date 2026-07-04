@@ -2928,6 +2928,177 @@ impl ActivationCrossedReceipt {
     }
 }
 
+/// Cross-node deterministic receipt recording that a **mutation plan was
+/// recorded** against a process session, after an activation crossing and
+/// before any mutation is applied.
+///
+/// The sixth `ProcessTransitionReceipt` class (ADR-0026 Layer 2), after
+/// [`ProcessGateResultReceipt`] (#2144), [`ProcessSessionOpenedReceipt`]
+/// (#2276), [`DeliberationEntryRecordedReceipt`] (#2279),
+/// [`DecisionRecordedReceipt`] (#2282), and [`ActivationCrossedReceipt`]
+/// (#2296), per the merged `docs/design/mutation-plan-recorded-receipt.md`
+/// contract (#2300) and the `docs/design/mutation-plan-recorded-receipt-decision-rung.md`
+/// M1/M2/M3 decision (#2302).
+///
+/// **This receipt records a process fact; it grants zero authority and is
+/// not mutation application.** It witnesses that a plan-of-record was
+/// recorded following an activation — **not** that any mutation was planned
+/// safely, authorized, or applied. Applying a plan (and any receipt of
+/// application) is a strictly later rung.
+///
+/// **M1 — the plan names the activation it follows by BOTH the caller-opaque
+/// `activation_id` and the content-addressed `activation_record_hash`** of
+/// the [`ActivationCrossedReceipt`]. Both fields participate in the canonical
+/// `record_hash` and in stable duplicate identity. The reference is verified,
+/// not merely asserted: the emitting manager requires an activation receipt
+/// with exactly `activation_record_hash` (and a matching `activation_id`) to
+/// exist in the same `(domain_id, session_id)` before the plan is recorded.
+/// This is the lane's second inter-receipt link. The decision and gate basis
+/// are **not** re-referenced here; they are inherited transitively through
+/// the activation (which already binds `decision_id`, `decision_record_hash`,
+/// and `gate_basis`).
+///
+/// **M2 — `body_hash`-only.** A caller-supplied 32-byte `body_hash`
+/// fingerprints the `MutationPlan` body; the plan body — its operation list,
+/// target list, effect payload, or any typed operation model — is **never
+/// stored**. There is no plan-kind taxonomy. The kernel never reads the plan
+/// semantically (meaning firewall).
+///
+/// **M3 — a single caller-supplied `recorded_at`**, hashed into `record_hash`
+/// but **excluded** from duplicate identity — identical to the five landed
+/// classes. No distinct `planned_at`. A retry never restamps.
+///
+/// **At most one plan exists per `(domain_id, session_id, plan_id)`** — the
+/// receipt backend enforces uniqueness atomically at the storage layer. A
+/// retry with identical stable identity (`activation_id`,
+/// `activation_record_hash`, `recorded_by`, `body_hash`) returns this
+/// original receipt unchanged (never restamped); any mismatch fails closed.
+///
+/// `recorded_by` is actor evidence — the recorder of the plan, not an
+/// authority to plan or act ("recorder, not planner"). Equality is anchored
+/// to `record_hash`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct MutationPlanRecordedReceipt {
+    /// Governance domain the session (and this plan) is scoped to.
+    pub domain_id: String,
+    /// Identifier of the already-opened process session this plan attaches
+    /// to. Caller-provided, treated as opaque, meaningful only together with
+    /// `domain_id` (session ids are not globally unique).
+    pub session_id: String,
+    /// Caller-supplied opaque identifier for this plan, unique within
+    /// `(domain_id, session_id)` — uniqueness is enforced at the storage
+    /// layer, not assumed of the id.
+    pub plan_id: String,
+    /// Caller-opaque `activation_id` of the [`ActivationCrossedReceipt`] this
+    /// plan follows — the human/index handle (M1).
+    pub activation_id: String,
+    /// Content-addressed `record_hash` of that [`ActivationCrossedReceipt`] —
+    /// the cryptographic proof link (M1). Verified to exist in-session before
+    /// the plan is recorded.
+    pub activation_record_hash: Hash,
+    /// DID of the authenticated actor who recorded the plan — recorder
+    /// evidence, not an authority to plan or act. Grants zero authority.
+    pub recorded_by: String,
+    /// Caller-supplied 32-byte content fingerprint of the `MutationPlan`
+    /// body (M2). The plan body itself is never stored in the receipt.
+    pub body_hash: Hash,
+    /// Unix-seconds the plan was recorded. Not part of duplicate identity —
+    /// a retry never restamps (M3).
+    pub recorded_at: u64,
+    /// blake3 canonical record hash binding the fields above.
+    pub record_hash: Hash,
+}
+
+impl PartialEq for MutationPlanRecordedReceipt {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_hash == other.record_hash
+    }
+}
+
+impl Eq for MutationPlanRecordedReceipt {}
+
+impl MutationPlanRecordedReceipt {
+    /// Domain separation tag for canonical mutation-plan-recorded record
+    /// hashes. Distinct from every other receipt-family tag — and in
+    /// particular it must NEVER converge with `icn:gov:activation_crossed:v1`,
+    /// `icn:gov:decision_recorded:v1`, `icn:gov:process_gate_result:v1`, or
+    /// the proposal/vote `icn:gov:decision:v1/v2/v3` lineage.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:mutation_plan_recorded:v1";
+
+    /// Build a new receipt and compute its canonical `record_hash`.
+    ///
+    /// `body_hash` is a caller-supplied fingerprint of the never-stored
+    /// `MutationPlan` body (M2), mirroring how the decision/deliberation
+    /// classes take a pre-computed `body_hash`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        domain_id: String,
+        session_id: String,
+        plan_id: String,
+        activation_id: String,
+        activation_record_hash: Hash,
+        recorded_by: String,
+        body_hash: Hash,
+        recorded_at: u64,
+    ) -> Self {
+        let record_hash = Self::compute_record_hash(
+            &domain_id,
+            &session_id,
+            &plan_id,
+            &activation_id,
+            &activation_record_hash,
+            &recorded_by,
+            &body_hash,
+            recorded_at,
+        );
+        Self {
+            domain_id,
+            session_id,
+            plan_id,
+            activation_id,
+            activation_record_hash,
+            recorded_by,
+            body_hash,
+            recorded_at,
+            record_hash,
+        }
+    }
+
+    /// Compute the canonical record hash from the input fields.
+    ///
+    /// Layout (per the #2300 contract as resolved by the #2302 M1/M2/M3
+    /// decision rung §7): [`Self::DOMAIN_TAG`] first; each string field
+    /// length-prefixed (u64 LE) in order `domain_id`, `session_id`,
+    /// `plan_id`, `activation_id`, `recorded_by`; then `activation_record_hash`
+    /// and `body_hash` appended **raw as fixed 32-byte fields with no length
+    /// prefix** (fixed-size fields cannot alias); then `recorded_at` as LE
+    /// bytes. No discriminant byte (this class has no kind taxonomy).
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_record_hash(
+        domain_id: &str,
+        session_id: &str,
+        plan_id: &str,
+        activation_id: &str,
+        activation_record_hash: &Hash,
+        recorded_by: &str,
+        body_hash: &Hash,
+        recorded_at: u64,
+    ) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        for field in [domain_id, session_id, plan_id, activation_id, recorded_by] {
+            hasher.update(&(field.len() as u64).to_le_bytes());
+            hasher.update(field.as_bytes());
+        }
+        hasher.update(activation_record_hash);
+        hasher.update(body_hash);
+        hasher.update(&recorded_at.to_le_bytes());
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+}
+
 // ============================================================================
 // Mandate grant reference (#1868 step 2 primitive — wire form only)
 // ============================================================================
@@ -4817,6 +4988,304 @@ mod tests {
             assert!(
                 !lower.contains(forbidden),
                 "ActivationCrossedReceipt JSON must not contain `{forbidden}`; got: {json}"
+            );
+        }
+    }
+
+    // ============================================================================
+    // MutationPlanRecordedReceipt — sixth ProcessTransitionReceipt class (per
+    // the #2300 contract + #2302 M1/M2/M3 decision rung)
+    // ============================================================================
+
+    fn sample_mutation_plan_recorded_receipt() -> MutationPlanRecordedReceipt {
+        MutationPlanRecordedReceipt::new(
+            "domain-food-coop".to_string(),
+            "session-alpha".to_string(),
+            "plan-001".to_string(),
+            "activation-001".to_string(),
+            [7u8; 32], // activation_record_hash (M1 proof link)
+            "did:icn:planner-1".to_string(),
+            [5u8; 32], // body_hash (M2 fingerprint)
+            1_750_000_000,
+        )
+    }
+
+    #[test]
+    fn mutation_plan_recorded_golden_vector() {
+        // Golden canonical hash vector: pins the FULL v1 layout (domain tag,
+        // length-prefixed strings domain_id/session_id/plan_id/activation_id/
+        // recorded_by, raw fixed 32-byte activation_record_hash then body_hash,
+        // recorded_at LE — no discriminant byte). Any layout change breaks
+        // this test and requires a new tag version, not an edit here.
+        let r = sample_mutation_plan_recorded_receipt();
+        assert_eq!(
+            hex32(&r.record_hash),
+            "57448b28c5109764b51af97f90a431c7701d016792ac0e59998c13f6eb86050d",
+            "canonical v1 hash layout drifted"
+        );
+    }
+
+    #[test]
+    fn mutation_plan_recorded_record_hash_determinism() {
+        let r1 = sample_mutation_plan_recorded_receipt();
+        let r2 = sample_mutation_plan_recorded_receipt();
+        assert_eq!(r1.record_hash, r2.record_hash);
+        assert_ne!(r1.record_hash, [0u8; 32]);
+        assert_eq!(r1, r2);
+    }
+
+    #[test]
+    fn mutation_plan_recorded_record_hash_changes_per_field() {
+        // Each field independently changes the hash — including
+        // activation_record_hash and body_hash (the M1/M2 links) and
+        // recorded_at.
+        let base = sample_mutation_plan_recorded_receipt();
+        let variants = [
+            MutationPlanRecordedReceipt::new(
+                "domain-other".to_string(),
+                base.session_id.clone(),
+                base.plan_id.clone(),
+                base.activation_id.clone(),
+                base.activation_record_hash,
+                base.recorded_by.clone(),
+                base.body_hash,
+                base.recorded_at,
+            ),
+            MutationPlanRecordedReceipt::new(
+                base.domain_id.clone(),
+                "session-other".to_string(),
+                base.plan_id.clone(),
+                base.activation_id.clone(),
+                base.activation_record_hash,
+                base.recorded_by.clone(),
+                base.body_hash,
+                base.recorded_at,
+            ),
+            MutationPlanRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                "plan-other".to_string(),
+                base.activation_id.clone(),
+                base.activation_record_hash,
+                base.recorded_by.clone(),
+                base.body_hash,
+                base.recorded_at,
+            ),
+            MutationPlanRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.plan_id.clone(),
+                "activation-other".to_string(),
+                base.activation_record_hash,
+                base.recorded_by.clone(),
+                base.body_hash,
+                base.recorded_at,
+            ),
+            MutationPlanRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.plan_id.clone(),
+                base.activation_id.clone(),
+                [8u8; 32],
+                base.recorded_by.clone(),
+                base.body_hash,
+                base.recorded_at,
+            ),
+            MutationPlanRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.plan_id.clone(),
+                base.activation_id.clone(),
+                base.activation_record_hash,
+                "did:icn:planner-other".to_string(),
+                base.body_hash,
+                base.recorded_at,
+            ),
+            MutationPlanRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.plan_id.clone(),
+                base.activation_id.clone(),
+                base.activation_record_hash,
+                base.recorded_by.clone(),
+                [6u8; 32],
+                base.recorded_at,
+            ),
+            MutationPlanRecordedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.plan_id.clone(),
+                base.activation_id.clone(),
+                base.activation_record_hash,
+                base.recorded_by.clone(),
+                base.body_hash,
+                base.recorded_at + 1,
+            ),
+        ];
+        for (i, v) in variants.iter().enumerate() {
+            assert_ne!(
+                base.record_hash, v.record_hash,
+                "variant {i} must change the record hash"
+            );
+        }
+    }
+
+    #[test]
+    fn mutation_plan_recorded_tag_separates_from_other_families() {
+        // Family separation from the five landed process-transition classes.
+        assert_ne!(
+            MutationPlanRecordedReceipt::DOMAIN_TAG,
+            ProcessSessionOpenedReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            MutationPlanRecordedReceipt::DOMAIN_TAG,
+            ProcessGateResultReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            MutationPlanRecordedReceipt::DOMAIN_TAG,
+            DeliberationEntryRecordedReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            MutationPlanRecordedReceipt::DOMAIN_TAG,
+            DecisionRecordedReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            MutationPlanRecordedReceipt::DOMAIN_TAG,
+            ActivationCrossedReceipt::DOMAIN_TAG
+        );
+        // Must NEVER converge with the proposal/vote decision lineage.
+        assert_ne!(
+            MutationPlanRecordedReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            MutationPlanRecordedReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceiptV2::DOMAIN_TAG
+        );
+        assert_ne!(
+            MutationPlanRecordedReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceiptV3::DOMAIN_TAG
+        );
+        let plan = sample_mutation_plan_recorded_receipt();
+        let activation = sample_activation_crossed_receipt();
+        assert_ne!(plan.record_hash, activation.record_hash);
+    }
+
+    #[test]
+    fn mutation_plan_recorded_length_prefix_prevents_field_shifting() {
+        // Shifting bytes between adjacent string fields must change the
+        // hash — the length prefix delimits each field exactly.
+        let a = MutationPlanRecordedReceipt::compute_record_hash(
+            "ab",
+            "c",
+            "plan-001",
+            "activation-001",
+            &[0u8; 32],
+            "did:icn:x",
+            &[0u8; 32],
+            1,
+        );
+        let b = MutationPlanRecordedReceipt::compute_record_hash(
+            "a",
+            "bc",
+            "plan-001",
+            "activation-001",
+            &[0u8; 32],
+            "did:icn:x",
+            &[0u8; 32],
+            1,
+        );
+        assert_ne!(a, b, "domain/session byte shift must change the hash");
+        let c = MutationPlanRecordedReceipt::compute_record_hash(
+            "d",
+            "s",
+            "xy",
+            "z",
+            &[0u8; 32],
+            "did:icn:x",
+            &[0u8; 32],
+            1,
+        );
+        let d = MutationPlanRecordedReceipt::compute_record_hash(
+            "d",
+            "s",
+            "x",
+            "yz",
+            &[0u8; 32],
+            "did:icn:x",
+            &[0u8; 32],
+            1,
+        );
+        assert_ne!(
+            c, d,
+            "plan_id/activation_id byte shift must change the hash"
+        );
+    }
+
+    #[test]
+    fn mutation_plan_recorded_serde_roundtrip_and_payload_audit() {
+        // Round-trip preserves everything (equality anchored to record_hash),
+        // and the persisted payload carries ONLY the v1 field set — no plan
+        // body, operation list, target, or effect payload.
+        let r = sample_mutation_plan_recorded_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let back: MutationPlanRecordedReceipt = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(r, back);
+        assert_eq!(back.recorded_at, r.recorded_at);
+        assert_eq!(back.activation_record_hash, r.activation_record_hash);
+        assert_eq!(back.body_hash, r.body_hash);
+        let value: serde_json::Value = serde_json::from_str(&json).expect("value");
+        let obj = value.as_object().expect("object");
+        let expected: std::collections::BTreeSet<&str> = [
+            "domain_id",
+            "session_id",
+            "plan_id",
+            "activation_id",
+            "activation_record_hash",
+            "recorded_by",
+            "body_hash",
+            "recorded_at",
+            "record_hash",
+        ]
+        .into_iter()
+        .collect();
+        let actual: std::collections::BTreeSet<&str> = obj.keys().map(|k| k.as_str()).collect();
+        assert_eq!(
+            actual, expected,
+            "payload must carry exactly the v1 field set — no plan body, \
+             operation list, target list, or effect payload"
+        );
+    }
+
+    #[test]
+    fn mutation_plan_recorded_no_prohibited_vocabulary() {
+        let r = sample_mutation_plan_recorded_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let lower = json.to_lowercase();
+        for forbidden in [
+            // regulated-finance vocabulary (same list as the sibling
+            // process-receipt tests)
+            "wallet",
+            "balance",
+            "currency",
+            "payment",
+            "withdraw",
+            "deposit",
+            // mutation-application vocabulary — that is a later rung, must not
+            // leak into this plan-recorded payload
+            "mutation applied",
+            "plan applied",
+            "applied",
+            // proposal/vote lineage vocabulary
+            "proposal",
+            "vote",
+            "tally",
+            "quorum",
+            "mandate",
+        ] {
+            assert!(
+                !lower.contains(forbidden),
+                "MutationPlanRecordedReceipt JSON must not contain `{forbidden}`; got: {json}"
             );
         }
     }

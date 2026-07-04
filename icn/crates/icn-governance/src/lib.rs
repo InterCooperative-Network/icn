@@ -147,8 +147,8 @@ pub use proof::{
     GovernanceDecisionReceiptV3Error, GovernanceProof, GovernanceProofV2, MandateGrantRef,
     MandateGrantRefError, MandateGrantRefTarget, MeetingAttendanceReceipt,
     MeetingAttendanceReceiptV2, MeetingAttendanceReceiptV2Error, MeetingAttendanceTransition,
-    NoMandateReason, ProcessGateKind, ProcessGateResult, ProcessGateResultReceipt,
-    ProcessSessionOpenedReceipt, ProofOutcome, ReceiptMandateAttestation,
+    MutationPlanRecordedReceipt, NoMandateReason, ProcessGateKind, ProcessGateResult,
+    ProcessGateResultReceipt, ProcessSessionOpenedReceipt, ProofOutcome, ReceiptMandateAttestation,
 };
 pub use proposal::{
     AllocationOption, DataSharingLevel, DisputeResolutionMethod, DisputeResolutionOutcome,
