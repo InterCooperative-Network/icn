@@ -1,0 +1,366 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>MutationPlanRecordedReceipt decision rung — M1/M2/M3 (plan → activation reference, plan-body representation, timestamp) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>mutation plan recorded receipt decision rung</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/mutation-plan-recorded-receipt-decision-rung.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>MutationPlanRecordedReceipt decision rung — M1/M2/M3 (plan → activation reference, plan-body representation, timestamp)</h1>
+<p><strong>Status:</strong> draft — design / decision rung (not runtime implementation)
+<strong>Truth class:</strong> descriptive
+<strong>Canonical:</strong> no — implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last reviewed:</strong> 2026-07-04
+<strong>Source basis:</strong> read against <code>origin/main</code> @ <code>0a84dc86</code> (the merged #2300 contract&#39;s tip). Code anchors (<code>icn/crates/icn-governance/src/proof.rs</code>, <code>icn/apps/governance/src/receipt_backend.rs</code>, <code>icn/apps/governance/src/manager.rs</code>) were verified at that commit — re-verify before relying on exact line numbers or hashes; they drift.
+<strong>Related:</strong> #2301 (this rung&#39;s issue) · #2299 (the <code>MutationPlanRecordedReceipt</code> design-contract issue) · #2300 (merged design/audit contract, <a href="https://github.com/InterCooperative-Network/icn/blob/main/mutation-plan-recorded-receipt">`docs/design/mutation-plan-recorded-receipt.md`</a>) · #1748 (Institutional Process Substrate milestone) · #2141 (vertical institutional spine control) · #2041 (human/AT pass — open/parked) · #2296 (<code>ActivationCrossedReceipt</code> implementation) · #2298 (activation render in the process-evidence member-shell demo) · PR #2295 (the sibling activation decision rung, <a href="https://github.com/InterCooperative-Network/icn/blob/main/activation-crossed-receipt-decision-rung">`activation-crossed-receipt-decision-rung.md`</a>) · <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a> (receipt &amp; provenance proof envelope) · <code>ops/ideas/framing/institutional-process-substrate.md</code> (framing)</p>
+<blockquote>
+<p>Narrow decision document resolving the three implementation blockers the merged #2300 <code>MutationPlanRecordedReceipt</code> design/audit contract named in its §14 — <strong>M1</strong> (plan → activation cross-receipt reference), <strong>M2</strong> (plan-body representation and whether a typed operation model / plan-kind taxonomy is required), and <strong>M3</strong> (<code>recorded_at</code> vs distinct <code>planned_at</code> timestamp semantics). It mirrors the <code>activation-crossed-receipt-decision-rung.md</code> cadence: land the contract (#2300), then resolve the hash-participating structure <strong>in writing</strong> before a tag is pinned, then implement. This document decides nothing else: no runtime change, no receipt class added, no mutation application, no evidence-packet production, no member-shell change, no human/AT run. Receipts record institutional facts. They grant zero authority.</p>
+</blockquote>
+<h2>1. Purpose</h2>
+<p>The #2300 design contract scoped a candidate <code>MutationPlanRecordedReceipt</code> — the sixth <code>ProcessTransitionReceipt</code> rung under #1748 / #2141 that would witness that a <strong>mutation plan was recorded</strong> after an <code>ActivationCrossedReceipt</code>, before any mutation is applied. The contract deliberately refused to pin the candidate <code>icn:gov:mutation_plan_recorded:v1</code> layout and blocked implementation on three questions whose answers change the canonical hash layout or the class&#39;s inter-receipt relationships:</p>
+<ul>
+<li><strong>M1</strong> — does the receipt name the activation it follows, and by what?</li>
+<li><strong>M2</strong> — how is the plan body represented, and is a typed operation model or plan-kind taxonomy required?</li>
+<li><strong>M3</strong> — what is the plan timestamp source, and how does it stay deterministic?</li>
+</ul>
+<p>The landed rule (from the #2278 review cycle, restated by the #2281 Q4 decision and applied again by the #2295 activation rung) is that <strong>hash-participating structure is decided in writing before a tag is pinned, never silently in an implementation PR.</strong> This document resolves M1/M2/M3 so a contract-conformant implementation PR can begin. It is not a workflow engine, not a policy engine, not mutation application, and not evidence-packet production.</p>
+<h2>2. Status basis</h2>
+<p>Verified live at authoring time (<code>origin/main</code> @ <code>0a84dc86</code>):</p>
+<ul>
+<li><strong>#2300</strong> — <code>MutationPlanRecordedReceipt</code> design/audit contract — <strong>landed</strong> (merged <code>0a84dc86</code>).</li>
+<li><strong>#2299</strong> — the design-contract issue — <strong>closed / completed</strong> (by #2300).</li>
+<li><strong>#2296</strong> — <code>ActivationCrossedReceipt</code> runtime implementation (the receipt this plan references) — <strong>landed</strong>; the fifth <code>ProcessTransitionReceipt</code> class.</li>
+<li><strong>#2298</strong> — activation render in the fixture-only process-evidence member-shell surface — <strong>landed</strong>.</li>
+<li><strong>#1748 / #2141</strong> — Institutional Process Substrate milestone / vertical spine — <strong>open</strong>.</li>
+<li><strong>#2041</strong> — real screen-reader / low-vision / switch / AT-compat human pass — <strong>open / parked</strong> for a broader human-testing phase; not attempted here.</li>
+<li><code>MutationPlanRecordedReceipt</code> <strong>is not implemented</strong> — no Rust struct, tag, manager method, backend class constant, route, or test exists anywhere in <code>icn/crates/</code> (confirmed by live audit).</li>
+<li><code>MutationPlan</code> / <code>MutationAppliedReceipt</code> / <code>EvidencePacketProducedReceipt</code>, and the framing&#39;s proposed read-model <code>PreviewReviewPacket</code> / <code>pending_publish_summary</code>, remain <strong>framing / doc-only</strong>; the live audit found no runtime seam for any of them.</li>
+</ul>
+<p>No production, pilot, organizer-ready, member-ready, live-federation, NYCN-activation, or Phase-2 claim is made or implied by this document.</p>
+<h2>3. Repo audit update (verified against live code)</h2>
+<p>Confirming the #2300 audit against <code>origin/main</code> @ <code>0a84dc86</code> — the facts M1/M2/M3 depend on:</p>
+<table>
+<thead>
+<tr>
+<th>Subject</th>
+<th>Finding</th>
+<th>Anchor</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ActivationCrossedReceipt</code> (the receipt this plan references)</td>
+<td>fields <code>domain_id, session_id, activation_id, decision_id, decision_record_hash, gate_basis, crossed_by, recorded_at, record_hash</code>; tag <code>icn:gov:activation_crossed:v1</code>; <code>record_hash</code> is the sole <code>PartialEq</code>/<code>Eq</code> anchor. It already binds the decision (<code>decision_id</code> + <code>decision_record_hash</code>) and the gate basis (<code>gate_basis</code>) — so a plan referencing the activation inherits those transitively</td>
+<td><code>proof.rs</code> (<code>ActivationCrossedReceipt</code>, <code>DOMAIN_TAG</code>, <code>compute_record_hash</code>)</td>
+</tr>
+<tr>
+<td>activation lookup / uniqueness</td>
+<td><code>put_activation_crossed</code> persists via <strong><code>put_opaque_if_absent</code></strong> under class <code>&quot;activation_crossed&quot;</code>, <code>key1 =</code> the injective netstring <code>activation_crossed_composite_key1(domain_id, session_id)</code>, <code>key2 = activation_id</code>; <code>get_activation_crossed(domain_id, session_id, activation_id)</code> reads it back. A plan can therefore verify its activation reference fail-closed by <code>get_activation_crossed(...)</code> then comparing <code>record_hash</code></td>
+<td><code>receipt_backend.rs</code> (<code>put_activation_crossed</code>, <code>get_activation_crossed</code>, <code>activation_crossed_composite_key1</code>); <code>manager.rs</code> (<code>record_activation_crossed</code>, <code>get_activation_crossed</code>)</td>
+</tr>
+<tr>
+<td>the five landed classes</td>
+<td><code>ProcessSessionOpenedReceipt</code> / <code>DeliberationEntryRecordedReceipt</code> / <code>DecisionRecordedReceipt</code> / <code>ProcessGateResultReceipt</code> / <code>ActivationCrossedReceipt</code> are the only runtime <code>ProcessTransitionReceipt</code>s; all five tags present in <code>proof.rs</code></td>
+<td><code>proof.rs</code></td>
+</tr>
+<tr>
+<td>inter-receipt references</td>
+<td>exactly <strong>one</strong> exists: <code>ActivationCrossedReceipt</code> → <code>DecisionRecordedReceipt</code> (by <code>decision_id</code> + <code>decision_record_hash</code>), the #2295 B1 link. A plan → activation link would be the lane&#39;s <strong>second</strong> inter-receipt reference</td>
+<td>whole-repo search</td>
+</tr>
+<tr>
+<td><code>MutationPlan</code> / <code>PreviewReviewPacket</code> / <code>pending_publish_summary</code> / <code>MutationAppliedReceipt</code> / <code>EvidencePacketProducedReceipt</code></td>
+<td><strong>framing/doc-only</strong> — no Rust type in <code>icn/crates</code> or <code>icn/apps</code>. <code>icn-baseline-lock/src/evidence.rs</code> defines a separate <code>EvidencePacket</code> baseline-lock bundle, <strong>not</strong> a governance process class</td>
+<td>whole-repo search</td>
+</tr>
+<tr>
+<td><code>put_opaque_if_absent</code></td>
+<td>the idempotence primitive on the gateway <code>ReceiptStore</code> and the <code>GovernanceReceiptBackend</code> trait — atomic insert-if-absent keyed on <code>(class, key1, key2)</code>; <code>None</code> ⇒ this write won, <code>Some(existing)</code> ⇒ return the original (never restamp). A sixth class reuses it</td>
+<td><code>receipt_backend.rs</code>, <code>receipt_store.rs</code></td>
+</tr>
+</tbody></table>
+<p><strong>Bottom line:</strong> every #2300 audit claim that M1/M2/M3 rely on is accurate against live code. The five landed classes are the only runtime <code>ProcessTransitionReceipt</code>s; the mutation-plan rung remains seam-discovery work, and the <code>ActivationCrossedReceipt</code> it would reference already carries the decision + gate-basis bindings the plan can inherit transitively.</p>
+<h2>4. M1 decision — plan → activation cross-receipt reference</h2>
+<p><strong>Question.</strong> Does <code>MutationPlanRecordedReceipt</code> name the <code>ActivationCrossedReceipt</code> it follows, and if so by <code>activation_id</code>, by <code>activation_record_hash</code>, or both? Must it also directly reference the decision and/or gate basis? This is the lane&#39;s <strong>second</strong> inter-receipt reference.</p>
+<p>Options considered:</p>
+<ol>
+<li><strong>No in-receipt reference</strong> — rely on the shared <code>(domain_id, session_id)</code> session anchor; a read-model joins activation and plan by session. Rejected: a session may cross more than one activation; &quot;which activation this plan follows&quot; then has no cryptographic answer, only a temporal guess. It also fails the contract&#39;s framing (a plan is recorded <em>as a consequence of</em> a specific activation).</li>
+<li><strong><code>activation_id</code> only</strong> — the caller-opaque handle. Rejected as the <em>sole</em> link: <code>activation_id</code> is unique only within a session and caller-opaque; it names <em>which slot</em> but does not bind to the activation&#39;s recorded <strong>content</strong>. A plan could cite an <code>activation_id</code> whose crossing later differs from what was recorded, and nothing would detect it.</li>
+<li><strong><code>activation_record_hash</code> only</strong> — the 32-byte content-addressed <code>record_hash</code> of the <code>ActivationCrossedReceipt</code>. Strong cryptographic binding, but drops the human/index handle.</li>
+<li><strong>Both <code>activation_id</code> and <code>activation_record_hash</code>. CHOSEN.</strong> Directly mirrors the #2295 B1 decision (<code>decision_id</code> + <code>decision_record_hash</code>) — the proven posture for this lane&#39;s first inter-receipt link.</li>
+<li>Also directly reference the decision (<code>decision_id</code> / <code>decision_record_hash</code>) and/or gate basis on the plan receipt. <strong>Rejected for <code>:v1</code>:</strong> the referenced <code>ActivationCrossedReceipt</code> <em>already</em> binds <code>decision_id</code>, <code>decision_record_hash</code>, and <code>gate_basis</code>. Duplicating them on the plan receipt is redundant, invites drift between the two copies, and grows the hash layout for no cryptographic gain — the plan inherits them <strong>transitively</strong> through the activation link. If a future consumer needs a direct plan→decision link, that is a <code>:v2</code>-or-later decision, not a silent <code>:v1</code> add.</li>
+</ol>
+<p><strong>Decision M1: <code>:v1</code> carries a direct reference to the activation it follows by <em>both</em> its caller-opaque <code>activation_id</code> and its content-addressed <code>activation_record_hash</code>.</strong> The decision and gate basis are <strong>not</strong> re-referenced on the plan receipt in <code>:v1</code>; they are inherited transitively through the activation. Candidate field names (subject to implementation proof and golden-vector pinning):</p>
+<ul>
+<li><code>activation_id: String</code> — the activation being followed; the human/index handle, unique within the session.</li>
+<li><code>activation_record_hash: Hash</code> — the 32-byte <code>record_hash</code> of that <code>ActivationCrossedReceipt</code>; the content-addressed proof link.</li>
+</ul>
+<p>Binding consequences:</p>
+<ul>
+<li><strong>Both fields participate in the canonical <code>record_hash</code> and in stable duplicate identity.</strong> A same-identity retry returns the original receipt un-restamped; a different <code>activation_record_hash</code> (or <code>activation_id</code>) for the same <code>plan_id</code> is a fail-closed conflict (<code>mutation_plan_recorded_conflict</code>), mirroring <code>activation_crossed_conflict</code>.</li>
+<li><strong>The reference is verified, not merely asserted (fail-closed precondition).</strong> The implementation MUST require that an <code>ActivationCrossedReceipt</code> with exactly <code>activation_record_hash</code> exists in the <strong>same</strong> <code>(domain_id, session_id)</code> — resolved via <code>get_activation_crossed(domain_id, session_id, activation_id)</code> and compared on <code>record_hash</code> — before the plan is recorded. If it is absent, present under a different session/domain, or its <code>activation_id</code> does not match the supplied one, the plan is <strong>not</strong> recorded and <strong>no receipt is emitted</strong> (mirroring the #2295 B1 verified-not-asserted precondition). This is what makes the link a <em>proof</em> (&quot;this activation was recorded and I planned on it&quot;), not a claim.</li>
+<li><strong>ADR-0026 preserved.</strong> The link points at the activation&#39;s own self-hashed <code>record_hash</code>; <code>MutationPlanRecordedReceipt</code> inherits the <em>process-transition</em> discipline (self-contained blake3 <code>record_hash</code>, opaque-store persistence) and asserts <strong>no</strong> signed-envelope/merkle inheritance.</li>
+<li><strong>Idempotence / replay.</strong> Because <code>activation_record_hash</code> is content-addressed and deterministic (not wall-clock), two nodes replaying the same logical plan derive the same plan identity and converge on the <strong>original</strong> receipt via <code>put_opaque_if_absent</code>.</li>
+</ul>
+<p><strong>Test that proves it:</strong> a runtime-slice test that (a) records an <code>ActivationCrossedReceipt</code>, then records a <code>MutationPlanRecordedReceipt</code> citing that activation&#39;s real <code>record_hash</code>, round-trips it, and asserts the stored <code>activation_record_hash</code> equals the activation receipt&#39;s <code>record_hash</code>; (b) a plan whose <code>activation_record_hash</code> names no activation in the session (or names one from a different session, or whose <code>activation_id</code> mismatches) is refused fail-closed and persists nothing; (c) a same-identity retry returns the original plan un-restamped; (d) a conflicting <code>activation_record_hash</code>/<code>activation_id</code> for the same <code>plan_id</code> is a fail-closed conflict.</p>
+<h2>5. M2 decision — plan-body representation</h2>
+<p><strong>Question.</strong> Is the receipt <code>body_hash</code>-only (like deliberation/decision), or does it carry a typed minimal operation/target/effect model? Is a plan-kind taxonomy needed?</p>
+<p>Options considered:</p>
+<ol>
+<li><strong><code>body_hash</code>-only — a caller-supplied 32-byte fingerprint of the <code>MutationPlan</code> body; the body is never stored. CHOSEN.</strong></li>
+<li>A typed minimal operation/target/effect model on the receipt (e.g. a list of <code>{op, target}</code>). Rejected for <code>:v1</code>: it puts kernel-readable mutation semantics into the receipt, violating the meaning firewall (the kernel enforces constraints without understanding their origin; the framing §&quot;MutationPlan&quot; is explicit that <em>&quot;the kernel does not read the plan semantically&quot;</em>). It also stores potentially sensitive operation content, breaking the privacy posture, and is variable-length and unbounded in the hash layout. The typed plan model, if any, stays <strong>app-side</strong> and is fingerprinted, not stored.</li>
+<li>A <code>PreviewReviewPacket</code>/<code>pending_publish_summary</code>-shaped payload. Rejected for <code>:v1</code>: that read-model is itself framing-only (no runtime type), and embedding it would import an unfixed schema into a hash-participating layout.</li>
+<li>A plan-kind taxonomy (à la <code>DeliberationEntryKind</code> / <code>ProcessGateKind</code>), e.g. <code>create/update/retire/reassign/allocate/settle/install/bind</code>. Rejected for <code>:v1</code>: a kind would be a hash-participating <code>u8</code> discriminant and an <strong>ADR-controlled taxonomy</strong> (closed enum, no free append) — exactly the boundary the #2295 B2 decision drew for gate kinds. It also leaks operation semantics into the receipt. No plan-kind in <code>:v1</code>.</li>
+</ol>
+<p><strong>Decision M2: <code>:v1</code> is <code>body_hash</code>-only.</strong> A caller-supplied 32-byte <code>body_hash</code> fingerprints the <code>MutationPlan</code> body; <strong>the plan body — its operation list, target list, effect payload, or any typed operation model — is never stored by the receipt.</strong> No plan-kind taxonomy in <code>:v1</code>. This mirrors the <code>DecisionRecordedReceipt</code> / <code>DeliberationEntryRecordedReceipt</code> <code>body_hash</code> discipline exactly.</p>
+<p>Binding consequences:</p>
+<ul>
+<li><strong><code>body_hash</code> participates in the canonical <code>record_hash</code> and in stable duplicate identity</strong> (like the decision/deliberation <code>body_hash</code>). It is a fixed-32 field appended raw (no length prefix).</li>
+<li><strong>The firewall holds:</strong> the receipt carries no kernel-readable operation content; it witnesses <em>that a plan (fingerprinted) was recorded</em>, not what the plan does. Whether the plan is safe/authorized to apply is a charter/gate/authority question upstream of this type.</li>
+<li><strong>Privacy holds:</strong> no plan body text, operation list, target list, or effect payload is stored; a future evidence/export summary carries proof pointers only (the #2289/#2291/#2298 pattern).</li>
+<li><strong><code>body_hash</code> is not verified for content</strong> (the receipt cannot re-derive what it never stored) — it is the caller&#39;s content fingerprint, exactly as for decision/deliberation. No non-zero requirement is imposed (consistent with the landed classes).</li>
+</ul>
+<p><strong>Test that proves it:</strong> the serialized receipt carries exactly the <code>:v1</code> field set — no <code>body</code>/<code>content</code>/operation/target/effect field; only <code>body_hash</code> (a per-field/golden test confirms <code>body_hash</code> participates in the hash; a serde payload-audit test confirms no body field is present).</p>
+<h2>6. M3 decision — plan timestamp source</h2>
+<p><strong>Question.</strong> Caller-supplied <code>recorded_at</code> excluded from stable duplicate identity (the current receipt pattern)? Any distinct <code>planned_at</code>? What stays deterministic?</p>
+<p>Three conceptually distinct times could exist: the activation crossing time (already on the referenced <code>ActivationCrossedReceipt</code> as its <code>recorded_at</code>); a plan-authored time; and the receipt record time.</p>
+<p>Options considered:</p>
+<ol>
+<li><strong>Single caller-supplied <code>recorded_at: u64</code>, byte-parallel with the five landed classes. CHOSEN.</strong></li>
+<li>Distinct <code>planned_at</code> <strong>and</strong> <code>recorded_at</code>. Rejected for <code>:v1</code>: in this local/dev/fixture slice the plan is <em>recorded at the moment it is authored</em> — the two instants coincide. Two fields would invite drift and a second, undecided determinism question for zero current benefit.</li>
+<li>Derive a time from the referenced activation. Rejected: importing the activation&#39;s <code>recorded_at</code> onto the plan manufactures a duplicated timestamp with unclear semantics; the plan&#39;s own <code>recorded_at</code> is its recording time, and the activation time is already reachable via the reference.</li>
+</ol>
+<p><strong>Decision M3: <code>:v1</code> carries a single caller-supplied <code>recorded_at: u64</code>, hashed into <code>record_hash</code> but excluded from stable duplicate identity — identical to the five landed classes. No distinct <code>planned_at</code> is added; no time is derived from the activation.</strong> In this slice <code>recorded_at</code> denotes the moment the plan was recorded, which coincides with the planning itself.</p>
+<p>Binding consequences:</p>
+<ul>
+<li><strong>No wall-clock time is a cross-node-deterministic identity input</strong> (per the #2283/#2284 membership-determinism doctrine). Determinism in the receipt comes entirely from its content-addressed identity — <code>(domain_id, session_id, plan_id, activation_id, activation_record_hash, recorded_by, body_hash)</code> — <strong>not</strong> from any timestamp. <code>recorded_at</code> may live inside <code>record_hash</code> <strong>only because</strong> the receipt is idempotent on stable, non-timestamp identity, so replay converges on the original stamp.</li>
+<li><strong>What appears in evidence/export: <code>recorded_at</code></strong> (human-readable &quot;when recorded&quot;) plus the content-addressed proof pointers (<code>activation_record_hash</code>, <code>body_hash</code>, <code>record_hash</code>). Evidence MUST NOT invent a <code>planned_at</code> distinct from <code>recorded_at</code>, and MUST NOT surface a plan body time pulled from the never-stored plan body.</li>
+<li><strong>Future split is a <code>:v2</code> decision.</strong> If a real consumer later needs to distinguish planning time from recording time, that is a <code>:v2</code>-or-later field addition under its own decision — never a silent <code>:v1</code> add — and any such time also stays out of cross-node identity.</li>
+</ul>
+<h2>7. Consolidated candidate <code>:v1</code> layout (for the implementation PR)</h2>
+<p>Resolving M1/M2/M3 pins the candidate <code>icn:gov:mutation_plan_recorded:v1</code> field set (all names <strong>candidate — subject to implementation proof and golden-vector pinning</strong>; the tag must hash-separate from, and never converge with, <code>icn:gov:activation_crossed:v1</code>, <code>icn:gov:decision_recorded:v1</code>, <code>icn:gov:process_gate_result:v1</code>, and the proposal/vote <code>icn:gov:decision:v1/v2/v3</code> lineage):</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>In stable identity?</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>domain_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key1</code> half)</td>
+<td>anchor</td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key1</code> half)</td>
+<td>anchor; session must be opened first</td>
+</tr>
+<tr>
+<td><code>plan_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key2</code>)</td>
+<td>caller-opaque per-plan id</td>
+</tr>
+<tr>
+<td><code>activation_id</code></td>
+<td><code>String</code></td>
+<td>yes</td>
+<td><strong>M1</strong> — activation being followed (must exist in-session)</td>
+</tr>
+<tr>
+<td><code>activation_record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td><strong>M1</strong> — content-addressed proof link to the <code>ActivationCrossedReceipt</code></td>
+</tr>
+<tr>
+<td><code>recorded_by</code></td>
+<td><code>String</code> (DID)</td>
+<td>yes</td>
+<td>recorder-not-planner; grants zero authority</td>
+</tr>
+<tr>
+<td><code>body_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td><strong>M2</strong> — fingerprint of the <code>MutationPlan</code> body; body never stored</td>
+</tr>
+<tr>
+<td><code>recorded_at</code></td>
+<td><code>u64</code></td>
+<td><strong>no</strong></td>
+<td><strong>M3</strong> — caller-supplied; hashed; excluded from identity (retry never restamps)</td>
+</tr>
+<tr>
+<td><code>record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>(equality anchor)</td>
+<td>canonical blake3; the sole <code>PartialEq</code>/<code>Eq</code> anchor</td>
+</tr>
+</tbody></table>
+<p><strong>Candidate canonical hashing:</strong> <code>DOMAIN_TAG</code> (<code>icn:gov:mutation_plan_recorded:v1</code>) first → length-prefixed <code>domain_id</code>, <code>session_id</code>, <code>plan_id</code>, <code>activation_id</code>, <code>recorded_by</code> → <code>activation_record_hash</code> raw 32 (no length prefix) → <code>body_hash</code> raw 32 (no length prefix) → <code>recorded_at</code> LE. Exact layout is fixed by the implementation PR and pinned by a golden vector.</p>
+<p><strong>Uniqueness / conflict:</strong> <code>put_opaque_if_absent</code> keyed on <code>(class, key1, key2)</code> where <code>key1</code> is an injective netstring composite of <code>(domain_id, session_id)</code> and <code>key2</code> is <code>plan_id</code>; conflict detection on <code>(activation_id, activation_record_hash, recorded_by, body_hash)</code>. <code>recorded_at</code> and <code>record_hash</code> are not identity. Same-identity retry ⇒ original returned; mismatch ⇒ fail-closed <code>mutation_plan_recorded_conflict</code>.</p>
+<p><strong>Preconditions (all fail-closed; on any failure nothing is persisted):</strong> (1) the <code>(domain_id, session_id)</code> session was opened first; (2) an <code>ActivationCrossedReceipt</code> with <code>record_hash == activation_record_hash</code> exists in that same session and its <code>activation_id</code> equals the supplied <code>activation_id</code>; (3) <code>domain_id</code> / <code>session_id</code> / <code>plan_id</code> / <code>activation_id</code> / <code>recorded_by</code> are non-empty / non-whitespace.</p>
+<h2>8. Implementation constraints for the next PR</h2>
+<p>The later implementation PR <strong>may</strong>:</p>
+<ul>
+<li>add the <code>MutationPlanRecordedReceipt</code> class <strong>only</strong>, conforming to the #2300 contract plus this rung (§7 above);</li>
+<li>add the minimum reference (M1), body-hash (M2), and timestamp (M3) support pinned here;</li>
+<li>add <code>proof.rs</code> unit tests and a runtime-slice integration test where the existing receipt pattern supports them (construction / emission / persistence / retrieval), mirroring <code>activation_crossed_receipt_runtime_slice.rs</code>.</li>
+</ul>
+<p>The later implementation PR <strong>must not</strong>:</p>
+<ul>
+<li>implement <code>MutationAppliedReceipt</code> or <code>EvidencePacketProducedReceipt</code>, or apply any mutation;</li>
+<li>add a typed/kernel-readable mutation-plan operation model, a <code>target_ref</code>/<code>effect_ref</code>, or a plan-kind taxonomy;</li>
+<li>add or change any <code>ProcessGateKind</code> variant, or add an <code>ActivationRequest</code> gate object;</li>
+<li>extend <code>web/member-shell/</code> or any evidence surface (rendering stays deferred) unless separately scoped and reviewed;</li>
+<li>touch OpenAPI / SDK, or publish a served schema;</li>
+<li>auto-close any protected issue (#1748, #2141, #2041) or its own implementation issue — leave it open for maintainer disposition.</li>
+</ul>
+<h2>9. Validation requirements for the implementation PR</h2>
+<p>Both test tiers the landed classes use, plus the rung-specific checks:</p>
+<ul>
+<li><strong><code>proof.rs</code> unit tests:</strong> a golden vector pinning the <code>:v1</code> <code>record_hash</code> of a fixed sample; a determinism test (same inputs ⇒ same hash); a per-field test (every field change, including <code>activation_record_hash</code> and <code>body_hash</code>, ⇒ different hash); a tag-disjointness test asserting <code>icn:gov:mutation_plan_recorded:v1</code> never collides with — and a comment that it must never converge with — <code>activation_crossed</code>, <code>decision_recorded</code>, <code>process_gate_result</code>, and the proposal/vote <code>icn:gov:decision:vN</code> lineage.</li>
+<li><strong>Runtime-slice integration test:</strong> emission + field round-trip + non-zero <code>record_hash</code> + retrieval; same-identity retry returns the original, never restamped; different <code>activation_id</code> / <code>activation_record_hash</code> / <code>recorded_by</code> / <code>body_hash</code> for the same identity fail closed; unopened session fails closed and creates nothing; empty/whitespace ids rejected pre-persistence; missing receipt store / backend failure fail closed; concurrent duplicates serialize to one winner; composite key injective (<code>(&quot;ab&quot;,&quot;c&quot;)</code> vs <code>(&quot;a&quot;,&quot;bc&quot;)</code> must not alias; two domains sharing a <code>session_id</code> never mix).</li>
+<li><strong>M1 cross-link test</strong> (§4): the referenced <code>ActivationCrossedReceipt</code> (by <code>activation_record_hash</code>) must exist in the same <code>(domain_id, session_id)</code> with a matching <code>activation_id</code>; an absent, wrong-session, wrong-domain, or <code>activation_id</code>-mismatched reference is refused fail-closed and persists nothing.</li>
+<li><strong>M2 body test</strong> (§5): the serialized payload carries exactly the <code>:v1</code> field set — no <code>body</code>/operation/target/effect field; <code>body_hash</code> participates in <code>record_hash</code>.</li>
+<li><strong>M3 timestamp test</strong> (§6): two records differing only in <code>recorded_at</code> share duplicate identity (retry returns original, no conflict); <code>recorded_at</code> participates in <code>record_hash</code> but not in identity.</li>
+<li><strong>Idempotence / replay test:</strong> a logical plan replayed on a second node converges on the original receipt (original stamp, original hash).</li>
+<li><strong>Privacy grep:</strong> no plan body / operation / target / effect text in any serialized receipt or fixture — fingerprints only.</li>
+<li><strong>No-overclaim grep:</strong> no &quot;mutation applied / plan applied / production / pilot / organizer-ready / member-ready / live federation / NYCN / Phase-2&quot; claims introduced.</li>
+<li><strong>ADR-0026 envelope check:</strong> the receipt sits at Layer 2, self-hashed, no signature/merkle inheritance claim.</li>
+<li><strong>Protected close-keyword grep:</strong> the implementation PR carries no closing keyword (fix / close / resolve) adjacent to a protected issue number (#1748, #2141, #2041) — use <code>Refs</code> only.</li>
+</ul>
+<h2>10. Deferred work (explicitly out of scope of this rung and its future implementation)</h2>
+<ul>
+<li><code>MutationAppliedReceipt</code> — the receipt that would witness a mutation actually applied.</li>
+<li><code>EvidencePacketProducedReceipt</code> — a runtime evidence-packet producer.</li>
+<li>Any typed/kernel-readable <code>MutationPlan</code> operation model, <code>target_ref</code>/<code>effect_ref</code>, plan-kind taxonomy, or <code>PreviewReviewPacket</code> runtime type.</li>
+<li>Member-shell / process-evidence rendering of <code>MutationPlanRecordedReceipt</code> (a later separately-scoped fixture-only surface may add it after the receipt lands, as #2298 did for <code>ActivationCrossedReceipt</code>).</li>
+<li>Action-card triggers (ADR-0027 / #1713).</li>
+<li>The actual <strong>#2041</strong> human/AT pass — parked for a real human-testing phase.</li>
+<li>Production / pilot / NYCN activation / live federation / Phase-2 work.</li>
+<li>entity-auth enforcement (#2081), trusted token issuance (#2080), UnknownLegacy repair (#2274), service hosting, K3s / DNS / Forgejo.</li>
+</ul>
+<h2>11. Non-goals</h2>
+<p>Restated from #2301 / the #2300 contract — this rung and its future implementation are:</p>
+<ul>
+<li>not <code>MutationAppliedReceipt</code>; not mutation application; not applying any plan;</li>
+<li>not <code>EvidencePacketProducedReceipt</code>; not an evidence-packet producer;</li>
+<li>not an action-card trigger; not a general workflow engine; not a policy/authority engine; not a new authorization semantic;</li>
+<li>not a typed/kernel-readable mutation-plan operation model; not a plan-kind taxonomy;</li>
+<li>not a new <code>ProcessGateKind</code>; not an <code>ActivationRequest</code> object;</li>
+<li>not OpenAPI / SDK / served-schema work; not member-shell implementation;</li>
+<li>not #2041 completion; not human/AT execution; not #1748 or #2141 closure;</li>
+<li>not production / pilot / organizer-ready / member-ready readiness; not live federation; not NYCN activation; not Phase-2 completion;</li>
+<li>not proposal / vote / quorum / mandate / outcome semantics.</li>
+</ul>
+<p>Receipts record institutional facts. They grant zero authority.</p>
+<h2>12. Implementation sequencing &amp; protected issue state</h2>
+<p><strong>Recommendation (matching the ActivationCrossed lane cadence #2294 → #2295 → #2296):</strong> with this decision rung landed on top of the #2300 contract, a contract-conformant implementation PR may add the <code>MutationPlanRecordedReceipt</code> class <strong>only</strong>, per §7–§9. The implementation PR must keep #1748 / #2141 / #2041 open unless separately reviewed, and must leave its own issue open for maintainer disposition rather than auto-closing it by side effect.</p>
+<p>Protected issue state at authoring: #2299 closed/completed (design contract); #1748 open; #2141 open; #2041 open/parked; #2289 closed; #2081 / #2080 / #2274 open/untouched; #1907 untouched.</p>
+<h2>13. Related</h2>
+<p>Refs #2301.
+Refs #2299.
+Refs #2300.
+Refs #1748.
+Refs #2141.
+Refs #2041.
+Refs #2296.
+Refs #2298.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
