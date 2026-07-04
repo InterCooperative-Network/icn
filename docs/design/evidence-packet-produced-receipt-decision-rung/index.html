@@ -1,0 +1,475 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>EvidencePacketProducedReceipt decision rung — EP1/EP2/EP3/EP4/EP5 (predecessor linkage, packet-hash coverage, redaction boundary, meaning of &quot;produced&quot;, human/AT status) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>evidence packet produced receipt decision rung</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/evidence-packet-produced-receipt-decision-rung.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>EvidencePacketProducedReceipt decision rung — EP1/EP2/EP3/EP4/EP5 (predecessor linkage, packet-hash coverage, redaction boundary, meaning of &quot;produced&quot;, human/AT status)</h1>
+<p><strong>Status:</strong> draft — design / decision rung (not runtime implementation)
+<strong>Truth class:</strong> descriptive
+<strong>Canonical:</strong> no — implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last reviewed:</strong> 2026-07-04
+<strong>Source basis:</strong> read against <code>origin/main</code> @ <code>1f0d6d9e</code> (the merged #2314 contract&#39;s tip). Code anchors (<code>icn/crates/icn-governance/src/proof.rs</code>, <code>icn/apps/governance/src/receipt_backend.rs</code>, <code>icn/apps/governance/src/manager.rs</code>) were verified at that commit — re-verify before relying on exact line numbers or hashes; they drift.
+<strong>Related:</strong> #2315 (this rung&#39;s issue) · #2313 (the <code>EvidencePacketProducedReceipt</code> design-contract issue) · #2314 (merged design/audit contract, <a href="https://github.com/InterCooperative-Network/icn/blob/main/evidence-packet-produced-receipt">`docs/design/evidence-packet-produced-receipt.md`</a>) · #1748 (Institutional Process Substrate milestone) · #2141 (vertical institutional spine control) · #2041 (human/AT pass — open/parked) · #2310 (<code>MutationAppliedReceipt</code> implementation — the immediate predecessor this packet draws from) · #2312 (mutation-applied render in the process-evidence member-shell demo) · PR #2309 (the sibling applied decision rung, <a href="https://github.com/InterCooperative-Network/icn/blob/main/mutation-applied-receipt-decision-rung">`mutation-applied-receipt-decision-rung.md`</a>) · <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a> (receipt &amp; provenance proof envelope) · <code>ops/ideas/framing/institutional-process-substrate.md</code> (framing)</p>
+<blockquote>
+<p>Narrow decision document resolving the five implementation blockers the merged #2314 <code>EvidencePacketProducedReceipt</code> design/audit contract named in its §14 — <strong>EP1</strong> (predecessor linkage: immediate applied step and/or source-receipt set), <strong>EP2</strong> (packet-hash coverage vs source-set coverage), <strong>EP3</strong> (redaction boundary representation), <strong>EP4</strong> (what &quot;produced&quot; asserts, and whether production is distinct from export/delivery), and <strong>EP5</strong> (human/AT status in v1). It mirrors the <code>mutation-applied-receipt-decision-rung.md</code> cadence: land the contract (#2314), then resolve the hash-participating structure <strong>in writing</strong> before a tag is pinned, then implement. This rung is <strong>heavier</strong> than its predecessors because two of the fields it pins — <code>receipt_set_hash</code> and <code>redaction_profile_hash</code> — introduce concepts with <strong>no precedent anywhere in the repo</strong>. This document decides nothing else: no runtime change, no receipt class added, no evidence-packet production, no member-shell change, no fixture change, no human/AT run. Receipts record institutional facts. They grant zero authority.</p>
+</blockquote>
+<h2>1. Purpose</h2>
+<p>The #2314 design contract scoped a candidate <code>EvidencePacketProducedReceipt</code> — the eighth <code>ProcessTransitionReceipt</code> rung under #1748 / #2141 that would witness that a <strong>redacted evidence packet artifact was produced</strong> from a set of prior process receipts, recorded after them (typically after a <code>MutationAppliedReceipt</code>). The contract deliberately refused to pin the candidate <code>icn:gov:evidence_packet_produced:v1</code> layout and blocked implementation on five questions whose answers change the canonical hash layout, the class&#39;s inter-receipt relationships, or the meaning of the receipt itself:</p>
+<ul>
+<li><strong>EP1</strong> — does the receipt name its immediate predecessor, a source-receipt set, or both?</li>
+<li><strong>EP2</strong> — what does <code>packet_hash</code> cover, and what does <code>receipt_set_hash</code> cover?</li>
+<li><strong>EP3</strong> — how is the redaction boundary represented (<code>redaction_profile_hash</code>, an id, both, or neither)?</li>
+<li><strong>EP4</strong> — what does &quot;produced&quot; assert, and is production distinct from export/delivery?</li>
+<li><strong>EP5</strong> — does <code>:v1</code> carry any human/AT status?</li>
+</ul>
+<p>The landed rule (from the #2278 review cycle, restated by the #2281 Q4 decision and applied again by the #2295 activation, #2302 plan, and #2309 applied rungs) is that <strong>hash-participating structure is decided in writing before a tag is pinned, never silently in an implementation PR.</strong> This document resolves EP1/EP2/EP3/EP4/EP5 so a contract-conformant implementation PR can begin. It is not a workflow engine, not a policy engine, not an evidence-packet producer, not an export/delivery mechanism, and not an action-card trigger.</p>
+<h2>2. Status basis</h2>
+<p>Verified live at authoring time (<code>origin/main</code> @ <code>1f0d6d9e</code>):</p>
+<ul>
+<li><strong>#2314</strong> — <code>EvidencePacketProducedReceipt</code> design/audit contract — <strong>landed</strong> (merged <code>1f0d6d9e</code>).</li>
+<li><strong>#2313</strong> — the design-contract issue — <strong>closed / completed</strong> (by #2314).</li>
+<li><strong>#2310</strong> — <code>MutationAppliedReceipt</code> runtime implementation (the immediate predecessor this packet references) — <strong>landed</strong>; the seventh <code>ProcessTransitionReceipt</code> class.</li>
+<li><strong>#2312</strong> — mutation-applied render in the fixture-only process-evidence member-shell surface — <strong>landed</strong>; <strong>#2311</strong> — its render issue — <strong>closed / completed</strong>.</li>
+<li><strong>#1748 / #2141</strong> — Institutional Process Substrate milestone / vertical spine — <strong>open</strong>.</li>
+<li><strong>#2041</strong> — real screen-reader / low-vision / switch / AT-compat human pass — <strong>open / parked</strong> for a broader human-testing phase; not attempted here.</li>
+<li><code>EvidencePacketProducedReceipt</code> <strong>is not implemented</strong> — no Rust struct, tag, manager method, backend class constant, route, fixture, or test exists anywhere in <code>icn/crates/</code> or <code>icn/apps/</code> (confirmed by live audit: <code>rg &quot;EvidencePacketProducedReceipt|evidence_packet_produced&quot; icn/crates icn/apps</code> → no match).</li>
+<li><code>receipt_set_hash</code> and <code>redaction_profile_hash</code> have <strong>no precedent anywhere</strong> — the only matches are in <code>docs/registry.toml</code> / <code>docs/INDEX.generated.md</code>, i.e. the #2314 registry description of this very lane, not code or another design doc.</li>
+</ul>
+<p>No production, pilot, organizer-ready, member-ready, live-federation, NYCN-activation, or Phase-2 claim is made or implied by this document.</p>
+<h2>3. Repo audit update (verified against live code)</h2>
+<p>Confirming the #2314 audit against <code>origin/main</code> @ <code>1f0d6d9e</code> — the facts EP1–EP5 depend on:</p>
+<table>
+<thead>
+<tr>
+<th>Subject</th>
+<th>Finding</th>
+<th>Anchor</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>MutationAppliedReceipt</code> (the immediate predecessor this packet references)</td>
+<td>fields <code>domain_id, session_id, application_id, plan_id, plan_record_hash, applied_by, result_hash, applied_at, record_hash</code>; tag <code>icn:gov:mutation_applied:v1</code>; <code>record_hash</code> is the sole <code>PartialEq</code>/<code>Eq</code> anchor. It references the plan (<code>plan_id</code> + <code>plan_record_hash</code>), which binds activation → decision → gate transitively — so a packet referencing the applied step inherits applied → plan → activation → decision → gate transitively</td>
+<td><code>icn/crates/icn-governance/src/proof.rs</code> (<code>MutationAppliedReceipt</code>, <code>DOMAIN_TAG</code>, <code>compute_record_hash</code>)</td>
+</tr>
+<tr>
+<td>applied lookup / uniqueness</td>
+<td><code>put_mutation_applied</code> persists via <strong><code>put_opaque_if_absent</code></strong> under class <code>&quot;mutation_applied&quot;</code>, <code>key1 =</code> the injective netstring <code>mutation_applied_composite_key1(domain_id, session_id)</code>, <code>key2 = application_id</code>; <code>get_mutation_applied(domain_id, session_id, application_id)</code> reads it back (<code>get_latest_opaque(MUTATION_APPLIED_CLASS, key1, Some(application_id))</code>). A packet can therefore verify its immediate-predecessor reference fail-closed by <code>get_mutation_applied(...)</code> then comparing <code>record_hash</code></td>
+<td><code>icn/apps/governance/src/receipt_backend.rs</code> (<code>put_mutation_applied</code>, <code>get_mutation_applied</code>, <code>mutation_applied_composite_key1</code>); <code>icn/apps/governance/src/manager.rs</code> (<code>record_mutation_applied</code>, <code>get_mutation_applied</code>)</td>
+</tr>
+<tr>
+<td>the seven landed classes</td>
+<td><code>ProcessSessionOpenedReceipt</code> / <code>DeliberationEntryRecordedReceipt</code> / <code>DecisionRecordedReceipt</code> / <code>ProcessGateResultReceipt</code> / <code>ActivationCrossedReceipt</code> / <code>MutationPlanRecordedReceipt</code> / <code>MutationAppliedReceipt</code> are the only runtime <code>ProcessTransitionReceipt</code>s; all seven tags present in <code>proof.rs</code></td>
+<td><code>proof.rs</code></td>
+</tr>
+<tr>
+<td>inter-receipt references</td>
+<td>exactly <strong>three</strong> exist: <code>ActivationCrossedReceipt</code> → <code>DecisionRecordedReceipt</code> (#2295 B1), <code>MutationPlanRecordedReceipt</code> → <code>ActivationCrossedReceipt</code> (#2302 M1), and <code>MutationAppliedReceipt</code> → <code>MutationPlanRecordedReceipt</code> (#2309 A1). A packet → applied-step link plus a source-receipt-set commitment would be the lane&#39;s <strong>fourth</strong> inter-receipt reference and the <strong>first to reference a set</strong></td>
+<td>whole-repo search</td>
+</tr>
+<tr>
+<td><code>EvidencePacketProducedReceipt</code></td>
+<td><strong>framing/doc-only</strong> — no Rust type in <code>icn/crates</code> or <code>icn/apps</code>. <code>icn/crates/icn-baseline-lock/src/evidence.rs</code> defines a separate <code>EvidencePacket</code> baseline-lock bundle, <strong>not</strong> a governance process class and <strong>not</strong> prior art for this lane</td>
+<td>whole-repo search</td>
+</tr>
+<tr>
+<td><code>receipt_set_hash</code> / <code>redaction_profile_hash</code> / <code>redaction_profile_id</code></td>
+<td><strong>no precedent anywhere</strong> — no runtime type, no other design doc; the only occurrences are the #2314 registry/index description of this lane</td>
+<td>whole-repo search</td>
+</tr>
+<tr>
+<td>the existing evidence export</td>
+<td><code>web/member-shell/fixtures/process-evidence-export.json</code> validated by <code>docs/scripts/validate-rehearsal-evidence.py</code> against <code>urn:icn:contract:rehearsal-evidence-export:v1</code> is a <strong>read-only summary artifact</strong>, not a receipt — the basis for EP4&#39;s produced ≠ export distinction</td>
+<td>whole-repo search</td>
+</tr>
+<tr>
+<td><code>put_opaque_if_absent</code></td>
+<td>the idempotence primitive on the gateway <code>ReceiptStore</code> and the <code>GovernanceReceiptBackend</code> trait — atomic insert-if-absent keyed on <code>(class, key1, key2)</code>; <code>None</code> ⇒ this write won, <code>Some(existing)</code> ⇒ return the original (never restamp). An eighth class reuses it</td>
+<td><code>receipt_backend.rs</code>, <code>receipt_store.rs</code></td>
+</tr>
+</tbody></table>
+<p><strong>Bottom line:</strong> every #2314 audit claim that EP1–EP5 rely on is accurate against live code. The seven landed classes are the only runtime <code>ProcessTransitionReceipt</code>s; the evidence-packet-produced rung remains seam-discovery work; the <code>MutationAppliedReceipt</code> it would reference already carries (transitively) the applied → plan → activation → decision → gate chain; and <code>receipt_set_hash</code> / <code>redaction_profile_hash</code> are genuinely new — this rung defines them, so it must pin their coverage and (for the set) their canonical ordering and hashing with extra care.</p>
+<h2>4. EP1 decision — predecessor linkage</h2>
+<p><strong>Question.</strong> Does <code>EvidencePacketProducedReceipt</code> name its immediate predecessor (<code>MutationAppliedReceipt</code>) by <code>mutation_application_id</code> and/or <code>mutation_applied_record_hash</code>, and does it also commit to the <em>set</em> of source receipts the packet draws from via <code>receipt_set_hash</code>? This is the lane&#39;s <strong>fourth</strong> inter-receipt reference and its <strong>first set commitment</strong>.</p>
+<p>Options considered:</p>
+<ol>
+<li><strong>Immediate predecessor only</strong> (<code>mutation_application_id</code> + <code>mutation_applied_record_hash</code>) — a single scalar link. Rejected as the <em>sole</em> link: an evidence packet is produced <em>from a body of prior receipts</em>, not just the last one; committing only to the immediate predecessor would leave &quot;which receipts this packet&#39;s evidence rests on&quot; with no cryptographic answer.</li>
+<li><strong><code>receipt_set_hash</code> only</strong> — commit to the whole source set, drop the scalar immediate link. Rejected: loses the human/index handle (<code>mutation_application_id</code>) and the cheap, directly-verifiable fail-closed check that the immediate prior boundary exists in-session; a bare set hash is opaque and cannot be spot-verified against a single known receipt.</li>
+<li><strong>All three: <code>mutation_application_id</code> + <code>mutation_applied_record_hash</code> + <code>receipt_set_hash</code>. CHOSEN.</strong> Mirrors the proven scalar posture (<code>*_id</code> + <code>*_record_hash</code>) the #2295 B1 / #2302 M1 / #2309 A1 decisions set for the lane&#39;s inter-receipt links, and adds a set commitment for the multi-predecessor evidence boundary that this class uniquely needs.</li>
+</ol>
+<p><strong>Decision EP1: <code>:v1</code> carries all three.</strong></p>
+<ul>
+<li><code>mutation_application_id: String</code> — the applied step this packet draws from; the human/index handle, unique within the session.</li>
+<li><code>mutation_applied_record_hash: Hash</code> — the 32-byte <code>record_hash</code> of that <code>MutationAppliedReceipt</code>; the content-addressed proof link to the <strong>immediate prior process boundary</strong>.</li>
+<li><code>receipt_set_hash: Hash</code> — a 32-byte content-addressed commitment to the <strong>canonical ordered set</strong> of source-receipt references included in the packet&#39;s evidence boundary.</li>
+</ul>
+<p>Canonical receipt-set rules (pinned):</p>
+<ul>
+<li><strong><code>receipt_set_hash</code> commits to an ordered list of receipt <em>references</em> — each member&#39;s <code>record_hash</code> — never receipt <em>bodies</em>.</strong> No receipt body, no private source data, no plan/applied-result body is stored or hashed; only 32-byte <code>record_hash</code>es participate.</li>
+<li><strong>v1 source-set membership is limited to in-session process/evidence <em>receipt</em> references</strong> needed for the produced-packet boundary (the seven landed <code>ProcessTransitionReceipt</code> classes&#39; <code>record_hash</code>es for that <code>(domain_id, session_id)</code>). <strong>Export/delivery artifacts remain outside v1</strong> unless a later decision explicitly adds them.</li>
+<li><strong>The immediate predecessor must be a member of the declared set.</strong> <code>mutation_applied_record_hash</code> MUST appear among the set members — the scalar link and the set commitment must be consistent.</li>
+<li><strong>Canonical ordering (pinned, deterministic — a canonicalization, not an ordering engine):</strong> members are sorted by <strong>(a) receipt-ladder position</strong> (<code>ProcessSessionOpened</code> &lt; <code>DeliberationEntryRecorded</code> &lt; <code>DecisionRecorded</code> &lt; <code>ProcessGateResult</code> &lt; <code>ActivationCrossed</code> &lt; <code>MutationPlanRecorded</code> &lt; <code>MutationApplied</code>), then <strong>(b) <code>record_hash</code> bytewise ascending</strong> within a class. The runtime canonicalizes to this order <strong>before</strong> hashing, so caller-supplied input order can never fork identity.</li>
+<li><strong>Members are a set — duplicates disallowed (pinned).</strong> Each source receipt&#39;s <code>record_hash</code> appears <strong>at most once</strong>; a declared list containing a duplicate <code>record_hash</code> is refused <strong>fail-closed</strong> (it persists nothing). This is required because <code>receipt_set_hash</code> is a <em>set</em> commitment: permitting a repeated element would let a caller fork <code>receipt_set_hash</code> (and therefore <code>record_hash</code> and the receipt&#39;s identity) by padding the list with duplicates. The runtime rejects duplicates rather than silently de-duplicating, so the caller&#39;s declared set and the hashed set are always identical.</li>
+<li><strong>Canonical set hashing (pinned):</strong> after de-duplication is confirmed (duplicates fail closed, above) and canonical ordering is applied, a domain-separated blake3 over a length-prefixed member count (<code>u64</code> LE) followed by each member&#39;s <code>record_hash</code> raw 32 (no per-member length prefix) in canonical order. (The implementation PR pins the exact set-hash domain separation and fixes it with a golden vector; the empty set is <strong>disallowed</strong> in <code>:v1</code> — a produced packet must draw from at least its immediate predecessor.)</li>
+<li><strong>Fail-closed predecessor verification (mandatory floor).</strong> The runtime MUST require that a <code>MutationAppliedReceipt</code> with <code>record_hash == mutation_applied_record_hash</code> exists in the <strong>same</strong> <code>(domain_id, session_id)</code> — resolved via <code>get_mutation_applied(domain_id, session_id, mutation_application_id)</code> and compared on <code>record_hash</code> — before the packet is recorded. If it is absent, present under a different session/domain, or its <code>application_id</code> does not match the supplied one, the packet is <strong>not</strong> recorded and <strong>no receipt is emitted</strong> (mirroring the #2309 A1 verified-not-asserted precondition). This is what makes the immediate link a <em>proof</em>, not a claim.</li>
+<li><strong>Set-member verification (recommended default; minimal floor is the immediate predecessor).</strong> Because the per-class <code>get_*</code> lookups already exist, the implementation SHOULD also verify that every declared set member&#39;s <code>record_hash</code> resolves to a receipt in the same <code>(domain_id, session_id)</code>, failing closed on any miss. The <strong>mandatory</strong> v1 floor is immediate-predecessor verification (above); full-set membership verification is the recommended default and is cheap (it reuses existing lookups), but deferring it for cost is acceptable only if the immediate-predecessor check and set-consistency check (immediate predecessor ∈ set) both hold. No set-walk subsystem is invented; verification is per-member <code>get_*</code> calls or it is deferred.</li>
+</ul>
+<p>Binding consequences:</p>
+<ul>
+<li><strong>All three fields participate in the canonical <code>record_hash</code> and in stable duplicate identity.</strong> A same-identity retry returns the original receipt un-restamped; a different <code>mutation_applied_record_hash</code>, <code>mutation_application_id</code>, or <code>receipt_set_hash</code> for the same <code>packet_id</code> is a fail-closed conflict (<code>evidence_packet_produced_conflict</code>).</li>
+<li><strong>ADR-0026 preserved.</strong> The links point at content-addressed <code>record_hash</code>es; <code>EvidencePacketProducedReceipt</code> inherits the <em>process-transition</em> discipline (self-contained blake3 <code>record_hash</code>, opaque-store persistence) and asserts <strong>no</strong> signed-envelope/merkle inheritance.</li>
+<li><strong>Idempotence / replay.</strong> Because <code>mutation_applied_record_hash</code> and <code>receipt_set_hash</code> are content-addressed and deterministic (not wall-clock, and — for the set — canonically ordered), two nodes replaying the same logical production derive the same packet identity and converge on the <strong>original</strong> receipt via <code>put_opaque_if_absent</code>.</li>
+</ul>
+<p><strong>Test that proves it:</strong> a runtime-slice test that (a) records the full prerequisite chain through a <code>MutationAppliedReceipt</code>, then records an <code>EvidencePacketProducedReceipt</code> citing that applied step&#39;s real <code>record_hash</code> and a set including it, round-trips it, and asserts the stored <code>mutation_applied_record_hash</code> and <code>receipt_set_hash</code> match; (b) a packet whose <code>mutation_applied_record_hash</code> names no applied receipt in the session (or names one from a different session/domain, or whose <code>application_id</code> mismatches) is refused fail-closed and persists nothing; (c) a packet whose declared set omits the immediate predecessor is refused fail-closed; (d) two callers supplying the same set members in different input orders produce the <strong>same</strong> <code>receipt_set_hash</code> (canonicalization proof); (e) a same-identity retry returns the original un-restamped; (f) a conflicting <code>receipt_set_hash</code>/<code>mutation_applied_record_hash</code> for the same <code>packet_id</code> is a fail-closed conflict.</p>
+<h2>5. EP2 decision — packet-hash coverage vs source-set coverage</h2>
+<p><strong>Question.</strong> What does <code>packet_hash</code> cover, what does <code>receipt_set_hash</code> cover, and what must neither cover?</p>
+<p>Options considered:</p>
+<ol>
+<li><strong><code>packet_hash</code> covers the public/redacted evidence packet artifact only; <code>receipt_set_hash</code> covers ordered source-receipt references; neither covers private bodies. CHOSEN.</strong></li>
+<li><code>packet_hash</code> covers the full pre-redaction packet (including private source bodies). Rejected: it would fingerprint (and thereby depend on) private organizer/member/sponsor/attendee data, breaking the privacy posture and the meaning firewall, and would make the hash unstable across redaction policies.</li>
+<li>A single combined hash over packet + sources. Rejected: it conflates &quot;what artifact was produced&quot; with &quot;what it was produced from&quot; — two distinct proofs that consumers need separately (verify the public artifact vs. audit the evidence basis).</li>
+</ol>
+<p><strong>Decision EP2: two distinct, single-purpose hashes.</strong></p>
+<ul>
+<li><strong><code>packet_hash</code> covers the public/redacted evidence packet artifact only</strong> — the content fingerprint of the artifact that was produced and could be shared publicly. It is a caller-supplied 32-byte fingerprint; <strong>the packet body is never stored</strong>.</li>
+<li><strong><code>receipt_set_hash</code> covers the canonical ordered source-receipt references/hashes</strong> (per EP1) — the evidence basis the packet rests on.</li>
+<li><strong>Neither hash covers private source bodies.</strong> Private source-receipt bodies, private organizer/member/sponsor/attendee data, plan bodies, applied-result bodies, operation lists, target lists, and effect payloads are <strong>out of <code>:v1</code> entirely</strong> — not stored, not hashed, not referenced as bodies.</li>
+</ul>
+<p><strong>What <code>packet_hash</code> explicitly does NOT prove</strong> (must be stated in the type doc-comment and any future evidence surface):</p>
+<ul>
+<li>correctness; completeness; legal sufficiency;</li>
+<li>external delivery; acceptance; audit certification;</li>
+<li>human verification; assistive-technology verification;</li>
+<li>production readiness; pilot readiness; organizer/member readiness.</li>
+</ul>
+<p><code>packet_hash</code> proves only that <em>an artifact with this content fingerprint was produced and recorded here.</em></p>
+<p>Binding consequences:</p>
+<ul>
+<li><strong>Both hashes participate in the canonical <code>record_hash</code> and in stable duplicate identity.</strong> They are fixed-32 fields appended raw (no length prefix).</li>
+<li><strong>The firewall holds:</strong> the receipt carries no kernel-readable packet content and no source bodies; it witnesses <em>that a redacted packet (fingerprinted) was produced from a committed set of references</em>, not what the packet or its sources contain.</li>
+<li><strong>Neither hash is verified for content</strong> (the receipt cannot re-derive what it never stored) — they are caller-supplied content fingerprints, exactly as for the landed classes&#39; <code>body_hash</code>/<code>result_hash</code>. (The <em>references</em> inside <code>receipt_set_hash</code> may be existence-verified per EP1; the <em>packet body</em> behind <code>packet_hash</code> is not.)</li>
+</ul>
+<p><strong>Test that proves it:</strong> the serialized receipt carries exactly the <code>:v1</code> field set — no <code>packet_body</code>/<code>content</code>/source-body/operation/target/effect field; only the three hashes plus ids/DID/timestamp (a per-field/golden test confirms <code>packet_hash</code> and <code>receipt_set_hash</code> each independently participate in <code>record_hash</code>; a serde payload-audit test confirms no body field is present).</p>
+<h2>6. EP3 decision — redaction boundary</h2>
+<p><strong>Question.</strong> Is the redaction boundary represented by <code>redaction_profile_hash</code>, a <code>redaction_profile_id</code>, both, or neither in <code>:v1</code>?</p>
+<p>Options considered:</p>
+<ol>
+<li><strong><code>redaction_profile_hash</code> only. CHOSEN.</strong></li>
+<li><code>redaction_profile_id</code> + <code>redaction_profile_hash</code>. Rejected for <code>:v1</code>: the #2314 contract audit found <strong>no repo precedent</strong> for ids-alongside-hashes in this lane; a human-readable profile id implies a profile registry / policy-identity scheme that does not exist. Adding an id now would pin an identifier format and registry contract that belong to their own later decision.</li>
+<li>Neither (no redaction field). Rejected: the receipt would then make no statement about how the public packet was shaped, leaving &quot;was this redacted, and under what profile&quot; unanswerable — a privacy-transparency gap for a receipt whose whole point is a <em>redacted</em> artifact.</li>
+</ol>
+<p><strong>Decision EP3: <code>:v1</code> carries <code>redaction_profile_hash</code> only</strong> — a 32-byte content-addressed fingerprint of the redaction profile that shaped the public packet. No <code>redaction_profile_id</code>, no profile registry, no human-readable redaction labels, no legal-sufficiency assertion in <code>:v1</code>; all deferred to a later decision if a real consumer needs them.</p>
+<p><strong>What <code>redaction_profile_hash</code> explicitly does NOT prove</strong> (must be stated in the type doc-comment):</p>
+<ul>
+<li>that redaction is complete;</li>
+<li>that redaction is legally sufficient;</li>
+<li>that private data was handled live;</li>
+<li>that an external reviewer accepted the packet;</li>
+<li>that human/AT review is complete.</li>
+</ul>
+<p>It records only <em>which redaction profile was applied</em>, by fingerprint.</p>
+<p>Binding consequences:</p>
+<ul>
+<li><strong><code>redaction_profile_hash</code> participates in the canonical <code>record_hash</code> and in stable duplicate identity</strong> (fixed-32, raw). Two packets differing only in redaction profile are distinct records.</li>
+<li><strong>Privacy holds:</strong> the profile <em>body</em> (rules, patterns, policy text) is not stored — only its fingerprint. No private data is carried by the profile hash.</li>
+</ul>
+<p><strong>Test that proves it:</strong> the serialized payload carries <code>redaction_profile_hash</code> and <strong>no</strong> <code>redaction_profile_id</code>/profile-body/policy-text field; <code>redaction_profile_hash</code> participates in <code>record_hash</code>; a no-overclaim grep confirms no &quot;redaction complete / legally sufficient / reviewer accepted&quot; claim in the type or its serialization.</p>
+<h2>7. EP4 decision — meaning of &quot;produced&quot;</h2>
+<p><strong>Question.</strong> What does &quot;produced&quot; assert, and is evidence-packet <em>production</em> the same boundary as evidence <em>export/delivery</em> (the existing <code>rehearsal-evidence-export</code> fixture)?</p>
+<p>This is the rung&#39;s boundary question — &quot;produced&quot; is temptingly readable as &quot;delivered to a recipient&quot; or &quot;accepted by an auditor,&quot; which would pull delivery, acceptance, and audit into the receipt.</p>
+<p>Options considered:</p>
+<ol>
+<li><strong>Produced = an evidence packet artifact was recorded/produced and content-addressed; the receipt is distinct from export, delivery, acceptance, external audit, and action-card triggering. CHOSEN.</strong></li>
+<li>Produced = delivered/accepted/audited. Rejected outright and permanently for this class: that would make the receipt a delivery/acceptance/audit engine, asserting facts about external recipients and reviewers it cannot witness, violating the lane&#39;s core doctrine (<em>receipts record facts and grant zero authority</em>) and maturity-band honesty.</li>
+<li>Fold production and export into one boundary. Rejected: the existing <code>rehearsal-evidence-export</code> fixture is a <strong>read-only summary</strong> artifact, not a receipt; conflating &quot;a packet artifact was produced&quot; (a recorded fact) with &quot;a summary was exported/rendered&quot; (a separate surface concern) would blur two distinct boundaries and over-claim what the receipt proves.</li>
+</ol>
+<p><strong>Decision EP4: <code>:v1</code> &quot;produced&quot; means an evidence packet artifact was recorded/produced and content-addressed</strong> (fingerprinted by <code>packet_hash</code>, per EP2). <code>EvidencePacketProducedReceipt</code> is <strong>distinct from export, delivery, acceptance, external audit, and action-card triggering.</strong> Production is a recorded fact about an artifact; export/summary/delivery/acceptance/audit are separate, later concerns this receipt does not assert.</p>
+<p><code>:v1</code> &quot;produced&quot; <strong>explicitly excludes</strong> (must be stated as non-claims in the type doc-comment and any future evidence surface):</p>
+<ul>
+<li>external delivery; acceptance; audit certification;</li>
+<li>human verification; assistive-technology verification;</li>
+<li>semantic correctness; legal sufficiency;</li>
+<li>production readiness; pilot readiness; organizer readiness; member readiness;</li>
+<li>live federation; NYCN activation; Phase-2 completion.</li>
+</ul>
+<p>Binding consequences:</p>
+<ul>
+<li><strong><code>produced_by</code></strong> is the recorder / producer-witness DID — actor evidence, <strong>not</strong> an authority to produce, deliver, certify, or audit, and not a claim that the producer was permitted to produce.</li>
+<li>The receipt <strong>does not produce, deliver, certify, audit, validate, authorize, enforce, or roll back</strong> the packet. It performs no side effect on domain state; it only records the production <em>fact</em>.</li>
+<li>The receipt&#39;s honesty label in any future evidence surface must read as &quot;an evidence packet was produced and recorded here,&quot; not &quot;the packet was delivered / accepted / audited / is correct.&quot;</li>
+<li>Because EP4 keeps <code>:v1</code> a <em>recording</em> fact (no delivery/acceptance/audit field), it introduces <strong>no</strong> additional hash-participating field beyond EP1–EP3; the §9 layout is complete and pinnable.</li>
+</ul>
+<p><strong>Test that proves it:</strong> a no-overclaim grep asserts the receipt/type carries no &quot;delivered / accepted / audited / certified / verified-correct / production-ready / pilot-ready&quot; claim; the runtime-slice test asserts recording a production performs no mutation of any domain state beyond persisting the receipt itself, and that <code>produced_by</code> is stored as an opaque DID string with no capability/authority check attached to it.</p>
+<h2>8. EP5 decision — human/AT status</h2>
+<p><strong>Question.</strong> Does <code>:v1</code> carry any human/AT completion status, and how does it relate to #2041?</p>
+<p>Options considered:</p>
+<ol>
+<li><strong>Exclude human/AT completion status entirely from <code>:v1</code>; #2041 stays open; the receipt may reference #2041 only as an open dependency. CHOSEN.</strong></li>
+<li>Carry a human/AT status field (e.g. <code>human_at_reviewed: bool</code>). Rejected outright: no real human/AT pass has occurred (this VM is headless and cannot run screen-reader / low-vision / switch / AT-compat testing), so any such field would be a false or premature claim; and automated a11y checks or evidence-packet production do <strong>not</strong> constitute a human/AT pass.</li>
+</ol>
+<p><strong>Decision EP5: <code>:v1</code> carries no human/AT status field and makes no human/AT claim.</strong> Specifically:</p>
+<ul>
+<li><strong>No completed human/AT field</strong> in <code>:v1</code>.</li>
+<li><strong>No implied human/AT pass</strong> — producing a packet, fingerprinting it, or running automated a11y checks does <strong>not</strong> complete #2041.</li>
+<li><strong>No claim that automated a11y or evidence-packet production completes #2041.</strong></li>
+<li>The decision document and the future type doc-comment <strong>may reference #2041 only as an open dependency</strong> — never as satisfied.</li>
+<li><strong>#2041 stays open.</strong></li>
+</ul>
+<p>Binding consequences:</p>
+<ul>
+<li>The <code>:v1</code> field set contains no human/AT field; this is a hash-layout consequence (nothing added) and a claims-discipline requirement.</li>
+<li>Any future human/AT status belongs to #2041&#39;s own track and a separate later decision, never a silent <code>:v1</code> add.</li>
+</ul>
+<h2>9. Consolidated candidate <code>:v1</code> layout (for the implementation PR)</h2>
+<p>Resolving EP1/EP2/EP3/EP4/EP5 pins the candidate <code>icn:gov:evidence_packet_produced:v1</code> field set (all names <strong>candidate — subject to implementation proof and golden-vector pinning</strong>; the tag must hash-separate from, and never converge with, <code>icn:gov:mutation_applied:v1</code>, <code>icn:gov:mutation_plan_recorded:v1</code>, <code>icn:gov:activation_crossed:v1</code>, <code>icn:gov:decision_recorded:v1</code>, <code>icn:gov:process_gate_result:v1</code>, <code>icn:gov:deliberation_entry_recorded:v1</code>, <code>icn:gov:process_session_opened:v1</code>, and the proposal/vote <code>icn:gov:decision:v1/v2/v3</code> lineage):</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>In stable identity?</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>domain_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key1</code> half)</td>
+<td>anchor</td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key1</code> half)</td>
+<td>anchor; session must be opened first</td>
+</tr>
+<tr>
+<td><code>packet_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key2</code>)</td>
+<td>caller-opaque per-packet id</td>
+</tr>
+<tr>
+<td><code>mutation_application_id</code></td>
+<td><code>String</code></td>
+<td>yes</td>
+<td><strong>EP1</strong> — immediate applied step (must exist in-session)</td>
+</tr>
+<tr>
+<td><code>mutation_applied_record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td><strong>EP1</strong> — content-addressed proof link to the <code>MutationAppliedReceipt</code> (verified fail-closed)</td>
+</tr>
+<tr>
+<td><code>receipt_set_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td><strong>EP1/EP2</strong> — canonical ordered commitment to the source-receipt reference set (references, not bodies)</td>
+</tr>
+<tr>
+<td><code>packet_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td><strong>EP2</strong> — fingerprint of the public/redacted packet artifact; packet body never stored</td>
+</tr>
+<tr>
+<td><code>redaction_profile_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td><strong>EP3</strong> — fingerprint of the redaction profile; profile body never stored</td>
+</tr>
+<tr>
+<td><code>produced_by</code></td>
+<td><code>String</code> (DID)</td>
+<td>yes</td>
+<td><strong>EP4</strong> — recorder / producer-witness; grants zero authority</td>
+</tr>
+<tr>
+<td><code>produced_at</code></td>
+<td><code>u64</code></td>
+<td><strong>no</strong></td>
+<td>node-stamped <strong>Unix seconds</strong> at record time (byte-parallel with the landed classes&#39; <code>recorded_at</code>/<code>applied_at</code>); hashed; excluded from identity (retry never restamps)</td>
+</tr>
+<tr>
+<td><code>record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>(equality anchor)</td>
+<td>canonical blake3; the sole <code>PartialEq</code>/<code>Eq</code> anchor</td>
+</tr>
+</tbody></table>
+<p><strong>Candidate canonical hashing:</strong> <code>DOMAIN_TAG</code> (<code>icn:gov:evidence_packet_produced:v1</code>) first → length-prefixed <code>domain_id</code>, <code>session_id</code>, <code>packet_id</code>, <code>mutation_application_id</code>, <code>produced_by</code> → <code>mutation_applied_record_hash</code> raw 32 (no length prefix) → <code>receipt_set_hash</code> raw 32 → <code>packet_hash</code> raw 32 → <code>redaction_profile_hash</code> raw 32 → <code>produced_at</code> LE. Exact layout is fixed by the implementation PR and pinned by a golden vector.</p>
+<p><strong>Candidate stable duplicate identity:</strong> <code>(domain_id, session_id, packet_id, mutation_application_id, mutation_applied_record_hash, receipt_set_hash, packet_hash, redaction_profile_hash, produced_by)</code>. <code>produced_at</code> and <code>record_hash</code> are <strong>not</strong> identity.</p>
+<p><strong>Timestamp stance (pinned):</strong> <code>produced_at</code> is a <code>u64</code> of <strong>Unix seconds</strong>, <strong>node-stamped at record time</strong> (byte-parallel with the landed classes&#39; <code>recorded_at</code>/<code>applied_at</code>, which the runtime stamps as <code>now</code> in Unix seconds), hashed into <code>record_hash</code> but <strong>excluded</strong> from stable duplicate identity. No wall-clock time is a cross-node-deterministic identity input (per the #2283/#2284 determinism doctrine); the receipt&#39;s determinism comes entirely from its content-addressed identity, so <code>produced_at</code> may live inside <code>record_hash</code> only because replay converges on the original stamp. A same stable-identity retry returns the original receipt and does <strong>not</strong> restamp.</p>
+<p><strong>Uniqueness / conflict:</strong> <code>put_opaque_if_absent</code> keyed on <code>(class, key1, key2)</code> where <code>key1</code> is an injective netstring composite of <code>(domain_id, session_id)</code> and <code>key2</code> is <code>packet_id</code>; conflict detection on <code>(mutation_application_id, mutation_applied_record_hash, receipt_set_hash, packet_hash, redaction_profile_hash, produced_by)</code>. <code>produced_at</code> and <code>record_hash</code> are not identity. Same-identity retry ⇒ original returned; a <strong>different stable identity for the same <code>(domain_id, session_id, packet_id)</code></strong> ⇒ fail-closed <code>evidence_packet_produced_conflict</code>.</p>
+<p><strong>Preconditions (all fail-closed; on any failure nothing is persisted):</strong> (1) the <code>(domain_id, session_id)</code> session was opened first; (2) a <code>MutationAppliedReceipt</code> with <code>record_hash == mutation_applied_record_hash</code> exists in that same session and its <code>application_id</code> equals the supplied <code>mutation_application_id</code> (resolved via <code>get_mutation_applied(domain_id, session_id, mutation_application_id)</code> then compared on <code>record_hash</code>); (3) the declared source set is non-empty, canonicalizable, and includes <code>mutation_applied_record_hash</code>; (4) <code>domain_id</code> / <code>session_id</code> / <code>packet_id</code> / <code>mutation_application_id</code> / <code>produced_by</code> are non-empty / non-whitespace.</p>
+<p><strong>Deliberately absent from <code>:v1</code> (must never appear):</strong> <code>redaction_profile_id</code>; any <code>human_at_status</code>/human-AT field; <code>packet_body</code>; private source-receipt bodies; private source data; plan body; applied-result body; operation list; target list; effect payload; any delivery/acceptance/transport/audit-outcome field; any external-recipient reference; any signature/attestation of delivery; any proposal/vote/quorum/mandate/outcome semantics.</p>
+<h2>10. Implementation constraints for the next PR</h2>
+<p>The later implementation PR <strong>may</strong>:</p>
+<ul>
+<li>add the <code>EvidencePacketProducedReceipt</code> class <strong>only</strong>, conforming to the #2314 contract plus this rung (§9 above);</li>
+<li>add the minimum immediate-predecessor reference (EP1), source-set commitment (EP1/EP2), packet-hash (EP2), redaction-profile-hash (EP3), producer-witness (EP4), and node-stamped timestamp support pinned here;</li>
+<li>add <code>proof.rs</code> unit tests and a runtime-slice integration test where the existing receipt pattern supports them (construction / emission / persistence / retrieval), mirroring <code>mutation_applied_receipt_runtime_slice.rs</code>.</li>
+</ul>
+<p>The later implementation PR <strong>must not</strong>:</p>
+<ul>
+<li>produce, assemble, redact, export, deliver, or audit any evidence packet; the receipt witnesses a <em>reported</em> production only;</li>
+<li>add a typed/kernel-readable packet/content/source-set model, a <code>packet_ref</code>/<code>recipient_ref</code>, a <code>redaction_profile_id</code>/registry, or any delivery/acceptance/audit field;</li>
+<li>carry any human/AT status field or imply #2041 completion;</li>
+<li>attach any capability/authority check to <code>produced_by</code> (it is opaque actor evidence);</li>
+<li>extend <code>web/member-shell/</code> or any evidence surface (rendering stays deferred) unless separately scoped and reviewed; add no fixtures;</li>
+<li>touch OpenAPI / SDK, or publish a served schema;</li>
+<li>auto-close any protected issue (#1748, #2141, #2041) or its own implementation issue — leave it open for maintainer disposition.</li>
+</ul>
+<h2>11. Validation requirements for the implementation PR</h2>
+<p>Both test tiers the landed classes use, plus the rung-specific checks:</p>
+<ul>
+<li><strong><code>proof.rs</code> unit tests:</strong> a golden vector pinning the <code>:v1</code> <code>record_hash</code> of a fixed sample; a determinism test (same inputs ⇒ same hash); a per-field test (every field change, including <code>mutation_applied_record_hash</code>, <code>receipt_set_hash</code>, <code>packet_hash</code>, and <code>redaction_profile_hash</code>, ⇒ different hash); a <strong>canonical-set-hash test</strong> (the same set of member <code>record_hash</code>es supplied in different input orders ⇒ identical <code>receipt_set_hash</code>; a different member set ⇒ different <code>receipt_set_hash</code>; empty set disallowed; a declared list containing a duplicate <code>record_hash</code> fails closed and persists nothing); a tag-disjointness test asserting <code>icn:gov:evidence_packet_produced:v1</code> never collides with — and a comment that it must never converge with — the seven landed tags and the proposal/vote <code>icn:gov:decision:vN</code> lineage; a serde/payload-audit test confirming no packet-body / source-body / <code>redaction_profile_id</code> / human-AT field is present.</li>
+<li><strong>Runtime-slice integration test:</strong> emission + field round-trip + non-zero <code>record_hash</code> + retrieval; same-identity retry returns the original, never restamped; a different <code>mutation_application_id</code> / <code>mutation_applied_record_hash</code> / <code>receipt_set_hash</code> / <code>packet_hash</code> / <code>redaction_profile_hash</code> / <code>produced_by</code> for the same identity fails closed (<code>evidence_packet_produced_conflict</code>); unopened session fails closed and creates nothing; empty/whitespace ids rejected pre-persistence; missing receipt store / backend failure fail closed; concurrent duplicates serialize to one winner; composite key injective (<code>(&quot;ab&quot;,&quot;c&quot;)</code> vs <code>(&quot;a&quot;,&quot;bc&quot;)</code> must not alias; two domains sharing a <code>session_id</code> never mix).</li>
+<li><strong>EP1 cross-link test</strong> (§4): the referenced <code>MutationAppliedReceipt</code> (by <code>mutation_applied_record_hash</code>) must exist in the same <code>(domain_id, session_id)</code> with a matching <code>application_id</code>; an absent, wrong-session, wrong-domain, or <code>application_id</code>-mismatched reference is refused fail-closed and persists nothing; a declared set that omits the immediate predecessor is refused fail-closed; (if set-member verification is implemented) a set member that resolves to no in-session receipt is refused fail-closed.</li>
+<li><strong>EP2 coverage test</strong> (§5): the serialized payload carries exactly the <code>:v1</code> field set — no packet-body / source-body / operation / target / effect field; <code>packet_hash</code> and <code>receipt_set_hash</code> each participate in <code>record_hash</code>.</li>
+<li><strong>EP3 redaction test</strong> (§6): <code>redaction_profile_hash</code> participates in <code>record_hash</code>; no <code>redaction_profile_id</code>/profile-body field is present.</li>
+<li><strong>EP4 boundary test</strong> (§7): recording a production performs no domain-state mutation beyond persisting the receipt; <code>produced_by</code> is an opaque DID with no attached authority/capability check; no &quot;delivered/accepted/audited/certified/verified-correct/production-ready&quot; claim in the type or its serialization.</li>
+<li><strong>EP5 human/AT test</strong> (§8): no human/AT status field is present in the type or its serialization; no code path sets or implies a human/AT-complete status.</li>
+<li><strong>Timestamp test</strong> (§9): two records differing only in <code>produced_at</code> share duplicate identity (retry returns original, no conflict); <code>produced_at</code> participates in <code>record_hash</code> but not in identity.</li>
+<li><strong>Idempotence / replay test:</strong> a logical production replayed on a second node converges on the original receipt (original stamp, original hash).</li>
+<li><strong>Privacy grep:</strong> no packet body / source-receipt body / private source text / plan body / applied-result body / operation / target / effect text in any serialized receipt or fixture — fingerprints only.</li>
+<li><strong>No-overclaim grep:</strong> no &quot;packet delivered / accepted / audited / certified / production / pilot / organizer-ready / member-ready / live federation / NYCN / Phase-2 / human-AT complete&quot; claims introduced.</li>
+<li><strong>ADR-0026 envelope check:</strong> the receipt sits at Layer 2, self-hashed, no signature/merkle inheritance claim.</li>
+<li><strong>Protected close-keyword grep:</strong> the implementation PR carries no closing keyword (fix / close / resolve) adjacent to a protected issue number (#1748, #2141, #2041) — use <code>Refs</code> only.</li>
+</ul>
+<h2>12. Deferred work (explicitly out of scope of this rung and its future implementation)</h2>
+<ul>
+<li>Any <strong>evidence-packet producer</strong> — code that assembles, redacts, or emits an evidence packet.</li>
+<li>Any <strong>evidence export / delivery / transport / acceptance / audit</strong> mechanism, external-recipient reference, or delivery attestation.</li>
+<li>Any typed/kernel-readable packet/content/source-set model, <code>packet_ref</code>/<code>recipient_ref</code>, <code>redaction_profile_id</code>/profile registry, or verifiable-packet binding beyond the <code>packet_hash</code>/<code>receipt_set_hash</code>/<code>redaction_profile_hash</code> fingerprints.</li>
+<li>Full source-set membership <em>re-verification</em> as a mandatory floor (recommended default only in <code>:v1</code>; a mandatory-verified set is a later decision if a consumer requires it), and any expansion of the source set to include export/delivery artifacts.</li>
+<li>The baseline-lock <code>EvidencePacket</code> type (<code>icn/crates/icn-baseline-lock/src/evidence.rs</code>) — a separate, unrelated bundle; not touched, not extended, not merged with this class.</li>
+<li>Member-shell / process-evidence rendering of <code>EvidencePacketProducedReceipt</code> (a later separately-scoped fixture-only surface may add it after the receipt lands, as #2312 did for <code>MutationAppliedReceipt</code>).</li>
+<li>Action-card triggers (ADR-0027 / #1713).</li>
+<li>The actual <strong>#2041</strong> human/AT pass — parked for a real human-testing phase.</li>
+<li>Production / pilot / NYCN activation / live federation / Phase-2 work.</li>
+<li>entity-auth enforcement (#2081), trusted token issuance (#2080), UnknownLegacy repair (#2274), service hosting, K3s / DNS / Forgejo.</li>
+</ul>
+<h2>13. Non-goals</h2>
+<p>Restated from #2315 / the #2314 contract — this rung and its future implementation are:</p>
+<ul>
+<li>not an evidence-packet producer; not assembling, redacting, or emitting any packet;</li>
+<li>not evidence export / delivery / transport / acceptance / audit; not certifying acceptance or auditing contents;</li>
+<li>not an action-card trigger; not a general workflow engine; not a policy/authority engine; not a new authorization semantic;</li>
+<li>not a typed/kernel-readable packet/content/source-set model; not a <code>redaction_profile_id</code>/registry; not a verifiable-packet binding;</li>
+<li>not a new <code>ProcessGateKind</code>; not an <code>ActivationRequest</code> object;</li>
+<li>not OpenAPI / SDK / served-schema work; not member-shell implementation; not a fixture change;</li>
+<li>not live/private data handling; not private organizer/member/sponsor/attendee data handling;</li>
+<li>not #2041 completion; not human/AT execution; not #1748 or #2141 closure;</li>
+<li>not production / pilot / organizer-ready / member-ready readiness; not live federation; not NYCN activation; not Phase-2 completion;</li>
+<li>not the baseline-lock <code>EvidencePacket</code> type;</li>
+<li>not proposal / vote / quorum / mandate / outcome semantics.</li>
+</ul>
+<p>Receipts record institutional facts. They grant zero authority.</p>
+<h2>14. Implementation sequencing &amp; protected issue state</h2>
+<p><strong>Recommendation (matching the applied lane cadence #2307 → #2309 → #2310):</strong> with this decision rung landed on top of the #2314 contract, a contract-conformant implementation PR may add the <code>EvidencePacketProducedReceipt</code> class <strong>only</strong>, per §9–§11. The implementation PR must keep #1748 / #2141 / #2041 open unless separately reviewed, and must leave its own issue open for maintainer disposition rather than auto-closing it by side effect.</p>
+<p>Protected issue state at authoring: #2313 closed/completed (design contract); #2311 closed/completed (mutation-applied render); #1748 open; #2141 open; #2041 open/parked; #1907 / #2081 / #2080 / #2274 open/untouched.</p>
+<h2>15. Related</h2>
+<p>Refs #2315.
+Refs #2314.
+Refs #2313.
+Refs #2312.
+Refs #2310.
+Refs #1748.
+Refs #2141.
+Refs #2041.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
