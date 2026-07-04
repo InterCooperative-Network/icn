@@ -105,11 +105,13 @@
 
   // #2289 organizer-steward evidence surface. `?mode=demo&set=process-evidence`
   // swaps the demo pack for a fixture-only, read-only evidence story over the
-  // seven already-landed ADR-0026 Layer 2 process-transition receipts (session
+  // eight already-landed ADR-0026 Layer 2 process-transition receipts (session
   // opened -> deliberation entry recorded -> decision recorded -> gate result
-  // -> activation crossed -> mutation plan recorded -> mutation applied) plus a repo-safe evidence-summary export. Fixture/dev only: nothing is live,
-  // every hash is illustrative (see the demo hash label), and the surface
-  // renders read views only — no download, no mutation. `set` is demo-only.
+  // -> activation crossed -> mutation plan recorded -> mutation applied ->
+  // evidence packet produced) plus a repo-safe evidence-summary export.
+  // Fixture/dev only: nothing is live, every hash is illustrative (see the
+  // demo hash label), and the surface renders read views only — no download,
+  // no mutation. `set` is demo-only.
   var SET = MODE === "demo" ? params.get("set") : null;
 
   // DEV/DEMO one-click launcher context. The local launcher
@@ -167,7 +169,7 @@
   }
 
   // #2289 organizer-steward evidence surface (fixture-only). Keeps the demo
-  // standing + cards pack; adds the seven-receipt process-evidence sequence and
+  // standing + cards pack; adds the eight-receipt process-evidence sequence and
   // its repo-safe evidence-summary export (both member-shell-local fixtures).
   if (SET === "process-evidence") {
     FIXTURES.processEvidence = "fixtures/process-evidence-receipts.json";
@@ -628,7 +630,7 @@
   // opts is optional. Existing callers (live completion + demo completion) pass
   // no opts, so the entry keeps its original {receipt, plainContext} shape and
   // renders through renderCompletionReceipt exactly as before. The #2289
-  // process-evidence pack passes opts.kind (one of the seven process-transition
+  // process-evidence pack passes opts.kind (one of the eight process-transition
   // classes) plus optional redaction metadata, routing to renderProcessReceipt.
   // No existing behavior changes.
   function addReceipt(receipt, plainContext, opts) {
@@ -701,7 +703,7 @@
 
   // ---------------------------------------------------------------------
   // #2289 organizer-steward evidence surface (fixture-only, read-only).
-  // Renders one of the seven ADR-0026 Layer 2 process-transition receipts
+  // Renders one of the eight ADR-0026 Layer 2 process-transition receipts
   // (proof.rs) as a plain-language summary first, with the record-level fields
   // under a progressive-disclosure "Show evidence detail" control. record_hash
   // is the proof pointer; body_hash is labeled proof-of-content (the body is
@@ -715,7 +717,8 @@
     process_gate_result: "ProcessGateResultReceipt",
     activation_crossed: "ActivationCrossedReceipt",
     mutation_plan_recorded: "MutationPlanRecordedReceipt",
-    mutation_applied: "MutationAppliedReceipt"
+    mutation_applied: "MutationAppliedReceipt",
+    evidence_packet_produced: "EvidencePacketProducedReceipt"
   };
 
   // record_hash label mirrors renderCompletionReceipt's maturity-tier honesty:
@@ -812,6 +815,27 @@
       li.appendChild(appliedBoundary);
     }
 
+    // Evidence-packet-produced explainer (icn#2319): make the terminal evidence
+    // boundary legible by naming the states plainly — the recorded decision,
+    // the activation crossing, the mutation plan recorded, the plan's
+    // application recorded, and the evidence packet's production recorded here.
+    // Producing a packet is not delivering, accepting, auditing, or certifying
+    // it; the receipt carries fingerprints only (packet, source set, redaction
+    // profile) and grants zero authority.
+    if (kind === "evidence_packet_produced") {
+      var packetBoundary = el("div", { class: "boundary" });
+      packetBoundary.appendChild(el("h4", { text: t("evidence.evidencePacket.boundaryHeading") }));
+      var ebul = el("ul", { class: "card-list" });
+      ebul.appendChild(el("li", { text: t("evidence.evidencePacket.boundary.decision") }));
+      ebul.appendChild(el("li", { text: t("evidence.evidencePacket.boundary.activation") }));
+      ebul.appendChild(el("li", { text: t("evidence.evidencePacket.boundary.planRecorded") }));
+      ebul.appendChild(el("li", { text: t("evidence.evidencePacket.boundary.applied") }));
+      ebul.appendChild(el("li", { text: t("evidence.evidencePacket.boundary.producedHere") }));
+      ebul.appendChild(el("li", { text: t("evidence.evidencePacket.boundary.notDelivered") }));
+      packetBoundary.appendChild(ebul);
+      li.appendChild(packetBoundary);
+    }
+
     var details = el("details");
     details.appendChild(el("summary", { text: t("receipt.showEvidence") }));
     var dl = el("dl", { class: "kv" });
@@ -892,6 +916,30 @@
       kvRow(dl, t("evidence.kv.resultHash"), el("code", { text: hashToHex(r.result_hash) }));
       kvRow(dl, t("evidence.kv.appliedBy"), el("code", { text: String(r.applied_by || "") }));
       kvRow(dl, t("evidence.kv.appliedAt"), String(r.applied_at || ""));
+    } else if (kind === "evidence_packet_produced") {
+      kvRow(dl, t("evidence.kv.packetId"), String(r.packet_id || ""));
+      // Applied reference (icn#2319 / EP1): the packet names the applied step
+      // it draws from by both its caller-opaque id and its content-addressed
+      // record hash. Both are proof pointers to the mutation-applied receipt
+      // above — never body text. Plan, activation, decision, and gate basis are
+      // inherited transitively through that applied step, not restated here.
+      kvRow(dl, t("evidence.kv.applicationRef"), String(r.mutation_application_id || ""));
+      kvRow(dl, t("evidence.kv.mutationAppliedRecordHash"),
+        el("code", { text: hashToHex(r.mutation_applied_record_hash) }));
+      // Source-set commitment (EP1/EP2): a fingerprint over the source
+      // receipts' record hashes — references only; no source receipt body is
+      // ever stored or shown.
+      kvRow(dl, t("evidence.kv.receiptSetHash"),
+        el("code", { text: hashToHex(r.receipt_set_hash) }));
+      // Packet proof pointer (EP2): fingerprints the public/redacted packet
+      // artifact only — the packet body is never stored.
+      kvRow(dl, t("evidence.kv.packetHash"), el("code", { text: hashToHex(r.packet_hash) }));
+      // Redaction boundary (EP3): fingerprints the redaction profile that
+      // shaped the public packet — the profile body is never stored.
+      kvRow(dl, t("evidence.kv.redactionProfileHash"),
+        el("code", { text: hashToHex(r.redaction_profile_hash) }));
+      kvRow(dl, t("evidence.kv.producedBy"), el("code", { text: String(r.produced_by || "") }));
+      kvRow(dl, t("evidence.kv.producedAt"), String(r.produced_at || ""));
     }
     recordHashRow(dl, r.record_hash);
     details.appendChild(dl);
@@ -992,7 +1040,7 @@
   }
 
   // #2289 organizer-steward evidence surface (fixture-only). Reuses the demo
-  // standing + cards render path, then renders the seven-receipt process
+  // standing + cards render path, then renders the eight-receipt process
   // sequence and the repo-safe evidence-summary export. No network beyond the
   // committed fixtures; nothing signed; read-only.
   function loadProcessEvidenceDemo() {
