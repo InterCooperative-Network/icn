@@ -2711,6 +2711,223 @@ impl DecisionRecordedReceipt {
     }
 }
 
+/// Domain separation tag for the `gate_basis` fingerprint of an
+/// [`ActivationCrossedReceipt`]. Distinct from every receipt `DOMAIN_TAG`
+/// so a basis fingerprint can never be confused with a receipt
+/// `record_hash`.
+const ACTIVATION_GATE_BASIS_TAG: &[u8] = b"icn:gov:activation_gate_basis:v1";
+
+/// Cross-node deterministic receipt recording that an already-recorded
+/// decision **crossed the activation boundary** for a process session —
+/// the spine's "boundary between deciding and doing" — with the required
+/// gates observed as passed.
+///
+/// The fifth `ProcessTransitionReceipt` class (ADR-0026 Layer 2), after
+/// [`ProcessGateResultReceipt`] (#2144), [`ProcessSessionOpenedReceipt`]
+/// (#2276), [`DeliberationEntryRecordedReceipt`] (#2279), and
+/// [`DecisionRecordedReceipt`] (#2282), per the merged
+/// `docs/design/activation-crossed-receipt-runtime-dogfood.md` contract
+/// (#2294) and the `docs/design/activation-crossed-receipt-decision-rung.md`
+/// B1/B2/B3 decision (#2295).
+///
+/// **This receipt records a process fact; it grants zero authority and is
+/// not a workflow engine.** "Activation" here is a local/dev/fixture
+/// institutional fact — a recorded decision was accepted as ready to drive
+/// a later action-planning step, conditioned on its required gates observing
+/// `pass`. It is the gate, not the mutation: it is **not** production
+/// activation, service deployment, NYCN launch, mutation planning, or
+/// mutation application. Crossing the boundary produces a receipt of the
+/// crossing and nothing else.
+///
+/// **B1 — the crossing names the decision it activates by BOTH the
+/// caller-opaque `decision_id` and the content-addressed
+/// `decision_record_hash`** of the [`DecisionRecordedReceipt`]. Both fields
+/// participate in the canonical `record_hash` and in stable duplicate
+/// identity. The reference is verified, not merely asserted: the emitting
+/// manager requires a decision receipt with exactly `decision_record_hash`
+/// to exist in the same `(domain_id, session_id)` before the crossing is
+/// recorded. This is the lane's first inter-receipt link; it points at the
+/// decision's own self-hashed `record_hash` and claims no signed-envelope
+/// inheritance (ADR-0026 §7).
+///
+/// **B2 — `gate_basis` is a fingerprint over the sorted, de-duplicated
+/// `record_hash`es of the `ProcessGateResultReceipt`s the caller declares
+/// as the basis for this crossing** (see [`Self::compute_gate_basis`]). The
+/// receipt carries **no `ProcessGateKind`, no `result`, and no gate
+/// evaluation** — only the content fingerprint of the passed gate receipts.
+/// It witnesses that gates passed; it does not re-derive the passing, and it
+/// owns no "required set" policy (that is charter/app-layer). The emitting
+/// manager verifies every declared gate result exists in the same
+/// `(domain_id, session_id)` and carries `result == Pass` before recording.
+///
+/// **B3 — a single caller-supplied `recorded_at`**, hashed into
+/// `record_hash` but **excluded** from duplicate identity — identical to the
+/// four landed classes. No distinct `crossed_at` field; no `effective_at` is
+/// carried or derived. A retry never restamps.
+///
+/// **At most one crossing exists per `(domain_id, session_id,
+/// activation_id)`** — the receipt backend enforces uniqueness atomically at
+/// the storage layer. A retry with identical stable identity (`decision_id`,
+/// `decision_record_hash`, `gate_basis`, `crossed_by`) returns this original
+/// receipt unchanged (never restamped); any mismatch fails closed.
+///
+/// `crossed_by` is actor evidence — the recorder of the crossing, not an
+/// authority to act ("recorder, not crosser"). Equality is anchored to
+/// `record_hash`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct ActivationCrossedReceipt {
+    /// Governance domain the session (and this crossing) is scoped to.
+    pub domain_id: String,
+    /// Identifier of the already-opened process session this crossing
+    /// attaches to. Caller-provided, treated as opaque, meaningful only
+    /// together with `domain_id` (session ids are not globally unique).
+    pub session_id: String,
+    /// Caller-supplied opaque identifier for this activation, unique within
+    /// `(domain_id, session_id)` — uniqueness is enforced at the storage
+    /// layer, not assumed of the id.
+    pub activation_id: String,
+    /// Caller-opaque `decision_id` of the [`DecisionRecordedReceipt`] being
+    /// activated — the human/index handle (B1).
+    pub decision_id: String,
+    /// Content-addressed `record_hash` of that [`DecisionRecordedReceipt`] —
+    /// the cryptographic proof link (B1). Verified to exist in-session
+    /// before the crossing is recorded.
+    pub decision_record_hash: Hash,
+    /// Fingerprint over the sorted, de-duplicated `record_hash`es of the
+    /// passed [`ProcessGateResultReceipt`]s declared as the basis for this
+    /// crossing (B2). See [`Self::compute_gate_basis`].
+    pub gate_basis: Hash,
+    /// DID of the authenticated actor who recorded the crossing — recorder
+    /// evidence, not an authority to act. Grants zero authority.
+    pub crossed_by: String,
+    /// Unix-seconds the crossing was recorded. Not part of duplicate
+    /// identity — a retry never restamps.
+    pub recorded_at: u64,
+    /// blake3 canonical record hash binding the fields above.
+    pub record_hash: Hash,
+}
+
+impl PartialEq for ActivationCrossedReceipt {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_hash == other.record_hash
+    }
+}
+
+impl Eq for ActivationCrossedReceipt {}
+
+impl ActivationCrossedReceipt {
+    /// Domain separation tag for canonical activation-crossed record hashes.
+    /// Distinct from every other receipt-family tag — and in particular it
+    /// must NEVER converge with `icn:gov:decision_recorded:v1`,
+    /// `icn:gov:process_gate_result:v1`, or the proposal/vote
+    /// `icn:gov:decision:v1/v2/v3` lineage.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:activation_crossed:v1";
+
+    /// Compute the canonical `gate_basis` fingerprint (B2) from the declared
+    /// gate-result `record_hash`es.
+    ///
+    /// The inputs are **sorted and de-duplicated** before hashing, so the
+    /// basis is a set fingerprint: the same passed gate receipts in any
+    /// order, with any duplication, always yield the same `gate_basis`
+    /// (contract §5.2 / decision rung §5.2). The count is length-prefixed
+    /// under a dedicated domain tag; each 32-byte hash is appended raw
+    /// (fixed-size fields cannot alias).
+    pub fn compute_gate_basis(gate_result_hashes: &[Hash]) -> Hash {
+        let mut sorted: Vec<Hash> = gate_result_hashes.to_vec();
+        sorted.sort_unstable();
+        sorted.dedup();
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(ACTIVATION_GATE_BASIS_TAG);
+        hasher.update(&(sorted.len() as u64).to_le_bytes());
+        for h in &sorted {
+            hasher.update(h);
+        }
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+
+    /// Build a new receipt and compute its canonical `record_hash`.
+    ///
+    /// `gate_basis` is supplied pre-computed (via [`Self::compute_gate_basis`]
+    /// over the verified passed gate-result hashes), mirroring how the
+    /// decision/deliberation classes take a pre-computed `body_hash`.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        domain_id: String,
+        session_id: String,
+        activation_id: String,
+        decision_id: String,
+        decision_record_hash: Hash,
+        gate_basis: Hash,
+        crossed_by: String,
+        recorded_at: u64,
+    ) -> Self {
+        let record_hash = Self::compute_record_hash(
+            &domain_id,
+            &session_id,
+            &activation_id,
+            &decision_id,
+            &decision_record_hash,
+            &gate_basis,
+            &crossed_by,
+            recorded_at,
+        );
+        Self {
+            domain_id,
+            session_id,
+            activation_id,
+            decision_id,
+            decision_record_hash,
+            gate_basis,
+            crossed_by,
+            recorded_at,
+            record_hash,
+        }
+    }
+
+    /// Compute the canonical record hash from the input fields.
+    ///
+    /// Layout (per the #2294 contract as resolved by the #2295 B1/B2/B3
+    /// decision rung §7): [`Self::DOMAIN_TAG`] first; each string field
+    /// length-prefixed (u64 LE) in order `domain_id`, `session_id`,
+    /// `activation_id`, `decision_id`, `crossed_by`; then
+    /// `decision_record_hash` and `gate_basis` appended **raw as fixed
+    /// 32-byte fields with no length prefix** (fixed-size fields cannot
+    /// alias); then `recorded_at` as LE bytes. No `body_hash` in this first
+    /// slice; no discriminant byte (this class has no kind taxonomy).
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_record_hash(
+        domain_id: &str,
+        session_id: &str,
+        activation_id: &str,
+        decision_id: &str,
+        decision_record_hash: &Hash,
+        gate_basis: &Hash,
+        crossed_by: &str,
+        recorded_at: u64,
+    ) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        for field in [
+            domain_id,
+            session_id,
+            activation_id,
+            decision_id,
+            crossed_by,
+        ] {
+            hasher.update(&(field.len() as u64).to_le_bytes());
+            hasher.update(field.as_bytes());
+        }
+        hasher.update(decision_record_hash);
+        hasher.update(gate_basis);
+        hasher.update(&recorded_at.to_le_bytes());
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+}
+
 // ============================================================================
 // Mandate grant reference (#1868 step 2 primitive — wire form only)
 // ============================================================================
@@ -4274,6 +4491,332 @@ mod tests {
             assert!(
                 !lower.contains(forbidden),
                 "DecisionRecordedReceipt JSON must not contain `{forbidden}`; got: {json}"
+            );
+        }
+    }
+
+    // ============================================================================
+    // ActivationCrossedReceipt — fifth ProcessTransitionReceipt class (per
+    // the #2294 contract + #2295 B1/B2/B3 decision rung)
+    // ============================================================================
+
+    fn sample_activation_crossed_receipt() -> ActivationCrossedReceipt {
+        ActivationCrossedReceipt::new(
+            "domain-food-coop".to_string(),
+            "session-alpha".to_string(),
+            "activation-001".to_string(),
+            "decision-001".to_string(),
+            [7u8; 32], // decision_record_hash (B1 proof link)
+            [5u8; 32], // gate_basis (B2 fingerprint — literal here so the
+            // receipt golden is independent of the basis derivation)
+            "did:icn:crosser-1".to_string(),
+            1_750_000_000,
+        )
+    }
+
+    #[test]
+    fn activation_crossed_golden_vector() {
+        // Golden canonical hash vector: pins the FULL v1 layout (domain tag,
+        // length-prefixed strings domain_id/session_id/activation_id/
+        // decision_id/crossed_by, raw fixed 32-byte decision_record_hash then
+        // gate_basis, recorded_at LE — no body_hash, no discriminant byte).
+        // Any layout change breaks this test and requires a new tag version,
+        // not an edit here.
+        let r = sample_activation_crossed_receipt();
+        assert_eq!(
+            hex32(&r.record_hash),
+            "2233c0322ec0509bb57070a9c3081c28715cadfa2995d0be2abc6efe9f7d1798",
+            "canonical v1 hash layout drifted"
+        );
+    }
+
+    #[test]
+    fn activation_crossed_gate_basis_golden_vector() {
+        // Pins the gate_basis fingerprint layout (its own domain tag, u64 LE
+        // count, sorted+deduped raw 32-byte hashes).
+        let basis = ActivationCrossedReceipt::compute_gate_basis(&[[4u8; 32], [3u8; 32]]);
+        assert_eq!(
+            hex32(&basis),
+            "3dd8d07807ed717cf08371ebb7f68870997a3d8c7bbec6dc0a941d402ef148ba",
+            "gate_basis fingerprint layout drifted"
+        );
+    }
+
+    #[test]
+    fn activation_crossed_gate_basis_order_and_dedup_independent() {
+        // B2 §5.2: basis is a set fingerprint — order-independent and
+        // de-duplicating.
+        let a = ActivationCrossedReceipt::compute_gate_basis(&[[1u8; 32], [2u8; 32], [3u8; 32]]);
+        let reordered =
+            ActivationCrossedReceipt::compute_gate_basis(&[[3u8; 32], [1u8; 32], [2u8; 32]]);
+        assert_eq!(
+            a, reordered,
+            "gate_basis must be order-independent (sorted)"
+        );
+        let duplicated = ActivationCrossedReceipt::compute_gate_basis(&[
+            [1u8; 32], [2u8; 32], [2u8; 32], [3u8; 32], [1u8; 32],
+        ]);
+        assert_eq!(a, duplicated, "gate_basis must de-duplicate");
+        let different = ActivationCrossedReceipt::compute_gate_basis(&[[1u8; 32], [2u8; 32]]);
+        assert_ne!(
+            a, different,
+            "a different basis set changes the fingerprint"
+        );
+        assert_ne!(a, [0u8; 32], "real blake3 fingerprint");
+    }
+
+    #[test]
+    fn activation_crossed_record_hash_determinism() {
+        let r1 = sample_activation_crossed_receipt();
+        let r2 = sample_activation_crossed_receipt();
+        assert_eq!(r1.record_hash, r2.record_hash);
+        assert_ne!(r1.record_hash, [0u8; 32]);
+        assert_eq!(r1, r2);
+    }
+
+    #[test]
+    fn activation_crossed_record_hash_changes_per_field() {
+        // Each field independently changes the hash — including
+        // decision_record_hash and gate_basis (the B1/B2 links).
+        let base = sample_activation_crossed_receipt();
+        let variants = [
+            ActivationCrossedReceipt::new(
+                "domain-other".to_string(),
+                base.session_id.clone(),
+                base.activation_id.clone(),
+                base.decision_id.clone(),
+                base.decision_record_hash,
+                base.gate_basis,
+                base.crossed_by.clone(),
+                base.recorded_at,
+            ),
+            ActivationCrossedReceipt::new(
+                base.domain_id.clone(),
+                "session-other".to_string(),
+                base.activation_id.clone(),
+                base.decision_id.clone(),
+                base.decision_record_hash,
+                base.gate_basis,
+                base.crossed_by.clone(),
+                base.recorded_at,
+            ),
+            ActivationCrossedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                "activation-other".to_string(),
+                base.decision_id.clone(),
+                base.decision_record_hash,
+                base.gate_basis,
+                base.crossed_by.clone(),
+                base.recorded_at,
+            ),
+            ActivationCrossedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.activation_id.clone(),
+                "decision-other".to_string(),
+                base.decision_record_hash,
+                base.gate_basis,
+                base.crossed_by.clone(),
+                base.recorded_at,
+            ),
+            ActivationCrossedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.activation_id.clone(),
+                base.decision_id.clone(),
+                [8u8; 32],
+                base.gate_basis,
+                base.crossed_by.clone(),
+                base.recorded_at,
+            ),
+            ActivationCrossedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.activation_id.clone(),
+                base.decision_id.clone(),
+                base.decision_record_hash,
+                [6u8; 32],
+                base.crossed_by.clone(),
+                base.recorded_at,
+            ),
+            ActivationCrossedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.activation_id.clone(),
+                base.decision_id.clone(),
+                base.decision_record_hash,
+                base.gate_basis,
+                "did:icn:crosser-other".to_string(),
+                base.recorded_at,
+            ),
+            ActivationCrossedReceipt::new(
+                base.domain_id.clone(),
+                base.session_id.clone(),
+                base.activation_id.clone(),
+                base.decision_id.clone(),
+                base.decision_record_hash,
+                base.gate_basis,
+                base.crossed_by.clone(),
+                base.recorded_at + 1,
+            ),
+        ];
+        for (i, v) in variants.iter().enumerate() {
+            assert_ne!(
+                base.record_hash, v.record_hash,
+                "variant {i} must change the record hash"
+            );
+        }
+    }
+
+    #[test]
+    fn activation_crossed_tag_separates_from_other_families() {
+        // Family separation from the four landed process-transition classes.
+        assert_ne!(
+            ActivationCrossedReceipt::DOMAIN_TAG,
+            ProcessSessionOpenedReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            ActivationCrossedReceipt::DOMAIN_TAG,
+            ProcessGateResultReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            ActivationCrossedReceipt::DOMAIN_TAG,
+            DeliberationEntryRecordedReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            ActivationCrossedReceipt::DOMAIN_TAG,
+            DecisionRecordedReceipt::DOMAIN_TAG
+        );
+        // Must NEVER converge with the proposal/vote decision lineage —
+        // that lineage records a vote outcome; this class records the fact
+        // that a recorded decision crossed the activation boundary.
+        assert_ne!(
+            ActivationCrossedReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceipt::DOMAIN_TAG
+        );
+        assert_ne!(
+            ActivationCrossedReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceiptV2::DOMAIN_TAG
+        );
+        assert_ne!(
+            ActivationCrossedReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceiptV3::DOMAIN_TAG
+        );
+        // The gate_basis fingerprint tag is also disjoint from the receipt
+        // tag so a basis can never be confused with a record_hash.
+        assert_ne!(
+            ActivationCrossedReceipt::DOMAIN_TAG,
+            ACTIVATION_GATE_BASIS_TAG
+        );
+        let activation = sample_activation_crossed_receipt();
+        let decision = sample_decision_recorded_receipt();
+        assert_ne!(activation.record_hash, decision.record_hash);
+    }
+
+    #[test]
+    fn activation_crossed_length_prefix_prevents_field_shifting() {
+        // Shifting bytes between adjacent string fields must change the
+        // hash — the length prefix delimits each field exactly.
+        let a = ActivationCrossedReceipt::compute_record_hash(
+            "ab",
+            "c",
+            "activation-001",
+            "decision-001",
+            &[0u8; 32],
+            &[0u8; 32],
+            "did:icn:x",
+            1,
+        );
+        let b = ActivationCrossedReceipt::compute_record_hash(
+            "a",
+            "bc",
+            "activation-001",
+            "decision-001",
+            &[0u8; 32],
+            &[0u8; 32],
+            "did:icn:x",
+            1,
+        );
+        assert_ne!(a, b, "domain/session byte shift must change the hash");
+        let c = ActivationCrossedReceipt::compute_record_hash(
+            "d",
+            "s",
+            "xy",
+            "z",
+            &[0u8; 32],
+            &[0u8; 32],
+            "did:icn:x",
+            1,
+        );
+        let d = ActivationCrossedReceipt::compute_record_hash(
+            "d",
+            "s",
+            "x",
+            "yz",
+            &[0u8; 32],
+            &[0u8; 32],
+            "did:icn:x",
+            1,
+        );
+        assert_ne!(
+            c, d,
+            "activation_id/decision_id byte shift must change the hash"
+        );
+    }
+
+    #[test]
+    fn activation_crossed_serde_roundtrip_and_payload_audit() {
+        // Round-trip preserves everything (equality anchored to
+        // record_hash), and the persisted payload carries ONLY the v1 field
+        // set — no body, no gate kind/result, no outcome/tally/vote fields.
+        let r = sample_activation_crossed_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let back: ActivationCrossedReceipt = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(r, back);
+        assert_eq!(back.recorded_at, r.recorded_at);
+        assert_eq!(back.decision_record_hash, r.decision_record_hash);
+        assert_eq!(back.gate_basis, r.gate_basis);
+        let value: serde_json::Value = serde_json::from_str(&json).expect("value");
+        let obj = value.as_object().expect("object");
+        let expected: std::collections::BTreeSet<&str> = [
+            "domain_id",
+            "session_id",
+            "activation_id",
+            "decision_id",
+            "decision_record_hash",
+            "gate_basis",
+            "crossed_by",
+            "recorded_at",
+            "record_hash",
+        ]
+        .into_iter()
+        .collect();
+        let actual: std::collections::BTreeSet<&str> = obj.keys().map(|k| k.as_str()).collect();
+        assert_eq!(
+            actual, expected,
+            "payload must carry exactly the v1 field set — no body, no gate \
+             kind/result, no outcome/tally/vote/proposal/mandate field"
+        );
+    }
+
+    #[test]
+    fn activation_crossed_no_prohibited_vocabulary() {
+        let r = sample_activation_crossed_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let lower = json.to_lowercase();
+        for forbidden in [
+            // regulated-finance vocabulary (same list as the sibling
+            // process-receipt tests)
+            "wallet", "balance", "currency", "payment", "withdraw", "deposit",
+            // proposal/vote lineage vocabulary — must not leak in
+            "proposal", "vote", "tally", "quorum", "mandate",
+            // authority-flavored actor names
+            "decider", "approver",
+        ] {
+            assert!(
+                !lower.contains(forbidden),
+                "ActivationCrossedReceipt JSON must not contain `{forbidden}`; got: {json}"
             );
         }
     }

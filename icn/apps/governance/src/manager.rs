@@ -2758,6 +2758,29 @@ pub enum DecisionRecordOutcome {
     AlreadyRecorded(icn_governance::DecisionRecordedReceipt),
 }
 
+/// Outcome of [`GovernanceManager::record_activation_crossed`] (#2294
+/// contract + #2295 B1/B2/B3 decision rung). Both variants are successes;
+/// the fail-closed mismatch conflict surfaces as an `Err` with stable prefix
+/// `activation_crossed_conflict`. Precondition failures surface as `Err`s
+/// with their own stable prefixes and persist nothing:
+/// `activation_crossed_session_not_opened` (unopened session),
+/// `activation_crossed_decision_not_found` / `activation_crossed_decision_mismatch`
+/// (B1 decision reference absent or mismatched),
+/// `activation_crossed_empty_gate_basis` (empty basis),
+/// `activation_crossed_gate_not_found` / `activation_crossed_gate_not_passed`
+/// (a declared gate result is absent/wrong-scope or did not pass).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActivationCrossedOutcome {
+    /// This call recorded the crossing: the receipt is the newly persisted
+    /// activation-crossed fact.
+    Crossed(icn_governance::ActivationCrossedReceipt),
+    /// The crossing was already recorded with the **same** stable identity
+    /// (`decision_id`, `decision_record_hash`, `gate_basis`, `crossed_by`);
+    /// carries the **original** persisted receipt (original `recorded_at` /
+    /// `record_hash` — a retry is never restamped).
+    AlreadyCrossed(icn_governance::ActivationCrossedReceipt),
+}
+
 /// Action items are always managed locally (not gossiped) and can use either
 /// in-memory or Sled-backed persistent storage.
 pub struct GovernanceManager {
@@ -6389,6 +6412,281 @@ impl GovernanceManager {
         store
             .list_decisions_recorded_for_session_in_domain(&domain_id.0, session_id)
             .map_err(|e| anyhow::anyhow!("Failed to list decision receipts: {e}"))
+    }
+
+    /// Record that an already-recorded decision **crossed the activation
+    /// boundary** for a process session — the fifth `ProcessTransitionReceipt`
+    /// class (#2294 contract + #2295 B1/B2/B3 decision rung). Emits an
+    /// [`ActivationCrossedReceipt`].
+    ///
+    /// This records a **process fact and grants zero authority.** It is not
+    /// a workflow engine, not mutation planning, and not mutation
+    /// application. `crossed_by` is recorder evidence, not an authority to
+    /// act.
+    ///
+    /// **All preconditions fail closed and persist nothing on failure**
+    /// (each with a stable error prefix; see [`ActivationCrossedOutcome`]):
+    ///
+    /// 1. `domain_id` / `session_id` / `activation_id` / `decision_id` and
+    ///    `crossed_by` must be non-empty and non-whitespace; a receipt store
+    ///    must be wired.
+    /// 2. The `(domain_id, session_id)` session must have a recorded opening
+    ///    (`activation_crossed_session_not_opened`) — no silent creation.
+    /// 3. **B1:** a [`DecisionRecordedReceipt`] with `decision_id` must exist
+    ///    in the same `(domain_id, session_id)`
+    ///    (`activation_crossed_decision_not_found`) and its `record_hash`
+    ///    must equal the supplied `decision_record_hash`
+    ///    (`activation_crossed_decision_mismatch`). Verified, not asserted.
+    /// 4. **B2:** the declared `gate_result_hashes` basis must be non-empty
+    ///    (`activation_crossed_empty_gate_basis`); every declared
+    ///    `record_hash` must name a [`ProcessGateResultReceipt`] in the same
+    ///    `(domain_id, session_id)` (`activation_crossed_gate_not_found`)
+    ///    carrying `result == Pass` (`activation_crossed_gate_not_passed`). A
+    ///    `Fail`, absent, wrong-domain, or wrong-session gate refuses the
+    ///    crossing. `gate_basis` is recomputed from the sorted, de-duplicated
+    ///    declared hashes, so basis input ordering does not matter.
+    ///
+    /// **At most one crossing exists per `(domain_id, session_id,
+    /// activation_id)`**, enforced atomically by the backend:
+    ///
+    /// - first record → [`ActivationCrossedOutcome::Crossed`];
+    /// - retry with identical stable identity (`decision_id`,
+    ///   `decision_record_hash`, `gate_basis`, `crossed_by`) →
+    ///   [`ActivationCrossedOutcome::AlreadyCrossed`] carrying the
+    ///   **original** receipt unchanged (never restamped;
+    ///   `recorded_at`/`record_hash` are not identity inputs);
+    /// - same `activation_id` with a different decision reference, gate
+    ///   basis, or crosser → fail-closed error (stable prefix
+    ///   `activation_crossed_conflict`); the original is untouched.
+    #[allow(clippy::too_many_arguments)]
+    pub fn record_activation_crossed(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        activation_id: &str,
+        decision_id: &str,
+        decision_record_hash: [u8; 32],
+        gate_result_hashes: &[[u8; 32]],
+        crossed_by: &Did,
+    ) -> Result<ActivationCrossedOutcome> {
+        // Whitespace-only ids are rejected alongside empty ones: a caller
+        // bypassing the HTTP layer must not mint receipts with
+        // visually-empty identifiers or whitespace storage keys.
+        if domain_id.0.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_activation_crossed: domain_id must be non-empty and non-whitespace"
+            ));
+        }
+        if session_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_activation_crossed: session_id must be non-empty and non-whitespace"
+            ));
+        }
+        if activation_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_activation_crossed: activation_id must be non-empty and non-whitespace"
+            ));
+        }
+        if decision_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_activation_crossed: decision_id must be non-empty and non-whitespace"
+            ));
+        }
+        let crossed_by_str = crossed_by.to_string();
+        if crossed_by_str.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_activation_crossed: crossed_by must be non-empty"
+            ));
+        }
+        let store = self.receipt_store.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "record_activation_crossed: a receipt store is required — activation \
+                 uniqueness and the decision/gate preconditions are enforced at the \
+                 storage layer and cannot be faked in memory"
+            )
+        })?;
+
+        // Precondition: the session was opened first. No silent creation.
+        let opened = store
+            .get_process_session_opened(&domain_id.0, session_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_activation_crossed: failed to read session-open state for \
+                     session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        if opened.is_none() {
+            return Err(anyhow::anyhow!(
+                "activation_crossed_session_not_opened: session {session_id} in domain {} \
+                 has no recorded opening; refusing to cross activation against an \
+                 unanchored session",
+                domain_id.0
+            ));
+        }
+
+        // B1 precondition: the decision being activated must exist in this
+        // same (domain, session) under `decision_id`, and its `record_hash`
+        // must equal the supplied `decision_record_hash`. The composite
+        // storage key makes a decision recorded under a different
+        // session/domain invisible here, so a wrong-session/wrong-domain
+        // reference fails closed as "not found".
+        let decision = store
+            .get_decision_recorded(&domain_id.0, session_id, decision_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_activation_crossed: failed to read decision state for decision \
+                     {decision_id} in session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        let decision = decision.ok_or_else(|| {
+            anyhow::anyhow!(
+                "activation_crossed_decision_not_found: no decision {decision_id} recorded in \
+                 session {session_id} in domain {}; refusing to cross activation for an \
+                 unrecorded decision",
+                domain_id.0
+            )
+        })?;
+        if decision.record_hash != decision_record_hash {
+            return Err(anyhow::anyhow!(
+                "activation_crossed_decision_mismatch: decision {decision_id} in session \
+                 {session_id} in domain {} was recorded with a different record_hash than the \
+                 one supplied; refusing to cross activation on a mismatched decision reference",
+                domain_id.0
+            ));
+        }
+
+        // B2 precondition: the declared gate-result basis must be non-empty,
+        // and every declared record_hash must name a gate result in this same
+        // (domain, session) carrying `Pass`. A Fail, absent, wrong-domain, or
+        // wrong-session gate result refuses the crossing.
+        if gate_result_hashes.is_empty() {
+            return Err(anyhow::anyhow!(
+                "activation_crossed_empty_gate_basis: at least one passed gate-result \
+                 record_hash must be declared as the activation basis; refusing to cross \
+                 activation with an empty basis"
+            ));
+        }
+        let gate_results = store
+            .list_process_gate_results_for_session_in_domain(&domain_id.0, session_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_activation_crossed: failed to read gate-result state for session \
+                     {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        // Index the in-scope gate results by `record_hash` once so each
+        // declared basis hash is an O(1) lookup rather than a linear scan
+        // (a session can accumulate many gate results over time). Distinct
+        // `record_hash`es are unique by construction, so the map is
+        // collision-free; iterating the declared list in order preserves the
+        // original first-failure error semantics.
+        let gate_index: HashMap<[u8; 32], icn_governance::ProcessGateResult> = gate_results
+            .iter()
+            .map(|g| (g.record_hash, g.result))
+            .collect();
+        for declared in gate_result_hashes {
+            match gate_index.get(declared) {
+                None => {
+                    return Err(anyhow::anyhow!(
+                        "activation_crossed_gate_not_found: a declared gate-result record_hash \
+                         is not recorded in session {session_id} in domain {}; refusing to \
+                         cross activation on an unverifiable gate basis",
+                        domain_id.0
+                    ));
+                }
+                Some(result) => {
+                    if *result != icn_governance::ProcessGateResult::Pass {
+                        return Err(anyhow::anyhow!(
+                            "activation_crossed_gate_not_passed: a declared gate-result in \
+                             session {session_id} in domain {} did not pass; refusing to cross \
+                             activation on a failed gate",
+                            domain_id.0
+                        ));
+                    }
+                }
+            }
+        }
+
+        // B2: recompute gate_basis from the sorted, de-duplicated declared
+        // record_hashes — order-independent and dedup-stable by construction.
+        let gate_basis =
+            icn_governance::ActivationCrossedReceipt::compute_gate_basis(gate_result_hashes);
+
+        let now = icn_time::current_timestamp_secs();
+        let receipt = icn_governance::ActivationCrossedReceipt::new(
+            domain_id.0.clone(),
+            session_id.to_string(),
+            activation_id.to_string(),
+            decision_id.to_string(),
+            decision_record_hash,
+            gate_basis,
+            crossed_by_str.clone(),
+            now,
+        );
+
+        match store.put_activation_crossed(&receipt).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to persist activation-crossed receipt for activation {activation_id} in \
+                 session {session_id} in domain {}: {e}",
+                domain_id.0
+            )
+        })? {
+            crate::receipt_backend::ActivationCrossedPersist::Inserted => {
+                Ok(ActivationCrossedOutcome::Crossed(receipt))
+            }
+            crate::receipt_backend::ActivationCrossedPersist::Existing(original) => {
+                if original.decision_id == decision_id
+                    && original.decision_record_hash == decision_record_hash
+                    && original.gate_basis == gate_basis
+                    && original.crossed_by == crossed_by_str
+                {
+                    Ok(ActivationCrossedOutcome::AlreadyCrossed(*original))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "activation_crossed_conflict: activation {activation_id} in session \
+                         {session_id} in domain {} was already recorded with a different \
+                         decision reference, gate basis, or crosser; refusing to overwrite",
+                        domain_id.0
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Retrieve the persisted activation-crossed receipt for a
+    /// `(domain_id, session_id, activation_id)`, or `None` when no crossing
+    /// has been recorded. Read-only.
+    pub fn get_activation_crossed(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        activation_id: &str,
+    ) -> Result<Option<icn_governance::ActivationCrossedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(None);
+        };
+        store
+            .get_activation_crossed(&domain_id.0, session_id, activation_id)
+            .map_err(|e| anyhow::anyhow!("Failed to read activation-crossed receipt: {e}"))
+    }
+
+    /// List all activation-crossed receipts recorded against one
+    /// `(domain_id, session_id)` anchor, in the store's deterministic
+    /// chronological `(recorded_at, record_hash)` order. Read-only.
+    pub fn list_activations_crossed_in_domain(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+    ) -> Result<Vec<icn_governance::ActivationCrossedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(vec![]);
+        };
+        store
+            .list_activations_crossed_for_session_in_domain(&domain_id.0, session_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list activation-crossed receipts: {e}"))
     }
 
     // ========================================================================
