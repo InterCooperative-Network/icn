@@ -561,6 +561,12 @@ Design for managing identity across multiple devices within a single agent
 
 **For:** `developers`, `architects` | **Updated:** 2026-03-10
 
+### 📋 **Draft** [MutationPlanRecordedReceipt decision rung — M1/M2/M3](/docs/design/mutation-plan-recorded-receipt-decision-rung.md)
+
+Narrow decision document resolving the three implementation blockers named in the merged #2300 MutationPlanRecordedReceipt design/audit contract (#2301, under #1748/#2141), mirroring the activation-crossed-receipt-decision-rung.md cadence — decide hash-participating structure in writing before the icn:gov:mutation_plan_recorded:v1 tag is pinned. M1 (plan→activation reference): the receipt carries both the caller-opaque activation_id and the content-addressed activation_record_hash of the ActivationCrossedReceipt it follows — the lane's second inter-receipt link — verified fail-closed (get_activation_crossed then record_hash compare; the referenced activation must exist in-session with a matching activation_id), with decision + gate basis inherited transitively through the activation rather than re-referenced in v1. M2 (plan-body representation): body_hash-only v1 (a caller-supplied 32-byte fingerprint; the MutationPlan body — operation list, target list, effect payload, or any typed operation model — is never stored, preserving the meaning firewall and privacy), no plan-kind taxonomy. M3 (timestamp): a single caller-supplied recorded_at, hashed but excluded from duplicate identity, byte-parallel with the five landed classes; no distinct planned_at; no wall-clock in cross-node identity. Pins a consolidated candidate :v1 field layout, preconditions, and the implementation PR's validation matrix. Design only — no Rust/UI/schema/OpenAPI/SDK/receipt-class change; no member-shell change; no human/AT execution (Refs #2301, #2299, #2300, #1748, #2141, #2041, #2296, #2298; no closure claims)
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-04
+
 ### 📋 **Draft** [MutationPlanRecordedReceipt — Design/Audit Contract](/docs/design/mutation-plan-recorded-receipt.md)
 
 Design/audit contract for #2299 (under #1748/#2141): the candidate sixth ProcessTransitionReceipt rung, a MutationPlanRecordedReceipt witnessing that a mutation plan (the framing spine's plan-of-record for what runtime should do as a consequence of an activation) was recorded after an ActivationCrossedReceipt, before any mutation is applied. Audits current state honestly (MutationPlanRecordedReceipt / MutationPlan / MutationAppliedReceipt / EvidencePacketProducedReceipt — and even the framing's proposed read-model PreviewReviewPacket / pending_publish_summary — are framing-only with no Rust seam; the five landed classes ProcessSessionOpened/DeliberationEntryRecorded/DecisionRecorded/ProcessGateResult/ActivationCrossed are the only runtime ProcessTransitionReceipts; icn-baseline-lock's EvidencePacket is a separate baseline-lock bundle, not this class). Proposes a candidate icn:gov:mutation_plan_recorded:v1 contract subject to implementation proof (session-anchored (domain_id, session_id), caller-opaque plan_id, activation reference by activation_id + content-addressed activation_record_hash as the lane's second inter-receipt link verified fail-closed, recorder-not-planner DID granting zero authority, body_hash-only fingerprint with the plan body never stored, put_opaque_if_absent idempotence with fail-closed conflict and session precondition), places it at ADR-0026 Layer 2 self-hashed (blake3 record_hash, no signature/merkle — naming the layering caveat), preserves the meaning-firewall + privacy boundary (no kernel-readable operation list, no plan body text), defers member-shell rendering, and names three blockers for a narrow decision rung before implementation: M1 plan→activation reference posture, M2 body_hash-only vs typed operation model + plan-kind taxonomy, M3 timestamp source. Recommendation Option C: land this contract, then a decision rung, then implementation. Explicitly stops at plan-recorded — MutationAppliedReceipt, EvidencePacketProducedReceipt, action-card triggers, and any typed/kernel-readable plan model are deferred. Design only — no Rust/UI/schema/OpenAPI/SDK/receipt-class change; no member-shell change; no human/AT execution (Refs #2299, #1748, #2141, #2041, #2296, #2298; no closure claims)
@@ -2084,10 +2090,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 340
+**Total documents:** 341
 
 **By status:**
 - Active: 1
 - Canonical: 40
-- Draft: 87
+- Draft: 88
 - Living: 212
