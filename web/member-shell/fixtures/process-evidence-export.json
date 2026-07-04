@@ -8,7 +8,7 @@
     {
       "kind": "committed-fixture",
       "basename": "process-evidence-receipts.json",
-      "summary": "Fictional fixture pack of five process-transition receipts (session opened, deliberation entry recorded, decision recorded, accessibility-gate result, activation crossed). No real people and no real domain; all hashes are illustrative."
+      "summary": "Fictional fixture pack of six process-transition receipts (session opened, deliberation entry recorded, decision recorded, accessibility-gate result, activation crossed, mutation plan recorded). No real people and no real domain; all hashes are illustrative."
     }
   ],
   "workflow_steps_completed": [
@@ -29,6 +29,10 @@
     {
       "category": "deferred",
       "plain_summary": "The recorded decision crossed from decision toward later action planning — accepted as ready to drive a later action-planning step, with the required gate observed as passed. The receipt records only that the crossing happened: it is not a mutation, grants zero authority, and the later action-planning (mutation planning) work remains deferred."
+    },
+    {
+      "category": "deferred",
+      "plain_summary": "A mutation plan was recorded after activation and before any mutation was applied. The receipt references the activation it follows and fingerprints the plan body as a content hash. It records only that the plan record exists: it does not apply the plan, expose the plan body, or grant authority — mutation application and evidence-packet production both remain deferred."
     }
   ],
   "preview_review_boundary": {
@@ -38,10 +42,10 @@
   "mutation_boundary": {
     "executed": false,
     "target": "none",
-    "notes": "Fixture-only rehearsal; no gateway contacted, no write attempted, no network egress. The activation crossing is a process fact, not a mutation — mutation planning and application remain deferred and are not part of this surface."
+    "notes": "Fixture-only rehearsal; no gateway contacted, no write attempted, no network egress. The activation crossing and the mutation-plan recording are process facts, not mutations — recording a plan is not applying it; mutation application and evidence-packet production remain deferred and are not part of this surface."
   },
   "warnings": [
-    "The five process-transition receipt hashes are illustrative fixture values, not real blake3 bindings; nothing is signed.",
+    "The six process-transition receipt hashes are illustrative fixture values, not real blake3 bindings; nothing is signed.",
     "This surface renders read views only; no live gateway, federation, or production posture is implied."
   ],
   "follow_ups": [
@@ -67,8 +71,9 @@
     "Not a live federation, live Google Drive / Groups / Sheets sync, or any K3s / DNS / Forgejo mutation.",
     "Not private-data handling; all material is fictional and repo-safe by construction.",
     "Not organizer-ready or member-ready; this is a dev/fixture evidence view only.",
-    "Not a new receipt class; it reads the five existing ADR-0026 Layer 2 process-transition receipts only (activation crossed landed in icn#2296).",
-    "Not a mutation, a planned or applied mutation, an action card, or an evidence-packet producer; activation records only that a decision crossed toward later action planning, which remains deferred.",
+    "Not a new receipt class; it reads the six existing ADR-0026 Layer 2 process-transition receipts only (mutation plan recorded landed in icn#2303).",
+    "Not a mutation, a planned or applied mutation, an action card, or an evidence-packet producer; activation records only that a decision crossed toward later action planning, and the mutation-plan receipt records only that a plan was recorded — recording a plan is not applying it, and application plus evidence-packet production remain deferred.",
+    "Not a plan body, operation list, target list, effect payload, or typed/kernel-readable mutation-plan operation model; the mutation-plan receipt carries a body-hash fingerprint only.",
     "Not NYCN activation and not Phase 2 completion."
   ]
 }

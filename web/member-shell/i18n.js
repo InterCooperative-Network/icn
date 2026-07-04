@@ -270,7 +270,7 @@
       "launcher.startFailed": "Could not start the local demo ({error}). Use Connect manually instead, or check the launcher tunnel.",
 
       // --- #2289 organizer-steward evidence surface (fixture-only) -------
-      // Renders the four already-landed ADR-0026 Layer 2 process-transition
+      // Renders the six already-landed ADR-0026 Layer 2 process-transition
       // receipts as a plain-language evidence story, plus a repo-safe evidence
       // summary. Fixture/dev only; nothing signed; read-only. No readiness is
       // claimed and no new receipt class is introduced.
@@ -279,6 +279,7 @@
       "evidence.decision_recorded.heading": "Decision recorded",
       "evidence.process_gate_result.heading": "Gate result recorded",
       "evidence.activation_crossed.heading": "Activation crossed",
+      "evidence.mutation_plan_recorded.heading": "Mutation plan recorded",
 
       // Deliberation redaction demo (steward-visible vs member/export-redacted).
       "evidence.redaction.stewardHeading": "What the steward body sees",
@@ -292,7 +293,16 @@
       "evidence.activation.boundary.crossing": "That recorded decision then crossed from decision toward later action planning, with the required gate observed as passed. This receipt records only that the crossing happened.",
       "evidence.activation.boundary.deferred": "The later action planning itself — planning or applying any change — is not done here and remains deferred. Activation is the boundary, not the change; the receipt records a process fact and grants zero authority.",
 
-      // Evidence-detail key/value labels for the five receipt classes.
+      // Mutation-plan-recorded explainer (icn#2304): names the states plainly so
+      // recording a plan is never read as applying it. Two later steps stay deferred.
+      "evidence.mutationPlan.boundaryHeading": "What recording a mutation plan means here",
+      "evidence.mutationPlan.boundary.decision": "A decision was recorded (the decision receipt above) — who recorded it, when, and a content fingerprint.",
+      "evidence.mutationPlan.boundary.activation": "That recorded decision then crossed the activation boundary (the activation receipt above), with the required gate observed as passed.",
+      "evidence.mutationPlan.boundary.planRecorded": "A mutation plan was then recorded — after activation, before any mutation was applied. This receipt references the activation it follows and fingerprints the plan body as a content hash. It records only that the plan record exists; it does not apply the plan, expose the private plan body, or grant authority.",
+      "evidence.mutationPlan.boundary.applicationDeferred": "Applying the plan — making any change — is not done here and remains deferred. Recording the plan is the boundary, not the change.",
+      "evidence.mutationPlan.boundary.evidencePacketDeferred": "Producing an evidence packet from the plan is also not done here and remains deferred.",
+
+      // Evidence-detail key/value labels for the six receipt classes.
       "evidence.kv.domainId": "Domain id",
       "evidence.kv.sessionId": "Session id",
       "evidence.kv.openedBy": "Opened by (who recorded this fact)",
@@ -311,6 +321,11 @@
       "evidence.kv.gateBasis": "Gate basis (fingerprint over the passed gate-result record hashes)",
       "evidence.kv.declaredGate": "Passed gate in basis — {kind} ({result}) — record hash",
       "evidence.kv.crossedBy": "Crossed by (who recorded the crossing, not an authority to act)",
+      "evidence.kv.planId": "Plan id",
+      "evidence.kv.activationRef": "Referenced activation id (the activation this plan was recorded against)",
+      "evidence.kv.activationRecordHash": "Referenced activation record hash (proof pointer to the activation crossing — not its text)",
+      "evidence.kv.planBodyHash": "Plan content fingerprint (body hash — proof of content; the plan body is never stored)",
+      "evidence.kv.planRecordedBy": "Recorded by (who recorded the plan, not the planner, approver, applier, or authority holder)",
 
       // Evidence summary / export (read-only render of the committed fixture).
       "evidence.export.heading": "Evidence summary",
