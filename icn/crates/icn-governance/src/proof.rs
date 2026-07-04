@@ -5003,9 +5003,9 @@ mod tests {
             "session-alpha".to_string(),
             "plan-001".to_string(),
             "activation-001".to_string(),
-            [7u8; 32], // activation_record_hash (M1 proof link)
-            "did:icn:planner-1".to_string(),
-            [5u8; 32], // body_hash (M2 fingerprint)
+            [7u8; 32],                        // activation_record_hash (M1 proof link)
+            "did:icn:recorder-1".to_string(), // recorder, not planner
+            [5u8; 32],                        // body_hash (M2 fingerprint)
             1_750_000_000,
         )
     }
@@ -5020,7 +5020,7 @@ mod tests {
         let r = sample_mutation_plan_recorded_receipt();
         assert_eq!(
             hex32(&r.record_hash),
-            "57448b28c5109764b51af97f90a431c7701d016792ac0e59998c13f6eb86050d",
+            "4147346ea5be5e6dc5b1a1402fa08f6b51b1a0d1af7719c22103b04cc4557414",
             "canonical v1 hash layout drifted"
         );
     }

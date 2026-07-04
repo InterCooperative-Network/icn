@@ -207,8 +207,10 @@ pub enum MutationPlanRecordedPersist {
     /// A plan already existed for this triple; nothing was written. Carries
     /// the original persisted receipt (original `recorded_at` / `record_hash`
     /// — never restamped). Boxed because [`MutationPlanRecordedReceipt`] is a
-    /// large payload (five ids plus two 32-byte hashes), so an unboxed variant
-    /// would make this enum needlessly large next to the unit `Inserted`.
+    /// large payload (five string fields plus three 32-byte hashes —
+    /// `activation_record_hash`, `body_hash`, and `record_hash`), so an
+    /// unboxed variant would make this enum needlessly large next to the unit
+    /// `Inserted`.
     Existing(Box<MutationPlanRecordedReceipt>),
 }
 
