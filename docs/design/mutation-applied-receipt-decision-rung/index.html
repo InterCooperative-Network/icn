@@ -1,0 +1,393 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>MutationAppliedReceipt decision rung — A1/A2/A3/A4 (plan → application reference, result representation, timestamp, applied-witness boundary) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>mutation applied receipt decision rung</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/mutation-applied-receipt-decision-rung.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>MutationAppliedReceipt decision rung — A1/A2/A3/A4 (plan → application reference, result representation, timestamp, applied-witness boundary)</h1>
+<p><strong>Status:</strong> draft — design / decision rung (not runtime implementation)
+<strong>Truth class:</strong> descriptive
+<strong>Canonical:</strong> no — implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last reviewed:</strong> 2026-07-04
+<strong>Source basis:</strong> read against <code>origin/main</code> @ <code>e96456f3</code> (the merged #2307 contract&#39;s tip). Code anchors (<code>icn/crates/icn-governance/src/proof.rs</code>, <code>icn/apps/governance/src/receipt_backend.rs</code>, <code>icn/apps/governance/src/manager.rs</code>) were verified at that commit — re-verify before relying on exact line numbers or hashes; they drift.
+<strong>Related:</strong> #2308 (this rung&#39;s issue) · #2306 (the <code>MutationAppliedReceipt</code> design-contract issue) · #2307 (merged design/audit contract, <a href="https://github.com/InterCooperative-Network/icn/blob/main/mutation-applied-receipt">`docs/design/mutation-applied-receipt.md`</a>) · #1748 (Institutional Process Substrate milestone) · #2141 (vertical institutional spine control) · #2041 (human/AT pass — open/parked) · #2303 (<code>MutationPlanRecordedReceipt</code> implementation) · #2305 (mutation-plan render in the process-evidence member-shell demo) · PR #2302 (the sibling plan decision rung, <a href="https://github.com/InterCooperative-Network/icn/blob/main/mutation-plan-recorded-receipt-decision-rung">`mutation-plan-recorded-receipt-decision-rung.md`</a>) · <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a> (receipt &amp; provenance proof envelope) · <code>ops/ideas/framing/institutional-process-substrate.md</code> (framing)</p>
+<blockquote>
+<p>Narrow decision document resolving the four implementation blockers the merged #2307 <code>MutationAppliedReceipt</code> design/audit contract named in its §14 — <strong>A1</strong> (plan → application cross-receipt reference), <strong>A2</strong> (application body/result representation and whether a typed operation/result/effect model is required), <strong>A3</strong> (<code>applied_at</code> timestamp semantics), and <strong>A4</strong> (what &quot;applied&quot; means without turning the receipt into an execution engine). It mirrors the <code>mutation-plan-recorded-receipt-decision-rung.md</code> cadence: land the contract (#2307), then resolve the hash-participating structure <strong>in writing</strong> before a tag is pinned, then implement. This document decides nothing else: no runtime change, no receipt class added, no mutation application, no evidence-packet production, no member-shell change, no human/AT run. Receipts record institutional facts. They grant zero authority.</p>
+</blockquote>
+<h2>1. Purpose</h2>
+<p>The #2307 design contract scoped a candidate <code>MutationAppliedReceipt</code> — the seventh <code>ProcessTransitionReceipt</code> rung under #1748 / #2141 that would witness that a <strong>mutation plan was applied</strong>, recorded after a <code>MutationPlanRecordedReceipt</code>. The contract deliberately refused to pin the candidate <code>icn:gov:mutation_applied:v1</code> layout and blocked implementation on four questions whose answers change the canonical hash layout, the class&#39;s inter-receipt relationships, or the meaning of the receipt itself:</p>
+<ul>
+<li><strong>A1</strong> — does the receipt name the plan it follows, and by what?</li>
+<li><strong>A2</strong> — how is the applied result represented, and is a typed operation/result/effect model required?</li>
+<li><strong>A3</strong> — what is the applied timestamp source, and how does it stay deterministic?</li>
+<li><strong>A4</strong> — what does &quot;applied&quot; assert, and how is the receipt kept from becoming an execution/authority engine?</li>
+</ul>
+<p>The landed rule (from the #2278 review cycle, restated by the #2281 Q4 decision and applied again by the #2295 activation and #2302 plan rungs) is that <strong>hash-participating structure is decided in writing before a tag is pinned, never silently in an implementation PR.</strong> This document resolves A1/A2/A3/A4 so a contract-conformant implementation PR can begin. It is not a workflow engine, not a policy engine, not a mutation-application engine, and not evidence-packet production.</p>
+<h2>2. Status basis</h2>
+<p>Verified live at authoring time (<code>origin/main</code> @ <code>e96456f3</code>):</p>
+<ul>
+<li><strong>#2307</strong> — <code>MutationAppliedReceipt</code> design/audit contract — <strong>landed</strong> (merged <code>e96456f3</code>).</li>
+<li><strong>#2306</strong> — the design-contract issue — <strong>closed / completed</strong> (by #2307).</li>
+<li><strong>#2303</strong> — <code>MutationPlanRecordedReceipt</code> runtime implementation (the receipt this application references) — <strong>landed</strong>; the sixth <code>ProcessTransitionReceipt</code> class.</li>
+<li><strong>#2305</strong> — mutation-plan render in the fixture-only process-evidence member-shell surface — <strong>landed</strong>; <strong>#2304</strong> — its render issue — <strong>closed / completed</strong>.</li>
+<li><strong>#1748 / #2141</strong> — Institutional Process Substrate milestone / vertical spine — <strong>open</strong>.</li>
+<li><strong>#2041</strong> — real screen-reader / low-vision / switch / AT-compat human pass — <strong>open / parked</strong> for a broader human-testing phase; not attempted here.</li>
+<li><code>MutationAppliedReceipt</code> <strong>is not implemented</strong> — no Rust struct, tag, manager method, backend class constant, route, or test exists anywhere in <code>icn/crates/</code> or <code>icn/apps/</code> (confirmed by live audit: <code>rg &quot;MutationAppliedReceipt|mutation_applied&quot; icn/crates icn/apps</code> → no match).</li>
+<li><code>EvidencePacketProducedReceipt</code> remains <strong>framing / doc-only</strong>; the live audit found no runtime seam for it.</li>
+</ul>
+<p>No production, pilot, organizer-ready, member-ready, live-federation, NYCN-activation, or Phase-2 claim is made or implied by this document.</p>
+<h2>3. Repo audit update (verified against live code)</h2>
+<p>Confirming the #2307 audit against <code>origin/main</code> @ <code>e96456f3</code> — the facts A1/A2/A3/A4 depend on:</p>
+<table>
+<thead>
+<tr>
+<th>Subject</th>
+<th>Finding</th>
+<th>Anchor</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>MutationPlanRecordedReceipt</code> (the receipt this application references)</td>
+<td>fields <code>domain_id, session_id, plan_id, activation_id, activation_record_hash, recorded_by, body_hash, recorded_at, record_hash</code>; tag <code>icn:gov:mutation_plan_recorded:v1</code>; <code>record_hash</code> is the sole <code>PartialEq</code>/<code>Eq</code> anchor. It already references the activation (<code>activation_id</code> + <code>activation_record_hash</code>), which itself binds the decision (<code>decision_id</code> + <code>decision_record_hash</code>) and gate basis (<code>gate_basis</code>) — so an application referencing the plan inherits activation → decision → gate transitively</td>
+<td><code>icn/crates/icn-governance/src/proof.rs</code> (<code>MutationPlanRecordedReceipt</code>, <code>DOMAIN_TAG</code>, <code>compute_record_hash</code>)</td>
+</tr>
+<tr>
+<td>plan lookup / uniqueness</td>
+<td><code>put_mutation_plan_recorded</code> persists via <strong><code>put_opaque_if_absent</code></strong> under class <code>&quot;mutation_plan_recorded&quot;</code>, <code>key1 =</code> the injective netstring <code>mutation_plan_recorded_composite_key1(domain_id, session_id)</code>, <code>key2 = plan_id</code>; <code>get_mutation_plan_recorded(domain_id, session_id, plan_id)</code> reads it back. An application can therefore verify its plan reference fail-closed by <code>get_mutation_plan_recorded(...)</code> then comparing <code>record_hash</code></td>
+<td><code>icn/apps/governance/src/receipt_backend.rs</code> (<code>put_mutation_plan_recorded</code>, <code>get_mutation_plan_recorded</code>, <code>mutation_plan_recorded_composite_key1</code>); <code>icn/apps/governance/src/manager.rs</code> (<code>record_mutation_plan_recorded</code>, <code>get_mutation_plan_recorded</code>)</td>
+</tr>
+<tr>
+<td>the six landed classes</td>
+<td><code>ProcessSessionOpenedReceipt</code> / <code>DeliberationEntryRecordedReceipt</code> / <code>DecisionRecordedReceipt</code> / <code>ProcessGateResultReceipt</code> / <code>ActivationCrossedReceipt</code> / <code>MutationPlanRecordedReceipt</code> are the only runtime <code>ProcessTransitionReceipt</code>s; all six tags present in <code>proof.rs</code></td>
+<td><code>proof.rs</code></td>
+</tr>
+<tr>
+<td>inter-receipt references</td>
+<td>exactly <strong>two</strong> exist: <code>ActivationCrossedReceipt</code> → <code>DecisionRecordedReceipt</code> (#2295 B1), and <code>MutationPlanRecordedReceipt</code> → <code>ActivationCrossedReceipt</code> (#2302 M1). An application → plan link would be the lane&#39;s <strong>third</strong> inter-receipt reference</td>
+<td>whole-repo search</td>
+</tr>
+<tr>
+<td><code>MutationAppliedReceipt</code> / <code>EvidencePacketProducedReceipt</code></td>
+<td><strong>framing/doc-only</strong> — no Rust type in <code>icn/crates</code> or <code>icn/apps</code>. <code>icn/crates/icn-baseline-lock/src/evidence.rs</code> defines a separate <code>EvidencePacket</code> baseline-lock bundle, <strong>not</strong> a governance process class</td>
+<td>whole-repo search</td>
+</tr>
+<tr>
+<td><code>put_opaque_if_absent</code></td>
+<td>the idempotence primitive on the gateway <code>ReceiptStore</code> and the <code>GovernanceReceiptBackend</code> trait — atomic insert-if-absent keyed on <code>(class, key1, key2)</code>; <code>None</code> ⇒ this write won, <code>Some(existing)</code> ⇒ return the original (never restamp). A seventh class reuses it</td>
+<td><code>receipt_backend.rs</code>, <code>receipt_store.rs</code></td>
+</tr>
+</tbody></table>
+<p><strong>Bottom line:</strong> every #2307 audit claim that A1/A2/A3/A4 rely on is accurate against live code. The six landed classes are the only runtime <code>ProcessTransitionReceipt</code>s; the mutation-applied rung remains seam-discovery work, and the <code>MutationPlanRecordedReceipt</code> it would reference already carries (transitively, via its activation link) the activation + decision + gate bindings the application can inherit.</p>
+<h2>4. A1 decision — plan → application cross-receipt reference</h2>
+<p><strong>Question.</strong> Does <code>MutationAppliedReceipt</code> name the <code>MutationPlanRecordedReceipt</code> it follows, and if so by <code>plan_id</code>, by <code>plan_record_hash</code>, or both? Must it also directly reference the activation, decision, and/or gate basis? This is the lane&#39;s <strong>third</strong> inter-receipt reference.</p>
+<p>Options considered:</p>
+<ol>
+<li><strong>No in-receipt reference</strong> — rely on the shared <code>(domain_id, session_id)</code> session anchor; a read-model joins plan and application by session. Rejected: a session may record more than one plan; &quot;which plan this application applied&quot; then has no cryptographic answer, only a temporal guess. It also fails the contract&#39;s framing (an application is recorded <em>as the application of a specific recorded plan</em>).</li>
+<li><strong><code>plan_id</code> only</strong> — the caller-opaque handle. Rejected as the <em>sole</em> link: <code>plan_id</code> is unique only within a session and caller-opaque; it names <em>which slot</em> but does not bind to the plan&#39;s recorded <strong>content</strong>. An application could cite a <code>plan_id</code> whose plan later differs from what was recorded, and nothing would detect it.</li>
+<li><strong><code>plan_record_hash</code> only</strong> — the 32-byte content-addressed <code>record_hash</code> of the <code>MutationPlanRecordedReceipt</code>. Strong cryptographic binding, but drops the human/index handle.</li>
+<li><strong>Both <code>plan_id</code> and <code>plan_record_hash</code>. CHOSEN.</strong> Directly mirrors the #2295 B1 (<code>decision_id</code> + <code>decision_record_hash</code>) and #2302 M1 (<code>activation_id</code> + <code>activation_record_hash</code>) decisions — the proven posture for this lane&#39;s inter-receipt links.</li>
+<li>Also directly reference the activation (<code>activation_id</code>/<code>activation_record_hash</code>), decision (<code>decision_id</code>/<code>decision_record_hash</code>), and/or gate basis on the application receipt. <strong>Rejected for <code>:v1</code>:</strong> the referenced <code>MutationPlanRecordedReceipt</code> <em>already</em> references the activation, which binds decision + gate basis. Duplicating any of them on the application receipt is redundant, invites drift, and grows the hash layout for no cryptographic gain — the application inherits them <strong>transitively</strong> through the plan → activation chain. If a future consumer needs a direct application→activation/decision link, that is a <code>:v2</code>-or-later decision, not a silent <code>:v1</code> add.</li>
+</ol>
+<p><strong>Decision A1: <code>:v1</code> carries a direct reference to the plan it applies by <em>both</em> its caller-opaque <code>plan_id</code> and its content-addressed <code>plan_record_hash</code>.</strong> The activation, decision, and gate basis are <strong>not</strong> re-referenced on the application receipt in <code>:v1</code>; they are inherited transitively through the plan → activation chain. Candidate field names (subject to implementation proof and golden-vector pinning):</p>
+<ul>
+<li><code>plan_id: String</code> — the plan being applied; the human/index handle, unique within the session.</li>
+<li><code>plan_record_hash: Hash</code> — the 32-byte <code>record_hash</code> of that <code>MutationPlanRecordedReceipt</code>; the content-addressed proof link.</li>
+</ul>
+<p>Binding consequences:</p>
+<ul>
+<li><strong>Both fields participate in the canonical <code>record_hash</code> and in stable duplicate identity.</strong> A same-identity retry returns the original receipt un-restamped; a different <code>plan_record_hash</code> (or <code>plan_id</code>) for the same <code>application_id</code> is a fail-closed conflict (<code>mutation_applied_conflict</code>), mirroring <code>mutation_plan_recorded_conflict</code>.</li>
+<li><strong>The reference is verified, not merely asserted (fail-closed precondition).</strong> The implementation MUST require that a <code>MutationPlanRecordedReceipt</code> with exactly <code>plan_record_hash</code> exists in the <strong>same</strong> <code>(domain_id, session_id)</code> — resolved via <code>get_mutation_plan_recorded(domain_id, session_id, plan_id)</code> and compared on <code>record_hash</code> — before the application is recorded. If it is absent, present under a different session/domain, or its <code>plan_id</code> does not match the supplied one, the application is <strong>not</strong> recorded and <strong>no receipt is emitted</strong> (mirroring the #2302 M1 verified-not-asserted precondition). This is what makes the link a <em>proof</em> (&quot;this plan was recorded and I applied it&quot;), not a claim.</li>
+<li><strong>ADR-0026 preserved.</strong> The link points at the plan&#39;s own self-hashed <code>record_hash</code>; <code>MutationAppliedReceipt</code> inherits the <em>process-transition</em> discipline (self-contained blake3 <code>record_hash</code>, opaque-store persistence) and asserts <strong>no</strong> signed-envelope/merkle inheritance.</li>
+<li><strong>Idempotence / replay.</strong> Because <code>plan_record_hash</code> is content-addressed and deterministic (not wall-clock), two nodes replaying the same logical application derive the same application identity and converge on the <strong>original</strong> receipt via <code>put_opaque_if_absent</code>.</li>
+</ul>
+<p><strong>Test that proves it:</strong> a runtime-slice test that (a) records the plan (and its prerequisite chain), then records a <code>MutationAppliedReceipt</code> citing that plan&#39;s real <code>record_hash</code>, round-trips it, and asserts the stored <code>plan_record_hash</code> equals the plan receipt&#39;s <code>record_hash</code>; (b) an application whose <code>plan_record_hash</code> names no plan in the session (or names one from a different session, or whose <code>plan_id</code> mismatches) is refused fail-closed and persists nothing; (c) a same-identity retry returns the original application un-restamped; (d) a conflicting <code>plan_record_hash</code>/<code>plan_id</code> for the same <code>application_id</code> is a fail-closed conflict.</p>
+<h2>5. A2 decision — application body/result representation</h2>
+<p><strong>Question.</strong> Is the receipt result-hash-only (like the plan&#39;s <code>body_hash</code>), or does it carry a typed minimal operation/result/effect model? Is an application-kind taxonomy needed? What is the fingerprint field named?</p>
+<p>Options considered:</p>
+<ol>
+<li><strong><code>result_hash</code>-only — a caller-supplied 32-byte fingerprint of the application-result record; the result body is never stored. CHOSEN.</strong></li>
+<li>A typed minimal operation/result/effect model on the receipt (e.g. a list of <code>{op, target, effect}</code>). Rejected for <code>:v1</code>: it puts kernel-readable mutation semantics into the receipt, violating the meaning firewall (the kernel enforces constraints without understanding their origin; the framing is explicit that the kernel does not read the plan/effect semantically). It also stores potentially sensitive effect content, breaking the privacy posture, and is variable-length and unbounded in the hash layout. The typed result model, if any, stays <strong>app-side</strong> and is fingerprinted, not stored.</li>
+<li>Reuse the name <code>body_hash</code> (as the plan/decision/deliberation classes do). Rejected: the plan already fingerprints the <em>plan body</em> as <code>body_hash</code>; the application fingerprints a distinct artifact (the <em>applied result / effect record</em>). Naming it <code>result_hash</code> distinguishes the two at the type level and prevents a reader from assuming the application re-fingerprints the plan body. <code>result_hash</code> <strong>CHOSEN</strong> as the name.</li>
+<li>An application-kind taxonomy (à la <code>DeliberationEntryKind</code> / <code>ProcessGateKind</code>). Rejected for <code>:v1</code>: a kind would be a hash-participating <code>u8</code> discriminant and an <strong>ADR-controlled taxonomy</strong> (closed enum, no free append) — exactly the boundary the #2295 B2 and #2302 M2 decisions drew. It also leaks operation/effect semantics into the receipt. No application-kind in <code>:v1</code>.</li>
+</ol>
+<p><strong>Decision A2: <code>:v1</code> is <code>result_hash</code>-only.</strong> A caller-supplied 32-byte <code>result_hash</code> fingerprints the application-result record; <strong>the applied-result body — the plan body, operation list, target list, effect payload, or any typed operation/result/effect model — is never stored by the receipt.</strong> No application-kind taxonomy in <code>:v1</code>. This mirrors the <code>MutationPlanRecordedReceipt</code> <code>body_hash</code> discipline exactly, under a distinct field name.</p>
+<p>Binding consequences:</p>
+<ul>
+<li><strong><code>result_hash</code> participates in the canonical <code>record_hash</code> and in stable duplicate identity</strong> (like the plan&#39;s <code>body_hash</code>). It is a fixed-32 field appended raw (no length prefix).</li>
+<li><strong>The firewall holds:</strong> the receipt carries no kernel-readable operation/result/effect content; it witnesses <em>that an application (fingerprinted) was recorded</em>, not what the application did to any domain state. Whether the application was correct or authorized is a charter/gate/authority question upstream of this type.</li>
+<li><strong>Privacy holds:</strong> no applied-result body text, plan body text, operation list, target list, or effect payload is stored; a future evidence/export summary carries proof pointers only (the #2289/#2291/#2305 pattern).</li>
+<li><strong><code>result_hash</code> is not verified for content</strong> (the receipt cannot re-derive what it never stored) — it is the caller&#39;s content fingerprint, exactly as for the plan&#39;s <code>body_hash</code>. No non-zero requirement is imposed (consistent with the landed classes).</li>
+</ul>
+<p><strong>Test that proves it:</strong> the serialized receipt carries exactly the <code>:v1</code> field set — no <code>body</code>/<code>content</code>/operation/target/effect/result-body field; only <code>result_hash</code> (a per-field/golden test confirms <code>result_hash</code> participates in the hash; a serde payload-audit test confirms no result-body field is present).</p>
+<h2>6. A3 decision — applied timestamp source</h2>
+<p><strong>Question.</strong> Caller-supplied <code>applied_at</code> excluded from stable duplicate identity (the current receipt pattern)? Any distinct <code>executed_at</code>/<code>effective_at</code>/<code>recorded_at</code>? What stays deterministic?</p>
+<p>Conceptually distinct times could exist: the plan recording time (already on the referenced <code>MutationPlanRecordedReceipt</code> as its <code>recorded_at</code>); an effect-effective time; and the application record time.</p>
+<p>Options considered:</p>
+<ol>
+<li><strong>Single caller-supplied <code>applied_at: u64</code>, byte-parallel with the six landed classes&#39; <code>recorded_at</code>. CHOSEN.</strong></li>
+<li>Distinct <code>executed_at</code>/<code>effective_at</code> <strong>and</strong> an application-record time. Rejected for <code>:v1</code>: in this local/dev/fixture slice the application is <em>recorded at the moment it is applied</em> — the instants coincide. Multiple time fields would invite drift and additional, undecided determinism questions for zero current benefit.</li>
+<li>Derive a time from the referenced plan. Rejected: importing the plan&#39;s <code>recorded_at</code> onto the application manufactures a duplicated timestamp with unclear semantics; the application&#39;s own <code>applied_at</code> is its recording time, and the plan time is already reachable via the reference.</li>
+<li>Name the field <code>recorded_at</code> for exact byte-parallelism with the six landed classes. Rejected in favor of <code>applied_at</code>: the field records <em>when the application was applied/recorded</em>; <code>applied_at</code> is the honest domain name and parallels the plan&#39;s <code>recorded_at</code> role without pretending this is a plan/decision recording. (This is a name choice only; the hash/identity treatment is identical to <code>recorded_at</code>.)</li>
+</ol>
+<p><strong>Decision A3: <code>:v1</code> carries a single caller-supplied <code>applied_at: u64</code>, hashed into <code>record_hash</code> but excluded from stable duplicate identity — the same treatment the six landed classes give <code>recorded_at</code>. No distinct <code>executed_at</code>, <code>effective_at</code>, or <code>recorded_at</code> is added; no time is derived from the plan.</strong> In this slice <code>applied_at</code> denotes the moment the application was applied, which coincides with its recording.</p>
+<p>Binding consequences:</p>
+<ul>
+<li><strong>No wall-clock time is a cross-node-deterministic identity input</strong> (per the #2283/#2284 membership-determinism doctrine). Determinism in the receipt comes entirely from its content-addressed identity — <code>(domain_id, session_id, application_id, plan_id, plan_record_hash, applied_by, result_hash)</code> — <strong>not</strong> from any timestamp. <code>applied_at</code> may live inside <code>record_hash</code> <strong>only because</strong> the receipt is idempotent on stable, non-timestamp identity, so replay converges on the original stamp.</li>
+<li><strong>What appears in evidence/export: <code>applied_at</code></strong> (human-readable &quot;when applied&quot;) plus the content-addressed proof pointers (<code>plan_record_hash</code>, <code>result_hash</code>, <code>record_hash</code>). Evidence MUST NOT invent an <code>executed_at</code>/<code>effective_at</code> distinct from <code>applied_at</code>, and MUST NOT surface an effect time pulled from the never-stored result body.</li>
+<li><strong>Future split is a <code>:v2</code> decision.</strong> If a real consumer later needs to distinguish an effect-effective time from the recording time, that is a <code>:v2</code>-or-later field addition under its own decision — never a silent <code>:v1</code> add — and any such time also stays out of cross-node identity.</li>
+</ul>
+<h2>7. A4 decision — applied-witness boundary vs execution/authority boundary</h2>
+<p><strong>Question.</strong> What must the runtime require to legitimately record an application, and what does &quot;applied&quot; assert, without the receipt becoming an execution engine or an authority grant? Must &quot;applied&quot; bind a <em>verifiable</em> effect, or is a caller-supplied <code>result_hash</code> sufficient for <code>:v1</code>?</p>
+<p>This is the rung&#39;s new question — the previous rungs (session/deliberation/decision/gate/activation/plan) all witnessed <em>recording</em> facts whose truth is self-contained (a thing was recorded). &quot;Applied&quot; is tempting to read as &quot;the mutation&#39;s effects are real and correct,&quot; which would pull verification, execution, and authority into the receipt.</p>
+<p>Options considered:</p>
+<ol>
+<li><strong>Application-recorded process fact; caller-supplied <code>result_hash</code> is a sufficient fingerprint; the receipt neither executes, authorizes, validates, enforces, rolls back, nor proves semantic correctness. CHOSEN.</strong></li>
+<li>Verifiable-effect binding — require the receipt to bind a downstream artifact/state hash the substrate can later re-derive and re-check. Rejected for <code>:v1</code>: there is no runtime effect model, no downstream-state addressing scheme, and no re-derivation path in the current codebase (all framing-only). Requiring it would (a) block this rung on building an effect/verification subsystem, and (b) change the field set (a verifiable-effect reference is a different, larger contract). This is deferred; if a real consumer later needs it, it is a <code>:v2</code>-or-later decision under its own rung.</li>
+<li>Execution/authority semantics — let the receipt <em>cause</em> or <em>authorize</em> the mutation. Rejected outright and permanently for this class: that would make the receipt an execution engine and an authority grant, violating the lane&#39;s core doctrine (<em>receipts record facts and grant zero authority</em>) and the meaning firewall. Authority stays upstream in charter/gate/capability/policy/governance paths.</li>
+</ol>
+<p><strong>Decision A4: <code>MutationAppliedReceipt</code> records that an <em>application fact was recorded</em> — a recorder/apply-witness attests that the plan (verified via A1) was applied and supplies a <code>result_hash</code> (A2) fingerprinting the application-result record.</strong> Specifically, for <code>:v1</code>:</p>
+<ul>
+<li><code>applied_by</code> is the <strong>recorder / apply-witness DID</strong> — actor evidence, <strong>not</strong> an authority grant, and not a claim that the applier was permitted to apply.</li>
+<li>The receipt <strong>does not execute, authorize, validate, enforce, roll back, or prove the semantic correctness of</strong> the mutation. It performs no side effect on domain state; it only records the application <em>fact</em>.</li>
+<li>A caller-supplied <code>result_hash</code> is <strong>sufficient</strong> for <code>:v1</code> as the content-addressed fingerprint of the application-result record. <code>:v1</code> makes <strong>no</strong> claim that the fingerprinted effect is real, complete, correct, or reversible — only that an application with that result fingerprint was recorded here.</li>
+<li><strong>Verifiable effect semantics, rollback/compensation semantics, typed result/effect models, and evidence-packet production are deferred</strong> to later rungs (and, where relevant, <code>EvidencePacketProducedReceipt</code>).</li>
+<li><strong>Authority remains upstream</strong> in charter / gate / capability / policy / governance paths, not in this receipt. A recorded application is not proof of legitimacy.</li>
+</ul>
+<p>Binding consequences:</p>
+<ul>
+<li>The receipt&#39;s honesty label in any future evidence surface must read as &quot;an application was recorded here,&quot; not &quot;the mutation succeeded / is correct / is authorized.&quot;</li>
+<li>Because A4 keeps <code>:v1</code> a <em>recording</em> fact (no verifiable-effect field), it introduces <strong>no</strong> additional hash-participating field beyond A1–A3; the §8 layout is complete and pinnable.</li>
+</ul>
+<p><strong>Test that proves it:</strong> a no-overclaim grep asserts the receipt/type carries no &quot;authorized / executed / enforced / rolled back / verified-correct&quot; claim; the runtime-slice test asserts recording an application performs no mutation of any domain state beyond persisting the receipt itself (it only calls <code>put_opaque_if_absent</code>), and that <code>applied_by</code> is stored as an opaque DID string with no capability/authority check attached to it.</p>
+<h2>8. Consolidated candidate <code>:v1</code> layout (for the implementation PR)</h2>
+<p>Resolving A1/A2/A3/A4 pins the candidate <code>icn:gov:mutation_applied:v1</code> field set (all names <strong>candidate — subject to implementation proof and golden-vector pinning</strong>; the tag must hash-separate from, and never converge with, <code>icn:gov:mutation_plan_recorded:v1</code>, <code>icn:gov:activation_crossed:v1</code>, <code>icn:gov:decision_recorded:v1</code>, <code>icn:gov:process_gate_result:v1</code>, and the proposal/vote <code>icn:gov:decision:v1/v2/v3</code> lineage):</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>In stable identity?</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>domain_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key1</code> half)</td>
+<td>anchor</td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key1</code> half)</td>
+<td>anchor; session must be opened first</td>
+</tr>
+<tr>
+<td><code>application_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key2</code>)</td>
+<td>caller-opaque per-application id</td>
+</tr>
+<tr>
+<td><code>plan_id</code></td>
+<td><code>String</code></td>
+<td>yes</td>
+<td><strong>A1</strong> — plan being applied (must exist in-session)</td>
+</tr>
+<tr>
+<td><code>plan_record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td><strong>A1</strong> — content-addressed proof link to the <code>MutationPlanRecordedReceipt</code></td>
+</tr>
+<tr>
+<td><code>applied_by</code></td>
+<td><code>String</code> (DID)</td>
+<td>yes</td>
+<td><strong>A4</strong> — recorder / apply-witness; grants zero authority</td>
+</tr>
+<tr>
+<td><code>result_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td><strong>A2</strong> — fingerprint of the application-result record; result body never stored</td>
+</tr>
+<tr>
+<td><code>applied_at</code></td>
+<td><code>u64</code></td>
+<td><strong>no</strong></td>
+<td><strong>A3</strong> — caller-supplied; hashed; excluded from identity (retry never restamps)</td>
+</tr>
+<tr>
+<td><code>record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>(equality anchor)</td>
+<td>canonical blake3; the sole <code>PartialEq</code>/<code>Eq</code> anchor</td>
+</tr>
+</tbody></table>
+<p><strong>Candidate canonical hashing:</strong> <code>DOMAIN_TAG</code> (<code>icn:gov:mutation_applied:v1</code>) first → length-prefixed <code>domain_id</code>, <code>session_id</code>, <code>application_id</code>, <code>plan_id</code>, <code>applied_by</code> → <code>plan_record_hash</code> raw 32 (no length prefix) → <code>result_hash</code> raw 32 (no length prefix) → <code>applied_at</code> LE. Exact layout is fixed by the implementation PR and pinned by a golden vector.</p>
+<p><strong>Candidate stable duplicate identity:</strong> <code>(domain_id, session_id, application_id, plan_id, plan_record_hash, applied_by, result_hash)</code>. <code>applied_at</code> and <code>record_hash</code> are <strong>not</strong> identity.</p>
+<p><strong>Uniqueness / conflict:</strong> <code>put_opaque_if_absent</code> keyed on <code>(class, key1, key2)</code> where <code>key1</code> is an injective netstring composite of <code>(domain_id, session_id)</code> and <code>key2</code> is <code>application_id</code>; conflict detection on <code>(plan_id, plan_record_hash, applied_by, result_hash)</code>. <code>applied_at</code> and <code>record_hash</code> are not identity. Same-identity retry ⇒ original returned; mismatch ⇒ fail-closed <code>mutation_applied_conflict</code>.</p>
+<p><strong>Preconditions (all fail-closed; on any failure nothing is persisted):</strong> (1) the <code>(domain_id, session_id)</code> session was opened first; (2) a <code>MutationPlanRecordedReceipt</code> with <code>record_hash == plan_record_hash</code> exists in that same session and its <code>plan_id</code> equals the supplied <code>plan_id</code> (resolved via <code>get_mutation_plan_recorded(domain_id, session_id, plan_id)</code> then compared on <code>record_hash</code>); (3) <code>domain_id</code> / <code>session_id</code> / <code>application_id</code> / <code>plan_id</code> / <code>applied_by</code> are non-empty / non-whitespace.</p>
+<h2>9. Implementation constraints for the next PR</h2>
+<p>The later implementation PR <strong>may</strong>:</p>
+<ul>
+<li>add the <code>MutationAppliedReceipt</code> class <strong>only</strong>, conforming to the #2307 contract plus this rung (§8 above);</li>
+<li>add the minimum plan reference (A1), result-hash (A2), timestamp (A3), and applied-witness (A4) support pinned here;</li>
+<li>add <code>proof.rs</code> unit tests and a runtime-slice integration test where the existing receipt pattern supports them (construction / emission / persistence / retrieval), mirroring <code>mutation_plan_recorded_receipt_runtime_slice.rs</code>.</li>
+</ul>
+<p>The later implementation PR <strong>must not</strong>:</p>
+<ul>
+<li>implement <code>EvidencePacketProducedReceipt</code>, or apply / execute / verify / roll back any mutation;</li>
+<li>add a typed/kernel-readable mutation operation/result/effect model, a <code>target_ref</code>/<code>effect_ref</code>, an application-kind taxonomy, or a verifiable-effect binding;</li>
+<li>attach any capability/authority check to <code>applied_by</code> (it is opaque actor evidence);</li>
+<li>extend <code>web/member-shell/</code> or any evidence surface (rendering stays deferred) unless separately scoped and reviewed;</li>
+<li>touch OpenAPI / SDK, or publish a served schema;</li>
+<li>auto-close any protected issue (#1748, #2141, #2041) or its own implementation issue — leave it open for maintainer disposition.</li>
+</ul>
+<h2>10. Validation requirements for the implementation PR</h2>
+<p>Both test tiers the landed classes use, plus the rung-specific checks:</p>
+<ul>
+<li><strong><code>proof.rs</code> unit tests:</strong> a golden vector pinning the <code>:v1</code> <code>record_hash</code> of a fixed sample; a determinism test (same inputs ⇒ same hash); a per-field test (every field change, including <code>plan_record_hash</code> and <code>result_hash</code>, ⇒ different hash); a tag-disjointness test asserting <code>icn:gov:mutation_applied:v1</code> never collides with — and a comment that it must never converge with — <code>mutation_plan_recorded</code>, <code>activation_crossed</code>, <code>decision_recorded</code>, <code>process_gate_result</code>, and the proposal/vote <code>icn:gov:decision:vN</code> lineage; a serde/payload-audit test confirming no result-body field is present.</li>
+<li><strong>Runtime-slice integration test:</strong> emission + field round-trip + non-zero <code>record_hash</code> + retrieval; same-identity retry returns the original, never restamped; different <code>plan_id</code> / <code>plan_record_hash</code> / <code>applied_by</code> / <code>result_hash</code> for the same identity fail closed (<code>mutation_applied_conflict</code>); unopened session fails closed and creates nothing; empty/whitespace ids rejected pre-persistence; missing receipt store / backend failure fail closed; concurrent duplicates serialize to one winner; composite key injective (<code>(&quot;ab&quot;,&quot;c&quot;)</code> vs <code>(&quot;a&quot;,&quot;bc&quot;)</code> must not alias; two domains sharing a <code>session_id</code> never mix).</li>
+<li><strong>A1 cross-link test</strong> (§4): the referenced <code>MutationPlanRecordedReceipt</code> (by <code>plan_record_hash</code>) must exist in the same <code>(domain_id, session_id)</code> with a matching <code>plan_id</code>; an absent, wrong-session, wrong-domain, or <code>plan_id</code>-mismatched reference is refused fail-closed and persists nothing.</li>
+<li><strong>A2 result test</strong> (§5): the serialized payload carries exactly the <code>:v1</code> field set — no <code>body</code>/operation/target/effect/result-body field; <code>result_hash</code> participates in <code>record_hash</code>.</li>
+<li><strong>A3 timestamp test</strong> (§6): two records differing only in <code>applied_at</code> share duplicate identity (retry returns original, no conflict); <code>applied_at</code> participates in <code>record_hash</code> but not in identity.</li>
+<li><strong>A4 boundary test</strong> (§7): recording an application performs no domain-state mutation beyond persisting the receipt; <code>applied_by</code> is an opaque DID with no attached authority/capability check; no &quot;authorized/executed/verified/rolled-back&quot; claim in the type or its serialization.</li>
+<li><strong>Idempotence / replay test:</strong> a logical application replayed on a second node converges on the original receipt (original stamp, original hash).</li>
+<li><strong>Privacy grep:</strong> no applied-result body / plan body / operation / target / effect text in any serialized receipt or fixture — fingerprints only.</li>
+<li><strong>No-overclaim grep:</strong> no &quot;mutation applied-and-verified / plan applied-and-authorized / production / pilot / organizer-ready / member-ready / live federation / NYCN / Phase-2&quot; claims introduced.</li>
+<li><strong>ADR-0026 envelope check:</strong> the receipt sits at Layer 2, self-hashed, no signature/merkle inheritance claim.</li>
+<li><strong>Protected close-keyword grep:</strong> the implementation PR carries no closing keyword (fix / close / resolve) adjacent to a protected issue number (#1748, #2141, #2041) — use <code>Refs</code> only.</li>
+</ul>
+<h2>11. Deferred work (explicitly out of scope of this rung and its future implementation)</h2>
+<ul>
+<li><code>EvidencePacketProducedReceipt</code> — a runtime evidence-packet producer.</li>
+<li>Any verifiable-effect binding, downstream-state addressing, typed/kernel-readable result/effect model, <code>target_ref</code>/<code>effect_ref</code>, or application-kind taxonomy.</li>
+<li>Any mutation-application, execution, verification, or rollback <strong>engine</strong> — the receipt witnesses a <em>reported</em> application; it never performs, verifies, or reverses one.</li>
+<li>Member-shell / process-evidence rendering of <code>MutationAppliedReceipt</code> (a later separately-scoped fixture-only surface may add it after the receipt lands, as #2305 did for <code>MutationPlanRecordedReceipt</code>).</li>
+<li>Action-card triggers (ADR-0027 / #1713).</li>
+<li>The actual <strong>#2041</strong> human/AT pass — parked for a real human-testing phase.</li>
+<li>Production / pilot / NYCN activation / live federation / Phase-2 work.</li>
+<li>entity-auth enforcement (#2081), trusted token issuance (#2080), UnknownLegacy repair (#2274), service hosting, K3s / DNS / Forgejo.</li>
+</ul>
+<h2>12. Non-goals</h2>
+<p>Restated from #2308 / the #2307 contract — this rung and its future implementation are:</p>
+<ul>
+<li>not <code>EvidencePacketProducedReceipt</code>; not an evidence-packet producer;</li>
+<li>not a mutation-application engine; not applying, executing, verifying, or rolling back any plan;</li>
+<li>not an action-card trigger; not a general workflow engine; not a policy/authority engine; not a new authorization semantic;</li>
+<li>not a typed/kernel-readable mutation operation/result/effect model; not an application-kind taxonomy; not a verifiable-effect binding;</li>
+<li>not a new <code>ProcessGateKind</code>; not an <code>ActivationRequest</code> object;</li>
+<li>not OpenAPI / SDK / served-schema work; not member-shell implementation;</li>
+<li>not #2041 completion; not human/AT execution; not #1748 or #2141 closure;</li>
+<li>not production / pilot / organizer-ready / member-ready readiness; not live federation; not NYCN activation; not Phase-2 completion;</li>
+<li>not proposal / vote / quorum / mandate / outcome semantics.</li>
+</ul>
+<p>Receipts record institutional facts. They grant zero authority.</p>
+<h2>13. Implementation sequencing &amp; protected issue state</h2>
+<p><strong>Recommendation (matching the plan lane cadence #2300 → #2302 → #2303):</strong> with this decision rung landed on top of the #2307 contract, a contract-conformant implementation PR may add the <code>MutationAppliedReceipt</code> class <strong>only</strong>, per §8–§10. The implementation PR must keep #1748 / #2141 / #2041 open unless separately reviewed, and must leave its own issue open for maintainer disposition rather than auto-closing it by side effect.</p>
+<p>Protected issue state at authoring: #2306 closed/completed (design contract); #2304 closed/completed (plan render); #1748 open; #2141 open; #2041 open/parked; #2289 closed; #2081 / #2080 / #2274 open/untouched.</p>
+<h2>14. Related</h2>
+<p>Refs #2308.
+Refs #2306.
+Refs #2307.
+Refs #2305.
+Refs #2303.
+Refs #1748.
+Refs #2141.
+Refs #2041.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
