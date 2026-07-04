@@ -2822,6 +2822,31 @@ pub enum MutationAppliedOutcome {
     AlreadyApplied(icn_governance::MutationAppliedReceipt),
 }
 
+/// Outcome of [`GovernanceManager::record_evidence_packet_produced`] (#2314
+/// contract + #2316 EP1–EP5 decision rung). Both variants are successes; the
+/// fail-closed mismatch conflict surfaces as an `Err` with stable prefix
+/// `evidence_packet_produced_conflict`. Precondition failures surface as `Err`s
+/// with their own stable prefixes and persist nothing:
+/// `evidence_packet_produced_session_not_opened` (unopened session),
+/// `evidence_packet_produced_predecessor_not_found` /
+/// `evidence_packet_produced_predecessor_mismatch` (EP1 immediate predecessor
+/// absent or hash-mismatched), `evidence_packet_produced_empty_source_set` /
+/// `evidence_packet_produced_duplicate_source` (invalid source set), and
+/// `evidence_packet_produced_predecessor_not_in_set` (the immediate predecessor
+/// is missing from the declared source set).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvidencePacketProducedOutcome {
+    /// This call recorded the packet: the receipt is the newly persisted
+    /// evidence-packet-produced fact.
+    Produced(icn_governance::EvidencePacketProducedReceipt),
+    /// The packet was already recorded with the **same** stable identity
+    /// (`mutation_application_id`, `mutation_applied_record_hash`,
+    /// `receipt_set_hash`, `packet_hash`, `redaction_profile_hash`,
+    /// `produced_by`); carries the **original** persisted receipt (original
+    /// `produced_at` / `record_hash` — a retry is never restamped).
+    AlreadyProduced(icn_governance::EvidencePacketProducedReceipt),
+}
+
 /// Action items are always managed locally (not gossiped) and can use either
 /// in-memory or Sled-backed persistent storage.
 pub struct GovernanceManager {
@@ -7140,6 +7165,267 @@ impl GovernanceManager {
         store
             .list_mutation_applied_for_session_in_domain(&domain_id.0, session_id)
             .map_err(|e| anyhow::anyhow!("Failed to list mutation-applied receipts: {e}"))
+    }
+
+    /// Record that a redacted evidence packet artifact was produced from a set
+    /// of prior process receipts — the eighth `ProcessTransitionReceipt` class
+    /// (#2314 contract + #2316 EP1–EP5 decision rung). Records a process fact and
+    /// grants zero authority; it does not produce, deliver, certify, audit,
+    /// execute, authorize, validate, enforce, or roll back anything.
+    ///
+    /// Fail-closed preconditions (on any failure nothing is persisted):
+    /// - all ids are non-empty / non-whitespace;
+    /// - a receipt store is wired (uniqueness and the predecessor precondition
+    ///   are enforced at the storage layer and cannot be faked in memory);
+    /// - the `(domain_id, session_id)` session was opened first
+    ///   (`evidence_packet_produced_session_not_opened`);
+    /// - EP1: a [`icn_governance::MutationAppliedReceipt`] exists in the **same**
+    ///   `(domain_id, session_id)` under `mutation_application_id`
+    ///   (`evidence_packet_produced_predecessor_not_found`) and its `record_hash`
+    ///   equals the supplied `mutation_applied_record_hash`
+    ///   (`evidence_packet_produced_predecessor_mismatch`);
+    /// - the source set is non-empty and free of duplicate `record_hash` members
+    ///   (`evidence_packet_produced_empty_source_set` /
+    ///   `evidence_packet_produced_duplicate_source`);
+    /// - the source set includes `mutation_applied_record_hash`
+    ///   (`evidence_packet_produced_predecessor_not_in_set`).
+    ///
+    /// On success returns [`EvidencePacketProducedOutcome::Produced`]; a
+    /// same-identity retry returns [`EvidencePacketProducedOutcome::AlreadyProduced`]
+    /// carrying the **original** receipt (never restamped). A same-`packet_id`
+    /// record with a different stable identity fails closed with the stable
+    /// `evidence_packet_produced_conflict` prefix.
+    ///
+    /// `source_refs` are hashes/references only, used solely to compute and
+    /// validate `receipt_set_hash`; no receipt body is stored. Per the #2316
+    /// rung §4 the mandatory floor is immediate-predecessor verification (above);
+    /// full per-member in-session verification of the source set is a
+    /// recommended default deferred here.
+    #[allow(clippy::too_many_arguments)]
+    pub fn record_evidence_packet_produced(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        packet_id: &str,
+        mutation_application_id: &str,
+        mutation_applied_record_hash: [u8; 32],
+        source_refs: &[icn_governance::EvidencePacketSourceRef],
+        packet_hash: [u8; 32],
+        redaction_profile_hash: [u8; 32],
+        produced_by: &Did,
+    ) -> Result<EvidencePacketProducedOutcome> {
+        // Whitespace-only ids are rejected alongside empty ones: a caller
+        // bypassing the HTTP layer must not mint receipts with visually-empty
+        // identifiers or whitespace storage keys.
+        if domain_id.0.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_produced: domain_id must be non-empty and non-whitespace"
+            ));
+        }
+        if session_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_produced: session_id must be non-empty and non-whitespace"
+            ));
+        }
+        if packet_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_produced: packet_id must be non-empty and non-whitespace"
+            ));
+        }
+        if mutation_application_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_produced: mutation_application_id must be non-empty and \
+                 non-whitespace"
+            ));
+        }
+        let produced_by_str = produced_by.to_string();
+        if produced_by_str.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_produced: produced_by must be non-empty"
+            ));
+        }
+        let store = self.receipt_store.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "record_evidence_packet_produced: a receipt store is required — packet \
+                 uniqueness and the predecessor precondition are enforced at the storage \
+                 layer and cannot be faked in memory"
+            )
+        })?;
+
+        // Precondition: the session was opened first. No silent creation.
+        let opened = store
+            .get_process_session_opened(&domain_id.0, session_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_evidence_packet_produced: failed to read session-open state for \
+                     session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        if opened.is_none() {
+            return Err(anyhow::anyhow!(
+                "evidence_packet_produced_session_not_opened: session {session_id} in domain {} \
+                 has no recorded opening; refusing to record a packet against an unanchored session",
+                domain_id.0
+            ));
+        }
+
+        // EP1 precondition: the applied step this packet draws from must exist in
+        // this same (domain, session) under `mutation_application_id`, and its
+        // `record_hash` must equal the supplied `mutation_applied_record_hash`.
+        // The composite storage key makes an application recorded under a
+        // different session/domain invisible here, so a wrong-session/wrong-domain
+        // reference fails closed as "not found".
+        let applied = store
+            .get_mutation_applied(&domain_id.0, session_id, mutation_application_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_evidence_packet_produced: failed to read applied state for \
+                     application {mutation_application_id} in session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        let applied = applied.ok_or_else(|| {
+            anyhow::anyhow!(
+                "evidence_packet_produced_predecessor_not_found: no application \
+                 {mutation_application_id} recorded in session {session_id} in domain {}; refusing \
+                 to record a packet for an unrecorded predecessor",
+                domain_id.0
+            )
+        })?;
+        if applied.record_hash != mutation_applied_record_hash {
+            return Err(anyhow::anyhow!(
+                "evidence_packet_produced_predecessor_mismatch: application \
+                 {mutation_application_id} in session {session_id} in domain {} was recorded with \
+                 a different record_hash than the one supplied; refusing to record a packet on a \
+                 mismatched predecessor reference",
+                domain_id.0
+            ));
+        }
+
+        // Fail fast on an empty source set with the documented stable prefix,
+        // before the more specific predecessor-in-set check below (an empty set
+        // trivially cannot contain the predecessor, so without this the empty
+        // case would surface the less precise `_predecessor_not_in_set`).
+        if source_refs.is_empty() {
+            return Err(anyhow::anyhow!(
+                "evidence_packet_produced_empty_source_set: packet {packet_id} in session \
+                 {session_id} in domain {} declared an empty source set; a produced packet \
+                 must draw from at least its immediate predecessor",
+                domain_id.0
+            ));
+        }
+
+        // The declared source set must include the immediate predecessor (EP1).
+        if !source_refs
+            .iter()
+            .any(|r| r.record_hash == mutation_applied_record_hash)
+        {
+            return Err(anyhow::anyhow!(
+                "evidence_packet_produced_predecessor_not_in_set: the declared source set for \
+                 packet {packet_id} in session {session_id} in domain {} does not include the \
+                 immediate predecessor mutation_applied_record_hash; refusing to record",
+                domain_id.0
+            ));
+        }
+
+        // Canonical, order-independent, duplicate-free source-set commitment.
+        let receipt_set_hash =
+            icn_governance::EvidencePacketProducedReceipt::compute_receipt_set_hash(source_refs)
+                .map_err(|e| match e {
+                    icn_governance::EvidencePacketReceiptSetError::Empty => anyhow::anyhow!(
+                        "evidence_packet_produced_empty_source_set: packet {packet_id} in session \
+                         {session_id} in domain {} declared an empty source set; a produced packet \
+                         must draw from at least its immediate predecessor",
+                        domain_id.0
+                    ),
+                    icn_governance::EvidencePacketReceiptSetError::DuplicateMember => {
+                        anyhow::anyhow!(
+                            "evidence_packet_produced_duplicate_source: packet {packet_id} in \
+                             session {session_id} in domain {} declared a duplicate source \
+                             record_hash; duplicate members are disallowed and fail closed",
+                            domain_id.0
+                        )
+                    }
+                })?;
+
+        let now = icn_time::current_timestamp_secs();
+        let receipt = icn_governance::EvidencePacketProducedReceipt::new(
+            domain_id.0.clone(),
+            session_id.to_string(),
+            packet_id.to_string(),
+            mutation_application_id.to_string(),
+            mutation_applied_record_hash,
+            receipt_set_hash,
+            packet_hash,
+            redaction_profile_hash,
+            produced_by_str.clone(),
+            now,
+        );
+
+        match store.put_evidence_packet_produced(&receipt).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to persist evidence-packet-produced receipt for packet {packet_id} in \
+                 session {session_id} in domain {}: {e}",
+                domain_id.0
+            )
+        })? {
+            crate::receipt_backend::EvidencePacketProducedPersist::Inserted => {
+                Ok(EvidencePacketProducedOutcome::Produced(receipt))
+            }
+            crate::receipt_backend::EvidencePacketProducedPersist::Existing(original) => {
+                if original.mutation_application_id == mutation_application_id
+                    && original.mutation_applied_record_hash == mutation_applied_record_hash
+                    && original.receipt_set_hash == receipt_set_hash
+                    && original.packet_hash == packet_hash
+                    && original.redaction_profile_hash == redaction_profile_hash
+                    && original.produced_by == produced_by_str
+                {
+                    Ok(EvidencePacketProducedOutcome::AlreadyProduced(*original))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "evidence_packet_produced_conflict: packet {packet_id} in session \
+                         {session_id} in domain {} was already recorded with a different \
+                         predecessor, source set, packet hash, redaction profile, or recorder; \
+                         refusing to overwrite",
+                        domain_id.0
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Retrieve the persisted evidence-packet-produced receipt for a
+    /// `(domain_id, session_id, packet_id)`, or `None` when no packet has been
+    /// recorded. Read-only.
+    pub fn get_evidence_packet_produced(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        packet_id: &str,
+    ) -> Result<Option<icn_governance::EvidencePacketProducedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(None);
+        };
+        store
+            .get_evidence_packet_produced(&domain_id.0, session_id, packet_id)
+            .map_err(|e| anyhow::anyhow!("Failed to read evidence-packet-produced receipt: {e}"))
+    }
+
+    /// List all evidence-packet-produced receipts recorded against one
+    /// `(domain_id, session_id)` anchor, in the store's deterministic
+    /// chronological `(produced_at, record_hash)` order. Read-only.
+    pub fn list_evidence_packet_produced_in_domain(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+    ) -> Result<Vec<icn_governance::EvidencePacketProducedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(vec![]);
+        };
+        store
+            .list_evidence_packet_produced_for_session_in_domain(&domain_id.0, session_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list evidence-packet-produced receipts: {e}"))
     }
 
     // ========================================================================

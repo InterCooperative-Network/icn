@@ -142,7 +142,8 @@ pub use profile::{DecisionOutcome, GovernanceProfile, GovernanceProfileId, Gover
 pub use proof::{
     ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, ActionItemCompletionReceiptV2Error,
     ActionItemTransition, ActivationCrossedReceipt, DecisionRecordedReceipt, DeliberationEntryKind,
-    DeliberationEntryRecordedReceipt, GovernanceDecisionAttestation, GovernanceDecisionReceipt,
+    DeliberationEntryRecordedReceipt, EvidencePacketProducedReceipt, EvidencePacketReceiptSetError,
+    EvidencePacketSourceRef, GovernanceDecisionAttestation, GovernanceDecisionReceipt,
     GovernanceDecisionReceiptV2, GovernanceDecisionReceiptV2Error, GovernanceDecisionReceiptV3,
     GovernanceDecisionReceiptV3Error, GovernanceProof, GovernanceProofV2, MandateGrantRef,
     MandateGrantRefError, MandateGrantRefTarget, MeetingAttendanceReceipt,

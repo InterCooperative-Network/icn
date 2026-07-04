@@ -3265,6 +3265,309 @@ impl MutationAppliedReceipt {
 }
 
 // ============================================================================
+// EvidencePacketProducedReceipt — eighth ProcessTransitionReceipt class
+// (#2314 design/audit contract + #2316 EP1/EP2/EP3/EP4/EP5 decision rung)
+// ============================================================================
+
+/// A single source-receipt reference contributing to an
+/// [`EvidencePacketProducedReceipt`]'s `receipt_set_hash` (EP1/EP2).
+///
+/// Carries only the receipt-ladder position (used to canonically order the set
+/// before hashing) and the content-addressed `record_hash` of the source
+/// receipt. It is a **reference, never a body** — no source-receipt body, packet
+/// body, or private data is carried. The ladder position is **not serialized
+/// into the hash input** (only the `record_hash`es are hashed), but it
+/// determines the canonical ordering of members and therefore **does influence**
+/// the resulting `receipt_set_hash`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EvidencePacketSourceRef {
+    /// Receipt-ladder position of the source receipt, used ONLY to canonically
+    /// order the set before hashing (0 = `ProcessSessionOpened`, 1 =
+    /// `DeliberationEntryRecorded`, 2 = `DecisionRecorded`, 3 =
+    /// `ProcessGateResult`, 4 = `ActivationCrossed`, 5 = `MutationPlanRecorded`,
+    /// 6 = `MutationApplied` — the process ladder order pinned by #2316 §4).
+    pub ladder_position: u8,
+    /// Content-addressed `record_hash` of the source receipt.
+    pub record_hash: Hash,
+}
+
+/// Fail-closed failure computing a `receipt_set_hash` from source references
+/// (EP1/EP2, #2316 §4). On either variant the caller records nothing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvidencePacketReceiptSetError {
+    /// The source set was empty. A produced packet must draw from at least its
+    /// immediate predecessor, so `:v1` disallows the empty set.
+    Empty,
+    /// A `record_hash` appeared more than once. Because `receipt_set_hash` is a
+    /// *set* commitment, a repeated member would let a caller fork the hash (and
+    /// therefore the receipt identity) by padding the list; duplicates fail
+    /// closed rather than being silently de-duplicated.
+    DuplicateMember,
+}
+
+impl core::fmt::Display for EvidencePacketReceiptSetError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Empty => f.write_str(
+                "evidence_packet_produced source set is empty; a produced packet must draw \
+                 from at least its immediate predecessor",
+            ),
+            Self::DuplicateMember => f.write_str(
+                "evidence_packet_produced source set contains a duplicate record_hash; \
+                 duplicate members are disallowed and fail closed",
+            ),
+        }
+    }
+}
+
+impl std::error::Error for EvidencePacketReceiptSetError {}
+
+/// Receipt of record that a redacted **evidence packet artifact was produced**
+/// from a set of prior process receipts — the eighth `ProcessTransitionReceipt`
+/// class under #1748 / #2141, recorded after a [`MutationAppliedReceipt`].
+///
+/// Per the #2314 contract as resolved by the #2316 EP1–EP5 decision rung:
+///
+/// **EP1 — predecessor linkage.** Carries all three of `mutation_application_id`
+/// (the human/index handle of the immediate prior boundary),
+/// `mutation_applied_record_hash` (the content-addressed proof link, verified
+/// fail-closed against the stored [`MutationAppliedReceipt`]), and
+/// `receipt_set_hash` (a canonical, order-independent commitment to the ordered
+/// set of source-receipt references the packet rests on, which must include the
+/// immediate predecessor).
+///
+/// **EP2 — hash coverage.** `packet_hash` fingerprints the public/redacted
+/// packet artifact only; `receipt_set_hash` commits to the source references;
+/// neither covers private source bodies. No packet body, source-receipt body,
+/// plan/applied-result body, operation list, target list, or effect payload is
+/// ever stored (meaning firewall).
+///
+/// **EP3 — redaction boundary.** `redaction_profile_hash` fingerprints the
+/// redaction profile that shaped the public packet; no `redaction_profile_id`
+/// and no profile body in `:v1`.
+///
+/// **EP4 — meaning of "produced".** Records that an evidence packet artifact was
+/// produced/recorded and content-addressed. Distinct from export, delivery,
+/// acceptance, external audit, and action-card triggering; the receipt does not
+/// deliver, certify, audit, execute, authorize, validate, enforce, roll back, or
+/// prove the correctness of anything.
+///
+/// **EP5 — human/AT.** `:v1` carries no human/AT status; #2041 stays open.
+///
+/// `produced_at` is node-stamped Unix seconds, hashed into `record_hash` but
+/// **excluded** from duplicate identity — a retry never restamps. `produced_by`
+/// is actor evidence (the recorder / producer-witness), not an authority to
+/// produce, deliver, certify, or audit ("recorder, not producer"). Equality is
+/// anchored to `record_hash`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EvidencePacketProducedReceipt {
+    /// Governance domain the session (and this packet) is scoped to.
+    pub domain_id: String,
+    /// Identifier of the already-opened process session this packet attaches to.
+    /// Caller-provided, opaque, meaningful only together with `domain_id`.
+    pub session_id: String,
+    /// Caller-supplied opaque identifier for this packet, unique within
+    /// `(domain_id, session_id)` — uniqueness is enforced at the storage layer.
+    pub packet_id: String,
+    /// Caller-opaque `application_id` of the [`MutationAppliedReceipt`] this
+    /// packet draws from — the immediate prior boundary's human/index handle
+    /// (EP1).
+    pub mutation_application_id: String,
+    /// Content-addressed `record_hash` of that [`MutationAppliedReceipt`] — the
+    /// cryptographic proof link to the immediate prior boundary (EP1). Verified
+    /// to exist in-session before the packet is recorded.
+    pub mutation_applied_record_hash: Hash,
+    /// Canonical commitment to the ordered set of source-receipt references
+    /// (their `record_hash`es) included in the packet's evidence boundary (EP1/
+    /// EP2). Order-independent of caller input; duplicates disallowed; must
+    /// include `mutation_applied_record_hash`. Computed via
+    /// [`Self::compute_receipt_set_hash`]. Covers references, never bodies.
+    pub receipt_set_hash: Hash,
+    /// Caller-supplied fingerprint of the **public/redacted** evidence packet
+    /// artifact (EP2). The packet body itself is never stored.
+    pub packet_hash: Hash,
+    /// Caller-supplied fingerprint of the redaction profile that shaped the
+    /// public packet (EP3). The profile body itself is never stored.
+    pub redaction_profile_hash: Hash,
+    /// DID of the authenticated actor who recorded the production — recorder /
+    /// producer-witness evidence, not an authority to produce or act. Grants
+    /// zero authority.
+    pub produced_by: String,
+    /// Unix-seconds the packet was produced/recorded (node-stamped). Not part of
+    /// duplicate identity — a retry never restamps.
+    pub produced_at: u64,
+    /// blake3 canonical record hash binding the fields above.
+    pub record_hash: Hash,
+}
+
+impl PartialEq for EvidencePacketProducedReceipt {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_hash == other.record_hash
+    }
+}
+
+impl Eq for EvidencePacketProducedReceipt {}
+
+impl EvidencePacketProducedReceipt {
+    /// Domain separation tag for canonical evidence-packet-produced record
+    /// hashes. Distinct from every other receipt-family tag — and in particular
+    /// it must NEVER converge with `icn:gov:mutation_applied:v1`,
+    /// `icn:gov:mutation_plan_recorded:v1`, `icn:gov:activation_crossed:v1`,
+    /// `icn:gov:decision_recorded:v1`, `icn:gov:process_gate_result:v1`,
+    /// `icn:gov:deliberation_entry_recorded:v1`,
+    /// `icn:gov:process_session_opened:v1`, or the proposal/vote
+    /// `icn:gov:decision:v1/v2/v3` lineage.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:evidence_packet_produced:v1";
+
+    /// Domain separation tag for the canonical `receipt_set_hash` sub-hash
+    /// (EP1/EP2). Kept distinct from [`Self::DOMAIN_TAG`] so a source-set hash
+    /// can never collide with a top-level record hash.
+    pub const RECEIPT_SET_DOMAIN_TAG: &[u8] = b"icn:gov:evidence_packet_produced:receipt_set:v1";
+
+    /// Build a new receipt and compute its canonical `record_hash`.
+    ///
+    /// `receipt_set_hash` must be pre-computed via
+    /// [`Self::compute_receipt_set_hash`]; `packet_hash` and
+    /// `redaction_profile_hash` are caller-supplied fingerprints of the
+    /// never-stored public packet and redaction profile (EP2/EP3), mirroring how
+    /// the sibling classes take pre-computed fingerprints.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        domain_id: String,
+        session_id: String,
+        packet_id: String,
+        mutation_application_id: String,
+        mutation_applied_record_hash: Hash,
+        receipt_set_hash: Hash,
+        packet_hash: Hash,
+        redaction_profile_hash: Hash,
+        produced_by: String,
+        produced_at: u64,
+    ) -> Self {
+        let record_hash = Self::compute_record_hash(
+            &domain_id,
+            &session_id,
+            &packet_id,
+            &mutation_application_id,
+            &mutation_applied_record_hash,
+            &receipt_set_hash,
+            &packet_hash,
+            &redaction_profile_hash,
+            &produced_by,
+            produced_at,
+        );
+        Self {
+            domain_id,
+            session_id,
+            packet_id,
+            mutation_application_id,
+            mutation_applied_record_hash,
+            receipt_set_hash,
+            packet_hash,
+            redaction_profile_hash,
+            produced_by,
+            produced_at,
+            record_hash,
+        }
+    }
+
+    /// Compute the canonical record hash from the input fields.
+    ///
+    /// Layout (per the #2314 contract as resolved by the #2316 EP1–EP5 decision
+    /// rung §9): [`Self::DOMAIN_TAG`] first; each string field length-prefixed
+    /// (u64 LE) in order `domain_id`, `session_id`, `packet_id`,
+    /// `mutation_application_id`, `produced_by`; then `mutation_applied_record_hash`,
+    /// `receipt_set_hash`, `packet_hash`, `redaction_profile_hash` appended
+    /// **raw as fixed 32-byte fields with no length prefix** (fixed-size fields
+    /// cannot alias); then `produced_at` as LE bytes (Unix seconds). No
+    /// discriminant byte (this class has no kind taxonomy).
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_record_hash(
+        domain_id: &str,
+        session_id: &str,
+        packet_id: &str,
+        mutation_application_id: &str,
+        mutation_applied_record_hash: &Hash,
+        receipt_set_hash: &Hash,
+        packet_hash: &Hash,
+        redaction_profile_hash: &Hash,
+        produced_by: &str,
+        produced_at: u64,
+    ) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        for field in [
+            domain_id,
+            session_id,
+            packet_id,
+            mutation_application_id,
+            produced_by,
+        ] {
+            hasher.update(&(field.len() as u64).to_le_bytes());
+            hasher.update(field.as_bytes());
+        }
+        hasher.update(mutation_applied_record_hash);
+        hasher.update(receipt_set_hash);
+        hasher.update(packet_hash);
+        hasher.update(redaction_profile_hash);
+        hasher.update(&produced_at.to_le_bytes());
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+
+    /// Compute the canonical `receipt_set_hash` over the source-receipt
+    /// references (EP1/EP2, #2316 §4).
+    ///
+    /// Canonicalization makes the hash **independent of caller input order**: the
+    /// members are sorted by `(ladder_position, record_hash bytewise ascending)`
+    /// before hashing, so two callers supplying the same set in different orders
+    /// derive the same hash. Duplicate `record_hash` members are rejected
+    /// **fail-closed** (a set commitment must not be forkable by repetition), as
+    /// is the empty set (a produced packet must draw from at least its immediate
+    /// predecessor).
+    ///
+    /// Layout: [`Self::RECEIPT_SET_DOMAIN_TAG`] first; the member count as `u64`
+    /// LE; then each member's `record_hash` appended raw 32 bytes in canonical
+    /// order. Ladder-position bytes are **not** part of the hash input, but they
+    /// determine the canonical member ordering above — so the hash commits to the
+    /// set of `record_hash`es *and their ladder-ordered sequence*, and a
+    /// different ladder position for a member can change the hash. **Bodies never
+    /// participate.**
+    pub fn compute_receipt_set_hash(
+        members: &[EvidencePacketSourceRef],
+    ) -> Result<Hash, EvidencePacketReceiptSetError> {
+        if members.is_empty() {
+            return Err(EvidencePacketReceiptSetError::Empty);
+        }
+        // Reject duplicate record_hash members regardless of ladder position —
+        // set semantics, fail-closed (never silently de-duplicated).
+        let mut seen = std::collections::HashSet::with_capacity(members.len());
+        for m in members {
+            if !seen.insert(m.record_hash) {
+                return Err(EvidencePacketReceiptSetError::DuplicateMember);
+            }
+        }
+        // Canonical order: ladder position, then record_hash bytewise ascending.
+        let mut sorted: Vec<EvidencePacketSourceRef> = members.to_vec();
+        sorted.sort_by(|a, b| {
+            a.ladder_position
+                .cmp(&b.ladder_position)
+                .then_with(|| a.record_hash.cmp(&b.record_hash))
+        });
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::RECEIPT_SET_DOMAIN_TAG);
+        hasher.update(&(sorted.len() as u64).to_le_bytes());
+        for m in &sorted {
+            hasher.update(&m.record_hash);
+        }
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        Ok(out)
+    }
+}
+
+// ============================================================================
 // Mandate grant reference (#1868 step 2 primitive — wire form only)
 // ============================================================================
 
@@ -5758,6 +6061,470 @@ mod tests {
             assert!(
                 !lower.contains(forbidden),
                 "MutationAppliedReceipt JSON must not contain `{forbidden}`; got: {json}"
+            );
+        }
+    }
+
+    // ============================================================================
+    // EvidencePacketProducedReceipt — eighth ProcessTransitionReceipt class
+    // (#2314 contract + #2316 EP1–EP5 decision rung)
+    // ============================================================================
+
+    fn sample_evidence_source_refs() -> Vec<EvidencePacketSourceRef> {
+        // A minimal in-ladder-order set: the immediate predecessor
+        // (MutationApplied, ladder 6) plus the plan it applied (ladder 5).
+        vec![
+            EvidencePacketSourceRef {
+                ladder_position: 6,
+                record_hash: [7u8; 32],
+            },
+            EvidencePacketSourceRef {
+                ladder_position: 5,
+                record_hash: [4u8; 32],
+            },
+        ]
+    }
+
+    fn sample_evidence_packet_produced_receipt() -> EvidencePacketProducedReceipt {
+        let receipt_set_hash =
+            EvidencePacketProducedReceipt::compute_receipt_set_hash(&sample_evidence_source_refs())
+                .expect("sample source set is valid");
+        EvidencePacketProducedReceipt::new(
+            "domain-food-coop".to_string(),
+            "session-alpha".to_string(),
+            "packet-001".to_string(),
+            "application-001".to_string(),
+            [7u8; 32],        // mutation_applied_record_hash (EP1 proof link)
+            receipt_set_hash, // EP1/EP2 source-set commitment
+            [5u8; 32],        // packet_hash (EP2 public/redacted artifact)
+            [9u8; 32],        // redaction_profile_hash (EP3)
+            "did:icn:producer-1".to_string(), // recorder, not producer
+            1_750_000_000,
+        )
+    }
+
+    #[test]
+    fn evidence_packet_produced_golden_vector() {
+        // Golden canonical hash vector: pins the FULL v1 layout (domain tag,
+        // length-prefixed strings domain_id/session_id/packet_id/
+        // mutation_application_id/produced_by, raw fixed 32-byte
+        // mutation_applied_record_hash then receipt_set_hash then packet_hash
+        // then redaction_profile_hash, produced_at LE — no discriminant byte).
+        // Any layout change breaks this test and requires a new tag version.
+        let r = sample_evidence_packet_produced_receipt();
+        assert_eq!(
+            hex32(&r.record_hash),
+            "c6c74f06499a0a4d8c3a7ff1f3995ad2a88976e7ec1e0a9de9e95a51f53dfe57",
+            "canonical v1 hash layout drifted"
+        );
+    }
+
+    #[test]
+    fn evidence_packet_produced_receipt_set_hash_golden_vector() {
+        // Pins the canonical receipt_set_hash sub-hash layout (set tag, count
+        // u64 LE, canonically ordered member record_hashes raw 32).
+        let h =
+            EvidencePacketProducedReceipt::compute_receipt_set_hash(&sample_evidence_source_refs())
+                .expect("valid set");
+        assert_eq!(
+            hex32(&h),
+            "61f4124b565da0be8b090a20ffdccc896b343ad23c4548bb0777af62766f85e7",
+            "canonical receipt_set_hash layout drifted"
+        );
+    }
+
+    #[test]
+    fn evidence_packet_produced_record_hash_determinism() {
+        let r1 = sample_evidence_packet_produced_receipt();
+        let r2 = sample_evidence_packet_produced_receipt();
+        assert_eq!(r1.record_hash, r2.record_hash);
+        assert_ne!(r1.record_hash, [0u8; 32]);
+        assert_eq!(r1, r2);
+    }
+
+    #[test]
+    fn evidence_packet_produced_record_hash_changes_per_field() {
+        // Every hashed field independently changes the record hash.
+        let base = sample_evidence_packet_produced_receipt();
+        let mk = |domain: &str,
+                  session: &str,
+                  packet: &str,
+                  app: &str,
+                  applied_hash: [u8; 32],
+                  set_hash: [u8; 32],
+                  packet_hash: [u8; 32],
+                  redaction: [u8; 32],
+                  by: &str,
+                  at: u64| {
+            EvidencePacketProducedReceipt::new(
+                domain.to_string(),
+                session.to_string(),
+                packet.to_string(),
+                app.to_string(),
+                applied_hash,
+                set_hash,
+                packet_hash,
+                redaction,
+                by.to_string(),
+                at,
+            )
+        };
+        let variants = [
+            mk(
+                "domain-other",
+                &base.session_id,
+                &base.packet_id,
+                &base.mutation_application_id,
+                base.mutation_applied_record_hash,
+                base.receipt_set_hash,
+                base.packet_hash,
+                base.redaction_profile_hash,
+                &base.produced_by,
+                base.produced_at,
+            ),
+            mk(
+                &base.domain_id,
+                "session-other",
+                &base.packet_id,
+                &base.mutation_application_id,
+                base.mutation_applied_record_hash,
+                base.receipt_set_hash,
+                base.packet_hash,
+                base.redaction_profile_hash,
+                &base.produced_by,
+                base.produced_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                "packet-other",
+                &base.mutation_application_id,
+                base.mutation_applied_record_hash,
+                base.receipt_set_hash,
+                base.packet_hash,
+                base.redaction_profile_hash,
+                &base.produced_by,
+                base.produced_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.packet_id,
+                "application-other",
+                base.mutation_applied_record_hash,
+                base.receipt_set_hash,
+                base.packet_hash,
+                base.redaction_profile_hash,
+                &base.produced_by,
+                base.produced_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.packet_id,
+                &base.mutation_application_id,
+                [1u8; 32],
+                base.receipt_set_hash,
+                base.packet_hash,
+                base.redaction_profile_hash,
+                &base.produced_by,
+                base.produced_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.packet_id,
+                &base.mutation_application_id,
+                base.mutation_applied_record_hash,
+                [2u8; 32],
+                base.packet_hash,
+                base.redaction_profile_hash,
+                &base.produced_by,
+                base.produced_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.packet_id,
+                &base.mutation_application_id,
+                base.mutation_applied_record_hash,
+                base.receipt_set_hash,
+                [3u8; 32],
+                base.redaction_profile_hash,
+                &base.produced_by,
+                base.produced_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.packet_id,
+                &base.mutation_application_id,
+                base.mutation_applied_record_hash,
+                base.receipt_set_hash,
+                base.packet_hash,
+                [8u8; 32],
+                &base.produced_by,
+                base.produced_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.packet_id,
+                &base.mutation_application_id,
+                base.mutation_applied_record_hash,
+                base.receipt_set_hash,
+                base.packet_hash,
+                base.redaction_profile_hash,
+                "did:icn:producer-other",
+                base.produced_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.packet_id,
+                &base.mutation_application_id,
+                base.mutation_applied_record_hash,
+                base.receipt_set_hash,
+                base.packet_hash,
+                base.redaction_profile_hash,
+                &base.produced_by,
+                base.produced_at + 1,
+            ),
+        ];
+        for (i, v) in variants.iter().enumerate() {
+            assert_ne!(
+                base.record_hash, v.record_hash,
+                "variant {i} must change the record hash"
+            );
+        }
+    }
+
+    #[test]
+    fn evidence_packet_produced_tag_separates_from_other_families() {
+        // Family separation from the seven landed process-transition classes.
+        for other in [
+            ProcessSessionOpenedReceipt::DOMAIN_TAG,
+            DeliberationEntryRecordedReceipt::DOMAIN_TAG,
+            DecisionRecordedReceipt::DOMAIN_TAG,
+            ProcessGateResultReceipt::DOMAIN_TAG,
+            ActivationCrossedReceipt::DOMAIN_TAG,
+            MutationPlanRecordedReceipt::DOMAIN_TAG,
+            MutationAppliedReceipt::DOMAIN_TAG,
+            // Must NEVER converge with the proposal/vote decision lineage.
+            GovernanceDecisionReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceiptV2::DOMAIN_TAG,
+            GovernanceDecisionReceiptV3::DOMAIN_TAG,
+        ] {
+            assert_ne!(EvidencePacketProducedReceipt::DOMAIN_TAG, other);
+        }
+        // The receipt-set sub-hash tag must never collide with the record tag.
+        assert_ne!(
+            EvidencePacketProducedReceipt::DOMAIN_TAG,
+            EvidencePacketProducedReceipt::RECEIPT_SET_DOMAIN_TAG
+        );
+    }
+
+    #[test]
+    fn evidence_packet_produced_length_prefix_prevents_field_shifting() {
+        // Shifting bytes between adjacent string fields must change the hash —
+        // the length prefix delimits each field exactly.
+        let a = EvidencePacketProducedReceipt::compute_record_hash(
+            "ab",
+            "c",
+            "packet-001",
+            "application-001",
+            &[0u8; 32],
+            &[0u8; 32],
+            &[0u8; 32],
+            &[0u8; 32],
+            "did:icn:x",
+            1,
+        );
+        let b = EvidencePacketProducedReceipt::compute_record_hash(
+            "a",
+            "bc",
+            "packet-001",
+            "application-001",
+            &[0u8; 32],
+            &[0u8; 32],
+            &[0u8; 32],
+            &[0u8; 32],
+            "did:icn:x",
+            1,
+        );
+        assert_ne!(a, b, "length prefix must delimit adjacent string fields");
+    }
+
+    #[test]
+    fn evidence_packet_produced_receipt_set_hash_order_independent() {
+        // Caller input order cannot fork the set hash: the same members in a
+        // different order canonicalize to the same hash.
+        let forward = sample_evidence_source_refs();
+        let mut reversed = forward.clone();
+        reversed.reverse();
+        let hf = EvidencePacketProducedReceipt::compute_receipt_set_hash(&forward).unwrap();
+        let hr = EvidencePacketProducedReceipt::compute_receipt_set_hash(&reversed).unwrap();
+        assert_eq!(
+            hf, hr,
+            "receipt_set_hash must be independent of input order"
+        );
+    }
+
+    #[test]
+    fn evidence_packet_produced_receipt_set_hash_rejects_duplicates() {
+        // Duplicate record_hash (even under different ladder positions) fails
+        // closed — a set commitment must not be forkable by repetition.
+        let dup = vec![
+            EvidencePacketSourceRef {
+                ladder_position: 6,
+                record_hash: [7u8; 32],
+            },
+            EvidencePacketSourceRef {
+                ladder_position: 4,
+                record_hash: [1u8; 32],
+            },
+            EvidencePacketSourceRef {
+                ladder_position: 5,
+                record_hash: [7u8; 32],
+            },
+        ];
+        assert_eq!(
+            EvidencePacketProducedReceipt::compute_receipt_set_hash(&dup),
+            Err(EvidencePacketReceiptSetError::DuplicateMember)
+        );
+    }
+
+    #[test]
+    fn evidence_packet_produced_receipt_set_hash_rejects_empty() {
+        assert_eq!(
+            EvidencePacketProducedReceipt::compute_receipt_set_hash(&[]),
+            Err(EvidencePacketReceiptSetError::Empty)
+        );
+    }
+
+    #[test]
+    fn evidence_packet_produced_receipt_set_hash_changes_with_membership() {
+        let base =
+            EvidencePacketProducedReceipt::compute_receipt_set_hash(&sample_evidence_source_refs())
+                .unwrap();
+        let mut extended = sample_evidence_source_refs();
+        extended.push(EvidencePacketSourceRef {
+            ladder_position: 4,
+            record_hash: [1u8; 32],
+        });
+        let ext = EvidencePacketProducedReceipt::compute_receipt_set_hash(&extended).unwrap();
+        assert_ne!(base, ext, "a different member set must change the hash");
+    }
+
+    #[test]
+    fn evidence_packet_produced_receipt_set_hash_ladder_position_orders() {
+        // Ladder position is the primary ordering key: two members with the same
+        // record_hashes but swapped ladder positions hash differently, proving
+        // ladder position participates in canonical ordering (not just hash).
+        let a = vec![
+            EvidencePacketSourceRef {
+                ladder_position: 6,
+                record_hash: [1u8; 32],
+            },
+            EvidencePacketSourceRef {
+                ladder_position: 5,
+                record_hash: [2u8; 32],
+            },
+        ];
+        let b = vec![
+            EvidencePacketSourceRef {
+                ladder_position: 5,
+                record_hash: [1u8; 32],
+            },
+            EvidencePacketSourceRef {
+                ladder_position: 6,
+                record_hash: [2u8; 32],
+            },
+        ];
+        let ha = EvidencePacketProducedReceipt::compute_receipt_set_hash(&a).unwrap();
+        let hb = EvidencePacketProducedReceipt::compute_receipt_set_hash(&b).unwrap();
+        assert_ne!(ha, hb);
+    }
+
+    #[test]
+    fn evidence_packet_produced_serde_roundtrip_and_payload_audit() {
+        let r = sample_evidence_packet_produced_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let back: EvidencePacketProducedReceipt = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(r, back);
+        // v1 layout audit: exactly the pinned fields are present, and NONE of the
+        // deliberately-absent fields (EP2/EP3/EP5) leak into the payload.
+        for present in [
+            "domain_id",
+            "session_id",
+            "packet_id",
+            "mutation_application_id",
+            "mutation_applied_record_hash",
+            "receipt_set_hash",
+            "packet_hash",
+            "redaction_profile_hash",
+            "produced_by",
+            "produced_at",
+            "record_hash",
+        ] {
+            assert!(json.contains(present), "field `{present}` must be present");
+        }
+        for forbidden in [
+            "redaction_profile_id",
+            "human_at_status",
+            "packet_body",
+            "source_receipt_bod",
+            "plan_body",
+            "applied_result_body",
+            "operation_list",
+            "target_list",
+            "effect_payload",
+        ] {
+            assert!(
+                !json.contains(forbidden),
+                "field `{forbidden}` must NOT be present; got: {json}"
+            );
+        }
+    }
+
+    #[test]
+    fn evidence_packet_produced_no_prohibited_vocabulary() {
+        // "produced" is core vocabulary for this class (produced_by / produced_at),
+        // so it is NOT forbidden. This enforces the EP4 boundary: no
+        // delivery/acceptance/audit/authority overclaim leaks into the payload,
+        // and no regulated-finance or proposal/vote lineage vocabulary appears.
+        let r = sample_evidence_packet_produced_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let lower = json.to_lowercase();
+        for forbidden in [
+            // regulated-finance vocabulary
+            "wallet",
+            "balance",
+            "currency",
+            "payment",
+            "withdraw",
+            "deposit",
+            // EP4 no-overclaim: records a fact; does not deliver/accept/audit/
+            // certify/execute/authorize/verify/roll back
+            "delivered",
+            "accepted",
+            "audited",
+            "certified",
+            "authorized",
+            "executed",
+            "verified",
+            "rolled back",
+            "roll back",
+            // proposal/vote lineage vocabulary
+            "proposal",
+            "vote",
+            "tally",
+            "quorum",
+            "mandate",
+        ] {
+            assert!(
+                !lower.contains(forbidden),
+                "EvidencePacketProducedReceipt JSON must not contain `{forbidden}`; got: {json}"
             );
         }
     }

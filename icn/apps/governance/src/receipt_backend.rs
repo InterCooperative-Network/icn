@@ -4,8 +4,8 @@
 use icn_governance::{
     ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, ActivationCrossedReceipt,
     AuthorityGrant, AuthorityGrantId, DecisionRecordedReceipt, DeliberationEntryRecordedReceipt,
-    GovernanceDecisionReceipt, GovernanceDecisionReceiptV3, Grantee, Mandate,
-    MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, MutationAppliedReceipt,
+    EvidencePacketProducedReceipt, GovernanceDecisionReceipt, GovernanceDecisionReceiptV3, Grantee,
+    Mandate, MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, MutationAppliedReceipt,
     MutationPlanRecordedReceipt, ProcessGateKind, ProcessGateResultReceipt,
     ProcessSessionOpenedReceipt, Timestamp,
 };
@@ -257,6 +257,51 @@ pub enum MutationAppliedPersist {
     /// variant would make this enum needlessly large next to the unit
     /// `Inserted`.
     Existing(Box<MutationAppliedReceipt>),
+}
+
+/// Class string for `EvidencePacketProducedReceipt` opaque storage (#2314
+/// contract + #2316 EP1–EP5 decision rung). Chosen in the apps layer so the
+/// gateway never sees the typed name. Distinct from every other process class
+/// store.
+const EVIDENCE_PACKET_PRODUCED_CLASS: &str = "evidence_packet_produced";
+
+/// Build the injective composite `key1` binding a produced evidence packet to
+/// its `(domain_id, session_id)` anchor in opaque storage.
+///
+/// Sibling of [`mutation_applied_composite_key1`] with the identical
+/// netstring-style encoding (decimal length of `domain_id`, a colon, then the
+/// two ids concatenated), kept as a separate function so this class's key
+/// derivation is independently anchored by its own anti-aliasing test. The
+/// length prefix delimits `domain_id` exactly, so `("ab","c")` and `("a","bc")`
+/// can never produce the same key, and two domains sharing a `session_id` scan
+/// different `key1` prefixes.
+pub fn evidence_packet_produced_composite_key1(domain_id: &str, session_id: &str) -> String {
+    format!("{}:{domain_id}{session_id}", domain_id.len())
+}
+
+/// Outcome of persisting an [`EvidencePacketProducedReceipt`] through
+/// [`GovernanceReceiptBackend::put_evidence_packet_produced`].
+///
+/// The backend enforces at most one packet per `(domain_id, session_id,
+/// packet_id)` **atomically at the storage layer** (same `put_opaque_if_absent`
+/// primitive as the sibling process classes). The caller (the manager) turns
+/// `Existing` into either a same-identity idempotent success or a fail-closed
+/// conflict — stable identity is `mutation_application_id` +
+/// `mutation_applied_record_hash` + `receipt_set_hash` + `packet_hash` +
+/// `redaction_profile_hash` + `produced_by` (per the #2316 rung §9;
+/// `produced_at`/`record_hash` are NOT identity inputs).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvidencePacketProducedPersist {
+    /// This call won the insert: the receipt is now the one persisted packet for
+    /// its `(domain_id, session_id, packet_id)`.
+    Inserted,
+    /// A packet already existed for this triple; nothing was written. Carries
+    /// the original persisted receipt (original `produced_at` / `record_hash` —
+    /// never restamped). Boxed because [`EvidencePacketProducedReceipt`] is a
+    /// large payload (five string fields plus four 32-byte hashes), so an
+    /// unboxed variant would make this enum needlessly large next to the unit
+    /// `Inserted`.
+    Existing(Box<EvidencePacketProducedReceipt>),
 }
 
 /// Class string for `MeetingAttendanceReceiptV2` opaque storage (#1868).
@@ -1535,6 +1580,101 @@ pub trait GovernanceReceiptBackend: Send + Sync {
             out.push(
                 serde_json::from_slice(&bytes)
                     .map_err(|e| format!("deserialize MutationAppliedReceipt in list: {e}"))?,
+            );
+        }
+        Ok(out)
+    }
+
+    /// Persist an [`EvidencePacketProducedReceipt`] emitted when the runtime
+    /// records that a redacted evidence packet artifact was produced (#2314
+    /// contract + #2316 rung).
+    ///
+    /// **Default routes through opaque storage.** Serialises the typed receipt
+    /// to JSON and delegates to [`Self::put_opaque_if_absent`] under class
+    /// `"evidence_packet_produced"` with `key1 =`
+    /// [`evidence_packet_produced_composite_key1`] (the injective domain+session
+    /// composite) and `key2 = packet_id`. On a lost insert the original
+    /// persisted receipt is hydrated and returned (never restamped). A backend
+    /// that has not opted in to opaque storage inherits the fail-closed
+    /// `opaque_storage_not_implemented` default.
+    fn put_evidence_packet_produced(
+        &self,
+        receipt: &EvidencePacketProducedReceipt,
+    ) -> Result<EvidencePacketProducedPersist, String> {
+        let payload = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize EvidencePacketProducedReceipt: {e}"))?;
+        let key1 = evidence_packet_produced_composite_key1(&receipt.domain_id, &receipt.session_id);
+        let existing = self.put_opaque_if_absent(
+            EVIDENCE_PACKET_PRODUCED_CLASS,
+            &key1,
+            Some(&receipt.packet_id),
+            receipt.produced_at,
+            receipt.record_hash,
+            &payload,
+        )?;
+        match existing {
+            None => Ok(EvidencePacketProducedPersist::Inserted),
+            Some(_winning_hash) => {
+                let original = self
+                    .get_evidence_packet_produced(
+                        &receipt.domain_id,
+                        &receipt.session_id,
+                        &receipt.packet_id,
+                    )?
+                    .ok_or_else(|| {
+                        // The unique marker says a packet exists but the payload
+                        // cannot be hydrated — surface loudly rather than minting
+                        // a second packet.
+                        "evidence_packet_produced_inconsistent: unique marker present \
+                         but no persisted packet payload could be read"
+                            .to_string()
+                    })?;
+                Ok(EvidencePacketProducedPersist::Existing(Box::new(original)))
+            }
+        }
+    }
+
+    /// Retrieve the persisted [`EvidencePacketProducedReceipt`] for a
+    /// `(domain_id, session_id, packet_id)`, or `None` when no packet has been
+    /// recorded. Same key convention as [`Self::put_evidence_packet_produced`];
+    /// at most one packet exists per triple (uniqueness is enforced on write).
+    fn get_evidence_packet_produced(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+        packet_id: &str,
+    ) -> Result<Option<EvidencePacketProducedReceipt>, String> {
+        let key1 = evidence_packet_produced_composite_key1(domain_id, session_id);
+        let payload =
+            self.get_latest_opaque(EVIDENCE_PACKET_PRODUCED_CLASS, &key1, Some(packet_id))?;
+        match payload {
+            Some(bytes) => {
+                Ok(Some(serde_json::from_slice(&bytes).map_err(|e| {
+                    format!("deserialize EvidencePacketProducedReceipt: {e}")
+                })?))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// List all evidence-packet-produced receipts recorded against one
+    /// `(domain_id, session_id)` anchor, in the store's deterministic
+    /// chronological `(produced_at, record_hash)` order. Because `key1` is the
+    /// injective domain+session composite, two domains sharing a `session_id`
+    /// can never mix here — no payload-side filtering is needed.
+    fn list_evidence_packet_produced_for_session_in_domain(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+    ) -> Result<Vec<EvidencePacketProducedReceipt>, String> {
+        let key1 = evidence_packet_produced_composite_key1(domain_id, session_id);
+        let payloads = self.list_opaque_for(EVIDENCE_PACKET_PRODUCED_CLASS, &key1)?;
+        let mut out = Vec::with_capacity(payloads.len());
+        for bytes in payloads {
+            out.push(
+                serde_json::from_slice(&bytes).map_err(|e| {
+                    format!("deserialize EvidencePacketProducedReceipt in list: {e}")
+                })?,
             );
         }
         Ok(out)
