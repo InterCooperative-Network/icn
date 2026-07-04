@@ -1,5 +1,5 @@
 {
-  "_note": "Fixture-only, dev-safe process-evidence pack for the organizer-steward evidence surface (icn#2289, extended for ActivationCrossedReceipt by icn#2297 and MutationPlanRecordedReceipt by icn#2304). Renders on web/member-shell/ at ?mode=demo&set=process-evidence. All six receipt objects are wire-shaped per icn/crates/icn-governance/src/proof.rs (bare JSON, snake_case enums, 32-byte hashes as integer arrays); the entry-level fields (kind, plainContext, redaction metadata, and the activation entry's declaredGateBasis) are display-only, not wire fields. Every record_hash / body_hash / decision_record_hash / gate_basis / activation_record_hash below is an ILLUSTRATIVE fixture value — NOT a real blake3 binding; nothing is signed. All DIDs are fictional (example-…-not-live). No new receipt class: this reads the six existing ADR-0026 Layer 2 process-transition classes only (the sixth, MutationPlanRecordedReceipt, landed in icn#2303). The deliberation body is never stored — the receipt carries a body_hash content fingerprint only, which is what makes the redaction demo honest. The activation receipt carries no body at all: it references the recorded decision by decision_id + decision_record_hash and fingerprints the passed gate results as gate_basis; declaredGateBasis (a display-only sibling of the receipt, not a wire field) lists the passed gate-result record_hash(es) the fixture's gate_basis stands for. The mutation-plan-recorded receipt references the activation it follows by activation_id + activation_record_hash (a proof pointer to the activation crossing above, whose record_hash it echoes) and fingerprints the plan body as body_hash only — the plan body, operation list, target list, and effect payload are never stored, and mutation application remains deferred.",
+  "_note": "Fixture-only, dev-safe process-evidence pack for the organizer-steward evidence surface (icn#2289, extended for ActivationCrossedReceipt by icn#2297, MutationPlanRecordedReceipt by icn#2304, and MutationAppliedReceipt by icn#2311). Renders on web/member-shell/ at ?mode=demo&set=process-evidence. All seven receipt objects are wire-shaped per icn/crates/icn-governance/src/proof.rs (bare JSON, snake_case enums, 32-byte hashes as integer arrays); the entry-level fields (kind, plainContext, redaction metadata, and the activation entry's declaredGateBasis) are display-only, not wire fields. Every record_hash / body_hash / decision_record_hash / gate_basis / activation_record_hash / plan_record_hash / result_hash below is an ILLUSTRATIVE fixture value — NOT a real blake3 binding; nothing is signed. All DIDs are fictional (example-…-not-live). No new receipt class: this reads the seven existing ADR-0026 Layer 2 process-transition classes only (the seventh, MutationAppliedReceipt, landed in icn#2310). The deliberation body is never stored — the receipt carries a body_hash content fingerprint only, which is what makes the redaction demo honest. The activation receipt carries no body at all: it references the recorded decision by decision_id + decision_record_hash and fingerprints the passed gate results as gate_basis; declaredGateBasis (a display-only sibling of the receipt, not a wire field) lists the passed gate-result record_hash(es) the fixture's gate_basis stands for. The mutation-plan-recorded receipt references the activation it follows by activation_id + activation_record_hash (a proof pointer to the activation crossing above, whose record_hash it echoes) and fingerprints the plan body as body_hash only — the plan body, operation list, target list, and effect payload are never stored, and mutation application remains deferred. The mutation-applied receipt references the plan it applies by plan_id + plan_record_hash (a proof pointer to the mutation-plan-recorded receipt above, whose record_hash it echoes) and fingerprints the applied result as result_hash only — the applied-result body is never stored; the receipt records an application fact, not the execution/authorization/validation/enforcement/rollback/proof-of-correctness of the mutation, and evidence-packet production remains deferred.",
   "domain_id": "demo.coop.stewardship",
   "session_id": "demo-process-session-0001",
   "sequence": [
@@ -156,6 +156,36 @@
           201, 40, 33, 5, 240, 119, 11, 64,
           156, 73, 8, 29, 101, 47, 90, 134,
           68, 3, 52, 175, 26, 199, 7, 145
+        ]
+      }
+    },
+    {
+      "kind": "mutation_applied",
+      "plainContext": "A mutation plan's application was recorded after the plan — an application fact. This references the plan it applies (by id and record hash) and fingerprints the applied result as a content hash. It does not execute, authorize, validate, enforce, roll back, or prove the mutation correct; it does not expose the applied-result body; and it grants zero authority. Evidence-packet production remains deferred. The receipt records a process fact and grants zero authority.",
+      "receipt": {
+        "domain_id": "demo.coop.stewardship",
+        "session_id": "demo-process-session-0001",
+        "application_id": "demo-mutation-application-0001",
+        "plan_id": "demo-mutation-plan-0001",
+        "plan_record_hash": [
+          44, 17, 88, 210, 155, 3, 92, 71,
+          201, 40, 33, 5, 240, 119, 11, 64,
+          156, 73, 8, 29, 101, 47, 90, 134,
+          68, 3, 52, 175, 26, 199, 7, 145
+        ],
+        "applied_by": "did:icn:example-recorder-demo-not-live",
+        "result_hash": [
+          91, 45, 200, 88, 71, 155, 3, 240,
+          119, 33, 11, 64, 92, 40, 201, 5,
+          90, 134, 101, 47, 11, 73, 156, 29,
+          199, 52, 175, 3, 68, 160, 32, 7
+        ],
+        "applied_at": 1729903600,
+        "record_hash": [
+          17, 44, 210, 88, 3, 155, 92, 71,
+          40, 201, 5, 33, 240, 119, 64, 11,
+          73, 156, 8, 29, 47, 101, 134, 90,
+          3, 68, 175, 52, 26, 199, 145, 7
         ]
       }
     }

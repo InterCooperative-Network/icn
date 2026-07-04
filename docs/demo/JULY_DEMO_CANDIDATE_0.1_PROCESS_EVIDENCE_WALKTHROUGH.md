@@ -8,14 +8,15 @@ It is **proof of path, not deployment readiness**. It is not production, not a p
 not organizer-ready, not member-ready, not live federation, not NYCN activation, not
 Phase 2 completion, not real member/partner data, and makes no signed/partner claim.
 
-This surface reads the **six already-landed ADR-0026 Layer 2 process-transition
+This surface reads the **seven already-landed ADR-0026 Layer 2 process-transition
 receipt classes** (`icn/crates/icn-governance/src/proof.rs`) — no new receipt class is
 introduced, no Rust runtime is changed, and no OpenAPI/SDK is touched. It implements the
 design contract landed in **#2290**
 ([`docs/design/organizer-steward-evidence-surface-runtime-dogfood.md`](../design/organizer-steward-evidence-surface-runtime-dogfood.md));
 the fifth class (`ActivationCrossedReceipt`, landed in **#2296**) was added to this
-fixture/demo surface by **#2297**, and the sixth (`MutationPlanRecordedReceipt`, landed
-in **#2303**) by **#2304**.
+fixture/demo surface by **#2297**, the sixth (`MutationPlanRecordedReceipt`, landed
+in **#2303**) by **#2304**, and the seventh (`MutationAppliedReceipt`, landed in
+**#2310**) by **#2311**.
 
 ## 1. What was run, and what was not
 
@@ -76,7 +77,7 @@ in **#2303**) by **#2304**.
 ## 3. Rendered walkthrough — observed
 
 The process-evidence view renders the `receipt → surface → evidence/export` tail of the
-vertical spine **as read views**: the six process-transition receipts in sequence, a
+vertical spine **as read views**: the seven process-transition receipts in sequence, a
 fixture-safe privacy/redaction boundary, and a repo-safe evidence-summary export. No
 mutation is performed; no gateway is contacted.
 
@@ -85,9 +86,10 @@ mutation is performed; no gateway is contacted.
 | Honesty banner text (permanently visible) | `Fixture-backed demo — no live node, nothing signed.` |
 | Standing pane visible; memberships / roles rendered | yes (reused demo standing) |
 | Action cards pane visible | yes (reused demo cards) |
-| Receipts pane: six process-transition receipts rendered in order | yes — **6 receipts** (`ProcessSessionOpenedReceipt` → `DeliberationEntryRecordedReceipt` → `DecisionRecordedReceipt` → `ProcessGateResultReceipt` → `ActivationCrossedReceipt` → `MutationPlanRecordedReceipt`) |
+| Receipts pane: seven process-transition receipts rendered in order | yes — **7 receipts** (`ProcessSessionOpenedReceipt` → `DeliberationEntryRecordedReceipt` → `DecisionRecordedReceipt` → `ProcessGateResultReceipt` → `ActivationCrossedReceipt` → `MutationPlanRecordedReceipt` → `MutationAppliedReceipt`) |
 | Activation boundary legible (icn#2297) | yes — the activation receipt names the boundary plainly ("crossed from decision toward later action planning") and distinguishes the three states: the recorded decision, the activation crossing itself, and the later mutation-planning work that remains deferred. It shows the decision reference (`decision_id` + `decision_record_hash` proof pointer) and the gate basis (`gate_basis` fingerprint + the declared passed gate-result `record_hash`), never body text; copy states it "records a process fact and grants zero authority" |
 | Mutation-plan-recorded boundary legible (icn#2304) | yes — the mutation-plan receipt names the boundary plainly ("a mutation plan was recorded after activation, before any mutation was applied") and distinguishes the states: the recorded decision, the activation crossing, the plan being recorded here, and the two later steps that remain deferred (mutation application and evidence-packet production). It shows the activation reference (`activation_id` + `activation_record_hash` proof pointer to the crossing above) and the plan proof pointer (`plan_id` + `body_hash`), never the plan body / operation list / target list / effect payload; `recorded_by` is labeled "who recorded the plan, not the planner, approver, applier, or authority holder"; copy states it "records a process fact and grants zero authority" |
+| Mutation-applied boundary legible (icn#2311) | yes — the mutation-applied receipt names the boundary plainly ("the plan's application was recorded after the plan — an application fact") and distinguishes the states: the recorded decision, the activation crossing, the mutation plan recorded, the plan's application recorded here, and the later evidence-packet production that remains deferred. It shows the plan reference (`plan_id` + `plan_record_hash` proof pointer to the mutation-plan receipt above) and the result proof pointer (`result_hash`), never the applied-result body / operation list / target list / effect payload; `applied_by` is labeled "who recorded the application — recorder / apply-witness, not the applier, approver, or authority holder"; copy states it "does not execute, authorize, validate, enforce, roll back, or prove the mutation correct" and "grants zero authority" |
 | Plain-language summary first; record fields under "Show evidence detail" | yes (per receipt) |
 | Privacy/redaction boundary legible | yes — the deliberation entry shows "What the steward body sees" (fictional summary) **and** "What members and the export see" (redaction reason + `record_hash`/`body_hash` proof pointers, no input text) |
 | Proof pointers labeled honestly | yes — `record_hash` = proof pointer; `body_hash` = "proof of content; the input itself is never stored"; recorder DIDs labeled "who recorded this fact, not who decided" |
@@ -111,7 +113,7 @@ Process-evidence view (`?mode=demo&set=process-evidence`), and the two regressio
 | **axe-core** (`wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa`) | **0 violations**, 27 passes | 0 violations, 27 passes | 0 violations, 27 passes |
 | Keyboard: focusables reached by Tab | 16 | 16 | 15 |
 | Keyboard: **every** focused element had a visible outline | **true** | true | true |
-| Receipts rendered | **6** | 1 | 1 |
+| Receipts rendered | **7** | 1 | 1 |
 | 200% CSS zoom render | no layout break | no layout break | no layout break |
 | Mobile (360px) horizontal scroll | none | none | none |
 | `prefers-reduced-motion: reduce` render | standing pane renders | renders | renders |
@@ -277,13 +279,14 @@ them.
 - Human 200% browser-zoom + small-device pass (3.3 / 3.5 / 3.8). [#2041]
 - External contrast-audit-tool confirmation of the documented ratios (3.3). [#2041]
 - Extend the process-evidence human/AT packet (§4G of the human-a11y-validation doc) to
-  cover the fifth and sixth receipts (`ActivationCrossedReceipt`, `MutationPlanRecordedReceipt`)
-  in the real human pass — the automated floor above now covers all six, but §4G currently
-  enumerates the four-receipt story; adding the activation and mutation-plan rows is owed,
-  not done here. [#2041]
+  cover the fifth, sixth, and seventh receipts (`ActivationCrossedReceipt`,
+  `MutationPlanRecordedReceipt`, `MutationAppliedReceipt`) in the real human pass — the
+  automated floor above now covers all seven, but §4G currently enumerates the four-receipt
+  story; adding the activation, mutation-plan, and mutation-applied rows is owed, not done
+  here. [#2041]
 - (Separate lanes, not this pass) real translations + human language QA (#1740); the
   broader human-operability spine (#1748 / #2141) remains open.
 
 ---
 
-_Refs #2289. Refs #2290. Refs #2291. Refs #2296. Refs #2297. Refs #2303. Refs #2304. Refs #1748. Refs #2141. Refs #2041._
+_Refs #2289. Refs #2290. Refs #2291. Refs #2296. Refs #2297. Refs #2303. Refs #2304. Refs #2310. Refs #2311. Refs #1748. Refs #2141. Refs #2041._

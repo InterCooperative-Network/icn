@@ -8,7 +8,7 @@
     {
       "kind": "committed-fixture",
       "basename": "process-evidence-receipts.json",
-      "summary": "Fictional fixture pack of six process-transition receipts (session opened, deliberation entry recorded, decision recorded, accessibility-gate result, activation crossed, mutation plan recorded). No real people and no real domain; all hashes are illustrative."
+      "summary": "Fictional fixture pack of seven process-transition receipts (session opened, deliberation entry recorded, decision recorded, accessibility-gate result, activation crossed, mutation plan recorded, mutation applied). No real people and no real domain; all hashes are illustrative."
     }
   ],
   "workflow_steps_completed": [
@@ -33,6 +33,10 @@
     {
       "category": "deferred",
       "plain_summary": "A mutation plan was recorded after activation and before any mutation was applied. The receipt references the activation it follows and fingerprints the plan body as a content hash. It records only that the plan record exists: it does not apply the plan, expose the plan body, or grant authority — mutation application and evidence-packet production both remain deferred."
+    },
+    {
+      "category": "deferred",
+      "plain_summary": "The plan's application was recorded after the plan — an application fact. The receipt references the plan it applies and fingerprints the applied result as a content hash. It does not execute, authorize, validate, enforce, roll back, or prove the mutation correct; it does not expose the applied-result body; and it grants zero authority. Evidence-packet production remains deferred."
     }
   ],
   "preview_review_boundary": {
@@ -42,10 +46,10 @@
   "mutation_boundary": {
     "executed": false,
     "target": "none",
-    "notes": "Fixture-only rehearsal; no gateway contacted, no write attempted, no network egress. The activation crossing and the mutation-plan recording are process facts, not mutations — recording a plan is not applying it; mutation application and evidence-packet production remain deferred and are not part of this surface."
+    "notes": "Fixture-only rehearsal; no gateway contacted, no write attempted, no network egress. The activation crossing, the mutation-plan recording, and the mutation-applied recording are all process facts, not mutations — recording that a plan's application happened is not executing/authorizing/validating/enforcing/rolling-back/proving the mutation; evidence-packet production remains deferred and is not part of this surface."
   },
   "warnings": [
-    "The six process-transition receipt hashes are illustrative fixture values, not real blake3 bindings; nothing is signed.",
+    "The seven process-transition receipt hashes are illustrative fixture values, not real blake3 bindings; nothing is signed.",
     "This surface renders read views only; no live gateway, federation, or production posture is implied."
   ],
   "follow_ups": [
@@ -71,9 +75,10 @@
     "Not a live federation, live Google Drive / Groups / Sheets sync, or any K3s / DNS / Forgejo mutation.",
     "Not private-data handling; all material is fictional and repo-safe by construction.",
     "Not organizer-ready or member-ready; this is a dev/fixture evidence view only.",
-    "Not a new receipt class; it reads the six existing ADR-0026 Layer 2 process-transition receipts only (mutation plan recorded landed in icn#2303).",
-    "Not a mutation, a planned or applied mutation, an action card, or an evidence-packet producer; activation records only that a decision crossed toward later action planning, and the mutation-plan receipt records only that a plan was recorded — recording a plan is not applying it, and application plus evidence-packet production remain deferred.",
-    "Not a plan body, operation list, target list, effect payload, or typed/kernel-readable mutation-plan operation model; the mutation-plan receipt carries a body-hash fingerprint only.",
+    "Not a new receipt class; it reads the seven existing ADR-0026 Layer 2 process-transition receipts only (mutation applied landed in icn#2310).",
+    "Not a mutation, a planned or applied mutation, a mutation-application engine, an action card, or an evidence-packet producer; activation records only that a decision crossed toward later action planning, and the mutation-plan receipt records only that a plan was recorded — recording a plan is not applying it.",
+    "The mutation-applied receipt records only that a plan's application happened; it does not execute, authorize, validate, enforce, roll back, or prove the mutation correct, and evidence-packet production remains deferred.",
+    "Not a plan body, applied-result body, operation list, target list, effect payload, or typed/kernel-readable mutation operation/result/effect model; the mutation-plan receipt carries a body-hash fingerprint only and the mutation-applied receipt carries a result-hash fingerprint only.",
     "Not NYCN activation and not Phase 2 completion."
   ]
 }
