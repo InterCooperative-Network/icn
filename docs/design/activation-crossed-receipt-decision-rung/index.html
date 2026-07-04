@@ -1,0 +1,381 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ActivationCrossedReceipt decision rung — B1/B2/B3 (decision → activation reference, gate basis, timestamp) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>activation crossed receipt decision rung</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/activation-crossed-receipt-decision-rung.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ActivationCrossedReceipt decision rung — B1/B2/B3 (decision → activation reference, gate basis, timestamp)</h1>
+<p><strong>Status:</strong> draft — design / decision rung (not runtime implementation)
+<strong>Truth class:</strong> descriptive
+<strong>Canonical:</strong> no — implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last reviewed:</strong> 2026-07-04
+<strong>Source basis:</strong> read against <code>origin/main</code> @ <code>a170d8e7</code> (the merged #2294 contract&#39;s tip). Code anchors (<code>icn/crates/icn-governance/src/proof.rs</code>, <code>icn/crates/icn-gateway/src/receipt_store.rs</code>, <code>icn/crates/icn-coop/src/types.rs</code>) were verified at that commit — re-verify before relying on exact line numbers or hashes; they drift.
+<strong>Related:</strong> #2293 (this rung&#39;s issue) · #1748 (Institutional Process Substrate milestone) · #2141 (vertical institutional spine control) · #2041 (human/AT pass — open/parked) · PR #2294 (merged design/audit contract, <a href="https://github.com/InterCooperative-Network/icn/blob/main/activation-crossed-receipt-runtime-dogfood">`docs/design/activation-crossed-receipt-runtime-dogfood.md`</a>) · PR #2278 / #2281 (the sibling decision-doc pattern: <a href="https://github.com/InterCooperative-Network/icn/blob/main/deliberation-entry-kind-taxonomy">`deliberation-entry-kind-taxonomy.md`</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/decision-recorded-q4-decision">`decision-recorded-q4-decision.md`</a>) · <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a> (receipt &amp; provenance proof envelope) · <code>ops/ideas/framing/institutional-process-substrate.md</code> (framing)</p>
+<blockquote>
+<p>Narrow decision document resolving the three implementation blockers the merged
+#2294 design contract named in its §14 — <strong>B1</strong> (decision → activation
+cross-receipt reference), <strong>B2</strong> (gate-basis representation and whether a new
+<code>ProcessGateKind</code> variant is required), and <strong>B3</strong> (<code>crossed_at</code> vs
+<code>effective_at</code> timestamp semantics). It mirrors the <code>decision-recorded-q4-decision.md</code>
+cadence: land the contract (#2294), then resolve the hash-participating
+structure <strong>in writing</strong> before a tag is pinned, then implement. This document
+decides nothing else: no runtime change, no receipt class added, no mutation
+planning, no evidence-packet production, no member-shell change, no human/AT run.
+Receipts record institutional facts. They grant zero authority.</p>
+</blockquote>
+<h2>1. Purpose</h2>
+<p>The #2294 design contract scoped a candidate <code>ActivationCrossedReceipt</code> — the fifth <code>ProcessTransitionReceipt</code> rung under #1748 / #2141 that would witness that an already-recorded decision <strong>crossed the activation boundary</strong> (the spine&#39;s &quot;boundary between deciding and doing&quot;), with the required gates observed as passed, before any later mutation/evidence work. The contract deliberately refused to pin the candidate <code>icn:gov:activation_crossed:v1</code> layout and blocked implementation on three questions whose answers change the canonical hash layout or the class&#39;s inter-receipt relationships:</p>
+<ul>
+<li><strong>B1</strong> — does the receipt name the decision it activates, and by what?</li>
+<li><strong>B2</strong> — how does the receipt witness &quot;required gates observed as passed,&quot; and is a new gate kind required?</li>
+<li><strong>B3</strong> — what is the activation timestamp source, and how does it stay deterministic?</li>
+</ul>
+<p>The landed rule (from the #2278 review cycle, restated by the #2281 Q4 decision) is that <strong>hash-participating structure is decided in writing before a tag is pinned, never silently in an implementation PR.</strong> This document resolves B1/B2/B3 so a contract-conformant implementation PR can begin. It is not a workflow engine, not a policy engine, not mutation planning, and not evidence-packet production.</p>
+<h2>2. Status basis</h2>
+<p>Verified live at authoring time (<code>origin/main</code> @ <code>a170d8e7</code>):</p>
+<ul>
+<li><strong>#2294</strong> — <code>ActivationCrossedReceipt</code> design/audit contract — <strong>landed</strong> (merged <code>a170d8e7</code>).</li>
+<li><strong>#2293</strong> — <code>ActivationCrossedReceipt</code> runtime dogfood slice — <strong>open</strong>; implementation has not started.</li>
+<li><strong>#1748 / #2141</strong> — Institutional Process Substrate milestone / vertical spine — <strong>open</strong>.</li>
+<li><strong>#2041</strong> — real screen-reader / low-vision / switch / AT-compat human pass — <strong>open / parked</strong> for a broader human-testing phase; not attempted here.</li>
+<li><code>ActivationCrossedReceipt</code> <strong>is not implemented</strong> — no Rust struct, tag, manager method, backend class constant, route, or test exists anywhere in <code>icn/crates/</code> (confirmed by live audit).</li>
+<li><code>ActivationRequest</code> / &quot;activation boundary&quot; remain <strong>framing / doc-only</strong>; the live audit found no runtime gate object or activation seam beyond this design lane&#39;s own docs.</li>
+<li><code>MutationPlanRecordedReceipt</code> / <code>MutationAppliedReceipt</code> / <code>EvidencePacketProducedReceipt</code> remain <strong>deferred</strong> (docs/framing only; no Rust).</li>
+</ul>
+<p>No production, pilot, organizer-ready, member-ready, live-federation, NYCN-activation, or Phase-2 claim is made or implied by this document.</p>
+<h2>3. Repo audit update (verified against live code)</h2>
+<p>Confirming the #2294 audit against <code>origin/main</code> @ <code>a170d8e7</code> — the facts B1/B2/B3 depend on:</p>
+<table>
+<thead>
+<tr>
+<th>Subject</th>
+<th>Finding</th>
+<th>Anchor</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>DecisionRecordedReceipt</code></td>
+<td>fields <code>domain_id, session_id, decision_id, recorded_by, recorded_at, body_hash, record_hash</code>; tag <code>icn:gov:decision_recorded:v1</code>; stable duplicate identity = <code>(domain_id, session_id, decision_id, recorded_by, body_hash)</code>; <code>recorded_at</code> <strong>excluded</strong> from identity (retry never restamps)</td>
+<td><code>proof.rs</code> (<code>DecisionRecordedReceipt</code>, <code>DOMAIN_TAG</code>, <code>compute_record_hash</code>)</td>
+</tr>
+<tr>
+<td><code>ProcessGateResultReceipt</code></td>
+<td>fields <code>session_id, domain_id, gate_kind: ProcessGateKind, result: ProcessGateResult, recorded_by, recorded_at, record_hash</code>; tag <code>icn:gov:process_gate_result:v1</code>; <code>result</code> is a two-variant <code>Pass</code> / <code>Fail</code> enum. <code>record_hash</code> — the sole <code>PartialEq</code>/<code>Eq</code> anchor — is computed over <strong>all</strong> fields <strong>including <code>recorded_at</code></strong> (<code>DOMAIN_TAG</code> → length-prefixed <code>session_id</code>, <code>domain_id</code>, <code>recorded_by</code> → <code>gate_kind</code> ordinal → <code>result</code> ordinal → <code>recorded_at</code> LE). <strong>Unlike the insert-if-absent classes, gate results are persisted with the plain append primitive <code>put_opaque</code></strong> keyed <code>(session_id, gate_kind)</code> for lookup — <em>not</em> <code>put_opaque_if_absent</code> — so there is <strong>no</strong> timestamp-excluding &quot;stable duplicate identity&quot; for this class: a re-record at a later second appends a fresh receipt and <code>get_latest_process_gate_result</code> returns the largest-<code>recorded_at</code> entry. A gate-basis reference therefore pins the specific <code>record_hash</code>, never a <code>(session, gate_kind)</code> pair</td>
+<td><code>proof.rs</code> (<code>ProcessGateResultReceipt</code>, <code>compute_record_hash</code>); <code>apps/governance/src/receipt_backend.rs</code> (<code>put_process_gate_result</code>, <code>get_latest_process_gate_result</code>)</td>
+</tr>
+<tr>
+<td><code>ProcessGateKind</code></td>
+<td><strong>closed enum, six variants</strong>: <code>PrivacyReview</code>(0), <code>AccessibilityReview</code>(1), <code>RepoSafetyReview</code>(2), <code>ScopeConfirmation</code>(3), <code>NoMutationCheck</code>(4), <code>SecondReviewerSignoff</code>(5); <code>Copy</code>, serde <code>snake_case</code>; <strong>no <code>#[non_exhaustive]</code>, no catch-all</strong>; ordinals are hard-mapped (<code>gate_kind_ordinal</code>) and <strong>participate in the gate receipt&#39;s <code>record_hash</code></strong></td>
+<td><code>proof.rs</code> (<code>ProcessGateKind</code>, <code>gate_kind_ordinal</code>)</td>
+</tr>
+<tr>
+<td>cross-receipt references</td>
+<td><strong>none exist</strong>: no receipt struct carries a field that points at another receipt&#39;s <code>record_hash</code> or id. The only &quot;ref&quot; concepts (<code>MandateGrantRef</code> / grant-to-receipt binding in the v2/v3 proposal-vote lineage) are not receipt-to-receipt links. B1&#39;s link is genuinely the lane&#39;s <strong>first</strong> inter-receipt reference</td>
+<td>whole-repo search</td>
+</tr>
+<tr>
+<td><code>effective_at</code></td>
+<td><strong>membership-actor lane only</strong> — <code>MemberBuilder::with_joined_at_secs</code> (<code>icn-coop/src/types.rs</code>) and the <code>Add/Remove/Freeze/Unfreeze</code> requests (<code>icn-core/src/services/membership_service.rs</code>), plus kernel-api protocol-parameter scheduling. It is <strong>not a field on any receipt.</strong> <code>decided_at</code> / <code>crossed_at</code> do not exist anywhere</td>
+<td><code>icn-coop/src/types.rs</code>, <code>membership_service.rs</code></td>
+</tr>
+<tr>
+<td><code>put_opaque_if_absent</code></td>
+<td>exists on the gateway <code>ReceiptStore</code> — signature <code>(class, key1, key2: Option&lt;&amp;str&gt;, recorded_at, record_hash, payload) -&gt; Result&lt;Option&lt;[u8;32]&gt;, String&gt;</code>; atomic sled transaction keyed on <code>(class, key1, key2)</code>; <code>None</code> ⇒ this write won, <code>Some(existing)</code> ⇒ return the original (never restamp); different payload for same <code>(class, record_hash)</code> ⇒ fail-closed. This is the idempotence mechanism a fifth class reuses</td>
+<td><code>receipt_store.rs</code> (<code>put_opaque_if_absent</code>)</td>
+</tr>
+</tbody></table>
+<p><strong>Bottom line:</strong> every #2294 audit claim that B1/B2/B3 rely on is accurate against live code. The four landed classes are the only runtime <code>ProcessTransitionReceipt</code>s; the activation rung remains seam-discovery work.</p>
+<h2>4. B1 decision — decision → activation cross-receipt reference</h2>
+<p><strong>Question.</strong> Does <code>ActivationCrossedReceipt</code> name the <code>DecisionRecordedReceipt</code> it activates, and if so by <code>decision_id</code>, by decision <code>record_hash</code>, or both — while preserving ADR-0026 proof/envelope semantics, idempotence, and replay safety? This is the lane&#39;s first inter-receipt reference; no existing pattern supports it.</p>
+<p>Options considered:</p>
+<ol>
+<li><strong>No in-receipt reference</strong> — rely on the shared <code>(domain_id, session_id)</code> session anchor; a read-model joins decision and activation by session. Rejected: it leaves the crossing&#39;s decision unbound. A session may record more than one decision; &quot;which decision was activated&quot; then has no cryptographic answer, only a temporal guess. It also fails the contract&#39;s own framing (§8: the crossing must <em>name</em> the decision it activates).</li>
+<li><strong><code>decision_id</code> only</strong> — carry the caller-opaque per-decision id. Rejected as the <em>sole</em> link: <code>decision_id</code> is unique only within a session and is caller-opaque; it names <em>which slot</em> but does not bind to the decision&#39;s recorded <strong>content</strong>. A crossing could cite a <code>decision_id</code> whose body later differs from what was recorded, and nothing would detect it.</li>
+<li><strong>decision <code>record_hash</code> only</strong> — carry the 32-byte content-addressed <code>record_hash</code> of the <code>DecisionRecordedReceipt</code>. Strong cryptographic binding, but drops the human/index handle; joining back to the session&#39;s decision list by id becomes indirect.</li>
+<li><strong>Both <code>decision_id</code> and decision <code>record_hash</code>. CHOSEN.</strong></li>
+<li>Proof-envelope / signature reference. Rejected for <code>:v1</code>: the process-transition classes are ADR-0026 Layer-2 <strong>self-hashed</strong> (blake3 <code>record_hash</code>, no signature/merkle — §7 of the contract). There is no signed envelope to point at; inventing one is an ADR-0026 revision, out of scope.</li>
+</ol>
+<p><strong>Decision B1: <code>:v1</code> carries a direct reference to the activated decision by <em>both</em> its caller-opaque <code>decision_id</code> and its content-addressed decision <code>record_hash</code>.</strong> Candidate field names (subject to implementation proof and golden-vector pinning):</p>
+<ul>
+<li><code>decision_id: String</code> — the decision being activated; the human/index handle, unique within the session.</li>
+<li><code>decision_record_hash: Hash</code> — the 32-byte <code>record_hash</code> of that <code>DecisionRecordedReceipt</code>; the content-addressed proof link.</li>
+</ul>
+<p>Binding consequences:</p>
+<ul>
+<li><strong>Both fields participate in the canonical <code>record_hash</code> and in stable duplicate identity.</strong> A same-identity retry returns the original receipt un-restamped; a different <code>decision_record_hash</code> (or <code>decision_id</code>) for the same <code>activation_id</code> is a fail-closed conflict (<code>activation_crossed_conflict</code>), mirroring <code>decision_recorded_conflict</code>.</li>
+<li><strong>The reference is verified, not merely asserted (fail-closed precondition).</strong> The implementation MUST require that a <code>DecisionRecordedReceipt</code> with exactly <code>decision_record_hash</code> exists in the <strong>same</strong> <code>(domain_id, session_id)</code> before the crossing is recorded. If it is absent — or present under a different session — the boundary is not crossed and <strong>no receipt is emitted</strong>, mirroring the session-open precondition of the landed classes. This is what makes the link a <em>proof</em> (&quot;this decision was recorded and I crossed on it&quot;), not a claim. It reads existing receipts; it does not evaluate or re-decide them.</li>
+<li><strong>ADR-0026 preserved.</strong> The link points at the decision&#39;s own self-hashed <code>record_hash</code> — the decision&#39;s existing provenance pointer. <code>ActivationCrossedReceipt</code> inherits the <em>process-transition</em> discipline (self-contained blake3 <code>record_hash</code>, opaque-store persistence), and asserts <strong>no</strong> signed-envelope/merkle inheritance. Any future signature upgrade is an ADR-0026 revision, not a receipt rung.</li>
+<li><strong>Idempotence / replay.</strong> Because <code>decision_record_hash</code> is content-addressed and deterministic (not wall-clock), two nodes replaying the same logical crossing derive the same activation identity and converge on the <strong>original</strong> receipt (original <code>recorded_at</code>, original <code>record_hash</code>) via <code>put_opaque_if_absent</code>. The cross-link is a hash, so it never introduces node-local nondeterminism.</li>
+<li><strong>Non-convergence.</strong> <code>decision_record_hash</code> is an opaque 32-byte value; it carries no proposal/vote/tally/outcome semantics and creates no tie to the <code>icn:gov:decision:v1/v2/v3</code> proposal-vote lineage. The activation rung references the <em>process-spine</em> <code>DecisionRecordedReceipt</code>, not the outcome-machinery <code>GovernanceDecisionReceipt</code>.</li>
+</ul>
+<p><strong>Test that proves it:</strong> a runtime-slice test that (a) records a <code>DecisionRecordedReceipt</code>, then records an <code>ActivationCrossedReceipt</code> citing that decision&#39;s real <code>record_hash</code>, round-trips it, and asserts the stored <code>decision_record_hash</code> equals the decision receipt&#39;s <code>record_hash</code>; (b) an activation whose <code>decision_record_hash</code> names no decision in the session (or names a decision from a different session) is refused fail-closed and persists nothing; (c) a same-identity retry returns the original activation un-restamped; (d) a conflicting <code>decision_record_hash</code>/<code>decision_id</code> for the same <code>activation_id</code> is a fail-closed conflict.</p>
+<h2>5. B2 decision — gate-basis representation and <code>ProcessGateKind</code></h2>
+<p><strong>Question.</strong> How does the receipt witness &quot;required gates observed as passed&quot;? Is a new <code>ActivationRequest</code> gate object and/or a new <code>ProcessGateKind</code> variant required? Is gate-basis required, optional, or fixture-only for this first slice?</p>
+<p>Two sub-decisions.</p>
+<h3>5.1 — No new <code>ProcessGateKind</code> variant; no new <code>ActivationRequest</code> gate object</h3>
+<p>Options considered:</p>
+<ol>
+<li><strong>Reuse the existing closed six-variant <code>ProcessGateKind</code>; add nothing. CHOSEN.</strong></li>
+<li>Add an <code>ActivationReadiness</code> (or similar) variant. Rejected: <code>ProcessGateKind</code> is a <code>Copy</code> enum with <strong>no <code>#[non_exhaustive]</code></strong> whose ordinals feed the gate receipt&#39;s <code>record_hash</code>. A new variant is (a) a breaking change at every exhaustive match site and (b) an <strong>ADR-controlled taxonomy change</strong>, not a free append — exactly the boundary the contract §14 flagged. It also conflates <em>evaluating</em> a gate with <em>witnessing</em> a crossing.</li>
+<li>Introduce a runtime <code>ActivationRequest</code> gate object. Rejected for this slice: it is a new primitive with its own authority/refusal semantics; the dogfood slice witnesses a crossing, it does not build a request/approval object. <code>ActivationRequest</code> stays framing-only.</li>
+</ol>
+<p><strong>Decision B2a: activation crossing reuses the existing <code>ProcessGateKind</code> taxonomy unchanged.</strong> The six variants (<code>PrivacyReview</code>, <code>AccessibilityReview</code>, <code>RepoSafetyReview</code>, <code>ScopeConfirmation</code>, <code>NoMutationCheck</code>, <code>SecondReviewerSignoff</code>) already express the gate semantics that matter at the boundary. The activation receipt <strong>witnesses</strong> that the relevant <code>ProcessGateResultReceipt</code>s were <code>Pass</code>; it does <strong>not</strong> evaluate gates, define which gates are <em>required</em>, or add a gate kind. Any future activation-specific gate kind is a separate ADR-controlled taxonomy change, never a silent <code>:v1</code> add.</p>
+<h3>5.2 — Gate basis is an explicit, verified, content-addressed fingerprint</h3>
+<p>Options considered:</p>
+<ol>
+<li><strong>No in-receipt basis</strong> — read-model joins gate receipts by session at read time. Rejected: the crossing then witnesses nothing about <em>which</em> gates justified it; &quot;the gate can be refused&quot; (contract §5) has no in-receipt anchor.</li>
+<li><strong>A boolean &quot;all required gates passed.&quot;</strong> Rejected: it asserts a readiness claim the receipt cannot prove and smuggles a &quot;required set&quot; policy the receipt layer must not own. This is the mushy path the membership-determinism doctrine (#2283/#2284) warns against.</li>
+<li><strong>A content fingerprint <code>gate_basis: Hash</code> over the sorted set of the passed <code>ProcessGateResultReceipt</code> <code>record_hash</code>es declared as the basis. CHOSEN.</strong></li>
+<li>A stored variable-length vector of gate-result <code>record_hash</code>es. Rejected for <code>:v1</code>: heavier and variable-length in the hash layout for no benefit over a fingerprint; the individual gate receipts remain queryable by session.</li>
+</ol>
+<p><strong>Decision B2b: <code>:v1</code> carries a <code>gate_basis: Hash</code> — a blake3 fingerprint over the sorted, de-duplicated <code>record_hash</code>es of the <code>ProcessGateResultReceipt</code>s the caller declares as the basis for this crossing.</strong> Candidate name, subject to implementation proof and golden-vector pinning. It is the analog of <code>body_hash</code>: a fixed-32 content fingerprint that hashes cleanly, participates in the canonical <code>record_hash</code> and in stable duplicate identity, and binds the crossing to exactly the gate receipts that justified it — content-addressed and deterministic.</p>
+<p>Binding consequences:</p>
+<ul>
+<li><strong>Required, non-empty, fail-closed (verified, not asserted).</strong> For this slice a crossing MUST declare a non-empty basis, and the implementation MUST verify that every gate-result receipt whose <code>record_hash</code> is in the declared basis (i) exists in the <strong>same</strong> <code>(domain_id, session_id)</code> and (ii) carries <code>result == Pass</code>. If any declared gate result is absent or <code>Fail</code>, the boundary is not crossed and <strong>no receipt is emitted</strong> (contract §5 / §12.3). An empty basis is refused. This keeps &quot;the gate can be refused&quot; honest <strong>without a policy engine</strong>: the receipt layer verifies the <em>declared</em> basis; it does not decide which gates are <em>required</em> — that policy is charter/app-layer and deferred.</li>
+<li><strong>The firewall the contract §6 requires holds:</strong> the receipt carries <strong>no <code>ProcessGateKind</code>, no <code>result</code>, no gate evaluation</strong> — only the fingerprint of the passed gate receipts. It witnesses that gates passed; it does not re-derive the passing.</li>
+<li><strong>Determinism.</strong> <code>gate_basis</code> is a hash over content-addressed inputs, so it introduces no node-local nondeterminism; replay converges.</li>
+</ul>
+<p><strong>Test that proves it:</strong> (a) a crossing declaring a basis of two real <code>Pass</code> gate receipts in-session round-trips and its <code>gate_basis</code> equals the independently-recomputed fingerprint of those two <code>record_hash</code>es; (b) a crossing whose declared basis includes a <code>Fail</code> or absent gate result is refused fail-closed and persists nothing; (c) an empty basis is refused; (d) basis ordering does not matter (sorted before hashing) — the same set in any order yields the same <code>gate_basis</code>.</p>
+<h2>6. B3 decision — activation timestamp source</h2>
+<p><strong>Question.</strong> Does <code>ActivationCrossedReceipt</code> need its own <code>crossed_at</code>? Should it carry or derive <code>effective_at</code> from the decision? What is deterministic, what is operational, what appears in evidence?</p>
+<p>Three conceptually distinct times exist:</p>
+<ul>
+<li><strong>decision effective / accepted time</strong> — a property of the <em>decision</em>. It is <strong>not</strong> a field on <code>DecisionRecordedReceipt</code> today (that class carries only <code>recorded_at</code>, a recording time; any effective time lives inside the never-stored, fingerprinted decision body). <code>effective_at</code> as a runtime field exists only in the <strong>membership actor lane</strong> (<code>icn-coop</code> / <code>membership_service</code>, the #2286/#2288 durable-timestamp work), not in any receipt.</li>
+<li><strong>activation crossing time</strong> — the instant the boundary is crossed.</li>
+<li><strong>receipt recorded time</strong> — the ADR-0026 envelope&#39;s record time; on the landed classes this is <code>recorded_at: u64</code>, caller-supplied, hashed into <code>record_hash</code> but <strong>excluded</strong> from duplicate identity.</li>
+</ul>
+<p>Options considered:</p>
+<ol>
+<li><strong>Single caller-supplied <code>recorded_at: u64</code>, byte-parallel with the four landed classes. CHOSEN.</strong></li>
+<li>Distinct <code>crossed_at</code> <strong>and</strong> <code>recorded_at</code>. Rejected for <code>:v1</code>: in this local/dev/fixture slice the crossing is <em>recorded at the moment it is crossed</em> — the two instants coincide. Two fields would invite drift and a second, undecided determinism question for zero current benefit.</li>
+<li>Carry or derive <code>effective_at</code> from the decision. Rejected: <code>effective_at</code> is a membership-lane concept absent from the receipt world; the referenced <code>DecisionRecordedReceipt</code> exposes no effective time (its <code>recorded_at</code> is a recording time; a genuine effective time, if any, is inside the never-stored body). Importing it would cross lanes and manufacture a mushy timestamp with unclear determinism — exactly the #2283/#2284 failure mode.</li>
+</ol>
+<p><strong>Decision B3: <code>:v1</code> carries a single caller-supplied <code>recorded_at: u64</code>, hashed into <code>record_hash</code> but excluded from stable duplicate identity — identical to the four landed classes. No distinct <code>crossed_at</code> field is added; no <code>effective_at</code> is carried or derived.</strong> In this slice <code>recorded_at</code> denotes the moment the crossing was recorded, which coincides with the crossing itself.</p>
+<p>Binding consequences:</p>
+<ul>
+<li><strong>Which timestamp is deterministic across nodes: none of them.</strong> No wall-clock time is a cross-node-deterministic input. Determinism in the receipt comes entirely from its content-addressed identity — <code>(domain_id, session_id, activation_id, decision_id, decision_record_hash, gate_basis, crossed_by)</code> — <strong>not</strong> from any timestamp. <code>recorded_at</code> may live inside <code>record_hash</code> <strong>only because</strong> the receipt is idempotent on stable, non-timestamp identity, so replay converges on the original stamp (contract §9). Local wall-clock must never be an identity input.</li>
+<li><strong>Which is operational: <code>recorded_at</code>.</strong> It is a local wall-clock stamp for human/audit legibility, not a coordination value.</li>
+<li><strong>What appears in evidence/export: <code>recorded_at</code></strong> (human-readable &quot;when recorded&quot;) plus the content-addressed proof pointers (<code>decision_record_hash</code>, <code>gate_basis</code>, <code>record_hash</code>). Evidence MUST NOT surface a decision effective time pulled from the never-stored decision body, and MUST NOT invent a <code>crossed_at</code> distinct from <code>recorded_at</code>.</li>
+<li><strong>Future split is a <code>:v2</code> decision.</strong> If a real consumer later needs to distinguish crossing time from recording time (e.g. a crossing recorded asynchronously after the boundary event), that is a <code>:v2</code>-or-later field addition under its own decision — never a silent <code>:v1</code> add — and any such time also stays out of cross-node identity.</li>
+</ul>
+<h2>7. Consolidated candidate <code>:v1</code> layout (for the implementation PR)</h2>
+<p>Resolving B1/B2/B3 pins the candidate <code>icn:gov:activation_crossed:v1</code> field set (all names <strong>candidate — subject to implementation proof and golden-vector pinning</strong>; the tag must hash-separate from, and never converge with, <code>icn:gov:decision_recorded:v1</code>, <code>icn:gov:process_gate_result:v1</code>, and the proposal/vote <code>icn:gov:decision:v1/v2/v3</code> lineage):</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>In stable identity?</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>domain_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key1</code> half)</td>
+<td>anchor</td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key1</code> half)</td>
+<td>anchor; session must be opened first</td>
+</tr>
+<tr>
+<td><code>activation_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key2</code>)</td>
+<td>caller-opaque per-activation id</td>
+</tr>
+<tr>
+<td><code>decision_id</code></td>
+<td><code>String</code></td>
+<td>yes</td>
+<td><strong>B1</strong> — decision being activated (must exist in-session)</td>
+</tr>
+<tr>
+<td><code>decision_record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td><strong>B1</strong> — content-addressed proof link to the <code>DecisionRecordedReceipt</code></td>
+</tr>
+<tr>
+<td><code>gate_basis</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td><strong>B2</strong> — fingerprint over the sorted passed gate-result <code>record_hash</code>es</td>
+</tr>
+<tr>
+<td><code>crossed_by</code></td>
+<td><code>String</code> (DID)</td>
+<td>yes</td>
+<td>recorder-not-crosser; grants zero authority</td>
+</tr>
+<tr>
+<td><code>recorded_at</code></td>
+<td><code>u64</code></td>
+<td><strong>no</strong></td>
+<td><strong>B3</strong> — caller-supplied; hashed; excluded from identity (retry never restamps)</td>
+</tr>
+<tr>
+<td><code>record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>(equality anchor)</td>
+<td>canonical blake3; the sole <code>PartialEq</code>/<code>Eq</code> anchor</td>
+</tr>
+</tbody></table>
+<p>An optional <code>body_hash: Hash</code> (a fixed-32 fingerprint of an <code>ActivationRequest</code> payload, if one is ever fingerprinted; the body is never stored) is <strong>deferred</strong> — the first slice witnesses a crossing without needing a request body. If added later it joins stable identity like the decision class&#39;s <code>body_hash</code>.</p>
+<p><strong>Candidate canonical hashing:</strong> <code>DOMAIN_TAG</code> (<code>icn:gov:activation_crossed:v1</code>) first → length-prefixed <code>domain_id</code>, <code>session_id</code>, <code>activation_id</code>, <code>decision_id</code>, <code>crossed_by</code> → <code>decision_record_hash</code> raw 32 (no length prefix) → <code>gate_basis</code> raw 32 (no length prefix) → <code>recorded_at</code> LE → any optional <code>body_hash</code> raw 32. Exact layout is fixed by the implementation PR and pinned by a golden vector.</p>
+<p><strong>Uniqueness / conflict:</strong> <code>put_opaque_if_absent</code> keyed on <code>(class, key1, key2)</code> where <code>key1</code> is an injective netstring composite of <code>(domain_id, session_id)</code> and <code>key2</code> is <code>activation_id</code>; conflict detection on <code>(decision_id, decision_record_hash, gate_basis, crossed_by, body_hash?)</code>. <code>recorded_at</code> and <code>record_hash</code> are not identity. Same-identity retry ⇒ original returned; mismatch ⇒ fail-closed <code>activation_crossed_conflict</code>.</p>
+<p><strong>Preconditions (all fail-closed; on any failure nothing is persisted):</strong> (1) the <code>(domain_id, session_id)</code> session was opened first; (2) a <code>DecisionRecordedReceipt</code> with <code>record_hash == decision_record_hash</code> exists in that same session; (3) every gate-result receipt in the declared basis exists in that same session and carries <code>result == Pass</code>; the basis is non-empty; (4) ids are non-empty/non-whitespace.</p>
+<h2>8. Implementation constraints for the next PR</h2>
+<p>The later implementation PR <strong>may</strong>:</p>
+<ul>
+<li>add the <code>ActivationCrossedReceipt</code> class <strong>only</strong>, conforming to the #2294 contract plus this rung (§7 above);</li>
+<li>add the minimum reference (B1), gate-basis (B2), and timestamp (B3) support pinned here;</li>
+<li>add <code>proof.rs</code> unit tests and a runtime-slice integration test where the existing receipt pattern supports them (construction / emission / persistence / retrieval), mirroring <code>decision_recorded_receipt_runtime_slice.rs</code>.</li>
+</ul>
+<p>The later implementation PR <strong>must not</strong>:</p>
+<ul>
+<li>implement <code>MutationPlanRecordedReceipt</code>, <code>MutationAppliedReceipt</code>, or <code>EvidencePacketProducedReceipt</code>;</li>
+<li>add or change a <code>ProcessGateKind</code> variant, or add an <code>ActivationRequest</code> gate object;</li>
+<li>extend <code>web/member-shell/</code> or any evidence surface (rendering stays deferred per contract §11) unless separately scoped and reviewed;</li>
+<li>touch OpenAPI / SDK, or publish a served schema;</li>
+<li>auto-close any protected issue (#2293, #1748, #2141, #2041) or reopen #2289 — it must leave #2293 open for maintainer disposition.</li>
+</ul>
+<h2>9. Validation requirements for the implementation PR</h2>
+<p>Both test tiers the landed classes use, plus the rung-specific checks:</p>
+<ul>
+<li><strong><code>proof.rs</code> unit tests:</strong> a golden vector pinning the <code>:v1</code> <code>record_hash</code> of a fixed sample; a determinism test (same inputs ⇒ same hash); a per-field test (every field change, including <code>decision_record_hash</code> and <code>gate_basis</code>, ⇒ different hash); a tag-disjointness test asserting <code>icn:gov:activation_crossed:v1</code> never collides with — and a comment that it must never converge with — <code>decision_recorded</code>, <code>process_gate_result</code>, and the proposal/vote <code>icn:gov:decision:vN</code> lineage.</li>
+<li><strong>Runtime-slice integration test:</strong> emission + field round-trip + non-zero <code>record_hash</code> + retrieval; same-identity retry returns the original, never restamped; different <code>crossed_by</code> / <code>decision_record_hash</code> / <code>gate_basis</code> for the same identity fail closed; unopened session fails closed and creates nothing; empty/whitespace ids rejected pre-persistence; missing receipt store / backend failure fail closed; concurrent duplicates serialize to one winner; composite key injective (<code>(&quot;ab&quot;,&quot;c&quot;)</code> vs <code>(&quot;a&quot;,&quot;bc&quot;)</code> must not alias; two domains sharing a <code>session_id</code> never mix).</li>
+<li><strong>B1 cross-link test</strong> (§4): reference resolves to the persisted decision; absent / wrong-session decision refused fail-closed.</li>
+<li><strong>B2 gate-basis test</strong> (§5.2): declared basis of real <code>Pass</code> gate receipts recomputes to <code>gate_basis</code>; a <code>Fail</code>/absent gate in the basis refused fail-closed; empty basis refused; basis order-independent.</li>
+<li><strong>B3 timestamp test</strong> (§6): two records differing only in <code>recorded_at</code> share duplicate identity (retry returns original, no conflict); <code>recorded_at</code> participates in <code>record_hash</code> but not in identity.</li>
+<li><strong>Idempotence / replay test:</strong> a logical crossing replayed on a second node converges on the original receipt (original stamp, original hash).</li>
+<li><strong>Privacy grep:</strong> no private deliberation / decision / activation-request body text in any serialized receipt or fixture — fingerprints only.</li>
+<li><strong>No-overclaim grep:</strong> no &quot;activation implemented / complete / production / pilot / organizer-ready / member-ready / live federation / NYCN / Phase-2&quot; claims introduced.</li>
+<li><strong>ADR-0026 envelope check:</strong> the receipt sits at Layer 2, self-hashed, no signature/merkle inheritance claim (§7 of the contract).</li>
+<li><strong>Protected close-keyword grep:</strong> the implementation PR carries no closing keyword (fix / close / resolve) adjacent to a protected issue number (#2293, #1748, #2141, #2041, #2289) — use <code>Refs</code> only.</li>
+</ul>
+<h2>10. Deferred work (explicitly out of scope of this rung and its future implementation)</h2>
+<ul>
+<li><code>MutationPlanRecordedReceipt</code>, <code>MutationAppliedReceipt</code>, <code>EvidencePacketProducedReceipt</code>.</li>
+<li>Any new <code>ProcessGateKind</code> variant or <code>ActivationRequest</code> gate object.</li>
+<li>Member-shell / evidence-surface rendering of <code>ActivationCrossedReceipt</code> (contract §11 defers it; a later separately-scoped fixture-only surface may add it after the receipt lands, as #2291 did for the first four classes).</li>
+<li>The actual <strong>#2041</strong> human/AT pass (screen-reader / low-vision / switch / AT-compat) — parked for a real human-testing phase.</li>
+<li>Production / pilot / NYCN activation / live federation / Phase-2 work.</li>
+<li>entity-auth enforcement (#2081), trusted token issuance (#2080), UnknownLegacy repair (#2274), service hosting, K3s / DNS / Forgejo.</li>
+</ul>
+<h2>11. Non-goals</h2>
+<p>Restated from #2293 / the #2294 contract — this rung and its future implementation are:</p>
+<ul>
+<li>not #2041 completion; not human/AT execution; no screen-reader, switch-control, or low-vision human validation is claimed or performed here;</li>
+<li>not production / pilot / organizer-ready / member-ready readiness;</li>
+<li>not live federation; not NYCN activation; not Phase-2 completion;</li>
+<li>not #2081 / #2080 / #2274; not entity-auth enforcement; not trusted token issuance; not UnknownLegacy repair; not service hosting; not K3s / DNS / Forgejo;</li>
+<li>not a general workflow engine; not a policy engine (which gates are <em>required</em> stays charter/app-layer and deferred); not chat / comment / moderation / social feed;</li>
+<li>not proposal / vote / quorum / mandate semantics; the reference to <code>DecisionRecordedReceipt</code> creates no tie to the proposal/vote <code>GovernanceDecisionReceipt</code> lineage;</li>
+<li>not mutation planning or mutation application;</li>
+<li>not <code>EvidencePacketProducedReceipt</code>.</li>
+</ul>
+<p>Receipts record institutional facts. They grant zero authority.</p>
+<h2>12. Related</h2>
+<p>Refs #2293.
+Refs #2294.
+Refs #1748.
+Refs #2141.
+Refs #2041.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
