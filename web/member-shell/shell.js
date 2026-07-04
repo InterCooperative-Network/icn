@@ -105,9 +105,9 @@
 
   // #2289 organizer-steward evidence surface. `?mode=demo&set=process-evidence`
   // swaps the demo pack for a fixture-only, read-only evidence story over the
-  // five already-landed ADR-0026 Layer 2 process-transition receipts (session
+  // six already-landed ADR-0026 Layer 2 process-transition receipts (session
   // opened -> deliberation entry recorded -> decision recorded -> gate result
-  // -> activation crossed) plus a repo-safe evidence-summary export. Fixture/dev only: nothing is live,
+  // -> activation crossed -> mutation plan recorded) plus a repo-safe evidence-summary export. Fixture/dev only: nothing is live,
   // every hash is illustrative (see the demo hash label), and the surface
   // renders read views only — no download, no mutation. `set` is demo-only.
   var SET = MODE === "demo" ? params.get("set") : null;
@@ -167,7 +167,7 @@
   }
 
   // #2289 organizer-steward evidence surface (fixture-only). Keeps the demo
-  // standing + cards pack; adds the five-receipt process-evidence sequence and
+  // standing + cards pack; adds the six-receipt process-evidence sequence and
   // its repo-safe evidence-summary export (both member-shell-local fixtures).
   if (SET === "process-evidence") {
     FIXTURES.processEvidence = "fixtures/process-evidence-receipts.json";
@@ -628,7 +628,7 @@
   // opts is optional. Existing callers (live completion + demo completion) pass
   // no opts, so the entry keeps its original {receipt, plainContext} shape and
   // renders through renderCompletionReceipt exactly as before. The #2289
-  // process-evidence pack passes opts.kind (one of the five process-transition
+  // process-evidence pack passes opts.kind (one of the six process-transition
   // classes) plus optional redaction metadata, routing to renderProcessReceipt.
   // No existing behavior changes.
   function addReceipt(receipt, plainContext, opts) {
@@ -701,7 +701,7 @@
 
   // ---------------------------------------------------------------------
   // #2289 organizer-steward evidence surface (fixture-only, read-only).
-  // Renders one of the five ADR-0026 Layer 2 process-transition receipts
+  // Renders one of the six ADR-0026 Layer 2 process-transition receipts
   // (proof.rs) as a plain-language summary first, with the record-level fields
   // under a progressive-disclosure "Show evidence detail" control. record_hash
   // is the proof pointer; body_hash is labeled proof-of-content (the body is
@@ -713,7 +713,8 @@
     deliberation_entry_recorded: "DeliberationEntryRecordedReceipt",
     decision_recorded: "DecisionRecordedReceipt",
     process_gate_result: "ProcessGateResultReceipt",
-    activation_crossed: "ActivationCrossedReceipt"
+    activation_crossed: "ActivationCrossedReceipt",
+    mutation_plan_recorded: "MutationPlanRecordedReceipt"
   };
 
   // record_hash label mirrors renderCompletionReceipt's maturity-tier honesty:
@@ -771,6 +772,25 @@
       li.appendChild(boundary);
     }
 
+    // Mutation-plan-recorded explainer (icn#2304): make the plan-recording
+    // boundary legible by naming the states plainly — the recorded decision,
+    // the activation crossing, the mutation plan being recorded here, and the
+    // two later steps that remain deferred (mutation application and
+    // evidence-packet production). Recording the plan is not applying it; the
+    // receipt carries only a body-hash fingerprint and grants zero authority.
+    if (kind === "mutation_plan_recorded") {
+      var planBoundary = el("div", { class: "boundary" });
+      planBoundary.appendChild(el("h4", { text: t("evidence.mutationPlan.boundaryHeading") }));
+      var pbul = el("ul", { class: "card-list" });
+      pbul.appendChild(el("li", { text: t("evidence.mutationPlan.boundary.decision") }));
+      pbul.appendChild(el("li", { text: t("evidence.mutationPlan.boundary.activation") }));
+      pbul.appendChild(el("li", { text: t("evidence.mutationPlan.boundary.planRecorded") }));
+      pbul.appendChild(el("li", { text: t("evidence.mutationPlan.boundary.applicationDeferred") }));
+      pbul.appendChild(el("li", { text: t("evidence.mutationPlan.boundary.evidencePacketDeferred") }));
+      planBoundary.appendChild(pbul);
+      li.appendChild(planBoundary);
+    }
+
     var details = el("details");
     details.appendChild(el("summary", { text: t("receipt.showEvidence") }));
     var dl = el("dl", { class: "kv" });
@@ -818,6 +838,22 @@
           el("code", { text: hashToHex(g.record_hash) }));
       });
       kvRow(dl, t("evidence.kv.crossedBy"), el("code", { text: String(r.crossed_by || "") }));
+      kvRow(dl, t("evidence.kv.recordedAt"), String(r.recorded_at || ""));
+    } else if (kind === "mutation_plan_recorded") {
+      kvRow(dl, t("evidence.kv.planId"), String(r.plan_id || ""));
+      // Activation reference (icn#2304 / M1): the plan names the activation it
+      // follows by both its caller-opaque id and its content-addressed record
+      // hash. Both are proof pointers to the activation crossing above — never
+      // body text. Decision and gate basis are inherited transitively through
+      // that activation, not restated here.
+      kvRow(dl, t("evidence.kv.activationRef"), String(r.activation_id || ""));
+      kvRow(dl, t("evidence.kv.activationRecordHash"),
+        el("code", { text: hashToHex(r.activation_record_hash) }));
+      // Plan proof pointer (M2): a body-hash fingerprint of the plan only —
+      // never the plan body, operation list, target list, or effect payload;
+      // only this hash is kept.
+      kvRow(dl, t("evidence.kv.planBodyHash"), el("code", { text: hashToHex(r.body_hash) }));
+      kvRow(dl, t("evidence.kv.planRecordedBy"), el("code", { text: String(r.recorded_by || "") }));
       kvRow(dl, t("evidence.kv.recordedAt"), String(r.recorded_at || ""));
     }
     recordHashRow(dl, r.record_hash);
@@ -919,7 +955,7 @@
   }
 
   // #2289 organizer-steward evidence surface (fixture-only). Reuses the demo
-  // standing + cards render path, then renders the five-receipt process
+  // standing + cards render path, then renders the six-receipt process
   // sequence and the repo-safe evidence-summary export. No network beyond the
   // committed fixtures; nothing signed; read-only.
   function loadProcessEvidenceDemo() {
