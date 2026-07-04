@@ -2,11 +2,11 @@
 //! in this crate without a circular dependency on icn-gateway.
 
 use icn_governance::{
-    ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, AuthorityGrant, AuthorityGrantId,
-    DecisionRecordedReceipt, DeliberationEntryRecordedReceipt, GovernanceDecisionReceipt,
-    GovernanceDecisionReceiptV3, Grantee, Mandate, MeetingAttendanceReceipt,
-    MeetingAttendanceReceiptV2, ProcessGateKind, ProcessGateResultReceipt,
-    ProcessSessionOpenedReceipt, Timestamp,
+    ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, ActivationCrossedReceipt,
+    AuthorityGrant, AuthorityGrantId, DecisionRecordedReceipt, DeliberationEntryRecordedReceipt,
+    GovernanceDecisionReceipt, GovernanceDecisionReceiptV3, Grantee, Mandate,
+    MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, ProcessGateKind,
+    ProcessGateResultReceipt, ProcessSessionOpenedReceipt, Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -122,6 +122,51 @@ pub enum DecisionRecordedPersist {
     /// Carries the original persisted receipt (original `recorded_at` /
     /// `record_hash` — never restamped).
     Existing(DecisionRecordedReceipt),
+}
+
+/// Class string for `ActivationCrossedReceipt` opaque storage (#2294
+/// contract + #2295 B1/B2/B3 decision rung). Chosen in the apps layer so the
+/// gateway never sees the typed name. Distinct from every other process
+/// class store.
+const ACTIVATION_CROSSED_CLASS: &str = "activation_crossed";
+
+/// Build the injective composite `key1` binding an activation crossing to
+/// its `(domain_id, session_id)` anchor in opaque storage.
+///
+/// Sibling of [`decision_recorded_composite_key1`] with the identical
+/// netstring-style encoding (decimal length of `domain_id`, a colon, then
+/// the two ids concatenated), kept as a separate function so this class's
+/// key derivation is independently anchored by its own anti-aliasing test.
+/// The length prefix delimits `domain_id` exactly, so `("ab","c")` and
+/// `("a","bc")` can never produce the same key, and two domains sharing a
+/// `session_id` scan different `key1` prefixes.
+pub fn activation_crossed_composite_key1(domain_id: &str, session_id: &str) -> String {
+    format!("{}:{domain_id}{session_id}", domain_id.len())
+}
+
+/// Outcome of persisting an [`ActivationCrossedReceipt`] through
+/// [`GovernanceReceiptBackend::put_activation_crossed`].
+///
+/// The backend enforces at most one crossing per
+/// `(domain_id, session_id, activation_id)` **atomically at the storage
+/// layer** (same `put_opaque_if_absent` primitive as the sibling process
+/// classes). The caller (the manager) turns `Existing` into either a
+/// same-identity idempotent success or a fail-closed conflict — stable
+/// identity is `decision_id` + `decision_record_hash` + `gate_basis` +
+/// `crossed_by` (per the #2295 rung §7; `recorded_at`/`record_hash` are NOT
+/// identity inputs).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ActivationCrossedPersist {
+    /// This call won the insert: the receipt is now the one persisted
+    /// crossing for its `(domain_id, session_id, activation_id)`.
+    Inserted,
+    /// A crossing already existed for this triple; nothing was written.
+    /// Carries the original persisted receipt (original `recorded_at` /
+    /// `record_hash` — never restamped). Boxed because
+    /// [`ActivationCrossedReceipt`] is the largest process-receipt payload
+    /// (five ids plus two 32-byte hashes), so an unboxed variant would make
+    /// this enum needlessly large next to the unit `Inserted`.
+    Existing(Box<ActivationCrossedReceipt>),
 }
 
 /// Class string for `MeetingAttendanceReceiptV2` opaque storage (#1868).
@@ -1119,6 +1164,101 @@ pub trait GovernanceReceiptBackend: Send + Sync {
             out.push(
                 serde_json::from_slice(&bytes)
                     .map_err(|e| format!("deserialize DecisionRecordedReceipt in list: {e}"))?,
+            );
+        }
+        Ok(out)
+    }
+
+    /// Persist an [`ActivationCrossedReceipt`] emitted when the runtime
+    /// records that a decision crossed the activation boundary (#2294
+    /// contract + #2295 rung).
+    ///
+    /// **Default routes through opaque storage.** Serialises the typed
+    /// receipt to JSON and delegates to [`Self::put_opaque_if_absent`] under
+    /// class `"activation_crossed"` with
+    /// `key1 =` [`activation_crossed_composite_key1`] (the injective
+    /// domain+session composite) and `key2 = activation_id`. On a lost
+    /// insert the original persisted receipt is hydrated and returned
+    /// (never restamped). A backend that has not opted in to opaque storage
+    /// inherits the fail-closed `opaque_storage_not_implemented` default.
+    fn put_activation_crossed(
+        &self,
+        receipt: &ActivationCrossedReceipt,
+    ) -> Result<ActivationCrossedPersist, String> {
+        let payload = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize ActivationCrossedReceipt: {e}"))?;
+        let key1 = activation_crossed_composite_key1(&receipt.domain_id, &receipt.session_id);
+        let existing = self.put_opaque_if_absent(
+            ACTIVATION_CROSSED_CLASS,
+            &key1,
+            Some(&receipt.activation_id),
+            receipt.recorded_at,
+            receipt.record_hash,
+            &payload,
+        )?;
+        match existing {
+            None => Ok(ActivationCrossedPersist::Inserted),
+            Some(_winning_hash) => {
+                let original = self
+                    .get_activation_crossed(
+                        &receipt.domain_id,
+                        &receipt.session_id,
+                        &receipt.activation_id,
+                    )?
+                    .ok_or_else(|| {
+                        // The unique marker says a crossing exists but the
+                        // payload cannot be hydrated — surface loudly rather
+                        // than minting a second crossing.
+                        "activation_crossed_inconsistent: unique marker present \
+                         but no persisted crossing payload could be read"
+                            .to_string()
+                    })?;
+                Ok(ActivationCrossedPersist::Existing(Box::new(original)))
+            }
+        }
+    }
+
+    /// Retrieve the persisted [`ActivationCrossedReceipt`] for a
+    /// `(domain_id, session_id, activation_id)`, or `None` when no crossing
+    /// has been recorded. Same key convention as
+    /// [`Self::put_activation_crossed`]; at most one crossing exists per
+    /// triple (uniqueness is enforced on write).
+    fn get_activation_crossed(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+        activation_id: &str,
+    ) -> Result<Option<ActivationCrossedReceipt>, String> {
+        let key1 = activation_crossed_composite_key1(domain_id, session_id);
+        let payload =
+            self.get_latest_opaque(ACTIVATION_CROSSED_CLASS, &key1, Some(activation_id))?;
+        match payload {
+            Some(bytes) => {
+                Ok(Some(serde_json::from_slice(&bytes).map_err(|e| {
+                    format!("deserialize ActivationCrossedReceipt: {e}")
+                })?))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// List all activation-crossed receipts recorded against one
+    /// `(domain_id, session_id)` anchor, in the store's deterministic
+    /// chronological `(recorded_at, record_hash)` order. Because `key1` is
+    /// the injective domain+session composite, two domains sharing a
+    /// `session_id` can never mix here — no payload-side filtering is needed.
+    fn list_activations_crossed_for_session_in_domain(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+    ) -> Result<Vec<ActivationCrossedReceipt>, String> {
+        let key1 = activation_crossed_composite_key1(domain_id, session_id);
+        let payloads = self.list_opaque_for(ACTIVATION_CROSSED_CLASS, &key1)?;
+        let mut out = Vec::with_capacity(payloads.len());
+        for bytes in payloads {
+            out.push(
+                serde_json::from_slice(&bytes)
+                    .map_err(|e| format!("deserialize ActivationCrossedReceipt in list: {e}"))?,
             );
         }
         Ok(out)
