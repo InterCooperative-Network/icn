@@ -495,6 +495,12 @@ Design for graceful shutdown and dissolution of cooperative entities
 
 **For:** `architects` | **Updated:** 2026-03-10
 
+### 📋 **Draft** [EvidencePacketProducedReceipt — Design/Audit Contract](/docs/design/evidence-packet-produced-receipt.md)
+
+Design/audit contract for #2313 (under #1748/#2141): the candidate eighth ProcessTransitionReceipt rung, an EvidencePacketProducedReceipt witnessing that a redacted evidence packet artifact was produced from a set of prior process receipts, recorded after them (typically following a MutationAppliedReceipt, landed #2310) — the terminal 'evidence' stage of the framing spine. Audits current state honestly (EvidencePacketProducedReceipt has no Rust seam — framing/docs only; the seven landed classes ProcessSessionOpened/DeliberationEntryRecorded/DecisionRecorded/ProcessGateResult/ActivationCrossed/MutationPlanRecorded/MutationApplied are the only runtime ProcessTransitionReceipts; the existing rehearsal-evidence-export fixture is a read-only summary, not a receipt; icn-baseline-lock's EvidencePacket is a separate baseline-lock bundle, not this class; and two proposed hash-participating fields — receipt_set_hash and redaction_profile_hash — have NO precedent anywhere in the repo). Proposes a candidate icn:gov:evidence_packet_produced:v1 contract subject to implementation proof (session-anchored (domain_id, session_id), caller-opaque packet_id, applied-step reference by mutation_application_id + content-addressed mutation_applied_record_hash as the immediate prior boundary verified fail-closed, receipt_set_hash committing to the ordered source-receipt set, packet_hash fingerprinting the public/redacted packet only with the packet body never stored, redaction_profile_hash committing to the redaction profile without storing private data, recorder-not-producer DID granting zero authority, node-stamped produced_at hashed but excluded from identity, put_opaque_if_absent idempotence with fail-closed conflict and session precondition), places it at ADR-0026 Layer 2 self-hashed (blake3 record_hash, no signature/merkle — naming the layering caveat), preserves the meaning-firewall + privacy boundary (no packet body, no private source-receipt bodies, no private organizer/member/sponsor/attendee data), defers member-shell rendering, and names blockers for a narrow decision rung before implementation: EP1 predecessor link (both immediate applied ref and receipt_set_hash), EP2 receipt_set_hash definition (NEW concept — membership/ordering/hashing/verification), EP3 packet_hash coverage (public/redacted artifact only), EP4 redaction boundary representation (redaction_profile_hash-only vs id), EP-time produced_at semantics, EP5 the produced-witness boundary vs delivery/acceptance/audit boundary and whether produced is separate from export/summary. States runtime implementation cannot begin while any hash-participating blocker (EP1/EP2/EP3/EP4) is unresolved. Recommendation Option C: land this contract, then a decision rung, then implementation. Explicitly stops at production-recorded — the receipt never produces, delivers, certifies, audits, validates, authorizes, or rolls back a packet; external delivery, acceptance, audit, evidence-packet producers, human/AT completion (#2041 stays open), and live/private data handling are deferred. Design only — no Rust/UI/schema/OpenAPI/SDK/receipt-class change; no member-shell change; no fixture change; no human/AT execution (Refs #2313, #2312, #2310, #2309, #2307, #1748, #2141, #2041; no closure claims)
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-04
+
 ### 📝 **Living** [Execution Bridge Specification](/docs/design/execution-bridge-spec.md)
 
 Authoritative design for bridging between ICN and external execution environments
@@ -2102,10 +2108,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 343
+**Total documents:** 344
 
 **By status:**
 - Active: 1
 - Canonical: 40
-- Draft: 90
+- Draft: 91
 - Living: 212
