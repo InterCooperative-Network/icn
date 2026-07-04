@@ -128,7 +128,7 @@ Candidate fields (naming follows the landed classes; anything marked **OPEN** is
 
 ## 7. ADR-0026 envelope usage
 
-`MutationPlanRecordedReceipt` should sit where the other six process classes sit: **ADR-0026 Layer 2**, as a self-contained record carrying its own canonical blake3 `record_hash`.
+`MutationPlanRecordedReceipt` should sit where the other five landed process classes sit: **ADR-0026 Layer 2**, as a self-contained record carrying its own canonical blake3 `record_hash`.
 
 **Honest layering caveat the implementation PR must respect (unchanged from the activation contract):** ADR-0026's *written* Layer-2 model (`ArtifactReceipt` wrapping a signed, merkle-rooted Layer-1 `GovernanceProof`) predates the process-transition classes. Those classes reuse the Layer-2 *slot* but use a lighter model — a self-hashed blake3 `record_hash`, **no signature, no merkle root**. This contract does **not** claim the plan receipt inherits the signed-proof envelope; it inherits the *process-transition* discipline (self-contained record hash, opaque-store persistence). Any future signature/merkle upgrade is out of scope here and would be an ADR-0026 revision, not a receipt rung.
 
@@ -139,7 +139,7 @@ How the receipt would link back (design-level):
 - **process/session** — via the `(domain_id, session_id)` anchor (existing pattern; no new seam).
 - **activation** — via `activation_id` + `activation_record_hash` (**M1**): naming the `ActivationCrossedReceipt` this plan follows. This is the lane's **second** inter-receipt reference; it mirrors the verified-not-asserted posture the #2295 B1 decision set for the activation→decision link (the referenced `ActivationCrossedReceipt` must exist in the same session, and its `activation_id` must match).
 - **decision / gate basis** — inherited **transitively** through the activation (the `ActivationCrossedReceipt` already binds `decision_id`, `decision_record_hash`, and `gate_basis`). The plan does **not** re-reference the decision or gates directly in `:v1` (see **M1**); the activation link is the single upstream anchor.
-- **proof/envelope metadata** — the receipt's own `record_hash` is the provenance pointer; persistence and retrieval go through the same opaque receipt store as the other six.
+- **proof/envelope metadata** — the receipt's own `record_hash` is the provenance pointer; persistence and retrieval go through the same opaque receipt store as the other five landed classes.
 
 ## 9. Idempotence and replay
 
