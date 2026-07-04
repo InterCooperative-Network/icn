@@ -2802,6 +2802,26 @@ pub enum MutationPlanRecordedOutcome {
     AlreadyRecorded(icn_governance::MutationPlanRecordedReceipt),
 }
 
+/// Outcome of [`GovernanceManager::record_mutation_applied`] (#2307 contract +
+/// #2308 A1/A2/A3/A4 decision rung). Both variants are successes; the
+/// fail-closed mismatch conflict surfaces as an `Err` with stable prefix
+/// `mutation_applied_conflict`. Precondition failures surface as `Err`s with
+/// their own stable prefixes and persist nothing:
+/// `mutation_applied_session_not_opened` (unopened session),
+/// `mutation_applied_plan_not_found` / `mutation_applied_plan_mismatch` (A1
+/// plan reference absent or hash-mismatched).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MutationAppliedOutcome {
+    /// This call recorded the application: the receipt is the newly persisted
+    /// mutation-applied fact.
+    Applied(icn_governance::MutationAppliedReceipt),
+    /// The application was already recorded with the **same** stable identity
+    /// (`plan_id`, `plan_record_hash`, `applied_by`, `result_hash`); carries
+    /// the **original** persisted receipt (original `applied_at` /
+    /// `record_hash` — a retry is never restamped).
+    AlreadyApplied(icn_governance::MutationAppliedReceipt),
+}
+
 /// Action items are always managed locally (not gossiped) and can use either
 /// in-memory or Sled-backed persistent storage.
 pub struct GovernanceManager {
@@ -6922,6 +6942,204 @@ impl GovernanceManager {
         store
             .list_mutation_plans_recorded_for_session_in_domain(&domain_id.0, session_id)
             .map_err(|e| anyhow::anyhow!("Failed to list mutation-plan-recorded receipts: {e}"))
+    }
+
+    /// Record that a previously recorded mutation plan was applied — the
+    /// seventh `ProcessTransitionReceipt` class (#2307 contract + #2308
+    /// A1/A2/A3/A4 decision rung). Emits a [`MutationAppliedReceipt`].
+    ///
+    /// This records a **process fact and grants zero authority.** It is NOT a
+    /// mutation-application engine: this method performs no domain-state
+    /// mutation beyond persisting the receipt, and does not execute, authorize,
+    /// validate, enforce, roll back, or prove the semantic correctness of the
+    /// mutation (A4). `applied_by` is recorder / apply-witness evidence, not an
+    /// authority to apply.
+    ///
+    /// Preconditions (all fail-closed; on any failure nothing is persisted),
+    /// each with a stable error prefix:
+    /// - ids non-empty / non-whitespace; a receipt store is required;
+    /// - the `(domain_id, session_id)` session was opened first
+    ///   (`mutation_applied_session_not_opened`);
+    /// - **A1:** the referenced [`MutationAppliedReceipt::plan_id`] plan exists
+    ///   in the same `(domain_id, session_id)`
+    ///   (`mutation_applied_plan_not_found`) and its `record_hash` equals the
+    ///   supplied `plan_record_hash` (`mutation_applied_plan_mismatch`).
+    ///
+    /// On success returns [`MutationAppliedOutcome::Applied`]; a same-identity
+    /// retry returns [`MutationAppliedOutcome::AlreadyApplied`] carrying the
+    /// original receipt (never restamped); a same `(domain, session,
+    /// application_id)` with a different plan reference, recorder, or result
+    /// hash fails closed with the stable `mutation_applied_conflict` prefix.
+    #[allow(clippy::too_many_arguments)]
+    pub fn record_mutation_applied(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        application_id: &str,
+        plan_id: &str,
+        plan_record_hash: [u8; 32],
+        result_hash: [u8; 32],
+        applied_by: &Did,
+    ) -> Result<MutationAppliedOutcome> {
+        // Whitespace-only ids are rejected alongside empty ones: a caller
+        // bypassing the HTTP layer must not mint receipts with visually-empty
+        // identifiers or whitespace storage keys.
+        if domain_id.0.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_mutation_applied: domain_id must be non-empty and non-whitespace"
+            ));
+        }
+        if session_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_mutation_applied: session_id must be non-empty and non-whitespace"
+            ));
+        }
+        if application_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_mutation_applied: application_id must be non-empty and non-whitespace"
+            ));
+        }
+        if plan_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_mutation_applied: plan_id must be non-empty and non-whitespace"
+            ));
+        }
+        let applied_by_str = applied_by.to_string();
+        if applied_by_str.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_mutation_applied: applied_by must be non-empty"
+            ));
+        }
+        let store = self.receipt_store.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "record_mutation_applied: a receipt store is required — application \
+                 uniqueness and the plan precondition are enforced at the storage \
+                 layer and cannot be faked in memory"
+            )
+        })?;
+
+        // Precondition: the session was opened first. No silent creation.
+        let opened = store
+            .get_process_session_opened(&domain_id.0, session_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_mutation_applied: failed to read session-open state for \
+                     session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        if opened.is_none() {
+            return Err(anyhow::anyhow!(
+                "mutation_applied_session_not_opened: session {session_id} in domain {} \
+                 has no recorded opening; refusing to record an application against an \
+                 unanchored session",
+                domain_id.0
+            ));
+        }
+
+        // A1 precondition: the plan being applied must exist in this same
+        // (domain, session) under `plan_id`, and its `record_hash` must equal
+        // the supplied `plan_record_hash`. The composite storage key makes a
+        // plan recorded under a different session/domain invisible here, so a
+        // wrong-session/wrong-domain reference fails closed as "not found".
+        let plan = store
+            .get_mutation_plan_recorded(&domain_id.0, session_id, plan_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_mutation_applied: failed to read plan state for plan \
+                     {plan_id} in session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        let plan = plan.ok_or_else(|| {
+            anyhow::anyhow!(
+                "mutation_applied_plan_not_found: no plan {plan_id} recorded in session \
+                 {session_id} in domain {}; refusing to record an application for an \
+                 unrecorded plan",
+                domain_id.0
+            )
+        })?;
+        if plan.record_hash != plan_record_hash {
+            return Err(anyhow::anyhow!(
+                "mutation_applied_plan_mismatch: plan {plan_id} in session {session_id} \
+                 in domain {} was recorded with a different record_hash than the one \
+                 supplied; refusing to record an application on a mismatched plan reference",
+                domain_id.0
+            ));
+        }
+
+        let now = icn_time::current_timestamp_secs();
+        let receipt = icn_governance::MutationAppliedReceipt::new(
+            domain_id.0.clone(),
+            session_id.to_string(),
+            application_id.to_string(),
+            plan_id.to_string(),
+            plan_record_hash,
+            applied_by_str.clone(),
+            result_hash,
+            now,
+        );
+
+        match store.put_mutation_applied(&receipt).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to persist mutation-applied receipt for application \
+                 {application_id} in session {session_id} in domain {}: {e}",
+                domain_id.0
+            )
+        })? {
+            crate::receipt_backend::MutationAppliedPersist::Inserted => {
+                Ok(MutationAppliedOutcome::Applied(receipt))
+            }
+            crate::receipt_backend::MutationAppliedPersist::Existing(original) => {
+                if original.plan_id == plan_id
+                    && original.plan_record_hash == plan_record_hash
+                    && original.applied_by == applied_by_str
+                    && original.result_hash == result_hash
+                {
+                    Ok(MutationAppliedOutcome::AlreadyApplied(*original))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "mutation_applied_conflict: application {application_id} in session \
+                         {session_id} in domain {} was already recorded with a different \
+                         plan reference, recorder, or result hash; refusing to overwrite",
+                        domain_id.0
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Retrieve the persisted mutation-applied receipt for a `(domain_id,
+    /// session_id, application_id)`, or `None` when no application has been
+    /// recorded. Read-only.
+    pub fn get_mutation_applied(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        application_id: &str,
+    ) -> Result<Option<icn_governance::MutationAppliedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(None);
+        };
+        store
+            .get_mutation_applied(&domain_id.0, session_id, application_id)
+            .map_err(|e| anyhow::anyhow!("Failed to read mutation-applied receipt: {e}"))
+    }
+
+    /// List all mutation-applied receipts recorded against one `(domain_id,
+    /// session_id)` anchor, in the store's deterministic chronological
+    /// `(recorded_at, record_hash)` order. Read-only.
+    pub fn list_mutation_applied_in_domain(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+    ) -> Result<Vec<icn_governance::MutationAppliedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(vec![]);
+        };
+        store
+            .list_mutation_applied_for_session_in_domain(&domain_id.0, session_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list mutation-applied receipts: {e}"))
     }
 
     // ========================================================================

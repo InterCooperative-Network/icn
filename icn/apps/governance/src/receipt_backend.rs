@@ -5,8 +5,9 @@ use icn_governance::{
     ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, ActivationCrossedReceipt,
     AuthorityGrant, AuthorityGrantId, DecisionRecordedReceipt, DeliberationEntryRecordedReceipt,
     GovernanceDecisionReceipt, GovernanceDecisionReceiptV3, Grantee, Mandate,
-    MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, MutationPlanRecordedReceipt,
-    ProcessGateKind, ProcessGateResultReceipt, ProcessSessionOpenedReceipt, Timestamp,
+    MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, MutationAppliedReceipt,
+    MutationPlanRecordedReceipt, ProcessGateKind, ProcessGateResultReceipt,
+    ProcessSessionOpenedReceipt, Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -212,6 +213,50 @@ pub enum MutationPlanRecordedPersist {
     /// unboxed variant would make this enum needlessly large next to the unit
     /// `Inserted`.
     Existing(Box<MutationPlanRecordedReceipt>),
+}
+
+/// Class string for `MutationAppliedReceipt` opaque storage (#2307 contract +
+/// #2308 A1/A2/A3/A4 decision rung). Chosen in the apps layer so the gateway
+/// never sees the typed name. Distinct from every other process class store.
+const MUTATION_APPLIED_CLASS: &str = "mutation_applied";
+
+/// Build the injective composite `key1` binding a recorded mutation
+/// application to its `(domain_id, session_id)` anchor in opaque storage.
+///
+/// Sibling of [`mutation_plan_recorded_composite_key1`] with the identical
+/// netstring-style encoding (decimal length of `domain_id`, a colon, then the
+/// two ids concatenated), kept as a separate function so this class's key
+/// derivation is independently anchored by its own anti-aliasing test. The
+/// length prefix delimits `domain_id` exactly, so `("ab","c")` and `("a","bc")`
+/// can never produce the same key, and two domains sharing a `session_id` scan
+/// different `key1` prefixes.
+pub fn mutation_applied_composite_key1(domain_id: &str, session_id: &str) -> String {
+    format!("{}:{domain_id}{session_id}", domain_id.len())
+}
+
+/// Outcome of persisting a [`MutationAppliedReceipt`] through
+/// [`GovernanceReceiptBackend::put_mutation_applied`].
+///
+/// The backend enforces at most one application per `(domain_id, session_id,
+/// application_id)` **atomically at the storage layer** (same
+/// `put_opaque_if_absent` primitive as the sibling process classes). The caller
+/// (the manager) turns `Existing` into either a same-identity idempotent
+/// success or a fail-closed conflict — stable identity is `plan_id` +
+/// `plan_record_hash` + `applied_by` + `result_hash` (per the #2308 rung §8;
+/// `applied_at`/`record_hash` are NOT identity inputs).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MutationAppliedPersist {
+    /// This call won the insert: the receipt is now the one persisted
+    /// application for its `(domain_id, session_id, application_id)`.
+    Inserted,
+    /// An application already existed for this triple; nothing was written.
+    /// Carries the original persisted receipt (original `applied_at` /
+    /// `record_hash` — never restamped). Boxed because [`MutationAppliedReceipt`]
+    /// is a large payload (five string fields plus three 32-byte hashes —
+    /// `plan_record_hash`, `result_hash`, and `record_hash`), so an unboxed
+    /// variant would make this enum needlessly large next to the unit
+    /// `Inserted`.
+    Existing(Box<MutationAppliedReceipt>),
 }
 
 /// Class string for `MeetingAttendanceReceiptV2` opaque storage (#1868).
@@ -1398,6 +1443,98 @@ pub trait GovernanceReceiptBackend: Send + Sync {
             out.push(
                 serde_json::from_slice(&bytes)
                     .map_err(|e| format!("deserialize MutationPlanRecordedReceipt in list: {e}"))?,
+            );
+        }
+        Ok(out)
+    }
+
+    /// Persist a [`MutationAppliedReceipt`] emitted when the runtime records
+    /// that a recorded mutation plan was applied (#2307 contract + #2308 rung).
+    ///
+    /// **Default routes through opaque storage.** Serialises the typed receipt
+    /// to JSON and delegates to [`Self::put_opaque_if_absent`] under class
+    /// `"mutation_applied"` with `key1 =` [`mutation_applied_composite_key1`]
+    /// (the injective domain+session composite) and `key2 = application_id`. On
+    /// a lost insert the original persisted receipt is hydrated and returned
+    /// (never restamped). A backend that has not opted in to opaque storage
+    /// inherits the fail-closed `opaque_storage_not_implemented` default.
+    fn put_mutation_applied(
+        &self,
+        receipt: &MutationAppliedReceipt,
+    ) -> Result<MutationAppliedPersist, String> {
+        let payload = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize MutationAppliedReceipt: {e}"))?;
+        let key1 = mutation_applied_composite_key1(&receipt.domain_id, &receipt.session_id);
+        let existing = self.put_opaque_if_absent(
+            MUTATION_APPLIED_CLASS,
+            &key1,
+            Some(&receipt.application_id),
+            receipt.applied_at,
+            receipt.record_hash,
+            &payload,
+        )?;
+        match existing {
+            None => Ok(MutationAppliedPersist::Inserted),
+            Some(_winning_hash) => {
+                let original = self
+                    .get_mutation_applied(
+                        &receipt.domain_id,
+                        &receipt.session_id,
+                        &receipt.application_id,
+                    )?
+                    .ok_or_else(|| {
+                        // The unique marker says an application exists but the
+                        // payload cannot be hydrated — surface loudly rather
+                        // than minting a second application.
+                        "mutation_applied_inconsistent: unique marker present \
+                         but no persisted application payload could be read"
+                            .to_string()
+                    })?;
+                Ok(MutationAppliedPersist::Existing(Box::new(original)))
+            }
+        }
+    }
+
+    /// Retrieve the persisted [`MutationAppliedReceipt`] for a `(domain_id,
+    /// session_id, application_id)`, or `None` when no application has been
+    /// recorded. Same key convention as [`Self::put_mutation_applied`]; at most
+    /// one application exists per triple (uniqueness is enforced on write).
+    fn get_mutation_applied(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+        application_id: &str,
+    ) -> Result<Option<MutationAppliedReceipt>, String> {
+        let key1 = mutation_applied_composite_key1(domain_id, session_id);
+        let payload =
+            self.get_latest_opaque(MUTATION_APPLIED_CLASS, &key1, Some(application_id))?;
+        match payload {
+            Some(bytes) => {
+                Ok(Some(serde_json::from_slice(&bytes).map_err(|e| {
+                    format!("deserialize MutationAppliedReceipt: {e}")
+                })?))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// List all mutation-applied receipts recorded against one `(domain_id,
+    /// session_id)` anchor, in the store's deterministic chronological
+    /// `(recorded_at, record_hash)` order. Because `key1` is the injective
+    /// domain+session composite, two domains sharing a `session_id` can never
+    /// mix here — no payload-side filtering is needed.
+    fn list_mutation_applied_for_session_in_domain(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+    ) -> Result<Vec<MutationAppliedReceipt>, String> {
+        let key1 = mutation_applied_composite_key1(domain_id, session_id);
+        let payloads = self.list_opaque_for(MUTATION_APPLIED_CLASS, &key1)?;
+        let mut out = Vec::with_capacity(payloads.len());
+        for bytes in payloads {
+            out.push(
+                serde_json::from_slice(&bytes)
+                    .map_err(|e| format!("deserialize MutationAppliedReceipt in list: {e}"))?,
             );
         }
         Ok(out)
