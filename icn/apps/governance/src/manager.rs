@@ -7303,6 +7303,19 @@ impl GovernanceManager {
             ));
         }
 
+        // Fail fast on an empty source set with the documented stable prefix,
+        // before the more specific predecessor-in-set check below (an empty set
+        // trivially cannot contain the predecessor, so without this the empty
+        // case would surface the less precise `_predecessor_not_in_set`).
+        if source_refs.is_empty() {
+            return Err(anyhow::anyhow!(
+                "evidence_packet_produced_empty_source_set: packet {packet_id} in session \
+                 {session_id} in domain {} declared an empty source set; a produced packet \
+                 must draw from at least its immediate predecessor",
+                domain_id.0
+            ));
+        }
+
         // The declared source set must include the immediate predecessor (EP1).
         if !source_refs
             .iter()

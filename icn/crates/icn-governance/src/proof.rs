@@ -3272,11 +3272,13 @@ impl MutationAppliedReceipt {
 /// A single source-receipt reference contributing to an
 /// [`EvidencePacketProducedReceipt`]'s `receipt_set_hash` (EP1/EP2).
 ///
-/// Carries only the receipt-ladder position (used solely to canonically order
-/// the set before hashing) and the content-addressed `record_hash` of the
-/// source receipt. It is a **reference, never a body** — no source-receipt body,
-/// packet body, or private data is carried. The ladder position is not itself
-/// hashed; only the ordered `record_hash`es participate in `receipt_set_hash`.
+/// Carries only the receipt-ladder position (used to canonically order the set
+/// before hashing) and the content-addressed `record_hash` of the source
+/// receipt. It is a **reference, never a body** — no source-receipt body, packet
+/// body, or private data is carried. The ladder position is **not serialized
+/// into the hash input** (only the `record_hash`es are hashed), but it
+/// determines the canonical ordering of members and therefore **does influence**
+/// the resulting `receipt_set_hash`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct EvidencePacketSourceRef {
     /// Receipt-ladder position of the source receipt, used ONLY to canonically
@@ -3527,8 +3529,11 @@ impl EvidencePacketProducedReceipt {
     ///
     /// Layout: [`Self::RECEIPT_SET_DOMAIN_TAG`] first; the member count as `u64`
     /// LE; then each member's `record_hash` appended raw 32 bytes in canonical
-    /// order. Only `record_hash`es participate — ladder positions order but are
-    /// not hashed, and **bodies never participate**.
+    /// order. Ladder-position bytes are **not** part of the hash input, but they
+    /// determine the canonical member ordering above — so the hash commits to the
+    /// set of `record_hash`es *and their ladder-ordered sequence*, and a
+    /// different ladder position for a member can change the hash. **Bodies never
+    /// participate.**
     pub fn compute_receipt_set_hash(
         members: &[EvidencePacketSourceRef],
     ) -> Result<Hash, EvidencePacketReceiptSetError> {

@@ -735,8 +735,8 @@ fn empty_source_set_fails_closed() {
     let actor = fresh_did();
     let domain = coop_test();
     let ah = setup_applied(&mgr, &domain, "session-001", "application-001", &actor);
-    // Empty set is caught by the predecessor-not-in-set guard before hashing
-    // (an empty set cannot contain the predecessor).
+    // An empty source set fails fast with the dedicated stable prefix, ahead of
+    // the more specific predecessor-in-set check.
     let err = mgr
         .record_evidence_packet_produced(
             &domain,
@@ -752,7 +752,7 @@ fn empty_source_set_fails_closed() {
         .expect_err("empty source set must fail closed");
     assert!(
         err.to_string()
-            .starts_with("evidence_packet_produced_predecessor_not_in_set"),
+            .starts_with("evidence_packet_produced_empty_source_set"),
         "got: {err}"
     );
 }
