@@ -5,8 +5,8 @@ use icn_governance::{
     ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, ActivationCrossedReceipt,
     AuthorityGrant, AuthorityGrantId, DecisionRecordedReceipt, DeliberationEntryRecordedReceipt,
     GovernanceDecisionReceipt, GovernanceDecisionReceiptV3, Grantee, Mandate,
-    MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, ProcessGateKind,
-    ProcessGateResultReceipt, ProcessSessionOpenedReceipt, Timestamp,
+    MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, MutationPlanRecordedReceipt,
+    ProcessGateKind, ProcessGateResultReceipt, ProcessSessionOpenedReceipt, Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -167,6 +167,51 @@ pub enum ActivationCrossedPersist {
     /// (five ids plus two 32-byte hashes), so an unboxed variant would make
     /// this enum needlessly large next to the unit `Inserted`.
     Existing(Box<ActivationCrossedReceipt>),
+}
+
+/// Class string for `MutationPlanRecordedReceipt` opaque storage (#2300
+/// contract + #2302 M1/M2/M3 decision rung). Chosen in the apps layer so the
+/// gateway never sees the typed name. Distinct from every other process
+/// class store.
+const MUTATION_PLAN_RECORDED_CLASS: &str = "mutation_plan_recorded";
+
+/// Build the injective composite `key1` binding a recorded mutation plan to
+/// its `(domain_id, session_id)` anchor in opaque storage.
+///
+/// Sibling of [`activation_crossed_composite_key1`] with the identical
+/// netstring-style encoding (decimal length of `domain_id`, a colon, then
+/// the two ids concatenated), kept as a separate function so this class's
+/// key derivation is independently anchored by its own anti-aliasing test.
+/// The length prefix delimits `domain_id` exactly, so `("ab","c")` and
+/// `("a","bc")` can never produce the same key, and two domains sharing a
+/// `session_id` scan different `key1` prefixes.
+pub fn mutation_plan_recorded_composite_key1(domain_id: &str, session_id: &str) -> String {
+    format!("{}:{domain_id}{session_id}", domain_id.len())
+}
+
+/// Outcome of persisting a [`MutationPlanRecordedReceipt`] through
+/// [`GovernanceReceiptBackend::put_mutation_plan_recorded`].
+///
+/// The backend enforces at most one plan per `(domain_id, session_id,
+/// plan_id)` **atomically at the storage layer** (same `put_opaque_if_absent`
+/// primitive as the sibling process classes). The caller (the manager) turns
+/// `Existing` into either a same-identity idempotent success or a fail-closed
+/// conflict — stable identity is `activation_id` + `activation_record_hash` +
+/// `recorded_by` + `body_hash` (per the #2302 rung §7; `recorded_at`/
+/// `record_hash` are NOT identity inputs).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MutationPlanRecordedPersist {
+    /// This call won the insert: the receipt is now the one persisted plan
+    /// for its `(domain_id, session_id, plan_id)`.
+    Inserted,
+    /// A plan already existed for this triple; nothing was written. Carries
+    /// the original persisted receipt (original `recorded_at` / `record_hash`
+    /// — never restamped). Boxed because [`MutationPlanRecordedReceipt`] is a
+    /// large payload (five string fields plus three 32-byte hashes —
+    /// `activation_record_hash`, `body_hash`, and `record_hash`), so an
+    /// unboxed variant would make this enum needlessly large next to the unit
+    /// `Inserted`.
+    Existing(Box<MutationPlanRecordedReceipt>),
 }
 
 /// Class string for `MeetingAttendanceReceiptV2` opaque storage (#1868).
@@ -1259,6 +1304,100 @@ pub trait GovernanceReceiptBackend: Send + Sync {
             out.push(
                 serde_json::from_slice(&bytes)
                     .map_err(|e| format!("deserialize ActivationCrossedReceipt in list: {e}"))?,
+            );
+        }
+        Ok(out)
+    }
+
+    /// Persist a [`MutationPlanRecordedReceipt`] emitted when the runtime
+    /// records that a mutation plan was recorded after an activation (#2300
+    /// contract + #2302 rung).
+    ///
+    /// **Default routes through opaque storage.** Serialises the typed
+    /// receipt to JSON and delegates to [`Self::put_opaque_if_absent`] under
+    /// class `"mutation_plan_recorded"` with
+    /// `key1 =` [`mutation_plan_recorded_composite_key1`] (the injective
+    /// domain+session composite) and `key2 = plan_id`. On a lost insert the
+    /// original persisted receipt is hydrated and returned (never restamped).
+    /// A backend that has not opted in to opaque storage inherits the
+    /// fail-closed `opaque_storage_not_implemented` default.
+    fn put_mutation_plan_recorded(
+        &self,
+        receipt: &MutationPlanRecordedReceipt,
+    ) -> Result<MutationPlanRecordedPersist, String> {
+        let payload = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize MutationPlanRecordedReceipt: {e}"))?;
+        let key1 = mutation_plan_recorded_composite_key1(&receipt.domain_id, &receipt.session_id);
+        let existing = self.put_opaque_if_absent(
+            MUTATION_PLAN_RECORDED_CLASS,
+            &key1,
+            Some(&receipt.plan_id),
+            receipt.recorded_at,
+            receipt.record_hash,
+            &payload,
+        )?;
+        match existing {
+            None => Ok(MutationPlanRecordedPersist::Inserted),
+            Some(_winning_hash) => {
+                let original = self
+                    .get_mutation_plan_recorded(
+                        &receipt.domain_id,
+                        &receipt.session_id,
+                        &receipt.plan_id,
+                    )?
+                    .ok_or_else(|| {
+                        // The unique marker says a plan exists but the payload
+                        // cannot be hydrated — surface loudly rather than
+                        // minting a second plan.
+                        "mutation_plan_recorded_inconsistent: unique marker present \
+                         but no persisted plan payload could be read"
+                            .to_string()
+                    })?;
+                Ok(MutationPlanRecordedPersist::Existing(Box::new(original)))
+            }
+        }
+    }
+
+    /// Retrieve the persisted [`MutationPlanRecordedReceipt`] for a
+    /// `(domain_id, session_id, plan_id)`, or `None` when no plan has been
+    /// recorded. Same key convention as
+    /// [`Self::put_mutation_plan_recorded`]; at most one plan exists per
+    /// triple (uniqueness is enforced on write).
+    fn get_mutation_plan_recorded(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+        plan_id: &str,
+    ) -> Result<Option<MutationPlanRecordedReceipt>, String> {
+        let key1 = mutation_plan_recorded_composite_key1(domain_id, session_id);
+        let payload = self.get_latest_opaque(MUTATION_PLAN_RECORDED_CLASS, &key1, Some(plan_id))?;
+        match payload {
+            Some(bytes) => {
+                Ok(Some(serde_json::from_slice(&bytes).map_err(|e| {
+                    format!("deserialize MutationPlanRecordedReceipt: {e}")
+                })?))
+            }
+            None => Ok(None),
+        }
+    }
+
+    /// List all mutation-plan-recorded receipts recorded against one
+    /// `(domain_id, session_id)` anchor, in the store's deterministic
+    /// chronological `(recorded_at, record_hash)` order. Because `key1` is
+    /// the injective domain+session composite, two domains sharing a
+    /// `session_id` can never mix here — no payload-side filtering is needed.
+    fn list_mutation_plans_recorded_for_session_in_domain(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+    ) -> Result<Vec<MutationPlanRecordedReceipt>, String> {
+        let key1 = mutation_plan_recorded_composite_key1(domain_id, session_id);
+        let payloads = self.list_opaque_for(MUTATION_PLAN_RECORDED_CLASS, &key1)?;
+        let mut out = Vec::with_capacity(payloads.len());
+        for bytes in payloads {
+            out.push(
+                serde_json::from_slice(&bytes)
+                    .map_err(|e| format!("deserialize MutationPlanRecordedReceipt in list: {e}"))?,
             );
         }
         Ok(out)

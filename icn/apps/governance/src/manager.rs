@@ -2781,6 +2781,27 @@ pub enum ActivationCrossedOutcome {
     AlreadyCrossed(icn_governance::ActivationCrossedReceipt),
 }
 
+/// Outcome of [`GovernanceManager::record_mutation_plan_recorded`] (#2300
+/// contract + #2302 M1/M2/M3 decision rung). Both variants are successes;
+/// the fail-closed mismatch conflict surfaces as an `Err` with stable prefix
+/// `mutation_plan_recorded_conflict`. Precondition failures surface as `Err`s
+/// with their own stable prefixes and persist nothing:
+/// `mutation_plan_recorded_session_not_opened` (unopened session),
+/// `mutation_plan_recorded_activation_not_found` /
+/// `mutation_plan_recorded_activation_mismatch` (M1 activation reference
+/// absent or hash-mismatched).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum MutationPlanRecordedOutcome {
+    /// This call recorded the plan: the receipt is the newly persisted
+    /// mutation-plan-recorded fact.
+    Recorded(icn_governance::MutationPlanRecordedReceipt),
+    /// The plan was already recorded with the **same** stable identity
+    /// (`activation_id`, `activation_record_hash`, `recorded_by`,
+    /// `body_hash`); carries the **original** persisted receipt (original
+    /// `recorded_at` / `record_hash` — a retry is never restamped).
+    AlreadyRecorded(icn_governance::MutationPlanRecordedReceipt),
+}
+
 /// Action items are always managed locally (not gossiped) and can use either
 /// in-memory or Sled-backed persistent storage.
 pub struct GovernanceManager {
@@ -6687,6 +6708,220 @@ impl GovernanceManager {
         store
             .list_activations_crossed_for_session_in_domain(&domain_id.0, session_id)
             .map_err(|e| anyhow::anyhow!("Failed to list activation-crossed receipts: {e}"))
+    }
+
+    /// Record that a mutation plan was recorded against a process session,
+    /// after an activation crossing and before any mutation is applied — the
+    /// sixth `ProcessTransitionReceipt` class (#2300 contract + #2302 M1/M2/M3
+    /// decision rung). Emits a [`MutationPlanRecordedReceipt`].
+    ///
+    /// This records a **process fact and grants zero authority.** It is not
+    /// mutation application. `recorded_by` is recorder evidence, not an
+    /// authority to plan or act.
+    ///
+    /// **All preconditions fail closed and persist nothing on failure**
+    /// (each with a stable error prefix; see [`MutationPlanRecordedOutcome`]):
+    ///
+    /// 1. `domain_id` / `session_id` / `plan_id` / `activation_id` and
+    ///    `recorded_by` must be non-empty and non-whitespace; a receipt store
+    ///    must be wired.
+    /// 2. The `(domain_id, session_id)` session must have a recorded opening
+    ///    (`mutation_plan_recorded_session_not_opened`) — no silent creation.
+    /// 3. **M1:** an [`ActivationCrossedReceipt`] with `activation_id` must
+    ///    exist in the same `(domain_id, session_id)`
+    ///    (`mutation_plan_recorded_activation_not_found`) and its `record_hash`
+    ///    must equal the supplied `activation_record_hash`
+    ///    (`mutation_plan_recorded_activation_mismatch`). Verified, not
+    ///    asserted. The decision and gate basis are inherited transitively
+    ///    through the activation and are not re-referenced here.
+    ///
+    /// **M2:** the plan body is never seen by this method — callers supply
+    /// only its 32-byte `body_hash` fingerprint.
+    ///
+    /// **At most one plan exists per `(domain_id, session_id, plan_id)`**,
+    /// enforced atomically by the backend:
+    ///
+    /// - first record → [`MutationPlanRecordedOutcome::Recorded`];
+    /// - retry with identical stable identity (`activation_id`,
+    ///   `activation_record_hash`, `recorded_by`, `body_hash`) →
+    ///   [`MutationPlanRecordedOutcome::AlreadyRecorded`] carrying the
+    ///   **original** receipt unchanged (never restamped;
+    ///   `recorded_at`/`record_hash` are not identity inputs);
+    /// - same `plan_id` with a different activation reference, recorder, or
+    ///   body hash → fail-closed error (stable prefix
+    ///   `mutation_plan_recorded_conflict`); the original is untouched.
+    #[allow(clippy::too_many_arguments)]
+    pub fn record_mutation_plan_recorded(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        plan_id: &str,
+        activation_id: &str,
+        activation_record_hash: [u8; 32],
+        body_hash: [u8; 32],
+        recorded_by: &Did,
+    ) -> Result<MutationPlanRecordedOutcome> {
+        // Whitespace-only ids are rejected alongside empty ones: a caller
+        // bypassing the HTTP layer must not mint receipts with visually-empty
+        // identifiers or whitespace storage keys.
+        if domain_id.0.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_mutation_plan_recorded: domain_id must be non-empty and non-whitespace"
+            ));
+        }
+        if session_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_mutation_plan_recorded: session_id must be non-empty and non-whitespace"
+            ));
+        }
+        if plan_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_mutation_plan_recorded: plan_id must be non-empty and non-whitespace"
+            ));
+        }
+        if activation_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_mutation_plan_recorded: activation_id must be non-empty and non-whitespace"
+            ));
+        }
+        let recorded_by_str = recorded_by.to_string();
+        if recorded_by_str.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_mutation_plan_recorded: recorded_by must be non-empty"
+            ));
+        }
+        let store = self.receipt_store.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "record_mutation_plan_recorded: a receipt store is required — plan \
+                 uniqueness and the activation precondition are enforced at the storage \
+                 layer and cannot be faked in memory"
+            )
+        })?;
+
+        // Precondition: the session was opened first. No silent creation.
+        let opened = store
+            .get_process_session_opened(&domain_id.0, session_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_mutation_plan_recorded: failed to read session-open state for \
+                     session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        if opened.is_none() {
+            return Err(anyhow::anyhow!(
+                "mutation_plan_recorded_session_not_opened: session {session_id} in domain {} \
+                 has no recorded opening; refusing to record a plan against an unanchored \
+                 session",
+                domain_id.0
+            ));
+        }
+
+        // M1 precondition: the activation being followed must exist in this
+        // same (domain, session) under `activation_id`, and its `record_hash`
+        // must equal the supplied `activation_record_hash`. The composite
+        // storage key makes an activation recorded under a different
+        // session/domain invisible here, so a wrong-session/wrong-domain
+        // reference fails closed as "not found".
+        let activation = store
+            .get_activation_crossed(&domain_id.0, session_id, activation_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_mutation_plan_recorded: failed to read activation state for \
+                     activation {activation_id} in session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        let activation = activation.ok_or_else(|| {
+            anyhow::anyhow!(
+                "mutation_plan_recorded_activation_not_found: no activation {activation_id} \
+                 recorded in session {session_id} in domain {}; refusing to record a plan for \
+                 an unrecorded activation",
+                domain_id.0
+            )
+        })?;
+        if activation.record_hash != activation_record_hash {
+            return Err(anyhow::anyhow!(
+                "mutation_plan_recorded_activation_mismatch: activation {activation_id} in \
+                 session {session_id} in domain {} was recorded with a different record_hash \
+                 than the one supplied; refusing to record a plan on a mismatched activation \
+                 reference",
+                domain_id.0
+            ));
+        }
+
+        let now = icn_time::current_timestamp_secs();
+        let receipt = icn_governance::MutationPlanRecordedReceipt::new(
+            domain_id.0.clone(),
+            session_id.to_string(),
+            plan_id.to_string(),
+            activation_id.to_string(),
+            activation_record_hash,
+            recorded_by_str.clone(),
+            body_hash,
+            now,
+        );
+
+        match store.put_mutation_plan_recorded(&receipt).map_err(|e| {
+            anyhow::anyhow!(
+                "Failed to persist mutation-plan-recorded receipt for plan {plan_id} in \
+                 session {session_id} in domain {}: {e}",
+                domain_id.0
+            )
+        })? {
+            crate::receipt_backend::MutationPlanRecordedPersist::Inserted => {
+                Ok(MutationPlanRecordedOutcome::Recorded(receipt))
+            }
+            crate::receipt_backend::MutationPlanRecordedPersist::Existing(original) => {
+                if original.activation_id == activation_id
+                    && original.activation_record_hash == activation_record_hash
+                    && original.recorded_by == recorded_by_str
+                    && original.body_hash == body_hash
+                {
+                    Ok(MutationPlanRecordedOutcome::AlreadyRecorded(*original))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "mutation_plan_recorded_conflict: plan {plan_id} in session \
+                         {session_id} in domain {} was already recorded with a different \
+                         activation reference, recorder, or body hash; refusing to overwrite",
+                        domain_id.0
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Retrieve the persisted mutation-plan-recorded receipt for a
+    /// `(domain_id, session_id, plan_id)`, or `None` when no plan has been
+    /// recorded. Read-only.
+    pub fn get_mutation_plan_recorded(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        plan_id: &str,
+    ) -> Result<Option<icn_governance::MutationPlanRecordedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(None);
+        };
+        store
+            .get_mutation_plan_recorded(&domain_id.0, session_id, plan_id)
+            .map_err(|e| anyhow::anyhow!("Failed to read mutation-plan-recorded receipt: {e}"))
+    }
+
+    /// List all mutation-plan-recorded receipts recorded against one
+    /// `(domain_id, session_id)` anchor, in the store's deterministic
+    /// chronological `(recorded_at, record_hash)` order. Read-only.
+    pub fn list_mutation_plans_recorded_in_domain(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+    ) -> Result<Vec<icn_governance::MutationPlanRecordedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(vec![]);
+        };
+        store
+            .list_mutation_plans_recorded_for_session_in_domain(&domain_id.0, session_id)
+            .map_err(|e| anyhow::anyhow!("Failed to list mutation-plan-recorded receipts: {e}"))
     }
 
     // ========================================================================
