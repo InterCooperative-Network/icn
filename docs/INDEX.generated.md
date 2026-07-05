@@ -216,6 +216,12 @@ Forward-direction design for model-driven advisory compute workloads, deliberati
 
 **For:** `developers`, `architects` | **Updated:** 2026-04-27
 
+### 📋 **Draft** [Private Data Disclosure Boundary, Scoped Vaults, and Access Receipts](/docs/architecture/PRIVATE_DATA_DISCLOSURE_BOUNDARY.md)
+
+Design/architecture boundary contract (#1792) defining ICN's generic private-data disclosure/access model after the landed EvidencePacketExportPreparedReceipt (#2326 runtime, #2328 member-shell fixture render). Defines and distinguishes private overlay, scoped vault, opaque receipt storage, encrypted storage, redaction, selective disclosure, private object reference, disclosure policy, access receipt, export receipt, made-available receipt, external custodian, sealed/restricted record, and public existence metadata vs restricted contents. Names the candidate model (PrivacyClass / DisclosurePolicy / PrivateObjectRef / RedactionMap / AccessReceipt / ExportReceipt) and a staged candidate receipt lifecycle (export-prepared [landed] then made-available then access then disclosure-decision then redaction-applied) without pinning hash structure or implementing runtime. Pins the core principle 'Data can be private. Power cannot be invisible.' and binds it to the Meaning Firewall / opaque receipt storage so the kernel stores opaque bytes and never parses domain meaning. States member-shell and operator privacy affordances (posture, not contents), hard rules against public-package and dashboard leakage, and a proposed follow-up issue sequence. Distinguishes #1792 (disclosure/access policy) from #1767 (encrypted distributed private-overlay storage). Design only — no runtime, encryption, route, OpenAPI/SDK, gateway/auth, or member-shell change; no production/pilot/readiness claim; leaves #1748/#2141/#1792/#2041/#1868/#2061/#2080/#2081 open.
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-05
+
 ### 📝 **Living** [Scope Bounded Trust](/docs/architecture/SCOPE_BOUNDED_TRUST.md)
 
 Trust model design limiting trust scope to organizational boundaries
@@ -2126,10 +2132,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 347
+**Total documents:** 348
 
 **By status:**
 - Active: 1
 - Canonical: 40
-- Draft: 94
+- Draft: 95
 - Living: 212
