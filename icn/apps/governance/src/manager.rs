@@ -2847,6 +2847,30 @@ pub enum EvidencePacketProducedOutcome {
     AlreadyProduced(icn_governance::EvidencePacketProducedReceipt),
 }
 
+/// Outcome of [`GovernanceManager::record_evidence_packet_export_prepared`]
+/// (#2322 boundary contract + #2324 EX1–EX8 decision rung). Both variants are
+/// successes; the fail-closed mismatch conflict surfaces as an `Err` with
+/// stable prefix `evidence_packet_export_prepared_conflict`. Precondition
+/// failures surface as `Err`s with their own stable prefixes and persist
+/// nothing: `evidence_packet_export_prepared_session_not_opened` (unopened
+/// session), `evidence_packet_export_prepared_predecessor_not_found` /
+/// `evidence_packet_export_prepared_predecessor_mismatch` (EX5 produced
+/// predecessor absent or record-hash-mismatched), and
+/// `evidence_packet_export_prepared_packet_hash_mismatch` (the echoed
+/// `packet_hash` differs from the stored produced receipt's `packet_hash`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvidencePacketExportPreparedOutcome {
+    /// This call recorded the export preparation: the receipt is the newly
+    /// persisted export-prepared fact.
+    Prepared(icn_governance::EvidencePacketExportPreparedReceipt),
+    /// The export preparation was already recorded with the **same** stable
+    /// identity (`packet_id`, `packet_produced_record_hash`, `packet_hash`,
+    /// `export_policy_hash`, `recipient_scope_id`, `prepared_by`); carries the
+    /// **original** persisted receipt (original `prepared_at` / `record_hash`
+    /// — a retry is never restamped).
+    AlreadyPrepared(icn_governance::EvidencePacketExportPreparedReceipt),
+}
+
 /// Action items are always managed locally (not gossiped) and can use either
 /// in-memory or Sled-backed persistent storage.
 pub struct GovernanceManager {
@@ -7426,6 +7450,250 @@ impl GovernanceManager {
         store
             .list_evidence_packet_produced_for_session_in_domain(&domain_id.0, session_id)
             .map_err(|e| anyhow::anyhow!("Failed to list evidence-packet-produced receipts: {e}"))
+    }
+
+    /// Record that an **export of a produced evidence packet was prepared**
+    /// for a named recipient scope under a declared export policy — the ninth
+    /// process/evidence receipt class (#2322 boundary contract + #2324 EX1–EX8
+    /// decision rung), and the first beyond the eight named by the idea-0019
+    /// framing. Records a process fact and grants zero authority; it does not
+    /// export, assemble, release, deliver, transmit, make available, certify,
+    /// audit, or accept anything — prepared is **not** delivered, received, or
+    /// accepted (EX1/EX4).
+    ///
+    /// Fail-closed preconditions (on any failure nothing is persisted):
+    /// - all ids are non-empty / non-whitespace (`recipient_scope_id` is a
+    ///   caller-opaque governance handle — never contact data);
+    /// - a receipt store is wired (uniqueness and the predecessor precondition
+    ///   are enforced at the storage layer and cannot be faked in memory);
+    /// - the `(domain_id, session_id)` session was opened first
+    ///   (`evidence_packet_export_prepared_session_not_opened`);
+    /// - EX5: an [`icn_governance::EvidencePacketProducedReceipt`] exists in
+    ///   the **same** `(domain_id, session_id)` under `packet_id`
+    ///   (`evidence_packet_export_prepared_predecessor_not_found`), its
+    ///   `record_hash` equals the supplied `packet_produced_record_hash`
+    ///   (`evidence_packet_export_prepared_predecessor_mismatch`), and its
+    ///   stored `packet_hash` equals the supplied `packet_hash`
+    ///   (`evidence_packet_export_prepared_packet_hash_mismatch`) — the
+    ///   record-hash link is checked before the packet-hash echo so a stale
+    ///   predecessor reference surfaces as the more specific mismatch.
+    ///
+    /// On success returns [`EvidencePacketExportPreparedOutcome::Prepared`]; a
+    /// same-identity retry returns
+    /// [`EvidencePacketExportPreparedOutcome::AlreadyPrepared`] carrying the
+    /// **original** receipt (never restamped). A same-`export_id` record with
+    /// a different stable identity fails closed with the stable
+    /// `evidence_packet_export_prepared_conflict` prefix. Multiple exports per
+    /// packet (distinct `export_id`s) are permitted at the substrate layer;
+    /// how many is charter policy.
+    #[allow(clippy::too_many_arguments)]
+    pub fn record_evidence_packet_export_prepared(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        export_id: &str,
+        packet_id: &str,
+        packet_produced_record_hash: [u8; 32],
+        packet_hash: [u8; 32],
+        export_policy_hash: [u8; 32],
+        recipient_scope_id: &str,
+        prepared_by: &Did,
+    ) -> Result<EvidencePacketExportPreparedOutcome> {
+        // Whitespace-only ids are rejected alongside empty ones: a caller
+        // bypassing the HTTP layer must not mint receipts with visually-empty
+        // identifiers or whitespace storage keys.
+        if domain_id.0.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_export_prepared: domain_id must be non-empty and \
+                 non-whitespace"
+            ));
+        }
+        if session_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_export_prepared: session_id must be non-empty and \
+                 non-whitespace"
+            ));
+        }
+        if export_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_export_prepared: export_id must be non-empty and \
+                 non-whitespace"
+            ));
+        }
+        if packet_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_export_prepared: packet_id must be non-empty and \
+                 non-whitespace"
+            ));
+        }
+        if recipient_scope_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_export_prepared: recipient_scope_id must be non-empty \
+                 and non-whitespace"
+            ));
+        }
+        let prepared_by_str = prepared_by.to_string();
+        if prepared_by_str.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_export_prepared: prepared_by must be non-empty"
+            ));
+        }
+        let store = self.receipt_store.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "record_evidence_packet_export_prepared: a receipt store is required — export \
+                 uniqueness and the predecessor precondition are enforced at the storage layer \
+                 and cannot be faked in memory"
+            )
+        })?;
+
+        // Precondition: the session was opened first. No silent creation.
+        let opened = store
+            .get_process_session_opened(&domain_id.0, session_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_evidence_packet_export_prepared: failed to read session-open state \
+                     for session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        if opened.is_none() {
+            return Err(anyhow::anyhow!(
+                "evidence_packet_export_prepared_session_not_opened: session {session_id} in \
+                 domain {} has no recorded opening; refusing to record an export preparation \
+                 against an unanchored session",
+                domain_id.0
+            ));
+        }
+
+        // EX5 precondition: the produced packet this export prepares must exist
+        // in this same (domain, session) under `packet_id`. The composite
+        // storage key makes a packet recorded under a different session/domain
+        // invisible here, so a wrong-session/wrong-domain reference fails
+        // closed as "not found".
+        let produced = store
+            .get_evidence_packet_produced(&domain_id.0, session_id, packet_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_evidence_packet_export_prepared: failed to read produced state for \
+                     packet {packet_id} in session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        let produced = produced.ok_or_else(|| {
+            anyhow::anyhow!(
+                "evidence_packet_export_prepared_predecessor_not_found: no packet {packet_id} \
+                 recorded in session {session_id} in domain {}; refusing to record an export \
+                 preparation for an unrecorded predecessor",
+                domain_id.0
+            )
+        })?;
+        if produced.record_hash != packet_produced_record_hash {
+            return Err(anyhow::anyhow!(
+                "evidence_packet_export_prepared_predecessor_mismatch: packet {packet_id} in \
+                 session {session_id} in domain {} was recorded with a different record_hash \
+                 than the one supplied; refusing to record an export preparation on a \
+                 mismatched predecessor reference",
+                domain_id.0
+            ));
+        }
+        // EX5 echoed-field verification: the supplied packet_hash must equal
+        // the stored produced receipt's packet_hash — the echo is a proof, not
+        // an assertion (verified in the same fetch as the predecessor link).
+        if produced.packet_hash != packet_hash {
+            return Err(anyhow::anyhow!(
+                "evidence_packet_export_prepared_packet_hash_mismatch: the supplied packet_hash \
+                 for packet {packet_id} in session {session_id} in domain {} does not equal the \
+                 stored produced receipt's packet_hash; refusing to record an export \
+                 preparation for a different artifact fingerprint",
+                domain_id.0
+            ));
+        }
+
+        let now = icn_time::current_timestamp_secs();
+        let receipt = icn_governance::EvidencePacketExportPreparedReceipt::new(
+            domain_id.0.clone(),
+            session_id.to_string(),
+            export_id.to_string(),
+            packet_id.to_string(),
+            packet_produced_record_hash,
+            packet_hash,
+            export_policy_hash,
+            recipient_scope_id.to_string(),
+            prepared_by_str.clone(),
+            now,
+        );
+
+        match store
+            .put_evidence_packet_export_prepared(&receipt)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to persist evidence-packet-export-prepared receipt for export \
+                     {export_id} in session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })? {
+            crate::receipt_backend::EvidencePacketExportPreparedPersist::Inserted => {
+                Ok(EvidencePacketExportPreparedOutcome::Prepared(receipt))
+            }
+            crate::receipt_backend::EvidencePacketExportPreparedPersist::Existing(original) => {
+                if original.packet_id == packet_id
+                    && original.packet_produced_record_hash == packet_produced_record_hash
+                    && original.packet_hash == packet_hash
+                    && original.export_policy_hash == export_policy_hash
+                    && original.recipient_scope_id == recipient_scope_id
+                    && original.prepared_by == prepared_by_str
+                {
+                    Ok(EvidencePacketExportPreparedOutcome::AlreadyPrepared(
+                        *original,
+                    ))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "evidence_packet_export_prepared_conflict: export {export_id} in session \
+                         {session_id} in domain {} was already recorded with a different packet \
+                         reference, packet hash, export policy, recipient scope, or recorder; \
+                         refusing to overwrite",
+                        domain_id.0
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Retrieve the persisted evidence-packet-export-prepared receipt for a
+    /// `(domain_id, session_id, export_id)`, or `None` when no export
+    /// preparation has been recorded. Read-only.
+    pub fn get_evidence_packet_export_prepared(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        export_id: &str,
+    ) -> Result<Option<icn_governance::EvidencePacketExportPreparedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(None);
+        };
+        store
+            .get_evidence_packet_export_prepared(&domain_id.0, session_id, export_id)
+            .map_err(|e| {
+                anyhow::anyhow!("Failed to read evidence-packet-export-prepared receipt: {e}")
+            })
+    }
+
+    /// List all evidence-packet-export-prepared receipts recorded against one
+    /// `(domain_id, session_id)` anchor, in the store's deterministic
+    /// chronological `(prepared_at, record_hash)` order. Read-only.
+    pub fn list_evidence_packet_export_prepared_in_domain(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+    ) -> Result<Vec<icn_governance::EvidencePacketExportPreparedReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(vec![]);
+        };
+        store
+            .list_evidence_packet_export_prepared_for_session_in_domain(&domain_id.0, session_id)
+            .map_err(|e| {
+                anyhow::anyhow!("Failed to list evidence-packet-export-prepared receipts: {e}")
+            })
     }
 
     // ========================================================================
