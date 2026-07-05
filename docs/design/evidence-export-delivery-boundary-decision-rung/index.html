@@ -1,0 +1,366 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Evidence export/delivery boundary decision rung — EX1–EX8 (fact name, availability vs delivery, recipient scope, acceptance placement, v1 field set, vault/access interaction, challenge shape, smallest dogfood) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>evidence export delivery boundary decision rung</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/evidence-export-delivery-boundary-decision-rung.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Evidence export/delivery boundary decision rung — EX1–EX8 (fact name, availability vs delivery, recipient scope, acceptance placement, v1 field set, vault/access interaction, challenge shape, smallest dogfood)</h1>
+<p><strong>Status:</strong> draft — design / decision rung (not runtime implementation)
+<strong>Truth class:</strong> descriptive
+<strong>Canonical:</strong> no — implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last reviewed:</strong> 2026-07-05
+<strong>Source basis:</strong> read against <code>origin/main</code> @ <code>87b425cf</code> (the merged #2322 boundary contract&#39;s tip). Code anchors (<code>icn/crates/icn-governance/src/proof.rs</code>, <code>icn/apps/governance/src/receipt_backend.rs</code>, <code>icn/apps/governance/src/manager.rs</code>) were verified at that commit — re-verify before relying on exact line numbers or hashes; they drift.
+<strong>Related:</strong> #2323 (this rung&#39;s issue) · #2321 (the boundary-contract issue — closed/completed by #2322) · #2322 (merged boundary contract, <a href="https://github.com/InterCooperative-Network/icn/blob/main/evidence-export-delivery-boundary">`evidence-export-delivery-boundary.md`</a>) · #1748 (Institutional Process Substrate milestone) · #2141 (vertical institutional spine control) · #1792 (private data disclosure boundary, scoped vaults, and access receipts — open) · #2041 (human/AT pass — open/parked) · #2318 (<code>EvidencePacketProducedReceipt</code> runtime slice) · #2320 (member-shell process-evidence fixture render) · <a href="https://github.com/InterCooperative-Network/icn/blob/main/evidence-packet-produced-receipt-decision-rung">`evidence-packet-produced-receipt-decision-rung.md`</a> (the sibling EP rung this document mirrors) · <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a> (receipt &amp; provenance proof envelope)</p>
+<blockquote>
+<p>Narrow decision document resolving the eight open questions the merged #2322 evidence export/delivery boundary contract named in its §9 — <strong>EX1</strong> (fact name and moment), <strong>EX2</strong> (availability vs delivery), <strong>EX3</strong> (recipient-scope representation), <strong>EX4</strong> (where acceptance lives), <strong>EX5</strong> (minimal v1 field set), <strong>EX6</strong> (vault/access interaction), <strong>EX7</strong> (challenge/rejection shape), <strong>EX8</strong> (smallest repo-safe dogfood). It mirrors the <code>evidence-packet-produced-receipt-decision-rung.md</code> cadence: land the boundary contract (#2322), then resolve the hash-participating structure <strong>in writing</strong> before a tag is pinned, then implement. This document decides nothing else: no runtime change, no receipt class added, no export performed, no member-shell change, no fixture change, no human/AT run. Receipts record institutional facts. They grant zero authority.</p>
+</blockquote>
+<h2>1. Purpose</h2>
+<p>The #2322 boundary contract separated the lifecycle facts that could follow <code>EvidencePacketProducedReceipt</code> — produced (landed) / export-prepared-or-exported / made available / delivered / received / accepted / audited-certified / challenged-rejected-withdrawn — and recommended the <strong>export fact</strong> as the single next rung, deferring its exact name, moment, and structure to this decision document. The landed rule (applied by every rung since #2278, most recently #2316) is that <strong>hash-participating structure is decided in writing before a tag is pinned, never silently in an implementation PR.</strong></p>
+<p>This rung resolves EX1–EX8 so a contract-conformant implementation PR <em>could</em> begin, if separately authorized. It is not an exporter, not a transport, not a delivery/acceptance/audit mechanism, and not an action-card trigger.</p>
+<h2>2. Status basis</h2>
+<p>Verified live at authoring time (<code>origin/main</code> @ <code>87b425cf</code>):</p>
+<ul>
+<li><strong>#2322</strong> — evidence export/delivery boundary design/audit contract — <strong>merged</strong> (<code>87b425cf</code>); <strong>#2321</strong> — its issue — <strong>closed / completed</strong>.</li>
+<li><strong>#2318</strong> — <code>EvidencePacketProducedReceipt</code> runtime slice — <strong>landed</strong> (<code>5f898b92</code>); the eighth <code>ProcessTransitionReceipt</code> class. <strong>#2320</strong> — its member-shell fixture render — <strong>merged</strong> (<code>cf3e7d47</code>).</li>
+<li><strong>#1748 / #2141 / #1792 / #2041</strong> — all <strong>open</strong>; #2041 remains parked for a real human/AT pass, not attempted here.</li>
+<li><strong>No evidence-packet export seam exists in the runtime:</strong> no <code>EvidencePacketExport*</code> type and no <code>evidence_packet_export*</code> / <code>export_prepared</code> identifier anywhere in <code>icn/crates</code> or <code>icn/apps</code> (verified by scoped <code>rg</code>, per the #2322 audit discipline — generic words like <em>exported</em>/<em>delivered</em>/<em>accepted</em> appear only in unrelated subsystems).</li>
+<li>The predecessor lookup seam this rung relies on <strong>exists</strong>: <code>get_evidence_packet_produced(domain_id, session_id, packet_id)</code> resolves the produced receipt via <code>get_latest_opaque(EVIDENCE_PACKET_PRODUCED_CLASS, key1, Some(packet_id))</code> under the injective <code>evidence_packet_produced_composite_key1(domain_id, session_id)</code> (<code>icn/apps/governance/src/receipt_backend.rs</code>), mirrored on the manager (<code>icn/apps/governance/src/manager.rs</code>).</li>
+</ul>
+<p>No production, pilot, organizer-ready, member-ready, live-federation, NYCN-activation, or Phase-2 claim is made or implied by this document.</p>
+<h2>3. Repo audit update (verified against live code)</h2>
+<table>
+<thead>
+<tr>
+<th>Subject</th>
+<th>Finding</th>
+<th>Anchor</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>EvidencePacketProducedReceipt</code> (the predecessor this fact references)</td>
+<td>fields <code>domain_id, session_id, packet_id, mutation_application_id, mutation_applied_record_hash, receipt_set_hash, packet_hash, redaction_profile_hash, produced_by, produced_at, record_hash</code>; tag <code>icn:gov:evidence_packet_produced:v1</code>; <code>record_hash</code> is the sole <code>PartialEq</code>/<code>Eq</code> anchor; <code>packet_hash</code> fingerprints the public/redacted packet artifact (body never stored)</td>
+<td><code>icn/crates/icn-governance/src/proof.rs</code> (struct + <code>DOMAIN_TAG</code> + <code>compute_record_hash</code>)</td>
+</tr>
+<tr>
+<td>produced lookup / uniqueness</td>
+<td><code>put_evidence_packet_produced</code> persists via <code>put_opaque_if_absent</code> under class <code>&quot;evidence_packet_produced&quot;</code>, <code>key1 =</code> injective netstring <code>evidence_packet_produced_composite_key1(domain_id, session_id)</code>, <code>key2 = packet_id</code>; <code>get_evidence_packet_produced(domain_id, session_id, packet_id)</code> reads it back. An export fact can therefore verify its predecessor <strong>fail-closed</strong> by <code>get_evidence_packet_produced(...)</code> then comparing <code>record_hash</code> — and, because the fetched receipt carries <code>packet_hash</code>, an echoed <code>packet_hash</code> can be verified in the same fetch at no extra cost</td>
+<td><code>receipt_backend.rs</code>, <code>manager.rs</code></td>
+</tr>
+<tr>
+<td>the eight landed classes</td>
+<td><code>ProcessSessionOpenedReceipt</code> / <code>DeliberationEntryRecordedReceipt</code> / <code>DecisionRecordedReceipt</code> / <code>ProcessGateResultReceipt</code> / <code>ActivationCrossedReceipt</code> / <code>MutationPlanRecordedReceipt</code> / <code>MutationAppliedReceipt</code> / <code>EvidencePacketProducedReceipt</code> are the only runtime <code>ProcessTransitionReceipt</code> classes</td>
+<td><code>proof.rs</code></td>
+</tr>
+<tr>
+<td>inter-receipt references</td>
+<td>exactly <strong>four</strong> exist: activation → decision (#2295 B1), plan → activation (#2302 M1), applied → plan (#2309 A1), packet → applied + source set (#2316 EP1). An export → produced link would be the lane&#39;s <strong>fifth</strong></td>
+<td>whole-repo search</td>
+</tr>
+<tr>
+<td>landed domain tags (disjointness set)</td>
+<td><code>icn:governance-proof:v1</code>; <code>icn:gov:decision:v1/v2/v3</code>; <code>icn:gov:attest:v1</code>; <code>icn:gov:action_item_completion:v1/v2</code>; <code>icn:gov:meeting_attendance:v1/v2</code>; <code>icn:gov:process_gate_result:v1</code>; <code>icn:gov:process_session_opened:v1</code>; <code>icn:gov:deliberation_entry_recorded:v1</code>; <code>icn:gov:decision_recorded:v1</code>; <code>icn:gov:activation_crossed:v1</code>; <code>icn:gov:mutation_plan_recorded:v1</code>; <code>icn:gov:mutation_applied:v1</code>; <code>icn:gov:evidence_packet_produced:v1</code> (+ its <code>:receipt_set:v1</code> sub-tag); <code>icn:gov:mandate_grant_ref:v1</code></td>
+<td><code>proof.rs</code></td>
+</tr>
+<tr>
+<td>export vocabulary</td>
+<td>#1792 names candidate <code>ExportReceipt</code> (<code>object_ref, exported_by, recipient_scope, redaction_policy, reason, receipt_hash</code>) and <code>AccessReceipt</code>, plus the hard rule &quot;No sensitive export without redaction policy and export receipt&quot;; the shipped <code>urn:icn:contract:rehearsal-evidence-export:v1</code> remains a read-only <strong>summary</strong> contract, not a lifecycle fact</td>
+<td>#1792; <code>docs/contracts/</code></td>
+</tr>
+<tr>
+<td>framing scope note</td>
+<td>the idea-0019 framing brief names <strong>eight</strong> <code>ProcessTransitionReceipt</code> classes ending at <code>EvidencePacketProducedReceipt</code>. An export fact is the <strong>first class beyond the named spine</strong> — same family discipline, but it extends the framing rather than filling it; it must not be presented as completing an existing #1748 acceptance gate</td>
+<td><code>ops/ideas/framing/institutional-process-substrate.md</code></td>
+</tr>
+</tbody></table>
+<p><strong>Bottom line:</strong> every seam the EX decisions rely on exists and is verified; the export fact itself has no seam and no precedent, so this rung pins its structure before any tag exists.</p>
+<h2>4. EX1 decision — fact name and moment</h2>
+<p><strong>Question.</strong> Is the v1 fact <code>export-prepared</code> (an export staged under a policy) or <code>exported</code> (a release act)? The #2322 rule: the chosen name must not imply transmission.</p>
+<p>Options considered:</p>
+<ol>
+<li><strong><code>exported</code></strong> (<code>EvidencePacketExportedReceipt</code>). Rejected: &quot;exported&quot; is passively readable as &quot;it left / it was sent&quot; — precisely the transmission implication #2322 forbids. The substrate cannot witness departure, only a recorder&#39;s report; a name that suggests more than the witness posture supports is a standing overclaim.</li>
+<li><strong><code>export-recorded</code></strong>. Rejected: says nothing about <em>which</em> moment was recorded; &quot;an export was recorded&quot; invites the same &quot;it left&quot; reading with extra vagueness.</li>
+<li><strong><code>export-prepared</code></strong> (<code>EvidencePacketExportPreparedReceipt</code>). <strong>CHOSEN.</strong> The fact is the sender-side <strong>preparation/staging</strong> of an export: a specific produced packet artifact was bound to a named recipient scope under a declared export policy, and that binding was recorded. Nothing in the name or the fact asserts that anything moved.</li>
+</ol>
+<p><strong>Decision EX1: the v1 fact is <code>export-prepared</code>.</strong></p>
+<ul>
+<li>Candidate class name: <code>EvidencePacketExportPreparedReceipt</code> (keeps the <code>EvidencePacket*</code> family prefix legible next to the produced class).</li>
+<li>Candidate tag: <code>icn:gov:evidence_packet_export_prepared:v1</code> — must hash-separate from, and never converge with, every tag in the §3 disjointness set.</li>
+<li>The <em>release act</em> (§5.4 of the boundary contract, <code>delivered</code>) remains a separate, deferred fact (EX2). &quot;Prepared&quot; is the strongest claim the sender-side witness posture supports without transmission semantics.</li>
+<li>Surface language (pinned for any future rendering): <em>&quot;An export of this evidence packet was prepared for a named recipient scope and recorded here. This does not mean it was delivered, received, or accepted.&quot;</em></li>
+</ul>
+<p><strong>Test that proves it:</strong> a no-overclaim grep over the future type and serialization asserting no <code>delivered</code> / <code>sent</code> / <code>transmitted</code> / <code>received</code> / <code>accepted</code> field or claim; the doc-comment states the prepared ≠ delivered boundary verbatim.</p>
+<h2>5. EX2 decision — availability vs delivery</h2>
+<p><strong>Question.</strong> Is <code>made available</code> a distinct fact from <code>delivered</code>, and does either enter v1?</p>
+<p>Options considered:</p>
+<ol>
+<li>Fold availability into delivery. Rejected: they have different witnesses and different truth conditions — availability is a <strong>unilateral custody fact</strong> (the artifact sits where an authorized scope can retrieve it), delivery is a <strong>claimed transmission act</strong>. Folding them makes one receipt ambiguous between &quot;it is retrievable&quot; and &quot;we pushed it,&quot; which is exactly the drift the boundary contract exists to prevent.</li>
+<li>Put one or both in v1 alongside export-prepared. Rejected: availability needs the scoped-vault/custody seam (#1792) to mature — recording &quot;made available&quot; without a governed custody reference would either leak location/endpoint data or record nothing verifiable; delivery needs transport-class decisions with no current consumer.</li>
+<li><strong>Distinct facts; both excluded from v1. CHOSEN.</strong></li>
+</ol>
+<p><strong>Decision EX2: <code>made available</code> and <code>delivered</code> are distinct lifecycle facts, and neither enters v1.</strong> The v1 family stops at export-prepared. Any later availability fact must reference governed custody (vault reference, per #1792) and any later delivery fact records a sender-side transmission report only — each requires its own contract + rung.</p>
+<p><strong>Test that proves it:</strong> the serialized v1 payload carries no availability / custody / location / vault / transport / delivery field (payload-audit test).</p>
+<h2>6. EX3 decision — recipient-scope representation</h2>
+<p><strong>Question.</strong> Is the recipient scope a handle, a fingerprint, a DID, or a combination — and how does contact data stay out by construction?</p>
+<p>Options considered:</p>
+<ol>
+<li>Recipient DID(s). Rejected: enumerating recipients inside a receipt turns the receipt into a disclosure surface (who may see what is itself sensitive), and person-level recipients invite contact data. Scope membership is #1792 disclosure-policy territory, not receipt content.</li>
+<li><code>recipient_scope_id</code> + <code>recipient_scope_hash</code> (a fingerprint of the scope definition). Rejected for v1: the scope-definition body (membership, rules) is a <strong>disclosure policy</strong> owned by the #1792 lane; fingerprinting it here would pin a policy-body format that #1792 has not defined. Same reasoning that EP3 rejected <code>redaction_profile_id</code>: do not pin a second representation with no repo precedent.</li>
+<li><strong>Caller-opaque <code>recipient_scope_id</code> string only. CHOSEN.</strong> Mirrors every caller-opaque handle in the lane (<code>session_id</code>, <code>packet_id</code>, <code>application_id</code>); names <em>which</em> scope without carrying <em>what</em> the scope is.</li>
+</ol>
+<p><strong>Decision EX3: v1 carries a single caller-opaque <code>recipient_scope_id</code>.</strong></p>
+<ul>
+<li>Non-empty / non-whitespace, validated pre-persistence like the sibling ids.</li>
+<li><strong>Hard rule (contractual, stated in the type doc-comment and enforced by fixture/privacy review):</strong> <code>recipient_scope_id</code> is an opaque governance handle — never a name, email, phone number, address, or any personal contact data. The same rule already governs every caller-opaque id in the lane; this rung restates it because recipient identifiers are the highest-temptation field for contact data (#1792 hard rules).</li>
+<li>No scope-definition hash, no scope registry, no recipient enumeration in v1. If #1792 later defines a fingerprintable disclosure-policy body, adding a hash is a later decision, not a silent v1 add.</li>
+</ul>
+<p><strong>Test that proves it:</strong> payload-audit test confirms exactly one recipient field (<code>recipient_scope_id</code>, string); privacy grep over fixtures/tests confirms no contact-data-shaped values; empty/whitespace id rejected pre-persistence.</p>
+<h2>7. EX4 decision — where acceptance lives</h2>
+<p><strong>Question.</strong> Do recipient-side facts (<code>received</code>, <code>accepted</code>) belong in generic ICN, or in institution/domain-package and bridge semantics?</p>
+<p>Options considered:</p>
+<ol>
+<li>Generic ICN receipt classes for received/accepted. Rejected: the substrate can only witness authenticated reports; a sender-side runtime recording &quot;received/accepted&quot; would let the sender fabricate the recipient&#39;s facts, violating the #2322 witness posture. A recipient inside the substrate could attest — but the <em>criteria</em> for acceptance are institutional, and generic ICN must not hard-code them (the meaning firewall keeps evaluative semantics in apps/packages).</li>
+<li><strong>Recipient-side facts stay out of generic ICN. CHOSEN.</strong> The substrate provides the receipt grammar; institution/domain packages define acceptance semantics on the recipient&#39;s own authority; external recipients arrive only through bridges, which emit import/translation receipts per the operating model.</li>
+</ol>
+<p><strong>Decision EX4: <code>received</code> and <code>accepted</code> are institution/domain-package and bridge territory, not generic ICN.</strong> No recipient-side fact enters this family without its own contract and rung, recorded on recipient authority. Nothing in v1 may imply either.</p>
+<p><strong>Test that proves it:</strong> payload-audit + no-overclaim grep: no <code>received</code> / <code>accepted</code> / recipient-attestation field or claim in the v1 type or serialization.</p>
+<h2>8. EX5 decision — minimal v1 field set</h2>
+<p><strong>Question.</strong> What is the smallest identity-honest field set for <code>export-prepared</code>, what participates in <code>record_hash</code> and duplicate identity, and what are the preconditions?</p>
+<p>Options considered per field group:</p>
+<ul>
+<li><strong>Predecessor link.</strong> Mirror the lane&#39;s proven scalar posture (<code>*_id</code> + <code>*_record_hash</code>, verified fail-closed): <code>packet_id</code> + <code>packet_produced_record_hash</code> naming the <code>EvidencePacketProducedReceipt</code> this export prepares. The lane&#39;s fifth inter-receipt link. Chosen. (Transitivity: applied/plan/activation/decision/gate are inherited through the produced receipt, not restated — same rule as every prior rung.)</li>
+<li><strong>Artifact fingerprint.</strong> Options: (a) no artifact hash (binding-only fact); (b) a new <code>export_artifact_hash</code> for a possibly-distinct export-shaped artifact; (c) <strong>echo the produced receipt&#39;s <code>packet_hash</code>, verified fail-closed against the stored produced receipt. CHOSEN.</strong> (a) leaves &quot;an export of <em>what bytes</em>&quot; answerable only by lookup; (b) invents an artifact no producer produces (v1 exports the produced artifact itself — a wrapped/re-encoded export form is a later version if a real producer ever needs it). The echo makes the receipt self-contained <em>and</em> is a proof rather than an assertion, because the predecessor verify already fetches the produced receipt — comparing <code>packet_hash</code> costs nothing. This is the lane&#39;s first <strong>verified echoed content field</strong> (predecessor echoes to date verify <code>record_hash</code> only).</li>
+<li><strong>Policy fingerprint.</strong> <code>export_policy_hash</code> — caller-supplied 32-byte fingerprint of the export policy that shaped/authorized this preparation for this scope; the policy <strong>body is never stored</strong> (mirrors <code>redaction_profile_hash</code> exactly, EP3 precedent; aligns with #1792&#39;s <code>ExportReceipt.redaction_policy</code> and its &quot;no sensitive export without redaction policy and export receipt&quot; hard rule). It records <em>which</em> policy, not that the policy is complete, correct, satisfied, or legally sufficient.</li>
+<li><strong>Recipient.</strong> <code>recipient_scope_id</code> per EX3.</li>
+<li><strong>Actor / time.</strong> <code>prepared_by</code> (DID; recorder / export-witness evidence, <strong>not</strong> an authority to export, release, deliver, certify, or audit — grants zero authority) and <code>prepared_at</code> (node-stamped Unix seconds, hashed, <strong>excluded</strong> from duplicate identity; the #2283/#2284 doctrine — no wall clock in cross-node identity; a retry never restamps).</li>
+</ul>
+<p><strong>Decision EX5: the candidate v1 layout is the 11-field set in §12</strong>, with <code>export_id</code> as the caller-opaque per-export unit of uniqueness (<code>key2</code>). <strong>Multiple exports per packet are permitted at the substrate layer</strong> (different scopes, different policies, re-preparations) — <code>export_id</code> is the uniqueness unit; how many, and to whom, is charter policy (same posture as decisions-per-session).</p>
+<h2>9. EX6 decision — vault/access interaction</h2>
+<p><strong>Question.</strong> Is the export artifact vaulted, and is retrieval an #1792 <code>AccessReceipt</code> rather than anything in this family?</p>
+<p><strong>Decision EX6: v1 carries no custody, vault, location, or retrieval semantics.</strong> Where the prepared export artifact lives is governed-custody territory (#1792 scoped vaults / the artifact-registry-and-scoped-vault spec); <em>access to it is a receipted act in the #1792 <code>AccessReceipt</code> lane, not in this family.</em> A future <code>made available</code> fact (EX2, deferred) would be the point where a governed custody reference enters — with its own rung. This keeps the export-prepared receipt free of endpoints, retrieval tokens, and location data by construction.</p>
+<p><strong>Test that proves it:</strong> payload-audit test — no vault / location / URL / credential / retrieval field in the v1 type or serialization.</p>
+<h2>10. EX7 decision — challenge/rejection shape</h2>
+<p><strong>Question.</strong> How do challenged/rejected/withdrawn facts appear, and does any of it enter v1?</p>
+<p><strong>Decision EX7: fully deferred from v1.</strong> Receipts in this family are append-only facts; withdrawal or challenge never deletes or mutates a prior receipt. When a real consumer needs dispute facts, they must be designed against the #1009 attestation/dispute pathway as their own contract — referencing the challenged fact by <code>record_hash</code> — and #1792&#39;s challenge-path requirement. v1 carries no status, supersession, revocation, or dispute field.</p>
+<p><strong>Test that proves it:</strong> payload-audit test — no status / superseded / withdrawn / challenged field in v1.</p>
+<h2>11. EX8 decision — smallest repo-safe dogfood</h2>
+<p><strong>Question.</strong> What is the minimal fixture-only path that tells the export story without performing any export?</p>
+<p><strong>Decision EX8: mirror the landed render cadence (#2291 → #2312 → #2320), only after the runtime class lands.</strong> The smallest honest dogfood is a fixture-only member-shell extension of <code>?mode=demo&amp;set=process-evidence</code>: one wire-shaped <code>evidence_packet_export_prepared</code> fixture entry whose <code>packet_produced_record_hash</code> echoes the fixture&#39;s produced receipt, a fictional <code>recipient_scope_id</code> (e.g. <code>demo-partner-review-scope-0001</code> — fictional, contact-data-free), illustrative hashes, and the EX1 surface language (&quot;prepared … not delivered, received, or accepted&quot;). It must re-run the committed a11y walkthrough and the rehearsal-evidence-export validator, keep #2041 owed, and claim no readiness. <strong>No fixture or member-shell change happens in this rung or in the runtime implementation PR</strong> — the render is its own later, separately-scoped rung.</p>
+<h2>12. Consolidated candidate <code>:v1</code> layout (for a later, separately authorized implementation PR)</h2>
+<p>All names <strong>candidate — subject to implementation proof and golden-vector pinning</strong>. The tag must hash-separate from, and never converge with, every tag in the §3 disjointness set.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>In stable identity?</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>domain_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key1</code> half)</td>
+<td>anchor</td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key1</code> half)</td>
+<td>anchor; session must be opened first</td>
+</tr>
+<tr>
+<td><code>export_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key2</code>)</td>
+<td>caller-opaque per-export id</td>
+</tr>
+<tr>
+<td><code>packet_id</code></td>
+<td><code>String</code></td>
+<td>yes</td>
+<td><strong>EX5</strong> — the produced packet&#39;s human/index handle (must exist in-session)</td>
+</tr>
+<tr>
+<td><code>packet_produced_record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td><strong>EX5</strong> — proof link to the <code>EvidencePacketProducedReceipt</code> (verified fail-closed); the lane&#39;s fifth inter-receipt link</td>
+</tr>
+<tr>
+<td><code>packet_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td><strong>EX5</strong> — echo of the produced receipt&#39;s public/redacted artifact fingerprint, <strong>verified equal to the stored produced receipt&#39;s <code>packet_hash</code></strong> (fail-closed); body never stored</td>
+</tr>
+<tr>
+<td><code>export_policy_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td><strong>EX5</strong> — fingerprint of the export policy that shaped this preparation; policy body never stored</td>
+</tr>
+<tr>
+<td><code>recipient_scope_id</code></td>
+<td><code>String</code></td>
+<td>yes</td>
+<td><strong>EX3</strong> — caller-opaque scope handle; never contact data</td>
+</tr>
+<tr>
+<td><code>prepared_by</code></td>
+<td><code>String</code> (DID)</td>
+<td>yes</td>
+<td><strong>EX1/EX5</strong> — recorder / export-witness; grants zero authority</td>
+</tr>
+<tr>
+<td><code>prepared_at</code></td>
+<td><code>u64</code></td>
+<td><strong>no</strong></td>
+<td>node-stamped Unix seconds; hashed; excluded from identity (retry never restamps)</td>
+</tr>
+<tr>
+<td><code>record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>(equality anchor)</td>
+<td>canonical blake3; the sole <code>PartialEq</code>/<code>Eq</code> anchor</td>
+</tr>
+</tbody></table>
+<p><strong>Candidate canonical hashing:</strong> <code>DOMAIN_TAG</code> (<code>icn:gov:evidence_packet_export_prepared:v1</code>) first → length-prefixed <code>domain_id</code>, <code>session_id</code>, <code>export_id</code>, <code>packet_id</code>, <code>recipient_scope_id</code>, <code>prepared_by</code> → <code>packet_produced_record_hash</code> raw 32 → <code>packet_hash</code> raw 32 → <code>export_policy_hash</code> raw 32 → <code>prepared_at</code> LE. Exact layout is fixed by the implementation PR and pinned by a golden vector.</p>
+<p><strong>Candidate stable duplicate identity:</strong> <code>(domain_id, session_id, export_id, packet_id, packet_produced_record_hash, packet_hash, export_policy_hash, recipient_scope_id, prepared_by)</code>. <code>prepared_at</code> and <code>record_hash</code> are <strong>not</strong> identity.</p>
+<p><strong>Uniqueness / conflict:</strong> <code>put_opaque_if_absent</code> keyed on <code>(class, key1, key2)</code> — <code>key1</code> an injective netstring composite of <code>(domain_id, session_id)</code>, <code>key2 = export_id</code>. Same-identity retry ⇒ the <strong>original</strong> receipt, never restamped; a different stable identity for the same <code>(domain_id, session_id, export_id)</code> ⇒ fail-closed <strong><code>evidence_packet_export_prepared_conflict</code></strong>.</p>
+<p><strong>Preconditions (all fail-closed; on any failure nothing is persisted):</strong> (1) the <code>(domain_id, session_id)</code> session was opened first; (2) an <code>EvidencePacketProducedReceipt</code> with <code>record_hash == packet_produced_record_hash</code> exists in that same session, its <code>packet_id</code> equals the supplied <code>packet_id</code>, <strong>and its stored <code>packet_hash</code> equals the supplied <code>packet_hash</code></strong> (all resolved in one <code>get_evidence_packet_produced(domain_id, session_id, packet_id)</code> fetch); (3) <code>domain_id</code> / <code>session_id</code> / <code>export_id</code> / <code>packet_id</code> / <code>recipient_scope_id</code> / <code>prepared_by</code> are non-empty / non-whitespace.</p>
+<p><strong>Deliberately absent from <code>:v1</code> (must never appear):</strong> any <code>delivered</code> / <code>sent</code> / <code>transmitted</code> / <code>received</code> / <code>accepted</code> / <code>audited</code> / <code>certified</code> field or claim (EX1/EX4); availability / custody / vault / location / URL / endpoint / retrieval-token / transport field (EX2/EX6); recipient DIDs, recipient enumeration, scope-definition body or hash, or any contact data (EX3); status / supersession / withdrawal / challenge field (EX7); packet body, export-policy body, redaction-profile body, source-receipt bodies, or any private data (bodies are never stored — fingerprints only); any human/AT status field (#2041 stays open); any authority grant, capability, mandate, or legal-sufficiency assertion.</p>
+<h2>13. Implementation constraints for the (later, separately authorized) PR</h2>
+<p>The implementation PR <strong>may</strong>: add the <code>EvidencePacketExportPreparedReceipt</code> class <strong>only</strong>, per §12; add the fail-closed predecessor + packet-hash-echo verification; add <code>proof.rs</code> unit tests and a runtime-slice integration test mirroring <code>evidence_packet_produced_receipt_runtime_slice.rs</code>.</p>
+<p>The implementation PR <strong>must not</strong>: prepare, assemble, export, deliver, or transmit any artifact (the receipt witnesses a <em>reported</em> preparation only); add any field from the deliberately-absent list; add a route, OpenAPI/SDK, or served schema; extend <code>web/member-shell/</code> or any fixture (EX8&#39;s render is its own later rung); attach any capability/authority check to <code>prepared_by</code>; imply #2041 completion; auto-close any protected issue (#1748, #2141, #1792, #2041) or its own issue — <code>Refs</code> only; present the ninth class as completing an existing #1748 acceptance gate (§3 framing note — it extends the family beyond the eight named classes).</p>
+<h2>14. Validation requirements for the implementation PR</h2>
+<ul>
+<li><strong><code>proof.rs</code> unit tests:</strong> golden vector pinning the <code>:v1</code> <code>record_hash</code>; determinism test; per-field test (every field change ⇒ different hash, including <code>packet_produced_record_hash</code>, <code>packet_hash</code>, <code>export_policy_hash</code>); tag-disjointness test against every tag in the §3 set, with the never-converge comment; serde payload-audit test confirming no deliberately-absent field is present.</li>
+<li><strong>Runtime-slice integration test:</strong> emission + round-trip + non-zero <code>record_hash</code> + retrieval; same-identity retry returns the original un-restamped; conflicting identity fails closed (<code>evidence_packet_export_prepared_conflict</code>); unopened session fails closed and creates nothing; empty/whitespace ids rejected pre-persistence; missing receipt store / backend failure fail closed; concurrent duplicates serialize to one winner; composite key injective (no aliasing; two domains sharing a <code>session_id</code> never mix).</li>
+<li><strong>EX5 cross-link tests:</strong> absent / wrong-session / wrong-domain / <code>packet_id</code>-mismatched predecessor refused fail-closed and persists nothing; <strong><code>packet_hash</code> mismatch against the stored produced receipt refused fail-closed</strong> (the echoed-field verification); multiple exports per packet with distinct <code>export_id</code>s succeed.</li>
+<li><strong>Timestamp test:</strong> two records differing only in <code>prepared_at</code> share duplicate identity; <code>prepared_at</code> participates in <code>record_hash</code> but not identity.</li>
+<li><strong>Privacy grep:</strong> no packet body / policy body / contact-data-shaped value / endpoint / URL in any serialized receipt, fixture, or test.</li>
+<li><strong>No-overclaim grep:</strong> no &quot;delivered / sent / transmitted / received / accepted / audited / certified / legally sufficient / production / pilot / organizer-ready / member-ready / live federation / NYCN / Phase-2 / human-AT complete&quot; claims introduced.</li>
+<li><strong>ADR-0026 envelope check:</strong> Layer 2, self-hashed, no signature/merkle inheritance claim.</li>
+<li><strong>Protected close-keyword grep:</strong> no closing keyword adjacent to a protected issue number — <code>Refs</code> only.</li>
+</ul>
+<h2>15. Deferred work (explicitly out of scope of this rung and its future implementation)</h2>
+<ul>
+<li>Any <strong>exporter/producer</strong> — code that assembles, wraps, redacts, or stages an export artifact.</li>
+<li><code>made available</code> and <code>delivered</code> facts (EX2), any custody/vault binding (EX6 — #1792 territory), and any <code>AccessReceipt</code> integration.</li>
+<li>Recipient-side <code>received</code> / <code>accepted</code> facts (EX4 — institution/domain-package and bridge territory).</li>
+<li><code>audited</code> / <code>certified</code> report-of-external-outcome facts (out of near-term scope per the boundary contract §5.7; #1009 relation).</li>
+<li>Challenge / rejection / withdrawal facts (EX7; #1009, #1792 challenge path).</li>
+<li>The member-shell / fixture render of the export-prepared fact (EX8 — its own later rung after the runtime lands).</li>
+<li>A scope-definition hash or registry (EX3 — awaits #1792&#39;s disclosure-policy model).</li>
+<li>OpenAPI/SDK/served-schema publication (the family-wide decision remains a future rung).</li>
+<li>Production / pilot / NYCN activation / live federation / Phase-2 work; the actual #2041 human/AT pass.</li>
+</ul>
+<h2>16. Non-goals</h2>
+<p>Restated from #2323 — this rung and its future implementation are: not an exporter, transport, notification, or delivery service; not delivery, receipt, acceptance, audit, or certification; not a typed packet/content/scope model; not a new authorization semantic (recording a preparation grants no permission to release anything); not an action-card trigger; not a workflow engine; not OpenAPI/SDK work; not a member-shell or fixture change; not live/private data handling; not #2041 completion; not #1748 / #2141 / #1792 closure; not production / pilot / organizer-ready / member-ready readiness; not live federation; not NYCN activation; not Phase-2 completion; not legally sufficient anything.</p>
+<p>Receipts record institutional facts. They grant zero authority.</p>
+<h2>17. Implementation sequencing &amp; protected issue state</h2>
+<p><strong>Recommendation (matching the lane cadence):</strong> with this rung landed on top of the #2322 contract, a contract-conformant implementation PR <em>may</em> add the <code>EvidencePacketExportPreparedReceipt</code> class <strong>only</strong>, per §12–§14 — subject to separate explicit authorization. After the runtime lands, the EX8 fixture render is its own rung. The implementation PR must keep #1748 / #2141 / #1792 / #2041 open and leave its own issue open for maintainer disposition.</p>
+<p>Protected issue state at authoring: #2321 closed/completed (boundary contract); #2319 closed/completed (produced render); #1748 open; #2141 open; #1792 open; #2041 open/parked; #1907 / #2080 / #2081 / #2274 open/untouched.</p>
+<h2>18. Related</h2>
+<p>Refs #2323.
+Refs #2322.
+Refs #2321.
+Refs #2318.
+Refs #2320.
+Refs #1748.
+Refs #2141.
+Refs #1792.
+Refs #2041.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
