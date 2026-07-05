@@ -351,6 +351,12 @@ PR-time review checklist for any organizer- or member-facing surface (rehearsal 
 
 **For:** `architects`, `contributors`, `design` | **Updated:** 2026-05-05
 
+### 📋 **Draft** [Access, made-available, and disclosure receipt decision rung — R1-R10](/docs/design/access-made-available-disclosure-receipt-decision-rung.md)
+
+Design-only decision rung (#2330) for the receipt facts after the landed EvidencePacketExportPreparedReceipt (#2326): recommends EvidencePacketMadeAvailableReceipt as the first runtime slice with narrow fingerprint-only semantics, and pins candidate field layouts for made-available, access, disclosure-decision, and redaction-applied receipts. Distinguishes prepared / made-available / accessed / delivered / received / accepted / audited / certified / legally-sufficient, defers authority adjudication to #1868/#2061 via opaque authority-basis references, and implements no runtime, receipt class, route, or member-shell change.
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-05
+
 ### 📋 **Draft** [ActivationCrossedReceipt decision rung — B1/B2/B3](/docs/design/activation-crossed-receipt-decision-rung.md)
 
 Narrow decision document resolving the three implementation blockers named in the merged #2294 ActivationCrossedReceipt design contract (#2293, under #1748/#2141), mirroring the decision-recorded-q4-decision.md cadence — decide hash-participating structure in writing before the icn:gov:activation_crossed:v1 tag is pinned. B1 (decision→activation reference): the receipt carries both the caller-opaque decision_id and the content-addressed decision_record_hash of the DecisionRecordedReceipt it activates — the lane's first inter-receipt link — verified fail-closed (the decision must exist in-session), preserving ADR-0026 self-hashed Layer-2 semantics and replay convergence via put_opaque_if_absent. B2 (gate basis): reuse the closed six-variant ProcessGateKind unchanged (no new variant, no ActivationRequest gate object — a variant would be a Copy-enum breaking change and an ADR-controlled taxonomy change); the receipt carries a content-addressed gate_basis fingerprint over the sorted passed ProcessGateResultReceipt record_hashes, non-empty and verified fail-closed (each declared gate exists in-session and is Pass) without owning a required-set policy. B3 (timestamp): a single caller-supplied recorded_at, hashed but excluded from duplicate identity, byte-parallel with the four landed classes; no distinct crossed_at, no decision-carried effective_at (effective_at is membership-lane only); no wall-clock time is a cross-node identity input. Pins a consolidated candidate :v1 field layout, preconditions, and the implementation PR's validation matrix. Design only — no Rust/UI/schema/OpenAPI/SDK/receipt-class change; no member-shell change; no human/AT execution (Refs #2293, #2294, #1748, #2141, #2041; no closure claims)
@@ -2132,10 +2138,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 348
+**Total documents:** 349
 
 **By status:**
 - Active: 1
 - Canonical: 40
-- Draft: 95
+- Draft: 96
 - Living: 212
