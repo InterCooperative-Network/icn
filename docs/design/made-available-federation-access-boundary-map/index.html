@@ -1,0 +1,542 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Made-Available, Federation Sync, Access, and Repair Boundary Map | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>made available federation access boundary map</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/made-available-federation-access-boundary-map.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Made-Available, Federation Sync, Access, and Repair Boundary Map</h1>
+<p><strong>Status:</strong> draft - design/control map
+<strong>Truth class:</strong> descriptive
+<strong>Canonical:</strong> no - implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last reviewed:</strong> 2026-07-05
+<strong>Source basis:</strong> read against <code>origin/main</code> at <code>8a64eec26ab83398e10d1f9ceba89e99fa766e2c</code>
+<strong>Related:</strong> #2336, #2335, #2334, #2333, #2330, #1792, #1748, #2141, #2041, #1868, #2061, #2080, #2081</p>
+<blockquote>
+<p>This document maps the control boundaries after <code>EvidencePacketMadeAvailableReceipt</code>. It is a design map for ICN as Digital Public Infrastructure, a Coordination OS, and democratic institutional infrastructure. It adds no runtime behavior, receipt class, route, authorization rule, vault, federation path, user interface, or fixture. It does not claim that a packet was accessed, delivered, received, accepted, audited, certified, or legally sufficient. Receipts record bounded institutional facts. Receipts grant zero authority.</p>
+</blockquote>
+<h2>1. Why this map exists</h2>
+<!-- truth: descriptive -->
+
+<p><code>EvidencePacketMadeAvailableReceipt</code> is now a landed runtime class and has a fixture-only member-shell render. That closes one narrow sender/custodian-side evidence boundary. It does not establish the mechanisms that come after availability.</p>
+<p>The next implementation could overreach in several ways:</p>
+<ul>
+<li>treating a made-available fact as proof that a recipient accessed an artifact;</li>
+<li>treating receipt or artifact propagation between peers as agreement;</li>
+<li>treating a routing acknowledgement as delivery to a recipient institution or person;</li>
+<li>treating an artifact registry reference as disclosure of private contents;</li>
+<li>treating a repair action as authority to read or copy restricted material;</li>
+<li>treating trust evidence as an authority grant.</li>
+</ul>
+<p>This map prevents those substitutions. It connects the landed receipt to the existing federation proof-loop and storage designs, identifies what remains design-only, and names the authority work that must precede private-access runtime.</p>
+<h2>2. Current landed facts</h2>
+<!-- truth: descriptive -->
+
+<p>The landed process/evidence sequence is:</p>
+<pre><code class="language-text">ProcessGateResultReceipt
+ProcessSessionOpenedReceipt
+DeliberationEntryRecordedReceipt
+DecisionRecordedReceipt
+ActivationCrossedReceipt
+MutationPlanRecordedReceipt
+MutationAppliedReceipt
+EvidencePacketProducedReceipt
+EvidencePacketExportPreparedReceipt
+EvidencePacketMadeAvailableReceipt
+</code></pre>
+<p>The last three facts are deliberately narrow:</p>
+<ol>
+<li><code>EvidencePacketProducedReceipt</code> records that a public/redacted packet artifact was produced and fingerprinted from referenced process evidence.</li>
+<li><code>EvidencePacketExportPreparedReceipt</code> records that an export of that packet was prepared for an opaque recipient scope under a fingerprinted export policy.</li>
+<li><code>EvidencePacketMadeAvailableReceipt</code> records that the prepared export was made available to that scope under a fingerprinted disclosure policy and availability method.</li>
+</ol>
+<p>The tenth class landed in #2333 with tag <code>icn:gov:evidence_packet_made_available:v1</code>. Its fixture-only member-shell render landed in #2335. The render states the negative boundary in plain language and introduces no new receipt class.</p>
+<p>The following are not landed as runtime behavior in this lane:</p>
+<ul>
+<li>no <code>AccessReceipt</code>, <code>DisclosureDecisionReceipt</code>, or <code>RedactionAppliedReceipt</code>;</li>
+<li>no artifact-registry or scoped-vault persistence and enforcement path;</li>
+<li>no private-object retrieval path;</li>
+<li>no live anti-entropy emission, classification, or repair path for these receipts;</li>
+<li>no recipient-side delivery, receipt, or acceptance contract;</li>
+<li>no authority decision that follows from any receipt.</li>
+</ul>
+<p>The anti-entropy identifiers named in <a href="/docs/spec/network-anti-entropy-proof-loops">`network-anti-entropy-proof-loops.md`</a> are wire-stable, but the spec explicitly says that live construction, gossip, classification, and repair are not wired end to end. The artifact registry and scoped vault in <a href="/docs/spec/artifact-registry-and-scoped-vault">`artifact-registry-and-scoped-vault.md`</a> remain design-level objects.</p>
+<h2>3. Boundary vocabulary</h2>
+<!-- truth: descriptive -->
+
+<p>These terms are related but not interchangeable.</p>
+<table>
+<thead>
+<tr>
+<th>Term</th>
+<th>Bounded meaning</th>
+<th>Does not establish</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Made available</strong></td>
+<td>A sender/custodian-side fact that a prepared export was placed under a recorded disclosure policy for an opaque recipient scope.</td>
+<td>Retrieval, access, delivery, recipient receipt, acceptance, or authority.</td>
+</tr>
+<tr>
+<td><strong>Federation sync</strong></td>
+<td>Bounded state or digest exchange between peers under a named scope and freshness window.</td>
+<td>Agreement with the state, institutional acceptance, delivery to a person, or broader disclosure.</td>
+</tr>
+<tr>
+<td><strong>Routing proof</strong></td>
+<td>Evidence that a routed message or receipt reached acknowledging network peers within its freshness contract.</td>
+<td>Application-level delivery, recipient access, human notice, or acceptance.</td>
+</tr>
+<tr>
+<td><strong>Receipt digest propagation</strong></td>
+<td>Propagation or comparison of bounded receipt-index fingerprints.</td>
+<td>Propagation of receipt bodies, packet bodies, policy bodies, or recipient acknowledgement.</td>
+</tr>
+<tr>
+<td><strong>Peer observation</strong></td>
+<td>A peer observed a digest, message, or state comparison and produced evidence of that observation.</td>
+<td>Institutional endorsement, agreement, or authority to act.</td>
+</tr>
+<tr>
+<td><strong>Recipient access</strong></td>
+<td>An authenticated actor scope attempted or performed a restricted-object read under policy and a cited authority basis, with an outcome.</td>
+<td>Delivery, recipient acceptance, or proof that the cited authority basis was valid merely because a receipt records it.</td>
+</tr>
+<tr>
+<td><strong>Delivery</strong></td>
+<td>A future sender or transport claim that an artifact was transmitted to a target under a defined delivery contract.</td>
+<td>Recipient receipt, opening, acceptance, or agreement.</td>
+</tr>
+<tr>
+<td><strong>Recipient receipt</strong></td>
+<td>A future recipient-side fact that the recipient obtained the artifact.</td>
+<td>Acceptance, audit, certification, or agreement with contents.</td>
+</tr>
+<tr>
+<td><strong>Acceptance</strong></td>
+<td>A recipient-side institutional decision under recipient criteria and authority.</td>
+<td>Audit, certification, settlement finality, or legal sufficiency.</td>
+</tr>
+<tr>
+<td><strong>Disclosure decision</strong></td>
+<td>A future decision that a disclosure request was approved, denied, limited, deferred, withdrawn, or superseded.</td>
+<td>That access or disclosure actually occurred.</td>
+</tr>
+<tr>
+<td><strong>Redaction applied</strong></td>
+<td>A future fact that a redaction transformation was recorded from a source reference to a redacted artifact fingerprint.</td>
+<td>Correctness, completeness, accessibility, legal compliance, or acceptance.</td>
+</tr>
+<tr>
+<td><strong>Repair</strong></td>
+<td>A bounded attempt to reconcile missing or divergent state under a repair plan and authority basis.</td>
+<td>Authority to access private contents, permission to broaden locality, or proof that all peers now agree.</td>
+</tr>
+<tr>
+<td><strong>Settlement finality</strong></td>
+<td>A domain-specific condition that all required finality gates for a settlement have been met.</td>
+<td>General federation agreement or finality for unrelated receipt and artifact classes.</td>
+</tr>
+<tr>
+<td><strong>Authority basis</strong></td>
+<td>The mandate, policy clause, capability, membership, or delegation cited for an act and evaluated by the authority layer.</td>
+<td>Authority merely because it is referenced, trusted, synchronized, or written into a receipt.</td>
+</tr>
+</tbody></table>
+<p>Trust can inform a policy oracle. It does not grant authority. The Meaning Firewall requires apps to translate semantic trust and governance decisions into bounded constraints while the kernel enforces those constraints without interpreting their institutional meaning.</p>
+<h2>4. The boundary chain</h2>
+<!-- truth: descriptive -->
+
+<p>The control chain is:</p>
+<pre><code class="language-text">prepared
+  -&gt; made available
+  -&gt; federation observed or synced
+  -&gt; access attempted
+  -&gt; access allowed, denied, expired, revoked,
+     not_found_or_not_visible, or policy_mismatch
+  -&gt; received
+  -&gt; accepted
+  -&gt; audited or certified
+</code></pre>
+<p>No arrow implies the next step. Each arrow requires its own actor, scope, authority, mechanism, evidence, and negative boundaries.</p>
+<p>The load-bearing inequality is:</p>
+<pre><code class="language-text">prepared != made available
+made available != accessed
+accessed != delivered
+delivered != received
+received != accepted
+accepted != audited
+audited != certified
+certified != legally sufficient
+</code></pre>
+<p>The federation extension is equally strict:</p>
+<pre><code class="language-text">sync != agreement
+routing proof != delivery
+federation observation != recipient acceptance
+trust != authority
+</code></pre>
+<p>An implementation must not collapse two rows because the same network exchange, actor, or stored fingerprint happens to participate in both.</p>
+<h2>5. Made-available vs federation sync</h2>
+<!-- truth: descriptive -->
+
+<p><code>EvidencePacketMadeAvailableReceipt</code> is a sender/custodian availability fact. It records an opaque recipient scope plus disclosure-policy and availability-method fingerprints. It does not say that any federation peer observed the receipt.</p>
+<p>Federation sync is a separate proof loop:</p>
+<ol>
+<li>A peer constructs an <code>AntiEntropyProbe</code> for a bounded state class and scope.</li>
+<li>Peers compare <code>StateDigest</code>, <code>ReceiptDigest</code>, or <code>ArtifactDigest</code> values.</li>
+<li>A <code>PeerSyncReport</code> records matching, missing, divergent, or unknown/out-of-scope comparison results.</li>
+<li>Non-matching results may produce <code>DivergenceEvidence</code>, a governed <code>RepairPlan</code>, and a <code>RepairReceipt</code> evidence artifact.</li>
+</ol>
+<p>A made-available receipt may be one record represented in a <code>ReceiptDigest</code>. Its packet or future registry reference may be represented by an <code>ArtifactDigest</code>. Only the digest or permitted envelope propagates. The disclosure rules on the underlying body still govern any fetch.</p>
+<p><code>QuorumSyncCheck</code> can prove that named federation peers exchanged matching digests for a state class within a <code>FederationSyncWindow</code>. It cannot prove that those peers agree with the institutional act, that a recipient accepted it, or that a private artifact was disclosed.</p>
+<p><code>RoutingProof</code> proves bounded network acknowledgement for a message or receipt. It is not an application-level delivery receipt. A future delivery contract would need to identify what was delivered, by which transport, to what recipient-side authority, and what acknowledgement counts. Until that contract exists, routing proof must be rendered as routing evidence only.</p>
+<p>Peer observation is evidence, not assent. Federation coordination occurs by agreement among domains; gossip cannot create that agreement.</p>
+<h2>6. Made-available vs artifact registry and scoped vault</h2>
+<!-- truth: descriptive -->
+
+<p>The landed made-available receipt carries fingerprints only:</p>
+<ul>
+<li><code>disclosure_policy_hash</code> identifies the policy body without storing it;</li>
+<li><code>availability_method_hash</code> identifies the method descriptor without exposing it;</li>
+<li><code>packet_hash</code> is an echoed, verified fingerprint of the public/redacted packet;</li>
+<li><code>recipient_scope_id</code> is an opaque scope handle.</li>
+</ul>
+<p>It carries no artifact-registry entry, <code>PrivateObjectRef</code>, vault identifier, vault path, network address, retrieval credential, contact detail, policy body, method body, or packet body.</p>
+<p>The future storage relationship is:</p>
+<pre><code class="language-text">ArtifactRegistry entry
+  -&gt; records that an artifact exists and what governs it
+  -&gt; uses a content-addressed public blob reference, or
+  -&gt; uses PrivateObjectRef for restricted contents
+
+PrivateObjectRef
+  -&gt; bridges safe public/scoped metadata to a private object
+  -&gt; carries opaque identity, content fingerprint, privacy class,
+     policy fingerprint, vault reference, and receipt reference
+  -&gt; never carries private contents or retrieval mechanics
+
+ScopedVault
+  -&gt; stores and enforces access to restricted objects
+  -&gt; applies disclosure and retention policy
+  -&gt; emits access evidence for reads
+</code></pre>
+<p>The registry records what exists and what governs it. The vault enforces privacy. The receipt store records actions on both. These responsibilities stay separate.</p>
+<p><code>PrivateObjectRef</code> is the bridge, not the body. A reference may be digestible and synchronized without synchronizing the private contents. Anti-entropy repair must preserve that separation and must never widen privacy class, data locality, recipient scope, or custody.</p>
+<h2>7. Made-available vs AccessReceipt</h2>
+<!-- truth: descriptive -->
+
+<p>Made available means that a prepared export was placed under a disclosure policy for a named recipient scope. The policy may describe which recipient scope can retrieve it, but the receipt does not adjudicate whether a particular actor currently holds valid authority.</p>
+<p>A future <code>AccessReceipt</code> would record a different fact:</p>
+<blockquote>
+<p>An authenticated actor scope attempted or performed access to a referenced restricted object under a named disclosure policy, cited an authority basis, and received a bounded outcome.</p>
+</blockquote>
+<p>The design-ready minimum includes:</p>
+<ul>
+<li>a <code>PrivateObjectRef</code> identifier and fingerprint, not private contents;</li>
+<li>an opaque actor scope;</li>
+<li>a disclosure-policy fingerprint;</li>
+<li>purpose and authority-basis fingerprints;</li>
+<li>an outcome from <code>allowed</code>, <code>denied</code>, <code>expired</code>, <code>revoked</code>, <code>not_found_or_not_visible</code>, or <code>policy_mismatch</code>;</li>
+<li>append-only evidence for successful and refused attempts where safe.</li>
+</ul>
+<p><code>not_found_or_not_visible</code> is mandatory to avoid turning the access path or receipt into an existence oracle. A caller must not be able to distinguish a missing hidden object from an object they are not allowed to know exists.</p>
+<h3>Runtime readiness decision</h3>
+<p><strong><code>AccessReceipt</code> is design-ready only. Its runtime is blocked.</strong></p>
+<p>The following are partially unblocked at the design level:</p>
+<ul>
+<li>the bounded fact and negative claims;</li>
+<li>the privacy-preserving object-reference pattern;</li>
+<li>the outcome vocabulary, including enumeration-safe failure;</li>
+<li>the rule that every access must cite authority and emit evidence;</li>
+<li>the rule that a receipt records a cited basis but grants no authority.</li>
+</ul>
+<p>Runtime remains blocked because:</p>
+<ul>
+<li>#1868 has not finished decomposing broad mutation capability into per-action authority;</li>
+<li>#2061 has not completed the entity-aware subject, target, membership, hierarchy, and delegation model across request authorization;</li>
+<li>#2080 has not landed the trusted positive issuance path for entity-scoped authority;</li>
+<li>#2081 has not completed enforcement cutover even for the treasury reference path;</li>
+<li>the artifact registry, <code>PrivateObjectRef</code>, and scoped-vault enforcement path are not runtime-real;</li>
+<li>there is no approved contract for visibility and retention of denied access evidence.</li>
+</ul>
+<p>An <code>AccessReceipt</code> implementation before those seams are clear could faithfully record an access attempt while still relying on the wrong authority gate. That would create strong-looking evidence around weak authority. The receipt must follow the authority decision, not substitute for it.</p>
+<h2>8. Federation proof-loop relationship</h2>
+<!-- truth: descriptive -->
+
+<p>The anti-entropy proof rail includes:</p>
+<table>
+<thead>
+<tr>
+<th>Artifact</th>
+<th>Role in this boundary</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ReceiptDigest</code></td>
+<td>Bounded digest of receipt-index state. May include a made-available receipt hash, never its private or policy bodies.</td>
+</tr>
+<tr>
+<td><code>ArtifactDigest</code></td>
+<td>Bounded digest of registry metadata or a scoped-vault reference, never the artifact body.</td>
+</tr>
+<tr>
+<td><code>PeerSyncReport</code></td>
+<td>Signed comparison result for peer state. Observation only.</td>
+</tr>
+<tr>
+<td><code>DivergenceEvidence</code></td>
+<td>Classified evidence of missing or divergent scoped state.</td>
+</tr>
+<tr>
+<td><code>RepairPlan</code></td>
+<td>Governed plan naming action, scope, authority basis, and boundary rules.</td>
+</tr>
+<tr>
+<td><code>RepairReceipt</code></td>
+<td>Evidence artifact recording repair attempt and outcome with before/after digest linkage.</td>
+</tr>
+<tr>
+<td><code>SyncDegradedStatus</code></td>
+<td>Honest status for unresolved missing or divergent state within or beyond a grace window.</td>
+</tr>
+<tr>
+<td><code>QuorumSyncCheck</code></td>
+<td>Fresh proof that a quorum exchanged matching digests for a state class.</td>
+</tr>
+<tr>
+<td><code>RoutingProof</code></td>
+<td>Bounded acknowledgement that a message or receipt reached named peers.</td>
+</tr>
+<tr>
+<td><code>RedundancyProof</code></td>
+<td>Evidence that observed replica count meets or misses policy.</td>
+</tr>
+<tr>
+<td><code>FederationSyncWindow</code></td>
+<td>Per-state-class freshness policy for quorum sync evidence.</td>
+</tr>
+</tbody></table>
+<p>These are proof/evidence artifacts or envelopes where the current spec says so. They are not new process/evidence receipt classes. <code>RepairReceipt</code>, despite its name, travels inside an existing evidence envelope and does not extend the ten-class process ladder.</p>
+<p>Anti-entropy can prove that a made-available receipt or safe artifact reference is missing, stale, or divergent at a peer. It can plan and record a bounded repair. It cannot authorize access to the private object. A repair executor may copy only material that the plan, authority basis, privacy class, locality, and disclosure policy permit. If the body is out of scope, the correct repair may synchronize only the digest/reference, quarantine state, or escalate for governance review.</p>
+<p>Repair outcome is not convergence forever. A later probe must verify the after-state within a fresh window. Matching state is not agreement with the underlying institutional act.</p>
+<h2>9. Authority blockers and why they matter</h2>
+<!-- truth: descriptive -->
+
+<table>
+<thead>
+<tr>
+<th>Issue</th>
+<th>Open boundary</th>
+<th>What it blocks here</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>#1868</strong></td>
+<td><code>governance:write</code> still covers many distinct actions; the design must choose per-action capability scopes, mandate-bundle gating, or a hybrid.</td>
+<td>A precise capability for requesting, approving, performing, challenging, or repairing private access. Trust or a broad bearer scope cannot stand in for this decomposition.</td>
+</tr>
+<tr>
+<td><strong>#2061</strong></td>
+<td>Flat namespace equality and entity-aware membership/hierarchy authorization are still converging.</td>
+<td>A reliable interpretation of actor scope, target object scope, federation/community delegation, and same-entity vs delegated access.</td>
+</tr>
+<tr>
+<td><strong>#2080</strong></td>
+<td>Trusted production issuance from verified membership, invitation, session, or enrollment state is not landed.</td>
+<td>A trustworthy token claim that binds the authenticated actor to entity scope and authority.</td>
+</tr>
+<tr>
+<td><strong>#2081</strong></td>
+<td>Entity-aware treasury authorization remains in observe-first cutover work.</td>
+<td>Evidence that the entity-aware gate can become authoritative without legitimate-access regressions. It is a reference migration, not an AccessReceipt implementation.</td>
+</tr>
+<tr>
+<td><strong>#2041</strong></td>
+<td>Human screen-reader, assistive-input, and zoom/contrast pass remains owed.</td>
+<td>Any claim that a future privacy/access rendering is organizer-ready or member-ready. It does not by itself block a headless design document, but every new human surface extends the owed pass.</td>
+</tr>
+<tr>
+<td><strong>#1748</strong></td>
+<td>The Institutional Process Substrate control issue still owes real privacy/redaction and accessibility-gate evidence.</td>
+<td>Any claim that this map completes the process substrate or its acceptance gates.</td>
+</tr>
+<tr>
+<td><strong>#2141</strong></td>
+<td>The vertical institutional spine remains a coordinating control issue, including custody enforcement and federation outcomes.</td>
+<td>Any claim that one receipt or proof loop completes package-to-evidence operation.</td>
+</tr>
+</tbody></table>
+<p><code>#1907</code> remains a protected review/control item unrelated to this implementation sequence. This map does not change or close it.</p>
+<p>Trust remains an input to policy, not an authority source. The kernel can enforce a typed constraint or capability blindly. It must not derive authority by interpreting a trust score, federation relationship, sync result, or receipt.</p>
+<h2>10. Cross-repo implications</h2>
+<!-- truth: descriptive -->
+
+<p>The repository order remains part of the control boundary:</p>
+<ul>
+<li><strong>icn</strong> defines the public generic primitives, proof artifacts, receipts, and this control map.</li>
+<li><strong>nycn</strong> may later consume landed primitives through institution-package mappings and local policy. It must not define ICN receipt, access, or federation semantics.</li>
+<li><strong>icn-infra</strong> may later carry bounded operator contracts and promotion gates. It is not a vault, secret store, or proof that runtime behavior exists.</li>
+<li><strong>icn-community-bridge</strong> may later need recipient-side mirroring or delivery boundaries. It is not governance, authority, or canonical record.</li>
+<li><strong>icn-learn</strong> may teach only after canonical truth lands in icn and any institution-specific truth lands in its source package.</li>
+<li><strong>.github</strong> may mirror public truth only after icn establishes it.</li>
+<li><strong>demo-repository</strong> has no assigned role in this lane.</li>
+</ul>
+<p>No downstream repository changes are part of this map. Cross-repo work follows the order <code>icn</code> first, private consumers second, teaching third, and public mirror last.</p>
+<h2>11. Recommended next sequence</h2>
+<!-- truth: descriptive -->
+
+<ol>
+<li>Review and close the PR for this map without treating the map as implementation.</li>
+<li><strong>Take authority design/hardening first:</strong> resolve the action-level authority shape across #1868 and #2061, including the representation an access decision can cite without the receipt adjudicating it.</li>
+<li>Advance the trusted positive issuance and entity-enforcement prerequisites in #2080 and #2081 using their own scoped work.</li>
+<li>Open a docs-only <code>AccessReceipt</code> decision rung after the authority representation is clear. Pin actor-scope representation, target/object references, outcome visibility, retention, existence-oracle behavior, predecessor links, and exact nonclaims.</li>
+<li>Run a small anti-entropy fixture/proof-loop slice that demonstrates made-available receipt-digest propagation, missing/divergent evidence, and bounded repair without accessing packet contents.</li>
+<li>Open a scoped-vault/<code>PrivateObjectRef</code> design rung that reconciles privacy-class naming and pins the registry-to-vault reference contract.</li>
+<li>Implement registry/vault authorization and receipted read enforcement only after those contracts are accepted.</li>
+<li>Revisit <code>AccessReceipt</code> runtime last, with authority, object reference, policy enforcement, and evidence visibility all testable together.</li>
+</ol>
+<p><strong>Recommended first next lane:</strong> the #1868/#2061 authority-basis control and hardening work. A docs-only <code>AccessReceipt</code> rung can follow immediately after that representation is explicit. Do not start <code>AccessReceipt</code> runtime from this map.</p>
+<h2>12. Non-goals</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li>No runtime changes.</li>
+<li>No Rust receipt class.</li>
+<li>No route, OpenAPI, or SDK change.</li>
+<li>No gateway or authorization implementation.</li>
+<li>No vault implementation.</li>
+<li>No encryption implementation.</li>
+<li>No <code>AccessReceipt</code> runtime.</li>
+<li>No <code>DisclosureDecisionReceipt</code> runtime.</li>
+<li>No <code>RedactionAppliedReceipt</code> runtime.</li>
+<li>No operator dashboard.</li>
+<li>No member-shell implementation.</li>
+<li>No fixture changes.</li>
+<li>No NYCN package update.</li>
+<li>No icn-learn update.</li>
+<li>No icn-infra update.</li>
+<li>No private body, policy body, availability-method body, vault location, network address, retrieval credential, recipient DID, or contact data.</li>
+<li>No production, pilot, member-ready, organizer-ready, live-federation, NYCN, or Phase-2 claim.</li>
+<li>No #2041 completion claim.</li>
+<li>No closure of #1748, #2141, #2041, #1868, #2061, #2080, #2081, or #1907.</li>
+</ul>
+<h2>References</h2>
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/access-made-available-disclosure-receipt-decision-rung">`access-made-available-disclosure-receipt-decision-rung.md`</a></li>
+<li><a href="/docs/architecture/PRIVATE_DATA_DISCLOSURE_BOUNDARY">`PRIVATE_DATA_DISCLOSURE_BOUNDARY.md`</a></li>
+<li><a href="/docs/spec/network-anti-entropy-proof-loops">`network-anti-entropy-proof-loops.md`</a></li>
+<li><a href="/docs/spec/artifact-registry-and-scoped-vault">`artifact-registry-and-scoped-vault.md`</a></li>
+<li><a href="/docs/spec/institutional-domain">`institutional-domain.md`</a></li>
+<li><a href="/docs/spec/governed-service-binding">`governed-service-binding.md`</a></li>
+<li><a href="/docs/spec/effect-dispatch-contract">`effect-dispatch-contract.md`</a></li>
+<li><a href="/docs/spec/federation-settlement-finality">`federation-settlement-finality.md`</a></li>
+<li><a href="/docs/architecture/KERNEL_APP_SEPARATION">`KERNEL_APP_SEPARATION.md`</a></li>
+<li><a href="/docs/architecture/INSTITUTION_PACKAGE_BOUNDARY">`INSTITUTION_PACKAGE_BOUNDARY.md`</a></li>
+<li><a href="/docs/reference/project-index/repository-map">`repository-map.md`</a></li>
+</ul>
+<p>Refs #2336.
+Refs #2335.
+Refs #2334.
+Refs #2333.
+Refs #2330.
+Refs #1792.
+Refs #1748.
+Refs #2141.
+Refs #2041.
+Refs #1868.
+Refs #2061.
+Refs #2080.
+Refs #2081.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
