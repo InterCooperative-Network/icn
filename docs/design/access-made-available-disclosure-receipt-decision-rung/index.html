@@ -1,0 +1,573 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Access, Made-Available, and Disclosure Receipt Decision Rung — R1–R10 (what comes after export-prepared) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>access made available disclosure receipt decision rung</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/access-made-available-disclosure-receipt-decision-rung.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Access, Made-Available, and Disclosure Receipt Decision Rung — R1–R10 (what comes after export-prepared)</h1>
+<p><strong>Status:</strong> draft — design / decision rung (not runtime implementation)
+<strong>Truth class:</strong> descriptive
+<strong>Canonical:</strong> no — implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last reviewed:</strong> 2026-07-05
+<strong>Source basis:</strong> read against <code>origin/main</code> @ <code>98195a10</code> (the merged #2329 tip). Code anchors (<code>icn/crates/icn-governance/src/proof.rs</code>, <code>icn/apps/governance/src/receipt_backend.rs</code>, <code>icn/apps/governance/src/manager.rs</code>) were verified at that commit — re-verify before relying on exact line numbers or hashes; they drift.
+<strong>Related:</strong> #2330 (this rung&#39;s issue) · #1792 (private disclosure/access boundary — closed/completed by #2329, <a href="/docs/architecture/PRIVATE_DATA_DISCLOSURE_BOUNDARY">`PRIVATE_DATA_DISCLOSURE_BOUNDARY.md`</a>) · #2322 (evidence export/delivery boundary contract, <a href="https://github.com/InterCooperative-Network/icn/blob/main/evidence-export-delivery-boundary">`evidence-export-delivery-boundary.md`</a>) · #2324 (EX1–EX8 rung, <a href="https://github.com/InterCooperative-Network/icn/blob/main/evidence-export-delivery-boundary-decision-rung">`evidence-export-delivery-boundary-decision-rung.md`</a> — the sibling rung this document mirrors) · #2326 (<code>EvidencePacketExportPreparedReceipt</code> runtime slice — the predecessor this family references) · #2328 (member-shell export-prepared fixture render) · #1748 (Institutional Process Substrate milestone) · #2141 (vertical institutional spine control) · #1868 (decompose <code>governance:write</code>) · #2061 (entity-aware request authorization) · #2080 (trusted positive token issuance) · #2081 (treasury entity-auth enforcement cutover) · #2041 (human/AT pass — open/parked) · <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a> (receipt &amp; provenance proof envelope)</p>
+<blockquote>
+<p>Narrow decision document resolving what receipt facts may follow <code>EvidencePacketExportPreparedReceipt</code>, per #2330 and the private-data disclosure/access boundary landed in #1792/#2329. It mirrors the <code>evidence-export-delivery-boundary-decision-rung.md</code> cadence: land the boundary architecture (#2329), then resolve the hash-participating structure <strong>in writing</strong> before any tag is pinned, then implement. This document decides nothing else: no runtime change, no receipt class added, nothing made available, no access performed, no disclosure evaluated, no redaction applied, no route/OpenAPI/SDK, no gateway/auth change, no member-shell change, no fixture change, no human/AT run. Receipts record institutional facts. They grant zero authority. No production, pilot, organizer-ready, member-ready, live-federation, NYCN-activation, or Phase-2 claim is made or implied by this document.</p>
+</blockquote>
+<h2>1. Status basis</h2>
+<p>Verified live at authoring time (<code>origin/main</code> @ <code>98195a10</code>):</p>
+<ul>
+<li><strong>#2329</strong> — private disclosure/access architecture doc — <strong>merged</strong> (<code>98195a10</code>); <strong>#1792</strong> — its issue — <strong>closed / completed</strong>. The candidate vocabulary this rung refines (<code>PrivacyClass</code>, <code>DisclosurePolicy</code>, <code>PrivateObjectRef</code>, <code>RedactionMap</code>, <code>AccessReceipt</code>, <code>ExportReceipt</code>) and the staged candidate lifecycle (export-prepared → made-available → access → disclosure-decision → redaction-applied) are pinned there as candidates, not implemented.</li>
+<li><strong>#2326</strong> — <code>EvidencePacketExportPreparedReceipt</code> runtime slice — <strong>landed</strong>; tag <code>icn:gov:evidence_packet_export_prepared:v1</code>; the ninth process/evidence receipt class and the direct predecessor this family extends. <strong>#2328</strong> — its member-shell fixture render — <strong>merged</strong>.</li>
+<li><strong>The predecessor lookup seam this rung relies on exists</strong> (verified in <code>icn/apps/governance/src/receipt_backend.rs</code>): <code>get_evidence_packet_export_prepared(domain_id, session_id, export_id)</code> resolves the export-prepared receipt via the opaque store under class <code>evidence_packet_export_prepared</code>, <code>key1 =</code> injective netstring <code>evidence_packet_export_prepared_composite_key1(domain_id, session_id)</code>, <code>key2 = export_id</code>; mirrored on the manager. A made-available fact can therefore verify its predecessor <strong>fail-closed</strong> (<code>get_evidence_packet_export_prepared(...)</code> then compare <code>record_hash</code>) and, in the same fetch, verify the echoed <code>packet_hash</code> and <code>recipient_scope_id</code> at no extra cost.</li>
+<li><strong>No made-available / access / disclosure / redaction seam exists in the runtime:</strong> no <code>EvidencePacketMadeAvailable*</code>, <code>AccessReceipt</code>, <code>DisclosureDecision*</code>, or <code>RedactionApplied*</code> type and no matching identifier in <code>icn/crates</code> or <code>icn/apps</code> (generic words like <em>accessed</em>/<em>delivered</em>/<em>accepted</em> appear only in unrelated subsystems). This rung pins structure before any tag exists.</li>
+<li><strong>#1748 / #2141 / #2041 / #1868 / #2061 / #2080 / #2081 / #1907</strong> — all <strong>open</strong>; #2041 remains parked for a real human/AT pass, not attempted here. The authority lanes (#1868/#2061/#2080/#2081) are open and are the reason authority adjudication is deferred (§ R7, R10).</li>
+</ul>
+<h2>2. Current landed boundary</h2>
+<p><code>EvidencePacketExportPreparedReceipt</code> (<code>:v1</code>, #2326) records the <strong>sender-side preparation</strong> of an export: a produced packet artifact was bound to a named recipient scope under a declared export policy, and that binding was recorded. Per its own contract it does <strong>not</strong> assert that anything was made available, delivered, received, accessed, accepted, audited, certified, retrieved, or is legally sufficient; it grants no access and no authority. Its <code>:v1</code> fields are <code>domain_id, session_id, export_id, packet_id, packet_produced_record_hash, packet_hash, export_policy_hash, recipient_scope_id, prepared_by, prepared_at, record_hash</code>; <code>record_hash</code> is the sole equality anchor; <code>key1 = (domain_id, session_id)</code>, <code>key2 = export_id</code>.</p>
+<p>Everything below extends that ladder without letting the generic receipt layer adjudicate authority or witness anything the substrate cannot see.</p>
+<h2>3. Terms to distinguish</h2>
+<p>The whole family exists to keep these facts separate. Each arrow is a boundary, not an implication:</p>
+<ul>
+<li><strong>prepared</strong> — an export was staged/bound for a recipient scope under a policy, and recorded (sender-side; #2326, landed).</li>
+<li><strong>made available</strong> — the prepared export was placed in governed custody where an authorized recipient scope <em>can</em> retrieve it, under a disclosure policy (a unilateral availability/custody fact; candidate, this rung).</li>
+<li><strong>accessed</strong> — an actor accessed, or attempted to access, a restricted object under a disclosure policy and a cited authority basis; the receipt records the <em>outcome</em> (candidate, this rung).</li>
+<li><strong>delivered</strong> — a sender-side transmission report (out of scope; #2322 §5.4 territory, deferred).</li>
+<li><strong>received</strong> — a recipient-side fact that the recipient obtained the object (institution/domain-package and bridge territory; not generic ICN — #2324 EX4).</li>
+<li><strong>accepted</strong> — a recipient-side fact that the recipient accepted the object on institutional criteria (institution/domain-package territory; not generic ICN — #2324 EX4).</li>
+<li><strong>audited</strong> — a report that an external audit occurred (out of near-term scope; #1009 relation).</li>
+<li><strong>certified</strong> — a report that an external certification occurred (out of near-term scope).</li>
+<li><strong>legally sufficient</strong> — never asserted by any receipt in this family.</li>
+</ul>
+<h2>4. Decision summary</h2>
+<table>
+<thead>
+<tr>
+<th>#</th>
+<th>Question</th>
+<th>Decision</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>R1</td>
+<td>Is made-available generic?</td>
+<td><strong>Yes, narrow.</strong> A generic <code>EvidencePacketMadeAvailableReceipt</code> is warranted now that #1792 defines governed custody by <em>fingerprint</em> — it records availability to a recipient scope under a disclosure policy, referencing custody/method by fingerprint only.</td>
+</tr>
+<tr>
+<td>R2</td>
+<td>What comes after export-prepared?</td>
+<td><strong>made-available first</strong>, then access, then (later) disclosure-decision and redaction-applied.</td>
+</tr>
+<tr>
+<td>R3</td>
+<td>Minimum <code>AccessReceipt</code> fact</td>
+<td>an actor accessed/attempted a restricted object under a policy and cited authority basis; the receipt records the <strong>outcome</strong>, not the contents.</td>
+</tr>
+<tr>
+<td>R4</td>
+<td>Access outcomes</td>
+<td><code>allowed / denied / expired / revoked / not_found_or_not_visible / policy_mismatch</code>; denied/failed attempts are receiptable when safe; <code>not_found_or_not_visible</code> deliberately conflates absence and invisibility to avoid an existence oracle.</td>
+</tr>
+<tr>
+<td>R5</td>
+<td>Safe generic vs institution fields</td>
+<td>fingerprints, opaque ids, scope handles, opaque authority-basis references are generic; scope membership, policy bodies, acceptance criteria, contact data, custody locations are institution/package or #1792-owned and never generic.</td>
+</tr>
+<tr>
+<td>R6</td>
+<td>Object / vault / policy references</td>
+<td>by opaque id + fingerprint only (<code>private_object_ref_id</code>, <code>object_ref_hash</code>, <code>disclosure_policy_hash</code>); never a vault path, URL, endpoint, or the policy body.</td>
+</tr>
+<tr>
+<td>R7</td>
+<td>Authority-basis boundary</td>
+<td>the receipt records an <strong>opaque <code>authority_basis_hash</code></strong> — <em>what basis was cited</em>, never <em>whether it was valid</em>; validity is #1868/#2061 territory.</td>
+</tr>
+<tr>
+<td>R8</td>
+<td>Redaction / disclosure-decision boundary</td>
+<td>candidate <code>RedactionAppliedReceipt</code> and <code>DisclosureDecisionReceipt</code>, deferred; neither is access, made-available, delivery, or acceptance.</td>
+</tr>
+<tr>
+<td>R9</td>
+<td>Member-shell language</td>
+<td>plain-language negative boundaries pinned per fact (§ R9).</td>
+</tr>
+<tr>
+<td>R10</td>
+<td>Deferred until authority work</td>
+<td>who-may-make-available / who-may-access / valid authority basis / entity delegation / production token issuance / treasury enforcement all wait on #1868/#2061/#2080/#2081.</td>
+</tr>
+</tbody></table>
+<p><strong>D1 — the pinned inequality chain (verbatim, load-bearing across the family):</strong></p>
+<pre><code>prepared        != made available
+made available  != accessed
+accessed        != received
+received        != accepted
+accepted        != audited
+audited          != certified
+certified        != legally sufficient
+</code></pre>
+<h2>R1 — Is made-available generic?</h2>
+<p><strong>Question.</strong> Should <code>made available</code> be a generic ICN receipt, or stay an institution/package-specific fact?</p>
+<p>The #2324 EX2 decision deferred <code>made available</code> from the export-prepared <code>:v1</code> family with a specific reason: <em>&quot;recording &#39;made available&#39; without a governed custody reference would either leak location/endpoint data or record nothing verifiable.&quot;</em> That reason is now resolved. #1792/#2329 defines governed custody and disclosure policy as things a receipt references <strong>by fingerprint</strong> (<code>disclosure_policy_hash</code>, <code>PrivateObjectRef</code>), and pins the hard rule that surfaces expose <em>public existence metadata</em>, never contents or locations. A made-available fact can therefore carry a verifiable custody/method reference (a fingerprint) that leaks no location, endpoint, or contact data.</p>
+<p><strong>Decision R1: <code>EvidencePacketMadeAvailableReceipt</code> is warranted as a generic ICN receipt, kept narrow.</strong> It records that a previously prepared evidence-packet export was made available to a recipient scope under a disclosure policy, referencing the availability method and policy by <strong>fingerprint only</strong>. It does <strong>not</strong> prove retrieval, access, receipt, acceptance, audit, certification, delivery, or legal sufficiency. It is a unilateral sender/custodian-side availability fact, not a recipient-side fact.</p>
+<p>The custody <em>location</em> stays out by construction: <code>availability_method_hash</code> is a fingerprint of the method descriptor, never a URL, vault path, endpoint, retrieval token, email, phone, or address. This is the design move that reconciles EX2&#39;s earlier deferral with #1792 having landed.</p>
+<h2>R2 — What comes after export-prepared?</h2>
+<p><strong>Decision R2: the candidate sequence is <code>made-available → access → disclosure-decision → redaction-applied</code></strong> (matching #1792 §7), with <strong>made-available first</strong> (§ D3). Access is second because it depends on authority/subject-identity (#1868/#2061). Disclosure-decision and redaction-applied are later still — they govern <em>whether</em> and <em>how</em> disclosure happens and are only useful once access exists.</p>
+<h2>R3 — What is the minimum <code>AccessReceipt</code> fact?</h2>
+<p><strong>Decision R3.</strong> The minimum access fact is: <em>an authenticated actor scope accessed, or attempted to access, a referenced restricted object under a named disclosure policy, citing an authority basis, with a recorded outcome.</em> The receipt carries references and fingerprints (object ref, policy hash, purpose hash, authority-basis hash) and the outcome enum — <strong>never the object contents</strong> and never an adjudication of whether the cited authority was valid. It is candidate only in this rung (§ Candidate field layouts); its exact runtime shape is refined by a later <code>docs(process)</code> rung (§ D10 step 3) once #1868/#2061 clarify the authority-basis representation.</p>
+<h2>R4 — Access outcomes</h2>
+<p><strong>Decision R4.</strong> Access records one of six outcomes, as separate facts:</p>
+<pre><code>allowed
+denied
+expired
+revoked
+not_found_or_not_visible
+policy_mismatch
+</code></pre>
+<ul>
+<li><strong>Attempted and denied access are receiptable institutional facts</strong> when safe — an access-control system that records only successful reads cannot prove misuse was refused. <code>denied</code>, <code>expired</code>, <code>revoked</code>, and <code>policy_mismatch</code> are all recorded.</li>
+<li><strong><code>not_found_or_not_visible</code> deliberately conflates &quot;the object does not exist&quot; with &quot;you are not permitted to see it exists&quot;</strong> — the same enumeration-safe posture as the gateway&#39;s enumeration-safe 404 (#1642). This prevents the access receipt from becoming an <strong>existence oracle</strong> for hidden objects, honoring #1792&#39;s &quot;no public disappearance of institutional power … unless a narrowly justified safety policy&quot; rule from the safe side.</li>
+<li>Public/member surfaces may need to <strong>redact or aggregate</strong> access receipts: an access receipt must record outcomes without leaking private contents, and without revealing a hidden object&#39;s existence where safety policy forbids it. Whether a given outcome is member-visible, steward-visible, or aggregate-only is disclosure-policy territory, not a generic receipt field.</li>
+</ul>
+<h2>R5 — Safe generic fields vs institution/package fields</h2>
+<p><strong>Decision R5.</strong></p>
+<ul>
+<li><strong>Safe for generic runtime:</strong> <code>domain_id</code>, <code>session_id</code>, opaque per-fact ids (<code>availability_id</code>, <code>access_id</code>, <code>request_id</code>), predecessor <code>*_record_hash</code> proof links, echoed-and-verified fingerprints (<code>packet_hash</code>), caller-supplied fingerprints of bodies-never-stored (<code>disclosure_policy_hash</code>, <code>availability_method_hash</code>, <code>purpose_hash</code>, <code>authority_basis_hash</code>, <code>redaction_policy_hash</code>, <code>redaction_map_hash</code>), opaque scope handles (<code>recipient_scope_id</code>, <code>actor_scope_id</code>), private-object references (<code>private_object_ref_id</code>, <code>object_ref_hash</code>), outcome/decision enums, recorder DIDs (<code>made_available_by</code>, <code>accessed_by</code>/<code>decided_by</code>/<code>applied_by</code>), and node-stamped timestamps.</li>
+<li><strong>Must remain institution/package-specific or #1792-owned (never generic receipt content):</strong> scope membership and definitions; disclosure-policy bodies; acceptance criteria; audit/certification criteria; real names, DIDs-of-persons, emails, phone numbers, addresses, accommodation needs, demographic data; custody locations, endpoints, vault paths, retrieval tokens; the private object contents themselves.</li>
+</ul>
+<h2>R6 — Private object / scoped vault / disclosure policy references</h2>
+<p><strong>Decision R6.</strong> Restricted objects are referenced <strong>only</strong> by an opaque id plus a content-addressed fingerprint, per #1792&#39;s <code>PrivateObjectRef</code>:</p>
+<ul>
+<li><code>private_object_ref_id</code> — the caller-opaque handle naming <em>which</em> private object.</li>
+<li><code>object_ref_hash</code> — the content-addressed fingerprint of that reference.</li>
+<li><code>disclosure_policy_hash</code> — a fingerprint of the disclosure policy governing the object/act; the <strong>policy body is never stored</strong> (mirrors <code>export_policy_hash</code>/<code>redaction_profile_hash</code> precedent).</li>
+<li>Scoped-vault location, endpoints, and retrieval mechanics are <strong>absent</strong> — access to the vaulted bytes is itself the receipted act, and where the bytes live is #1792 scoped-vault / artifact-registry territory, referenced by fingerprint, never by path.</li>
+</ul>
+<h2>R7 — Authority-basis boundary</h2>
+<p><strong>Decision R7 (the load-bearing deferral mechanism).</strong> Every access/availability fact may carry an <strong>opaque <code>authority_basis_hash</code></strong> — a fingerprint of <em>what authority basis was cited</em> for the act. The generic receipt layer records the cited basis; it does <strong>not</strong> adjudicate whether the basis was valid, sufficient, or currently held. Adjudication is the authority model&#39;s job (#1868 per-action capabilities, #2061 entity-aware <code>require_entity_access</code>), and generic ICN must not hard-code it (the Meaning Firewall keeps evaluative semantics in apps).</p>
+<p>This lets future runtime record &quot;what authority basis was cited&quot; without the receipt claiming the act was authorized — &quot;receipts record facts; they do not grant permission.&quot; A separate authority-decision fact (aligned with #1868/#2061) may later attest validity; this family never conflates <em>cited</em> with <em>valid</em>.</p>
+<h2>R8 — Redaction and disclosure-decision boundary</h2>
+<p><strong>Decision R8.</strong> Two further candidate facts are named and <strong>deferred</strong> (candidate layouts below):</p>
+<ul>
+<li><strong><code>DisclosureDecisionReceipt</code></strong> — records that a disclosure request was approved / denied / limited. A disclosure decision is <strong>not</strong> itself access, made-available, delivery, or acceptance; it governs whether a later access <em>may</em> occur.</li>
+<li><strong><code>RedactionAppliedReceipt</code></strong> — records that a redaction profile was applied to a source artifact to produce a public/redacted artifact fingerprint. It proves a transformation was <strong>recorded</strong>; it does <strong>not</strong> prove the redaction is correct, complete, sufficient, legally compliant, accessible, or accepted by any recipient. (<code>EvidencePacketProducedReceipt</code> already carries a <code>redaction_profile_hash</code>; a standalone <code>RedactionAppliedReceipt</code> is only warranted when redaction happens <em>outside</em> packet production — its necessity is itself a later decision.)</li>
+</ul>
+<h2>R9 — Member-shell negative-boundary language</h2>
+<p><strong>Decision R9.</strong> Pinned plain-language rendering (for the later, separately-scoped render rungs; no member-shell change here):</p>
+<ul>
+<li><strong>Made-available:</strong> <em>&quot;This evidence packet export was made available to a named recipient scope under a recorded disclosure policy. This does not mean the recipient opened it, retrieved it, received it, accepted it, audited it, certified it, or agreed with it. No location, endpoint, or contents are recorded here.&quot;</em></li>
+<li><strong>Access:</strong> <em>&quot;An access attempt or access event was recorded for a restricted object under a disclosure policy. The receipt records the access outcome and the cited authority basis — not the private contents, and not a ruling that the access was authorized.&quot;</em></li>
+<li>Both surfaces keep the honesty banner, show fingerprints/handles under a disclosure, and render the negative boundaries as first-class text — mirroring the export-prepared render (#2328). Any such render adds human/AT surface owed under #2041.</li>
+</ul>
+<h2>R10 — Deferred until authority work</h2>
+<p><strong>Decision R10.</strong> The following are explicitly deferred until #1868 / #2061 / #2080 / #2081 progress, and must <strong>not</strong> be decided by this family:</p>
+<ul>
+<li>who may make an export available;</li>
+<li>who may access a restricted object;</li>
+<li>what authority basis is valid (vs merely cited);</li>
+<li>how entity hierarchy / delegation is enforced;</li>
+<li>how production token issuance binds actor / entity / scope;</li>
+<li>treasury/entity-specific enforcement.</li>
+</ul>
+<p>The receipts still define <strong>opaque authority-basis references</strong> (<code>authority_basis_hash</code>, <code>actor_scope_id</code>) so future runtime can record <em>what was cited</em> without adjudicating it in the generic layer.</p>
+<h2>Candidate receipt sequence</h2>
+<p>All candidate, none implemented here. Each references its predecessor by <code>*_id</code> + <code>*_record_hash</code>, verified fail-closed, echoing verified content fingerprints where cheap:</p>
+<ol>
+<li><code>EvidencePacketExportPreparedReceipt</code> — <strong>landed</strong> (#2326), the anchor.</li>
+<li><code>EvidencePacketMadeAvailableReceipt</code> — <strong>first runtime slice</strong> (§ D3); references the export-prepared receipt (the lane&#39;s <strong>sixth</strong> inter-receipt link).</li>
+<li><code>AccessReceipt</code> — candidate; references a <code>PrivateObjectRef</code>, gated by the authority model.</li>
+<li><code>DisclosureDecisionReceipt</code> — candidate, later.</li>
+<li><code>RedactionAppliedReceipt</code> — candidate, later (only if redaction happens outside packet production).</li>
+</ol>
+<h2>Candidate field layouts</h2>
+<p>All names <strong>candidate — subject to implementation proof and golden-vector pinning</strong>. Each tag must hash-separate from, and never converge with, every landed governance domain tag (verified set at authoring: <code>icn:governance-proof:v1</code>; <code>icn:gov:decision:v1/v2/v3</code>; <code>icn:gov:attest:v1</code>; <code>icn:gov:action_item_completion:v1/v2</code>; <code>icn:gov:meeting_attendance:v1/v2</code>; <code>icn:gov:process_gate_result:v1</code>; <code>icn:gov:process_session_opened:v1</code>; <code>icn:gov:deliberation_entry_recorded:v1</code>; <code>icn:gov:decision_recorded:v1</code>; <code>icn:gov:activation_crossed:v1</code>; <code>icn:gov:mutation_plan_recorded:v1</code>; <code>icn:gov:mutation_applied:v1</code>; <code>icn:gov:evidence_packet_produced:v1</code> + <code>:receipt_set:v1</code>; <code>icn:gov:evidence_packet_export_prepared:v1</code>; <code>icn:gov:mandate_grant_ref:v1</code>).</p>
+<h3>D4 — <code>EvidencePacketMadeAvailableReceipt</code> (candidate <code>:v1</code>, first runtime slice)</h3>
+<p>Candidate tag: <code>icn:gov:evidence_packet_made_available:v1</code>. <code>key1 =</code> injective netstring <code>(domain_id, session_id)</code>; <code>key2 = availability_id</code>. Conflict sentinel: <code>evidence_packet_made_available_conflict</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>In stable identity?</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>domain_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key1</code> half)</td>
+<td>governance domain; session must be opened first</td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key1</code> half)</td>
+<td>the process session this availability attaches to</td>
+</tr>
+<tr>
+<td><code>availability_id</code></td>
+<td><code>String</code></td>
+<td>yes (<code>key2</code>)</td>
+<td>caller-opaque per-availability unit of uniqueness; multiple availabilities per export permitted at the substrate layer (re-availability, policy change) — how many is charter policy</td>
+</tr>
+<tr>
+<td><code>export_id</code></td>
+<td><code>String</code></td>
+<td>yes</td>
+<td>the <code>EvidencePacketExportPreparedReceipt</code>&#39;s handle this availability follows (transitive)</td>
+</tr>
+<tr>
+<td><code>packet_id</code></td>
+<td><code>String</code></td>
+<td>yes</td>
+<td>the produced packet handle, inherited transitively through the export-prepared receipt</td>
+</tr>
+<tr>
+<td><code>export_prepared_record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td>proof link to the <code>EvidencePacketExportPreparedReceipt</code> (verified fail-closed via <code>get_evidence_packet_export_prepared</code>); the lane&#39;s <strong>sixth</strong> inter-receipt link</td>
+</tr>
+<tr>
+<td><code>packet_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td>echo of the export-prepared receipt&#39;s public/redacted packet fingerprint, <strong>verified equal</strong> to the stored predecessor&#39;s <code>packet_hash</code> (fail-closed); body never stored</td>
+</tr>
+<tr>
+<td><code>recipient_scope_id</code></td>
+<td><code>String</code></td>
+<td>yes</td>
+<td>echo of the export-prepared receipt&#39;s recipient scope, <strong>verified equal</strong> (fail-closed) — availability must be to the scope the export was prepared for; opaque handle, never contact data</td>
+</tr>
+<tr>
+<td><code>disclosure_policy_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td>caller-supplied fingerprint of the disclosure policy governing this availability; body never stored; distinct from <code>export_policy_hash</code> (which shaped the <em>preparation</em>) — not required to equal it</td>
+</tr>
+<tr>
+<td><code>availability_method_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>yes</td>
+<td>caller-supplied fingerprint of the availability <em>method descriptor</em> — <strong>never a URL, vault path, endpoint, retrieval token, location, email, phone, or address</strong>; body never stored</td>
+</tr>
+<tr>
+<td><code>made_available_by</code></td>
+<td><code>String</code> (DID)</td>
+<td>yes</td>
+<td>recorder / availability-witness; <strong>grants zero authority</strong> to make available, deliver, certify, or audit</td>
+</tr>
+<tr>
+<td><code>made_available_at</code></td>
+<td><code>u64</code></td>
+<td><strong>no</strong></td>
+<td>node-stamped Unix seconds; hashed into <code>record_hash</code> but <strong>excluded</strong> from duplicate identity (no-wall-clock cross-node identity doctrine, #2283/#2284; a retry never restamps)</td>
+</tr>
+<tr>
+<td><code>record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>(equality anchor)</td>
+<td>canonical blake3; the sole <code>PartialEq</code>/<code>Eq</code> anchor</td>
+</tr>
+</tbody></table>
+<p><strong>Candidate stable duplicate identity:</strong> all fields <strong>except</strong> <code>made_available_at</code> and <code>record_hash</code>.</p>
+<p><strong>Preconditions (all fail-closed; on any failure nothing is persisted):</strong> (1) the <code>(domain_id, session_id)</code> session was opened first; (2) an <code>EvidencePacketExportPreparedReceipt</code> with <code>record_hash == export_prepared_record_hash</code> exists in that same session, and its stored <code>export_id</code>, <code>packet_id</code>, <code>packet_hash</code>, and <code>recipient_scope_id</code> equal the supplied values (all resolved in one <code>get_evidence_packet_export_prepared(domain_id, session_id, export_id)</code> fetch); (3) <code>domain_id / session_id / availability_id / export_id / packet_id / recipient_scope_id / made_available_by</code> are non-empty / non-whitespace.</p>
+<p><strong>Deliberately absent from <code>:v1</code> (must never appear):</strong> any <code>delivered / sent / transmitted / received / accepted / audited / certified / accessed / retrieved</code> field or claim; any URL / endpoint / vault path / location / retrieval-token / credential / recipient-DID / contact-data value; any status / supersession / withdrawal / challenge field; any packet body / policy body / method body / private data (fingerprints only); any human/AT status field (#2041 stays open); any authority grant, capability, mandate, or legal-sufficiency assertion.</p>
+<h3>D5 — <code>AccessReceipt</code> (candidate; <strong>not</strong> the first runtime slice)</h3>
+<p>Candidate tag: <code>icn:gov:access:v1</code> (final name at its own rung). Candidate <code>key2 = access_id</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>domain_id</code></td>
+<td><code>String</code></td>
+<td>governance domain</td>
+</tr>
+<tr>
+<td><code>session_id</code></td>
+<td><code>String</code></td>
+<td>the process session (if the access is session-bound; may be optional at its own rung)</td>
+</tr>
+<tr>
+<td><code>access_id</code></td>
+<td><code>String</code></td>
+<td>caller-opaque per-access unit</td>
+</tr>
+<tr>
+<td><code>object_ref_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>content-addressed fingerprint of the <code>PrivateObjectRef</code> accessed</td>
+</tr>
+<tr>
+<td><code>private_object_ref_id</code></td>
+<td><code>String</code></td>
+<td>caller-opaque handle of the private object</td>
+</tr>
+<tr>
+<td><code>disclosure_policy_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>fingerprint of the disclosure policy under which access was evaluated; body never stored</td>
+</tr>
+<tr>
+<td><code>actor_scope_id</code></td>
+<td><code>String</code></td>
+<td>opaque scope handle of the accessing actor — <strong>not</strong> a person DID or contact data (whether to also record an actor DID is deferred to the AccessReceipt rung)</td>
+</tr>
+<tr>
+<td><code>authority_basis_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>opaque fingerprint of the <strong>cited</strong> authority basis (§ R7) — never an adjudication of validity</td>
+</tr>
+<tr>
+<td><code>purpose_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>fingerprint of the stated access purpose; purpose body never stored</td>
+</tr>
+<tr>
+<td><code>access_outcome</code></td>
+<td>enum</td>
+<td><code>allowed / denied / expired / revoked / not_found_or_not_visible / policy_mismatch</code> (§ R4)</td>
+</tr>
+<tr>
+<td><code>accessed_at</code></td>
+<td><code>u64</code></td>
+<td>node-stamped Unix seconds; hashed; excluded from identity</td>
+</tr>
+<tr>
+<td><code>record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>canonical blake3; equality anchor</td>
+</tr>
+</tbody></table>
+<p><strong>Boundary:</strong> an <code>AccessReceipt</code> records an access <em>fact and outcome</em> under a <em>cited</em> basis. It never exposes the private contents, never asserts the access was authorized, and (via <code>not_found_or_not_visible</code>) never becomes an existence oracle for hidden objects.</p>
+<h3>D6 — <code>DisclosureDecisionReceipt</code> (candidate, later)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>request_id</code></td>
+<td><code>String</code></td>
+<td>caller-opaque disclosure-request handle</td>
+</tr>
+<tr>
+<td><code>object_ref_hash</code> (or <code>private_object_ref_id</code>)</td>
+<td><code>Hash</code> (32) / <code>String</code></td>
+<td>the private object the decision concerns</td>
+</tr>
+<tr>
+<td><code>recipient_scope_id</code></td>
+<td><code>String</code></td>
+<td>opaque scope the decision is about; never contact data</td>
+</tr>
+<tr>
+<td><code>decision</code></td>
+<td>enum</td>
+<td><code>approved / denied / approved_with_redactions / deferred / withdrawn / superseded</code></td>
+</tr>
+<tr>
+<td><code>decision_basis_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>fingerprint of the basis for the decision; body never stored</td>
+</tr>
+<tr>
+<td><code>decided_by</code></td>
+<td><code>String</code> (DID)</td>
+<td>recorder / decision-witness; grants zero authority</td>
+</tr>
+<tr>
+<td><code>decided_at</code></td>
+<td><code>u64</code></td>
+<td>node-stamped; excluded from identity</td>
+</tr>
+<tr>
+<td><code>record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>equality anchor</td>
+</tr>
+</tbody></table>
+<p><strong>Boundary:</strong> a disclosure decision is <strong>not</strong> itself access, made-available, delivery, or acceptance.</p>
+<h3>D7 — <code>RedactionAppliedReceipt</code> (candidate, later)</h3>
+<table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>source_object_ref_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>fingerprint of the source (private) artifact reference</td>
+</tr>
+<tr>
+<td><code>redaction_policy_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>fingerprint of the redaction policy applied; body never stored</td>
+</tr>
+<tr>
+<td><code>redacted_artifact_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>fingerprint of the resulting public/redacted artifact; body never stored</td>
+</tr>
+<tr>
+<td><code>redaction_map_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>fingerprint of the <code>RedactionMap</code> (which fields were removed); body never stored</td>
+</tr>
+<tr>
+<td><code>applied_by</code></td>
+<td><code>String</code> (DID)</td>
+<td>recorder; grants zero authority</td>
+</tr>
+<tr>
+<td><code>applied_at</code></td>
+<td><code>u64</code></td>
+<td>node-stamped; excluded from identity</td>
+</tr>
+<tr>
+<td><code>record_hash</code></td>
+<td><code>Hash</code> (32)</td>
+<td>equality anchor</td>
+</tr>
+</tbody></table>
+<p><strong>Boundary:</strong> proves a redaction transformation was <strong>recorded</strong>; does <strong>not</strong> prove correctness, sufficiency, legal compliance, accessibility, or recipient acceptance.</p>
+<h2>First runtime slice recommendation</h2>
+<p><strong>D3 — the first runtime slice after this rung is <code>EvidencePacketMadeAvailableReceipt</code>.</strong> It is the smallest next sender/custodian-side boundary after export-prepared; it can remain <strong>policy/vault opaque</strong> (fingerprints only, no location or authority adjudication); and it has a <strong>landed predecessor</strong> to verify fail-closed (<code>EvidencePacketExportPreparedReceipt</code>, #2326). <code>AccessReceipt</code> is deliberately <strong>not</strong> first: it depends far more directly on authority, subject identity, and the #1868/#2061 authority model, and recording access before those are clearer risks either an under-specified authority-basis field or an existence-oracle leak.</p>
+<p>The made-available implementation PR (later, separately authorized) would mirror the export-prepared slice (#2326): the <code>EvidencePacketMadeAvailableReceipt</code> class only, per D4, with fail-closed predecessor + echoed-field verification, <code>proof.rs</code> unit tests (golden vector, determinism, per-field, tag-disjointness, serde payload-audit), and a runtime-slice integration test mirroring <code>evidence_packet_export_prepared_receipt_runtime_slice.rs</code>. It must add no field from the deliberately-absent list, no route/OpenAPI/SDK, no member-shell/fixture change (its render is its own later rung), no authority check on <code>made_available_by</code>, and it must keep the protected issues open (<code>Refs</code> only).</p>
+<h2>Non-goals</h2>
+<p>This rung and its future implementation are: not a custodian, exporter, transport, notification, or delivery service; not delivery, receipt, access-authorization, acceptance, audit, or certification; not a vault runtime, encryption, or private-data schema; not a new authorization semantic (recording an availability or access grants and proves no permission); not an action-card trigger or workflow engine; not a route/OpenAPI/SDK change; not a gateway/auth enforcement change; not a member-shell, operator-dashboard, or fixture change; not live/private data handling; not NYCN-specific semantics in generic ICN; not #2041 completion; not #1748 / #2141 / #1868 / #2061 / #2080 / #2081 closure; not production / pilot / organizer-ready / member-ready readiness; not live federation; not NYCN activation; not Phase-2 completion; not legally sufficient anything.</p>
+<p>Receipts record institutional facts. They grant zero authority.</p>
+<h2>Follow-up issue sequence</h2>
+<p>Proposed, <strong>not opened</strong> by this rung (opening them is a later, separately-authorized step):</p>
+<ol>
+<li><code>feat(process)</code>: emit <code>EvidencePacketMadeAvailableReceipt</code> runtime slice (per D4).</li>
+<li><code>feat(process)</code>: render <code>EvidencePacketMadeAvailableReceipt</code> in the member-shell process-evidence fixture (mirror #2328).</li>
+<li><code>docs(process)</code>: define <code>AccessReceipt</code> runtime decision details (actor-DID-vs-scope, session-boundedness, outcome surfacing) once #1868/#2061 clarify authority basis.</li>
+<li><code>feat(process)</code>: emit <code>AccessReceipt</code> runtime slice.</li>
+<li><code>feat(member-shell)</code>: render access / privacy outcome states.</li>
+<li><code>test(a11y)</code>: human/AT pass over privacy/access states (extends #2041 §4G).</li>
+<li><code>docs(process)</code>: define <code>DisclosureDecisionReceipt</code> / <code>RedactionAppliedReceipt</code> receipts.</li>
+<li><code>docs(process)</code>: challenge / repair path for access misuse (append-only supersession).</li>
+</ol>
+<h2>Related</h2>
+<p>Refs #2330.
+Refs #1792.
+Refs #2322.
+Refs #2324.
+Refs #2326.
+Refs #2328.
+Refs #1748.
+Refs #2141.
+Refs #1868.
+Refs #2061.
+Refs #2080.
+Refs #2081.
+Refs #2041.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
