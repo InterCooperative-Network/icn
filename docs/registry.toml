@@ -818,6 +818,20 @@ depends_on = ["docs/architecture/KERNEL_APP_SEPARATION.md", "docs/strategy/ADR-0
 recommended_action = "keep"
 freshness = "current"
 
+[docs."docs/architecture/PRIVATE_DATA_DISCLOSURE_BOUNDARY.md"]
+category = "architecture"
+status = "draft"
+truth_class = "descriptive"
+title = "Private Data Disclosure Boundary, Scoped Vaults, and Access Receipts"
+description = "Design-only architecture boundary contract (#1792) for ICN's generic private-data disclosure/access model: private overlays, scoped vaults, opaque receipt storage, redaction, selective disclosure, disclosure policies, and access/export/made-available receipts, following the landed EvidencePacketExportPreparedReceipt. Names candidate vocabulary and a follow-up sequence, distinguishes disclosure/access policy (#1792) from encrypted private-overlay storage (#1767), and implements no runtime."
+last_updated = "2026-07-05"
+last_reviewed = "2026-07-05"
+owner = "matt"
+audiences = ["architects", "developers"]
+depends_on = ["docs/architecture/KERNEL_APP_SEPARATION.md", "docs/design/evidence-export-delivery-boundary.md", "docs/spec/artifact-registry-and-scoped-vault.md"]
+recommended_action = "keep"
+freshness = "current"
+
 [docs."docs/architecture/INSTITUTIONAL_FEEDBACK_AND_SUPPORT_PRIMITIVES.md"]
 category = "architecture"
 status = "living"

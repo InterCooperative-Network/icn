@@ -216,6 +216,12 @@ Forward-direction design for model-driven advisory compute workloads, deliberati
 
 **For:** `developers`, `architects` | **Updated:** 2026-04-27
 
+### 📋 **Draft** [Private Data Disclosure Boundary, Scoped Vaults, and Access Receipts](/docs/architecture/PRIVATE_DATA_DISCLOSURE_BOUNDARY.md)
+
+Design-only architecture boundary contract (#1792) for ICN's generic private-data disclosure/access model: private overlays, scoped vaults, opaque receipt storage, redaction, selective disclosure, disclosure policies, and access/export/made-available receipts, following the landed EvidencePacketExportPreparedReceipt. Names candidate vocabulary and a follow-up sequence, distinguishes disclosure/access policy (#1792) from encrypted private-overlay storage (#1767), and implements no runtime.
+
+**For:** `architects`, `developers` | **Updated:** 2026-07-05
+
 ### 📝 **Living** [Scope Bounded Trust](/docs/architecture/SCOPE_BOUNDED_TRUST.md)
 
 Trust model design limiting trust scope to organizational boundaries
@@ -2126,10 +2132,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 347
+**Total documents:** 348
 
 **By status:**
 - Active: 1
 - Canonical: 40
-- Draft: 94
+- Draft: 95
 - Living: 212
