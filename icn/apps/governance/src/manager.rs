@@ -2871,6 +2871,32 @@ pub enum EvidencePacketExportPreparedOutcome {
     AlreadyPrepared(icn_governance::EvidencePacketExportPreparedReceipt),
 }
 
+/// Outcome of [`GovernanceManager::record_evidence_packet_made_available`]
+/// (#2330 access/made-available/disclosure decision rung, issue #2332). Both
+/// variants are successes; the fail-closed mismatch conflict surfaces as an
+/// `Err` with stable prefix `evidence_packet_made_available_conflict`.
+/// Precondition failures surface as `Err`s with their own stable prefixes and
+/// persist nothing: `evidence_packet_made_available_session_not_opened`
+/// (unopened session), `evidence_packet_made_available_predecessor_not_found` /
+/// `evidence_packet_made_available_predecessor_mismatch` (D4 export-prepared
+/// predecessor absent or record-hash-mismatched),
+/// `evidence_packet_made_available_packet_id_mismatch` /
+/// `evidence_packet_made_available_packet_hash_mismatch` /
+/// `evidence_packet_made_available_recipient_scope_mismatch` (the echoed fields
+/// differ from the stored export-prepared receipt).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvidencePacketMadeAvailableOutcome {
+    /// This call recorded the availability: the receipt is the newly persisted
+    /// made-available fact.
+    MadeAvailable(icn_governance::EvidencePacketMadeAvailableReceipt),
+    /// The availability was already recorded with the **same** stable identity
+    /// (`export_id`, `packet_id`, `export_prepared_record_hash`, `packet_hash`,
+    /// `recipient_scope_id`, `disclosure_policy_hash`, `availability_method_hash`,
+    /// `made_available_by`); carries the **original** persisted receipt (original
+    /// `made_available_at` / `record_hash` — a retry is never restamped).
+    AlreadyMadeAvailable(icn_governance::EvidencePacketMadeAvailableReceipt),
+}
+
 /// Action items are always managed locally (not gossiped) and can use either
 /// in-memory or Sled-backed persistent storage.
 pub struct GovernanceManager {
@@ -7693,6 +7719,290 @@ impl GovernanceManager {
             .list_evidence_packet_export_prepared_for_session_in_domain(&domain_id.0, session_id)
             .map_err(|e| {
                 anyhow::anyhow!("Failed to list evidence-packet-export-prepared receipts: {e}")
+            })
+    }
+
+    /// Record that a prepared evidence-packet export was **made available** to a
+    /// recipient scope under a disclosure policy — the tenth process/evidence
+    /// receipt class and the first runtime slice recommended by the #2330
+    /// access/made-available/disclosure decision rung (issue #2332).
+    ///
+    /// This records a sender/custodian-side availability fact only. It does not
+    /// retrieve, access, deliver, transmit, receive, accept, audit, or certify
+    /// anything — made available is **not** accessed, delivered, received, or
+    /// accepted (R1). The custody location, endpoint, and retrieval mechanics
+    /// stay out of the receipt by construction: `availability_method_hash` and
+    /// `disclosure_policy_hash` are opaque fingerprints of never-stored bodies
+    /// (R6). Authority adjudication is deferred (#1868/#2061); this grants zero
+    /// authority.
+    ///
+    /// Fail-closed preconditions (on any failure nothing is persisted):
+    /// - all ids are non-empty / non-whitespace (`recipient_scope_id` is a
+    ///   caller-opaque governance handle — never contact data);
+    /// - a receipt store is wired (uniqueness and the predecessor precondition
+    ///   are enforced at the storage layer and cannot be faked in memory);
+    /// - the `(domain_id, session_id)` session was opened first
+    ///   (`evidence_packet_made_available_session_not_opened`);
+    /// - D4: an [`icn_governance::EvidencePacketExportPreparedReceipt`] exists in
+    ///   the **same** `(domain_id, session_id)` under `export_id`
+    ///   (`evidence_packet_made_available_predecessor_not_found`), its
+    ///   `record_hash` equals the supplied `export_prepared_record_hash`
+    ///   (`evidence_packet_made_available_predecessor_mismatch`), and its stored
+    ///   `packet_id`, `packet_hash`, and `recipient_scope_id` equal the supplied
+    ///   echoes (`evidence_packet_made_available_packet_id_mismatch` /
+    ///   `_packet_hash_mismatch` / `_recipient_scope_mismatch`) — availability
+    ///   must be to the scope the export was prepared for. The record-hash link
+    ///   is checked before the echoed fields so a stale predecessor reference
+    ///   surfaces as the more specific mismatch.
+    ///
+    /// On success returns [`EvidencePacketMadeAvailableOutcome::MadeAvailable`];
+    /// a same-identity retry returns
+    /// [`EvidencePacketMadeAvailableOutcome::AlreadyMadeAvailable`] carrying the
+    /// **original** receipt (never restamped). A same-`availability_id` record
+    /// with a different stable identity fails closed with the stable
+    /// `evidence_packet_made_available_conflict` prefix. Multiple availabilities
+    /// per export (distinct `availability_id`s) are permitted at the substrate
+    /// layer; how many is charter policy.
+    #[allow(clippy::too_many_arguments)]
+    pub fn record_evidence_packet_made_available(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        availability_id: &str,
+        export_id: &str,
+        packet_id: &str,
+        export_prepared_record_hash: [u8; 32],
+        packet_hash: [u8; 32],
+        recipient_scope_id: &str,
+        disclosure_policy_hash: [u8; 32],
+        availability_method_hash: [u8; 32],
+        made_available_by: &Did,
+    ) -> Result<EvidencePacketMadeAvailableOutcome> {
+        // Whitespace-only ids are rejected alongside empty ones: a caller
+        // bypassing the HTTP layer must not mint receipts with visually-empty
+        // identifiers or whitespace storage keys.
+        if domain_id.0.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_made_available: domain_id must be non-empty and \
+                 non-whitespace"
+            ));
+        }
+        if session_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_made_available: session_id must be non-empty and \
+                 non-whitespace"
+            ));
+        }
+        if availability_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_made_available: availability_id must be non-empty and \
+                 non-whitespace"
+            ));
+        }
+        if export_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_made_available: export_id must be non-empty and \
+                 non-whitespace"
+            ));
+        }
+        if packet_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_made_available: packet_id must be non-empty and \
+                 non-whitespace"
+            ));
+        }
+        if recipient_scope_id.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_made_available: recipient_scope_id must be non-empty \
+                 and non-whitespace"
+            ));
+        }
+        let made_available_by_str = made_available_by.to_string();
+        if made_available_by_str.trim().is_empty() {
+            return Err(anyhow::anyhow!(
+                "record_evidence_packet_made_available: made_available_by must be non-empty"
+            ));
+        }
+        let store = self.receipt_store.as_ref().ok_or_else(|| {
+            anyhow::anyhow!(
+                "record_evidence_packet_made_available: a receipt store is required — \
+                 availability uniqueness and the predecessor precondition are enforced at the \
+                 storage layer and cannot be faked in memory"
+            )
+        })?;
+
+        // Precondition: the session was opened first. No silent creation.
+        let opened = store
+            .get_process_session_opened(&domain_id.0, session_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_evidence_packet_made_available: failed to read session-open state \
+                     for session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        if opened.is_none() {
+            return Err(anyhow::anyhow!(
+                "evidence_packet_made_available_session_not_opened: session {session_id} in \
+                 domain {} has no recorded opening; refusing to record an availability against \
+                 an unanchored session",
+                domain_id.0
+            ));
+        }
+
+        // D4 precondition: the export-prepared predecessor this availability
+        // follows must exist in this same (domain, session) under `export_id`.
+        // The composite storage key makes an export recorded under a different
+        // session/domain invisible here, so a wrong-session/wrong-domain
+        // reference fails closed as "not found".
+        let prepared = store
+            .get_evidence_packet_export_prepared(&domain_id.0, session_id, export_id)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "record_evidence_packet_made_available: failed to read export-prepared state \
+                     for export {export_id} in session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })?;
+        let prepared = prepared.ok_or_else(|| {
+            anyhow::anyhow!(
+                "evidence_packet_made_available_predecessor_not_found: no export {export_id} \
+                 recorded in session {session_id} in domain {}; refusing to record an \
+                 availability for an unrecorded predecessor",
+                domain_id.0
+            )
+        })?;
+        if prepared.record_hash != export_prepared_record_hash {
+            return Err(anyhow::anyhow!(
+                "evidence_packet_made_available_predecessor_mismatch: export {export_id} in \
+                 session {session_id} in domain {} was recorded with a different record_hash \
+                 than the one supplied; refusing to record an availability on a mismatched \
+                 predecessor reference",
+                domain_id.0
+            ));
+        }
+        // D4 echoed-field verification: the supplied packet_id / packet_hash /
+        // recipient_scope_id must equal the stored export-prepared receipt's
+        // values — the echoes are proofs, not assertions (verified in the same
+        // fetch as the predecessor link). Availability must be to the scope the
+        // export was prepared for.
+        if prepared.packet_id != packet_id {
+            return Err(anyhow::anyhow!(
+                "evidence_packet_made_available_packet_id_mismatch: the supplied packet_id for \
+                 export {export_id} in session {session_id} in domain {} does not equal the \
+                 stored export-prepared receipt's packet_id; refusing to record an availability \
+                 for a different packet",
+                domain_id.0
+            ));
+        }
+        if prepared.packet_hash != packet_hash {
+            return Err(anyhow::anyhow!(
+                "evidence_packet_made_available_packet_hash_mismatch: the supplied packet_hash \
+                 for export {export_id} in session {session_id} in domain {} does not equal the \
+                 stored export-prepared receipt's packet_hash; refusing to record an \
+                 availability for a different artifact fingerprint",
+                domain_id.0
+            ));
+        }
+        if prepared.recipient_scope_id != recipient_scope_id {
+            return Err(anyhow::anyhow!(
+                "evidence_packet_made_available_recipient_scope_mismatch: the supplied \
+                 recipient_scope_id for export {export_id} in session {session_id} in domain {} \
+                 does not equal the stored export-prepared receipt's recipient_scope_id; \
+                 refusing to record an availability to a scope the export was not prepared for",
+                domain_id.0
+            ));
+        }
+
+        let now = icn_time::current_timestamp_secs();
+        let receipt = icn_governance::EvidencePacketMadeAvailableReceipt::new(
+            domain_id.0.clone(),
+            session_id.to_string(),
+            availability_id.to_string(),
+            export_id.to_string(),
+            packet_id.to_string(),
+            export_prepared_record_hash,
+            packet_hash,
+            recipient_scope_id.to_string(),
+            disclosure_policy_hash,
+            availability_method_hash,
+            made_available_by_str.clone(),
+            now,
+        );
+
+        match store
+            .put_evidence_packet_made_available(&receipt)
+            .map_err(|e| {
+                anyhow::anyhow!(
+                    "Failed to persist evidence-packet-made-available receipt for availability \
+                     {availability_id} in session {session_id} in domain {}: {e}",
+                    domain_id.0
+                )
+            })? {
+            crate::receipt_backend::EvidencePacketMadeAvailablePersist::Inserted => {
+                Ok(EvidencePacketMadeAvailableOutcome::MadeAvailable(receipt))
+            }
+            crate::receipt_backend::EvidencePacketMadeAvailablePersist::Existing(original) => {
+                if original.export_id == export_id
+                    && original.packet_id == packet_id
+                    && original.export_prepared_record_hash == export_prepared_record_hash
+                    && original.packet_hash == packet_hash
+                    && original.recipient_scope_id == recipient_scope_id
+                    && original.disclosure_policy_hash == disclosure_policy_hash
+                    && original.availability_method_hash == availability_method_hash
+                    && original.made_available_by == made_available_by_str
+                {
+                    Ok(EvidencePacketMadeAvailableOutcome::AlreadyMadeAvailable(
+                        *original,
+                    ))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "evidence_packet_made_available_conflict: availability {availability_id} \
+                         in session {session_id} in domain {} was already recorded with a \
+                         different export reference, packet reference, packet hash, recipient \
+                         scope, disclosure policy, availability method, or recorder; refusing to \
+                         overwrite",
+                        domain_id.0
+                    ))
+                }
+            }
+        }
+    }
+
+    /// Retrieve the persisted evidence-packet-made-available receipt for a
+    /// `(domain_id, session_id, availability_id)`, or `None` when no availability
+    /// has been recorded. Read-only.
+    pub fn get_evidence_packet_made_available(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+        availability_id: &str,
+    ) -> Result<Option<icn_governance::EvidencePacketMadeAvailableReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(None);
+        };
+        store
+            .get_evidence_packet_made_available(&domain_id.0, session_id, availability_id)
+            .map_err(|e| {
+                anyhow::anyhow!("Failed to read evidence-packet-made-available receipt: {e}")
+            })
+    }
+
+    /// List all evidence-packet-made-available receipts recorded against one
+    /// `(domain_id, session_id)` anchor, in the store's deterministic
+    /// chronological `(made_available_at, record_hash)` order. Read-only.
+    pub fn list_evidence_packet_made_available_in_domain(
+        &self,
+        domain_id: &GovernanceDomainId,
+        session_id: &str,
+    ) -> Result<Vec<icn_governance::EvidencePacketMadeAvailableReceipt>> {
+        let Some(ref store) = self.receipt_store else {
+            return Ok(vec![]);
+        };
+        store
+            .list_evidence_packet_made_available_for_session_in_domain(&domain_id.0, session_id)
+            .map_err(|e| {
+                anyhow::anyhow!("Failed to list evidence-packet-made-available receipts: {e}")
             })
     }
 

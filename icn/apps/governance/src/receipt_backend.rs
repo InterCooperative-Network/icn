@@ -4,10 +4,11 @@
 use icn_governance::{
     ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, ActivationCrossedReceipt,
     AuthorityGrant, AuthorityGrantId, DecisionRecordedReceipt, DeliberationEntryRecordedReceipt,
-    EvidencePacketExportPreparedReceipt, EvidencePacketProducedReceipt, GovernanceDecisionReceipt,
-    GovernanceDecisionReceiptV3, Grantee, Mandate, MeetingAttendanceReceipt,
-    MeetingAttendanceReceiptV2, MutationAppliedReceipt, MutationPlanRecordedReceipt,
-    ProcessGateKind, ProcessGateResultReceipt, ProcessSessionOpenedReceipt, Timestamp,
+    EvidencePacketExportPreparedReceipt, EvidencePacketMadeAvailableReceipt,
+    EvidencePacketProducedReceipt, GovernanceDecisionReceipt, GovernanceDecisionReceiptV3, Grantee,
+    Mandate, MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, MutationAppliedReceipt,
+    MutationPlanRecordedReceipt, ProcessGateKind, ProcessGateResultReceipt,
+    ProcessSessionOpenedReceipt, Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -347,6 +348,51 @@ pub enum EvidencePacketExportPreparedPersist {
     /// fields plus three 32-byte hashes), so an unboxed variant would make
     /// this enum needlessly large next to the unit `Inserted`.
     Existing(Box<EvidencePacketExportPreparedReceipt>),
+}
+
+/// Class string for `EvidencePacketMadeAvailableReceipt` opaque storage (#2330
+/// decision rung, issue #2332). Chosen in the apps layer so the gateway never
+/// sees the typed name. Distinct from every other process class store.
+const EVIDENCE_PACKET_MADE_AVAILABLE_CLASS: &str = "evidence_packet_made_available";
+
+/// Build the injective composite `key1` binding a made-available evidence-packet
+/// export to its `(domain_id, session_id)` anchor in opaque storage.
+///
+/// Sibling of [`evidence_packet_export_prepared_composite_key1`] with the
+/// identical netstring-style encoding (decimal length of `domain_id`, a colon,
+/// then the two ids concatenated), kept as a separate function so this class's
+/// key derivation is independently anchored by its own anti-aliasing test. The
+/// length prefix delimits `domain_id` exactly, so `("ab","c")` and `("a","bc")`
+/// can never produce the same key, and two domains sharing a `session_id` scan
+/// different `key1` prefixes.
+pub fn evidence_packet_made_available_composite_key1(domain_id: &str, session_id: &str) -> String {
+    format!("{}:{domain_id}{session_id}", domain_id.len())
+}
+
+/// Outcome of persisting an [`EvidencePacketMadeAvailableReceipt`] through
+/// [`GovernanceReceiptBackend::put_evidence_packet_made_available`].
+///
+/// The backend enforces at most one availability per `(domain_id, session_id,
+/// availability_id)` **atomically at the storage layer** (same
+/// `put_opaque_if_absent` primitive as the sibling process classes). The caller
+/// (the manager) turns `Existing` into either a same-identity idempotent success
+/// or a fail-closed conflict — stable identity is `export_id`, `packet_id`,
+/// `export_prepared_record_hash`, `packet_hash`, `recipient_scope_id`,
+/// `disclosure_policy_hash`, `availability_method_hash`, and `made_available_by`
+/// (per the #2330 rung D4; `made_available_at` and `record_hash` are NOT
+/// identity inputs).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvidencePacketMadeAvailablePersist {
+    /// This call won the insert: the receipt is now the one persisted
+    /// availability for its `(domain_id, session_id, availability_id)`.
+    Inserted,
+    /// An availability already existed for this triple; nothing was written.
+    /// Carries the original persisted receipt (original `made_available_at` /
+    /// `record_hash` — never restamped). Boxed because
+    /// [`EvidencePacketMadeAvailableReceipt`] is a large payload (seven string
+    /// fields plus four 32-byte hashes), so an unboxed variant would make this
+    /// enum needlessly large next to the unit `Inserted`.
+    Existing(Box<EvidencePacketMadeAvailableReceipt>),
 }
 
 /// Class string for `MeetingAttendanceReceiptV2` opaque storage (#1868).
@@ -1818,6 +1864,104 @@ pub trait GovernanceReceiptBackend: Send + Sync {
         for bytes in payloads {
             out.push(serde_json::from_slice(&bytes).map_err(|e| {
                 format!("deserialize EvidencePacketExportPreparedReceipt in list: {e}")
+            })?);
+        }
+        Ok(out)
+    }
+
+    /// Persist an [`EvidencePacketMadeAvailableReceipt`] emitted when the runtime
+    /// records that a prepared evidence-packet export was made available (#2330
+    /// rung, issue #2332).
+    ///
+    /// **Default routes through opaque storage.** Serialises the typed receipt
+    /// to JSON and delegates to [`Self::put_opaque_if_absent`] under class
+    /// `"evidence_packet_made_available"` with `key1 =`
+    /// [`evidence_packet_made_available_composite_key1`] (the injective
+    /// domain+session composite) and `key2 = availability_id`. On a lost insert
+    /// the original persisted receipt is hydrated and returned (never restamped).
+    /// A backend that has not opted in to opaque storage inherits the
+    /// fail-closed `opaque_storage_not_implemented` default.
+    fn put_evidence_packet_made_available(
+        &self,
+        receipt: &EvidencePacketMadeAvailableReceipt,
+    ) -> Result<EvidencePacketMadeAvailablePersist, String> {
+        let payload = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize EvidencePacketMadeAvailableReceipt: {e}"))?;
+        let key1 =
+            evidence_packet_made_available_composite_key1(&receipt.domain_id, &receipt.session_id);
+        let existing = self.put_opaque_if_absent(
+            EVIDENCE_PACKET_MADE_AVAILABLE_CLASS,
+            &key1,
+            Some(&receipt.availability_id),
+            receipt.made_available_at,
+            receipt.record_hash,
+            &payload,
+        )?;
+        match existing {
+            None => Ok(EvidencePacketMadeAvailablePersist::Inserted),
+            Some(_winning_hash) => {
+                let original = self
+                    .get_evidence_packet_made_available(
+                        &receipt.domain_id,
+                        &receipt.session_id,
+                        &receipt.availability_id,
+                    )?
+                    .ok_or_else(|| {
+                        // The unique marker says an availability exists but the
+                        // payload cannot be hydrated — surface loudly rather
+                        // than minting a second availability.
+                        "evidence_packet_made_available_inconsistent: unique marker present \
+                         but no persisted made-available payload could be read"
+                            .to_string()
+                    })?;
+                Ok(EvidencePacketMadeAvailablePersist::Existing(Box::new(
+                    original,
+                )))
+            }
+        }
+    }
+
+    /// Retrieve the persisted [`EvidencePacketMadeAvailableReceipt`] for a
+    /// `(domain_id, session_id, availability_id)`, or `None` when no availability
+    /// has been recorded. Same key convention as
+    /// [`Self::put_evidence_packet_made_available`]; at most one availability
+    /// exists per triple (uniqueness is enforced on write).
+    fn get_evidence_packet_made_available(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+        availability_id: &str,
+    ) -> Result<Option<EvidencePacketMadeAvailableReceipt>, String> {
+        let key1 = evidence_packet_made_available_composite_key1(domain_id, session_id);
+        let payload = self.get_latest_opaque(
+            EVIDENCE_PACKET_MADE_AVAILABLE_CLASS,
+            &key1,
+            Some(availability_id),
+        )?;
+        match payload {
+            Some(bytes) => Ok(Some(serde_json::from_slice(&bytes).map_err(|e| {
+                format!("deserialize EvidencePacketMadeAvailableReceipt: {e}")
+            })?)),
+            None => Ok(None),
+        }
+    }
+
+    /// List all evidence-packet-made-available receipts recorded against one
+    /// `(domain_id, session_id)` anchor, in the store's deterministic
+    /// chronological `(made_available_at, record_hash)` order. Because `key1` is
+    /// the injective domain+session composite, two domains sharing a
+    /// `session_id` can never mix here — no payload-side filtering is needed.
+    fn list_evidence_packet_made_available_for_session_in_domain(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+    ) -> Result<Vec<EvidencePacketMadeAvailableReceipt>, String> {
+        let key1 = evidence_packet_made_available_composite_key1(domain_id, session_id);
+        let payloads = self.list_opaque_for(EVIDENCE_PACKET_MADE_AVAILABLE_CLASS, &key1)?;
+        let mut out = Vec::with_capacity(payloads.len());
+        for bytes in payloads {
+            out.push(serde_json::from_slice(&bytes).map_err(|e| {
+                format!("deserialize EvidencePacketMadeAvailableReceipt in list: {e}")
             })?);
         }
         Ok(out)
