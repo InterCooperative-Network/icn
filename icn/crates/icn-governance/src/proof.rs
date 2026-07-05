@@ -3771,6 +3771,229 @@ impl EvidencePacketExportPreparedReceipt {
 }
 
 // ============================================================================
+// EvidencePacketMadeAvailableReceipt — tenth process/evidence receipt class
+// (#2330 access/made-available/disclosure decision rung, issue #2332). The
+// first runtime slice recommended by that rung — it extends the export-prepared
+// family and must not be presented as completing a #1748 acceptance gate.
+// ============================================================================
+
+/// Receipt of record that a **previously prepared evidence-packet export was
+/// made available** to a named recipient scope under a disclosure policy — the
+/// sender/custodian-side availability fact chosen by the #2330 R1/D2 decision.
+///
+/// Per the #2330 rung:
+///
+/// **R1 — made available, not sent.** The fact is that a prepared export was
+/// placed in governed custody where an authorized recipient scope *can*
+/// retrieve it, and that availability was recorded. Nothing in this receipt
+/// asserts that anything was retrieved, accessed, delivered, received,
+/// accepted, audited, or certified. Made available is **not** accessed.
+///
+/// **R6 — fingerprints only.** `availability_method_hash` fingerprints the
+/// availability *method descriptor* — it is **never** a URL, endpoint,
+/// retrieval token, vault path, location, email, phone, or address.
+/// `disclosure_policy_hash` fingerprints the disclosure policy that governs
+/// this availability; the policy **body is never stored**. Custody location
+/// stays out by construction.
+///
+/// **D4 — verified predecessor echo.** `export_id` +
+/// `export_prepared_record_hash` name the [`EvidencePacketExportPreparedReceipt`]
+/// this availability follows (verified fail-closed — the lane's sixth
+/// inter-receipt link), and `packet_id`, `packet_hash`, and `recipient_scope_id`
+/// echo that receipt's values, each verified equal to the stored predecessor in
+/// the same fetch (availability must be to the scope the export was prepared
+/// for). Produced/applied/plan/activation/decision/gate provenance is inherited
+/// transitively through the export-prepared receipt, not restated.
+///
+/// **Deliberately absent.** No retrieval, access, delivery, receipt,
+/// acceptance, audit, certification, status, supersession, challenge, custody
+/// location, endpoint, token, or contact-data semantics exist in `:v1`.
+///
+/// `made_available_at` is node-stamped Unix seconds, hashed into `record_hash`
+/// but **excluded** from duplicate identity — a retry never restamps.
+/// `made_available_by` is actor evidence (the recorder / availability-witness),
+/// not an authority to make available, deliver, certify, or audit ("recorder,
+/// not releaser"). Authority adjudication is deferred (#1868/#2061); this
+/// receipt grants zero authority. Equality is anchored to `record_hash`.
+/// Human/AT status is excluded; #2041 stays open.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct EvidencePacketMadeAvailableReceipt {
+    /// Governance domain the session (and this availability) is scoped to.
+    pub domain_id: String,
+    /// Identifier of the already-opened process session this availability
+    /// attaches to. Caller-provided, opaque, meaningful only with `domain_id`.
+    pub session_id: String,
+    /// Caller-supplied opaque identifier for this availability, unique within
+    /// `(domain_id, session_id)` — uniqueness is enforced at the storage layer.
+    /// Multiple availabilities per export (distinct `availability_id`s) are
+    /// permitted at the substrate layer; how many is charter policy.
+    pub availability_id: String,
+    /// Caller-opaque `export_id` of the [`EvidencePacketExportPreparedReceipt`]
+    /// this availability follows — the predecessor's index handle (D4).
+    pub export_id: String,
+    /// Caller-opaque `packet_id`, inherited transitively through the
+    /// export-prepared receipt (verified equal to the predecessor's).
+    pub packet_id: String,
+    /// Content-addressed `record_hash` of the
+    /// [`EvidencePacketExportPreparedReceipt`] this availability follows — the
+    /// cryptographic proof link (D4, verified fail-closed before recording).
+    pub export_prepared_record_hash: Hash,
+    /// Echo of the export-prepared receipt's fingerprint of the public/redacted
+    /// packet artifact (D4). Verified equal to the stored predecessor's
+    /// `packet_hash`. The packet body itself is never stored.
+    pub packet_hash: Hash,
+    /// Caller-opaque handle of the recipient scope this export was made
+    /// available to (R6) — echoed from and verified equal to the export-prepared
+    /// receipt's `recipient_scope_id`. Never a name, email, phone number,
+    /// address, or any personal contact data.
+    pub recipient_scope_id: String,
+    /// Caller-supplied fingerprint of the disclosure policy governing this
+    /// availability (R6). The policy body itself is never stored; the hash
+    /// records *which* policy, not that the policy is complete, correct,
+    /// satisfied, or legally sufficient. Distinct from the predecessor's
+    /// `export_policy_hash`.
+    pub disclosure_policy_hash: Hash,
+    /// Caller-supplied fingerprint of the availability *method descriptor* (R6).
+    /// Records *that* a method was used, never the method itself — it is never a
+    /// URL, endpoint, retrieval token, vault path, location, or contact detail.
+    pub availability_method_hash: Hash,
+    /// DID of the authenticated actor who recorded the availability — recorder /
+    /// availability-witness evidence, not an authority to make available,
+    /// deliver, certify, or audit. Grants zero authority.
+    pub made_available_by: String,
+    /// Unix-seconds the availability was recorded (node-stamped). Not part of
+    /// duplicate identity — a retry never restamps.
+    pub made_available_at: u64,
+    /// blake3 canonical record hash binding the fields above.
+    pub record_hash: Hash,
+}
+
+impl PartialEq for EvidencePacketMadeAvailableReceipt {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_hash == other.record_hash
+    }
+}
+
+impl Eq for EvidencePacketMadeAvailableReceipt {}
+
+impl EvidencePacketMadeAvailableReceipt {
+    /// Domain separation tag for canonical evidence-packet-made-available record
+    /// hashes. Distinct from every other receipt-family tag — and in particular
+    /// it must NEVER converge with `icn:gov:evidence_packet_export_prepared:v1`
+    /// (its predecessor), `icn:gov:evidence_packet_produced:v1` (or its
+    /// `:receipt_set:v1` sub-tag), `icn:gov:mutation_applied:v1`,
+    /// `icn:gov:mutation_plan_recorded:v1`, `icn:gov:activation_crossed:v1`,
+    /// `icn:gov:decision_recorded:v1`, `icn:gov:process_gate_result:v1`,
+    /// `icn:gov:deliberation_entry_recorded:v1`,
+    /// `icn:gov:process_session_opened:v1`, or the proposal/vote
+    /// `icn:gov:decision:v1/v2/v3` lineage.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:evidence_packet_made_available:v1";
+
+    /// Build a new receipt and compute its canonical `record_hash`.
+    ///
+    /// `export_prepared_record_hash`, `packet_hash`, and `recipient_scope_id`
+    /// must reference/echo the stored [`EvidencePacketExportPreparedReceipt`]
+    /// (the manager verifies all three fail-closed before recording);
+    /// `disclosure_policy_hash` and `availability_method_hash` are
+    /// caller-supplied fingerprints of never-stored bodies (R6), mirroring how
+    /// the sibling classes take pre-computed fingerprints.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        domain_id: String,
+        session_id: String,
+        availability_id: String,
+        export_id: String,
+        packet_id: String,
+        export_prepared_record_hash: Hash,
+        packet_hash: Hash,
+        recipient_scope_id: String,
+        disclosure_policy_hash: Hash,
+        availability_method_hash: Hash,
+        made_available_by: String,
+        made_available_at: u64,
+    ) -> Self {
+        let record_hash = Self::compute_record_hash(
+            &domain_id,
+            &session_id,
+            &availability_id,
+            &export_id,
+            &packet_id,
+            &export_prepared_record_hash,
+            &packet_hash,
+            &recipient_scope_id,
+            &disclosure_policy_hash,
+            &availability_method_hash,
+            &made_available_by,
+            made_available_at,
+        );
+        Self {
+            domain_id,
+            session_id,
+            availability_id,
+            export_id,
+            packet_id,
+            export_prepared_record_hash,
+            packet_hash,
+            recipient_scope_id,
+            disclosure_policy_hash,
+            availability_method_hash,
+            made_available_by,
+            made_available_at,
+            record_hash,
+        }
+    }
+
+    /// Compute the canonical record hash from the input fields.
+    ///
+    /// Layout (per the #2330 rung §"Candidate field layouts" D4):
+    /// [`Self::DOMAIN_TAG`] first; each string field length-prefixed (u64 LE) in
+    /// order `domain_id`, `session_id`, `availability_id`, `export_id`,
+    /// `packet_id`, `recipient_scope_id`, `made_available_by`; then
+    /// `export_prepared_record_hash`, `packet_hash`, `disclosure_policy_hash`,
+    /// `availability_method_hash` appended **raw as fixed 32-byte fields with no
+    /// length prefix** (fixed-size fields cannot alias); then `made_available_at`
+    /// as LE bytes (Unix seconds). No discriminant byte (no kind taxonomy).
+    #[allow(clippy::too_many_arguments)]
+    pub fn compute_record_hash(
+        domain_id: &str,
+        session_id: &str,
+        availability_id: &str,
+        export_id: &str,
+        packet_id: &str,
+        export_prepared_record_hash: &Hash,
+        packet_hash: &Hash,
+        recipient_scope_id: &str,
+        disclosure_policy_hash: &Hash,
+        availability_method_hash: &Hash,
+        made_available_by: &str,
+        made_available_at: u64,
+    ) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        for field in [
+            domain_id,
+            session_id,
+            availability_id,
+            export_id,
+            packet_id,
+            recipient_scope_id,
+            made_available_by,
+        ] {
+            hasher.update(&(field.len() as u64).to_le_bytes());
+            hasher.update(field.as_bytes());
+        }
+        hasher.update(export_prepared_record_hash);
+        hasher.update(packet_hash);
+        hasher.update(disclosure_policy_hash);
+        hasher.update(availability_method_hash);
+        hasher.update(&made_available_at.to_le_bytes());
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+}
+
+// ============================================================================
 // Mandate grant reference (#1868 step 2 primitive — wire form only)
 // ============================================================================
 
@@ -7098,6 +7321,446 @@ mod tests {
             assert!(
                 !lower.contains(forbidden),
                 "EvidencePacketExportPreparedReceipt JSON must not contain `{forbidden}`; got: {json}"
+            );
+        }
+    }
+
+    // ============================================================================
+    // EvidencePacketMadeAvailableReceipt — tenth process/evidence class
+    // (#2330 access/made-available/disclosure decision rung, issue #2332)
+    // ============================================================================
+
+    fn sample_evidence_packet_made_available_receipt() -> EvidencePacketMadeAvailableReceipt {
+        EvidencePacketMadeAvailableReceipt::new(
+            "domain-food-coop".to_string(),
+            "session-alpha".to_string(),
+            "availability-001".to_string(),
+            "export-001".to_string(),
+            "packet-001".to_string(),
+            [7u8; 32], // export_prepared_record_hash (D4 proof link)
+            [5u8; 32], // packet_hash (verified echo of the export-prepared receipt)
+            "scope-partner-review".to_string(), // caller-opaque scope handle, never contact data
+            [3u8; 32], // disclosure_policy_hash (R6, body never stored)
+            [2u8; 32], // availability_method_hash (R6, fingerprint not a URL/path)
+            "did:icn:availer-1".to_string(), // recorder, not releaser
+            1_750_000_000,
+        )
+    }
+
+    #[test]
+    fn evidence_packet_made_available_golden_vector() {
+        // Golden canonical hash vector: pins the FULL v1 layout (domain tag,
+        // length-prefixed strings domain_id/session_id/availability_id/export_id/
+        // packet_id/recipient_scope_id/made_available_by, raw fixed 32-byte
+        // export_prepared_record_hash then packet_hash then disclosure_policy_hash
+        // then availability_method_hash, made_available_at LE — no discriminant
+        // byte). Any layout change breaks this test and requires a new tag version.
+        let r = sample_evidence_packet_made_available_receipt();
+        assert_eq!(
+            hex32(&r.record_hash),
+            "cc42740fa1e73e62ef58002620f067b720f3d8f2c61f1e4477b72be43da1ffad",
+            "canonical v1 hash layout drifted"
+        );
+    }
+
+    #[test]
+    fn evidence_packet_made_available_record_hash_determinism() {
+        let r1 = sample_evidence_packet_made_available_receipt();
+        let r2 = sample_evidence_packet_made_available_receipt();
+        assert_eq!(r1.record_hash, r2.record_hash);
+        assert_ne!(r1.record_hash, [0u8; 32]);
+        assert_eq!(r1, r2);
+    }
+
+    #[test]
+    fn evidence_packet_made_available_record_hash_changes_per_field() {
+        // Every hashed field independently changes the record hash — including
+        // made_available_at (hashed but excluded from duplicate identity; the
+        // identity exclusion is proven at the runtime-slice layer).
+        let base = sample_evidence_packet_made_available_receipt();
+        #[allow(clippy::too_many_arguments)]
+        let mk = |domain: &str,
+                  session: &str,
+                  availability: &str,
+                  export: &str,
+                  packet: &str,
+                  prepared_hash: [u8; 32],
+                  packet_hash: [u8; 32],
+                  scope: &str,
+                  policy_hash: [u8; 32],
+                  method_hash: [u8; 32],
+                  by: &str,
+                  at: u64| {
+            EvidencePacketMadeAvailableReceipt::new(
+                domain.to_string(),
+                session.to_string(),
+                availability.to_string(),
+                export.to_string(),
+                packet.to_string(),
+                prepared_hash,
+                packet_hash,
+                scope.to_string(),
+                policy_hash,
+                method_hash,
+                by.to_string(),
+                at,
+            )
+        };
+        let variants = [
+            mk(
+                "domain-other",
+                &base.session_id,
+                &base.availability_id,
+                &base.export_id,
+                &base.packet_id,
+                base.export_prepared_record_hash,
+                base.packet_hash,
+                &base.recipient_scope_id,
+                base.disclosure_policy_hash,
+                base.availability_method_hash,
+                &base.made_available_by,
+                base.made_available_at,
+            ),
+            mk(
+                &base.domain_id,
+                "session-other",
+                &base.availability_id,
+                &base.export_id,
+                &base.packet_id,
+                base.export_prepared_record_hash,
+                base.packet_hash,
+                &base.recipient_scope_id,
+                base.disclosure_policy_hash,
+                base.availability_method_hash,
+                &base.made_available_by,
+                base.made_available_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                "availability-other",
+                &base.export_id,
+                &base.packet_id,
+                base.export_prepared_record_hash,
+                base.packet_hash,
+                &base.recipient_scope_id,
+                base.disclosure_policy_hash,
+                base.availability_method_hash,
+                &base.made_available_by,
+                base.made_available_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.availability_id,
+                "export-other",
+                &base.packet_id,
+                base.export_prepared_record_hash,
+                base.packet_hash,
+                &base.recipient_scope_id,
+                base.disclosure_policy_hash,
+                base.availability_method_hash,
+                &base.made_available_by,
+                base.made_available_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.availability_id,
+                &base.export_id,
+                "packet-other",
+                base.export_prepared_record_hash,
+                base.packet_hash,
+                &base.recipient_scope_id,
+                base.disclosure_policy_hash,
+                base.availability_method_hash,
+                &base.made_available_by,
+                base.made_available_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.availability_id,
+                &base.export_id,
+                &base.packet_id,
+                [1u8; 32],
+                base.packet_hash,
+                &base.recipient_scope_id,
+                base.disclosure_policy_hash,
+                base.availability_method_hash,
+                &base.made_available_by,
+                base.made_available_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.availability_id,
+                &base.export_id,
+                &base.packet_id,
+                base.export_prepared_record_hash,
+                [8u8; 32],
+                &base.recipient_scope_id,
+                base.disclosure_policy_hash,
+                base.availability_method_hash,
+                &base.made_available_by,
+                base.made_available_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.availability_id,
+                &base.export_id,
+                &base.packet_id,
+                base.export_prepared_record_hash,
+                base.packet_hash,
+                "scope-other",
+                base.disclosure_policy_hash,
+                base.availability_method_hash,
+                &base.made_available_by,
+                base.made_available_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.availability_id,
+                &base.export_id,
+                &base.packet_id,
+                base.export_prepared_record_hash,
+                base.packet_hash,
+                &base.recipient_scope_id,
+                [4u8; 32],
+                base.availability_method_hash,
+                &base.made_available_by,
+                base.made_available_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.availability_id,
+                &base.export_id,
+                &base.packet_id,
+                base.export_prepared_record_hash,
+                base.packet_hash,
+                &base.recipient_scope_id,
+                base.disclosure_policy_hash,
+                [1u8; 32],
+                &base.made_available_by,
+                base.made_available_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.availability_id,
+                &base.export_id,
+                &base.packet_id,
+                base.export_prepared_record_hash,
+                base.packet_hash,
+                &base.recipient_scope_id,
+                base.disclosure_policy_hash,
+                base.availability_method_hash,
+                "did:icn:availer-other",
+                base.made_available_at,
+            ),
+            mk(
+                &base.domain_id,
+                &base.session_id,
+                &base.availability_id,
+                &base.export_id,
+                &base.packet_id,
+                base.export_prepared_record_hash,
+                base.packet_hash,
+                &base.recipient_scope_id,
+                base.disclosure_policy_hash,
+                base.availability_method_hash,
+                &base.made_available_by,
+                base.made_available_at + 1,
+            ),
+        ];
+        for (i, v) in variants.iter().enumerate() {
+            assert_ne!(
+                base.record_hash, v.record_hash,
+                "variant {i} must change the record hash"
+            );
+        }
+    }
+
+    #[test]
+    fn evidence_packet_made_available_tag_separates_from_other_families() {
+        // Family separation from every landed proof.rs domain tag, including the
+        // export-prepared predecessor and the produced receipt's set sub-tag.
+        for other in [
+            GovernanceProof::DOMAIN_TAG,
+            ProcessSessionOpenedReceipt::DOMAIN_TAG,
+            DeliberationEntryRecordedReceipt::DOMAIN_TAG,
+            DecisionRecordedReceipt::DOMAIN_TAG,
+            ProcessGateResultReceipt::DOMAIN_TAG,
+            ActivationCrossedReceipt::DOMAIN_TAG,
+            MutationPlanRecordedReceipt::DOMAIN_TAG,
+            MutationAppliedReceipt::DOMAIN_TAG,
+            EvidencePacketProducedReceipt::DOMAIN_TAG,
+            EvidencePacketProducedReceipt::RECEIPT_SET_DOMAIN_TAG,
+            // Must NEVER converge with the export-prepared predecessor.
+            EvidencePacketExportPreparedReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceipt::DOMAIN_TAG,
+            GovernanceDecisionReceiptV2::DOMAIN_TAG,
+            GovernanceDecisionReceiptV3::DOMAIN_TAG,
+            GovernanceDecisionAttestation::DOMAIN_TAG,
+            ActionItemCompletionReceipt::DOMAIN_TAG,
+            ActionItemCompletionReceiptV2::DOMAIN_TAG,
+            MeetingAttendanceReceipt::DOMAIN_TAG,
+            MeetingAttendanceReceiptV2::DOMAIN_TAG,
+            MandateGrantRef::DOMAIN_TAG,
+        ] {
+            assert_ne!(EvidencePacketMadeAvailableReceipt::DOMAIN_TAG, other);
+        }
+    }
+
+    #[test]
+    fn evidence_packet_made_available_length_prefix_prevents_field_shifting() {
+        // Shifting bytes between adjacent string fields must change the hash —
+        // the length prefix delimits each field exactly.
+        let a = EvidencePacketMadeAvailableReceipt::compute_record_hash(
+            "ab",
+            "c",
+            "availability-001",
+            "export-001",
+            "packet-001",
+            &[0u8; 32],
+            &[0u8; 32],
+            "scope-x",
+            &[0u8; 32],
+            &[0u8; 32],
+            "did:icn:x",
+            1,
+        );
+        let b = EvidencePacketMadeAvailableReceipt::compute_record_hash(
+            "a",
+            "bc",
+            "availability-001",
+            "export-001",
+            "packet-001",
+            &[0u8; 32],
+            &[0u8; 32],
+            "scope-x",
+            &[0u8; 32],
+            &[0u8; 32],
+            "did:icn:x",
+            1,
+        );
+        assert_ne!(a, b, "length prefix must delimit adjacent string fields");
+    }
+
+    #[test]
+    fn evidence_packet_made_available_serde_roundtrip_and_payload_audit() {
+        let r = sample_evidence_packet_made_available_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let back: EvidencePacketMadeAvailableReceipt =
+            serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(r, back);
+        // v1 layout audit: exactly the pinned fields are present, and NONE of
+        // the deliberately-absent fields (retrieval/access/delivery/custody
+        // location) leak into the payload.
+        for present in [
+            "domain_id",
+            "session_id",
+            "availability_id",
+            "export_id",
+            "packet_id",
+            "export_prepared_record_hash",
+            "packet_hash",
+            "recipient_scope_id",
+            "disclosure_policy_hash",
+            "availability_method_hash",
+            "made_available_by",
+            "made_available_at",
+            "record_hash",
+        ] {
+            assert!(json.contains(present), "field `{present}` must be present");
+        }
+        // NOTE: "availability" is core vocabulary for this class
+        // (availability_id / availability_method_hash / made_available_*), so it
+        // is NOT forbidden — but a custody *location*, method body, or contact
+        // datum must never appear.
+        for forbidden in [
+            "retrieved",
+            "accessed",
+            "delivered",
+            "received",
+            "accepted",
+            "audited",
+            "certified",
+            "custody",
+            "vault",
+            "location",
+            "url",
+            "endpoint",
+            "retrieval",
+            "credential",
+            "recipient_did",
+            "recipient_name",
+            "recipient_email",
+            "recipient_phone",
+            "recipient_address",
+            "recipient_list",
+            "recipient_scope_hash",
+            "scope_definition",
+            "status",
+            "superseded",
+            "withdrawn",
+            "challenged",
+            "packet_body",
+            "disclosure_policy_body",
+            "availability_method_body",
+            "human_at_status",
+            "ready",
+        ] {
+            assert!(
+                !json.contains(forbidden),
+                "field `{forbidden}` must NOT be present; got: {json}"
+            );
+        }
+    }
+
+    #[test]
+    fn evidence_packet_made_available_no_prohibited_vocabulary() {
+        // "made"/"available" are core vocabulary for this class, so they are NOT
+        // forbidden. This enforces the R1 boundary: no retrieval/access/
+        // transmission/receipt/acceptance/audit overclaim leaks into the
+        // payload, and no regulated-finance or proposal/vote lineage vocabulary
+        // appears.
+        let r = sample_evidence_packet_made_available_receipt();
+        let json = serde_json::to_string(&r).expect("serialize");
+        let lower = json.to_lowercase();
+        for forbidden in [
+            // regulated-finance vocabulary
+            "wallet",
+            "token",
+            "payment",
+            "currency",
+            "balance",
+            "deposit",
+            // R1 no-overclaim: made available, not retrieved/accessed/moved
+            "retrieved",
+            "accessed",
+            "delivered",
+            "transmitted",
+            "\"sent\"",
+            "received",
+            "accepted",
+            "audited",
+            "certified",
+            "authorized",
+            "executed",
+            // proposal/vote lineage vocabulary
+            "proposal",
+            "vote",
+            "tally",
+            "quorum",
+            "mandate",
+        ] {
+            assert!(
+                !lower.contains(forbidden),
+                "EvidencePacketMadeAvailableReceipt JSON must not contain `{forbidden}`; got: {json}"
             );
         }
     }
