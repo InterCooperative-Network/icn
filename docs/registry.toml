@@ -1475,6 +1475,15 @@ last_updated = "2026-07-05"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/design/evidence-export-delivery-boundary-decision-rung.md"]
+category = "design"
+status = "draft"
+title = "Evidence export/delivery boundary decision rung — EX1-EX8"
+description = "Narrow decision document resolving the eight open questions the merged #2322 evidence export/delivery boundary contract named in its §9 (#2323, under #1748/#2141, deferring to #1792), mirroring the evidence-packet-produced-receipt-decision-rung.md cadence — decide hash-participating structure in writing before any icn:gov:evidence_packet_export_prepared:v1 tag is pinned. EX1 (fact name/moment): the v1 fact is export-prepared, candidate class EvidencePacketExportPreparedReceipt — the sender-side preparation/staging of an export (packet bound to a recipient scope under an export policy); the name cannot be read as transmission; pinned surface language: prepared, not delivered, received, or accepted. EX2: made-available and delivered are distinct facts (unilateral custody fact vs claimed transmission report) and BOTH are excluded from v1. EX3: a single caller-opaque recipient_scope_id (no scope-definition hash/registry, no recipient DIDs or enumeration; hard rule: never contact data — mirrors EP3's no-id-without-precedent reasoning). EX4: recipient-side facts (received/accepted) stay out of generic ICN — institution/domain-package and bridge territory on recipient authority. EX5: consolidated 11-field candidate layout (domain_id, session_id, export_id key2, packet_id, packet_produced_record_hash verified fail-closed via get_evidence_packet_produced = the lane's fifth inter-receipt link, packet_hash ECHOED AND VERIFIED against the stored produced receipt in the same fetch — the lane's first verified echoed content field, export_policy_hash body-never-stored, recipient_scope_id, prepared_by recorder/export-witness zero-authority, prepared_at node-stamped hashed excluded from identity, record_hash); multiple exports per packet permitted (export_id = uniqueness unit, how many is charter policy); conflict sentinel evidence_packet_export_prepared_conflict. EX6: no custody/vault/location/retrieval semantics in v1 — access is the #1792 AccessReceipt lane. EX7: challenge/rejection/withdrawal fully deferred (append-only doctrine; #1009 dispute pathway). EX8: smallest dogfood = a later fixture-only member-shell rung mirroring #2312/#2320, only after the runtime class lands. Notes the ninth class extends the family beyond the eight named by the idea-0019 framing and must not be presented as completing a #1748 acceptance gate. Design only — no runtime, no receipt class, no tag pinned, no route/OpenAPI/SDK/member-shell/fixture change, no export performed, no delivery/acceptance/audit/legal-sufficiency claim, no human/AT execution (Refs #2323, #2322, #2321, #2318, #2320, #1748, #2141, #1792, #2041; no closure claims)"
+last_updated = "2026-07-05"
+owner = "matt"
+audiences = ["architects", "developers"]
+
 [docs."docs/design/mutation-applied-receipt-decision-rung.md"]
 category = "design"
 status = "draft"
