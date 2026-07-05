@@ -632,7 +632,7 @@
   // opts is optional. Existing callers (live completion + demo completion) pass
   // no opts, so the entry keeps its original {receipt, plainContext} shape and
   // renders through renderCompletionReceipt exactly as before. The #2289
-  // process-evidence pack passes opts.kind (one of the nine process/evidence
+  // process-evidence pack passes opts.kind (one of the ten process/evidence
   // classes) plus optional redaction metadata, routing to renderProcessReceipt.
   // No existing behavior changes.
   function addReceipt(receipt, plainContext, opts) {
@@ -705,9 +705,10 @@
 
   // ---------------------------------------------------------------------
   // #2289 organizer-steward evidence surface (fixture-only, read-only).
-  // Renders one of the nine process/evidence receipts — the eight ADR-0026
+  // Renders one of the ten process/evidence receipts — the eight ADR-0026
   // Layer 2 process-transition classes plus the export-boundary
-  // EvidencePacketExportPreparedReceipt — from proof.rs as a plain-language
+  // EvidencePacketExportPreparedReceipt and the availability-boundary
+  // EvidencePacketMadeAvailableReceipt — from proof.rs as a plain-language
   // summary first, with the record-level fields
   // under a progressive-disclosure "Show evidence detail" control. record_hash
   // is the proof pointer; body_hash is labeled proof-of-content (the body is
@@ -723,7 +724,8 @@
     mutation_plan_recorded: "MutationPlanRecordedReceipt",
     mutation_applied: "MutationAppliedReceipt",
     evidence_packet_produced: "EvidencePacketProducedReceipt",
-    evidence_packet_export_prepared: "EvidencePacketExportPreparedReceipt"
+    evidence_packet_export_prepared: "EvidencePacketExportPreparedReceipt",
+    evidence_packet_made_available: "EvidencePacketMadeAvailableReceipt"
   };
 
   // record_hash label mirrors renderCompletionReceipt's maturity-tier honesty:
@@ -862,6 +864,28 @@
       li.appendChild(exportBoundary);
     }
 
+    // Evidence-packet-made-available explainer (icn#2334): make the availability
+    // boundary legible by naming the states plainly — the prepared export, the
+    // availability recorded here to the same recipient scope under a disclosure
+    // policy, and the stacked negations (made available is not retrieved /
+    // accessed / delivered / received / accepted / audited / certified). Making
+    // an export available is not sending or opening it; this surface assembles,
+    // fetches, and delivers nothing, carries no URL / endpoint / token / vault /
+    // location meaning, and grants zero authority (who may access is a separate
+    // authority decision, not asserted here). This is the tenth receipt class
+    // and does not complete any #1748 acceptance gate.
+    if (kind === "evidence_packet_made_available") {
+      var availBoundary = el("div", { class: "boundary" });
+      availBoundary.appendChild(el("h4", { text: t("evidence.madeAvailable.boundaryHeading") }));
+      var abul = el("ul", { class: "card-list" });
+      abul.appendChild(el("li", { text: t("evidence.madeAvailable.boundary.exportPrepared") }));
+      abul.appendChild(el("li", { text: t("evidence.madeAvailable.boundary.availableHere") }));
+      abul.appendChild(el("li", { text: t("evidence.madeAvailable.boundary.notAccessed") }));
+      abul.appendChild(el("li", { text: t("evidence.madeAvailable.boundary.noAuthority") }));
+      availBoundary.appendChild(abul);
+      li.appendChild(availBoundary);
+    }
+
     var details = el("details");
     details.appendChild(el("summary", { text: t("receipt.showEvidence") }));
     var dl = el("dl", { class: "kv" });
@@ -993,6 +1017,40 @@
       kvRow(dl, t("evidence.kv.recipientScopeId"), String(r.recipient_scope_id || ""));
       kvRow(dl, t("evidence.kv.preparedBy"), el("code", { text: String(r.prepared_by || "") }));
       kvRow(dl, t("evidence.kv.preparedAt"), String(r.prepared_at || ""));
+    } else if (kind === "evidence_packet_made_available") {
+      kvRow(dl, t("evidence.kv.availabilityId"), String(r.availability_id || ""));
+      // Export-prepared reference (icn#2334 / D4): the availability names the
+      // export-prepared receipt it follows by both its caller-opaque id and its
+      // content-addressed record hash. Both are proof pointers to the
+      // evidence-packet-export-prepared receipt above — never body text. Produced,
+      // applied, plan, activation, decision, and gate provenance are inherited
+      // transitively through that export-prepared receipt, not restated here.
+      kvRow(dl, t("evidence.kv.madeAvailableExportRef"), String(r.export_id || ""));
+      kvRow(dl, t("evidence.kv.exportPreparedRecordHash"),
+        el("code", { text: hashToHex(r.export_prepared_record_hash) }));
+      kvRow(dl, t("evidence.kv.exportPacketRef"), String(r.packet_id || ""));
+      // Echoed packet fingerprint (D4): the export-prepared receipt's
+      // public/redacted packet_hash, echoed here as a verified proof link — the
+      // packet body is never stored and no retrieval / access / delivery fact is
+      // asserted by echoing it.
+      kvRow(dl, t("evidence.kv.madeAvailablePacketHashEcho"),
+        el("code", { text: hashToHex(r.packet_hash) }));
+      // Recipient scope (R6): a caller-opaque governance handle naming *which*
+      // scope this was made available to — echoed from and verified against the
+      // export-prepared receipt; never a name, email, address, or contact data.
+      kvRow(dl, t("evidence.kv.madeAvailableRecipientScope"), String(r.recipient_scope_id || ""));
+      // Disclosure policy fingerprint (R6): which disclosure policy governs this
+      // availability — the policy body is never stored; not a claim access was
+      // granted, or that anything is complete, satisfied, or legally sufficient.
+      kvRow(dl, t("evidence.kv.disclosurePolicyHash"),
+        el("code", { text: hashToHex(r.disclosure_policy_hash) }));
+      // Availability method fingerprint (R6): which method made this available —
+      // a fingerprint only, never a URL, endpoint, retrieval token, vault path,
+      // location, or contact detail; the method descriptor is never stored.
+      kvRow(dl, t("evidence.kv.availabilityMethodHash"),
+        el("code", { text: hashToHex(r.availability_method_hash) }));
+      kvRow(dl, t("evidence.kv.madeAvailableBy"), el("code", { text: String(r.made_available_by || "") }));
+      kvRow(dl, t("evidence.kv.madeAvailableAt"), String(r.made_available_at || ""));
     }
     recordHashRow(dl, r.record_hash);
     details.appendChild(dl);

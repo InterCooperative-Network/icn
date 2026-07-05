@@ -270,9 +270,10 @@
       "launcher.startFailed": "Could not start the local demo ({error}). Use Connect manually instead, or check the launcher tunnel.",
 
       // --- #2289 organizer-steward evidence surface (fixture-only) -------
-      // Renders the nine already-landed process/evidence receipts (the eight
+      // Renders the ten already-landed process/evidence receipts (the eight
       // ADR-0026 Layer 2 process-transition classes plus the export-boundary
-      // EvidencePacketExportPreparedReceipt) as a plain-language evidence story,
+      // EvidencePacketExportPreparedReceipt and the availability-boundary
+      // EvidencePacketMadeAvailableReceipt) as a plain-language evidence story,
       // plus a repo-safe evidence summary. Fixture/dev only; nothing signed;
       // read-only. No readiness is claimed and no new receipt class is
       // introduced (the ninth landed at runtime in icn#2326).
@@ -285,6 +286,7 @@
       "evidence.mutation_applied.heading": "Mutation applied",
       "evidence.evidence_packet_produced.heading": "Evidence packet produced",
       "evidence.evidence_packet_export_prepared.heading": "Evidence packet export prepared",
+      "evidence.evidence_packet_made_available.heading": "Evidence packet made available",
 
       // Deliberation redaction demo (steward-visible vs member/export-redacted).
       "evidence.redaction.stewardHeading": "What the steward body sees",
@@ -339,8 +341,13 @@
       "evidence.exportPrepared.boundary.preparedHere": "An export of that produced packet was then prepared here for a named recipient scope, under a declared export policy. This receipt references the produced packet (by id and record hash), echoes its public/redacted fingerprint as a proof link, and fingerprints the export policy — the policy body, packet body, recipient list, and any contact data are never stored; the recipient scope is a caller-opaque handle.",
       "evidence.exportPrepared.boundary.notDelivered": "Preparing an export is not sending it. This receipt does not assert that anything was made available, delivered, received, accepted, audited, or certified — those remain separate, later concerns. No export artifact was assembled by this surface.",
       "evidence.exportPrepared.boundary.noAuthority": "It carries no access, vault, custody, location, or retrieval meaning, records a process fact, and grants zero authority. Delivery and everything after it remain deferred.",
+      "evidence.madeAvailable.boundaryHeading": "What making an evidence packet export available means here",
+      "evidence.madeAvailable.boundary.exportPrepared": "An export of the produced packet was prepared for a named recipient scope (the evidence-packet-export-prepared receipt above) — a sender-side preparation fact, with no packet or policy body stored.",
+      "evidence.madeAvailable.boundary.availableHere": "That prepared export was then made available to the same recipient scope here, under a recorded disclosure policy. This receipt references the export-prepared receipt (by id and record hash), echoes its public/redacted fingerprint and recipient scope as verified proof links, and fingerprints the disclosure policy and the availability method — the policy body, method descriptor, packet body, recipient list, and any contact data are never stored; no URL, endpoint, retrieval token, vault path, or location appears; the recipient scope is a caller-opaque handle.",
+      "evidence.madeAvailable.boundary.notAccessed": "Making an export available is not sending or opening it. This receipt does not assert that the recipient retrieved, accessed, received, accepted, audited, or certified it, or agreed with it — those remain separate, later concerns. No artifact is assembled, fetched, or delivered by this surface.",
+      "evidence.madeAvailable.boundary.noAuthority": "It carries no access, retrieval, custody, or vault meaning, records a process fact, and grants zero authority. Who may access the object is a separate authority decision, not asserted here. Access and everything after it remain deferred.",
 
-      // Evidence-detail key/value labels for the nine receipt classes.
+      // Evidence-detail key/value labels for the ten receipt classes.
       "evidence.kv.domainId": "Domain id",
       "evidence.kv.sessionId": "Session id",
       "evidence.kv.openedBy": "Opened by (who recorded this fact)",
@@ -386,6 +393,15 @@
       "evidence.kv.recipientScopeId": "Recipient scope (a caller-opaque governance handle naming which scope this export was prepared for — never a name, email, address, or any contact data)",
       "evidence.kv.preparedBy": "Prepared by (who recorded this preparation fact — recorder / export-witness, not an authority to export, release, deliver, certify, or audit)",
       "evidence.kv.preparedAt": "Prepared at (unix seconds)",
+      "evidence.kv.availabilityId": "Availability id",
+      "evidence.kv.madeAvailableExportRef": "Referenced export id (the export-prepared receipt this availability follows)",
+      "evidence.kv.exportPreparedRecordHash": "Referenced export-prepared record hash (proof pointer to the evidence-packet-export-prepared receipt above — not its body)",
+      "evidence.kv.madeAvailablePacketHashEcho": "Echoed packet fingerprint (the export-prepared receipt's public/redacted packet hash, echoed here as a verified proof link — the packet body is never stored; not a claim it was retrieved, accessed, or delivered)",
+      "evidence.kv.madeAvailableRecipientScope": "Recipient scope (a caller-opaque governance handle naming which scope this was made available to — echoed from and verified against the export-prepared receipt; never a name, email, address, or any contact data)",
+      "evidence.kv.disclosurePolicyHash": "Disclosure policy fingerprint (which disclosure policy governs this availability; the policy body is never stored — not a claim access was granted, or that anything is complete, satisfied, or legally sufficient)",
+      "evidence.kv.availabilityMethodHash": "Availability method fingerprint (which method made this available; the method descriptor is never stored — never a URL, endpoint, retrieval token, vault path, location, or contact detail)",
+      "evidence.kv.madeAvailableBy": "Made available by (who recorded this availability fact — recorder / availability-witness, not an authority to make available, deliver, certify, or audit)",
+      "evidence.kv.madeAvailableAt": "Made available at (unix seconds)",
 
       // Evidence summary / export (read-only render of the committed fixture).
       "evidence.export.heading": "Evidence summary",
