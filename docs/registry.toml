@@ -1498,6 +1498,15 @@ last_updated = "2026-07-05"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/design/access-made-available-disclosure-receipt-decision-rung.md"]
+category = "design"
+status = "draft"
+title = "Access, made-available, and disclosure receipt decision rung — R1-R10"
+description = "Design-only decision rung (#2330) for the receipt facts after the landed EvidencePacketExportPreparedReceipt (#2326): recommends EvidencePacketMadeAvailableReceipt as the first runtime slice with narrow fingerprint-only semantics, and pins candidate field layouts for made-available, access, disclosure-decision, and redaction-applied receipts. Distinguishes prepared / made-available / accessed / delivered / received / accepted / audited / certified / legally-sufficient, defers authority adjudication to #1868/#2061 via opaque authority-basis references, and implements no runtime, receipt class, route, or member-shell change."
+last_updated = "2026-07-05"
+owner = "matt"
+audiences = ["architects", "developers"]
+
 [docs."docs/design/mutation-applied-receipt-decision-rung.md"]
 category = "design"
 status = "draft"
