@@ -537,6 +537,12 @@ Authoritative design for bridging between ICN and external execution environment
 
 **For:** `architects`, `developers` | **Updated:** 2026-03-10
 
+### 📋 **Draft** [Governance Write Authority Decomposition](/docs/design/governance-write-authority-decomposition.md)
+
+Current-state design/control map for #1868 after the original hybrid governance:write decomposition began landing. Enumerates all 51 current governance HTTP handlers still accepting the broad scope, including six newer direct-only paths; confirms the hybrid of bounded class scopes plus app-side mandate/process/entity authority; maps the seven landed class scopes and proposes governance:process:write for four real process-receipt handlers; maps DomainPolicy adoption and InstitutionalDomain declaration to the landed charter class; distinguishes technical capability, entity-aware subject/target authorization, MandateGate authority, and receipt evidence; and explains why #1868/#2061/#2080/#2081 must advance before AccessReceipt runtime. Docs only: no runtime, scope, handler, route, receipt, token, enforcement, vault, encryption, UI, fixture, downstream-repo, or readiness change.
+
+**For:** `architects`, `developers`, `security`, `operators` | **Updated:** 2026-07-05
+
 ### 📝 **Living** [ICN Project Governance](/docs/design/governance/PROJECT_GOVERNANCE.md)
 
 Governance structure for ICN development and decision-making
@@ -2144,10 +2150,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 350
+**Total documents:** 351
 
 **By status:**
 - Active: 1
 - Canonical: 40
-- Draft: 97
+- Draft: 98
 - Living: 212

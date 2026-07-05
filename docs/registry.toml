@@ -1517,6 +1517,16 @@ owner = "matt"
 audiences = ["architects", "developers", "operators"]
 depends_on = ["docs/design/access-made-available-disclosure-receipt-decision-rung.md", "docs/architecture/PRIVATE_DATA_DISCLOSURE_BOUNDARY.md", "docs/spec/network-anti-entropy-proof-loops.md", "docs/spec/artifact-registry-and-scoped-vault.md", "docs/spec/institutional-domain.md", "docs/spec/governed-service-binding.md", "docs/spec/effect-dispatch-contract.md", "docs/spec/federation-settlement-finality.md", "docs/architecture/KERNEL_APP_SEPARATION.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/reference/project-index/repository-map.md"]
 
+[docs."docs/design/governance-write-authority-decomposition.md"]
+category = "design"
+status = "draft"
+title = "Governance Write Authority Decomposition"
+description = "Current-state design/control map for #1868 after the original hybrid governance:write decomposition began landing. Enumerates all 51 current governance HTTP handlers still accepting the broad scope, including six newer direct-only paths; confirms the hybrid of bounded class scopes plus app-side mandate/process/entity authority; maps the seven landed class scopes and proposes governance:process:write for four real process-receipt handlers; maps DomainPolicy adoption and InstitutionalDomain declaration to the landed charter class; distinguishes technical capability, entity-aware subject/target authorization, MandateGate authority, and receipt evidence; and explains why #1868/#2061/#2080/#2081 must advance before AccessReceipt runtime. Docs only: no runtime, scope, handler, route, receipt, token, enforcement, vault, encryption, UI, fixture, downstream-repo, or readiness change."
+last_updated = "2026-07-05"
+owner = "matt"
+audiences = ["architects", "developers", "security", "operators"]
+depends_on = ["docs/design/governance/governance-write-decomposition.md", "docs/design/governance/mandate-gate-design.md", "docs/design/entity-aware-auth-control-map.md", "docs/design/made-available-federation-access-boundary-map.md", "docs/design/access-made-available-disclosure-receipt-decision-rung.md", "docs/architecture/ABUSE_CASE_HARDENING_STRATEGY.md", "docs/spec/effect-dispatch-contract.md", "docs/spec/institutional-domain.md", "docs/spec/ccl-policy-registry.md", "docs/rfcs/RFC-0018-entity-aware-request-authorization.md"]
+
 [docs."docs/design/mutation-applied-receipt-decision-rung.md"]
 category = "design"
 status = "draft"
