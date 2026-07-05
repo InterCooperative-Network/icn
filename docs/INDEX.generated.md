@@ -579,6 +579,12 @@ Design for managing multiple network endpoints with IPv6
 
 **For:** `architects`, `developers` | **Updated:** 2026-03-10
 
+### 📋 **Draft** [Made-Available, Federation Sync, Access, and Repair Boundary Map](/docs/design/made-available-federation-access-boundary-map.md)
+
+Design/control map (#2336) for the boundary after the landed EvidencePacketMadeAvailableReceipt (#2333/#2335). Distinguishes sender/custodian availability from federation digest propagation, routing proof, peer observation, recipient access, delivery, receipt, acceptance, audit, certification, and legal sufficiency. Maps the design-level ArtifactRegistry, ScopedVault, PrivateObjectRef, DisclosurePolicy, future AccessReceipt, and the wire-stable anti-entropy proof artifacts without claiming live emission or enforcement. Decides that AccessReceipt is design-ready only and runtime-blocked by authority-basis, entity-aware authorization, trusted issuance, and vault-enforcement gaps. Recommends #1868/#2061 authority work as the next lane. No runtime, receipt class, route, UI, fixture, vault, encryption, federation rollout, or readiness change.
+
+**For:** `architects`, `developers`, `operators` | **Updated:** 2026-07-05
+
 ### 📋 **Draft** [apps/membership coop_core — Map-Parity Contract (#2082 gap 12b)](/docs/design/membership-coop-core-map-parity.md)
 
 Design/audit contract for the last #2082 structural gap: the apps/membership coop_core actor is a test-harness fixture (icn-core dev-dependency; sole consumer is vertical_slice_integration.rs; no production caller) frozen pre-#2104 — no icn-entity dep, no CoopEntityMap integration, no activation binding/populate, no CreateTreasury consultation. Defines the divergence table, the parity-vs-deprecate decision (Option B deprecate/redirect recommended: migrate the vertical-slice test to icn_coop::CoopActor and freeze/remove the duplicate), the exact parity slices and test matrix if parity is chosen instead, and explicit non-claims. Mapping stays zero-authority; UnknownLegacy stays untrusted. Design only — no runtime change (#2082; #2081/#2080 untouched)
@@ -2138,10 +2144,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 349
+**Total documents:** 350
 
 **By status:**
 - Active: 1
 - Canonical: 40
-- Draft: 96
+- Draft: 97
 - Living: 212

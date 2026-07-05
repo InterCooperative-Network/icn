@@ -1507,6 +1507,16 @@ last_updated = "2026-07-05"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/design/made-available-federation-access-boundary-map.md"]
+category = "design"
+status = "draft"
+title = "Made-Available, Federation Sync, Access, and Repair Boundary Map"
+description = "Design/control map (#2336) for the boundary after the landed EvidencePacketMadeAvailableReceipt (#2333/#2335). Distinguishes sender/custodian availability from federation digest propagation, routing proof, peer observation, recipient access, delivery, receipt, acceptance, audit, certification, and legal sufficiency. Maps the design-level ArtifactRegistry, ScopedVault, PrivateObjectRef, DisclosurePolicy, future AccessReceipt, and the wire-stable anti-entropy proof artifacts without claiming live emission or enforcement. Decides that AccessReceipt is design-ready only and runtime-blocked by authority-basis, entity-aware authorization, trusted issuance, and vault-enforcement gaps. Recommends #1868/#2061 authority work as the next lane. No runtime, receipt class, route, UI, fixture, vault, encryption, federation rollout, or readiness change."
+last_updated = "2026-07-05"
+owner = "matt"
+audiences = ["architects", "developers", "operators"]
+depends_on = ["docs/design/access-made-available-disclosure-receipt-decision-rung.md", "docs/architecture/PRIVATE_DATA_DISCLOSURE_BOUNDARY.md", "docs/spec/network-anti-entropy-proof-loops.md", "docs/spec/artifact-registry-and-scoped-vault.md", "docs/spec/institutional-domain.md", "docs/spec/governed-service-binding.md", "docs/spec/effect-dispatch-contract.md", "docs/spec/federation-settlement-finality.md", "docs/architecture/KERNEL_APP_SEPARATION.md", "docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md", "docs/reference/project-index/repository-map.md"]
+
 [docs."docs/design/mutation-applied-receipt-decision-rung.md"]
 category = "design"
 status = "draft"
