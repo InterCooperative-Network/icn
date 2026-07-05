@@ -270,10 +270,12 @@
       "launcher.startFailed": "Could not start the local demo ({error}). Use Connect manually instead, or check the launcher tunnel.",
 
       // --- #2289 organizer-steward evidence surface (fixture-only) -------
-      // Renders the eight already-landed ADR-0026 Layer 2 process-transition
-      // receipts as a plain-language evidence story, plus a repo-safe evidence
-      // summary. Fixture/dev only; nothing signed; read-only. No readiness is
-      // claimed and no new receipt class is introduced.
+      // Renders the nine already-landed process/evidence receipts (the eight
+      // ADR-0026 Layer 2 process-transition classes plus the export-boundary
+      // EvidencePacketExportPreparedReceipt) as a plain-language evidence story,
+      // plus a repo-safe evidence summary. Fixture/dev only; nothing signed;
+      // read-only. No readiness is claimed and no new receipt class is
+      // introduced (the ninth landed at runtime in icn#2326).
       "evidence.process_session_opened.heading": "Process session opened",
       "evidence.deliberation_entry_recorded.heading": "Deliberation input recorded",
       "evidence.decision_recorded.heading": "Decision recorded",
@@ -282,6 +284,7 @@
       "evidence.mutation_plan_recorded.heading": "Mutation plan recorded",
       "evidence.mutation_applied.heading": "Mutation applied",
       "evidence.evidence_packet_produced.heading": "Evidence packet produced",
+      "evidence.evidence_packet_export_prepared.heading": "Evidence packet export prepared",
 
       // Deliberation redaction demo (steward-visible vs member/export-redacted).
       "evidence.redaction.stewardHeading": "What the steward body sees",
@@ -326,7 +329,18 @@
       "evidence.evidencePacket.boundary.producedHere": "An evidence packet was produced and recorded here. This receipt references the applied step it draws from, commits to the set of source receipts as a single fingerprint, and fingerprints the public/redacted packet artifact and the redaction profile that shaped it. No packet body, source receipt body, or private data is stored — fingerprints only.",
       "evidence.evidencePacket.boundary.notDelivered": "Producing the packet is not delivering it. This receipt does not assert delivery, acceptance, audit certification, human or assistive-technology verification, correctness, completeness, or legal sufficiency — those remain separate, later concerns. The receipt records a process fact and grants zero authority.",
 
-      // Evidence-detail key/value labels for the eight receipt classes.
+      // Evidence-packet-export-prepared explainer (icn#2327): names the states
+      // plainly so a preparation-recorded fact is never read as delivery, being
+      // made available, receipt, acceptance, audit, or certification. This is
+      // the ninth receipt class — the first beyond the eight process-transition
+      // classes — and completes no #1748 acceptance gate.
+      "evidence.exportPrepared.boundaryHeading": "What preparing an evidence packet export means here",
+      "evidence.exportPrepared.boundary.produced": "An evidence packet was produced and recorded (the evidence-packet-produced receipt above) — a public/redacted artifact fingerprinted there, with no packet body stored.",
+      "evidence.exportPrepared.boundary.preparedHere": "An export of that produced packet was then prepared here for a named recipient scope, under a declared export policy. This receipt references the produced packet (by id and record hash), echoes its public/redacted fingerprint as a proof link, and fingerprints the export policy — the policy body, packet body, recipient list, and any contact data are never stored; the recipient scope is a caller-opaque handle.",
+      "evidence.exportPrepared.boundary.notDelivered": "Preparing an export is not sending it. This receipt does not assert that anything was made available, delivered, received, accepted, audited, or certified — those remain separate, later concerns. No export artifact was assembled by this surface.",
+      "evidence.exportPrepared.boundary.noAuthority": "It carries no access, vault, custody, location, or retrieval meaning, records a process fact, and grants zero authority. Delivery and everything after it remain deferred.",
+
+      // Evidence-detail key/value labels for the nine receipt classes.
       "evidence.kv.domainId": "Domain id",
       "evidence.kv.sessionId": "Session id",
       "evidence.kv.openedBy": "Opened by (who recorded this fact)",
@@ -364,6 +378,14 @@
       "evidence.kv.redactionProfileHash": "Redaction profile fingerprint (which redaction profile shaped the public packet; the profile body is never stored — not a claim the redaction is complete or legally sufficient)",
       "evidence.kv.producedBy": "Produced by (who recorded this production fact — recorder / producer-witness, not an authority to produce, deliver, certify, or audit)",
       "evidence.kv.producedAt": "Produced at (unix seconds)",
+      "evidence.kv.exportId": "Export id",
+      "evidence.kv.exportPacketRef": "Referenced produced packet id (the produced packet this export prepares)",
+      "evidence.kv.packetProducedRecordHash": "Referenced produced record hash (proof pointer to the evidence-packet-produced receipt above — not its body)",
+      "evidence.kv.exportPacketHashEcho": "Echoed packet fingerprint (the produced receipt's public/redacted packet hash, echoed here as a proof link — the packet body is never stored; not a claim it was delivered or made available)",
+      "evidence.kv.exportPolicyHash": "Export policy fingerprint (which export policy shaped this preparation; the policy body is never stored — not a claim the export is authorized, complete, satisfied, or legally sufficient)",
+      "evidence.kv.recipientScopeId": "Recipient scope (a caller-opaque governance handle naming which scope this export was prepared for — never a name, email, address, or any contact data)",
+      "evidence.kv.preparedBy": "Prepared by (who recorded this preparation fact — recorder / export-witness, not an authority to export, release, deliver, certify, or audit)",
+      "evidence.kv.preparedAt": "Prepared at (unix seconds)",
 
       // Evidence summary / export (read-only render of the committed fixture).
       "evidence.export.heading": "Evidence summary",

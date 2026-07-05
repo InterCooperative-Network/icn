@@ -9,15 +9,21 @@ not organizer-ready, not member-ready, not live federation, not NYCN activation,
 Phase 2 completion, not real member/partner data, and makes no signed/partner claim.
 
 This surface reads the **eight already-landed ADR-0026 Layer 2 process-transition
-receipt classes** (`icn/crates/icn-governance/src/proof.rs`) — no new receipt class is
-introduced, no Rust runtime is changed, and no OpenAPI/SDK is touched. It implements the
+receipt classes plus the ninth `EvidencePacketExportPreparedReceipt`** — the
+export-boundary follow-on that extends the receipt family — all landed in
+`icn/crates/icn-governance/src/proof.rs`. **No new receipt class is introduced by this
+render pass**, no Rust runtime is changed, and no OpenAPI/SDK is touched. It implements the
 design contract landed in **#2290**
 ([`docs/design/organizer-steward-evidence-surface-runtime-dogfood.md`](../design/organizer-steward-evidence-surface-runtime-dogfood.md));
 the fifth class (`ActivationCrossedReceipt`, landed in **#2296**) was added to this
 fixture/demo surface by **#2297**, the sixth (`MutationPlanRecordedReceipt`, landed
 in **#2303**) by **#2304**, the seventh (`MutationAppliedReceipt`, landed in
-**#2310**) by **#2311**, and the eighth (`EvidencePacketProducedReceipt`, landed in
-**#2318**) by **#2319**.
+**#2310**) by **#2311**, the eighth (`EvidencePacketProducedReceipt`, landed in
+**#2318**) by **#2319**, and the ninth (`EvidencePacketExportPreparedReceipt`,
+`icn:gov:evidence_packet_export_prepared:v1`, landed at runtime in **#2326** under the
+**#2322** boundary contract / **#2324** EX1–EX8 decision rung) by **#2327** (this pass).
+The ninth is the first class beyond the eight process-transition classes; rendering it
+completes no **#1748** acceptance gate and asserts no delivery.
 
 ## 1. What was run, and what was not
 
@@ -78,7 +84,7 @@ in **#2303**) by **#2304**, the seventh (`MutationAppliedReceipt`, landed in
 ## 3. Rendered walkthrough — observed
 
 The process-evidence view renders the `receipt → surface → evidence/export` tail of the
-vertical spine **as read views**: the eight process-transition receipts in sequence, a
+vertical spine **as read views**: the nine process/evidence receipts in sequence, a
 fixture-safe privacy/redaction boundary, and a repo-safe evidence-summary export. No
 mutation is performed; no gateway is contacted.
 
@@ -87,11 +93,12 @@ mutation is performed; no gateway is contacted.
 | Honesty banner text (permanently visible) | `Fixture-backed demo — no live node, nothing signed.` |
 | Standing pane visible; memberships / roles rendered | yes (reused demo standing) |
 | Action cards pane visible | yes (reused demo cards) |
-| Receipts pane: eight process-transition receipts rendered in order | yes — **8 receipts** (`ProcessSessionOpenedReceipt` → `DeliberationEntryRecordedReceipt` → `DecisionRecordedReceipt` → `ProcessGateResultReceipt` → `ActivationCrossedReceipt` → `MutationPlanRecordedReceipt` → `MutationAppliedReceipt` → `EvidencePacketProducedReceipt`) |
+| Receipts pane: nine process/evidence receipts rendered in order | yes — **9 receipts** (`ProcessSessionOpenedReceipt` → `DeliberationEntryRecordedReceipt` → `DecisionRecordedReceipt` → `ProcessGateResultReceipt` → `ActivationCrossedReceipt` → `MutationPlanRecordedReceipt` → `MutationAppliedReceipt` → `EvidencePacketProducedReceipt` → `EvidencePacketExportPreparedReceipt`) |
 | Activation boundary legible (icn#2297) | yes — the activation receipt names the boundary plainly ("crossed from decision toward later action planning") and distinguishes the three states: the recorded decision, the activation crossing itself, and the later mutation-planning work that remains deferred. It shows the decision reference (`decision_id` + `decision_record_hash` proof pointer) and the gate basis (`gate_basis` fingerprint + the declared passed gate-result `record_hash`), never body text; copy states it "records a process fact and grants zero authority" |
 | Mutation-plan-recorded boundary legible (icn#2304) | yes — the mutation-plan receipt names the boundary plainly ("a mutation plan was recorded after activation, before any mutation was applied") and distinguishes the states: the recorded decision, the activation crossing, the plan being recorded here, and the two later steps that remain deferred (mutation application and evidence-packet production). It shows the activation reference (`activation_id` + `activation_record_hash` proof pointer to the crossing above) and the plan proof pointer (`plan_id` + `body_hash`), never the plan body / operation list / target list / effect payload; `recorded_by` is labeled "who recorded the plan, not the planner, approver, applier, or authority holder"; copy states it "records a process fact and grants zero authority" |
 | Mutation-applied boundary legible (icn#2311) | yes — the mutation-applied receipt names the boundary plainly ("the plan's application was recorded after the plan — an application fact") and distinguishes the states: the recorded decision, the activation crossing, the mutation plan recorded, the plan's application recorded here, and the later evidence-packet production that remains deferred. It shows the plan reference (`plan_id` + `plan_record_hash` proof pointer to the mutation-plan receipt above) and the result proof pointer (`result_hash`), never the applied-result body / operation list / target list / effect payload; `applied_by` is labeled "who recorded the application — recorder / apply-witness, not the applier, approver, or authority holder"; copy states it "does not execute, authorize, validate, enforce, roll back, or prove the mutation correct" and "grants zero authority" |
 | Evidence-packet-produced boundary legible (icn#2319) | yes — the evidence-packet-produced receipt names the terminal boundary plainly ("an evidence packet was produced and recorded here") and distinguishes the states: the recorded decision, the activation crossing, the mutation plan recorded, the plan's application recorded, the packet's production recorded here, and the explicit non-claim that producing is not delivering ("does not assert delivery, acceptance, audit certification, human or assistive-technology verification, correctness, completeness, or legal sufficiency"). It shows the applied reference (`mutation_application_id` + `mutation_applied_record_hash` proof pointer to the mutation-applied receipt above), the source-set commitment (`receipt_set_hash` — references, never bodies), the packet fingerprint (`packet_hash` — public/redacted artifact only, body never stored), and the redaction-profile fingerprint (`redaction_profile_hash` — profile body never stored, no completeness/sufficiency claim); `produced_by` is labeled "who recorded this production fact — recorder / producer-witness, not an authority to produce, deliver, certify, or audit"; copy states the receipt "records a process fact and grants zero authority" |
+| Export-prepared boundary legible (icn#2327) | yes — the evidence-packet-export-prepared receipt names the export boundary plainly ("an export of the produced evidence packet was prepared for a named recipient scope and recorded here") and distinguishes the states: the produced packet, the export preparation recorded here, and the stacked negations (prepared is **not** made available, delivered, received, accepted, audited, or certified). It shows the produced-packet reference (`packet_id` + `packet_produced_record_hash` proof pointer to the evidence-packet-produced receipt above), the echoed packet fingerprint (`packet_hash`, the produced receipt's public/redacted artifact hash echoed as a proof link — not a delivery/made-available claim), the export-policy fingerprint (`export_policy_hash` — policy body never stored, no authorized/complete/legally-sufficient claim), and the recipient scope (`recipient_scope_id`, a caller-opaque handle — never a name, email, address, or contact data); `prepared_by` is labeled "recorder / export-witness, not an authority to export, release, deliver, certify, or audit"; copy states "no export artifact was assembled by this surface", it "carries no access, vault, custody, location, or retrieval meaning", and "records a process fact and grants zero authority" |
 | Plain-language summary first; record fields under "Show evidence detail" | yes (per receipt) |
 | Privacy/redaction boundary legible | yes — the deliberation entry shows "What the steward body sees" (fictional summary) **and** "What members and the export see" (redaction reason + `record_hash`/`body_hash` proof pointers, no input text) |
 | Proof pointers labeled honestly | yes — `record_hash` = proof pointer; `body_hash` = "proof of content; the input itself is never stored"; recorder DIDs labeled "who recorded this fact, not who decided" |
@@ -115,7 +122,7 @@ Process-evidence view (`?mode=demo&set=process-evidence`), and the two regressio
 | **axe-core** (`wcag2a, wcag2aa, wcag21a, wcag21aa, wcag22aa`) | **0 violations**, 27 passes | 0 violations, 27 passes | 0 violations, 27 passes |
 | Keyboard: focusables reached by Tab | 16 | 16 | 15 |
 | Keyboard: **every** focused element had a visible outline | **true** | true | true |
-| Receipts rendered | **8** | 1 | 1 |
+| Receipts rendered | **9** | 1 | 1 |
 | 200% CSS zoom render | no layout break | no layout break | no layout break |
 | Mobile (360px) horizontal scroll | none | none | none |
 | `prefers-reduced-motion: reduce` render | standing pane renders | renders | renders |
@@ -281,14 +288,15 @@ them.
 - Human 200% browser-zoom + small-device pass (3.3 / 3.5 / 3.8). [#2041]
 - External contrast-audit-tool confirmation of the documented ratios (3.3). [#2041]
 - Extend the process-evidence human/AT packet (§4G of the human-a11y-validation doc) to
-  cover the fifth, sixth, seventh, and eighth receipts (`ActivationCrossedReceipt`,
-  `MutationPlanRecordedReceipt`, `MutationAppliedReceipt`, `EvidencePacketProducedReceipt`)
-  in the real human pass — the automated floor above now covers all eight, but §4G currently
-  enumerates the four-receipt story; adding the activation, mutation-plan, mutation-applied,
-  and evidence-packet-produced rows is owed, not done here. [#2041]
+  cover the fifth through ninth receipts (`ActivationCrossedReceipt`,
+  `MutationPlanRecordedReceipt`, `MutationAppliedReceipt`, `EvidencePacketProducedReceipt`,
+  `EvidencePacketExportPreparedReceipt`) in the real human pass — the automated floor above
+  now covers all nine, but §4G currently enumerates the four-receipt story; adding the
+  activation, mutation-plan, mutation-applied, evidence-packet-produced, and
+  evidence-packet-export-prepared rows is owed, not done here. [#2041]
 - (Separate lanes, not this pass) real translations + human language QA (#1740); the
   broader human-operability spine (#1748 / #2141) remains open.
 
 ---
 
-_Refs #2289. Refs #2290. Refs #2291. Refs #2296. Refs #2297. Refs #2303. Refs #2304. Refs #2310. Refs #2311. Refs #2318. Refs #2319. Refs #1748. Refs #2141. Refs #2041._
+_Refs #2289. Refs #2290. Refs #2291. Refs #2296. Refs #2297. Refs #2303. Refs #2304. Refs #2310. Refs #2311. Refs #2318. Refs #2319. Refs #2322. Refs #2324. Refs #2326. Refs #2327. Refs #1748. Refs #2141. Refs #1792. Refs #2041._
