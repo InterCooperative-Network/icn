@@ -20,7 +20,7 @@ This is the architecture home issue #1792 asks for. Three landed/normative docum
 
 - [`evidence-export-delivery-boundary.md`](../design/evidence-export-delivery-boundary.md) names candidate `ExportReceipt`/`AccessReceipt` shapes and states "this boundary document defers to #1792's vocabulary wherever the two overlap."
 - [`artifact-registry-and-scoped-vault.md`](../spec/artifact-registry-and-scoped-vault.md) cross-links "the forward-direction `PrivacyClass` / `DisclosurePolicy` / `PrivateObjectRef` / `AccessReceipt` / `ExportReceipt` / `RedactionMap` vocabulary proposed under #1792."
-- `ICN_INTEGRATED_SYSTEM_MODEL.md` describes a scoped vault as "private state with restricted disclosure. Tracked under #1792 and #1767."
+- [`ICN_INTEGRATED_SYSTEM_MODEL.md`](ICN_INTEGRATED_SYSTEM_MODEL.md) describes a scoped vault as "private state with restricted disclosure. Tracked under #1792 and #1767."
 
 Until this document lands, that vocabulary is undefined and each consumer improvises. This document is the definition.
 
