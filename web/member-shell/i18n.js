@@ -270,10 +270,12 @@
       "launcher.startFailed": "Could not start the local demo ({error}). Use Connect manually instead, or check the launcher tunnel.",
 
       // --- #2289 organizer-steward evidence surface (fixture-only) -------
-      // Renders the eight already-landed ADR-0026 Layer 2 process-transition
-      // receipts as a plain-language evidence story, plus a repo-safe evidence
-      // summary. Fixture/dev only; nothing signed; read-only. No readiness is
-      // claimed and no new receipt class is introduced.
+      // Renders the nine already-landed process/evidence receipts (the eight
+      // ADR-0026 Layer 2 process-transition classes plus the export-boundary
+      // EvidencePacketExportPreparedReceipt) as a plain-language evidence story,
+      // plus a repo-safe evidence summary. Fixture/dev only; nothing signed;
+      // read-only. No readiness is claimed and no new receipt class is
+      // introduced (the ninth landed at runtime in icn#2326).
       "evidence.process_session_opened.heading": "Process session opened",
       "evidence.deliberation_entry_recorded.heading": "Deliberation input recorded",
       "evidence.decision_recorded.heading": "Decision recorded",

@@ -105,10 +105,12 @@
 
   // #2289 organizer-steward evidence surface. `?mode=demo&set=process-evidence`
   // swaps the demo pack for a fixture-only, read-only evidence story over the
-  // eight already-landed ADR-0026 Layer 2 process-transition receipts (session
+  // eight already-landed ADR-0026 Layer 2 process-transition receipts plus the
+  // ninth, export-boundary EvidencePacketExportPreparedReceipt (session
   // opened -> deliberation entry recorded -> decision recorded -> gate result
   // -> activation crossed -> mutation plan recorded -> mutation applied ->
-  // evidence packet produced) plus a repo-safe evidence-summary export.
+  // evidence packet produced -> evidence packet export prepared) plus a
+  // repo-safe evidence-summary export.
   // Fixture/dev only: nothing is live, every hash is illustrative (see the
   // demo hash label), and the surface renders read views only — no download,
   // no mutation. `set` is demo-only.
@@ -169,7 +171,7 @@
   }
 
   // #2289 organizer-steward evidence surface (fixture-only). Keeps the demo
-  // standing + cards pack; adds the eight-receipt process-evidence sequence and
+  // standing + cards pack; adds the nine-receipt process-evidence sequence and
   // its repo-safe evidence-summary export (both member-shell-local fixtures).
   if (SET === "process-evidence") {
     FIXTURES.processEvidence = "fixtures/process-evidence-receipts.json";
@@ -630,7 +632,7 @@
   // opts is optional. Existing callers (live completion + demo completion) pass
   // no opts, so the entry keeps its original {receipt, plainContext} shape and
   // renders through renderCompletionReceipt exactly as before. The #2289
-  // process-evidence pack passes opts.kind (one of the eight process-transition
+  // process-evidence pack passes opts.kind (one of the nine process/evidence
   // classes) plus optional redaction metadata, routing to renderProcessReceipt.
   // No existing behavior changes.
   function addReceipt(receipt, plainContext, opts) {
@@ -703,8 +705,10 @@
 
   // ---------------------------------------------------------------------
   // #2289 organizer-steward evidence surface (fixture-only, read-only).
-  // Renders one of the eight ADR-0026 Layer 2 process-transition receipts
-  // (proof.rs) as a plain-language summary first, with the record-level fields
+  // Renders one of the nine process/evidence receipts — the eight ADR-0026
+  // Layer 2 process-transition classes plus the export-boundary
+  // EvidencePacketExportPreparedReceipt — from proof.rs as a plain-language
+  // summary first, with the record-level fields
   // under a progressive-disclosure "Show evidence detail" control. record_hash
   // is the proof pointer; body_hash is labeled proof-of-content (the body is
   // never stored). In demo mode the hashes are illustrative, mirroring the
@@ -1089,7 +1093,7 @@
   }
 
   // #2289 organizer-steward evidence surface (fixture-only). Reuses the demo
-  // standing + cards render path, then renders the eight-receipt process
+  // standing + cards render path, then renders the nine-receipt process
   // sequence and the repo-safe evidence-summary export. No network beyond the
   // committed fixtures; nothing signed; read-only.
   function loadProcessEvidenceDemo() {
