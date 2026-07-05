@@ -4,10 +4,10 @@
 use icn_governance::{
     ActionItemCompletionReceipt, ActionItemCompletionReceiptV2, ActivationCrossedReceipt,
     AuthorityGrant, AuthorityGrantId, DecisionRecordedReceipt, DeliberationEntryRecordedReceipt,
-    EvidencePacketProducedReceipt, GovernanceDecisionReceipt, GovernanceDecisionReceiptV3, Grantee,
-    Mandate, MeetingAttendanceReceipt, MeetingAttendanceReceiptV2, MutationAppliedReceipt,
-    MutationPlanRecordedReceipt, ProcessGateKind, ProcessGateResultReceipt,
-    ProcessSessionOpenedReceipt, Timestamp,
+    EvidencePacketExportPreparedReceipt, EvidencePacketProducedReceipt, GovernanceDecisionReceipt,
+    GovernanceDecisionReceiptV3, Grantee, Mandate, MeetingAttendanceReceipt,
+    MeetingAttendanceReceiptV2, MutationAppliedReceipt, MutationPlanRecordedReceipt,
+    ProcessGateKind, ProcessGateResultReceipt, ProcessSessionOpenedReceipt, Timestamp,
 };
 use icn_kernel_api::{AllocationReceipt, Hash};
 
@@ -302,6 +302,51 @@ pub enum EvidencePacketProducedPersist {
     /// unboxed variant would make this enum needlessly large next to the unit
     /// `Inserted`.
     Existing(Box<EvidencePacketProducedReceipt>),
+}
+
+/// Class string for `EvidencePacketExportPreparedReceipt` opaque storage
+/// (#2322 boundary contract + #2324 EX1–EX8 decision rung). Chosen in the apps
+/// layer so the gateway never sees the typed name. Distinct from every other
+/// process class store.
+const EVIDENCE_PACKET_EXPORT_PREPARED_CLASS: &str = "evidence_packet_export_prepared";
+
+/// Build the injective composite `key1` binding a prepared evidence-packet
+/// export to its `(domain_id, session_id)` anchor in opaque storage.
+///
+/// Sibling of [`evidence_packet_produced_composite_key1`] with the identical
+/// netstring-style encoding (decimal length of `domain_id`, a colon, then the
+/// two ids concatenated), kept as a separate function so this class's key
+/// derivation is independently anchored by its own anti-aliasing test. The
+/// length prefix delimits `domain_id` exactly, so `("ab","c")` and `("a","bc")`
+/// can never produce the same key, and two domains sharing a `session_id` scan
+/// different `key1` prefixes.
+pub fn evidence_packet_export_prepared_composite_key1(domain_id: &str, session_id: &str) -> String {
+    format!("{}:{domain_id}{session_id}", domain_id.len())
+}
+
+/// Outcome of persisting an [`EvidencePacketExportPreparedReceipt`] through
+/// [`GovernanceReceiptBackend::put_evidence_packet_export_prepared`].
+///
+/// The backend enforces at most one export preparation per `(domain_id,
+/// session_id, export_id)` **atomically at the storage layer** (same
+/// `put_opaque_if_absent` primitive as the sibling process classes). The
+/// caller (the manager) turns `Existing` into either a same-identity
+/// idempotent success or a fail-closed conflict — stable identity is
+/// `packet_id` + `packet_produced_record_hash` + `packet_hash` +
+/// `export_policy_hash` + `recipient_scope_id` + `prepared_by` (per the #2324
+/// rung §12; `prepared_at`/`record_hash` are NOT identity inputs).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum EvidencePacketExportPreparedPersist {
+    /// This call won the insert: the receipt is now the one persisted export
+    /// preparation for its `(domain_id, session_id, export_id)`.
+    Inserted,
+    /// An export preparation already existed for this triple; nothing was
+    /// written. Carries the original persisted receipt (original `prepared_at`
+    /// / `record_hash` — never restamped). Boxed because
+    /// [`EvidencePacketExportPreparedReceipt`] is a large payload (six string
+    /// fields plus three 32-byte hashes), so an unboxed variant would make
+    /// this enum needlessly large next to the unit `Inserted`.
+    Existing(Box<EvidencePacketExportPreparedReceipt>),
 }
 
 /// Class string for `MeetingAttendanceReceiptV2` opaque storage (#1868).
@@ -1676,6 +1721,104 @@ pub trait GovernanceReceiptBackend: Send + Sync {
                     format!("deserialize EvidencePacketProducedReceipt in list: {e}")
                 })?,
             );
+        }
+        Ok(out)
+    }
+
+    /// Persist an [`EvidencePacketExportPreparedReceipt`] emitted when the
+    /// runtime records that an export of a produced evidence packet was
+    /// prepared (#2322 contract + #2324 rung).
+    ///
+    /// **Default routes through opaque storage.** Serialises the typed receipt
+    /// to JSON and delegates to [`Self::put_opaque_if_absent`] under class
+    /// `"evidence_packet_export_prepared"` with `key1 =`
+    /// [`evidence_packet_export_prepared_composite_key1`] (the injective
+    /// domain+session composite) and `key2 = export_id`. On a lost insert the
+    /// original persisted receipt is hydrated and returned (never restamped).
+    /// A backend that has not opted in to opaque storage inherits the
+    /// fail-closed `opaque_storage_not_implemented` default.
+    fn put_evidence_packet_export_prepared(
+        &self,
+        receipt: &EvidencePacketExportPreparedReceipt,
+    ) -> Result<EvidencePacketExportPreparedPersist, String> {
+        let payload = serde_json::to_vec(receipt)
+            .map_err(|e| format!("serialize EvidencePacketExportPreparedReceipt: {e}"))?;
+        let key1 =
+            evidence_packet_export_prepared_composite_key1(&receipt.domain_id, &receipt.session_id);
+        let existing = self.put_opaque_if_absent(
+            EVIDENCE_PACKET_EXPORT_PREPARED_CLASS,
+            &key1,
+            Some(&receipt.export_id),
+            receipt.prepared_at,
+            receipt.record_hash,
+            &payload,
+        )?;
+        match existing {
+            None => Ok(EvidencePacketExportPreparedPersist::Inserted),
+            Some(_winning_hash) => {
+                let original = self
+                    .get_evidence_packet_export_prepared(
+                        &receipt.domain_id,
+                        &receipt.session_id,
+                        &receipt.export_id,
+                    )?
+                    .ok_or_else(|| {
+                        // The unique marker says a preparation exists but the
+                        // payload cannot be hydrated — surface loudly rather
+                        // than minting a second preparation.
+                        "evidence_packet_export_prepared_inconsistent: unique marker present \
+                         but no persisted export-prepared payload could be read"
+                            .to_string()
+                    })?;
+                Ok(EvidencePacketExportPreparedPersist::Existing(Box::new(
+                    original,
+                )))
+            }
+        }
+    }
+
+    /// Retrieve the persisted [`EvidencePacketExportPreparedReceipt`] for a
+    /// `(domain_id, session_id, export_id)`, or `None` when no export
+    /// preparation has been recorded. Same key convention as
+    /// [`Self::put_evidence_packet_export_prepared`]; at most one preparation
+    /// exists per triple (uniqueness is enforced on write).
+    fn get_evidence_packet_export_prepared(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+        export_id: &str,
+    ) -> Result<Option<EvidencePacketExportPreparedReceipt>, String> {
+        let key1 = evidence_packet_export_prepared_composite_key1(domain_id, session_id);
+        let payload = self.get_latest_opaque(
+            EVIDENCE_PACKET_EXPORT_PREPARED_CLASS,
+            &key1,
+            Some(export_id),
+        )?;
+        match payload {
+            Some(bytes) => Ok(Some(serde_json::from_slice(&bytes).map_err(|e| {
+                format!("deserialize EvidencePacketExportPreparedReceipt: {e}")
+            })?)),
+            None => Ok(None),
+        }
+    }
+
+    /// List all evidence-packet-export-prepared receipts recorded against one
+    /// `(domain_id, session_id)` anchor, in the store's deterministic
+    /// chronological `(prepared_at, record_hash)` order. Because `key1` is the
+    /// injective domain+session composite, two domains sharing a `session_id`
+    /// can never mix here — no payload-side filtering is needed.
+    fn list_evidence_packet_export_prepared_for_session_in_domain(
+        &self,
+        domain_id: &str,
+        session_id: &str,
+    ) -> Result<Vec<EvidencePacketExportPreparedReceipt>, String> {
+        let key1 = evidence_packet_export_prepared_composite_key1(domain_id, session_id);
+        let payloads = self.list_opaque_for(EVIDENCE_PACKET_EXPORT_PREPARED_CLASS, &key1)?;
+        let mut out = Vec::with_capacity(payloads.len());
+        for bytes in payloads {
+            out.push(serde_json::from_slice(&bytes).map_err(|e| {
+                format!("deserialize EvidencePacketExportPreparedReceipt in list: {e}")
+            })?);
         }
         Ok(out)
     }
