@@ -275,8 +275,9 @@
       // EvidencePacketExportPreparedReceipt and the availability-boundary
       // EvidencePacketMadeAvailableReceipt) as a plain-language evidence story,
       // plus a repo-safe evidence summary. Fixture/dev only; nothing signed;
-      // read-only. No readiness is claimed and no new receipt class is
-      // introduced (the ninth landed at runtime in icn#2326).
+      // read-only. No readiness is claimed. Fixture-only render: no new receipt
+      // class. Export-prepared landed at runtime in icn#2326; made-available
+      // landed at runtime in icn#2333 and is rendered here.
       "evidence.process_session_opened.heading": "Process session opened",
       "evidence.deliberation_entry_recorded.heading": "Deliberation input recorded",
       "evidence.decision_recorded.heading": "Decision recorded",
