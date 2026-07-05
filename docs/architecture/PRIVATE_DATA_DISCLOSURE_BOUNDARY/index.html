@@ -1,0 +1,387 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Private Data Disclosure Boundary, Scoped Vaults, and Access Receipts | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>PRIVATE DATA DISCLOSURE BOUNDARY</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/PRIVATE_DATA_DISCLOSURE_BOUNDARY.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Private Data Disclosure Boundary, Scoped Vaults, and Access Receipts</h1>
+<p><strong>Status:</strong> draft — design/architecture boundary contract
+<strong>Truth class:</strong> descriptive
+<strong>Canonical:</strong> no — implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last reviewed:</strong> 2026-07-05
+<strong>Source basis:</strong> read against <code>origin/main</code> @ <code>749fffb5</code> (the merged #2328 tip — re-verify before relying on exact anchors; they drift)
+<strong>Related:</strong> #1792 (this doc&#39;s issue) · #1767 (encrypted distributed private-overlay storage — the storage/encryption sibling) · #1748 (Institutional Process Substrate milestone) · #2141 (vertical institutional spine control) · #2041 (human/AT accessibility pass — open/parked) · #2326 (<code>EvidencePacketExportPreparedReceipt</code> runtime slice — merged) · #2328 (member-shell export-prepared fixture render — merged) · <a href="/docs/design/evidence-export-delivery-boundary">`evidence-export-delivery-boundary.md`</a> (#2321 export/delivery boundary — defers here) · <a href="/docs/design/evidence-export-delivery-boundary-decision-rung">`evidence-export-delivery-boundary-decision-rung.md`</a> (#2324 EX1–EX8) · <a href="/docs/spec/artifact-registry-and-scoped-vault">`artifact-registry-and-scoped-vault.md`</a> (#1798 registry/vault outline — defers here) · <a href="/docs/spec/private-overlay-did-activation-flow">`private-overlay-did-activation-flow.md`</a> (#1730 private-overlay activation) · <a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">KERNEL_APP_SEPARATION.md</a> (Meaning Firewall / opaque receipt storage) · <a href="/docs/DESIGN_PRINCIPLES">DESIGN_PRINCIPLES.md</a> (§1.5 Meaning Firewall) · <a href="https://github.com/InterCooperative-Network/icn/blob/main/INSTITUTION_PACKAGE_BOUNDARY">INSTITUTION_PACKAGE_BOUNDARY.md</a> (package vs core) · <a href="/docs/adr/ADR-0020-institutional-bootstrap-activation-and-standing-read-model">ADR-0020</a> (institutional bootstrap activation &amp; standing read-model) · <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a> (receipt &amp; provenance envelope)</p>
+<blockquote>
+<p>This is a <strong>design/architecture boundary contract, not a runtime spec and not a receipt class.</strong> It adds no code, no receipt class, no route, no OpenAPI/SDK change, no gateway/auth change, no member-shell change, and no fixture change. Its job is to pin one coherent private-data disclosure/access architecture now that the receipt ladder can <em>prepare</em> an export (<code>EvidencePacketExportPreparedReceipt</code>, #2326/#2328) but cannot yet honestly express <em>made available</em>, <em>accessed</em>, <em>disclosed</em>, or <em>redacted-then-shared</em>. It names the vocabulary, the candidate model, the hard rules, and the surface affordances — and defers <strong>encryption and distributed storage</strong> to #1767 and <strong>any implementation</strong> to a later decision rung. Receipts record institutional facts. They grant zero authority. No production, pilot, organizer-ready, member-ready, live-federation, NYCN-activation, or Phase-2 claim is made or implied by this document.</p>
+</blockquote>
+<hr>
+<h2>1. Purpose</h2>
+<!-- truth: descriptive -->
+
+<p>Define ICN&#39;s generic private-data and disclosure boundary so that private overlays, scoped vaults, opaque receipt storage, redaction, selective disclosure, private object references, disclosure policies, access receipts, evidence export, and member/operator UI privacy affordances all follow <strong>one</strong> coherent architecture instead of scattering per feature.</p>
+<p>This is the architecture home issue #1792 asks for. Three landed/normative documents already <strong>defer to</strong> this boundary rather than defining it:</p>
+<ul>
+<li><a href="/docs/design/evidence-export-delivery-boundary">`evidence-export-delivery-boundary.md`</a> names candidate <code>ExportReceipt</code>/<code>AccessReceipt</code> shapes and states &quot;this boundary document defers to #1792&#39;s vocabulary wherever the two overlap.&quot;</li>
+<li><a href="/docs/spec/artifact-registry-and-scoped-vault">`artifact-registry-and-scoped-vault.md`</a> cross-links &quot;the forward-direction <code>PrivacyClass</code> / <code>DisclosurePolicy</code> / <code>PrivateObjectRef</code> / <code>AccessReceipt</code> / <code>ExportReceipt</code> / <code>RedactionMap</code> vocabulary proposed under #1792.&quot;</li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/ICN_INTEGRATED_SYSTEM_MODEL">`ICN_INTEGRATED_SYSTEM_MODEL.md`</a> describes a scoped vault as &quot;private state with restricted disclosure. Tracked under #1792 and #1767.&quot;</li>
+</ul>
+<p>Until this document lands, that vocabulary is undefined and each consumer improvises. This document is the definition.</p>
+<h2>2. Status basis</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li>The process/evidence receipt ladder is <strong>nine classes deep</strong>, runtime-landed and rendered read-only in the fixture-only member-shell process-evidence demo: <code>ProcessSessionOpened</code> → <code>DeliberationEntryRecorded</code> → <code>DecisionRecorded</code> → <code>ProcessGateResult</code> → <code>ActivationCrossed</code> → <code>MutationPlanRecorded</code> → <code>MutationApplied</code> → <code>EvidencePacketProduced</code> → <code>EvidencePacketExportPrepared</code>.</li>
+<li>The newest rung, <strong><code>EvidencePacketExportPreparedReceipt</code></strong> (<code>icn:gov:evidence_packet_export_prepared:v1</code>, #2326), records only that a produced packet was <em>prepared</em> for export to a recipient scope under an export policy. Per its own contract: <strong>nothing was made available, delivered, received, accepted, audited, or certified; no private data moved; no access was granted; no authority was granted.</strong></li>
+<li>That is exactly the seam this document opens. &quot;Prepared for a recipient scope&quot; presumes a <em>scope</em>, a <em>policy</em>, and eventually an <em>access</em> — none of which have a defined model yet. The candidate <code>AccessReceipt</code>, <code>ExportReceipt</code>, <code>DisclosurePolicy</code>, <code>PrivateObjectRef</code>, and <code>RedactionMap</code> shapes are named in sibling docs but <strong>defined nowhere</strong>.</li>
+<li>The kernel already persists typed receipts as <strong>opaque bytes</strong> (see <a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">KERNEL_APP_SEPARATION.md §"Opaque Storage for Receipts"</a>); that primitive is the enforcement surface this boundary relies on. No new storage primitive is proposed here.</li>
+</ul>
+<p>This document is design-only. It changes no runtime and pins no hash-participating structure; a later decision rung (see §15) does that before any tag or implementation.</p>
+<h2>3. Core principle</h2>
+<!-- truth: normative -->
+
+<blockquote>
+<p><strong>Data can be private. Power cannot be invisible.</strong></p>
+</blockquote>
+<p>ICN must support private <em>contents</em> with public or scoped <em>provenance</em> where safe. The two halves are independent:</p>
+<ul>
+<li><strong>Data can be private.</strong> The <em>contents</em> of a restricted record (real names, contact data, accommodation needs, care notes, conflict details, sponsor pipelines, external settlement credentials) may be withheld, scoped, encrypted, or held by an external custodian.</li>
+<li><strong>Power cannot be invisible.</strong> The <em>existence</em>, responsible body, authority basis, and transition history of an institutional act must remain provable where safe, so that power exercised through private records still leaves a receipt. Hiding <em>every</em> trace of a restricted record is permitted only under a narrowly justified safety policy, never as a default.</li>
+</ul>
+<p>This principle is enforced structurally by the <strong>Meaning Firewall</strong> (canonical: <a href="/docs/DESIGN_PRINCIPLES">DESIGN_PRINCIPLES.md §1.5</a>; <a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">KERNEL_APP_SEPARATION.md</a>). The kernel stores and indexes <strong>opaque bytes</strong> and does not parse domain meaning. A receipt can therefore prove that an access, disclosure, or export-preparation <em>happened</em> — with a content fingerprint and proof-pointer chain — without the kernel (or a public reader) learning the private contents. Confidentiality of the contents (encryption) is a separate concern, owned by #1767; this document owns <em>who may read what, under what policy, and what receipt witnesses it</em>.</p>
+<h2>4. Vocabulary — define and distinguish</h2>
+<!-- truth: normative -->
+
+<p>These terms are <strong>defined here for the first time</strong>. Sibling docs reference them; none pin them. Where a term names a <em>candidate</em> runtime shape, §5 gives the field outline; this section fixes the <em>meaning</em>.</p>
+<ul>
+<li><strong>private overlay</strong> — the non-public mapping/context that binds public placeholder identifiers (holder labels, placeholder IDs) in an institution package to real DIDs, contact data, and real-person records. Lives <strong>outside</strong> public git. Storage/encryption of overlays is #1767; activation is <a href="/docs/spec/private-overlay-did-activation-flow">`private-overlay-did-activation-flow.md`</a> / ADR-0020. Distinct from a scoped vault: an overlay is a <em>binding context</em>, a vault is a <em>store</em>.</li>
+<li><strong>scoped vault</strong> — a store for private runtime objects whose read access is bounded by scope and governed by a disclosure policy. Runtime private data belongs in scoped vaults, <strong>not</strong> in public packages and <strong>not</strong> in generic unscoped stores. A vault has an id, a scope, a disclosure policy, and (per #1767) an encryption/custody backend this document does not define.</li>
+<li><strong>opaque receipt storage</strong> — the kernel primitive that persists a typed receipt as <code>(class, record_hash) → bytes</code> with a secondary audit-chain index, <strong>without parsing the typed body</strong> (KERNEL_APP_SEPARATION.md). Opaque ≠ encrypted: opaque means <em>the kernel does not interpret meaning</em>; the bytes may be plaintext-to-an-app or ciphertext. This is what lets a receipt&#39;s <em>existence</em> be provable while its <em>meaning</em> stays app-side.</li>
+<li><strong>encrypted storage</strong> — confidentiality of the stored bytes themselves (ciphertext at rest / in transit, key custody, rotation, recovery). Orthogonal to opaque storage. <strong>Owned by #1767</strong>, referenced here, not defined here.</li>
+<li><strong>redaction</strong> — deriving a public/redacted artifact from a private/source artifact by removing or masking fields under a profile, and committing to that transformation by fingerprint. The landed <code>EvidencePacketProducedReceipt</code> already carries a <code>redaction_profile_hash</code>; a full redaction <em>model</em> (a <code>RedactionMap</code>, §5) is candidate.</li>
+<li><strong>selective disclosure</strong> — revealing a bounded subset of a private object&#39;s fields (or a proof about them) to a specific scope under policy, while withholding the rest. A disclosure policy&#39;s <code>redaction_rules</code> + <code>allowed_scopes</code> express which subset which scope may see.</li>
+<li><strong>private object reference (<code>PrivateObjectRef</code>)</strong> — the public/scoped handle used <em>in place of</em> private contents: names the object, its content fingerprint, its vault, its privacy class, its policy fingerprint, and the receipt that governs it — <strong>never the contents</strong>. This is how a public/scoped surface can point at a private object without leaking it.</li>
+<li><strong>disclosure policy (<code>DisclosurePolicy</code>)</strong> — the governing rules for a private object or class: who may see it, at what scope, with what redaction, how access is requested, how it is challenged, how long it is retained, and how it may be exported. The policy <em>body</em> is never stored in a public surface; a <code>policy_hash</code> fingerprints it.</li>
+<li><strong>access receipt (<code>AccessReceipt</code>)</strong> — a receipt that records that an actor accessed (or attempted to access) a private object under a disclosure policy and an authority basis. Access to private data is <strong>itself a receipted institutional act</strong> — no silent reads.</li>
+<li><strong>export receipt (<code>ExportReceipt</code>)</strong> — a receipt that records that a (typically redacted) artifact was exported to a recipient scope under an export policy. The landed <code>EvidencePacketExportPreparedReceipt</code> is the <em>sender-side preparation</em> form of this; a general <code>ExportReceipt</code> is candidate and must not be conflated with delivery.</li>
+<li><strong>made-available receipt</strong> — a candidate receipt recording that a prepared export was placed in governed custody where an authorized recipient scope can retrieve it (a unilateral availability/custody fact). Made-available is <strong>not</strong> delivered, received, or accepted (see <a href="/docs/design/evidence-export-delivery-boundary">`evidence-export-delivery-boundary.md`</a> §5).</li>
+<li><strong>external custodian</strong> — a party (outside ICN core) that holds private contents under agreement (e.g. a partner-held overlay store during migration). A privacy class marks such objects so surfaces never imply ICN core holds the plaintext.</li>
+<li><strong>sealed / restricted record</strong> — a record whose contents are withheld now (<code>SealedUntil</code> a condition/time, or <code>ScopeRestricted</code> to a body). Its <em>existence and responsible body</em> may still be public where safe.</li>
+<li><strong>public existence metadata vs restricted contents</strong> — the load-bearing split. <strong>Public existence metadata</strong> = the safe-to-expose facts about a record (that it exists, its responsible body, its access path, its challenge path, custody/provenance fingerprints, its receipt hash). <strong>Restricted contents</strong> = the private body the metadata deliberately does not contain. A surface may show the former without ever showing the latter.</li>
+</ul>
+<h2>5. Candidate model (proposed, not implemented)</h2>
+<!-- truth: descriptive -->
+
+<p>The following shapes are <strong>candidates</strong> carried forward from the #1792 issue body and sibling references. They are named here so consumers stop improvising; <strong>field layout, canonicalization, and any hash-participation are NOT pinned here</strong> — a decision rung does that (§15). No runtime type is created by this document.</p>
+<ul>
+<li><strong><code>PrivacyClass</code></strong> (taxonomy of how private an object is): <code>Public</code>, <code>MembersOnly</code>, <code>ScopeRestricted</code>, <code>PrivateOverlay</code>, <code>SecretCredential</code>, <code>ExternalCustodian</code>, <code>SealedUntil</code>.<ul>
+<li>⚠️ <strong>Naming-collision note:</strong> distinct <code>PrivacyClass</code>-named enums already exist in the codebase for unrelated purposes. This candidate taxonomy must be disambiguated (renamed, or namespaced) at the decision rung before any implementation; do not assume the existing enum is this taxonomy.</li>
+</ul>
+</li>
+<li><strong><code>DisclosurePolicy</code></strong>: <code>visibility</code>, <code>allowed_scopes</code>, <code>redaction_rules</code>, <code>access_request_path</code>, <code>challenge_path</code>, <code>retention_policy</code>, <code>export_policy</code>.</li>
+<li><strong><code>PrivateObjectRef</code></strong>: <code>object_id</code>, <code>content_hash</code>, <code>vault_id</code>, <code>privacy_class</code>, <code>policy_hash</code>, <code>receipt_ref</code>.</li>
+<li><strong><code>RedactionMap</code></strong>: <code>original_hash</code>, <code>redacted_hash</code>, <code>fields_redacted</code>, <code>reason</code>, <code>policy_ref</code>.</li>
+<li><strong><code>AccessReceipt</code></strong>: <code>object_ref</code>, <code>actor</code>, <code>authority_basis</code>, <code>purpose</code>, <code>timestamp</code>, <code>outcome</code>.</li>
+<li><strong><code>ExportReceipt</code></strong>: <code>object_ref</code>, <code>exported_by</code>, <code>recipient_scope</code>, <code>redaction_policy</code>, <code>reason</code>, <code>receipt_hash</code>.</li>
+</ul>
+<p>Every one of these carries <strong>references and fingerprints, not bodies</strong>: <code>content_hash</code>/<code>policy_hash</code>/<code>original_hash</code>/<code>redacted_hash</code> are fingerprints; <code>object_ref</code>/<code>vault_id</code>/<code>recipient_scope</code> are opaque handles. Contact data, real DIDs, and private bodies never appear in these structures.</p>
+<h2>6. Public existence metadata vs restricted contents</h2>
+<!-- truth: normative -->
+
+<p>Every restricted record is modeled as a <strong>public/scoped <code>PrivateObjectRef</code> over a private body</strong>. The reference is the surface-visible half; the body lives in a scoped vault. Where safe, the reference exposes:</p>
+<ul>
+<li><strong>existence</strong> — that the record exists;</li>
+<li><strong>responsible body</strong> — which governed body holds/answers for it;</li>
+<li><strong>access path</strong> — how an authorized actor requests/obtains access;</li>
+<li><strong>challenge path</strong> — how misuse or overbroad access is challenged;</li>
+<li><strong>custody/provenance metadata</strong> — where the contents are held (vault id, external-custodian marker) and their content fingerprint;</li>
+<li><strong>receipt hash</strong> — the receipt that proves the record&#39;s restriction and any access to it.</li>
+</ul>
+<p>It deliberately does <strong>not</strong> expose the private body. The safety-policy exception in §3 (&quot;Power cannot be invisible … unless narrowly justified&quot;) is the only case where even existence is withheld, and it must be justified per record class, not applied by default.</p>
+<h2>7. Staged receipt vocabulary (candidate lifecycle)</h2>
+<!-- truth: descriptive -->
+
+<p>The disclosure/access lifecycle beyond the landed export-prepared fact is a <strong>staged, candidate</strong> sequence. Each stage is a <em>possible future</em> receipt; <strong>names may change at the decision rung and none is implemented here.</strong> Each stage witnesses a narrower fact than a naïve reader might assume.</p>
+<table>
+<thead>
+<tr>
+<th>Stage</th>
+<th>Candidate receipt</th>
+<th>Records</th>
+<th>Explicitly does NOT mean</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0 (landed)</td>
+<td><code>EvidencePacketExportPreparedReceipt</code> (#2326)</td>
+<td>a produced packet was <strong>prepared</strong> for export to a recipient scope under an export policy — sender-side only</td>
+<td>made available · delivered · received · accepted · audited · certified · accessed · authority granted</td>
+</tr>
+<tr>
+<td>1</td>
+<td><code>EvidencePacketMadeAvailableReceipt</code> <em>(candidate)</em></td>
+<td>a prepared export was <strong>made available</strong> to a recipient scope under policy (unilateral custody/availability)</td>
+<td>retrieved · received · accepted · audited · certified</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>AccessReceipt</code> <em>(candidate)</em></td>
+<td>an actor <strong>accessed or attempted to access</strong> a private object under a disclosure policy and authority basis (records <code>outcome</code>)</td>
+<td>that access was authorized <em>by this receipt</em> (authority basis is decided by the authority model, not the receipt) · that contents were disclosed in full</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>DisclosureDecisionReceipt</code> <em>(candidate)</em></td>
+<td>a disclosure request was <strong>approved / denied / limited</strong></td>
+<td>that any access then occurred</td>
+</tr>
+<tr>
+<td>4</td>
+<td><code>RedactionAppliedReceipt</code> <em>(candidate)</em></td>
+<td>a <strong>redaction profile was applied</strong> to a private/source artifact, producing a public/redacted artifact fingerprint</td>
+<td>that the redaction is complete, correct, or legally sufficient</td>
+</tr>
+</tbody></table>
+<p>Two invariants across the ladder: (a) each receipt records a <strong>fact</strong>, not a permission — &quot;receipts record facts; they do not grant permission&quot;; the authority <em>basis</em> referenced by an <code>AccessReceipt</code> is decided by the authority-hardening model (#1868 per-action capabilities, #2061 entity-aware authorization), not minted by the receipt. (b) each stage&#39;s non-claims are <strong>load-bearing</strong>: prepared ≠ available ≠ accessed ≠ disclosed ≠ redacted-sufficiently, exactly as produced ≠ exported per <a href="/docs/design/evidence-export-delivery-boundary">`evidence-export-delivery-boundary.md`</a>.</p>
+<h2>8. Opaque receipt storage and the Meaning Firewall</h2>
+<!-- truth: normative -->
+
+<p><code>AccessReceipt</code>, <code>ExportReceipt</code>, and the candidate disclosure/redaction receipts are <strong>app-emitted, kernel-blind facts</strong>. Per <a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">KERNEL_APP_SEPARATION.md §"Opaque Storage for Receipts"</a>, when a vault/governance app generates a typed receipt, the kernel persists it as opaque bytes in a <code>(class, record_hash) → bytes</code> store with a secondary <code>(class, key1, key2_opt, recorded_at, record_hash)</code> audit-chain index, and <strong>does not parse or pattern-match the typed body</strong>.</p>
+<p>Consequences for this boundary:</p>
+<ul>
+<li>The kernel can prove a receipt <strong>exists</strong> and order it in an audit chain without learning what private object it concerns.</li>
+<li>The private <em>contents</em> never enter the kernel as parsed meaning; only fingerprints and opaque handles do. This is how &quot;power cannot be invisible&quot; and &quot;data can be private&quot; hold simultaneously.</li>
+<li>Opaque storage gives <em>kernel-blindness</em>, not <em>confidentiality</em>. If the receipt bytes themselves must be ciphertext (e.g. because even the fingerprint set is sensitive), that is #1767&#39;s encryption concern layered underneath, not a change to the opaque primitive.</li>
+<li>No new kernel storage primitive is required or proposed. This boundary rides the existing opaque store.</li>
+</ul>
+<h2>9. Relationship to #1767 and sibling documents</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li><strong>#1767 (encrypted distributed private-overlay storage) vs #1792 (this doc).</strong> #1767 owns <em>how the private bytes are encrypted and where keys/replicas live</em> — client/steward-side encryption, key model, replication across nodes/commons, consent/revocation/rotation/recovery, and the threat model against node operators, ICN core maintainers, and public repo readers. #1792 owns <em>the disclosure/access policy layer over any private object</em> — privacy classes, disclosure policies, access/export/disclosure/redaction receipts, the public-existence-vs-contents split, and UI affordances. <strong>This document references #1767 for encryption and does not redefine it;</strong> it names the vault&#39;s encryption/custody slot and defers.</li>
+<li><strong><code>artifact-registry-and-scoped-vault.md</code> (#1798)</strong> outlines a <code>ScopedVault</code> object and states every read MUST emit an <code>AccessReceipt</code> per #1792. That spec is a <em>consumer</em> of this vocabulary; it should reference this document once landed.</li>
+<li><strong><code>evidence-export-delivery-boundary.md</code> (#2321) / decision rung (#2324)</strong> define the export/made-available/delivery taxonomy and already defer to #1792. The export-prepared fact (#2326/#2328) is the stage-0 anchor of §7.</li>
+<li><strong>INSTITUTION_PACKAGE_BOUNDARY.md</strong> — public institution packages use placeholder IDs; private overlays bind the real values outside public git. This document&#39;s hard rules (§10) enforce that split at the disclosure layer.</li>
+<li><strong>#1748 / #2141</strong> — the &quot;real visibility/privacy-boundary run with redaction&quot; owed under #1748, and the &quot;storage/artifact/vault custody enforcement&quot; node of the #2141 spine, both depend on this boundary being defined.</li>
+</ul>
+<h2>10. Hard rules</h2>
+<!-- truth: normative -->
+
+<ol>
+<li><strong>No private data in public package repos.</strong> No real names, emails, phone numbers, addresses, accommodation needs, demographic data, sponsor/private pipelines, external settlement credentials, or private-overlay contents may appear in public package or public git material. Public packages use placeholder IDs; private overlays bind the real values outside public git.</li>
+<li><strong>No private data access without an authority basis.</strong> Every access to a private object is gated by an authority basis decided by the authority model (#1868/#2061) and witnessed by an <code>AccessReceipt</code>. No silent reads.</li>
+<li><strong>No sensitive export without redaction/disclosure policy and receipted access/made-available semantics.</strong> An export of sensitive material requires a disclosure/export policy and a redaction where required, and produces receipts; export-prepared is never treated as delivery.</li>
+<li><strong>No dashboard or member-shell preview of private vault contents.</strong> Operator and member surfaces show <em>privacy posture and public existence metadata</em>, never restricted contents.</li>
+<li><strong>No kernel parsing of typed receipt bodies.</strong> The kernel stores opaque bytes; all typed-body meaning stays app-side (Meaning Firewall).</li>
+<li><strong>No public disappearance of institutional power.</strong> Hiding every trace of a restricted record is allowed only under a narrowly justified safety policy, never by default; where safe, existence and the responsible body remain provable.</li>
+<li><strong>Every restricted record exposes, where safe:</strong> existence, responsible body, access path, challenge path, custody/provenance metadata, and receipt hash.</li>
+<li><strong>References and fingerprints, never bodies.</strong> Every disclosure/access/export structure and every surface carries <code>PrivateObjectRef</code>-style handles and fingerprints, never contents, real DIDs, or contact data.</li>
+</ol>
+<h2>11. Member-shell implications</h2>
+<!-- truth: descriptive -->
+
+<p>A member should be able to see, in plain language and without any private body being exposed:</p>
+<ul>
+<li><strong>that this restricted record exists</strong> (where safe);</li>
+<li><strong>whether it contains private details</strong> (privacy class, not contents);</li>
+<li><strong>who can access it</strong> (responsible body / allowed scopes, as handles);</li>
+<li><strong>why they can access it</strong> (authority basis category, not credentials);</li>
+<li><strong>what receipt proves the access or restriction</strong> (receipt hash / proof pointer);</li>
+<li><strong>how to request review, revoke sharing where allowed, or challenge misuse</strong> (access/challenge paths from the disclosure policy);</li>
+<li><strong>what has not happened yet</strong> — the same load-bearing non-claims as the export-prepared surface: prepared ≠ made available ≠ accessed ≠ delivered ≠ received ≠ accepted ≠ audited ≠ certified.</li>
+</ul>
+<p>No member-shell surface may preview private vault contents. The existing fixture-only process-evidence demo (#2328) is the pattern: plain-language summary first, fingerprints/handles under a disclosure, honesty banner, and explicit negative boundaries. Any new privacy/access states rendered here add human/AT surface owed under #2041 (see §12/§15).</p>
+<h2>12. Operator / steward implications</h2>
+<!-- truth: descriptive -->
+
+<p>A steward/operator dashboard shows <strong>privacy posture, not private content</strong>:</p>
+<ul>
+<li>vault health (reachable, consistent) — no contents;</li>
+<li>private overlay <strong>loaded / missing</strong>; public package <strong>clean</strong> (no private leakage detected);</li>
+<li>access grants <strong>expiring</strong>;</li>
+<li><strong>overbroad disclosure-policy warnings</strong> (e.g. a policy whose <code>allowed_scopes</code> is wider than the record&#39;s sensitivity warrants);</li>
+<li><strong>export-prepared receipts awaiting</strong> made-available / access follow-up;</li>
+<li>redaction / evidence-export status;</li>
+<li><strong>opaque receipt store health</strong> (audit chain intact) — no typed-body previews.</li>
+</ul>
+<p>The operator surface must never render restricted contents, real DIDs, or contact data — only posture, counts, fingerprints, and handles.</p>
+<h2>13. Failure and safety table</h2>
+<!-- truth: operational -->
+
+<table>
+<thead>
+<tr>
+<th>Situation</th>
+<th>Correct behavior</th>
+<th>Never</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Private overlay missing at runtime</td>
+<td>surface &quot;private overlay missing&quot; posture; deny access; emit no plaintext</td>
+<td>fabricate or infer the mapping</td>
+</tr>
+<tr>
+<td>Access requested without authority basis</td>
+<td>deny; witness the attempt as an <code>AccessReceipt</code> with <code>outcome = denied</code></td>
+<td>allow a silent read</td>
+</tr>
+<tr>
+<td>Sensitive artifact exported without redaction where required</td>
+<td>block; require a disclosure/redaction policy first</td>
+<td>ship unredacted sensitive contents</td>
+</tr>
+<tr>
+<td>Operator opens the dashboard</td>
+<td>show posture, counts, fingerprints, handles</td>
+<td>preview vault contents</td>
+</tr>
+<tr>
+<td>Public reader inspects a public package</td>
+<td>see placeholder IDs and public existence metadata</td>
+<td>learn real DIDs / contact data</td>
+</tr>
+<tr>
+<td>Kernel indexes a new receipt</td>
+<td>store opaque bytes; order the audit chain</td>
+<td>parse the typed body</td>
+</tr>
+<tr>
+<td>A restricted record&#39;s existence is itself dangerous to reveal</td>
+<td>withhold under a narrowly justified, per-class safety policy</td>
+<td>hide all institutional power by default</td>
+</tr>
+<tr>
+<td>Export prepared but not yet available</td>
+<td>surface &quot;prepared — not made available/delivered/accepted&quot;</td>
+<td>imply delivery, receipt, or acceptance</td>
+</tr>
+</tbody></table>
+<h2>14. Non-goals and non-claims</h2>
+<!-- truth: normative -->
+
+<ul>
+<li><strong>No runtime implementation.</strong> No vault runtime, no encryption implementation, no access/made-available/disclosure/redaction receipt runtime, no <code>PrivacyClass</code>/<code>DisclosurePolicy</code>/<code>PrivateObjectRef</code> types created.</li>
+<li><strong>No route, OpenAPI, SDK, or gateway/auth change.</strong> Design only.</li>
+<li><strong>No encryption or distributed-storage design.</strong> That is #1767; this document references it.</li>
+<li><strong>No Drive migration, no NYCN-specific private-data schema, no directory rollout.</strong></li>
+<li><strong>No change to #1767, #2326, or the landed receipt classes</strong> beyond cross-reference.</li>
+<li><strong>No production, pilot, organizer-ready, member-ready, live-federation, NYCN-activation, or Phase-2 claim.</strong> Nothing here asserts anything was made available, delivered, received, accepted, audited, certified, or is legally sufficient, nor that private data is handled, that access is enforced, or that a vault/encryption runtime exists.</li>
+<li><strong>Leaves #1748, #2141, #1792, #2041, #1868, #2061, #2080, and #2081 open.</strong> This document is an input to #1792 and to #1748&#39;s owed visibility/privacy criterion; it settles none of them.</li>
+</ul>
+<h2>15. Follow-up issue sequence (proposed, not opened)</h2>
+<!-- truth: descriptive -->
+
+<p>This document <strong>proposes</strong> the following child sequence. Per the export-lane cadence, each rung is a separate, narrowly-scoped artifact; <strong>none is opened by this document.</strong> Opening them is a later, explicitly-authorized step.</p>
+<ol>
+<li><strong>docs(process): resolve access / made-available / disclosure receipt decision rung</strong> — pin, for each candidate receipt, the fact name/moment, the field layout, hash-participation, uniqueness anchor, proof-pointer chain, private-data exclusions, non-claims, and surface language. Mirrors the EX1–EX8 rung. Blocks all runtime below.</li>
+<li><strong>feat(process): emit <code>EvidencePacketMadeAvailableReceipt</code> runtime slice</strong> — the stage-1 fact, after (1).</li>
+<li><strong>feat(process): emit <code>AccessReceipt</code> runtime slice</strong> — the stage-2 fact, after (1) and the authority-basis seam (#1868/#2061) is at least specified.</li>
+<li><strong>feat(member-shell): render made-available / access privacy states (fixture-only)</strong> — mirrors #2328.</li>
+<li><strong>test(a11y): human/AT pass over the privacy/access member-shell states</strong> — extends #2041 §4G; automated floor ≠ human pass.</li>
+<li><strong>spec(authz): align access receipts with the #1868/#2061 authority model</strong> — the authority <em>basis</em> an <code>AccessReceipt</code> references.</li>
+<li><strong>feat(operator): privacy-posture view (no content preview)</strong> — the §12 dashboard, into the operator/appliance path.</li>
+<li><strong>docs(process): challenge / repair path for access misuse</strong> — append-only supersession/withdrawal after access/disclosure exists.</li>
+</ol>
+<p><strong>Recommendation on whether to open these now:</strong> do <strong>not</strong> open them from this document. The repo convention for this lane is one design/boundary doc → one decision rung → per-rung runtime, each separately authorized; child issues are opened at the point of pickup, not at design time. If the maintainer wants the sequence tracked as issues, that is a deliberate follow-up, not part of this PR.</p>
+<h2>16. Related</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li>Issues: #1792 (this) · #1767 · #1748 · #2141 · #2041 · #1868 · #2061 · #2080 · #2081 · #2326 · #2328 · #1798 (artifact registry / scoped vault) · #1730 (private-overlay activation).</li>
+<li>Docs: <a href="https://github.com/InterCooperative-Network/icn/blob/main/KERNEL_APP_SEPARATION">KERNEL_APP_SEPARATION.md</a> · <a href="/docs/DESIGN_PRINCIPLES">DESIGN_PRINCIPLES.md</a> · <a href="https://github.com/InterCooperative-Network/icn/blob/main/INSTITUTION_PACKAGE_BOUNDARY">INSTITUTION_PACKAGE_BOUNDARY.md</a> · <a href="/docs/design/evidence-export-delivery-boundary">`evidence-export-delivery-boundary.md`</a> · <a href="/docs/design/evidence-export-delivery-boundary-decision-rung">`evidence-export-delivery-boundary-decision-rung.md`</a> · <a href="/docs/spec/artifact-registry-and-scoped-vault">`artifact-registry-and-scoped-vault.md`</a> · <a href="/docs/spec/private-overlay-did-activation-flow">`private-overlay-did-activation-flow.md`</a>.</li>
+<li>ADRs: <a href="/docs/adr/ADR-0020-institutional-bootstrap-activation-and-standing-read-model">ADR-0020</a> (institutional bootstrap activation &amp; standing read-model) · <a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">ADR-0026</a> (receipt &amp; provenance envelope).</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
