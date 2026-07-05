@@ -1466,6 +1466,15 @@ last_updated = "2026-07-04"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/design/evidence-export-delivery-boundary.md"]
+category = "design"
+status = "draft"
+title = "Evidence Export and Delivery Boundary — Design/Audit Contract"
+description = "Design/audit contract for the evidence export/delivery boundary that follows the landed EvidencePacketProducedReceipt (#2318 runtime, #2320 member-shell fixture render), under #1748/#2141 and deferring to #1792's disclosure/vault/access-receipt vocabulary. Prevents semantic drift: produced (a redacted evidence packet artifact was produced and content-addressed) must never be misread as exported, made available, delivered, received, accepted, audited, certified, legally sufficient, human/AT verified, or ready. Disambiguates the two repo meanings of export (the shipped read-only rehearsal-evidence-export summary contract vs the future export lifecycle fact). Defines the boundary taxonomy — produced (landed) / export-prepared-or-exported / made-available / delivered-transmitted / received / accepted / audited-certified (out of near-term scope) / challenged-rejected-withdrawn — with, per row: meaning, permitted recorder (recorder/witness evidence, zero authority), minimum proof-pointer references (predecessor id + record_hash chain), private-data exclusions (no packet/policy/source bodies; no recipient contact data — recipient identity is itself sensitive, scope handle or fingerprint only), explicit non-claims, and member/steward surface language. Pins the witness posture: the substrate witnesses authenticated reports; recipient-side facts (received/accepted) require recipient authority and likely belong to institution/domain-package or bridge semantics. Recommends the single next rung: the export fact (aligned with #1792's candidate ExportReceipt), via a decision rung resolving EX1–EX8 (fact name/moment, availability-vs-delivery, recipient-scope representation, where acceptance lives, minimal v1 field set, vault/access interaction, challenge shape, smallest repo-safe dogfood) before any tag or implementation. Design only — no runtime, no receipt class, no route, no OpenAPI/SDK, no member-shell or fixture change, no external delivery performed, no acceptance/audit/legal-sufficiency claim, no human/AT completion (Refs #2321, #2141, #1748, #1792, #2041, #2320, #2318, #2319; no closure claims)"
+last_updated = "2026-07-05"
+owner = "matt"
+audiences = ["architects", "developers"]
+
 [docs."docs/design/mutation-applied-receipt-decision-rung.md"]
 category = "design"
 status = "draft"
