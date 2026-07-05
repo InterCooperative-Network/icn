@@ -670,7 +670,7 @@ fn missing_predecessor_fails_closed() {
     let (mgr, store) = make_manager();
     let actor = fresh_did();
     let domain = coop_test();
-    // Session opened, but NO export-prepared recept recorded.
+    // Session opened, but NO export-prepared receipt recorded.
     open_session(&mgr, &domain, "session-001", &actor);
     let err = mgr
         .record_evidence_packet_made_available(
