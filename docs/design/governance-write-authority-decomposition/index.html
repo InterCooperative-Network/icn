@@ -1,0 +1,815 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governance Write Authority Decomposition | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>governance write authority decomposition</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/governance-write-authority-decomposition.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Governance Write Authority Decomposition</h1>
+<p><strong>Status:</strong> draft - design/control map
+<strong>Truth class:</strong> descriptive
+<strong>Canonical:</strong> no - implementation truth lives in <a href="/docs/STATE">docs/STATE.md</a> and <a href="/docs/PHASE_PROGRESS">docs/PHASE_PROGRESS.md</a>
+<strong>Last reviewed:</strong> 2026-07-05
+<strong>Source basis:</strong> read against <code>origin/main</code> at <code>fbb3f00bb28dea3b6e13f34b194343982f7786d5</code>
+<strong>Related:</strong> #1868, #2061, #2080, #2081, #2337, #2336, #1748, #2141, #2041</p>
+<blockquote>
+<p>This document is a current-state completion map for the <code>governance:write</code> decomposition. It supplements, and does not replace, <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/governance/governance-write-decomposition">`governance-write-decomposition.md`</a> and <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/governance/mandate-gate-design">`mandate-gate-design.md`</a>. It chooses no runtime behavior in this PR and changes no capability, handler, route, receipt, authorization rule, or token. The design keeps the Meaning Firewall intact: the kernel enforces opaque constraints and scope strings, while governance and gateway apps evaluate institutional authority. A capability is not a mandate. A receipt records evidence and grants zero authority.</p>
+</blockquote>
+<h2>1. Why this design exists</h2>
+<!-- truth: descriptive -->
+
+<p>Issue #1868 began from a broad technical gate: <code>GOVERNANCE_WRITE = &quot;governance:write&quot;</code> let one bearer scope reach many unrelated governance mutation families. The original decomposition design chose a hybrid path and several implementation slices have landed since then:</p>
+<ul>
+<li>seven class-level governance scope strings exist in <code>icn-rpc</code> and the gateway allowlist;</li>
+<li>most governance HTTP mutations accept a class scope first and retain broad <code>governance:write</code> as an accepted-also compatibility fallback;</li>
+<li>five governance JSON-RPC methods prefer charter or proposal class scopes and retain the broad fallback;</li>
+<li><code>MandateGate</code>, <code>MandateRequest</code>, <code>MandateGrant</code>, and <code>MandateGrantRef</code> exist;</li>
+<li>v2/v3 governance receipts can bind <code>capability_scope_presented</code> and an explicit mandate-attestation posture;</li>
+<li>selected handlers capture the scope actually matched and selected authority-sensitive domain operations use <code>DefaultMandateGate</code>.</li>
+</ul>
+<p>The work is therefore partially landed, not undecided. The remaining problem is that broad fallback still authorizes every handler in the current inventory, and six newer handlers use the broad scope directly with no class alternative. A token with only <code>governance:write</code> still has an unnecessarily large technical blast radius.</p>
+<p>This matters directly to the private-access lane established by #2337. A future <code>AccessReceipt</code> may cite an opaque authority-basis fingerprint, but it cannot substitute for a clear act-time authority decision. The subject, target, action, scope, validity, and revocation posture must be evaluated before the receipt records the result. Otherwise strong-looking evidence would wrap a weak gate.</p>
+<h2>2. Current state and complete handler inventory</h2>
+<!-- truth: descriptive -->
+
+<h3>2.1 Code anchors</h3>
+<ul>
+<li>Broad scope: <code>icn/crates/icn-rpc/src/auth.rs:947</code>.</li>
+<li>Existing class scopes: <code>icn/crates/icn-rpc/src/auth.rs:966-986</code>.</li>
+<li>JSON-RPC accepted-also mapping: <code>icn/crates/icn-rpc/src/auth.rs:1023-1069</code>.</li>
+<li>HTTP gates: <code>icn/apps/governance/src/http/handlers.rs</code>.</li>
+<li>HTTP route registration: <code>icn/apps/governance/src/http/configure.rs:573-872</code>.</li>
+<li>App-side authority resolver: <code>icn/apps/governance/src/mandate_gate.rs</code>.</li>
+<li>Entity-aware route authority: <code>icn/crates/icn-gateway/src/authority.rs</code> and <a href="/docs/rfcs/RFC-0018-entity-aware-request-authorization">RFC-0018</a>.</li>
+</ul>
+<p>The inventory below was produced from the live handler source, then matched to route registration. It contains <strong>51 HTTP handlers</strong>: 44 with inline broad scope or broad accepted-also fallback, plus seven federation-proposal handlers gated through <code>extract_federation_common</code>.</p>
+<h3>2.2 Evidence notation</h3>
+<p>The final column uses these short forms:</p>
+<ul>
+<li><strong>Admission only:</strong> the scope is checked, but this handler does not capture which accepted-also candidate matched for a receipt.</li>
+<li><strong>Matched-scope receipt:</strong> <code>require_any_scope_matched</code> returns the actual matched scope and the downstream typed receipt can bind it.</li>
+<li><strong>Fact receipt only:</strong> the handler emits a bounded process receipt, but that receipt does not itself establish or grant the recorder&#39;s authority.</li>
+<li><strong>MandateGate:</strong> a real app-side <code>DefaultMandateGate</code> resolves actor, domain, act, target, and time before persistence.</li>
+</ul>
+<h3>2.3 Handler table</h3>
+<p>The proposed authority posture is descriptive and must be frozen by a later implementation/ADR review. <code>Representation</code>, <code>Execution</code>, and <code>Attestation</code> use ADR-0014 vocabulary. <code>Standing/ownership</code> means the operation may remain mandate-exempt but still needs class scope plus existing membership or resource-ownership checks.</p>
+<table>
+<thead>
+<tr>
+<th>Handler/function</th>
+<th>Route or operation</th>
+<th>Current gate</th>
+<th>Mutation family</th>
+<th>Proposed authority posture</th>
+<th>Proposed next gate</th>
+<th>Evidence/receipt implication</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>create_domain</code></td>
+<td><code>POST /gov/domains</code></td>
+<td>charter class or broad fallback</td>
+<td>domain creation</td>
+<td>Execution</td>
+<td>charter class only; label bootstrap/administrative path</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>add_domain_member</code></td>
+<td><code>POST /gov/domains/{domain_id}/members</code></td>
+<td>charter class or broad fallback</td>
+<td>membership mutation</td>
+<td>Execution</td>
+<td>charter class plus <code>MandateGate</code> for production</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>remove_domain_member</code></td>
+<td><code>DELETE /gov/domains/{domain_id}/members</code></td>
+<td>charter class or broad fallback</td>
+<td>membership mutation</td>
+<td>Execution</td>
+<td>charter class plus <code>MandateGate</code> for production</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>activate_charter</code></td>
+<td><code>POST /gov/charters</code></td>
+<td>charter class or broad fallback</td>
+<td>charter activation</td>
+<td>Execution</td>
+<td>charter class plus <code>MandateGate</code>; retain explicit bootstrap labeling</td>
+<td>Admission only; shortcut provenance is separate</td>
+</tr>
+<tr>
+<td><code>adopt_domain_policy</code></td>
+<td><code>POST /gov/domains/{domain_id}/domain-policy/adopt</code></td>
+<td>broad only</td>
+<td>domain policy adoption</td>
+<td>Execution</td>
+<td>charter class plus existing <code>DefaultMandateGate</code></td>
+<td>MandateGate already enforced; broad capability remains</td>
+</tr>
+<tr>
+<td><code>declare_institutional_domain</code></td>
+<td><code>POST /gov/domains/{domain_id}/institutional-domain/declare</code></td>
+<td>broad only</td>
+<td>institutional-domain declaration</td>
+<td>Execution</td>
+<td>charter class plus existing <code>DefaultMandateGate</code></td>
+<td>MandateGate already enforced; broad capability remains</td>
+</tr>
+<tr>
+<td><code>create_proposal</code></td>
+<td><code>POST /gov/proposals</code></td>
+<td>proposal class or broad fallback</td>
+<td>proposal lifecycle</td>
+<td>Representation</td>
+<td>proposal class only plus membership/standing</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>open_proposal</code></td>
+<td><code>POST /gov/proposals/{proposal_id}/open</code></td>
+<td>proposal class or broad fallback</td>
+<td>proposal lifecycle</td>
+<td>Representation</td>
+<td>proposal class only plus target-domain check</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>close_proposal</code></td>
+<td><code>POST /gov/proposals/{proposal_id}/close</code></td>
+<td>proposal class or broad fallback</td>
+<td>decision finalization</td>
+<td>Execution/process authority</td>
+<td>proposal class only; preserve process-authorized or grant attestation</td>
+<td>Matched-scope receipt; v3 decision receipt binds presented scope</td>
+</tr>
+<tr>
+<td><code>cast_vote</code></td>
+<td><code>POST /gov/proposals/{proposal_id}/vote</code></td>
+<td>proposal class or broad fallback</td>
+<td>voting</td>
+<td>Representation</td>
+<td>proposal class only plus entity/standing/target checks</td>
+<td>Admission only; vote record is not a mandate</td>
+</tr>
+<tr>
+<td><code>create_delegation</code></td>
+<td><code>POST /gov/delegations</code></td>
+<td>proposal class or broad fallback</td>
+<td>vote delegation</td>
+<td>Representation</td>
+<td>proposal class only plus actor/target binding</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>revoke_delegation</code></td>
+<td><code>DELETE /gov/delegations/{delegation_id}</code></td>
+<td>proposal class or broad fallback</td>
+<td>vote delegation</td>
+<td>Representation</td>
+<td>proposal class only plus ownership/authority check</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>create_appoint_steward_proposal</code></td>
+<td><code>POST /gov/proposals/sdis/appoint-steward</code></td>
+<td>proposal class or broad fallback</td>
+<td>steward proposal</td>
+<td>Representation at proposal; Execution at effect</td>
+<td>proposal class only; downstream effect requires mandate/grant</td>
+<td>Admission only at proposal creation</td>
+</tr>
+<tr>
+<td><code>create_remove_steward_proposal</code></td>
+<td><code>POST /gov/proposals/sdis/remove-steward</code></td>
+<td>proposal class or broad fallback</td>
+<td>steward proposal</td>
+<td>Representation at proposal; Execution at effect</td>
+<td>proposal class only; downstream effect requires mandate/grant</td>
+<td>Admission only at proposal creation</td>
+</tr>
+<tr>
+<td><code>assign_role</code></td>
+<td><code>POST /gov/structures/{structure_id}/roles</code></td>
+<td>steward class or broad fallback</td>
+<td>direct role assignment</td>
+<td>Execution</td>
+<td>steward class only plus <code>MandateGate</code> or explicit administrative shortcut</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>create_join_federation_proposal</code></td>
+<td><code>POST /gov/proposals/federation/join</code></td>
+<td>federation class or broad fallback via helper</td>
+<td>federation proposal</td>
+<td>Representation at proposal; Execution at effect</td>
+<td>federation class only; mandate at binding effect</td>
+<td>Admission only via shared helper</td>
+</tr>
+<tr>
+<td><code>create_leave_federation_proposal</code></td>
+<td><code>POST /gov/proposals/federation/leave</code></td>
+<td>federation class or broad fallback via helper</td>
+<td>federation proposal</td>
+<td>Representation at proposal; Execution at effect</td>
+<td>federation class only; mandate at binding effect</td>
+<td>Admission only via shared helper</td>
+</tr>
+<tr>
+<td><code>create_establish_clearing_proposal</code></td>
+<td><code>POST /gov/proposals/federation/clearing/establish</code></td>
+<td>federation class or broad fallback via helper</td>
+<td>federation proposal</td>
+<td>Representation at proposal; Execution at effect</td>
+<td>federation class only; mandate at binding effect</td>
+<td>Admission only via shared helper</td>
+</tr>
+<tr>
+<td><code>create_terminate_clearing_proposal</code></td>
+<td><code>POST /gov/proposals/federation/clearing/terminate</code></td>
+<td>federation class or broad fallback via helper</td>
+<td>federation proposal</td>
+<td>Representation at proposal; Execution at effect</td>
+<td>federation class only; mandate at binding effect</td>
+<td>Admission only via shared helper</td>
+</tr>
+<tr>
+<td><code>create_vouch_proposal</code></td>
+<td><code>POST /gov/proposals/federation/vouch</code></td>
+<td>federation class or broad fallback via helper</td>
+<td>federation proposal</td>
+<td>Representation at proposal; Execution at effect</td>
+<td>federation class only; mandate at binding effect</td>
+<td>Admission only via shared helper</td>
+</tr>
+<tr>
+<td><code>create_revoke_vouch_proposal</code></td>
+<td><code>POST /gov/proposals/federation/vouch/revoke</code></td>
+<td>federation class or broad fallback via helper</td>
+<td>federation proposal</td>
+<td>Representation at proposal; Execution at effect</td>
+<td>federation class only; mandate at binding effect</td>
+<td>Admission only via shared helper</td>
+</tr>
+<tr>
+<td><code>create_update_federation_policy_proposal</code></td>
+<td><code>POST /gov/proposals/federation/policy</code></td>
+<td>federation class or broad fallback via helper</td>
+<td>federation proposal</td>
+<td>Representation at proposal; Execution at effect</td>
+<td>federation class only; mandate at binding effect</td>
+<td>Admission only via shared helper</td>
+</tr>
+<tr>
+<td><code>add_comment</code></td>
+<td><code>POST /gov/proposals/{proposal_id}/discussion/comments</code></td>
+<td>comment class or broad fallback</td>
+<td>deliberation comment</td>
+<td>Standing/ownership</td>
+<td>comment class only plus membership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>edit_comment</code></td>
+<td><code>PUT /gov/proposals/{proposal_id}/discussion/comments/{comment_id}</code></td>
+<td>comment class or broad fallback</td>
+<td>deliberation comment</td>
+<td>Standing/ownership</td>
+<td>comment class only plus author ownership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>delete_comment</code></td>
+<td><code>DELETE /gov/proposals/{proposal_id}/discussion/comments/{comment_id}</code></td>
+<td>comment class or broad fallback</td>
+<td>deliberation comment</td>
+<td>Standing/ownership</td>
+<td>comment class only plus author ownership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>add_reaction</code></td>
+<td><code>POST /gov/proposals/{proposal_id}/discussion/comments/{comment_id}/reactions</code></td>
+<td>comment class or broad fallback</td>
+<td>deliberation reaction</td>
+<td>Standing/ownership</td>
+<td>comment class only plus membership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>remove_reaction</code></td>
+<td><code>DELETE /gov/proposals/{proposal_id}/discussion/comments/{comment_id}/reactions</code></td>
+<td>comment class or broad fallback</td>
+<td>deliberation reaction</td>
+<td>Standing/ownership</td>
+<td>comment class only plus actor ownership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>create_action_item</code></td>
+<td><code>POST /gov/domains/{domain_id}/action-items</code></td>
+<td>meeting class or broad fallback</td>
+<td>action-item record</td>
+<td>Execution/standing</td>
+<td>meeting class only plus membership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>update_action_item</code></td>
+<td><code>PUT /gov/domains/{domain_id}/action-items/{item_id}</code></td>
+<td>meeting class or broad fallback</td>
+<td>action-item mutation</td>
+<td>Execution/ownership</td>
+<td>meeting class only plus ownership; completion keeps receipt path</td>
+<td>Matched scope is captured; receipt only on completion transition</td>
+</tr>
+<tr>
+<td><code>delete_action_item</code></td>
+<td><code>DELETE /gov/domains/{domain_id}/action-items/{item_id}</code></td>
+<td>meeting class or broad fallback</td>
+<td>action-item mutation</td>
+<td>Execution/ownership</td>
+<td>meeting class only plus ownership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>update_action_item_status</code></td>
+<td><code>PUT /gov/domains/{domain_id}/action-items/{item_id}/status</code></td>
+<td>meeting class or broad fallback</td>
+<td>action-item transition</td>
+<td>Execution/attestation</td>
+<td>meeting class only plus creator/assignee check</td>
+<td>Matched-scope completion receipt when transition requires it</td>
+</tr>
+<tr>
+<td><code>add_action_item_note</code></td>
+<td><code>POST /gov/domains/{domain_id}/action-items/{item_id}/notes</code></td>
+<td>meeting class or broad fallback</td>
+<td>action-item note</td>
+<td>Standing/ownership</td>
+<td>meeting class only plus membership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>create_meeting</code></td>
+<td><code>POST /gov/domains/{domain_id}/meetings</code></td>
+<td>meeting class or broad fallback</td>
+<td>meeting record</td>
+<td>Execution/standing</td>
+<td>meeting class only plus membership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>start_meeting</code></td>
+<td><code>POST /gov/meetings/{meeting_id}/start</code></td>
+<td>meeting class or broad fallback</td>
+<td>meeting lifecycle</td>
+<td>Execution</td>
+<td>meeting class only plus target-domain membership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>end_meeting</code></td>
+<td><code>POST /gov/meetings/{meeting_id}/end</code></td>
+<td>meeting class or broad fallback</td>
+<td>meeting lifecycle</td>
+<td>Execution</td>
+<td>meeting class only plus target-domain membership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>add_attendee</code></td>
+<td><code>POST /gov/meetings/{meeting_id}/attendees</code></td>
+<td>meeting class or broad fallback</td>
+<td>attendee roster</td>
+<td>Execution/standing</td>
+<td>meeting class only plus target-domain membership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>mark_attendance</code></td>
+<td><code>PUT /gov/meetings/{meeting_id}/attendance</code></td>
+<td>meeting class or broad fallback</td>
+<td>attendance fact</td>
+<td>Attestation</td>
+<td>meeting class only plus target-domain membership</td>
+<td>Matched-scope v2 attendance receipt for receipted transitions</td>
+</tr>
+<tr>
+<td><code>add_agenda_item</code></td>
+<td><code>POST /gov/meetings/{meeting_id}/agenda</code></td>
+<td>meeting class or broad fallback</td>
+<td>agenda mutation</td>
+<td>Execution/standing</td>
+<td>meeting class only plus target-domain membership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>update_agenda_item</code></td>
+<td><code>PUT /gov/meetings/{meeting_id}/agenda/{item_id}</code></td>
+<td>meeting class or broad fallback</td>
+<td>agenda mutation</td>
+<td>Execution/standing</td>
+<td>meeting class only plus target-domain membership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>create_structure</code></td>
+<td><code>POST /gov/entities/{entity_id}/structures</code></td>
+<td>activity class or broad fallback</td>
+<td>structure record</td>
+<td>Execution</td>
+<td>activity class only plus entity-aware target check</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>create_activity</code></td>
+<td><code>POST /gov/entities/{entity_id}/activities</code></td>
+<td>activity class or broad fallback</td>
+<td>activity record</td>
+<td>Execution</td>
+<td>activity class only plus entity-aware target check</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>create_program</code></td>
+<td><code>POST /gov/domains/{domain_id}/programs</code></td>
+<td>activity class or broad fallback</td>
+<td>program record</td>
+<td>Execution/standing</td>
+<td>activity class only plus membership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>create_milestone</code></td>
+<td><code>POST /gov/programs/{program_id}/milestones</code></td>
+<td>activity class or broad fallback</td>
+<td>milestone record</td>
+<td>Execution/standing</td>
+<td>activity class only plus program-domain membership</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>update_milestone_status</code></td>
+<td><code>PATCH /gov/milestones/{milestone_id}</code></td>
+<td>activity class or broad fallback</td>
+<td>milestone transition</td>
+<td>Execution</td>
+<td>activity class only plus program-domain authority</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>link_activity_to_program</code></td>
+<td><code>PUT /gov/programs/{program_id}/activities/{activity_id}</code></td>
+<td>activity class or broad fallback</td>
+<td>program/activity linkage</td>
+<td>Execution</td>
+<td>activity class only plus same-domain target checks</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>unlink_activity_from_program</code></td>
+<td><code>DELETE /gov/programs/{program_id}/activities/{activity_id}</code></td>
+<td>activity class or broad fallback</td>
+<td>program/activity linkage</td>
+<td>Execution</td>
+<td>activity class only plus same-domain target checks</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>update_program_status</code></td>
+<td><code>PATCH /gov/programs/{program_id}/status</code></td>
+<td>activity class or broad fallback</td>
+<td>program transition</td>
+<td>Execution</td>
+<td>activity class only plus program-domain authority</td>
+<td>Admission only</td>
+</tr>
+<tr>
+<td><code>record_process_gate_result</code></td>
+<td><code>POST /gov/domains/{domain_id}/process-sessions/{session_id}/gate-results</code></td>
+<td>broad only</td>
+<td>process fact recording</td>
+<td>Attestation</td>
+<td>candidate process class plus domain membership and recorder authority</td>
+<td>Fact receipt only; receipt grants zero authority</td>
+</tr>
+<tr>
+<td><code>open_process_session</code></td>
+<td><code>POST /gov/domains/{domain_id}/process-sessions/{session_id}/open</code></td>
+<td>broad only</td>
+<td>process session fact</td>
+<td>Attestation/Execution boundary</td>
+<td>candidate process class plus domain membership and process authority</td>
+<td>Fact receipt only; receipt grants zero authority</td>
+</tr>
+<tr>
+<td><code>record_deliberation_entry</code></td>
+<td><code>POST /gov/domains/{domain_id}/process-sessions/{session_id}/deliberation-entries/{entry_id}/record</code></td>
+<td>broad only</td>
+<td>deliberation fact</td>
+<td>Attestation</td>
+<td>candidate process class plus domain membership and recorder authority</td>
+<td>Fact receipt only; no deliberation body stored</td>
+</tr>
+<tr>
+<td><code>record_decision</code></td>
+<td><code>POST /gov/domains/{domain_id}/process-sessions/{session_id}/decisions/{decision_id}/record</code></td>
+<td>broad only</td>
+<td>process decision fact</td>
+<td>Attestation</td>
+<td>candidate process class plus domain membership and process authority</td>
+<td>Fact receipt only; recording is not authority to decide</td>
+</tr>
+</tbody></table>
+<p>The table deliberately excludes read-only handlers whose comments mention <code>governance:write</code> but whose implementation does not require it. It also excludes test-only injected claims.</p>
+<h2>3. Design choice</h2>
+<!-- truth: descriptive -->
+
+<p><strong>Choose and complete the hybrid path.</strong> This confirms the original #1868 decision against current code rather than reopening it.</p>
+<ol>
+<li><strong>Mechanical class scope at the RPC/HTTP boundary.</strong> The technical gate uses a small, bounded class taxonomy. The class scope limits which mutation family a token may attempt. It is opaque to the kernel.</li>
+<li><strong>App-side authority evaluation for institutionally consequential acts.</strong> <code>MandateGate</code>, domain membership/standing, resource ownership, process authority, and entity-aware subject/target checks decide whether the actor may perform this act on this target now.</li>
+<li><strong>Evidence records the basis without becoming the basis.</strong> A receipt may bind the matched class scope and a <code>MandateGrantRef</code>, <code>ProcessAuthorized</code> posture, or explicit <code>NoMandateRequired</code> reason. The receipt does not validate itself into authority.</li>
+</ol>
+<p>Pure per-handler scope strings are rejected because 51 route strings would still fail to bind actor, target, domain, time, delegation, or revocation. Pure mandate gating is rejected because a missed app check would leave the broad technical capability as a full bypass. The hybrid gives defense in depth at two different layers.</p>
+<h2>4. Proposed scope taxonomy</h2>
+<!-- truth: descriptive -->
+
+<p>Seven class strings are landed:</p>
+<pre><code class="language-text">governance:charter:write
+governance:proposal:write
+governance:steward:write
+governance:federation:write
+governance:meeting:write
+governance:activity:write
+governance:comment:write
+</code></pre>
+<p>This map proposes one additional class for the four real process-receipt handlers added after the original 45-handler inventory:</p>
+<pre><code class="language-text">governance:process:write
+</code></pre>
+<p>It is a candidate until a separate implementation review freezes it. It means technical permission to attempt process-fact recording. It does not mean permission to open a session, speak for a deliberating body, decide, make evidence available, or access private contents. Those remain app-side authority questions.</p>
+<p>The two newer constitutional handlers map to the existing charter class:</p>
+<pre><code class="language-text">adopt_domain_policy          -&gt; governance:charter:write
+declare_institutional_domain -&gt; governance:charter:write
+</code></pre>
+<p>No <code>governance:evidence:export</code> or <code>governance:access:write</code> scope is proposed here because no corresponding handler is in this inventory. Scope names should follow real enforcement surfaces, not anticipated products.</p>
+<p><code>governance:write</code> remains a compatibility fallback today. The completion target is to remove it from production handler candidate lists only after trusted issuance can mint all required class scopes and clients have migrated. Retirement must be measured, tested, and fail-closed, not a flag-day string replacement.</p>
+<h2>5. Mandate-bundle and authority-basis surface</h2>
+<!-- truth: descriptive -->
+
+<p>The app-side foundation is landed. <code>MandateRequest</code> currently carries:</p>
+<pre><code class="language-text">actor
+domain
+act
+target
+at
+</code></pre>
+<p><code>MandateGate::require</code> validates the actor&#39;s active grants, authority class, explicit domain binding, act token, target, mandate status, deadline, and revocation posture. It returns <code>MandateGrant</code>, which can be converted to a wire-recordable <code>MandateGrantRef</code> carrying:</p>
+<pre><code class="language-text">mandate_id
+decision_hash
+act
+target
+granted_at
+</code></pre>
+<p>The receipt side already has an explicit <code>ReceiptMandateAttestation</code> taxonomy:</p>
+<pre><code class="language-text">Grant { grant_ref }
+NoMandateRequired { reason }
+ProcessAuthorized
+</code></pre>
+<p>This is the correct pattern for future authority evidence. Absence must never ambiguously mean &quot;no mandate required.&quot;</p>
+<p>For a future <code>AccessReceipt</code>, the generic receipt should record only an opaque, deterministic <code>authority_basis_hash</code> or a stable reference hash derived from an app-validated basis. The app/gateway decision surface, not the receipt, owns the richer evaluation inputs:</p>
+<ul>
+<li>authenticated actor DID and future <code>actor_entity_id</code>;</li>
+<li>target domain/entity and <code>PrivateObjectRef</code>;</li>
+<li>requested action and purpose;</li>
+<li>mandate/grant/decision reference where applicable;</li>
+<li>adopted policy and <code>policy_clause_ref</code> where applicable;</li>
+<li>typed scope and delegation chain;</li>
+<li>validity, expiry, and revocation posture.</li>
+</ul>
+<p>These are not all landed fields on one object. The current <code>MandateRequest</code>/<code>MandateGrantRef</code> is the implemented mandate slice; <code>actor_entity_id</code>, private-object target, policy-clause evidence, and access-purpose binding belong to later #2061/private-access design. This map does not pretend they already exist.</p>
+<h2>6. Relationship to #2061 entity-aware authorization</h2>
+<!-- truth: descriptive -->
+
+<p>The two lanes answer different halves of one authorization question:</p>
+<ul>
+<li><strong>#1868 asks what action is technically permitted and what institutional basis must cover it.</strong> Its class scope narrows the action family; its mandate/process/standing posture explains the act-time authority basis.</li>
+<li><strong>#2061 asks which authenticated actor/entity may perform that action on which target entity.</strong> It owns <code>EntityId</code>, membership, standing, hierarchy, delegation, and subject/target binding.</li>
+</ul>
+<p>Both must agree before private-object access runtime:</p>
+<pre><code class="language-text">authenticated actor
+  + trusted entity binding
+  + action-family capability
+  + entity-aware subject/target authorization
+  + app-side mandate/policy/process authority
+  -&gt; allow or deny
+  -&gt; then record evidence
+</code></pre>
+<p>Flat <code>coop_id</code> equality remains the enforced same-namespace baseline on many gateway routes. It is the degenerate same-entity case, not the final delegation model. Federation/community delegation must never be inferred from federation sync, peer trust, route reachability, or receipt propagation.</p>
+<h2>7. Relationship to #2080 and #2081</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li><strong>#2080 supplies trusted positive issuance.</strong> The system cannot retire broad fallback safely until a trusted source can mint the correct class scope and entity binding from verified membership, invitation, enrollment, or privileged bootstrap state. DID key control and self-assertion are insufficient.</li>
+<li><strong>#2081 supplies an observe-to-enforce migration precedent.</strong> Treasury currently keeps the flat guard authoritative while entity-aware decisions are measured. Governance class-scope retirement should follow the same discipline: accept both during a bounded compatibility window, record which matched, measure broad-only callers, then enforce the narrower class.</li>
+</ul>
+<p>Neither issue is solved by this document. This document also does not copy treasury&#39;s entity-action taxonomy into governance. It adopts only the migration discipline.</p>
+<h2>8. What changes in kernel and receipt evidence</h2>
+<!-- truth: descriptive -->
+
+<h3>Current</h3>
+<ul>
+<li>The RPC/kernel-side authorization layer knows <code>governance:write</code> and seven opaque class strings.</li>
+<li>Five JSON-RPC methods prefer charter/proposal class strings but accept broad fallback.</li>
+<li>Most HTTP mutations prefer a class scope but accept broad fallback; six direct-only handlers still ask for broad scope.</li>
+<li>Most handlers call <code>require_any_scope</code>, so the handler proceeds without retaining which candidate matched.</li>
+<li><code>close_proposal</code>, action-item completion paths, and <code>mark_attendance</code> use <code>require_any_scope_matched</code> and can bind the presented scope into v2/v3 receipts.</li>
+<li><code>adopt_domain_policy</code> and <code>declare_institutional_domain</code> use a real <code>DefaultMandateGate</code>, but still require the broad technical scope.</li>
+<li>Process receipts record bounded facts and actor/time/proof links, but their existence does not prove that <code>governance:write</code> was an adequate authority basis.</li>
+</ul>
+<h3>Completion target</h3>
+<ul>
+<li>The technical gate identifies one class scope per mutation family, including a separately reviewed process class if accepted.</li>
+<li>Broad fallback is retired after trusted issuance and compatibility measurement.</li>
+<li>Handlers that produce authority-relevant receipts capture the actual matched scope rather than hardcoding or discarding it.</li>
+<li>Consequential acts carry an app-validated grant/process/policy basis into the evidence chain by stable reference or hash.</li>
+<li><code>AccessReceipt</code> may later cite that basis by fingerprint only after #2061 subject/target authorization and private-object policy enforcement have decided the request.</li>
+</ul>
+<p>The kernel still does not parse <code>MandateAct</code>, <code>EntityId</code> membership meaning, policy clauses, process meaning, or private-object semantics. It enforces opaque strings and constraints. The app supplies the decision and evidence.</p>
+<h2>9. What does not change</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li>No runtime behavior changes in this PR.</li>
+<li>No handler, route, OpenAPI description, or SDK changes.</li>
+<li>No scope constant or gateway allowlist changes.</li>
+<li>No token issuance or enforcement cutover.</li>
+<li>No new receipt class or receipt wire change.</li>
+<li>No <code>MandateGate</code> implementation change.</li>
+<li>No entity-aware authorization implementation.</li>
+<li>No <code>AccessReceipt</code>, <code>DisclosureDecisionReceipt</code>, or <code>RedactionAppliedReceipt</code> runtime.</li>
+<li>No vault or encryption implementation.</li>
+<li>No Meaning Firewall widening.</li>
+<li>No authority is granted by a receipt, sync result, trust score, or routing proof.</li>
+<li>No production, pilot, organizer-ready, member-ready, live-federation, NYCN, Phase-2, or #2041 completion claim.</li>
+</ul>
+<h2>10. Implementation sequence after this document</h2>
+<!-- truth: descriptive -->
+
+<ol>
+<li>Land this current-state control map without closing #1868.</li>
+<li>Open a narrow implementation issue for the new direct-only gaps: map domain-policy adoption and institutional-domain declaration to the existing charter class; decide and, if accepted, mint <code>governance:process:write</code> for the four process-recording handlers.</li>
+<li>Add accepted-also compatibility gates and tests for missing, wrong-class, narrow-only, broad-only, and both-scope tokens. Capture matched scope wherever downstream evidence consumes it.</li>
+<li>Instrument or audit broad-fallback use so retirement has evidence. Do not infer migration readiness from green tests alone.</li>
+<li>Extend existing <code>MandateGate</code> use to one uncovered high-blast mutation family, with actor, domain, act, target, status, deadline, and revocation tests.</li>
+<li>Connect the #2061 entity-aware subject/target model for entity- and domain-bound governance writes. Keep existing membership/ownership checks as defense in depth during migration.</li>
+<li>Wire #2080 trusted issuance for the class and entity claims needed by migrated clients; follow observe, measure, enforce discipline before removing broad fallback.</li>
+<li>Freeze the stable scope/authority contract in an ADR only after the process-class decision and compatibility evidence are reviewed.</li>
+<li>Only then open the <code>AccessReceipt</code> runtime decision rung. Private access additionally requires artifact registry, <code>PrivateObjectRef</code>, scoped-vault enforcement, disclosure policy, enumeration-safe outcomes, and visibility/retention decisions.</li>
+</ol>
+<p>The recommended first implementation lane after this docs PR is step 2: close the six direct-only handler gaps without changing the meaning of any handler.</p>
+<h2>11. Non-goals</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li>No runtime changes.</li>
+<li>No Rust receipt class.</li>
+<li>No route, OpenAPI, or SDK change.</li>
+<li>No gateway or authorization implementation.</li>
+<li>No token issuance.</li>
+<li>No enforcement cutover.</li>
+<li>No <code>AccessReceipt</code> runtime.</li>
+<li>No <code>DisclosureDecisionReceipt</code> runtime.</li>
+<li>No <code>RedactionAppliedReceipt</code> runtime.</li>
+<li>No vault implementation.</li>
+<li>No encryption implementation.</li>
+<li>No operator dashboard or member-shell implementation.</li>
+<li>No fixture changes.</li>
+<li>No NYCN package update.</li>
+<li>No icn-learn update.</li>
+<li>No icn-infra update.</li>
+<li>No downstream repository work.</li>
+<li>No production, pilot, organizer-ready, member-ready, live-federation, NYCN, Phase-2, or #2041 completion claim.</li>
+<li>No closure of #1748, #2141, #2041, #1868, #2061, #2080, #2081, or #1907.</li>
+</ul>
+<h2>References</h2>
+<!-- truth: descriptive -->
+
+<ul>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/governance/governance-write-decomposition">`governance-write-decomposition.md`</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/governance/mandate-gate-design">`mandate-gate-design.md`</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/entity-aware-auth-control-map">`entity-aware-auth-control-map.md`</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/made-available-federation-access-boundary-map">`made-available-federation-access-boundary-map.md`</a></li>
+<li><a href="https://github.com/InterCooperative-Network/icn/blob/main/access-made-available-disclosure-receipt-decision-rung">`access-made-available-disclosure-receipt-decision-rung.md`</a></li>
+<li><a href="/docs/architecture/ABUSE_CASE_HARDENING_STRATEGY">`ABUSE_CASE_HARDENING_STRATEGY.md`</a></li>
+<li><a href="/docs/spec/effect-dispatch-contract">`effect-dispatch-contract.md`</a></li>
+<li><a href="/docs/spec/institutional-domain">`institutional-domain.md`</a></li>
+<li><a href="/docs/spec/ccl-policy-registry">`ccl-policy-registry.md`</a></li>
+<li><a href="/docs/rfcs/RFC-0018-entity-aware-request-authorization">RFC-0018</a></li>
+</ul>
+<p>Refs #1868.
+Refs #2061.
+Refs #2080.
+Refs #2081.
+Refs #2337.
+Refs #2336.
+Refs #1748.
+Refs #2141.
+Refs #2041.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 

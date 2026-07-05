@@ -311,6 +311,9 @@ View source on GitHub →
 <h3>📝 <strong>Living</strong> <a href="/docs/design/execution-bridge-spec.md">Execution Bridge Specification</a></h3>
 <p>Authoritative design for bridging between ICN and external execution environments</p>
 <p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-03-10</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/design/governance-write-authority-decomposition.md">Governance Write Authority Decomposition</a></h3>
+<p>Current-state design/control map for #1868 after the original hybrid governance:write decomposition began landing. Enumerates all 51 current governance HTTP handlers still accepting the broad scope, including six newer direct-only paths; confirms the hybrid of bounded class scopes plus app-side mandate/process/entity authority; maps the seven landed class scopes and proposes governance:process:write for four real process-receipt handlers; maps DomainPolicy adoption and InstitutionalDomain declaration to the landed charter class; distinguishes technical capability, entity-aware subject/target authorization, MandateGate authority, and receipt evidence; and explains why #1868/#2061/#2080/#2081 must advance before AccessReceipt runtime. Docs only: no runtime, scope, handler, route, receipt, token, enforcement, vault, encryption, UI, fixture, downstream-repo, or readiness change.</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code>, <code>security</code>, <code>operators</code> | <strong>Updated:</strong> 2026-07-05</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/design/governance/PROJECT_GOVERNANCE.md">ICN Project Governance</a></h3>
 <p>Governance structure for ICN development and decision-making</p>
 <p><strong>For:</strong> <code>team</code>, <code>stakeholders</code> | <strong>Updated:</strong> 2026-03-10</p>
@@ -1111,12 +1114,12 @@ View source on GitHub →
 <p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
 <hr>
 <h2>Summary</h2>
-<p><strong>Total documents:</strong> 350</p>
+<p><strong>Total documents:</strong> 351</p>
 <p><strong>By status:</strong></p>
 <ul>
 <li>Active: 1</li>
 <li>Canonical: 40</li>
-<li>Draft: 97</li>
+<li>Draft: 98</li>
 <li>Living: 212</li>
 </ul>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
