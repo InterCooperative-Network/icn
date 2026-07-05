@@ -3094,10 +3094,9 @@ pub async fn get_action_item_completion_receipt<E: GovernanceEventEmitter + Clon
 /// carries the persisted receipt and its `record_hash` is the verification
 /// evidence. This adds no new receipt type and no process runtime.
 ///
-/// Authorization mirrors the action-item write surface: the existing
-/// `governance:write` scope plus domain membership for the caller. This
-/// handler composes those existing gates and changes no authorization
-/// decision. The manager performs no authority check itself — charter
+/// Authorization accepts `governance:process:write` first and retains
+/// `governance:write` as a compatibility fallback, then requires domain
+/// membership for the caller. The manager performs no authority check itself — charter
 /// enforcement of "who may record a gate result for this domain/session"
 /// is upstream of this slice.
 ///
@@ -3106,8 +3105,8 @@ pub async fn get_action_item_completion_receipt<E: GovernanceEventEmitter + Clon
 /// - 400 when `result`/`gate_kind` is outside its closed taxonomy
 ///   (deserialization) or `session_id` is empty/whitespace.
 /// - 401 when the bearer token is missing/invalid.
-/// - 403 when the token lacks `governance:write` or the caller is not a
-///   member of the domain.
+/// - 403 when the token lacks both accepted write scopes or the caller is not
+///   a member of the domain.
 /// - 404 when the domain does not exist.
 pub async fn record_process_gate_result<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,
@@ -3115,7 +3114,10 @@ pub async fn record_process_gate_result<E: GovernanceEventEmitter + Clone + 'sta
     path: web::Path<(String, String)>,
     req: web::Json<RecordProcessGateResultRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:process:write", "governance:write"],
+    )?;
     let recorded_by = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (domain_id, session_id) = path.into_inner();
@@ -3158,19 +3160,18 @@ pub async fn record_process_gate_result<E: GovernanceEventEmitter + Clone + 'sta
 /// evidence, not proof of permission.
 ///
 /// Authorization mirrors the gate-result write surface exactly (per the
-/// #2275 contract): the existing `governance:write` scope plus domain
-/// membership for the caller — sticky duplicate-open semantics would
+/// #2275 contract): process-class-first scope admission with broad fallback,
+/// plus domain membership for the caller — sticky duplicate-open semantics would
 /// otherwise let an authenticated outsider preempt a session id in
-/// someone else's domain. This handler composes those existing gates and
-/// changes no authorization decision.
+/// someone else's domain.
 ///
 /// Returns:
 /// - 200 with the persisted `ProcessSessionOpenedReceipt` JSON (first
 ///   open AND same-opener retry).
 /// - 400 when `session_id` is empty/whitespace.
 /// - 401 when the bearer token is missing/invalid.
-/// - 403 when the token lacks `governance:write` or the caller is not a
-///   member of the domain.
+/// - 403 when the token lacks both accepted write scopes or the caller is not
+///   a member of the domain.
 /// - 404 when the domain does not exist.
 /// - 409 when the session was already opened by a different actor.
 pub async fn open_process_session<E: GovernanceEventEmitter + Clone + 'static>(
@@ -3178,7 +3179,10 @@ pub async fn open_process_session<E: GovernanceEventEmitter + Clone + 'static>(
     http_req: HttpRequest,
     path: web::Path<(String, String)>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:process:write", "governance:write"],
+    )?;
     let opened_by = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (domain_id, session_id) = path.into_inner();
@@ -3229,9 +3233,9 @@ pub async fn open_process_session<E: GovernanceEventEmitter + Clone + 'static>(
 /// zero authority; `author` is the authenticated caller as actor
 /// evidence, not proof of entitlement.
 ///
-/// Authorization mirrors the session-open surface exactly: the existing
-/// `governance:write` scope plus domain membership for the caller. No new
-/// capability is introduced.
+/// Authorization mirrors the session-open surface exactly:
+/// process-class-first scope admission with broad fallback, plus domain
+/// membership for the caller.
 ///
 /// Returns:
 /// - 200 with the persisted `DeliberationEntryRecordedReceipt` JSON
@@ -3240,8 +3244,8 @@ pub async fn open_process_session<E: GovernanceEventEmitter + Clone + 'static>(
 ///   `entry_kind` is outside the closed taxonomy (serde rejects it), or
 ///   `body_hash` is not 64 hex characters.
 /// - 401 when the bearer token is missing/invalid.
-/// - 403 when the token lacks `governance:write` or the caller is not a
-///   member of the domain.
+/// - 403 when the token lacks both accepted write scopes or the caller is not
+///   a member of the domain.
 /// - 404 when the domain does not exist, or when the session has no
 ///   recorded opening (`deliberation_entry_session_not_opened`) — the
 ///   referenced anchor is absent, mirroring the existing missing-domain
@@ -3254,7 +3258,10 @@ pub async fn record_deliberation_entry<E: GovernanceEventEmitter + Clone + 'stat
     path: web::Path<(String, String, String)>,
     req: web::Json<RecordDeliberationEntryRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:process:write", "governance:write"],
+    )?;
     let author = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (domain_id, session_id, entry_id) = path.into_inner();
@@ -3331,8 +3338,8 @@ pub async fn record_deliberation_entry<E: GovernanceEventEmitter + Clone + 'stat
 /// evidence — not decider identity, not proof of entitlement.
 ///
 /// Authorization mirrors the sibling process-receipt surfaces exactly:
-/// the existing `governance:write` scope plus domain membership for the
-/// caller. No new capability is introduced.
+/// process-class-first scope admission with broad fallback, plus domain
+/// membership for the caller.
 ///
 /// Returns:
 /// - 200 with the persisted `DecisionRecordedReceipt` JSON (first record
@@ -3340,8 +3347,8 @@ pub async fn record_deliberation_entry<E: GovernanceEventEmitter + Clone + 'stat
 /// - 400 when `domain_id`/`session_id`/`decision_id` is empty/whitespace
 ///   or `body_hash` is not 64 hex characters.
 /// - 401 when the bearer token is missing/invalid.
-/// - 403 when the token lacks `governance:write` or the caller is not a
-///   member of the domain.
+/// - 403 when the token lacks both accepted write scopes or the caller is not
+///   a member of the domain.
 /// - 404 when the domain does not exist, or when the session has no
 ///   recorded opening (`decision_recorded_session_not_opened`) — the
 ///   referenced anchor is absent, mirroring the existing missing-domain
@@ -3354,7 +3361,10 @@ pub async fn record_decision<E: GovernanceEventEmitter + Clone + 'static>(
     path: web::Path<(String, String, String)>,
     req: web::Json<RecordDecisionRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:process:write", "governance:write"],
+    )?;
     let recorded_by = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (domain_id, session_id, decision_id) = path.into_inner();
@@ -3436,7 +3446,8 @@ fn institutional_domain_store_err_to_api(e: InstitutionalDomainStoreError) -> Ap
 /// Drives the existing persisted adoption seam end-to-end over HTTP:
 ///
 /// ```text
-/// POST → governance:write scope + domain-membership gate
+/// POST → governance:charter:write class scope (or broad compatibility fallback)
+///      → domain-membership gate
 ///      → GovernanceManager::adopt_domain_policy_persisted
 ///        → load InstitutionalDomain
 ///        → DefaultMandateGate authority resolution (actor → active grants →
@@ -3462,8 +3473,8 @@ fn institutional_domain_store_err_to_api(e: InstitutionalDomainStoreError) -> Ap
 /// - 400 when `policy_content` is empty/whitespace or exceeds
 ///   `MAX_DOMAIN_POLICY_CONTENT_BYTES`, or the body/DID is malformed.
 /// - 401 when the bearer token is missing/invalid.
-/// - 403 when the token lacks `governance:write`, the caller is not a domain
-///   member, or the `DefaultMandateGate` refuses adoption authority.
+/// - 403 when the token lacks both accepted write scopes, the caller is not a
+///   domain member, or the `DefaultMandateGate` refuses adoption authority.
 /// - 404 when no `InstitutionalDomain` is declared for `domain_id` (or the
 ///   `GovernanceDomain` membership target does not exist).
 /// - 500 when no domain/receipt store is wired, or a backend read/write fails.
@@ -3473,7 +3484,10 @@ pub async fn adopt_domain_policy<E: GovernanceEventEmitter + Clone + 'static>(
     path: web::Path<String>,
     req: web::Json<AdoptDomainPolicyRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:charter:write", "governance:write"],
+    )?;
     let actor = parse_did(&claims.sub, "Invalid DID in token")?;
 
     // Reject empty/whitespace and oversize bodies before content-addressing
@@ -3570,7 +3584,7 @@ fn declare_institutional_domain_err_to_api(e: DeclareInstitutionalDomainError) -
 /// Drives the mandate-gated declaration seam end-to-end over HTTP:
 ///
 /// ```text
-/// POST → governance:write scope
+/// POST → governance:charter:write class scope (or broad compatibility fallback)
 ///      → GovernanceManager::declare_institutional_domain_gated
 ///        → DefaultMandateGate authority resolution (actor → active grants →
 ///          domain-scoped Execution `institutional_domain:declare` grant +
@@ -3601,8 +3615,8 @@ fn declare_institutional_domain_err_to_api(e: DeclareInstitutionalDomainError) -
 /// - 400 when `entity_type` is out of taxonomy, `charter_id` is malformed, or
 ///   the body/DID is malformed.
 /// - 401 when the bearer token is missing/invalid.
-/// - 403 when the token lacks `governance:write` or the `DefaultMandateGate`
-///   refuses declaration authority.
+/// - 403 when the token lacks both accepted write scopes or the
+///   `DefaultMandateGate` refuses declaration authority.
 /// - 409 when an `InstitutionalDomain` is already declared for `domain_id`.
 /// - 500 when no receipt/domain store is wired, or a backend read/write fails.
 pub async fn declare_institutional_domain<E: GovernanceEventEmitter + Clone + 'static>(
@@ -3611,7 +3625,10 @@ pub async fn declare_institutional_domain<E: GovernanceEventEmitter + Clone + 's
     path: web::Path<String>,
     req: web::Json<DeclareInstitutionalDomainRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    let claims = require_scope::<BasicClaims>(&http_req, "governance:write")?;
+    let claims = require_any_scope::<BasicClaims>(
+        &http_req,
+        &["governance:charter:write", "governance:write"],
+    )?;
     let actor = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let domain = GovernanceDomainId(path.into_inner());
