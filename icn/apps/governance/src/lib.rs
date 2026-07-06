@@ -31,6 +31,7 @@ pub mod dispatch_evidence_sink;
 pub mod domain_policy_adoption;
 pub mod events;
 pub mod executor;
+pub mod fallback_observation;
 pub mod grant_minting;
 pub mod handlers;
 pub mod http;
@@ -51,6 +52,7 @@ pub use dispatch_evidence::{
 pub use dispatch_evidence_sink::{DeferredDispatchEvidenceSink, GovernanceDispatchEvidenceSink};
 pub use events::{GovernanceEventEmitter, NoopEventEmitter};
 pub use executor::{ExecutionCallback, GovernanceProposalExecutor};
+pub use fallback_observation::{GovernanceScopeAdmission, RequiredClass, RouteFamily};
 pub use handlers::translate_payload_to_effects;
 pub use institutional_effect::InstitutionalEffectRecord;
 pub use manager::{
