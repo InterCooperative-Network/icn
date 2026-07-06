@@ -9,6 +9,7 @@
 
 pub mod auth;
 pub mod error;
+pub mod observation;
 pub mod pagination;
 pub mod validation;
 
@@ -17,6 +18,10 @@ pub use auth::{
     ScopeAdmission,
 };
 pub use error::ApiError;
+pub use observation::{
+    NoopScopeAdmissionObserver, ObservationOutcome, ObservationSurface, ScopeAdmissionObservation,
+    ScopeAdmissionObserver,
+};
 pub use pagination::{
     Cursor, Cursored, Direction, ListPagination, ListQuery, ListResponse, PaginatedList,
     PaginationRequest, PaginationResponse, ResponseMeta, SortField,
