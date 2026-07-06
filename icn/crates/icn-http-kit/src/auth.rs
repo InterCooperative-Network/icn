@@ -150,17 +150,31 @@ pub fn require_any_scope_matched<C: ClaimsLike>(
 /// (which only observes) use it, so an observation can never disagree with the
 /// gate it describes.
 fn scope_str_grants(raw: &str, required: &str) -> bool {
-    raw.split_whitespace()
-        .any(|s| s == required || s.starts_with(&format!("{required}:")))
+    raw.split_whitespace().any(|s| {
+        // Exact match, or a colon-delimited sub-scope (e.g. `governance:write:admin`
+        // grants `governance:write`) — never a bare prefix like `governance:writer`.
+        // `strip_prefix` avoids allocating a `format!("{required}:")` per token.
+        s.strip_prefix(required)
+            .is_some_and(|rest| rest.is_empty() || rest.starts_with(':'))
+    })
 }
 
 /// Centralized scope checking. Split and normalize once, not in every handler.
+///
+/// A missing scope claim and a whitespace-only (tokenless) scope string are both
+/// treated as "no scope present": a whitespace-only string carries no usable
+/// scope, so it takes the same rejection path as an absent claim. This keeps the
+/// gate aligned with [`classify_scope_admission`], which classifies both `None`
+/// and whitespace-only as [`ScopeAdmission::RejectedMissing`]. Only the error
+/// *message* changes for the whitespace-only edge; the `ApiError` variant, HTTP
+/// status, and allow/deny outcome are unchanged (both were already `Forbidden`).
 fn check_scope<C: ClaimsLike>(claims: &C, required: &str) -> Result<(), ApiError> {
-    let Some(raw) = claims.raw_scope() else {
+    let raw = claims.raw_scope().unwrap_or_default();
+    if raw.split_whitespace().next().is_none() {
         return Err(ApiError::Forbidden(format!(
             "scope '{required}' required but no scope present"
         )));
-    };
+    }
 
     if scope_str_grants(raw, required) {
         Ok(())
@@ -471,6 +485,45 @@ mod tests {
         assert_eq!(
             classify_scope_admission(Some("governance:write:admin"), CHARTER, BROAD, SIBLINGS),
             ScopeAdmission::Fallback
+        );
+    }
+
+    #[test]
+    fn scope_prefix_without_colon_does_not_grant() {
+        // A bare prefix like `governance:writer` must NOT satisfy `governance:write`
+        // — only an exact match or a colon-delimited sub-scope grants. Guards the
+        // `strip_prefix`-based matcher against false prefix positives, for both the
+        // gate (`require_scope`) and the classifier.
+        let req = req_with_scope(Some("governance:writer"));
+        assert!(
+            require_scope::<BasicClaims>(&req, BROAD).is_err(),
+            "bare prefix `governance:writer` must not grant `governance:write`"
+        );
+        assert_eq!(
+            classify_scope_admission(Some("governance:writer"), CHARTER, BROAD, SIBLINGS),
+            ScopeAdmission::RejectedUnrelated
+        );
+    }
+
+    #[test]
+    fn whitespace_only_scope_takes_the_no_scope_present_path() {
+        // Post-#2344 alignment: the gate treats a whitespace-only (tokenless) scope
+        // as "no scope present" — the same rejection class as a missing claim —
+        // matching the classifier's `RejectedMissing`. The `ApiError` variant and
+        // HTTP status are unchanged (`Forbidden` either way); only the message text
+        // changes, so this is not an authorization-behavior change.
+        let req = req_with_scope(Some("   "));
+        match require_any_scope::<BasicClaims>(&req, &[CHARTER, BROAD]).unwrap_err() {
+            ApiError::Forbidden(msg) => assert!(
+                msg.contains("no scope present"),
+                "whitespace-only scope should use the no-scope-present message, got: {msg}"
+            ),
+            other => panic!("expected Forbidden, got {other:?}"),
+        }
+        // Gate and classifier now agree this is the "missing" case.
+        assert_eq!(
+            classify_scope_admission(Some("   "), CHARTER, BROAD, SIBLINGS),
+            ScopeAdmission::RejectedMissing
         );
     }
 
