@@ -537,6 +537,12 @@ Authoritative design for bridging between ICN and external execution environment
 
 **For:** `architects`, `developers` | **Updated:** 2026-03-10
 
+### 📋 **Draft** [Governance Broad-Fallback Observability and Retirement Evidence](/docs/design/governance-broad-fallback-observability.md)
+
+Design/control map for #2341: after #2340 every known governance mutation surface is class-first with governance:write retained as an accepted-also compatibility fallback, but the repo has no bounded, privacy-safe way to measure which accepted candidate scope callers actually present. Inventories the post-#2340 class-first surface from live main — 51 governance HTTP mutation handlers (charter 6, proposal 8, federation 7 via extract_federation_common, steward 1, comment 5, meeting 12, activity 8, process 4), three gateway aliases (cast_vote_alias, decision-registry create_meeting, index_decision_endpoint), and the governance JSON-RPC mappings (corrects the informal five-method count to seven by including the two #2113 delegation writes) — and confirms no broad-only or narrow-only-without-fallback handlers remain. Specifies a matched-scope outcome model (class/fallback/class_preferred/rejected_sibling/rejected_unrelated/rejected_missing), a bounded signal schema over closed enums (surface_kind/route_family/required_class/match_outcome/observation_outcome), an explicit privacy budget prohibiting token contents, DIDs, entity/actor/subject/domain/resource/proposal/meeting/activity/program/milestone/receipt IDs, payloads, deliberation content, IPs, user agents, free-form labels/errors, and any high-cardinality value, and an absolute observe-only guarantee (observation failure never changes any authorization, handler, route, receipt, mandate, membership, manager, or persistence outcome). Defines the test matrix and the retirement criteria a separate later proposal would need — measured compatibility across every surface, a defined observation window, candidate (unapproved) thresholds, trusted issuance (#2080), entity-aware subject/target authorization (#2061), and a separate enforcement issue/PR with rollback. States explicitly that #2341 does not authorize fallback removal. Docs only: no runtime, observability, scope, handler, route, receipt, token, enforcement, mandate, entity-auth, vault, encryption, provider-import, NYCN, icn-learn, icn-infra, UI, fixture, or readiness/completion change.
+
+**For:** `architects`, `developers`, `security`, `operators` | **Updated:** 2026-07-06
+
 ### 📋 **Draft** [Governance Write Authority Decomposition](/docs/design/governance-write-authority-decomposition.md)
 
 Current-state design/control map for #1868 after the original hybrid governance:write decomposition began landing. Enumerates all 51 current governance HTTP handlers still accepting the broad scope, including six newer direct-only paths; confirms the hybrid of bounded class scopes plus app-side mandate/process/entity authority; maps the seven landed class scopes and proposes governance:process:write for four real process-receipt handlers; maps DomainPolicy adoption and InstitutionalDomain declaration to the landed charter class; distinguishes technical capability, entity-aware subject/target authorization, MandateGate authority, and receipt evidence; and explains why #1868/#2061/#2080/#2081 must advance before AccessReceipt runtime. Docs only: no runtime, scope, handler, route, receipt, token, enforcement, vault, encryption, UI, fixture, downstream-repo, or readiness change.
@@ -2150,10 +2156,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 351
+**Total documents:** 352
 
 **By status:**
 - Active: 1
 - Canonical: 40
-- Draft: 98
+- Draft: 99
 - Living: 212
