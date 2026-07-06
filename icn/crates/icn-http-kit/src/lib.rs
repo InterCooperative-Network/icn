@@ -12,7 +12,10 @@ pub mod error;
 pub mod pagination;
 pub mod validation;
 
-pub use auth::{BasicClaims, ClaimsLike};
+pub use auth::{
+    classify_scope_admission, classify_scope_admission_for_claims, BasicClaims, ClaimsLike,
+    ScopeAdmission,
+};
 pub use error::ApiError;
 pub use pagination::{
     Cursor, Cursored, Direction, ListPagination, ListQuery, ListResponse, PaginatedList,
