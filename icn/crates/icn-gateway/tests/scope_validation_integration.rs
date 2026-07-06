@@ -73,16 +73,15 @@ fn test_scope_count_limit() {
 
 #[test]
 fn test_all_allowed_scopes_are_valid() {
-    // Verify all scopes in ALLOWED_SCOPES actually pass validation
-    let all_allowed_scopes = validation::ALLOWED_SCOPES
-        .iter()
-        .map(|s| s.to_string())
-        .collect::<Vec<String>>();
-
-    assert!(
-        validation::validate_scopes(&all_allowed_scopes).is_ok(),
-        "All ALLOWED_SCOPES should be valid"
-    );
+    // Verify each allowlisted scope passes validation independently. The
+    // allowlist may contain more entries than a single request is permitted
+    // to carry under MAX_SCOPES.
+    for scope in validation::ALLOWED_SCOPES {
+        assert!(
+            validation::validate_scopes(&[scope.to_string()]).is_ok(),
+            "Allowlisted scope '{scope}' should be valid"
+        );
+    }
 }
 
 #[test]
