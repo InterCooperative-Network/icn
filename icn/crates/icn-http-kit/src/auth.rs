@@ -141,6 +141,19 @@ pub fn require_any_scope_matched<C: ClaimsLike>(
     ))
 }
 
+/// Whether a space-separated `raw` scope string grants `required`.
+///
+/// Matching rule: some whitespace-split entry is either an exact match or a
+/// sub-scope of `required` (e.g. `governance:write:admin` grants
+/// `governance:write`). This is the single source of truth for scope matching;
+/// both [`check_scope`] (which enforces) and [`classify_scope_admission`]
+/// (which only observes) use it, so an observation can never disagree with the
+/// gate it describes.
+fn scope_str_grants(raw: &str, required: &str) -> bool {
+    raw.split_whitespace()
+        .any(|s| s == required || s.starts_with(&format!("{required}:")))
+}
+
 /// Centralized scope checking. Split and normalize once, not in every handler.
 fn check_scope<C: ClaimsLike>(claims: &C, required: &str) -> Result<(), ApiError> {
     let Some(raw) = claims.raw_scope() else {
@@ -149,18 +162,124 @@ fn check_scope<C: ClaimsLike>(claims: &C, required: &str) -> Result<(), ApiError
         )));
     };
 
-    let granted = raw.split_whitespace().any(|s| {
-        // Exact match or sub-scope (governance:write:admin satisfies governance:write)
-        s == required || s.starts_with(&format!("{required}:"))
-    });
-
-    if granted {
+    if scope_str_grants(raw, required) {
         Ok(())
     } else {
         Err(ApiError::Forbidden(format!(
             "required scope '{required}' not in granted scopes"
         )))
     }
+}
+
+/// How a class-first, accepted-also scope gate was satisfied — or why it would
+/// be rejected.
+///
+/// This is **observability only**. It classifies the *same* scope decision the
+/// gate helpers ([`require_any_scope`] / [`require_any_scope_matched`]) already
+/// make; it never authorizes, rejects, or alters a request. It is the stable
+/// in-code vocabulary a future privacy-safe observability slice can count
+/// without capturing token contents, subjects, or resource identity. See
+/// `docs/design/governance-broad-fallback-observability.md` §3.
+///
+/// A "class-first accepted-also" gate lists a narrowed class scope first and a
+/// broad compatibility scope as a fallback (e.g.
+/// `["governance:charter:write", "governance:write"]`). The classification
+/// distinguishes admission via the class scope from admission via the broad
+/// fallback, so migration off the fallback can eventually be measured.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ScopeAdmission {
+    /// Accepted by the required class scope; the broad fallback was not needed.
+    Class,
+    /// Accepted only by the broad fallback scope.
+    Fallback,
+    /// Both the class scope and the broad fallback are present; the class scope
+    /// is the preferred/classified match.
+    ClassPreferred,
+    /// Rejected: a *different* class scope (from the sibling set) is present,
+    /// but neither the required class scope nor the broad fallback.
+    RejectedSibling,
+    /// Rejected: only unrelated scopes are present.
+    RejectedUnrelated,
+    /// Rejected: no usable scope is present at all.
+    RejectedMissing,
+}
+
+impl ScopeAdmission {
+    /// Whether this classification corresponds to an accepted request.
+    ///
+    /// The accepted variants ([`Class`](Self::Class),
+    /// [`Fallback`](Self::Fallback), [`ClassPreferred`](Self::ClassPreferred))
+    /// match exactly the requests the gate helpers accept; the `Rejected*`
+    /// variants match those they reject. Provided so an observer can assert its
+    /// classification agrees with the gate outcome without re-deriving it.
+    pub fn is_accepted(self) -> bool {
+        matches!(self, Self::Class | Self::Fallback | Self::ClassPreferred)
+    }
+}
+
+/// Classify how a class-first, accepted-also scope gate was satisfied, from the
+/// request's granted scope string alone.
+///
+/// Observability only — this makes no authorization decision and must never be
+/// wired to change one. It applies the same whitespace/sub-scope rule the gate
+/// uses ([`scope_str_grants`]), so the classification cannot disagree with the
+/// gate it describes.
+///
+/// - `granted_scope`: the request's space-separated scope string
+///   ([`ClaimsLike::raw_scope`]), or `None` when no scope claim is present.
+/// - `class_scope`: the narrowed class scope this surface prefers
+///   (e.g. `"governance:charter:write"`).
+/// - `broad_scope`: the broad compatibility fallback (e.g. `"governance:write"`).
+/// - `sibling_scopes`: the other class scopes in the same family, used only to
+///   tell [`RejectedSibling`](ScopeAdmission::RejectedSibling) from
+///   [`RejectedUnrelated`](ScopeAdmission::RejectedUnrelated). Passed as a
+///   parameter (not hard-coded) so this crate stays domain-agnostic.
+///
+/// Privacy: only scope strings are inspected. No subject, DID, domain, entity,
+/// resource identifier, or payload is read, returned, or retained.
+pub fn classify_scope_admission(
+    granted_scope: Option<&str>,
+    class_scope: &str,
+    broad_scope: &str,
+    sibling_scopes: &[&str],
+) -> ScopeAdmission {
+    let Some(raw) = granted_scope else {
+        return ScopeAdmission::RejectedMissing;
+    };
+
+    let has_class = scope_str_grants(raw, class_scope);
+    let has_broad = scope_str_grants(raw, broad_scope);
+
+    match (has_class, has_broad) {
+        (true, true) => ScopeAdmission::ClassPreferred,
+        (true, false) => ScopeAdmission::Class,
+        (false, true) => ScopeAdmission::Fallback,
+        (false, false) => {
+            if raw.split_whitespace().next().is_none() {
+                ScopeAdmission::RejectedMissing
+            } else if sibling_scopes
+                .iter()
+                .any(|sibling| scope_str_grants(raw, sibling))
+            {
+                ScopeAdmission::RejectedSibling
+            } else {
+                ScopeAdmission::RejectedUnrelated
+            }
+        }
+    }
+}
+
+/// [`classify_scope_admission`] applied to a request's already-validated claims.
+///
+/// Convenience wrapper that reads [`ClaimsLike::raw_scope`]; identical semantics
+/// and the same privacy guarantee — only the scope string is inspected.
+pub fn classify_scope_admission_for_claims<C: ClaimsLike>(
+    claims: &C,
+    class_scope: &str,
+    broad_scope: &str,
+    sibling_scopes: &[&str],
+) -> ScopeAdmission {
+    classify_scope_admission(claims.raw_scope(), class_scope, broad_scope, sibling_scopes)
 }
 
 #[cfg(test)]
@@ -280,5 +399,123 @@ mod tests {
         let req = req_with_scope(Some(CHARTER));
         let err = require_any_scope_matched::<BasicClaims>(&req, &[]).unwrap_err();
         assert!(matches!(err, ApiError::Internal(_)));
+    }
+
+    // --- ScopeAdmission classification (observability only) ---
+
+    const MEETING: &str = "governance:meeting:write";
+    // A representative sibling-class set. The real set is
+    // `icn_rpc::auth::scopes::GOVERNANCE_CLASS_WRITE`, supplied by callers;
+    // `icn-http-kit` stays domain-agnostic and takes it as a parameter.
+    const SIBLINGS: &[&str] = &[CHARTER, MEETING, "governance:proposal:write"];
+
+    #[test]
+    fn classify_class_only_is_class() {
+        assert_eq!(
+            classify_scope_admission(Some(CHARTER), CHARTER, BROAD, SIBLINGS),
+            ScopeAdmission::Class
+        );
+    }
+
+    #[test]
+    fn classify_broad_only_is_fallback() {
+        assert_eq!(
+            classify_scope_admission(Some(BROAD), CHARTER, BROAD, SIBLINGS),
+            ScopeAdmission::Fallback
+        );
+    }
+
+    #[test]
+    fn classify_class_and_broad_is_class_preferred() {
+        let both = format!("{CHARTER} {BROAD}");
+        assert_eq!(
+            classify_scope_admission(Some(&both), CHARTER, BROAD, SIBLINGS),
+            ScopeAdmission::ClassPreferred
+        );
+    }
+
+    #[test]
+    fn classify_sibling_class_scope_is_rejected_sibling() {
+        // A different governance class scope, but neither the required class nor
+        // the broad fallback.
+        assert_eq!(
+            classify_scope_admission(Some(MEETING), CHARTER, BROAD, SIBLINGS),
+            ScopeAdmission::RejectedSibling
+        );
+    }
+
+    #[test]
+    fn classify_unrelated_scope_is_rejected_unrelated() {
+        assert_eq!(
+            classify_scope_admission(Some("ledger:write"), CHARTER, BROAD, SIBLINGS),
+            ScopeAdmission::RejectedUnrelated
+        );
+    }
+
+    #[test]
+    fn classify_missing_scope_is_rejected_missing() {
+        assert_eq!(
+            classify_scope_admission(None, CHARTER, BROAD, SIBLINGS),
+            ScopeAdmission::RejectedMissing
+        );
+        // An empty / whitespace-only scope string is "no usable scope" too.
+        assert_eq!(
+            classify_scope_admission(Some("   "), CHARTER, BROAD, SIBLINGS),
+            ScopeAdmission::RejectedMissing
+        );
+    }
+
+    #[test]
+    fn classify_honors_sub_scope_match_for_broad_fallback() {
+        // `governance:write:admin` satisfies the broad `governance:write` fallback.
+        assert_eq!(
+            classify_scope_admission(Some("governance:write:admin"), CHARTER, BROAD, SIBLINGS),
+            ScopeAdmission::Fallback
+        );
+    }
+
+    #[test]
+    fn classify_for_claims_matches_pure_classifier() {
+        let broad_claims = get_claims::<BasicClaims>(&req_with_scope(Some(BROAD))).unwrap();
+        assert_eq!(
+            classify_scope_admission_for_claims(&broad_claims, CHARTER, BROAD, SIBLINGS),
+            ScopeAdmission::Fallback
+        );
+        let no_claims = get_claims::<BasicClaims>(&req_with_scope(None)).unwrap();
+        assert_eq!(
+            classify_scope_admission_for_claims(&no_claims, CHARTER, BROAD, SIBLINGS),
+            ScopeAdmission::RejectedMissing
+        );
+    }
+
+    #[test]
+    fn classification_accept_set_agrees_with_require_any_scope() {
+        // The observer must never disagree with the gate it describes: accepted
+        // classifications correspond exactly to gate acceptance, rejected ones to
+        // gate rejection, for the same `[class, broad]` candidate list.
+        let both = format!("{CHARTER} {BROAD}");
+        let cases: [(Option<&str>, bool); 7] = [
+            (Some(CHARTER), true),
+            (Some(BROAD), true),
+            (Some(both.as_str()), true),
+            (Some(MEETING), false),
+            (Some("ledger:write"), false),
+            (Some("   "), false),
+            (None, false),
+        ];
+        for (scope, gate_accepts) in cases {
+            let req = req_with_scope(scope);
+            let gate_ok = require_any_scope::<BasicClaims>(&req, &[CHARTER, BROAD]).is_ok();
+            assert_eq!(
+                gate_ok, gate_accepts,
+                "gate acceptance mismatch for {scope:?}"
+            );
+            let admission = classify_scope_admission(scope, CHARTER, BROAD, SIBLINGS);
+            assert_eq!(
+                admission.is_accepted(),
+                gate_accepts,
+                "classifier/gate disagree for {scope:?}: {admission:?}"
+            );
+        }
     }
 }
