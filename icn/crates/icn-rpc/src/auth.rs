@@ -953,12 +953,11 @@ pub mod scopes {
 
     // Governance class-level write scopes (subdivisions of `governance:write`).
     //
-    // These are minted by §10 step 1 of
-    // `docs/design/governance/governance-write-decomposition.md`. Handler
-    // migration happens in later steps; this PR only mints the strings and
-    // adds them to the gateway allowlist
-    // (`icn-gateway/src/validation.rs::ALLOWED_SCOPES`). No handler in
-    // `apps/governance/src/http/handlers.rs` references these constants yet.
+    // The first seven scopes were minted by §10 step 1 of
+    // `docs/design/governance/governance-write-decomposition.md`; the process
+    // class was added by the current-state completion map in
+    // `docs/design/governance-write-authority-decomposition.md`. Handler
+    // migrations are incremental and retain the broad fallback.
     //
     // `GOVERNANCE_WRITE` remains in place during the migration and is only
     // retired by step 13 once no production code references it (see §10
@@ -970,9 +969,10 @@ pub mod scopes {
     pub const GOVERNANCE_MEETING_WRITE: &str = "governance:meeting:write";
     pub const GOVERNANCE_ACTIVITY_WRITE: &str = "governance:activity:write";
     pub const GOVERNANCE_COMMENT_WRITE: &str = "governance:comment:write";
+    pub const GOVERNANCE_PROCESS_WRITE: &str = "governance:process:write";
 
-    /// Class-level governance write scopes minted by §10 step 1 of the
-    /// `governance:write` decomposition design. Listed in declaration order so
+    /// Class-level governance write scopes minted by the `governance:write`
+    /// decomposition designs. Listed in declaration order so
     /// downstream consumers (gateway allowlist, RPC method mappings, future
     /// handler migrations) can iterate over them without depending on the
     /// individual constant names.
@@ -984,6 +984,7 @@ pub mod scopes {
         GOVERNANCE_MEETING_WRITE,
         GOVERNANCE_ACTIVITY_WRITE,
         GOVERNANCE_COMMENT_WRITE,
+        GOVERNANCE_PROCESS_WRITE,
     ];
 
     // Admin scopes
@@ -1687,8 +1688,8 @@ mod tests {
         );
     }
 
-    /// The seven governance class-level scope constants minted by §10 step 1
-    /// of the `governance:write` decomposition design must have their declared
+    /// The governance class-level scope constants minted by the
+    /// `governance:write` decomposition designs must have their declared
     /// wire-string values, and the `GOVERNANCE_CLASS_WRITE` slice must
     /// enumerate them in declaration order.
     ///
@@ -1707,8 +1708,9 @@ mod tests {
         assert_eq!(GOVERNANCE_MEETING_WRITE, "governance:meeting:write");
         assert_eq!(GOVERNANCE_ACTIVITY_WRITE, "governance:activity:write");
         assert_eq!(GOVERNANCE_COMMENT_WRITE, "governance:comment:write");
+        assert_eq!(GOVERNANCE_PROCESS_WRITE, "governance:process:write");
 
-        assert_eq!(GOVERNANCE_CLASS_WRITE.len(), 7);
+        assert_eq!(GOVERNANCE_CLASS_WRITE.len(), 8);
         assert_eq!(
             GOVERNANCE_CLASS_WRITE,
             &[
@@ -1719,6 +1721,7 @@ mod tests {
                 GOVERNANCE_MEETING_WRITE,
                 GOVERNANCE_ACTIVITY_WRITE,
                 GOVERNANCE_COMMENT_WRITE,
+                GOVERNANCE_PROCESS_WRITE,
             ]
         );
 
