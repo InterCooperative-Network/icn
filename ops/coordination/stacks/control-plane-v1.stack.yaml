@@ -34,10 +34,10 @@ dependency_policy:
 stages:
   - stage: 1
     repo: InterCooperative-Network/icn
-    status: in_progress
+    status: implemented
     depends_on_stages: []
     merged_prs: [2354, 2356, 2358]
-    note: "Preflight/root hardening (also Refs icn#2140), org-repo registry + truth-spine validator, config-driven claim linter + reusable workflow. The PR introducing this manifest is further stage-1 work; more stage-1 rungs may follow."
+    note: "Preflight/root hardening (also Refs icn#2140), org-repo registry + truth-spine validator, config-driven claim linter + reusable workflow — all merged. The PR introducing this manifest is further stage-1 work in flight; status is 'implemented' (work exists, more stage-1 rungs may follow), not 'merged' (the whole stage is not done)."
 
   - stage: 2
     repo: InterCooperative-Network/icn-infra

@@ -62,6 +62,12 @@ conflates:
 | `reviewed` | review completed | merged |
 | `merged` | landed on that repo's default branch | adopted downstream |
 | `adopted` | a downstream consumer actually uses it (caller workflow on its default branch, lock citing the new ref) | anything about runtime |
+| `none` | a stage in the order with no work planned in this stack | that the stage/repo is irrelevant in general |
+
+These are the only values a manifest stage's `status` may take;
+`scripts/check-pr-stack.sh` rejects any other. A partly-done stage (some
+rungs merged, more in flight) is `implemented`, not `merged` — `merged`
+means the whole stage is done.
 
 No readiness claim may be inferred from any of these. A stack stage
 existing — or reaching `merged` or `adopted` — says nothing about

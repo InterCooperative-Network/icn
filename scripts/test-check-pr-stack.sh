@@ -32,7 +32,7 @@ expect() {
   fi
 }
 
-mkfixture() { # mkfixture <name> -> prints root; manifest body on stdin
+mkfixture() { # mkfixture <dir-name> <manifest-filename> -> prints root; manifest body on stdin
   local root="$TMP/$1"
   mkdir -p "$root/ops/coordination/stacks"
   cat > "$root/ops/coordination/stacks/$2"
@@ -41,7 +41,8 @@ mkfixture() { # mkfixture <name> -> prints root; manifest body on stdin
 
 echo "test-check-pr-stack"
 
-# 1. Good manifest: upstream merged, downstream planned.
+# 1. Good manifest: upstream merged, mid/downstream stages exercise the
+# 'implemented' and 'none' statuses so the full vocabulary passes end-to-end.
 root="$(mkfixture good good-stack.stack.yaml <<'EOF'
 schema: icn-pr-stack/v1
 stack_id: good-stack
@@ -53,7 +54,11 @@ stages:
     merged_prs: [10]
   - stage: 2
     repo: example-org/downstream
-    status: planned
+    status: implemented
+    merged_prs: []
+  - stage: 3
+    repo: example-org/mirror
+    status: none
     merged_prs: []
 EOF
 )"
@@ -112,6 +117,9 @@ EOF
 expect "filename/stack_id mismatch is malformed" 2 "$root"
 
 # 6. Downstream merged before upstream: warning-mode passes, strict fails.
+# Upstream is 'reviewed' (in the vocabulary but intentionally NOT equivalent to
+# 'merged'), so the ordering check must still fire — this doubles as coverage
+# for the 'reviewed' status.
 root="$(mkfixture out-of-order out-of-order.stack.yaml <<'EOF'
 schema: icn-pr-stack/v1
 stack_id: out-of-order
@@ -119,14 +127,14 @@ anchor_issue: example-org/example#1
 stages:
   - stage: 1
     repo: example-org/example
-    status: planned
+    status: reviewed
   - stage: 2
     repo: example-org/downstream
     status: merged
 EOF
 )"
-expect "downstream-before-upstream warns (non-strict exit 0)" 0 "$root"
-expect "downstream-before-upstream fails under --strict" 1 "$root" --strict
+expect "downstream-merged-before-upstream-reviewed warns (non-strict exit 0)" 0 "$root"
+expect "downstream-merged-before-upstream-reviewed fails under --strict" 1 "$root" --strict
 
 # 7. Explicit depends_on_stages overrides the default ordering.
 root="$(mkfixture explicit-deps explicit-deps.stack.yaml <<'EOF'

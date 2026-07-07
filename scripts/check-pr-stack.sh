@@ -60,9 +60,13 @@ finding()  { echo -e "${YELLOW}  !!${NC}  $1"; FINDINGS=$((FINDINGS + 1)); }
 malformed(){ echo -e "${RED}  FAIL${NC}  $1"; MALFORMED=$((MALFORMED + 1)); }
 
 # Close-keyword next to an issue number (GitHub auto-close syntax). Optional
-# repo prefix (org/repo#N). Word-bounded so e.g. "prefix #12" does not match.
-CLOSE_KW_RE='\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\b[[:space:]:]+([A-Za-z0-9._/-]+)?#[0-9]+'
-STATUS_ENUM='none|planned|in_progress|merged|adopted'
+# repo prefix (org/repo#N). ERE-safe boundaries only: `\b` is not portable in
+# POSIX ERE (grep -E), so the leading boundary is `(^|[^A-Za-z])` and the
+# trailing one is the required `[[:space:]:]+` separator before the ref.
+CLOSE_KW_RE='(^|[^A-Za-z])(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]:]+([A-Za-z0-9._/-]+)?#[0-9]+'
+# Status vocabulary — kept identical to ops/coordination/PR_STACK_PROTOCOL.md.
+# `none` = a stage in the order with no work planned in this stack.
+STATUS_ENUM='none|planned|implemented|reviewed|merged|adopted'
 
 echo "check-pr-stack"
 
@@ -115,10 +119,13 @@ for manifest in "$STACKS_DIR"/*.stack.yaml; do
     pass "stack_id matches filename"
   fi
 
-  anchor_repo=""; anchor_num=""
+  anchor_repo=""; anchor_num=""; anchor_repo_re=""
   if echo "$anchor" | grep -qE '^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+#[0-9]+$'; then
     anchor_repo="${anchor%%#*}"
     anchor_num="${anchor##*#}"
+    # Escape regex-special chars (only '.' is possible in a repo slug) so the
+    # anchor repo can be matched literally inside ERE patterns below.
+    anchor_repo_re="$(printf '%s' "$anchor_repo" | sed 's/[.]/\\./g')"
     pass "anchor_issue: $anchor"
   else
     malformed "anchor_issue must be org/repo#N (got: '${anchor:-<missing>}')"
@@ -181,9 +188,12 @@ for manifest in "$STACKS_DIR"/*.stack.yaml; do
     pass "$(echo "$stage_order" | wc -w) stages parsed, statuses in vocabulary"
   fi
 
-  # Dependency + ordering rules. Declared deps must exist and point at earlier
-  # stages; a merged/adopted stage requires all its deps merged/adopted. When
-  # depends_on_stages is absent, the default is every earlier non-'none' stage.
+  # Dependency + ordering rules. A merged/adopted stage requires all its deps
+  # merged/adopted. Declared depends_on_stages may reference ANY other stage
+  # (the protocol allows a lower-numbered stage to depend on higher-numbered
+  # ones — e.g. a dashboard consuming downstream envelopes); they need only
+  # exist and not be self-referential. When depends_on_stages is absent, the
+  # default is every earlier non-'none' stage.
   for num in $stage_order; do
     deps="${st_deps[$num]}"
     dep_list=""
@@ -242,12 +252,21 @@ for manifest in "$STACKS_DIR"/*.stack.yaml; do
           finding "stage $num: $repo#$pr listed in merged_prs but state is $pr_state"
         fi
         pr_body="$(echo "$pr_json" | python3 -c 'import json,sys; print(json.load(sys.stdin)["body"] or "")')"
-        if echo "$pr_body" | grep -qE "Refs[[:space:]]+([A-Za-z0-9._/-]+)?#${anchor_num}\b"; then
-          pass "stage $num: $repo#$pr body Refs the anchor (#${anchor_num})"
+        # A bare "#N" resolves to an issue in the PR's OWN repo. It only points
+        # at the stack anchor when the PR lives in the anchor repo; a downstream
+        # PR must spell out the full "anchor_repo#N" cross-repo reference, or it
+        # links its own repo's issue #N and the anchor is never actually cited.
+        if [ "$repo" = "$anchor_repo" ]; then
+          ref_re="Refs[[:space:]]+(${anchor_repo_re}#|#)${anchor_num}([^0-9]|$)"
         else
-          finding "stage $num: $repo#$pr body has no 'Refs #${anchor_num}' for the stack anchor"
+          ref_re="Refs[[:space:]]+${anchor_repo_re}#${anchor_num}([^0-9]|$)"
         fi
-        kw="$(echo "$pr_body" | grep -inE "\b(close[sd]?|fix(e[sd])?|resolve[sd]?)\b[[:space:]:]+([A-Za-z0-9._/-]+)?#${anchor_num}\b" || true)"
+        if echo "$pr_body" | grep -qE "$ref_re"; then
+          pass "stage $num: $repo#$pr body Refs the anchor ($anchor)"
+        else
+          finding "stage $num: $repo#$pr body has no 'Refs $anchor' for the stack anchor"
+        fi
+        kw="$(echo "$pr_body" | grep -inE "(^|[^A-Za-z])(close[sd]?|fix(e[sd])?|resolve[sd]?)[[:space:]:]+([A-Za-z0-9._/-]+)?#${anchor_num}([^0-9]|$)" || true)"
         if [ -n "$kw" ]; then
           finding "stage $num: $repo#$pr body uses a close-keyword next to the anchor issue:"
           echo "$kw" | sed 's/^/        /'
