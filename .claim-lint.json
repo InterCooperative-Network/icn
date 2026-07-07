@@ -1,0 +1,10 @@
+{
+  "scan_dirs": [
+    "docs/deployment",
+    "docs/operations/deployment",
+    "docs/pilots",
+    "docs/reference/project-index",
+    "website"
+  ],
+  "exclude_dirs": ["generated", "archive", "dev-journal"]
+}

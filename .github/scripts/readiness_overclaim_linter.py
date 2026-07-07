@@ -20,8 +20,30 @@ practices on docs/deployment/*.md (see the already-bannered siblings).
 This complements compliance_linter.py (fintech vocabulary in API surfaces); it
 does NOT replace it. See docs/dev/language-guide.md and docs/ci/GATE_RATCHET_PLAN.md.
 
+Config (optional, --config PATH): a JSON object with either or both of
+`scan_dirs` / `exclude_dirs` (lists of strings). Each key present REPLACES the
+corresponding default list wholesale (not merged) — e.g. icn's own
+.claim-lint.json lists every current default dir plus "website" so a reader
+sees the full authoritative scope in one file. With no --config, scan scope
+and findings are byte-identical to the hardcoded SCAN_DIRS/EXCLUDE_DIRS below.
+
+Historical-proof-artifact category: a dated/status-named historical doc (e.g.
+DEPLOYMENT_STATUS_2025-12-12.md) that still uses raw liveness language ("live",
+"running", "operational", "in production") must carry an explicit marker
+before that language is exempt:
+
+    <!-- claim-class: historical-proof ref=<sha> date=<YYYY-MM-DD> evidence=<link/issue> -->
+
+A marker missing `ref`, or carrying an unparseable `date`, does not count as
+valid. Without a valid marker, each liveness-language line in such a doc is
+flagged as `unmarked-historical-liveness` — a stale/archive BANNER alone lets
+a doc keep describing what it once did, but this category exists specifically
+to block "exercised once" quietly reading as "still live" with no citable
+evidence trail. This is separate from (and does not replace) the
+archive-banner exemption used by the affirmative-overclaim patterns above.
+
 Usage:
-    python3 .github/scripts/readiness_overclaim_linter.py [--repo-root PATH]
+    python3 .github/scripts/readiness_overclaim_linter.py [--repo-root PATH] [--config PATH]
 
 Exit codes:
     0: No un-disclaimed readiness overclaims detected
@@ -30,11 +52,13 @@ Exit codes:
 """
 
 import argparse
+import json
 import os
 import re
 import sys
 from dataclasses import dataclass, field
-from typing import List
+from datetime import date
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 # ---------------------------------------------------------------------------
 # Scan scope (directories, relative to repo root). Allowlist-based and widened
@@ -69,6 +93,52 @@ SCAN_DIRS = [
 # archival/historical trees (dated snapshots are exempt by design). Future-proofs
 # the widening so adding a root that contains these subtrees stays low-noise.
 EXCLUDE_DIRS = {"generated", "archive", "dev-journal"}
+
+# File extensions scanned. ".astro" was added alongside the pre-existing ".md"
+# so a --config that widens SCAN_DIRS to "website" (pure .astro pages) is
+# actually scanned — none of the default SCAN_DIRS above contain .astro files,
+# so this widening does not change default-config findings.
+SCAN_EXTENSIONS = (".md", ".astro")
+
+
+def load_scan_config(config_path: Optional[str]) -> Tuple[Sequence[str], Set[str]]:
+    """Resolve (scan_dirs, exclude_dirs) from an optional --config JSON file.
+
+    No path -> the hardcoded defaults, unchanged. A present `scan_dirs` or
+    `exclude_dirs` key REPLACES the corresponding default list wholesale (not
+    merged); an absent key keeps that default. Raises ValueError on any
+    problem (missing file, invalid JSON, wrong value types) so main() can
+    report it and exit with the documented "script error" code rather than
+    silently falling back to defaults.
+    """
+    if config_path is None:
+        return SCAN_DIRS, EXCLUDE_DIRS
+    try:
+        with open(config_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+    except (OSError, json.JSONDecodeError) as e:
+        raise ValueError("cannot read/parse config " + config_path + ": " + str(e)) from e
+    if not isinstance(data, dict):
+        raise ValueError("config " + config_path + " must be a JSON object")
+
+    if "scan_dirs" in data:
+        scan_dirs = data["scan_dirs"]
+        if not isinstance(scan_dirs, list) or not all(isinstance(d, str) for d in scan_dirs):
+            raise ValueError("config scan_dirs must be a list of strings")
+    else:
+        scan_dirs = SCAN_DIRS
+
+    if "exclude_dirs" in data:
+        exclude_dirs_list = data["exclude_dirs"]
+        if not isinstance(exclude_dirs_list, list) or not all(
+            isinstance(d, str) for d in exclude_dirs_list
+        ):
+            raise ValueError("config exclude_dirs must be a list of strings")
+        exclude_dirs: Set[str] = set(exclude_dirs_list)
+    else:
+        exclude_dirs = EXCLUDE_DIRS
+
+    return scan_dirs, exclude_dirs
 
 # Affirmative readiness-claim patterns (case-insensitive).
 OVERCLAIM_PATTERNS = [
@@ -391,6 +461,92 @@ def scan_lines(rel_path, lines):
     return violations
 
 
+# --- Historical-proof-artifact category ---------------------------------
+#
+# A dated/status-named filename is the narrow, explicit signal that a doc is a
+# point-in-time snapshot (mirrors the one real example in the repo today:
+# DEPLOYMENT_STATUS_2025-12-12.md). This is deliberately filename-based, NOT
+# "any banner-exempt file" — the banner mechanism above already has its own
+# broader, content-based exemption for the affirmative-overclaim patterns;
+# widening THIS category to every banner-exempt file would sweep in docs never
+# named by the design this category implements, which is scope creep this PR
+# does not take on.
+HISTORICAL_FILENAME_RE = re.compile(
+    r"(?i)(?:status|deployment|snapshot).*\d{4}[-_]\d{2}[-_]\d{2}|"
+    r"\d{4}[-_]\d{2}[-_]\d{2}.*(?:status|deployment|snapshot)"
+)
+
+# The marker this category recognises. ref and date are required for the
+# marker to be VALID (an invalid marker behaves as if no marker were present);
+# evidence is documented but not required, matching the acceptance criteria
+# ("ref/date required for marker validity").
+HISTORICAL_MARKER_RE = re.compile(
+    r"<!--\s*claim-class:\s*historical-proof\b([^>]*)-->", re.IGNORECASE
+)
+_MARKER_ATTR_RE = re.compile(r"(\w+)=(\S+)")
+
+LIVENESS_RE = re.compile(r"(?i)\b(live|running|operational|in production)\b")
+
+
+def is_historical_doc(rel_path: str) -> bool:
+    """True if the filename itself marks the doc as a dated/status-named
+    historical snapshot (see HISTORICAL_FILENAME_RE for the narrow scope)."""
+    return bool(HISTORICAL_FILENAME_RE.search(os.path.basename(rel_path)))
+
+
+def parse_historical_marker(lines) -> Optional[Dict[str, str]]:
+    """Return the marker's attributes if a VALID `claim-class: historical-proof`
+    marker is present anywhere in the file (ref present, date present and
+    ISO-parseable); otherwise None. A syntactically-present but malformed
+    marker (missing ref/date, or an unparseable date) returns None — it does
+    not exempt anything, same as no marker at all."""
+    for line in lines:
+        m = HISTORICAL_MARKER_RE.search(line)
+        if not m:
+            continue
+        attrs = dict(_MARKER_ATTR_RE.findall(m.group(1)))
+        ref = attrs.get("ref")
+        date_str = attrs.get("date")
+        if not ref or not date_str:
+            continue
+        try:
+            date.fromisoformat(date_str)
+        except ValueError:
+            continue
+        return attrs
+    return None
+
+
+def scan_historical_liveness(rel_path, lines) -> List[Violation]:
+    """Flag raw liveness language in a dated/status-named historical doc that
+    lacks a valid claim-class: historical-proof marker. Only applies to docs
+    is_historical_doc() recognises — an ordinary current doc's liveness
+    language is not this category's concern. A valid marker exempts the whole
+    file, mirroring how an archive banner exempts a file from the
+    affirmative-overclaim patterns above (see module docstring)."""
+    if not is_historical_doc(rel_path):
+        return []
+    if parse_historical_marker(lines) is not None:
+        return []
+    violations = []
+    for line_num, line in enumerate(lines, start=1):
+        if _is_interrogative(line):
+            continue
+        for m in LIVENESS_RE.finditer(line):
+            if NEGATION_RE.search(_clause_around(line, m.start(), m.end())):
+                continue
+            violations.append(
+                Violation(
+                    file=rel_path,
+                    line=line_num,
+                    text=line.rstrip()[:160],
+                    rule="unmarked-historical-liveness",
+                )
+            )
+            break  # one violation per line is enough, consistent with scan_lines
+    return violations
+
+
 def scan_file(rel_path, abs_path):
     try:
         with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
@@ -401,26 +557,45 @@ def scan_file(rel_path, abs_path):
     return scan_lines(rel_path, lines)
 
 
-def run_lint(repo_root):
+def run_lint(repo_root, scan_dirs: Optional[Sequence[str]] = None,
+             exclude_dirs: Optional[Set[str]] = None):
+    scan_dirs = SCAN_DIRS if scan_dirs is None else scan_dirs
+    exclude_dirs = EXCLUDE_DIRS if exclude_dirs is None else exclude_dirs
     result = LintResult()
-    for scan_dir in SCAN_DIRS:
+    for scan_dir in scan_dirs:
         abs_dir = os.path.join(repo_root, scan_dir)
         if not os.path.isdir(abs_dir):
             continue
         for dirpath, dirnames, filenames in os.walk(abs_dir):
             # Prune excluded subtrees (generated artifacts, archive/dev-journal)
             # in place so os.walk does not descend into them.
-            dirnames[:] = [d for d in dirnames if d not in EXCLUDE_DIRS]
+            dirnames[:] = [d for d in dirnames if d not in exclude_dirs]
             for name in sorted(filenames):
-                if not name.endswith(".md"):
+                if not name.endswith(SCAN_EXTENSIONS):
                     continue
                 abs_path = os.path.join(dirpath, name)
                 rel_path = os.path.relpath(abs_path, repo_root).replace(os.sep, "/")
                 result.files_scanned += 1
-                with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
-                    lines = f.read().splitlines()
+                try:
+                    with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
+                        lines = f.read().splitlines()
+                except OSError as e:
+                    # Mirror scan_file()'s per-file tolerance: an unreadable
+                    # file must not fail the whole run, only be skipped.
+                    print("Warning: could not read " + rel_path + ": " + str(e), file=sys.stderr)
+                    continue
+                # The historical-liveness category runs regardless of banner
+                # exemption — that is the point of this category: a banner
+                # alone must not be enough to launder liveness language.
+                historical_violations = scan_historical_liveness(rel_path, lines)
+                result.violations.extend(historical_violations)
                 if is_banner_exempt(lines):
-                    result.files_exempt.append(rel_path)
+                    # Only count the file as "exempt" in the summary when it
+                    # is genuinely clean — a file with historical_violations
+                    # is not exempt, it has findings, even though the banner
+                    # skips the (separate) affirmative-overclaim scan below.
+                    if not historical_violations:
+                        result.files_exempt.append(rel_path)
                     continue
                 result.violations.extend(scan_lines(rel_path, lines))
     return result
@@ -429,8 +604,20 @@ def run_lint(repo_root):
 def main():
     parser = argparse.ArgumentParser(description="ICN Readiness Overclaim Linter")
     parser.add_argument("--repo-root", default=os.getcwd(), help="Repository root (default: cwd)")
+    parser.add_argument(
+        "--config",
+        default=None,
+        help="Optional JSON config path ({\"scan_dirs\": [...], \"exclude_dirs\": [...]}); "
+        "omitted keys keep the built-in default. No --config = default behavior, unchanged.",
+    )
     args = parser.parse_args()
     repo_root = os.path.abspath(args.repo_root)
+
+    try:
+        scan_dirs, exclude_dirs = load_scan_config(args.config)
+    except ValueError as e:
+        print("ERROR: " + str(e), file=sys.stderr)
+        return 2
 
     print("=" * 70)
     print("Readiness Overclaim Linter")
@@ -438,12 +625,14 @@ def main():
     print("=" * 70)
     print()
     print("Repo root: " + repo_root)
-    print("Scope: " + ", ".join(SCAN_DIRS))
+    print("Scope: " + ", ".join(scan_dirs))
+    if args.config:
+        print("Config: " + args.config)
     print("Reference: docs/dev/language-guide.md")
     print()
 
     try:
-        result = run_lint(repo_root)
+        result = run_lint(repo_root, scan_dirs=scan_dirs, exclude_dirs=exclude_dirs)
     except Exception as e:  # documented exit code 2 for unexpected script errors
         print("ERROR: readiness linter failed: " + str(e), file=sys.stderr)
         return 2
@@ -475,6 +664,9 @@ def main():
     print("     (see the bannered docs/deployment/*.md siblings; point to docs/ci/CI_CURRENT_STATUS.md).")
     print("  2. If the claim is current and true: keep it (it stays flagged until proven by CI).")
     print("  3. If it is a genuine bounded exception: add it to ALLOWLIST with a reason.")
+    print("  4. If it is genuine historical proof (rule: unmarked-historical-liveness): add")
+    print("     <!-- claim-class: historical-proof ref=<sha> date=<YYYY-MM-DD> evidence=<link/issue> -->")
+    print("     (see this script's module docstring for the marker format).")
     print("See docs/dev/language-guide.md (Readiness claims + exception policy).")
     print()
     return 1
