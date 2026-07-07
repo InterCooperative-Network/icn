@@ -2001,6 +2001,18 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["developers", "integrators"]
 
+[docs."docs/reference/upstream-lock-format.md"]
+category = "reference"
+status = "living"
+truth_class = "descriptive"
+canonical = "yes"
+title = "ICN Upstream Lock Format (icn-upstream-lock/v1)"
+description = "Lock-file format downstream repos use to record the ICN ref they were last reviewed against; a human-signed review attestation, not an automated constraint"
+last_updated = "2026-07-07"
+last_reviewed = "2026-07-07"
+owner = "matt"
+audiences = ["developers", "operators"]
+
 [docs."docs/reference/api/API_REFERENCE.md"]
 category = "reference"
 status = "living"
