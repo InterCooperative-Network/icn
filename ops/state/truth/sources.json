@@ -41,9 +41,9 @@
       "description": "Human-signed review attestations pinning the ICN ref each downstream repo (nycn today; icn-learn and icn-community-bridge planned) was last reviewed against. Format: icn-upstream-lock/v1 (docs/reference/upstream-lock-format.md). The lock files live in the downstream repos, never in this repo — a lock is a review attestation, not an automated dependency constraint."
     },
     "cross_repo_pr_stacks": {
-      "owner": "ops/coordination/PR_STACK_PROTOCOL.md",
+      "owner": "ops/coordination/stacks/",
       "stability": "slow-changing",
-      "description": "Cross-repo PR merge-order discipline (icn first, downstream after). When the stack-manifest extension lands under ops/coordination/stacks/, that directory becomes the owner and this entry's pointer moves with it."
+      "description": "Cross-repo PR merge order and per-stack state: machine-readable stack manifests (<slug>.stack.yaml, format icn-pr-stack/v1, validated by scripts/check-pr-stack.sh). ops/coordination/PR_STACK_PROTOCOL.md documents the discipline; the manifests own stack state. Coordination metadata only — plan/order facts, never runtime or readiness truth."
     },
     "adr_decisions": {
       "owner": "docs/adr/",
