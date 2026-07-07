@@ -27,6 +27,88 @@
       "notes": "Manages the infrastructure ICN runs on. icn-ops observes but never mutates homelab state."
     }
   },
+  "org_repos": {
+    "description": "InterCooperative-Network org repos and adjacent private layers, seen from icn: repo discovery / coordination metadata for the ecosystem control plane. NOT architectural truth — ops/state/truth/sources.json wins on any truth-ownership conflict, and docs/ATLAS.md + ops/state/ecosystem.json remain the role/boundary index. Fields record CURRENT state only (a null lock/envelope means none exists yet; planned is not done). stack_stage = cross-repo merge order per ops/coordination/PR_STACK_PROTOCOL.md (1=icn canonical first; 6=org profile mirror last; null=not part of PR stacks).",
+    "repos": {
+      "nycn": {
+        "remote": "InterCooperative-Network/nycn",
+        "visibility": "private",
+        "default_branch": "main",
+        "local_store": "~/icn-dev/repos/nycn.git",
+        "lock": { "path": "ops/upstream/icn.lock.yaml", "format": "icn-upstream-lock/v1" },
+        "status_envelope": null,
+        "claim_enforcement": "none",
+        "stack_stage": 3,
+        "role_note": "First institution ecosystem package (NYCN / Summit 2026); depends on icn via a human-signed review-attestation lock"
+      },
+      "icn-infra": {
+        "remote": "InterCooperative-Network/icn-infra",
+        "visibility": "private",
+        "default_branch": "main",
+        "local_store": "~/icn-dev/repos/icn-infra.git",
+        "lock": null,
+        "status_envelope": null,
+        "claim_enforcement": "none",
+        "stack_stage": 2,
+        "role_note": "Org operating contracts: cross-repo boundary, public-claims gates, source classification"
+      },
+      "icn-learn": {
+        "remote": "InterCooperative-Network/icn-learn",
+        "visibility": "private",
+        "default_branch": "main",
+        "local_store": "~/icn-dev/repos/icn-learn.git",
+        "lock": null,
+        "status_envelope": null,
+        "claim_enforcement": "none",
+        "stack_stage": 4,
+        "role_note": "ICN Academy: teaches from canonical sources, is never canonical; no upstream lock exists yet"
+      },
+      "icn-community-bridge": {
+        "remote": "InterCooperative-Network/icn-community-bridge",
+        "visibility": "private",
+        "default_branch": "main",
+        "local_store": "~/icn-dev/repos/icn-community-bridge.git",
+        "lock": null,
+        "status_envelope": null,
+        "claim_enforcement": "none",
+        "stack_stage": 5,
+        "role_note": "Discord-to-Matrix onboarding bridge: policy/scaffold only, not deployed, no governance authority, no canonical truth"
+      },
+      "org-github": {
+        "remote": "InterCooperative-Network/.github",
+        "visibility": "public",
+        "default_branch": "main",
+        "local_store": "~/icn-dev/repos/org-github.git",
+        "lock": null,
+        "status_envelope": null,
+        "claim_enforcement": "none",
+        "stack_stage": 6,
+        "role_note": "Org profile mirror: mirrors public icn truth, originates no claims, updated last in any stack"
+      },
+      "network-ops": {
+        "remote": null,
+        "visibility": "private",
+        "default_branch": null,
+        "local_store": null,
+        "lock": null,
+        "status_envelope": null,
+        "claim_enforcement": "none",
+        "stack_stage": null,
+        "role_note": "Provider/personal layer (most private), access-gated outside the GitHub org; feeds icn-infra only via the ADR-0005 scrub gate; never referenced by concrete pointer from public icn"
+      },
+      "demo-repository": {
+        "remote": "InterCooperative-Network/demo-repository",
+        "visibility": "private",
+        "default_branch": "main",
+        "local_store": null,
+        "lock": null,
+        "status_envelope": null,
+        "claim_enforcement": "none",
+        "stack_stage": null,
+        "role_note": "role: none — GitHub-generated demo noise per docs/reference/project-index/repository-map.md; archive-or-ignore decision pending"
+      }
+    }
+  },
   "worktrees": {
     "root": "..",
     "notes": "Resolved relative to the monorepo root. Canonical dev-VM layout: bare stores in ~/icn-dev/repos/*.git with worktrees at ~/icn-dev/worktrees/icn/<name>, so sibling worktrees live one level up ('..'). The older repo-adjacent ../icn-wt layout is retired (legacy); ops/mcp/src/paths.ts resolveWorktreeRoot() keeps it only as a last-resort fallback (ICN_WT_ROOT env overrides everything).",

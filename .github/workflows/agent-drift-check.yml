@@ -9,6 +9,8 @@ on:
       - 'ops/state/truth/**'
       - 'ops/scripts/drift-check.sh'
       - 'scripts/check-preflight-consistency.sh'
+      - 'scripts/check-truth-spine.py'
+      - 'ops/state/config/**'
       - 'CLAUDE.md'
       - 'ops/CLAUDE.md'
       - 'AGENTS.md'
@@ -34,6 +36,9 @@ jobs:
 
       - name: Preflight/root guidance consistency (Refs icn#2140)
         run: bash scripts/check-preflight-consistency.sh
+
+      - name: Truth-spine validation (warning-mode, Refs icn#2141)
+        run: python3 scripts/check-truth-spine.py
 
       - name: Validate JSON truth files are parseable
         run: |

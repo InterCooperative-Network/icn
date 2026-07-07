@@ -10,9 +10,9 @@
     },
     "repo_topology": {
       "owner": "ops/state/config/repo-map.json",
-      "sections": ["repos", "worktrees", "relationships", "infrastructure"],
+      "sections": ["repos", "org_repos", "worktrees", "relationships", "infrastructure"],
       "stability": "slow-changing",
-      "description": "Monorepo layout, subdirectory purposes, worktree root, K3s cluster IPs"
+      "description": "Monorepo layout, subdirectory purposes, org-repo coordination metadata (org_repos), worktree root, K3s cluster IPs. org_repos is repo discovery / coordination metadata, not architectural truth — role/boundary meaning stays with docs/ATLAS.md + ops/state/ecosystem.json, and ops/state/truth/sources.json (this arbiter file, not repo-map.json) wins on truth-ownership conflicts."
     },
     "sprint_state": {
       "owner": "ops/state/sprint/current.json",
@@ -33,6 +33,17 @@
       "owner": "ops/state/truth/skills.json",
       "stability": "slow-changing",
       "description": "All available skills, their canonical paths, and ownership"
+    },
+    "downstream_dependency_locks": {
+      "owner": "downstream-repos",
+      "query": "each downstream repo's ops/upstream/icn.lock.yaml, registered in ops/state/config/repo-map.json#org_repos",
+      "stability": "slow-changing",
+      "description": "Human-signed review attestations pinning the ICN ref each downstream repo (nycn today; icn-learn and icn-community-bridge planned) was last reviewed against. Format: icn-upstream-lock/v1 (docs/reference/upstream-lock-format.md). The lock files live in the downstream repos, never in this repo — a lock is a review attestation, not an automated dependency constraint."
+    },
+    "cross_repo_pr_stacks": {
+      "owner": "ops/coordination/PR_STACK_PROTOCOL.md",
+      "stability": "slow-changing",
+      "description": "Cross-repo PR merge-order discipline (icn first, downstream after). When the stack-manifest extension lands under ops/coordination/stacks/, that directory becomes the owner and this entry's pointer moves with it."
     },
     "adr_decisions": {
       "owner": "docs/adr/",

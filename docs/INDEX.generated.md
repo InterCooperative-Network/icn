@@ -1878,6 +1878,12 @@ Top-level repo surfaces and what each is for; monorepo root vs Rust workspace at
 
 **For:** `contributors`, `developers` | **Updated:** 2026-04-29
 
+### 📝 **Living** [ICN Upstream Lock Format (icn-upstream-lock/v1)](/docs/reference/upstream-lock-format.md)
+
+Lock-file format downstream repos use to record the ICN ref they were last reviewed against; a human-signed review attestation, not an automated constraint
+
+**For:** `developers`, `operators` | **Updated:** 2026-07-07
+
 ### 📝 **Living** [SDIS API Guide](/docs/sdis/SDIS_API_GUIDE.md)
 
 Complete API guide for Sovereign Digital Identity System
@@ -2156,10 +2162,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 352
+**Total documents:** 353
 
 **By status:**
 - Active: 1
 - Canonical: 40
 - Draft: 99
-- Living: 212
+- Living: 213
