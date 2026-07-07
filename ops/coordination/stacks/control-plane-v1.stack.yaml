@@ -24,12 +24,13 @@ non_claims:
   - not-production
   - not-pilot
   - not-live-federation
-  - nycn-caller-and-envelope-adoption-is-not-a-runtime-pilot-or-readiness-claim
-  - no-downstream-adoption-beyond-nycn-caller-and-envelope
+  - downstream-caller-and-envelope-adoption-is-not-a-runtime-pilot-readiness-or-live-federation-claim
+  - adopted-means-lock-envelope-and-warning-mode-caller-on-default-branch-only-not-runtime-integration
+  - downstream-locks-carry-reviewer-pending-and-are-not-human-signed
 
 dependency_policy:
   - "A stage may be marked merged or adopted only after every stage it depends on is merged or adopted."
-  - "Downstream repos must not claim claim-lint adoption until a caller workflow lands on their default branch (per-repo caller status lives in each stage entry below and in repo-map.json#org_repos — nycn's caller landed via nycn#81; icn-learn/bridge callers do not exist yet)."
+  - "Downstream repos must not claim claim-lint adoption until a caller workflow lands on their default branch (per-repo caller status lives in each stage entry below and in repo-map.json#org_repos — nycn (nycn#81), icn-learn (icn-learn#4), and icn-community-bridge (icn-community-bridge#2) callers have landed; icn-infra has none)."
   - "Upstream lock refreshes must cite the exact icn merge commit they were reviewed against."
 
 stages:
@@ -56,17 +57,17 @@ stages:
 
   - stage: 4
     repo: InterCooperative-Network/icn-learn
-    status: planned
+    status: adopted
     depends_on_stages: [1]
-    merged_prs: []
-    note: "Upstream lock + status envelope + claim-lint caller + checked-against policy. Planned, not started."
+    merged_prs: [4]
+    note: "Adopted on icn-learn main: first ICN upstream lock (reviewer: pending, no reviewed_at — machine-prepared, NOT human-signed), status envelope, and a claim-lint caller pinned to icn d944cf04 (both uses: and icn-ref) on the default branch (PR #4 `chore(ops): add icn-learn control-plane envelope and claim lint`, merge 6a61f927). No heavy checked-against policy: icn-learn deliberately links to ICN main, so its lock is the repo-level reviewed-against anchor (a CANONICAL_LINKING bullet points at it). 'adopted' = the caller/envelope existing on the default branch; it is NOT a runtime, pilot, readiness, or live-federation claim, and icn-learn consumes no ICN runtime contract."
 
   - stage: 5
     repo: InterCooperative-Network/icn-community-bridge
-    status: planned
+    status: adopted
     depends_on_stages: [1]
-    merged_prs: []
-    note: "Upstream lock + status envelope + claim-lint caller. Planned, not started."
+    merged_prs: [2]
+    note: "Adopted on icn-community-bridge main: first ICN upstream lock (reviewer: pending, no reviewed_at — machine-prepared, NOT human-signed), status envelope, and a claim-lint caller pinned to icn d944cf04 (both uses: and icn-ref) on the default branch (PR #2 `chore(ops): add bridge control-plane envelope and claim lint`, merge 4592e869). The bridge remains scaffold/planned, not built, with no ICN runtime consumption and no governance/identity authority. 'adopted' = the caller/envelope existing on the default branch; it is NOT a runtime, pilot, readiness, live-federation, deployment, or production claim."
 
   - stage: 6
     repo: InterCooperative-Network/.github
