@@ -24,7 +24,8 @@ non_claims:
   - not-production
   - not-pilot
   - not-live-federation
-  - no-downstream-adoption-yet
+  - nycn-caller-and-envelope-adoption-is-not-a-runtime-pilot-or-readiness-claim
+  - no-downstream-adoption-beyond-nycn-caller-and-envelope
 
 dependency_policy:
   - "A stage may be marked merged or adopted only after every stage it depends on is merged or adopted."
@@ -34,10 +35,10 @@ dependency_policy:
 stages:
   - stage: 1
     repo: InterCooperative-Network/icn
-    status: implemented
+    status: merged
     depends_on_stages: []
-    merged_prs: [2354, 2356, 2358]
-    note: "Preflight/root hardening (also Refs icn#2140), org-repo registry + truth-spine validator, config-driven claim linter + reusable workflow — all merged. The PR introducing this manifest is further stage-1 work in flight; status is 'implemented' (work exists, more stage-1 rungs may follow), not 'merged' (the whole stage is not done)."
+    merged_prs: [2354, 2356, 2358, 2359]
+    note: "Preflight/root hardening (also Refs icn#2140), org-repo registry + truth-spine validator, config-driven claim linter + reusable workflow, and the stack protocol + this manifest (#2359, merge 36f5b08c) — all merged to icn main. The in-flight manifest PR that kept this stage at 'implemented' has landed, so the stage is now 'merged' (the downstream-consumed surfaces — reusable claim-lint workflow and the reviewed pin — are on main). Optional advisory-routing work (plan PR9) is not a committed rung of this stack."
 
   - stage: 2
     repo: InterCooperative-Network/icn-infra
@@ -48,10 +49,10 @@ stages:
 
   - stage: 3
     repo: InterCooperative-Network/nycn
-    status: planned
+    status: adopted
     depends_on_stages: [1]
-    merged_prs: []
-    note: "Intended next stage after stage-1 protocol work: upstream lock refresh + drift memo first (no workflow changes), then status envelope + claim-lint caller as a separate PR. Planned, not started."
+    merged_prs: [80, 81]
+    note: "Both adoption conditions are met on nycn main: the upstream lock cites the reviewed icn ref (PR #80 `chore(sync): refresh icn upstream lock`, pin 91a63eec->36f5b08c, merge 9d7982fd) AND a claim-lint caller workflow is on the default branch (PR #81 `chore(ci): add nycn status envelope and claim-lint caller`, merge 7dfda45c; caller pinned to icn 36f5b08c in both uses: and icn-ref). 'adopted' is a coordination fact about the caller/envelope existing — it is NOT a runtime, pilot, readiness, live-federation, or production claim, and NYCN's lock still carries human_review: pending."
 
   - stage: 4
     repo: InterCooperative-Network/icn-learn
