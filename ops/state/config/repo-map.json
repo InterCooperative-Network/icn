@@ -57,22 +57,22 @@
         "visibility": "private",
         "default_branch": "main",
         "local_store": "~/icn-dev/repos/icn-learn.git",
-        "lock": null,
-        "status_envelope": null,
-        "claim_enforcement": "none",
+        "lock": { "path": "ops/upstream/icn.lock.yaml", "format": "icn-upstream-lock/v1", "review_status": "pending-human-signoff" },
+        "status_envelope": "ops/status-envelope.json",
+        "claim_enforcement": "reusable-claim-lint-caller (warning-mode, advisory; not blocking)",
         "stack_stage": 4,
-        "role_note": "ICN Academy: teaches from canonical sources, is never canonical; no upstream lock exists yet"
+        "role_note": "ICN Academy: teaches from canonical sources, is never canonical. First ICN upstream lock + status envelope + claim-lint caller landed via icn-learn#4 (caller pinned to icn d944cf04); lock carries reviewer: pending (machine-prepared, not human-signed). Warning-mode enforcement is advisory, not a runtime/readiness claim; icn-learn consumes no ICN runtime contract"
       },
       "icn-community-bridge": {
         "remote": "InterCooperative-Network/icn-community-bridge",
         "visibility": "private",
         "default_branch": "main",
         "local_store": "~/icn-dev/repos/icn-community-bridge.git",
-        "lock": null,
-        "status_envelope": null,
-        "claim_enforcement": "none",
+        "lock": { "path": "ops/upstream/icn.lock.yaml", "format": "icn-upstream-lock/v1", "review_status": "pending-human-signoff" },
+        "status_envelope": "ops/status-envelope.json",
+        "claim_enforcement": "reusable-claim-lint-caller (warning-mode, advisory; not blocking)",
         "stack_stage": 5,
-        "role_note": "Discord-to-Matrix onboarding bridge: policy/scaffold only, not deployed, no governance authority, no canonical truth"
+        "role_note": "Discord-to-Matrix onboarding bridge: policy/scaffold only, not deployed, no governance authority, no canonical truth. First ICN upstream lock + status envelope + claim-lint caller landed via icn-community-bridge#2 (caller pinned to icn d944cf04); lock carries reviewer: pending (machine-prepared, not human-signed). Warning-mode enforcement is advisory, not a runtime/readiness claim"
       },
       "org-github": {
         "remote": "InterCooperative-Network/.github",
