@@ -2,7 +2,7 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 import type Database from "better-sqlite3";
 import { join } from "path";
-import { resolveMonorepoRoot } from "../paths.js";
+import { resolveMonorepoRoot, resolveWorktreeRoot } from "../paths.js";
 import { runCommand } from "../utils/commands.js";
 
 const ICN_ROOT = resolveMonorepoRoot();
@@ -76,7 +76,7 @@ export function registerRepoTools(
     "List all git worktrees with branch, last commit, staleness vs main.",
     {},
     async () => {
-      const wtRoot = join(ICN_ROOT, "..", "icn-wt");
+      const wtRoot = resolveWorktreeRoot();
       const icnPath = join(ICN_ROOT, "icn");
       const mainHash = await gitLine(icnPath, ["rev-parse", "origin/main"]);
 

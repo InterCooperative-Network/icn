@@ -55,15 +55,29 @@ This monorepo has **two important roots** — mixing them up causes subtle failu
 
 | Root | Path | Contains |
 |------|------|----------|
-| **Monorepo root** | `/home/ubuntu/projects/icn` | `sdk/`, `docs/`, `web/`, `deploy/`, `scripts/`, `CLAUDE.md` |
-| **Rust workspace** | `/home/ubuntu/projects/icn/icn` | `Cargo.toml`, `crates/`, `bins/`, `Cargo.lock` |
+| **Monorepo root** | the checkout you are in — discover with `git rev-parse --show-toplevel` (on the dev VM: `~/icn-dev/worktrees/icn/<worktree>`) | `sdk/`, `docs/`, `web/`, `deploy/`, `scripts/`, `CLAUDE.md` |
+| **Rust workspace** | `$(git rev-parse --show-toplevel)/icn` | `Cargo.toml`, `crates/`, `bins/`, `Cargo.lock` |
 
-**Rule**: Rust commands (`cargo *`) run from `icn/icn/`. SDK/OpenAPI commands run from the monorepo root's subdirectories (`sdk/typescript/`, `docs/api/`).
+**Rule**: Rust commands (`cargo *`) run from the `icn/` subdirectory of the monorepo root. SDK/OpenAPI commands run from the monorepo root's subdirectories (`sdk/typescript/`, `docs/api/`).
 
 ```bash
 # Quick "where am I?" check
 git rev-parse --show-toplevel
 test -f Cargo.toml && echo "Rust root" || echo "Not Rust root"
+```
+
+**Legacy checkouts are not truth.** The standalone clone `~/projects/icn` and the repo-adjacent
+`../icn-wt/` worktree layout are retired (legacy); never treat them as current state — they can sit
+weeks behind `origin/main`. On the dev VM, work happens only in `~/icn-dev/worktrees/icn/<worktree>`
+(bare stores in `~/icn-dev/repos/*.git`). The worktree root of record is
+`ops/state/config/repo-map.json#worktrees.root`; the MCP server resolves it via `ICN_WT_ROOT` →
+repo-map → legacy fallback (`ops/mcp/src/paths.ts`).
+
+**Preflight path (one documented path — run from the monorepo root at session start):**
+
+```bash
+bash scripts/icn-preflight.sh               # repo/branch, gh auth, ports, toolchain, cargo check
+bash scripts/check-preflight-consistency.sh # root-guidance drift, stale legacy checkout, MCP-root mismatch
 ```
 
 **Crates** (38 directories in `icn/crates/`; 37 are declared in `[workspace].members`, with `icn-baseline-lock-guest` present on disk but excluded; principal crates listed below):
@@ -169,6 +183,21 @@ Navigate using `docs/INDEX.md` (complete index) or `docs/README.md` (overview).
 - `archive/` - Historical documentation (organized by year)
 
 **See `docs/DOCUMENTATION_MAINTENANCE.md` for where to put new documentation.**
+
+**Doc-control commands (exact forms — run from the monorepo root):**
+
+```bash
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml
+python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status docs/status.toml --repo .
+python3 .github/scripts/compliance_linter.py --repo-root .
+python3 .github/scripts/readiness_overclaim_linter.py --repo-root .
+```
+
+**Generated orientation artifacts are navigation aids, not truth roots.** `docs/INDEX.generated.md`,
+`docs/DOCUMENT_REGISTRY.md`, `docs/reference/project-index/generated/*` (agent context spine),
+`docs/reference/project-index/full-repo-record.md`, and live-state overlays are generated to help you
+find things. Canonical ownership lives in `ops/state/truth/sources.json`; when a generated artifact
+disagrees with a canonical owner, the owner wins.
 
 ## Build & Test Commands
 
@@ -686,7 +715,11 @@ You are operating as an execution engine. Be concise. Do not narrate routine ste
 Before making ANY code change:
 1. Print current branch
 2. Identify PR number (if any) and its base branch
-3. Confirm correct repo + correct directory
+3. Confirm correct repo + correct directory (`git rev-parse --show-toplevel` — must be the intended
+   worktree, never a legacy checkout)
+4. **Read before edit**: read the file in this session, from this checkout, before modifying it.
+   Never edit from memory of another checkout's copy — stale-checkout edits are how wrong-root
+   regressions ship.
 
 If any of these are ambiguous, STOP and ask.
 

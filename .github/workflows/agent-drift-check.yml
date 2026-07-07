@@ -8,6 +8,10 @@ on:
       - 'ops/automation/skills/**'
       - 'ops/state/truth/**'
       - 'ops/scripts/drift-check.sh'
+      - 'scripts/check-preflight-consistency.sh'
+      - 'CLAUDE.md'
+      - 'ops/CLAUDE.md'
+      - 'AGENTS.md'
   pull_request:
     # No paths filter: run on ALL PRs so any new skill/agent is checked for truth_contract
     # and registry entries. The check is fast (~5s) and catches silent drift early.
@@ -27,6 +31,9 @@ jobs:
 
       - name: Verify canonical truth files exist
         run: bash ops/scripts/drift-check.sh
+
+      - name: Preflight/root guidance consistency (Refs icn#2140)
+        run: bash scripts/check-preflight-consistency.sh
 
       - name: Validate JSON truth files are parseable
         run: |

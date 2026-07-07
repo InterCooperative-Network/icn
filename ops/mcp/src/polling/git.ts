@@ -4,6 +4,7 @@
 import type Database from "better-sqlite3";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
+import { resolveWorktreeRoot } from "../paths.js";
 import { runCommand } from "../utils/commands.js";
 
 const INTERVAL_MS = 30_000;
@@ -55,7 +56,7 @@ async function pollOnce(db: Database.Database, icnRoot: string): Promise<void> {
     }
     writeCache(db, "git:repo_statuses", statuses);
 
-    const wtRoot = join(icnRoot, "..", "icn-wt");
+    const wtRoot = resolveWorktreeRoot();
     let dirs: string[] = [];
     try {
       dirs = readdirSync(wtRoot).filter((d) => !d.startsWith("."));
