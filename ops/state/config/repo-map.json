@@ -36,10 +36,10 @@
         "default_branch": "main",
         "local_store": "~/icn-dev/repos/nycn.git",
         "lock": { "path": "ops/upstream/icn.lock.yaml", "format": "icn-upstream-lock/v1" },
-        "status_envelope": null,
-        "claim_enforcement": "none",
+        "status_envelope": "ops/status-envelope.json",
+        "claim_enforcement": "reusable-claim-lint-caller (warning-mode, advisory; not blocking)",
         "stack_stage": 3,
-        "role_note": "First institution ecosystem package (NYCN / Summit 2026); depends on icn via a human-signed review-attestation lock"
+        "role_note": "First institution ecosystem package (NYCN / Summit 2026); depends on icn via a human-signed review-attestation lock. Status envelope + claim-lint caller landed via nycn#81 (caller pinned to icn 36f5b08c); warning-mode enforcement is advisory, not a runtime/readiness claim"
       },
       "icn-infra": {
         "remote": "InterCooperative-Network/icn-infra",
