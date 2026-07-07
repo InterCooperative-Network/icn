@@ -24,7 +24,8 @@
 //! a later, separately-reviewed slice can back with a real (bounded)
 //! metrics/audit sink and wire to a single handler family.
 
-use crate::fallback_observation::GovernanceScopeAdmission;
+use crate::fallback_observation::{GovernanceScopeAdmission, RequiredClass, RouteFamily};
+use icn_http_kit::auth::{classify_scope_admission_for_claims, ClaimsLike};
 use icn_http_kit::{ObservationOutcome, ObservationSurface, ScopeAdmission};
 
 /// The bounded, closed-label aggregate key for one governance fallback
@@ -122,12 +123,60 @@ impl FallbackObservationEmitter for NoopFallbackObservationEmitter {
     }
 }
 
+/// The class scope the `CharterDomain` family prefers.
+const CHARTER_CLASS_SCOPE: &str = "governance:charter:write";
+/// The broad compatibility fallback retained across governance write surfaces
+/// until it is (separately, and only after its prerequisites) retired.
+const GOVERNANCE_BROAD_SCOPE: &str = "governance:write";
+
+/// Side-band, observe-only recording of how a **CharterDomain** scope gate was
+/// satisfied — via the required class scope or via the broad fallback.
+///
+/// Call this **after** the handler's unchanged
+/// `["governance:charter:write", "governance:write"]` gate has already accepted
+/// the request, passing the same `claims` the gate validated. It re-derives the
+/// [`ScopeAdmission`] from the claims' scope string with
+/// [`classify_scope_admission_for_claims`], which shares the gate's matching rule
+/// ([`icn_http_kit`]'s `scope_str_grants`), so the observation can never disagree
+/// with the authorization decision. It then emits one bounded
+/// [`GovernanceScopeAdmission`] on `emitter`.
+///
+/// **Cannot affect the request.** [`FallbackObservationEmitter::emit`] returns
+/// unit, so neither the classification nor an emission failure can change the
+/// request, response, or authorization outcome; the default production emitter is
+/// [`NoopFallbackObservationEmitter`], so the default path does no I/O. Only
+/// closed-enum labels are produced — no scope string, subject, DID, domain id,
+/// policy id, or payload is read out or retained.
+///
+/// Because it is reached only on the allow path, the admission is one of
+/// [`ScopeAdmission::Class`], [`ClassPreferred`](ScopeAdmission::ClassPreferred),
+/// or [`Fallback`](ScopeAdmission::Fallback); the sibling set is therefore empty
+/// (the `Rejected*` variants are unreachable here).
+pub fn observe_charter_domain_admission<C, E>(emitter: &E, claims: &C)
+where
+    C: ClaimsLike,
+    E: FallbackObservationEmitter,
+{
+    let match_outcome = classify_scope_admission_for_claims(
+        claims,
+        CHARTER_CLASS_SCOPE,
+        GOVERNANCE_BROAD_SCOPE,
+        &[],
+    );
+    emitter.emit(GovernanceScopeAdmission::new(
+        RouteFamily::CharterDomain,
+        RequiredClass::Charter,
+        match_outcome,
+        ObservationOutcome::Observed,
+    ));
+}
+
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
-    use crate::fallback_observation::{RequiredClass, RouteFamily};
+    use icn_http_kit::auth::BasicClaims;
     use std::collections::BTreeSet;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Mutex;
@@ -319,5 +368,59 @@ mod tests {
     fn emitter_usable_behind_a_trait_object() {
         let emitter: &dyn FallbackObservationEmitter = &NoopFallbackObservationEmitter;
         emitter.emit(sample(RouteFamily::StewardDirect, RequiredClass::Steward));
+    }
+
+    fn claims_with_scope(scope: &str) -> BasicClaims {
+        BasicClaims {
+            sub: "did:icn:test-subject".to_string(),
+            scope: Some(scope.to_string()),
+        }
+    }
+
+    #[test]
+    fn observe_charter_domain_admission_records_bounded_class_labels() {
+        let emitter = RecordingEmitter::default();
+        observe_charter_domain_admission(&emitter, &claims_with_scope(CHARTER_CLASS_SCOPE));
+        let seen = emitter.seen.lock().expect("poisoned").clone();
+        assert_eq!(seen.len(), 1);
+        // Every field is a bounded control-map §4 static label — the charter
+        // route family, its class, an accept outcome, on the governance HTTP
+        // surface. No scope string, subject, DID, or payload is present.
+        assert_eq!(seen[0].surface, "governance_http");
+        assert_eq!(seen[0].route_family, "charter_domain");
+        assert_eq!(seen[0].required_class, "charter");
+        assert_eq!(seen[0].match_outcome, "class");
+        assert_eq!(seen[0].observation_outcome, "observed");
+    }
+
+    #[test]
+    fn observe_charter_domain_admission_records_broad_fallback() {
+        let emitter = RecordingEmitter::default();
+        observe_charter_domain_admission(&emitter, &claims_with_scope(GOVERNANCE_BROAD_SCOPE));
+        let seen = emitter.seen.lock().expect("poisoned").clone();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].route_family, "charter_domain");
+        assert_eq!(seen[0].required_class, "charter");
+        assert_eq!(seen[0].match_outcome, "fallback");
+    }
+
+    #[test]
+    fn observe_charter_domain_admission_prefers_class_when_both_present() {
+        let emitter = RecordingEmitter::default();
+        let both = format!("{CHARTER_CLASS_SCOPE} {GOVERNANCE_BROAD_SCOPE}");
+        observe_charter_domain_admission(&emitter, &claims_with_scope(&both));
+        let seen = emitter.seen.lock().expect("poisoned").clone();
+        assert_eq!(seen[0].match_outcome, "class_preferred");
+    }
+
+    #[test]
+    fn observe_charter_domain_admission_with_noop_default_records_nothing_and_returns_unit() {
+        // The production default: observing changes nothing and returns unit, so
+        // it can never influence the request it observes.
+        let unit: () = observe_charter_domain_admission(
+            &NoopFallbackObservationEmitter,
+            &claims_with_scope(CHARTER_CLASS_SCOPE),
+        );
+        assert_eq!(unit, ());
     }
 }

@@ -30,6 +30,9 @@ use crate::domain_policy_adoption::{
     InstitutionalDomainStoreError,
 };
 use crate::events::GovernanceEventEmitter;
+use crate::fallback_observation_emitter::{
+    observe_charter_domain_admission, NoopFallbackObservationEmitter,
+};
 
 // ============================================================================
 // Internal helpers
@@ -3488,6 +3491,10 @@ pub async fn adopt_domain_policy<E: GovernanceEventEmitter + Clone + 'static>(
         &http_req,
         &["governance:charter:write", "governance:write"],
     )?;
+    // Observe-only (#2352): record how the *unchanged* charter gate was
+    // satisfied (class vs. broad fallback) via the no-op emission seam. Returns
+    // unit and defaults to the no-op emitter, so it cannot affect this request.
+    observe_charter_domain_admission(&NoopFallbackObservationEmitter, &claims);
     let actor = parse_did(&claims.sub, "Invalid DID in token")?;
 
     // Reject empty/whitespace and oversize bodies before content-addressing
@@ -3629,6 +3636,10 @@ pub async fn declare_institutional_domain<E: GovernanceEventEmitter + Clone + 's
         &http_req,
         &["governance:charter:write", "governance:write"],
     )?;
+    // Observe-only (#2352): record how the *unchanged* charter gate was
+    // satisfied (class vs. broad fallback) via the no-op emission seam. Returns
+    // unit and defaults to the no-op emitter, so it cannot affect this request.
+    observe_charter_domain_admission(&NoopFallbackObservationEmitter, &claims);
     let actor = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let domain = GovernanceDomainId(path.into_inner());
