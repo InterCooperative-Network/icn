@@ -38,7 +38,7 @@
       "owner": "downstream-repos",
       "query": "each downstream repo's ops/upstream/icn.lock.yaml, registered in ops/state/config/repo-map.json#org_repos",
       "stability": "slow-changing",
-      "description": "Human-signed review attestations pinning the ICN ref each downstream repo (nycn today; icn-learn and icn-community-bridge planned) was last reviewed against. Format: icn-upstream-lock/v1 (docs/reference/upstream-lock-format.md). The lock files live in the downstream repos, never in this repo — a lock is a review attestation, not an automated dependency constraint."
+      "description": "Review attestations pinning the ICN ref each downstream repo (nycn, icn-learn, icn-community-bridge) was last reviewed against. Format: icn-upstream-lock/v1 (docs/reference/upstream-lock-format.md). A lock is human-signed once a person fills `reviewer`; a first machine-prepared lock carries `reviewer: pending` with no `reviewed_at` and is registered in org_repos with `lock.review_status: pending-human-signoff` so tooling does NOT treat it as a completed human attestation — icn-learn and icn-community-bridge are in that state today, while nycn carries a human-signed prior review (previous_review). The lock files live in the downstream repos, never in this repo — a lock is a review attestation, not an automated dependency constraint."
     },
     "cross_repo_pr_stacks": {
       "owner": "ops/coordination/stacks/",
