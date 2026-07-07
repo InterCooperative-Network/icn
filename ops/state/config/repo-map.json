@@ -28,7 +28,7 @@
     }
   },
   "org_repos": {
-    "description": "InterCooperative-Network org repos and adjacent private layers, seen from icn: repo discovery / coordination metadata for the ecosystem control plane. NOT architectural truth — ops/state/truth/sources.json wins on any truth-ownership conflict, and docs/ATLAS.md + ops/state/ecosystem.json remain the role/boundary index. Fields record CURRENT state only (a null lock/envelope means none exists yet; planned is not done). stack_stage = cross-repo merge order per ops/coordination/PR_STACK_PROTOCOL.md (1=icn canonical first; 6=org profile mirror last; null=not part of PR stacks).",
+    "description": "InterCooperative-Network org repos and adjacent private layers, seen from icn: repo discovery / coordination metadata for the ecosystem control plane. NOT architectural truth — ops/state/truth/sources.json wins on any truth-ownership conflict, and docs/ATLAS.md + ops/state/ecosystem.json remain the role/boundary index. Fields record CURRENT state only (a null lock/envelope means none exists yet; planned is not done). stack_stage = cross-repo merge order per ops/coordination/PR_STACK_PROTOCOL.md (1=icn canonical first; 6=org profile mirror last; null=not part of PR stacks). dashboard (present only on the ecosystem dashboard-home repo, icn-infra) points at a static coordination-snapshot artifact (schema icn-ecosystem-dashboard/v1, runtime_health:false) — it is a dated snapshot, NOT a status envelope, a claim-lint caller, or a live-health source.",
     "repos": {
       "nycn": {
         "remote": "InterCooperative-Network/nycn",
@@ -49,8 +49,15 @@
         "lock": null,
         "status_envelope": null,
         "claim_enforcement": "none",
+        "dashboard": {
+          "path": "docs/status/ecosystem-dashboard.md",
+          "machine_readable": "docs/status/ecosystem-dashboard.json",
+          "schema": "icn-ecosystem-dashboard/v1",
+          "mode": "static-coordination-snapshot",
+          "runtime_health": false
+        },
         "stack_stage": 2,
-        "role_note": "Org operating contracts: cross-repo boundary, public-claims gates, source classification"
+        "role_note": "Org operating contracts: cross-repo boundary, public-claims gates, source classification. Ecosystem dashboard home (control-plane-v1 stage 2): a static coordination snapshot of the downstream status envelopes landed via icn-infra#4 (see `dashboard`). icn-infra is the dashboard home, NOT a claim-lint caller — it has no upstream lock or status envelope of its own (lock/status_envelope stay null, claim_enforcement none). The dashboard is a dated snapshot, not a live health check or readiness claim."
       },
       "icn-learn": {
         "remote": "InterCooperative-Network/icn-learn",
