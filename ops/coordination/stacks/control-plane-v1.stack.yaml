@@ -29,7 +29,7 @@ non_claims:
 
 dependency_policy:
   - "A stage may be marked merged or adopted only after every stage it depends on is merged or adopted."
-  - "Downstream repos must not claim claim-lint adoption until a caller workflow lands on their default branch (none exists yet)."
+  - "Downstream repos must not claim claim-lint adoption until a caller workflow lands on their default branch (per-repo caller status lives in each stage entry below and in repo-map.json#org_repos — nycn's caller landed via nycn#81; icn-learn/bridge callers do not exist yet)."
   - "Upstream lock refreshes must cite the exact icn merge commit they were reviewed against."
 
 stages:
