@@ -1,5 +1,8 @@
 # ICN Deployment Status - December 12, 2025
 
+<!-- claim-class: historical-proof ref=294f89235b1caece870244beba5740ca081bc75e date=2025-12-13 evidence=docs/deployment/DEPLOYMENT_STATUS_2025-12-12.md -->
+> Historical snapshot (2025-12-12); not a current-runtime claim — see docs/status.toml.
+
 > Historical snapshot (December 12, 2025). Values in this document are not authoritative for current deployments.
 > For current status, run live checks and consult `docs/ci/CI_CURRENT_STATUS.md`.
 

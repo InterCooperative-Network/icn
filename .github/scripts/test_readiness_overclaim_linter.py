@@ -13,11 +13,14 @@ Run:
 """
 
 import importlib.util
+import json
 import os
+import tempfile
 import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 FIX = os.path.join(HERE, "fixtures", "readiness")
+REPO_ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 
 _spec = importlib.util.spec_from_file_location(
     "readiness_overclaim_linter", os.path.join(HERE, "readiness_overclaim_linter.py")
@@ -342,6 +345,198 @@ class TestFixturesEndToEnd(unittest.TestCase):
 
     def test_good_negated_clean(self):
         self.assertEqual(linter.scan_file("good_negated.md", os.path.join(FIX, "good_negated.md")), [])
+
+
+class TestScanConfig(unittest.TestCase):
+    """--config loading: no-config default, override semantics, malformed input."""
+
+    def test_no_config_returns_hardcoded_defaults(self):
+        scan_dirs, exclude_dirs = linter.load_scan_config(None)
+        self.assertEqual(scan_dirs, linter.SCAN_DIRS)
+        self.assertEqual(exclude_dirs, linter.EXCLUDE_DIRS)
+
+    def _write_config(self, data):
+        f = tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False, dir=self._tmp)
+        json.dump(data, f)
+        f.close()
+        return f.name
+
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self._tmp = self._tmpdir.name
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def test_config_replaces_scan_dirs_wholesale(self):
+        path = self._write_config({"scan_dirs": ["docs/deployment", "website"]})
+        scan_dirs, exclude_dirs = linter.load_scan_config(path)
+        self.assertEqual(scan_dirs, ["docs/deployment", "website"])
+        # exclude_dirs key omitted -> stays at the hardcoded default.
+        self.assertEqual(exclude_dirs, linter.EXCLUDE_DIRS)
+
+    def test_config_replaces_exclude_dirs_wholesale(self):
+        path = self._write_config({"exclude_dirs": ["only-this"]})
+        scan_dirs, exclude_dirs = linter.load_scan_config(path)
+        self.assertEqual(scan_dirs, linter.SCAN_DIRS)
+        self.assertEqual(exclude_dirs, {"only-this"})
+
+    def test_missing_config_file_raises(self):
+        with self.assertRaises(ValueError):
+            linter.load_scan_config(os.path.join(self._tmp, "does-not-exist.json"))
+
+    def test_malformed_json_raises(self):
+        path = os.path.join(self._tmp, "bad.json")
+        with open(path, "w") as f:
+            f.write("{not valid json")
+        with self.assertRaises(ValueError):
+            linter.load_scan_config(path)
+
+    def test_scan_dirs_wrong_type_raises(self):
+        path = self._write_config({"scan_dirs": "not-a-list"})
+        with self.assertRaises(ValueError):
+            linter.load_scan_config(path)
+
+    def test_scan_dirs_non_string_element_raises(self):
+        path = self._write_config({"scan_dirs": ["ok", 42]})
+        with self.assertRaises(ValueError):
+            linter.load_scan_config(path)
+
+    def test_config_not_an_object_raises(self):
+        path = self._write_config(["not", "an", "object"])
+        with self.assertRaises(ValueError):
+            linter.load_scan_config(path)
+
+
+class TestRunLintScope(unittest.TestCase):
+    """run_lint honours configured scan_dirs/exclude_dirs (the --config include/path behavior)."""
+
+    def setUp(self):
+        self._tmpdir = tempfile.TemporaryDirectory()
+        self._tmp = self._tmpdir.name
+
+    def tearDown(self):
+        self._tmpdir.cleanup()
+
+    def test_run_lint_only_scans_configured_dirs(self):
+        os.makedirs(os.path.join(self._tmp, "included"))
+        os.makedirs(os.path.join(self._tmp, "not_configured"))
+        with open(os.path.join(self._tmp, "included", "a.md"), "w") as f:
+            f.write("ICN is production-ready.\n")
+        with open(os.path.join(self._tmp, "not_configured", "b.md"), "w") as f:
+            f.write("ICN is production-ready.\n")
+
+        result = linter.run_lint(self._tmp, scan_dirs=["included"], exclude_dirs=set())
+        self.assertEqual(result.files_scanned, 1)
+        self.assertEqual(len(result.violations), 1)
+        self.assertEqual(result.violations[0].file, "included/a.md")
+
+    def test_run_lint_scans_astro_files_under_configured_dir(self):
+        # The website/ use case: pure .astro pages, no .md files at all.
+        os.makedirs(os.path.join(self._tmp, "website"))
+        with open(os.path.join(self._tmp, "website", "index.astro"), "w") as f:
+            f.write("ICN is production-ready.\n")
+
+        result = linter.run_lint(self._tmp, scan_dirs=["website"], exclude_dirs=set())
+        self.assertEqual(result.files_scanned, 1)
+        self.assertEqual(len(result.violations), 1)
+        self.assertEqual(result.violations[0].rule, "production-ready")
+
+    def test_default_run_lint_matches_hardcoded_defaults(self):
+        # No scan_dirs/exclude_dirs passed -> identical to the hardcoded globals
+        # (the "no-config/default behavior" contract the CLI relies on).
+        explicit = linter.run_lint(REPO_ROOT, scan_dirs=linter.SCAN_DIRS,
+                                    exclude_dirs=linter.EXCLUDE_DIRS)
+        implicit = linter.run_lint(REPO_ROOT)
+        self.assertEqual(implicit.files_scanned, explicit.files_scanned)
+        self.assertEqual(len(implicit.violations), len(explicit.violations))
+
+
+class TestHistoricalProofArtifact(unittest.TestCase):
+    """The historical-proof-artifact category: marker exempts, missing marker
+    flags, ref/date are required for marker validity."""
+
+    HISTORICAL_NAME = "DEPLOYMENT_STATUS_2025-12-12.md"
+    NORMAL_NAME = "CURRENT_STATUS.md"
+    VALID_MARKER = (
+        "<!-- claim-class: historical-proof ref=91a63eec date=2026-04-29 "
+        "evidence=https://example.invalid/issues/1 -->"
+    )
+
+    def test_is_historical_doc_matches_dated_status_filename(self):
+        self.assertTrue(linter.is_historical_doc(self.HISTORICAL_NAME))
+        self.assertTrue(linter.is_historical_doc("docs/deployment/" + self.HISTORICAL_NAME))
+
+    def test_is_historical_doc_false_for_normal_filename(self):
+        self.assertFalse(linter.is_historical_doc(self.NORMAL_NAME))
+
+    def test_missing_marker_flags_liveness(self):
+        lines = ["# Deploy", "**Status**: Running (Healthy)"]
+        v = linter.scan_historical_liveness(self.HISTORICAL_NAME, lines)
+        self.assertEqual(len(v), 1)
+        self.assertEqual(v[0].rule, "unmarked-historical-liveness")
+
+    def test_valid_marker_exempts_liveness(self):
+        lines = ["# Deploy", self.VALID_MARKER, "**Status**: Running (Healthy)"]
+        v = linter.scan_historical_liveness(self.HISTORICAL_NAME, lines)
+        self.assertEqual(v, [])
+
+    def test_marker_missing_ref_does_not_exempt(self):
+        lines = [
+            "# Deploy",
+            "<!-- claim-class: historical-proof date=2026-04-29 -->",
+            "**Status**: Running (Healthy)",
+        ]
+        v = linter.scan_historical_liveness(self.HISTORICAL_NAME, lines)
+        self.assertEqual(len(v), 1)
+
+    def test_marker_missing_date_does_not_exempt(self):
+        lines = [
+            "# Deploy",
+            "<!-- claim-class: historical-proof ref=91a63eec -->",
+            "**Status**: Running (Healthy)",
+        ]
+        v = linter.scan_historical_liveness(self.HISTORICAL_NAME, lines)
+        self.assertEqual(len(v), 1)
+
+    def test_marker_with_unparseable_date_does_not_exempt(self):
+        lines = [
+            "# Deploy",
+            "<!-- claim-class: historical-proof ref=91a63eec date=not-a-date -->",
+            "**Status**: Running (Healthy)",
+        ]
+        v = linter.scan_historical_liveness(self.HISTORICAL_NAME, lines)
+        self.assertEqual(len(v), 1)
+
+    def test_non_historical_doc_not_scanned_regardless_of_liveness_language(self):
+        lines = ["**Status**: Running (Healthy)"]
+        v = linter.scan_historical_liveness(self.NORMAL_NAME, lines)
+        self.assertEqual(v, [])
+
+    def test_negated_liveness_not_flagged(self):
+        lines = ["The daemon is not running."]
+        v = linter.scan_historical_liveness(self.HISTORICAL_NAME, lines)
+        self.assertEqual(v, [])
+
+    def test_parse_historical_marker_returns_attrs(self):
+        attrs = linter.parse_historical_marker(["x", self.VALID_MARKER])
+        self.assertEqual(attrs["ref"], "91a63eec")
+        self.assertEqual(attrs["date"], "2026-04-29")
+
+    def test_parse_historical_marker_none_when_absent(self):
+        self.assertIsNone(linter.parse_historical_marker(["# Deploy", "no marker here"]))
+
+    def test_real_deployment_status_doc_is_marked_and_clean(self):
+        # Regression for the actual file this category was built for: after
+        # applying the marker (PR3), the real doc must scan clean.
+        path = os.path.join(REPO_ROOT, "docs", "deployment", self.HISTORICAL_NAME)
+        with open(path, "r", encoding="utf-8") as f:
+            lines = f.read().splitlines()
+        self.assertIsNotNone(
+            linter.parse_historical_marker(lines),
+            "expected a valid claim-class: historical-proof marker in " + path,
+        )
+        self.assertEqual(linter.scan_historical_liveness(self.HISTORICAL_NAME, lines), [])
 
 
 if __name__ == "__main__":
