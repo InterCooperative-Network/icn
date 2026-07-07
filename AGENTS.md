@@ -17,10 +17,14 @@ conflict, the canonical owner it points to wins.
 2. **Keep diffs small and reviewable.** Prefer multiple PRs over one mega-PR.
 3. **No "fixing" by weakening safety.**
    - Do not relax validation, trust gates, signature checks, or encoding rules to make tests pass.
-4. **Run the right checks for the area you touched** (see "Change routing" below).
-5. **Docs/specs must match reality.** If you change semantics, update the relevant doc/spec in the same PR,
+4. **Verify your root, then read before edit.** Confirm `git rev-parse --show-toplevel` is the
+   checkout you intend (on the dev VM: `~/icn-dev/worktrees/icn/<worktree>`; standalone clones such
+   as `~/projects/icn` are legacy and can be weeks stale). Read a file from this checkout before
+   editing it — never edit from memory or from another checkout's copy.
+5. **Run the right checks for the area you touched** (see "Change routing" below).
+6. **Docs/specs must match reality.** If you change semantics, update the relevant doc/spec in the same PR,
    or create a blocking issue and reference it in the PR description.
-6. **No new tooling.** Do not introduce new linters, build systems, or frameworks unless explicitly requested.
+7. **No new tooling.** Do not introduce new linters, build systems, or frameworks unless explicitly requested.
 
 ---
 
@@ -188,7 +192,16 @@ npm run dev  # python3 -m http.server 8080
 | **React Native SDK** (`sdk/react-native/`) | `npm test && npm run build` |
 | **Pilot UI** (`web/pilot-ui/`) | `npm run test && npm run test:e2e && npm run test:a11y` |
 | **Deploy manifests** (`deploy/`) | Ensure no secrets committed; keep placeholders; update deploy docs if behavior changes |
-| **Documentation** (`docs/`) | Verify links, check terminology consistency |
+| **Documentation** (`docs/`) | Verify links, check terminology consistency, run the doc-control commands below |
+
+**Doc-control commands (exact forms — run from the monorepo root, not from `docs/`):**
+
+```bash
+python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml
+python3 docs/scripts/freshness-check.py --freshness docs/freshness.toml --status docs/status.toml --repo .
+python3 .github/scripts/compliance_linter.py --repo-root .
+python3 .github/scripts/readiness_overclaim_linter.py --repo-root .
+```
 
 ---
 
@@ -291,7 +304,9 @@ On the dev host, agent sessions follow the `~/icn-dev` bare-store/worktree opera
 **Rules:**
 - One agent = one branch = one worktree
 - Never commit to `main` — all work on feature branches
-- Worktrees live in `../icn-wt/` (sibling to repo root)
+- In this older/legacy layout, worktrees live in `../icn-wt/` (sibling to repo root); on the dev VM
+  the canonical location is `~/icn-dev/worktrees/icn/<name>` per
+  `ops/state/config/repo-map.json#worktrees.root`
 - Override defaults via `ICN_WT_DIR`, `ICN_WT_REMOTE`, `ICN_WT_BASE_REF`
 - **Rebase before edits**: Any agent assigned to an older branch must first run `git fetch origin && git rebase origin/main` before making any edits. This prevents CRLF phantom diffs and merge conflicts from stale bases.
 

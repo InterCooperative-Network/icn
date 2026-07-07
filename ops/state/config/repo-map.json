@@ -28,8 +28,9 @@
     }
   },
   "worktrees": {
-    "root": "../icn-wt",
-    "managed_by": "scripts/worktrees.sh",
+    "root": "..",
+    "notes": "Resolved relative to the monorepo root. Canonical dev-VM layout: bare stores in ~/icn-dev/repos/*.git with worktrees at ~/icn-dev/worktrees/icn/<name>, so sibling worktrees live one level up ('..'). The older repo-adjacent ../icn-wt layout is retired (legacy); ops/mcp/src/paths.ts resolveWorktreeRoot() keeps it only as a last-resort fallback (ICN_WT_ROOT env overrides everything).",
+    "managed_by": "~/icn-dev/scripts (wt-new / wt-pr / wt-status / wt-clean) on the dev VM; scripts/worktrees.sh remains for the legacy layout",
     "base_branch": "origin/main",
     "active": []
   },

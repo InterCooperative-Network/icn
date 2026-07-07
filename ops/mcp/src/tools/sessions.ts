@@ -23,7 +23,7 @@ export function registerSessionTools(
       worktree: z
         .string()
         .optional()
-        .describe("Worktree name if working in icn-wt/ (e.g. 1084-names-gateway-a)"),
+        .describe("Worktree name under the configured worktree root (repo-map.json#worktrees.root; e.g. task-preflight-hardening)"),
       task_description: z
         .string()
         .optional()
