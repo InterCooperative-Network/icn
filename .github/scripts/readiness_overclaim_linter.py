@@ -576,14 +576,26 @@ def run_lint(repo_root, scan_dirs: Optional[Sequence[str]] = None,
                 abs_path = os.path.join(dirpath, name)
                 rel_path = os.path.relpath(abs_path, repo_root).replace(os.sep, "/")
                 result.files_scanned += 1
-                with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
-                    lines = f.read().splitlines()
+                try:
+                    with open(abs_path, "r", encoding="utf-8", errors="replace") as f:
+                        lines = f.read().splitlines()
+                except OSError as e:
+                    # Mirror scan_file()'s per-file tolerance: an unreadable
+                    # file must not fail the whole run, only be skipped.
+                    print("Warning: could not read " + rel_path + ": " + str(e), file=sys.stderr)
+                    continue
                 # The historical-liveness category runs regardless of banner
                 # exemption — that is the point of this category: a banner
                 # alone must not be enough to launder liveness language.
-                result.violations.extend(scan_historical_liveness(rel_path, lines))
+                historical_violations = scan_historical_liveness(rel_path, lines)
+                result.violations.extend(historical_violations)
                 if is_banner_exempt(lines):
-                    result.files_exempt.append(rel_path)
+                    # Only count the file as "exempt" in the summary when it
+                    # is genuinely clean — a file with historical_violations
+                    # is not exempt, it has findings, even though the banner
+                    # skips the (separate) affirmative-overclaim scan below.
+                    if not historical_violations:
+                        result.files_exempt.append(rel_path)
                     continue
                 result.violations.extend(scan_lines(rel_path, lines))
     return result

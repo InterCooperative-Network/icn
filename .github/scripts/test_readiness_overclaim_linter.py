@@ -451,6 +451,56 @@ class TestRunLintScope(unittest.TestCase):
         self.assertEqual(implicit.files_scanned, explicit.files_scanned)
         self.assertEqual(len(implicit.violations), len(explicit.violations))
 
+    def test_unreadable_file_warns_and_does_not_abort_the_run(self):
+        # Regression for Copilot review (#2358): run_lint() must tolerate a
+        # per-file OSError the same way scan_file() already does, not let one
+        # bad file turn the whole run into a script error.
+        os.makedirs(os.path.join(self._tmp, "included"))
+        unreadable = os.path.join(self._tmp, "included", "locked.md")
+        with open(unreadable, "w") as f:
+            f.write("ICN is production-ready.\n")
+        os.chmod(unreadable, 0o000)
+        readable = os.path.join(self._tmp, "included", "ok.md")
+        with open(readable, "w") as f:
+            f.write("ICN is production-ready.\n")
+        try:
+            if os.access(unreadable, os.R_OK):
+                self.skipTest("running as a user that ignores file permissions (e.g. root)")
+            result = linter.run_lint(self._tmp, scan_dirs=["included"], exclude_dirs=set())
+            self.assertEqual(len(result.violations), 1)
+            self.assertEqual(result.violations[0].file, "included/ok.md")
+        finally:
+            os.chmod(unreadable, 0o644)
+
+    def test_banner_exempt_file_with_historical_violations_not_counted_exempt(self):
+        # Regression for Copilot review (#2358): a banner-exempt file that
+        # ALSO has unmarked-historical-liveness violations must not be
+        # reported as "exempt" — that would misrepresent a file with findings
+        # as clean in the summary count.
+        os.makedirs(os.path.join(self._tmp, "docs_status"))
+        path = os.path.join(self._tmp, "docs_status", "STATUS_2025-12-12.md")
+        with open(path, "w") as f:
+            f.write("# T\n> Historical snapshot.\n**Status**: Running (Healthy)\n")
+
+        result = linter.run_lint(self._tmp, scan_dirs=["docs_status"], exclude_dirs=set())
+        self.assertEqual(len(result.violations), 1)
+        self.assertEqual(result.violations[0].rule, "unmarked-historical-liveness")
+        self.assertNotIn("docs_status/STATUS_2025-12-12.md", result.files_exempt)
+
+    def test_banner_exempt_file_without_historical_violations_still_counted_exempt(self):
+        # Regression guard the OTHER direction: an ordinary banner-exempt file
+        # (no historical-liveness findings) must still land in files_exempt —
+        # the fix above must not turn every banner-exempt file into "not
+        # exempt".
+        os.makedirs(os.path.join(self._tmp, "included"))
+        path = os.path.join(self._tmp, "included", "a.md")
+        with open(path, "w") as f:
+            f.write("# T\n> Historical snapshot.\n**Status:** PRODUCTION READY\n")
+
+        result = linter.run_lint(self._tmp, scan_dirs=["included"], exclude_dirs=set())
+        self.assertEqual(result.violations, [])
+        self.assertIn("included/a.md", result.files_exempt)
+
 
 class TestHistoricalProofArtifact(unittest.TestCase):
     """The historical-proof-artifact category: marker exempts, missing marker
@@ -532,11 +582,16 @@ class TestHistoricalProofArtifact(unittest.TestCase):
         path = os.path.join(REPO_ROOT, "docs", "deployment", self.HISTORICAL_NAME)
         with open(path, "r", encoding="utf-8") as f:
             lines = f.read().splitlines()
+        attrs = linter.parse_historical_marker(lines)
         self.assertIsNotNone(
-            linter.parse_historical_marker(lines),
-            "expected a valid claim-class: historical-proof marker in " + path,
+            attrs, "expected a valid claim-class: historical-proof marker in " + path
         )
         self.assertEqual(linter.scan_historical_liveness(self.HISTORICAL_NAME, lines), [])
+        # Regression for Copilot review (#2358): evidence must be an
+        # externally-citable pointer (a permalink/issue), not a self-reference
+        # to the very file the marker is embedded in.
+        self.assertNotEqual(attrs.get("evidence"), "docs/deployment/" + self.HISTORICAL_NAME)
+        self.assertTrue(attrs.get("evidence", "").startswith("http"))
 
 
 if __name__ == "__main__":
