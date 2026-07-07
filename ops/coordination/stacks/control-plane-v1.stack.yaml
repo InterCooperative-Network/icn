@@ -1,0 +1,75 @@
+# control-plane-v1.stack.yaml — stack manifest for the ecosystem control-plane PR stack.
+#
+# Coordination metadata ONLY. This file records cross-repo merge order and
+# stack state (format: icn-pr-stack/v1 — see ops/coordination/PR_STACK_PROTOCOL.md;
+# validate with scripts/check-pr-stack.sh). It is not architectural truth
+# (ops/state/truth/sources.json is the arbiter), not runtime truth, and no
+# readiness claim of any kind may be inferred from anything recorded here.
+#
+# Parsing contract: scalar keys are `key: value` on one line; list values use
+# flow style on one line (e.g. `merged_prs: [2354, 2356]`). Keep it that way —
+# the checker is deliberately line-oriented.
+
+schema: icn-pr-stack/v1
+stack_id: control-plane-v1
+anchor_issue: InterCooperative-Network/icn#2141
+description: >-
+  Ecosystem control plane: preflight/root hardening, org-repo coordination
+  registry + truth-spine validator, reusable claim firewall, stack protocol
+  + manifests, then downstream locks, status envelopes, caller workflows,
+  and a dashboard home. Coordination metadata for the stack itself.
+
+non_claims:
+  - not-runtime
+  - not-production
+  - not-pilot
+  - not-live-federation
+  - no-downstream-adoption-yet
+
+dependency_policy:
+  - "A stage may be marked merged or adopted only after every stage it depends on is merged or adopted."
+  - "Downstream repos must not claim claim-lint adoption until a caller workflow lands on their default branch (none exists yet)."
+  - "Upstream lock refreshes must cite the exact icn merge commit they were reviewed against."
+
+stages:
+  - stage: 1
+    repo: InterCooperative-Network/icn
+    status: implemented
+    depends_on_stages: []
+    merged_prs: [2354, 2356, 2358]
+    note: "Preflight/root hardening (also Refs icn#2140), org-repo registry + truth-spine validator, config-driven claim linter + reusable workflow — all merged. The PR introducing this manifest is further stage-1 work in flight; status is 'implemented' (work exists, more stage-1 rungs may follow), not 'merged' (the whole stage is not done)."
+
+  - stage: 2
+    repo: InterCooperative-Network/icn-infra
+    status: planned
+    depends_on_stages: [1, 3, 4, 5]
+    merged_prs: []
+    note: "Ecosystem dashboard home. Consumes downstream status envelopes, so in THIS stack it intentionally depends on stages 3-5 despite its lower stage number."
+
+  - stage: 3
+    repo: InterCooperative-Network/nycn
+    status: planned
+    depends_on_stages: [1]
+    merged_prs: []
+    note: "Intended next stage after stage-1 protocol work: upstream lock refresh + drift memo first (no workflow changes), then status envelope + claim-lint caller as a separate PR. Planned, not started."
+
+  - stage: 4
+    repo: InterCooperative-Network/icn-learn
+    status: planned
+    depends_on_stages: [1]
+    merged_prs: []
+    note: "Upstream lock + status envelope + claim-lint caller + checked-against policy. Planned, not started."
+
+  - stage: 5
+    repo: InterCooperative-Network/icn-community-bridge
+    status: planned
+    depends_on_stages: [1]
+    merged_prs: []
+    note: "Upstream lock + status envelope + claim-lint caller. Planned, not started."
+
+  - stage: 6
+    repo: InterCooperative-Network/.github
+    status: none
+    depends_on_stages: []
+    merged_prs: []
+    note: "No work planned in this stack: org profile verified clean 2026-07-07. Mirror updates land last, only after public truth lands in icn."
