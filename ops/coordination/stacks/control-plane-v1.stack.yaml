@@ -43,10 +43,10 @@ stages:
 
   - stage: 2
     repo: InterCooperative-Network/icn-infra
-    status: planned
+    status: adopted
     depends_on_stages: [1, 3, 4, 5]
-    merged_prs: []
-    note: "Ecosystem dashboard home. Consumes downstream status envelopes, so in THIS stack it intentionally depends on stages 3-5 despite its lower stage number."
+    merged_prs: [4]
+    note: "Ecosystem dashboard home. Consumes downstream status envelopes, so in THIS stack it intentionally depends on stages 3-5 despite its lower stage number. Adopted on icn-infra main: a static coordination dashboard (docs/status/ecosystem-dashboard.md + .json, schema icn-ecosystem-dashboard/v1) that reads the nycn/icn-learn/icn-community-bridge status envelopes, landed via PR #4 `docs(status): add ecosystem dashboard snapshot` (merge 7c2dd827). NOTE: icn-infra adopts by CONSUMING the downstream envelopes into a dashboard — unlike stages 3-5 it is NOT a claim-lint caller and has no upstream lock or status envelope of its own; repo-map.json#org_repos.icn-infra records a `dashboard` field (not lock/status_envelope/caller). 'adopted' here = the dashboard artifact landed on the default branch and is recorded; it is a dated static snapshot, NOT a live health check, deployment, readiness, pilot, or runtime-verification claim."
 
   - stage: 3
     repo: InterCooperative-Network/nycn
