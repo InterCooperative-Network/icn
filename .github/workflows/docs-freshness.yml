@@ -30,6 +30,11 @@ on:
       # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
       # under docs/scripts + docs/contracts are already covered by docs/**
       - 'web/pilot-ui/fixtures/**'
+      # governed bridge conformance fixtures + validator: the fixtures live under
+      # tools/ (outside docs/**), so trigger the workflow when they or the
+      # validator change, otherwise a fixtures-only PR would not fire this check.
+      - 'tools/bridge-conformance/**'
+      - 'tools/validate-governed-bridge-conformance.py'
   pull_request:
     paths:
       - 'docs/**'
@@ -62,6 +67,11 @@ on:
       # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
       # under docs/scripts + docs/contracts are already covered by docs/**
       - 'web/pilot-ui/fixtures/**'
+      # governed bridge conformance fixtures + validator: the fixtures live under
+      # tools/ (outside docs/**), so trigger the workflow when they or the
+      # validator change, otherwise a fixtures-only PR would not fire this check.
+      - 'tools/bridge-conformance/**'
+      - 'tools/validate-governed-bridge-conformance.py'
   schedule:
     # Sunday at midnight UTC
     - cron: '0 0 * * 0'
@@ -235,6 +245,36 @@ jobs:
           python3 docs/scripts/validate-rehearsal-shell-fixtures.py
         continue-on-error: false
 
+  bridge_conformance:
+    name: Governed Bridge Conformance Fixtures
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          python3 -m pip install pyyaml
+
+      # Guards the governed bridge conformance fixtures (#2375/#2376): the FAKE
+      # fixture sets under tools/bridge-conformance/*/ must keep the minimum
+      # governed-bridge chain honest — binding -> dry-run -> steward review ->
+      # expected receipts — with per-(record,field) review coverage, a required
+      # reviewer authority ref, a dry-run that writes nothing, observe-only
+      # external references, and a conservative privacy scan. The check is
+      # deterministic and offline (reads no source, writes no node, reaches no
+      # network); it validates fake fixtures only — it implements no runtime
+      # bridge, connector, or import.
+      # Manual equivalent: python3 tools/validate-governed-bridge-conformance.py
+      - name: Validate governed bridge conformance fixtures (offline, deterministic)
+        run: |
+          python3 tools/validate-governed-bridge-conformance.py
+        continue-on-error: false
+
   route_inventory:
     name: Check Generated Route Inventory
     runs-on: ubuntu-latest
@@ -298,7 +338,7 @@ jobs:
 
   summary:
     name: Documentation CI Summary
-    needs: [doc_control, lint, freshness, index, fixture_bundle, route_inventory, icnctl_inventory]
+    needs: [doc_control, lint, freshness, index, fixture_bundle, bridge_conformance, route_inventory, icnctl_inventory]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -316,6 +356,12 @@ jobs:
           # drift guard — anything but explicit success fails the summary.
           if [ "${{ needs.fixture_bundle.result }}" != "success" ]; then
             echo "::error::Rehearsal-shell fixture bundle validation did not succeed (result: ${{ needs.fixture_bundle.result }})"
+            exit 1
+          fi
+          # Fail closed, same posture as fixture_bundle: a cancelled or skipped
+          # governed bridge conformance job must not pass the guard.
+          if [ "${{ needs.bridge_conformance.result }}" != "success" ]; then
+            echo "::error::Governed bridge conformance fixture validation did not succeed (result: ${{ needs.bridge_conformance.result }})"
             exit 1
           fi
           if [ "${{ needs.freshness.result }}" = "failure" ]; then
