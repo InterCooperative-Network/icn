@@ -1,0 +1,133 @@
+# Fake NYCN intake handoff binding — FICTIONAL, conformance fixture only.
+#
+# Expresses NYCN's fake intake-import airlock rehearsal
+# (nycn:docs/bridge-rehearsals/fake-intake-import-airlock/) as the per-run
+# binding a governed bridge WOULD refine from GovernedServiceBinding (#2372).
+# Every value is invented. No real data, no connector, no runtime, no live sync.
+# real_row_read_enabled stays false. See governed-bridge-nycn-handoff-map.md for
+# how each NYCN source field maps onto this ICN custody contract.
+meta:
+  fictional: true
+  imports_real_data: false
+
+binding_id: nycn_handoff_binding_001
+tool_manifest_id: manifest_nycn_fake_001
+
+allowed_source_systems:
+  - src_sys_nycn_fake_intake
+
+real_row_read_enabled: false        # off; would require every promotion gate satisfied
+promotion_gates:
+  - source_authority_registered
+  - privacy_classes_defined
+  - target_vault_scopes_exist
+  - artifact_namespace_exists
+  - governed_object_class_exists
+  - receipt_sink_exists
+  - steward_review_surface_exists
+  - dry_run_preview_exists
+  - no_default_write_enforced
+  - export_delete_recovery_path_exists
+  - external_reference_observe_only
+  - private_data_never_in_git
+
+# Keyed by field_path (source_field prefixed with the record kind, `attendee.`).
+# NYCN privacy classes pass through verbatim — ICN accepts them as opaque strings.
+# The intake flow naturally exercises five custody kinds: artifact_registry,
+# scoped_vault, governed_object, external_reference, discard. It does NOT
+# naturally exercise the policy_gate / policy_block custody kinds — the
+# no-consent case is expressed as a steward block on the follow-up governed
+# object (see dry-run/steward-review). Full custody-kind coverage lives in the
+# review-coverage-v0 fixture; sponsor publication-gate blocks are a later slice.
+field_custody_map:
+  attendee.role_interest:
+    source_authority: participant_provided
+    privacy_class: public
+    custody_target:
+      kind: artifact_registry
+      namespace: public-program-signal
+    required_receipts:
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+  attendee.display_name_preference:
+    source_authority: participant_provided
+    privacy_class: participant_visible
+    custody_target:
+      kind: scoped_vault
+      scope: directory-participant-visible
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  attendee.interpretation_language_need:
+    source_authority: participant_provided
+    privacy_class: care_sensitive
+    custody_target:
+      kind: scoped_vault
+      scope: care-restricted
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  attendee.accessibility_need:
+    source_authority: participant_provided
+    privacy_class: care_sensitive
+    custody_target:
+      kind: scoped_vault
+      scope: care-restricted
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  attendee.follow_up_contact:
+    source_authority: participant_provided
+    privacy_class: organizer_only
+    custody_target:
+      kind: scoped_vault
+      scope: attendees-internal
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  attendee.follow_up_consent:
+    source_authority: participant_provided
+    privacy_class: follow_up_only
+    custody_target:
+      kind: governed_object      # underlying follow-up record; a card derives from it
+      object_class: follow-up-record
+    required_receipts:
+      - BridgeImportReceipt
+      - FollowUpObjectCreationReceipt
+  attendee.registration_reference:
+    source_authority: external_registration_system
+    privacy_class: external_reference
+    custody_target:
+      kind: external_reference   # observed, never processed
+    required_receipts:
+      - BridgeImportReceipt
+      - ExternalReferenceObservationReceipt
+  attendee.free_text_note:
+    source_authority: participant_provided
+    privacy_class: discard
+    custody_target:
+      kind: discard
+    required_receipts:
+      - DiscardDecisionReceipt
+
+receipt_sink: receipt_sink_nycn_fake_001
+required_receipts:
+  - BridgeDryRunReceipt
+  - BridgeReviewDecisionReceipt
+  - BridgeImportReceipt
+  - VaultObjectWriteReceipt
+  - ArtifactRegistrationReceipt
+  - FollowUpObjectCreationReceipt
+  - ExternalReferenceObservationReceipt
+  - DiscardDecisionReceipt
+  - ConsentPolicyBlockReceipt
+
+steward_review_surface: steward_cockpit_bridge_review_panel
+
+external_reference_policy:
+  allowed_external_systems:
+    - src_sys_nycn_fake_intake
+  observe_only: true                  # observed, never processed
+
+export_delete_recovery_refs:
+  - export_delete_path_nycn_fake_001
