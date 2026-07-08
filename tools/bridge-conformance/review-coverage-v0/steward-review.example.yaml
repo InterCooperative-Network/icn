@@ -1,0 +1,76 @@
+# Fake steward review decision — FICTIONAL, conformance fixture only.
+#
+# The human review gate over the dry-run proposal. No real reviewer, no real
+# data, no writes. The reviewer is bound by a VERIFIABLE authority reference; the
+# display role is for legibility only and is never sufficient on its own. Every
+# proposed action gets exactly one decision, keyed by (source_record_ref,
+# field_path) — never a bare field name. reviewed_plan_hash must equal the
+# dry-run plan_hash.
+meta:
+  fictional: true
+
+review_id: review_fake_001
+dry_run_id: dryrun_fake_001
+binding_id: binding_fake_001
+reviewer_authority_ref: authref_fake_did_sig_001   # verifiable; display role is not enough
+reviewer_display_role: summit_data_steward
+reviewed_plan_hash: planhash_fake_abc123
+
+decisions:
+  - decision_id: dec_001
+    action_id: act_001
+    source_record_ref: src_rec_001
+    field_path: attendee.care_note
+    decision: approve
+    reason: care-restricted; need-to-know vault custody authorized without exposing the value
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  - decision_id: dec_002
+    action_id: act_002
+    source_record_ref: src_rec_001
+    field_path: attendee.role_interest
+    decision: approve
+    reason: public-aggregate-safe topic signal
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+  - decision_id: dec_003
+    action_id: act_003
+    source_record_ref: src_rec_001
+    field_path: attendee.free_text_note
+    decision: discard
+    reason: unbounded free text; discard from the repo-safe path
+    expected_receipts:
+      - DiscardDecisionReceipt
+  - decision_id: dec_004
+    action_id: act_004
+    source_record_ref: src_rec_002
+    field_path: sponsor.follow_up_flag
+    decision: approve
+    reason: consent present; underlying governed follow-up object authorized (card derives from it)
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - FollowUpObjectCreationReceipt
+  - decision_id: dec_005
+    action_id: act_005
+    source_record_ref: src_rec_002
+    field_path: sponsor.external_status
+    decision: approve
+    reason: observed external reference; observe-only custody authorized, never processed
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - ExternalReferenceObservationReceipt
+  - decision_id: dec_006
+    action_id: act_006
+    source_record_ref: src_rec_002
+    field_path: sponsor.public_logo_permission
+    decision: block
+    automatic: true                 # automatic policy block; NOT a human review decision
+    reason: publication permission absent; automatic block, no human review implied
+    expected_receipts:
+      - PublicationConsentBlockReceipt

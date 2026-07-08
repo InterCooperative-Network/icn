@@ -1,0 +1,105 @@
+# Fake governed-service binding — FICTIONAL, conformance fixture only.
+#
+# Models the per-run binding a governed bridge would refine from
+# GovernedServiceBinding (#2372): which sources may be read, the per-field
+# custody map, allowed targets, required receipts, and the promotion gates that
+# must hold before real rows are read. Every value is invented. No real data,
+# no connector, no runtime. real_row_read_enabled stays false in this fixture.
+meta:
+  fictional: true
+  imports_real_data: false
+
+binding_id: binding_fake_001
+tool_manifest_id: manifest_fake_001
+
+allowed_source_systems:
+  - src_sys_fake_intake
+  - src_sys_fake_sponsor
+
+real_row_read_enabled: false        # off; would require every promotion gate satisfied
+promotion_gates:
+  - source_authority_registered
+  - privacy_classes_defined
+  - target_vault_scopes_exist
+  - artifact_namespace_exists
+  - governed_object_class_exists
+  - receipt_sink_exists
+  - steward_review_surface_exists
+  - dry_run_preview_exists
+  - no_default_write_enforced
+  - export_delete_recovery_path_exists
+  - external_reference_observe_only
+  - private_data_never_in_git
+
+field_custody_map:
+  attendee.care_note:
+    source_authority: participant_provided
+    privacy_class: care_restricted
+    custody_target:
+      kind: scoped_vault
+      scope: care-restricted
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  attendee.role_interest:
+    source_authority: participant_provided
+    privacy_class: public
+    custody_target:
+      kind: artifact_registry
+      namespace: public-program-signal
+    required_receipts:
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+  attendee.free_text_note:
+    source_authority: participant_provided
+    privacy_class: discard
+    custody_target:
+      kind: discard
+    required_receipts:
+      - DiscardDecisionReceipt
+  sponsor.follow_up_flag:
+    source_authority: sponsor_provided
+    privacy_class: follow_up_only
+    custody_target:
+      kind: governed_object
+      object_class: follow-up-record
+    required_receipts:
+      - BridgeImportReceipt
+      - FollowUpObjectCreationReceipt
+  sponsor.external_status:
+    source_authority: external_accounting_system
+    privacy_class: external_reference
+    custody_target:
+      kind: external_reference
+    required_receipts:
+      - BridgeImportReceipt
+      - ExternalReferenceObservationReceipt
+  sponsor.public_logo_permission:
+    source_authority: sponsor_provided
+    privacy_class: gate_only          # a gate, consumed — never published
+    custody_target:
+      kind: policy_block
+    required_receipts:
+      - PublicationConsentBlockReceipt
+
+receipt_sink: receipt_sink_fake_001
+required_receipts:
+  - BridgeDryRunReceipt
+  - BridgeReviewDecisionReceipt
+  - BridgeImportReceipt
+  - VaultObjectWriteReceipt
+  - ArtifactRegistrationReceipt
+  - FollowUpObjectCreationReceipt
+  - ExternalReferenceObservationReceipt
+  - DiscardDecisionReceipt
+  - PublicationConsentBlockReceipt
+
+steward_review_surface: steward_cockpit_bridge_review_panel
+
+external_reference_policy:
+  allowed_external_systems:
+    - src_sys_fake_sponsor
+  observe_only: true                  # observed, never processed
+
+export_delete_recovery_refs:
+  - export_delete_path_fake_001
