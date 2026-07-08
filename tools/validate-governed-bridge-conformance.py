@@ -604,10 +604,32 @@ def check_folder(folder: Path) -> list:
     return errors
 
 
-def discover_folders() -> list:
+def discover_folders(errors=None) -> list:
+    """Discover fixture folders under tools/bridge-conformance/*.
+
+    A symlinked entry is rejected outright and never followed: discovery must
+    not walk a symlinked fixture dir, whether it points in-repo or escapes the
+    tree. `is_dir()` alone follows symlinks, so the `is_symlink()` guard runs
+    first. Explicit argv paths keep their own `_within_repo` resolution guard in
+    main(); this closes the discovery-mode vector.
+    """
     if not CONFORMANCE_DIR.is_dir():
         return []
-    return sorted(p for p in CONFORMANCE_DIR.iterdir() if p.is_dir() and not p.name.startswith("."))
+    out = []
+    for p in sorted(CONFORMANCE_DIR.iterdir(), key=lambda x: x.name):
+        if p.name.startswith("."):
+            continue
+        if p.is_symlink():
+            if errors is not None:
+                errors.append(
+                    f"{os.path.relpath(p, REPO_ROOT)}: symlinked fixture dir is not "
+                    f"allowed in discovery (refusing to follow a symlink under "
+                    f"tools/bridge-conformance/)"
+                )
+            continue
+        if p.is_dir():
+            out.append(p)
+    return out
 
 
 def main(argv) -> int:
@@ -615,8 +637,13 @@ def main(argv) -> int:
 
     total_errors = 0
     # Boundary-check BOTH explicit args and auto-discovered folders: a symlinked
-    # fixture dir must not let the validator read outside the repository.
-    candidates = [Path(a) for a in argv] if argv else discover_folders()
+    # fixture dir must not let the validator read outside the repository, and in
+    # discovery mode a symlink must not be followed at all.
+    discovery_errors: list = []
+    candidates = [Path(a) for a in argv] if argv else discover_folders(discovery_errors)
+    for e in discovery_errors:
+        print(f"    FAIL: {e}")
+        total_errors += 1
     folders = []
     for p in candidates:
         if not _within_repo(p):
