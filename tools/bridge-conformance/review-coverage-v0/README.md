@@ -38,6 +38,10 @@ proves the minimum invariants from the six governed-bridge docs:
 - a role label is **not** authority proof — a `reviewer_authority_ref` is
   required;
 - approved writes require `BridgeImportReceipt` **plus** the target receipt;
+- **the binding is the per-run receipt contract** — an approved write must also
+  expect every receipt its field's `field_custody_map` entry declares;
+- **every binding custody rule must be exercised** — a `field_custody_map`
+  field that no dry-run action proposes is an error;
 - a verified-transfer `ArtifactReceipt` does **not** satisfy
   `ArtifactRegistrationReceipt`;
 - **action cards are derived read views, not write targets** — no action-card

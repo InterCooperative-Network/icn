@@ -371,6 +371,17 @@ def check_dry_run(data, binding_ctx, errors, rel):
             else:
                 coverage[key] = aid
 
+    # Every binding custody rule must be exercised: a field_path declared in
+    # field_custody_map that no proposed action references is an unexercised
+    # (and therefore unreviewed, unreceipted) custody rule.
+    proposed_fields = {f for (_src, f, _kind) in action_index.values() if f is not None}
+    for bound_field in field_map:
+        if bound_field not in proposed_fields:
+            errors.append(
+                f"{rel}: binding field_custody_map[{bound_field!r}] is never exercised "
+                f"by any dry-run proposed action"
+            )
+
     return {
         "dry_run_id": d.get("dry_run_id"),
         "plan_hash": d.get("plan_hash"),
@@ -522,6 +533,20 @@ def check_expected_receipts(data, binding_ctx, dry_ctx, review_ctx, errors, rel)
                     f"{lbl}: {ARTIFACT_TRANSFER_RECEIPT} does not satisfy {REGISTRATION_RECEIPT} "
                     f"(transfer proof is not registry registration)"
                 )
+            # The binding is the per-run receipt contract: an approved write must
+            # expect every receipt its field's custody rule declares. Scoped to
+            # approved writes only — hold/block/discard outcomes must not be
+            # forced to carry write receipts.
+            if aid in action_index:
+                fld = action_index[aid][1]
+                bound = binding_ctx.get("field_map", {}).get(fld) if fld is not None else None
+                if bound is not None:
+                    for br in bound[1]:
+                        if br not in rc:
+                            errors.append(
+                                f"{lbl}: approved write for field {fld!r} must include "
+                                f"binding-declared receipt {br}"
+                            )
         if verb == "discard" or kind == DISCARD_KIND:
             if "DiscardDecisionReceipt" not in rc:
                 errors.append(f"{lbl}: a discard must include DiscardDecisionReceipt")
