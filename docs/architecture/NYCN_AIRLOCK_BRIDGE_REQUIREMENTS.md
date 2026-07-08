@@ -153,14 +153,25 @@ The rehearsals coined a receipt family. **Only `ArtifactReceipt` exists in code
 today** (`icn/crates/icn-kernel-api/src/proofs.rs`); every bridge-specific
 receipt below is **expected / future** vocabulary, not an ICN type.
 
+One precision the airlock design must not lose: the implemented `ArtifactReceipt`
+proves a **verified blob transfer** (an action *on* an artifact), **not** that an
+artifact was recorded in the registry. Per
+[`artifact-registry-and-scoped-vault.md`](../spec/artifact-registry-and-scoped-vault.md)
+(§"`ArtifactReceipt` vs `ArtifactRegistry`"): "the receipt proves a blob
+transfer; the registry records that an artifact exists and what governs it —
+these are distinct concepts." So a real bridge write into custody still owes the
+**planned** registry-recording (`ArtifactRegistrationReceipt`) and vault-write
+(`VaultObjectWriteReceipt`) evidence; `ArtifactReceipt` does not stand in for
+them.
+
 | Receipt | Role | Status |
 | --- | --- | --- |
-| `ArtifactReceipt` | Proof an artifact was recorded | **Implemented** (`icn-kernel-api`) |
+| `ArtifactReceipt` | Proof a **blob transfer completed and content was verified** (ADR-0026 Layer 2) — an action *on* an artifact, **not** proof it was recorded in the registry | **Implemented** (`icn-kernel-api`) |
 | `BridgeDryRunReceipt` | The dry-run pass itself | Expected / future |
 | `BridgeReviewDecisionReceipt` | A steward review decision (a human reviewed) | Expected / future |
 | `BridgeImportReceipt` | The import decision itself (source id/hash, mapping version, target scope, privacy class) — expected on **every** write path | Expected / future |
 | `VaultObjectWriteReceipt` | A write into a `ScopedVault` | Expected / future |
-| `ArtifactRegistrationReceipt` | Registration into the `ArtifactRegistry` | Expected / future |
+| `ArtifactRegistrationReceipt` | Proof an artifact was **recorded in the `ArtifactRegistry`** (that it exists and what governs it) — distinct from `ArtifactReceipt`'s transfer proof, and not satisfied by it | Expected / future |
 | `ExternalReferenceObservationReceipt` | An observed external reference (observed, not processed) | Expected / future |
 | `DiscardDecisionReceipt` | A discard decision | Expected / future |
 | `ConsentPolicyBlockReceipt` | An automatic no-consent block (no human review implied) | Expected / future |
