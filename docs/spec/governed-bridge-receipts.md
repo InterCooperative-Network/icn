@@ -176,10 +176,12 @@ produced. A completed import decision therefore points at its coordinated target
 receipts; a missing target receipt means the effect it claims is unproven.
 
 Note the existing substrate already separates these concerns: `ReceiptStore`
-(`icn-gateway/src/receipt_store.rs`, keyed by `record_hash`) is the persistent
-receipt backend, and `ArtifactRegistry` carries `receipt_refs` to existing
-classes — "the registry never invents a new receipt class." Where the bridge
-receipts should live is an open question (§10).
+(`icn/crates/icn-gateway/src/receipt_store.rs`) is the persistent receipt
+backend — its opaque records are **write-once-by-hash under a `(class,
+record_hash)` primary key** — and `ArtifactRegistry` carries `receipt_refs` to
+existing classes — "the registry never invents a new receipt class." Where the
+bridge receipts should live, and under what `(class, record_hash)` uniqueness
+model, is an open question (§10).
 
 ## 8. Relationship to `ToolManifest` and `GovernedServiceBinding`
 
@@ -214,7 +216,10 @@ Issues #2366 and #2367 are the dependent substrate work; this document is
    app-level ones)?
 2. Does `BridgeImportReceipt` live in a general `ReceiptStore`, in the artifact
    registry's `receipt_refs`, or both (coordinating record in `ReceiptStore`,
-   referenced from the registry)?
+   referenced from the registry)? If in `ReceiptStore`, what `class` string does
+   it carry, and does the existing write-once `(class, record_hash)` uniqueness
+   model fit bridge re-run / idempotency needs (a re-decided import produces a
+   distinct `record_hash`, never an in-place overwrite)?
 3. How do `VaultObjectWriteReceipt`s expose proof (existence, hash, privacy
    class) without leaking private content?
 4. What is the final name for the follow-up underlying-object receipt, once the
