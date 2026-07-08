@@ -95,7 +95,7 @@ All rows below are **expected / future** vocabulary. None exists in code. The
 | Receipt | Bounded event it proves | Required fields / evidence | Must not imply | Status | Related primitive |
 | --- | --- | --- | --- | --- | --- |
 | `BridgeDryRunReceipt` | A dry-run/preview pass ran over a source shape | bridge tool id · manifest id · binding id · source system id · candidate-action count · timestamp | any write occurred · steward authorization · that real rows were read | Expected / future | `ToolManifest` dry-run mode (#2366) |
-| `BridgeReviewDecisionReceipt` | A **human** steward review decision was recorded | verifiable reviewer authority reference (`actor_did` / signature / authority basis, per existing receipt patterns — role-labeled for display, never a bare role string as the only evidence) · decision id · decision (approve/reject/hold/block) · reason ref · reviewed field set · timestamp | the decision was correct or wise · that a write followed · that a role label alone proves authority | Expected / future | Steward review surface (#2369) |
+| `BridgeReviewDecisionReceipt` | A **human** steward review decision was recorded | verifiable reviewer authority reference (`actor_did` / signature / authority basis, per existing receipt patterns — role-labeled for display, never a bare role string as the only evidence) · decision id · decision (approve/reject/hold/block) · reason ref · reviewed decision set bound to opaque source-record refs + field paths (or a dry-run plan hash that commits to that exact set) — never a bare field-name set · timestamp | the decision was correct or wise · that a write followed · that a role label alone proves authority · that a bare shared field name covers unrelated records | Expected / future | Steward review surface (#2369) |
 | `BridgeImportReceipt` | The **import decision** itself (coordinating record) — see §5 | the §5 minimum-evidence set | raw source payload was stored · that the decision was wise | Expected / future | `GovernedServiceBinding` (#2367) |
 | `VaultObjectWriteReceipt` | An object was written into a `ScopedVault` | vault id · scope/class · private object ref · content hash · privacy class · timestamp | public visibility · disclosure of vault content | Expected / future | `ScopedVault` |
 | `ArtifactRegistrationReceipt` | An artifact was **recorded in `ArtifactRegistry`** | artifact id · content hash · registry namespace · artifact class · timestamp | a blob transfer (that is `ArtifactReceipt`) · publication | Expected / future | `ArtifactRegistry` |
@@ -126,6 +126,9 @@ minimum evidence set:
 - bridge tool id / manifest id
 - governed service binding id
 - steward decision id (the `BridgeReviewDecisionReceipt` it rests on)
+- dry-run reference — the `BridgeDryRunReceipt` id / preview-plan hash the steward
+  reviewed (the import must cite the exact dry-run proposal it confirms;
+  refuse-by-default means no write without a preceding reviewed preview)
 - target custody class
 - target scope / namespace
 - privacy class
