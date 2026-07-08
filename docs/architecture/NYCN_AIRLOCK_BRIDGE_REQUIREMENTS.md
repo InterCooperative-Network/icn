@@ -90,7 +90,8 @@ owns institutional truth. To move real rows safely it must be able to:
   nothing;
 - **require steward confirmation** before any write;
 - **write only to allowed custody targets** (the vault scopes / registry
-  namespace / action-card target named in the binding);
+  namespace / **underlying governed object** named in the binding — never an
+  action card: a card is a derived read view, not a write target);
 - **produce receipts** for each decision and each write;
 - **refuse by policy** unbounded free text, credentials, payment instruments,
   and unsupported classes;
@@ -121,7 +122,7 @@ today.**
 | Classification output | Every field classified before any write | Declare a classification output the manifest binds to a custody taxonomy | Precedes all writes | Planned |
 | Dry-run output | A preview must exist before a write | Declare a dry-run/preview capability that produces evidence, not state | Writes nothing | Planned |
 | Steward review handoff | The human gate authorizes custody | Declare a review-handoff surface (steward cockpit) the bridge yields to | No write without review | Planned (see [steward-cockpit-v0](../spec/steward-cockpit-v0.md)) |
-| Custody-target write permissions | Only allowed targets may be written | Enumerate permitted vault scopes / registry namespace / action-card target | Deny-by-default | Planned |
+| Custody-target write permissions | Only allowed targets may be written | Enumerate permitted vault scopes / registry namespace / underlying governed-object target (not the read-only action-card surface) | Deny-by-default | Planned |
 | Receipt emission | Each decision/write needs evidence | Declare which receipt classes the tool emits | Receipt per write | Only `ArtifactReceipt` implemented; bridge receipts planned |
 | Export/delete hooks | Custody must be reversible | Declare export/delete/recovery affordances per target | No irreversible custody | Planned |
 | External-custodian reference observation | Settlement is observed, not processed | Declare an observe-only reference capability (no payment path) | No payment/settlement action | Planned |
@@ -137,10 +138,10 @@ spec advances #1815; no code today).
 | --- | --- | --- | --- | --- |
 | Explicit authorization | Operator/steward must authorize the binding and each real-import run | Custody is a governed act, not an ambient tool power | Silent/ambient import of real rows | Planned |
 | Allowed source systems | Enumerate the specific external systems the bridge may read | An unbounded reader is an exfiltration surface in reverse | Reads arbitrary sources | Planned |
-| Allowed custody targets | Enumerate the vault scopes / registry namespace / action-card target | Writes must be to pre-approved destinations only | Writes land anywhere | Planned |
+| Allowed custody targets | Enumerate the vault scopes / registry namespace / underlying governed-object target | Writes must be to pre-approved destinations only | Writes land anywhere | Planned |
 | Vault scopes / classes | Bind each field-class to a `ScopedVault` scope | Care/sponsor/finance data are need-to-know | Sensitive data mis-scoped | Planned ([artifact-registry-and-scoped-vault](../spec/artifact-registry-and-scoped-vault.md)) |
 | Artifact registry namespace | Bind public artifacts to an `ArtifactRegistry` namespace | Public recognition/output must be addressable + governed | Public artifacts ungoverned | Planned (same spec) |
-| Action-card target | Bind consent-gated follow-ups to the action-card surface | Follow-ups are member-facing, consent-gated work | Follow-ups bypass consent | Read surface implemented; bridge-driven creation planned |
+| Follow-up governed object | Bind a consent-gated follow-up to the **underlying governed object** the action-card surface derives from — the bridge writes that object, never the card (ADR-0027: cards are derived views with no mutation API) | Follow-ups are member-facing consent-gated work realized through a governed object, not a card write | Follow-ups bypass consent, or a non-existent card-write path gets designed | `GET /me/action-cards` read surface implemented; the governed follow-up object is planned |
 | Receipt sink | Bind a durable sink for the emitted receipts | Evidence must persist and be auditable | Decisions leave no trail | Planned; `ArtifactReceipt` is the only implemented class |
 | External custodian references | Declare where observed external references live | Settlement stays external; ICN records a reference only | Payment logic pulled in-house | Planned |
 | Rollback / export / delete | A reversal path for any written custody | Custody without deletion is a one-way trap | No way to withdraw imported data | Planned |
@@ -176,7 +177,7 @@ them.
 | `DiscardDecisionReceipt` | A discard decision | Expected / future |
 | `ConsentPolicyBlockReceipt` | An automatic no-consent block (no human review implied) | Expected / future |
 | `PublicationConsentBlockReceipt` | An automatic no-publication-permission block | Expected / future |
-| `ActionCardCreationReceipt` | Creation of an action-card candidate | Expected / future |
+| `ActionCardCreationReceipt` | Proof the **underlying governed object** behind a consent-gated follow-up was created (the card is *derived* from it per ADR-0027 — there is no card write; the name is subject to reconciliation with that object's own creation receipt) | Expected / future |
 
 Open design question (§10): whether these should be a first-class bridge
 receipt family or projections of existing artifact receipts.
@@ -195,13 +196,22 @@ forward-direction ICN primitive:
 | Sponsor-restricted vault object | `ScopedVault` sponsor-restricted scope |
 | Finance-restricted vault object | `ScopedVault` finance-restricted scope |
 | External bridge reference | External-custodian reference model (observed, not processed) |
-| Action-card candidate | Member action-card surface (`/v1/gov/me/action-cards`, read/derived-view implemented; consent-gated creation planned) |
+| Action-card candidate | The **underlying governed object** (a proposal / action-item / signal, or a governed follow-up object) that the action-card surface *derives* a read-only card from — `GET /v1/gov/me/action-cards` has **no mutation API** (ADR-0027); the bridge writes the object, never the card |
 | Discard / policy-block evidence | Receipt-only evidence (no custody object) |
 
 The taxonomy above is NYCN's operational custody framing. It is deliberately
 **mapped, not merged**, onto ICN's forward-direction `PrivacyClass` /
 `ScopedVault` model — the two vocabularies stay distinct until an ICN spec
 unifies them.
+
+One row deserves emphasis: an **action card is a derived read view, not a
+custody target.** Per [ADR-0027](../adr/ADR-0027-action-card-contract.md), cards
+are derived views with no mutation API — "cards reference underlying objects;
+mutation flows through those." A consent-gated follow-up is therefore realized by
+creating or updating the underlying governed object; the card is derived from it.
+Designing a card-write path (or a stored `ActionCardCreationReceipt` against the
+card itself) would conflict with the existing `standing → card → action →
+receipt` proof loop.
 
 ## 8. Promotion gates before real bridge use
 
