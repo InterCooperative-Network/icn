@@ -126,6 +126,7 @@ Comprehensive architectural reviews and design decisions:
 - [CLIENT_MODEL.md](architecture/CLIENT_MODEL.md) - Client architecture patterns
 - [GOVERNANCE_STATE_MACHINE.md](architecture/GOVERNANCE_STATE_MACHINE.md) - Governance flow design
 - [IDENTITY_MEMBERSHIP_ARCHITECTURE.md](architecture/IDENTITY_MEMBERSHIP_ARCHITECTURE.md) - Identity & membership
+- [NYCN_AIRLOCK_BRIDGE_REQUIREMENTS.md](architecture/NYCN_AIRLOCK_BRIDGE_REQUIREMENTS.md) - Downstream demand signal from NYCN's fake airlock rehearsals: what ICN must provide (Tool Commons / GovernedServiceBinding / ToolManifest / receipts) before a governed bridge can move real rows into custody (requirements note, not doctrine)
 - Plus audit reports and gap analyses
 
 ### Design Documents (`design/`)

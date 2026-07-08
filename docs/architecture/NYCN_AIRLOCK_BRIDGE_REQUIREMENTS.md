@@ -1,7 +1,7 @@
 ---
 Status: requirements note / downstream demand signal
 Canonical: no
-Authority: ICN architecture
+Authority: architecture (downstream demand signal from NYCN; not doctrine, not normative)
 Last Reviewed: 2026-07-08
 ---
 
