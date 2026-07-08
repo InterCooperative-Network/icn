@@ -95,7 +95,7 @@ All rows below are **expected / future** vocabulary. None exists in code. The
 | Receipt | Bounded event it proves | Required fields / evidence | Must not imply | Status | Related primitive |
 | --- | --- | --- | --- | --- | --- |
 | `BridgeDryRunReceipt` | A dry-run/preview pass ran over a source shape | bridge tool id · manifest id · binding id · source system id · candidate-action count · timestamp | any write occurred · steward authorization · that real rows were read | Expected / future | `ToolManifest` dry-run mode (#2366) |
-| `BridgeReviewDecisionReceipt` | A **human** steward review decision was recorded | reviewer role (role-only) · decision id · decision (approve/reject/hold/block) · reason ref · reviewed field set · timestamp | the decision was correct or wise · that a write followed | Expected / future | Steward review surface (#2369) |
+| `BridgeReviewDecisionReceipt` | A **human** steward review decision was recorded | verifiable reviewer authority reference (`actor_did` / signature / authority basis, per existing receipt patterns — role-labeled for display, never a bare role string as the only evidence) · decision id · decision (approve/reject/hold/block) · reason ref · reviewed field set · timestamp | the decision was correct or wise · that a write followed · that a role label alone proves authority | Expected / future | Steward review surface (#2369) |
 | `BridgeImportReceipt` | The **import decision** itself (coordinating record) — see §5 | the §5 minimum-evidence set | raw source payload was stored · that the decision was wise | Expected / future | `GovernedServiceBinding` (#2367) |
 | `VaultObjectWriteReceipt` | An object was written into a `ScopedVault` | vault id · scope/class · private object ref · content hash · privacy class · timestamp | public visibility · disclosure of vault content | Expected / future | `ScopedVault` |
 | `ArtifactRegistrationReceipt` | An artifact was **recorded in `ArtifactRegistry`** | artifact id · content hash · registry namespace · artifact class · timestamp | a blob transfer (that is `ArtifactReceipt`) · publication | Expected / future | `ArtifactRegistry` |
@@ -118,7 +118,9 @@ provisional and must reconcile with the eventual governed-object model.**
 minimum evidence set:
 
 - source system id
-- source record id / source row id
+- source record **reference** — an opaque/hash-bound id or a vault-backed private
+  ref, **never** a raw natural or PII-bearing external key (a raw key can itself
+  be private data, e.g. an email used as a source row key)
 - source hash / content hash
 - mapping version
 - bridge tool id / manifest id
@@ -133,16 +135,22 @@ minimum evidence set:
 - export/delete path reference
 
 This is a **decision-and-provenance record, not raw source payload storage.** It
-captures *what was decided and where it landed*, addressed by hashes and ids —
-never the source rows themselves. The private content lives (if anywhere) in a
-`ScopedVault`, referenced, never inlined.
+captures *what was decided and where it landed*, addressed by hashes and opaque
+references — never the source rows themselves, and never a raw PII-bearing source
+key. The reference is itself opaque/hash-bound or vault-backed, so nothing
+private lands in the receipt body or in any steward/member surface that renders
+receipt refs. The private content lives (if anywhere) in a `ScopedVault`,
+referenced, never inlined.
 
 ## 6. Review and policy-block receipts
 
 These four are frequently conflated; the vocabulary must keep them distinct so
 that **no-review policy blocks cannot masquerade as human review**:
 
-- `BridgeReviewDecisionReceipt` — a **human** reviewed and decided.
+- `BridgeReviewDecisionReceipt` — a **human** reviewed and decided; it must bind a
+  **verifiable** reviewer authority reference (a signed `actor_did` / authority
+  basis), role-labeled only for display — a bare role string does not prove an
+  authorized steward acted.
 - `ConsentPolicyBlockReceipt` — an **automatic** no-consent block; no human
   review implied.
 - `PublicationConsentBlockReceipt` — an **automatic** publication-permission
