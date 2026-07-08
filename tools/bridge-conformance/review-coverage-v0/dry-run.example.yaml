@@ -1,0 +1,81 @@
+# Fake dry-run proposal — FICTIONAL, conformance fixture only.
+#
+# The preview a governed bridge WOULD propose over a source shape. It performs
+# no writes and reaches no external service. Every proposed action is
+# decision-required and carries an opaque/hash-bound source-record reference —
+# never a raw natural or PII-bearing key. Field values are NOT included.
+meta:
+  fictional: true
+  performs_writes: false
+
+dry_run_id: dryrun_fake_001
+binding_id: binding_fake_001
+source_system_id: src_sys_fake_sponsor
+source_shape_ref: shape_fake_001
+plan_hash: planhash_fake_abc123
+
+proposed_actions:
+  - action_id: act_001
+    source_record_ref: src_rec_001
+    field_path: attendee.care_note
+    source_authority: participant_provided
+    privacy_class: care_restricted
+    proposed_custody_target:
+      kind: scoped_vault
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+    decision_required: true
+  - action_id: act_002
+    source_record_ref: src_rec_001
+    field_path: attendee.role_interest
+    source_authority: participant_provided
+    privacy_class: public
+    proposed_custody_target:
+      kind: artifact_registry
+    required_receipts:
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+    decision_required: true
+  - action_id: act_003
+    source_record_ref: src_rec_001
+    field_path: attendee.free_text_note
+    source_authority: participant_provided
+    privacy_class: discard
+    proposed_custody_target:
+      kind: discard
+    required_receipts:
+      - DiscardDecisionReceipt
+    decision_required: true
+  - action_id: act_004
+    source_record_ref: src_rec_002
+    field_path: sponsor.follow_up_flag
+    source_authority: sponsor_provided
+    privacy_class: follow_up_only
+    proposed_custody_target:
+      kind: governed_object
+    required_receipts:
+      - BridgeImportReceipt
+      - FollowUpObjectCreationReceipt
+    decision_required: true
+  - action_id: act_005
+    source_record_ref: src_rec_002
+    field_path: sponsor.external_status
+    source_authority: external_accounting_system
+    privacy_class: external_reference
+    proposed_custody_target:
+      kind: external_reference
+    required_receipts:
+      - BridgeImportReceipt
+      - ExternalReferenceObservationReceipt
+    decision_required: true
+  - action_id: act_006
+    source_record_ref: src_rec_002
+    field_path: sponsor.public_logo_permission
+    source_authority: sponsor_provided
+    privacy_class: gate_only
+    proposed_custody_target:
+      kind: policy_block
+    required_receipts:
+      - PublicationConsentBlockReceipt
+    decision_required: true
