@@ -20,7 +20,7 @@ Last Reviewed: 2026-07-08
 > ([`governed-bridge-service-binding.md`](governed-bridge-service-binding.md),
 > #2372). Derived from the NYCN airlock requirements note
 > ([`../architecture/NYCN_AIRLOCK_BRIDGE_REQUIREMENTS.md`](../architecture/NYCN_AIRLOCK_BRIDGE_REQUIREMENTS.md)),
-> tracking ICN issue #2367→#2368. It implements no connector, no settlement, and
+> tracking ICN issue #2368. It implements no connector, no settlement, and
 > does not imply any bridge can import real rows today. The PR introducing this
 > doc advances #2368 without closing it.
 
