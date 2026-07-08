@@ -332,6 +332,7 @@ def check_dry_run(data, binding_ctx, errors, rel):
     actions = require_list(d.get("proposed_actions"), f"{rel}: proposed_actions", errors)
     action_index = {}  # action_id -> (src_ref, field_path, kind)
     coverage = {}  # (src_ref, field_path) -> action_id
+    proposed_fields = set()  # every valid field_path proposed, regardless of action_id validity
     for i, act in enumerate(actions):
         lbl = f"{rel}: proposed_actions[{i}]"
         a = require_mapping(act, lbl, errors)
@@ -360,6 +361,8 @@ def check_dry_run(data, binding_ctx, errors, rel):
                     f"{lbl}.proposed_custody_target.kind {kind!r} != binding's "
                     f"{bound_kind!r} for field {fld!r}"
                 )
+        if fld is not None:
+            proposed_fields.add(fld)
         if aid:
             action_index[aid] = (src, fld, kind)
         if src is not None and fld is not None:
@@ -370,6 +373,18 @@ def check_dry_run(data, binding_ctx, errors, rel):
                 )
             else:
                 coverage[key] = aid
+
+    # Every binding custody rule must be exercised: a field_path declared in
+    # field_custody_map that no proposed action references is an unexercised
+    # (and therefore unreviewed, unreceipted) custody rule. proposed_fields is
+    # collected independently of action_id validity so a broken action_id does
+    # not cascade into a spurious coverage error here.
+    for bound_field in field_map:
+        if bound_field not in proposed_fields:
+            errors.append(
+                f"{rel}: binding field_custody_map[{bound_field!r}] is never exercised "
+                f"by any dry-run proposed action"
+            )
 
     return {
         "dry_run_id": d.get("dry_run_id"),
@@ -522,6 +537,20 @@ def check_expected_receipts(data, binding_ctx, dry_ctx, review_ctx, errors, rel)
                     f"{lbl}: {ARTIFACT_TRANSFER_RECEIPT} does not satisfy {REGISTRATION_RECEIPT} "
                     f"(transfer proof is not registry registration)"
                 )
+            # The binding is the per-run receipt contract: an approved write must
+            # expect every receipt its field's custody rule declares. Scoped to
+            # approved writes only — hold/block/discard outcomes must not be
+            # forced to carry write receipts.
+            if aid in action_index:
+                fld = action_index[aid][1]
+                bound = binding_ctx.get("field_map", {}).get(fld) if fld is not None else None
+                if bound is not None:
+                    for br in bound[1]:
+                        if br not in rc:
+                            errors.append(
+                                f"{lbl}: approved write for field {fld!r} must include "
+                                f"binding-declared receipt {br!r}"
+                            )
         if verb == "discard" or kind == DISCARD_KIND:
             if "DiscardDecisionReceipt" not in rc:
                 errors.append(f"{lbl}: a discard must include DiscardDecisionReceipt")
