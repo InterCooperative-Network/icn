@@ -1,8 +1,8 @@
 ---
-Status: design contract
+Status: mixed — shipped subset read model + forward design contract
 Canonical: no
 Authority: architecture (complements THE_COMMONS.md and KERNEL_APP_SEPARATION.md)
-Last Reviewed: 2026-04-24
+Last Reviewed: 2026-07-08
 Owner: Matt Faherty
 ---
 
@@ -12,9 +12,11 @@ Owner: Matt Faherty
 >
 > It is the substrate under the Commons Shell. It is the substrate under Action Cards. It is the substrate under accessible and assisted participation. It is not a convenience endpoint.
 
+> **Implementation status.** `GET /v1/gov/me/standing` is a shipped subset read model (ICN #1627, merged 2026-04-25, closing #1604). Elsewhere this document refers to the route by its app-relative form `GET /me/standing`; that is the same route — the governance app registers `/me/standing`, which the gateway mounts under `/gov` behind its `/v1` prefix, so the callable/served path is `/v1/gov/me/standing` (the served OpenAPI documents it as `/gov/me/standing`). The shipped response exposes `{did, display_label, domains, roles, authority_scopes, generated_at}`. This document still describes a richer member-standing projection — attention items, delegations, active scope selection, and accessibility affordances — that remains forward design unless marked otherwise. This document does not claim any live deployed gateway currently serves the route; live-gateway availability is a separate operational claim.
+
 This document is the design contract for `GET /me/standing`. It sits directly beneath `docs/architecture/THE_COMMONS.md` and inherits from it: The Commons doctrine says ordinary people must be able to participate in Commons institutions without becoming sysadmins; this document specifies the surface that makes that possible. It complements `docs/architecture/KERNEL_APP_SEPARATION.md` (the Meaning Firewall) and `docs/architecture/INSTITUTION_PACKAGE_BOUNDARY.md` (institution packaging), and takes the `[future design]` marker from `THE_COMMONS.md §9` and turns it into a concrete, implementation-ready contract.
 
-**This is design-only.** No endpoint is authorized for implementation here. Implementation happens in subsequent phases, each with its own PR.
+This document no longer blocks the shipped subset endpoint (see the implementation-status note above). It remains the design contract for the richer projection beyond the shipped subset; that further implementation happens in subsequent phases, each with its own PR.
 
 ---
 
