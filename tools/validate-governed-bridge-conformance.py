@@ -332,6 +332,7 @@ def check_dry_run(data, binding_ctx, errors, rel):
     actions = require_list(d.get("proposed_actions"), f"{rel}: proposed_actions", errors)
     action_index = {}  # action_id -> (src_ref, field_path, kind)
     coverage = {}  # (src_ref, field_path) -> action_id
+    proposed_fields = set()  # every valid field_path proposed, regardless of action_id validity
     for i, act in enumerate(actions):
         lbl = f"{rel}: proposed_actions[{i}]"
         a = require_mapping(act, lbl, errors)
@@ -360,6 +361,8 @@ def check_dry_run(data, binding_ctx, errors, rel):
                     f"{lbl}.proposed_custody_target.kind {kind!r} != binding's "
                     f"{bound_kind!r} for field {fld!r}"
                 )
+        if fld is not None:
+            proposed_fields.add(fld)
         if aid:
             action_index[aid] = (src, fld, kind)
         if src is not None and fld is not None:
@@ -373,8 +376,9 @@ def check_dry_run(data, binding_ctx, errors, rel):
 
     # Every binding custody rule must be exercised: a field_path declared in
     # field_custody_map that no proposed action references is an unexercised
-    # (and therefore unreviewed, unreceipted) custody rule.
-    proposed_fields = {f for (_src, f, _kind) in action_index.values() if f is not None}
+    # (and therefore unreviewed, unreceipted) custody rule. proposed_fields is
+    # collected independently of action_id validity so a broken action_id does
+    # not cascade into a spurious coverage error here.
     for bound_field in field_map:
         if bound_field not in proposed_fields:
             errors.append(
@@ -545,7 +549,7 @@ def check_expected_receipts(data, binding_ctx, dry_ctx, review_ctx, errors, rel)
                         if br not in rc:
                             errors.append(
                                 f"{lbl}: approved write for field {fld!r} must include "
-                                f"binding-declared receipt {br}"
+                                f"binding-declared receipt {br!r}"
                             )
         if verb == "discard" or kind == DISCARD_KIND:
             if "DiscardDecisionReceipt" not in rc:
