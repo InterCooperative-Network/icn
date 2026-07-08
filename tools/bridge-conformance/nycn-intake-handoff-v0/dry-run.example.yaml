@@ -1,0 +1,109 @@
+# Fake NYCN intake dry-run proposal — FICTIONAL, conformance fixture only.
+#
+# The preview a governed bridge WOULD propose over the NYCN fake intake source
+# shape. It performs no writes and reaches no external service. Every proposed
+# action is decision-required and carries an opaque source-record reference —
+# never a raw natural or PII-bearing key. Field values are NOT included; only the
+# field path, classification, and proposed custody target. Records mirror the
+# three fake intake records (consents / no-consent / minimal-plus-external-ref).
+meta:
+  fictional: true
+  performs_writes: false
+
+dry_run_id: dryrun_nycn_fake_001
+binding_id: nycn_handoff_binding_001
+source_system_id: src_sys_nycn_fake_intake
+source_shape_ref: shape_nycn_fake_001
+plan_hash: planhash_nycn_fake_0001
+
+proposed_actions:
+  # --- record 001: consents to follow-up; public + participant-visible + care ---
+  - action_id: act_001
+    source_record_ref: nycn_rec_fake_001
+    field_path: attendee.role_interest
+    source_authority: participant_provided
+    privacy_class: public
+    proposed_custody_target:
+      kind: artifact_registry
+    required_receipts:
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+    decision_required: true
+  - action_id: act_002
+    source_record_ref: nycn_rec_fake_001
+    field_path: attendee.display_name_preference
+    source_authority: participant_provided
+    privacy_class: participant_visible
+    proposed_custody_target:
+      kind: scoped_vault
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+    decision_required: true
+  - action_id: act_003
+    source_record_ref: nycn_rec_fake_001
+    field_path: attendee.interpretation_language_need
+    source_authority: participant_provided
+    privacy_class: care_sensitive
+    proposed_custody_target:
+      kind: scoped_vault
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+    decision_required: true
+  - action_id: act_004
+    source_record_ref: nycn_rec_fake_001
+    field_path: attendee.follow_up_consent
+    source_authority: participant_provided
+    privacy_class: follow_up_only
+    proposed_custody_target:
+      kind: governed_object       # consent present -> follow-up record proposed
+    required_receipts:
+      - BridgeImportReceipt
+      - FollowUpObjectCreationReceipt
+    decision_required: true
+  - action_id: act_005
+    source_record_ref: nycn_rec_fake_001
+    field_path: attendee.free_text_note
+    source_authority: participant_provided
+    privacy_class: discard
+    proposed_custody_target:
+      kind: discard
+    required_receipts:
+      - DiscardDecisionReceipt
+    decision_required: true
+  # --- record 002: care need present; does NOT consent to follow-up ---
+  - action_id: act_006
+    source_record_ref: nycn_rec_fake_002
+    field_path: attendee.accessibility_need
+    source_authority: participant_provided
+    privacy_class: care_sensitive
+    proposed_custody_target:
+      kind: scoped_vault
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+    decision_required: true
+  - action_id: act_007
+    source_record_ref: nycn_rec_fake_002
+    field_path: attendee.follow_up_consent
+    source_authority: participant_provided
+    privacy_class: follow_up_only
+    proposed_custody_target:
+      kind: governed_object       # consent ABSENT -> steward blocks (see steward-review)
+    required_receipts:
+      - BridgeImportReceipt
+      - FollowUpObjectCreationReceipt
+    decision_required: true
+  # --- record 003: minimal, public; carries an observe-only external reference ---
+  - action_id: act_008
+    source_record_ref: nycn_rec_fake_003
+    field_path: attendee.registration_reference
+    source_authority: external_registration_system
+    privacy_class: external_reference
+    proposed_custody_target:
+      kind: external_reference
+    required_receipts:
+      - BridgeImportReceipt
+      - ExternalReferenceObservationReceipt
+    decision_required: true

@@ -1,0 +1,98 @@
+# Fake NYCN intake steward review — FICTIONAL, conformance fixture only.
+#
+# The human review gate over the dry-run proposal. No real reviewer, no real
+# data, no writes. The reviewer is bound by a VERIFIABLE authority reference; the
+# display role is for legibility only and is never sufficient on its own. NYCN's
+# airlock has only a role-only reviewer today (see the handoff map's reviewer
+# authority gap). Every proposed action gets exactly one decision, keyed by
+# (source_record_ref, field_path). reviewed_plan_hash must equal the dry-run
+# plan_hash. The no-consent follow-up (record 002) is an AUTOMATIC block — no
+# human review is implied for it.
+meta:
+  fictional: true
+
+review_id: review_nycn_fake_001
+dry_run_id: dryrun_nycn_fake_001
+binding_id: nycn_handoff_binding_001
+reviewer_authority_ref: authref_nycn_fake_did_sig_001   # verifiable; display role is not enough
+reviewer_display_role: summit_data_steward
+reviewed_plan_hash: planhash_nycn_fake_0001
+
+decisions:
+  - decision_id: dec_001
+    action_id: act_001
+    source_record_ref: nycn_rec_fake_001
+    field_path: attendee.role_interest
+    decision: approve
+    reason: public topic interest; aggregate-safe program signal to the artifact registry
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+  - decision_id: dec_002
+    action_id: act_002
+    source_record_ref: nycn_rec_fake_001
+    field_path: attendee.display_name_preference
+    decision: approve
+    reason: participant-visible display preference; scoped-vault custody honoring the preference
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  - decision_id: dec_003
+    action_id: act_003
+    source_record_ref: nycn_rec_fake_001
+    field_path: attendee.interpretation_language_need
+    decision: approve
+    reason: care-sensitive language-justice need; need-to-know vault custody without exposing the value
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  - decision_id: dec_004
+    action_id: act_004
+    source_record_ref: nycn_rec_fake_001
+    field_path: attendee.follow_up_consent
+    decision: approve
+    reason: consent present; underlying governed follow-up object authorized (an action card derives from it)
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - FollowUpObjectCreationReceipt
+  - decision_id: dec_005
+    action_id: act_005
+    source_record_ref: nycn_rec_fake_001
+    field_path: attendee.free_text_note
+    decision: discard
+    reason: unbounded free text; discard from the repo-safe path
+    expected_receipts:
+      - DiscardDecisionReceipt
+  - decision_id: dec_006
+    action_id: act_006
+    source_record_ref: nycn_rec_fake_002
+    field_path: attendee.accessibility_need
+    decision: approve
+    reason: care-sensitive access need; need-to-know vault custody
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  - decision_id: dec_007
+    action_id: act_007
+    source_record_ref: nycn_rec_fake_002
+    field_path: attendee.follow_up_consent
+    decision: block
+    automatic: true                 # automatic policy block; NOT a human review decision
+    reason: follow-up consent absent; automatic block, no follow-up object created, no human review implied
+    expected_receipts:
+      - ConsentPolicyBlockReceipt
+  - decision_id: dec_008
+    action_id: act_008
+    source_record_ref: nycn_rec_fake_003
+    field_path: attendee.registration_reference
+    decision: approve
+    reason: external registration reference; observe-only custody authorized, never processed
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - ExternalReferenceObservationReceipt

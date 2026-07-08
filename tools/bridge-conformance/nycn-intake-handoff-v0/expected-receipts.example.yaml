@@ -1,0 +1,59 @@
+# Fake NYCN intake expected-receipts contract — FICTIONAL, conformance fixture only.
+#
+# The receipt set the run must emit to be complete. run_level covers the dry-run
+# and the human review; per_action covers each proposed action's outcome. A
+# missing expected receipt means the run is incomplete. ArtifactReceipt (a
+# verified-transfer proof) never satisfies ArtifactRegistrationReceipt, and no
+# action-card write receipt appears (cards are derived read views). The
+# no-consent follow-up (act_007) is an automatic block, so it carries only a
+# consent policy-block receipt and no review/import/write receipt.
+meta:
+  fictional: true
+
+binding_id: nycn_handoff_binding_001
+dry_run_id: dryrun_nycn_fake_001
+review_id: review_nycn_fake_001
+
+expected_receipts:
+  run_level:
+    - BridgeDryRunReceipt          # a dry-run pass ran
+    - BridgeReviewDecisionReceipt  # a human steward reviewed
+  per_action:
+    - action_id: act_001
+      custody_target_kind: artifact_registry
+      receipts:
+        - BridgeImportReceipt
+        - ArtifactRegistrationReceipt
+    - action_id: act_002
+      custody_target_kind: scoped_vault
+      receipts:
+        - BridgeImportReceipt
+        - VaultObjectWriteReceipt
+    - action_id: act_003
+      custody_target_kind: scoped_vault
+      receipts:
+        - BridgeImportReceipt
+        - VaultObjectWriteReceipt
+    - action_id: act_004
+      custody_target_kind: governed_object
+      receipts:
+        - BridgeImportReceipt
+        - FollowUpObjectCreationReceipt
+    - action_id: act_005
+      custody_target_kind: discard
+      receipts:
+        - DiscardDecisionReceipt
+    - action_id: act_006
+      custody_target_kind: scoped_vault
+      receipts:
+        - BridgeImportReceipt
+        - VaultObjectWriteReceipt
+    - action_id: act_007
+      custody_target_kind: governed_object
+      receipts:
+        - ConsentPolicyBlockReceipt
+    - action_id: act_008
+      custody_target_kind: external_reference
+      receipts:
+        - BridgeImportReceipt
+        - ExternalReferenceObservationReceipt
