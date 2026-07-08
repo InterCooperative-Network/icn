@@ -64,6 +64,19 @@ except Exception:  # pragma: no cover
 REPO_ROOT = Path(__file__).resolve().parent.parent
 CONFORMANCE_DIR = REPO_ROOT / "tools" / "bridge-conformance"
 
+
+def _within_repo(p) -> bool:
+    """True if p resolves (symlinks collapsed) to a path inside the repo.
+
+    Guards both explicit args and auto-discovered fixtures against a symlink
+    that escapes the repository boundary.
+    """
+    try:
+        Path(p).resolve().relative_to(REPO_ROOT.resolve())
+        return True
+    except (ValueError, OSError):
+        return False
+
 REQUIRED_FILES = (
     "README.md",
     "binding.example.yaml",
@@ -194,6 +207,9 @@ def require_str_list(node, label, errors):
 
 
 def _load_yaml(path: Path, label, errors):
+    if not _within_repo(path):
+        errors.append(f"{label}: file escapes the repository (symlink); refusing to read")
+        return None
     try:
         with open(path, "r", encoding="utf-8") as fh:
             return yaml.safe_load(fh)
@@ -240,7 +256,7 @@ def check_binding(data, errors, rel):
         "steward_review_surface",
     ):
         require_str(b.get(key), f"{rel}: {key}", errors)
-    require_str_list(b.get("allowed_source_systems"), f"{rel}: allowed_source_systems", errors)
+    allowed_sources = require_str_list(b.get("allowed_source_systems"), f"{rel}: allowed_source_systems", errors)
     require_str_list(b.get("promotion_gates"), f"{rel}: promotion_gates", errors)
     require_str_list(b.get("required_receipts"), f"{rel}: required_receipts", errors)
     require_str_list(
@@ -289,6 +305,7 @@ def check_binding(data, errors, rel):
         "binding_id": b.get("binding_id"),
         "field_map": field_map,
         "external_reference_policy": b.get("external_reference_policy") or {},
+        "allowed_source_systems": allowed_sources,
     }
 
 
@@ -304,6 +321,12 @@ def check_dry_run(data, binding_ctx, errors, rel):
         require_str(d.get(key), f"{rel}: {key}", errors)
     if d.get("binding_id") != binding_ctx.get("binding_id"):
         errors.append(f"{rel}: binding_id does not match binding.example.yaml")
+    allowed_sources = binding_ctx.get("allowed_source_systems") or []
+    ssid = d.get("source_system_id")
+    if isinstance(ssid, str) and allowed_sources and ssid not in allowed_sources:
+        errors.append(
+            f"{rel}: source_system_id {ssid!r} is not in binding allowed_source_systems"
+        )
 
     field_map = binding_ctx.get("field_map", {})
     actions = require_list(d.get("proposed_actions"), f"{rel}: proposed_actions", errors)
@@ -371,6 +394,8 @@ def check_review(data, binding_ctx, dry_ctx, errors, rel):
             f"{rel}: reviewer_display_role present but reviewer_authority_ref is missing — "
             f"a role label alone is not authority proof"
         )
+    if r.get("binding_id") != binding_ctx.get("binding_id"):
+        errors.append(f"{rel}: binding_id does not match binding.example.yaml")
     if r.get("dry_run_id") != dry_ctx.get("dry_run_id"):
         errors.append(f"{rel}: dry_run_id does not match dry-run.example.yaml")
     if r.get("reviewed_plan_hash") != dry_ctx.get("plan_hash"):
@@ -439,6 +464,12 @@ def check_expected_receipts(data, binding_ctx, dry_ctx, review_ctx, errors, rel)
     require_bool(meta.get("fictional"), f"{rel}: meta.fictional", errors, want=True)
     for key in ("binding_id", "dry_run_id", "review_id"):
         require_str(e.get(key), f"{rel}: {key}", errors)
+    if e.get("binding_id") != binding_ctx.get("binding_id"):
+        errors.append(f"{rel}: binding_id does not match binding.example.yaml")
+    if e.get("dry_run_id") != dry_ctx.get("dry_run_id"):
+        errors.append(f"{rel}: dry_run_id does not match dry-run.example.yaml")
+    if e.get("review_id") != review_ctx.get("review_id"):
+        errors.append(f"{rel}: review_id does not match steward-review.example.yaml")
 
     exp = require_mapping(e.get("expected_receipts"), f"{rel}: expected_receipts", errors)
     run_level = require_str_list(exp.get("run_level"), f"{rel}: expected_receipts.run_level", errors)
@@ -461,7 +492,11 @@ def check_expected_receipts(data, binding_ctx, dry_ctx, review_ctx, errors, rel)
         kind = require_str(p.get("custody_target_kind"), f"{lbl}.custody_target_kind", errors)
         rc = require_str_list(p.get("receipts"), f"{lbl}.receipts", errors)
         if aid:
+            if aid in seen_actions:
+                errors.append(f"{lbl}: duplicate per_action entry for action_id {aid!r}")
             seen_actions.add(aid)
+            if aid not in action_index:
+                errors.append(f"{lbl}.action_id {aid!r} does not match any dry-run action")
         for r_ in rc:
             if r_ == FORBIDDEN_RECEIPT:
                 errors.append(f"{lbl}.receipts: {FORBIDDEN_RECEIPT} must not appear")
@@ -507,6 +542,9 @@ def scan_privacy(folder: Path, errors, rel_folder):
     for name in sorted(os.listdir(folder)):
         path = folder / name
         if not path.is_file():
+            continue
+        if not _within_repo(path):
+            errors.append(f"{rel_folder}/{name}: file escapes the repository (symlink); refusing to read")
             continue
         try:
             text = path.read_text(encoding="utf-8")
@@ -576,20 +614,17 @@ def main(argv) -> int:
     print("==> validate-governed-bridge-conformance.py")
 
     total_errors = 0
-    if argv:
-        folders = []
-        repo_root = REPO_ROOT.resolve()
-        for a in argv:
-            p = Path(a).resolve()  # collapses symlinks before the boundary check
-            try:
-                p.relative_to(repo_root)
-            except ValueError:
-                print(f"    FAIL: {a}: path is outside the repository; this validator only reads repo files")
-                total_errors += 1
-                continue
-            folders.append(p)
-    else:
-        folders = discover_folders()
+    # Boundary-check BOTH explicit args and auto-discovered folders: a symlinked
+    # fixture dir must not let the validator read outside the repository.
+    candidates = [Path(a) for a in argv] if argv else discover_folders()
+    folders = []
+    for p in candidates:
+        if not _within_repo(p):
+            label = str(p) if argv else p.name
+            print(f"    FAIL: {label}: path escapes the repository (symlink or outside); refusing to read")
+            total_errors += 1
+            continue
+        folders.append(p)
 
     if not folders and total_errors == 0:
         print("    no fixture folders found under tools/bridge-conformance/*/")
