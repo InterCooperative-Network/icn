@@ -100,8 +100,8 @@ All rows below are **expected / future** vocabulary. None exists in code. The
 | `VaultObjectWriteReceipt` | An object was written into a `ScopedVault` | vault id · scope/class · private object ref · content hash · privacy class · timestamp | public visibility · disclosure of vault content | Expected / future | `ScopedVault` |
 | `ArtifactRegistrationReceipt` | An artifact was **recorded in `ArtifactRegistry`** | artifact id · content hash · registry namespace · artifact class · timestamp | a blob transfer (that is `ArtifactReceipt`) · publication | Expected / future | `ArtifactRegistry` |
 | `ExternalReferenceObservationReceipt` | An external reference/status was **observed** | external system id · external ref id · observed status · source hash · timestamp | settlement was processed · a payment path · that ICN holds authority over the fact | Expected / future | External-custodian model (#2368) |
-| `DiscardDecisionReceipt` | A discard decision was recorded | source field/record id · discard basis (policy or review) · timestamp | the discarded content was stored · that a human reviewed (unless basis = review) | Expected / future | — |
-| `ConsentPolicyBlockReceipt` | An **automatic** no-consent block was enforced | source field · policy id/basis · timestamp | a human reviewed · that the field was imported | Expected / future | — |
+| `DiscardDecisionReceipt` | A discard decision was recorded | opaque/hash-bound source-record ref + field path (never a raw PII-bearing key; the pair preserves per-`(record, field)` coverage) · discard basis (policy or review) · timestamp | the discarded content was stored · that a human reviewed (unless basis = review) | Expected / future | — |
+| `ConsentPolicyBlockReceipt` | An **automatic** no-consent block was enforced | opaque/hash-bound source-record ref + field path (never a raw PII-bearing key; a bare field name loses per-record coverage) · policy id/basis · timestamp | a human reviewed · that the field was imported | Expected / future | — |
 | `PublicationConsentBlockReceipt` | An **automatic** no-publication-permission block was enforced | candidate artifact ref · missing-permission basis · timestamp | a human reviewed · that publication occurred | Expected / future | — |
 | `FollowUpObjectCreationReceipt` *(provisional name)* | The **underlying governed object** behind a consent-gated follow-up was created (a card is *derived* from it) | underlying object id · object kind · consent basis ref · timestamp | that an action card was written · that `GET /me/action-cards` mutated | Expected / future | ADR-0027 (cards derived) |
 
@@ -162,6 +162,14 @@ that **no-review policy blocks cannot masquerade as human review**:
 A `ConsentPolicyBlockReceipt` or `PublicationConsentBlockReceipt` must never be
 substituted for a `BridgeReviewDecisionReceipt`; an automatic block is evidence
 that a policy fired, not that a steward looked.
+
+Wherever a discard/policy-block receipt references source data, it uses the same
+rule as `BridgeImportReceipt` (§5): an **opaque/hash-bound source-record
+reference plus a field path**, never a raw natural/PII-bearing key. The record
+reference + field path together preserve the per-`(record, field)` coverage that
+`../architecture/NYCN_AIRLOCK_BRIDGE_REQUIREMENTS.md` requires — a bare field
+name (e.g. `email`) shared across many records would both leak a raw identifier
+and collapse per-record coverage.
 
 ## 7. Target write receipts
 
