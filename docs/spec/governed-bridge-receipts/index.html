@@ -1,0 +1,410 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Governed Bridge Receipt Vocabulary | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>spec</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>governed bridge receipts</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/spec/governed-bridge-receipts.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Governed Bridge Receipt Vocabulary</h1>
+<blockquote>
+<p><strong>Status: draft spec, requirements vocabulary.</strong> Names the receipt vocabulary a
+future governed bridge import would need, so that later <code>ToolManifest</code> /
+<code>GovernedServiceBinding</code> work does not invent receipt names inconsistently. It
+is derived from the NYCN airlock requirements note
+(<a href="/docs/architecture/NYCN_AIRLOCK_BRIDGE_REQUIREMENTS">`../architecture/NYCN_AIRLOCK_BRIDGE_REQUIREMENTS.md`</a>)
+and ICN issue #2365. It defines vocabulary and evidence boundaries only — it
+implements no receipt, adds no route, and does not imply any bridge can import
+real rows today. Only <code>ArtifactReceipt</code> (below) exists in code. The PR
+introducing this doc advances #2365 without closing it.</p>
+</blockquote>
+<h2>1. Purpose</h2>
+<p>A governed bridge would move data from an external source into ICN custody only
+under steward authorization, leaving evidence at each bounded step. The NYCN
+airlock rehearsals coined a family of receipt names for those steps; this
+document names them once, precisely, so downstream substrate work
+(<code>ToolManifest</code> #2366, <code>GovernedServiceBinding</code> #2367, external-custodian model
+#2368, steward review surface #2369) binds to a consistent vocabulary rather
+than re-coining it.</p>
+<p>It answers:</p>
+<blockquote>
+<p>What receipts must exist before a governed bridge can safely move real rows
+from an external source into ICN custody?</p>
+</blockquote>
+<p>This is <strong>docs/spec planning only</strong>. It does not implement the receipts, define a
+wire schema, or imply any current bridge can import real rows. Every class named
+here is <strong>expected / future</strong> except <code>ArtifactReceipt</code>, which already exists as a
+transfer proof and is explicitly <em>not</em> a bridge receipt.</p>
+<h2>2. Receipt boundary doctrine</h2>
+<blockquote>
+<p>A receipt proves that a bounded event was recorded. It does not prove the event
+was wise, complete, authorized by itself, or sufficient for custody.</p>
+</blockquote>
+<p>From that, three doctrine lines the rehearsals kept returning to:</p>
+<ul>
+<li><strong>The bridge proposes custody; the steward authorizes custody.</strong> A tool
+emitting a receipt does not make the tool the authority.</li>
+<li><strong>A dry-run is evidence, not authority.</strong> <code>BridgeDryRunReceipt</code> proves a
+preview ran; it authorizes nothing.</li>
+<li><strong>A receipt proves a decision happened, not that the decision was wise.</strong>
+Correctness lives in the review and the policy, not in the existence of a
+receipt.</li>
+</ul>
+<p>Three hard boundaries this vocabulary must preserve:</p>
+<ol>
+<li><strong><code>ArtifactReceipt</code> proves verified blob transfer only</strong> — an action <em>on</em> an
+artifact. It is not proof of <code>ArtifactRegistry</code> registration, not a
+<code>BridgeImportReceipt</code>, and not a <code>VaultObjectWriteReceipt</code>.</li>
+<li><strong>Registry recording still needs its own evidence.</strong> An
+<code>ArtifactRegistrationReceipt</code> (or equivalent registry-write evidence) proves
+that an artifact was <em>recorded in the registry</em>; the transfer receipt does not
+stand in for it.</li>
+<li><strong>Action cards are derived read views.</strong> Per
+<a href="/docs/adr/ADR-0027-action-card-contract">ADR-0027</a>, <code>GET /v1/gov/me/action-cards</code>
+has no mutation API — &quot;cards reference underlying objects; mutation flows
+through those.&quot; So this vocabulary names the <strong>underlying governed-object</strong>
+event, never a card write.</li>
+</ol>
+<h2>3. Existing implemented receipt</h2>
+<p><code>ArtifactReceipt</code> is the <strong>only</strong> receipt class in this document that exists in
+code today. It is defined in <code>icn-kernel-api</code> (<code>icn/crates/icn-kernel-api/src/proofs.rs</code>),
+is the ADR-0026 Layer 2 receipt (see
+<a href="/docs/adr/ADR-0026-receipt-and-provenance-proof-envelope">`../adr/ADR-0026-receipt-and-provenance-proof-envelope.md`</a>),
+and carries the fields <code>blob_hash</code>, <code>provider_did</code>, <code>requester_did</code>,
+<code>request_id</code>, <code>scope_id</code>, <code>verified_at</code>, <code>receipt_hash</code>, and <code>signature</code>.</p>
+<blockquote>
+<p><code>ArtifactReceipt</code> proves a blob/artifact transfer completed and content was
+verified. It is an action on an artifact.
+It is <strong>not</strong> proof of <code>ArtifactRegistry</code> registration.
+It is <strong>not</strong> <code>BridgeImportReceipt</code>.
+It is <strong>not</strong> <code>VaultObjectWriteReceipt</code>.</p>
+</blockquote>
+<p>Per <a href="https://github.com/InterCooperative-Network/icn/blob/main/artifact-registry-and-scoped-vault">`artifact-registry-and-scoped-vault.md`</a>
+the registry holds <code>receipt_refs</code> that <em>may point at</em> <code>ArtifactReceipt</code>
+instances, alongside other classes — the transfer proof and the registration
+record are deliberately separable.</p>
+<h2>4. Proposed / future bridge receipt family</h2>
+<p>All rows below are <strong>expected / future</strong> vocabulary. None exists in code. The
+&quot;Related primitive&quot; column points at the substrate work that would own each.</p>
+<table>
+<thead>
+<tr>
+<th>Receipt</th>
+<th>Bounded event it proves</th>
+<th>Required fields / evidence</th>
+<th>Must not imply</th>
+<th>Status</th>
+<th>Related primitive</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>BridgeDryRunReceipt</code></td>
+<td>A dry-run/preview pass ran over a source shape</td>
+<td>bridge tool id · manifest id · binding id · source system id · candidate-action count · timestamp</td>
+<td>any write occurred · steward authorization · that real rows were read</td>
+<td>Expected / future</td>
+<td><code>ToolManifest</code> dry-run mode (#2366)</td>
+</tr>
+<tr>
+<td><code>BridgeReviewDecisionReceipt</code></td>
+<td>A <strong>human</strong> steward review decision was recorded</td>
+<td>verifiable reviewer authority reference (<code>actor_did</code> / signature / authority basis, per existing receipt patterns — role-labeled for display, never a bare role string as the only evidence) · decision id · decision (approve/reject/hold/block) · reason ref · reviewed decision set bound to opaque source-record refs + field paths (or a dry-run plan hash that commits to that exact set) — never a bare field-name set · timestamp</td>
+<td>the decision was correct or wise · that a write followed · that a role label alone proves authority · that a bare shared field name covers unrelated records</td>
+<td>Expected / future</td>
+<td>Steward review surface (#2369)</td>
+</tr>
+<tr>
+<td><code>BridgeImportReceipt</code></td>
+<td>The <strong>import decision</strong> itself (coordinating record) — see §5</td>
+<td>the §5 minimum-evidence set</td>
+<td>raw source payload was stored · that the decision was wise</td>
+<td>Expected / future</td>
+<td><code>GovernedServiceBinding</code> (#2367)</td>
+</tr>
+<tr>
+<td><code>VaultObjectWriteReceipt</code></td>
+<td>An object was written into a <code>ScopedVault</code></td>
+<td>vault id · scope/class · private object ref · content hash · privacy class · timestamp</td>
+<td>public visibility · disclosure of vault content</td>
+<td>Expected / future</td>
+<td><code>ScopedVault</code></td>
+</tr>
+<tr>
+<td><code>ArtifactRegistrationReceipt</code></td>
+<td>An artifact was <strong>recorded in <code>ArtifactRegistry</code></strong></td>
+<td>artifact id · content hash · registry namespace · artifact class · timestamp</td>
+<td>a blob transfer (that is <code>ArtifactReceipt</code>) · publication</td>
+<td>Expected / future</td>
+<td><code>ArtifactRegistry</code></td>
+</tr>
+<tr>
+<td><code>ExternalReferenceObservationReceipt</code></td>
+<td>An external reference/status was <strong>observed</strong></td>
+<td>external system id · external ref id · observed status · source hash · timestamp</td>
+<td>settlement was processed · a payment path · that ICN holds authority over the fact</td>
+<td>Expected / future</td>
+<td>External-custodian model (#2368)</td>
+</tr>
+<tr>
+<td><code>DiscardDecisionReceipt</code></td>
+<td>A discard decision was recorded</td>
+<td>opaque/hash-bound source-record ref + field path (never a raw PII-bearing key; the pair preserves per-<code>(record, field)</code> coverage) · discard basis (policy or review) · timestamp</td>
+<td>the discarded content was stored · that a human reviewed (unless basis = review)</td>
+<td>Expected / future</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>ConsentPolicyBlockReceipt</code></td>
+<td>An <strong>automatic</strong> no-consent block was enforced</td>
+<td>opaque/hash-bound source-record ref + field path (never a raw PII-bearing key; a bare field name loses per-record coverage) · policy id/basis · timestamp</td>
+<td>a human reviewed · that the field was imported</td>
+<td>Expected / future</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>PublicationConsentBlockReceipt</code></td>
+<td>An <strong>automatic</strong> no-publication-permission block was enforced</td>
+<td>candidate artifact ref · missing-permission basis · timestamp</td>
+<td>a human reviewed · that publication occurred</td>
+<td>Expected / future</td>
+<td>—</td>
+</tr>
+<tr>
+<td><code>FollowUpObjectCreationReceipt</code> <em>(provisional name)</em></td>
+<td>The <strong>underlying governed object</strong> behind a consent-gated follow-up was created (a card is <em>derived</em> from it)</td>
+<td>underlying object id · object kind · consent basis ref · timestamp</td>
+<td>that an action card was written · that <code>GET /me/action-cards</code> mutated</td>
+<td>Expected / future</td>
+<td>ADR-0027 (cards derived)</td>
+</tr>
+</tbody></table>
+<p><strong>Do not use <code>ActionCardCreationReceipt</code> as a final name.</strong> It is retained only as
+a <strong>deprecated placeholder</strong>: action cards are derived read views (ADR-0027), so
+no receipt should assert a card write. The provisional
+<code>FollowUpObjectCreationReceipt</code> (or <code>GovernedFollowUpCreationReceipt</code>) names the
+real event — the creation of the underlying governed object. <strong>The exact name is
+provisional and must reconcile with the eventual governed-object model.</strong></p>
+<h2>5. <code>BridgeImportReceipt</code> minimum evidence</h2>
+<p><code>BridgeImportReceipt</code> is the coordinating record of a single import decision. Its
+minimum evidence set:</p>
+<ul>
+<li>source system id</li>
+<li>source record <strong>reference</strong> — an opaque/hash-bound id or a vault-backed private
+ref, <strong>never</strong> a raw natural or PII-bearing external key (a raw key can itself
+be private data, e.g. an email used as a source row key)</li>
+<li>source hash / content hash</li>
+<li>mapping version</li>
+<li>bridge tool id / manifest id</li>
+<li>governed service binding id</li>
+<li>steward decision id (the <code>BridgeReviewDecisionReceipt</code> it rests on)</li>
+<li>dry-run reference — the <code>BridgeDryRunReceipt</code> id / preview-plan hash the steward
+reviewed (the import must cite the exact dry-run proposal it confirms;
+refuse-by-default means no write without a preceding reviewed preview)</li>
+<li>target custody class</li>
+<li>target scope / namespace</li>
+<li>privacy class</li>
+<li>import timestamp</li>
+<li>receipt refs for the target writes it coordinated (vault / registry / external
+observation / follow-up object)</li>
+<li>export/delete path reference</li>
+</ul>
+<p>This is a <strong>decision-and-provenance record, not raw source payload storage.</strong> It
+captures <em>what was decided and where it landed</em>, addressed by hashes and opaque
+references — never the source rows themselves, and never a raw PII-bearing source
+key. The reference is itself opaque/hash-bound or vault-backed, so nothing
+private lands in the receipt body or in any steward/member surface that renders
+receipt refs. The private content lives (if anywhere) in a <code>ScopedVault</code>,
+referenced, never inlined.</p>
+<h2>6. Review and policy-block receipts</h2>
+<p>These four are frequently conflated; the vocabulary must keep them distinct so
+that <strong>no-review policy blocks cannot masquerade as human review</strong>:</p>
+<ul>
+<li><code>BridgeReviewDecisionReceipt</code> — a <strong>human</strong> reviewed and decided; it must bind a
+<strong>verifiable</strong> reviewer authority reference (a signed <code>actor_did</code> / authority
+basis), role-labeled only for display — a bare role string does not prove an
+authorized steward acted.</li>
+<li><code>ConsentPolicyBlockReceipt</code> — an <strong>automatic</strong> no-consent block; no human
+review implied.</li>
+<li><code>PublicationConsentBlockReceipt</code> — an <strong>automatic</strong> publication-permission
+block; no human review implied.</li>
+<li><code>DiscardDecisionReceipt</code> — a discard decision; its <code>basis</code> field records
+whether it was policy-directed or review-directed (the source of the decision
+matters and must be carried, not assumed).</li>
+</ul>
+<p>A <code>ConsentPolicyBlockReceipt</code> or <code>PublicationConsentBlockReceipt</code> must never be
+substituted for a <code>BridgeReviewDecisionReceipt</code>; an automatic block is evidence
+that a policy fired, not that a steward looked.</p>
+<p>Wherever a discard/policy-block receipt references source data, it uses the same
+rule as <code>BridgeImportReceipt</code> (§5): an <strong>opaque/hash-bound source-record
+reference plus a field path</strong>, never a raw natural/PII-bearing key. The record
+reference + field path together preserve the per-<code>(record, field)</code> coverage that
+<code>../architecture/NYCN_AIRLOCK_BRIDGE_REQUIREMENTS.md</code> requires — a bare field
+name (e.g. <code>email</code>) shared across many records would both leak a raw identifier
+and collapse per-record coverage.</p>
+<h2>7. Target write receipts</h2>
+<p>The import decision (<code>BridgeImportReceipt</code>) <strong>coordinates</strong>; the target-specific
+receipts prove the <strong>effects</strong>. Four distinct target effects:</p>
+<ul>
+<li><strong>Vault write</strong> → <code>VaultObjectWriteReceipt</code> (an object landed in a
+<code>ScopedVault</code>).</li>
+<li><strong>Registry registration</strong> → <code>ArtifactRegistrationReceipt</code> (an artifact was
+recorded in <code>ArtifactRegistry</code>) — distinct from the <code>ArtifactReceipt</code> transfer
+proof.</li>
+<li><strong>External reference observation</strong> → <code>ExternalReferenceObservationReceipt</code> (an
+external status/reference was observed, never processed).</li>
+<li><strong>Underlying follow-up object creation</strong> →
+<code>FollowUpObjectCreationReceipt</code> <em>(provisional)</em> (a governed object was created;
+a card is derived from it, never written directly).</li>
+</ul>
+<p><code>BridgeImportReceipt</code> carries <code>receipt_refs</code> to whichever of these its decision
+produced. A completed import decision therefore points at its coordinated target
+receipts; a missing target receipt means the effect it claims is unproven.</p>
+<p>Note the existing substrate already separates these concerns: <code>ReceiptStore</code>
+(<code>icn/crates/icn-gateway/src/receipt_store.rs</code>) is the persistent receipt
+backend — its opaque records are <strong>write-once-by-hash under a <code>(class, record_hash)</code> primary key</strong> — and <code>ArtifactRegistry</code> carries <code>receipt_refs</code> to
+existing classes — &quot;the registry never invents a new receipt class.&quot; Where the
+bridge receipts should live, and under what <code>(class, record_hash)</code> uniqueness
+model, is an open question (§10).</p>
+<h2>8. Relationship to <code>ToolManifest</code> and <code>GovernedServiceBinding</code></h2>
+<ul>
+<li><strong><code>ToolManifest</code> declares</strong> which receipt classes a bridge tool <em>can</em> emit (a
+capability declaration — see #2366).</li>
+<li><strong><code>GovernedServiceBinding</code> pins</strong> which receipt classes are <em>required</em> for a
+given run (the run&#39;s evidence contract — see #2367).</li>
+<li><strong>A bridge run is incomplete if its expected receipts are missing.</strong> The
+binding&#39;s required set is the checklist; absence is a failure, not a silent
+pass.</li>
+<li><strong>No-default-write / dry-run-only mode emits dry-run evidence only</strong> — a
+<code>BridgeDryRunReceipt</code> and nothing that claims a write.</li>
+</ul>
+<p>Issues #2366 and #2367 are the dependent substrate work; this document is
+<code>Refs</code>-only and closes neither.</p>
+<h2>9. Non-goals / non-claims</h2>
+<ul>
+<li>no runtime implementation; no new API route; no OpenAPI change; no migration;</li>
+<li>no production, pilot-readiness, or live-federation claim;</li>
+<li>no deployed bridge behavior; no claim any bridge can import real rows today;</li>
+<li>no raw Drive import; no live sync;</li>
+<li>no private data;</li>
+<li>no payment-processing / wallet / token / cryptocurrency framing (external
+settlement is <em>observed</em>, never processed);</li>
+<li>no claim that current NYCN operations are ICN-native.</li>
+</ul>
+<h2>10. Open questions</h2>
+<ol>
+<li>Should these be Rust types, receipt-enum variants, or schema-defined event
+names (or a mix — enum variants for kernel-visible classes, schema names for
+app-level ones)?</li>
+<li>Does <code>BridgeImportReceipt</code> live in a general <code>ReceiptStore</code>, in the artifact
+registry&#39;s <code>receipt_refs</code>, or both (coordinating record in <code>ReceiptStore</code>,
+referenced from the registry)? If in <code>ReceiptStore</code>, what <code>class</code> string does
+it carry, and does the existing write-once <code>(class, record_hash)</code> uniqueness
+model fit bridge re-run / idempotency needs (a re-decided import produces a
+distinct <code>record_hash</code>, never an in-place overwrite)?</li>
+<li>How do <code>VaultObjectWriteReceipt</code>s expose proof (existence, hash, privacy
+class) without leaking private content?</li>
+<li>What is the final name for the follow-up underlying-object receipt, once the
+governed-object model is settled?</li>
+<li>How are receipt refs surfaced in the Member Shell
+(<a href="https://github.com/InterCooperative-Network/icn/blob/main/member-shell-v0">`member-shell-v0.md`</a>) and Steward Cockpit
+(<a href="https://github.com/InterCooperative-Network/icn/blob/main/steward-cockpit-v0">`steward-cockpit-v0.md`</a>) without exposing private
+organizer data?</li>
+<li>How are export / delete / recovery proofs attached to (or referenced from) a
+<code>BridgeImportReceipt</code>?</li>
+</ol>
+<hr>
+<p><em>Provenance: derived from the NYCN airlock lane (NYCN #84–#89) and the ICN
+requirements note (#2364), tracking ICN issue #2365. A vocabulary/boundary spec,
+not an implementation or deployment claim.</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
