@@ -1,0 +1,601 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>NYCN Airlock Bridge Requirements | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>architecture</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>NYCN AIRLOCK BRIDGE REQUIREMENTS</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/architecture/NYCN_AIRLOCK_BRIDGE_REQUIREMENTS.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>NYCN Airlock Bridge Requirements</h1>
+<blockquote>
+<p><strong>This is downstream demand pressure from NYCN, not an ICN implementation
+claim.</strong> It captures what ICN would need to provide <em>before</em> a governed
+bridge could safely move real NYCN operational rows from external systems
+into ICN custody. It implements nothing, deploys nothing, and does not claim
+any real NYCN data is in ICN custody today. Every primitive named below is
+cross-referenced to its actual implementation status; the honest default is
+<strong>planned / spec / RFC</strong>, not implemented.</p>
+</blockquote>
+<h2>1. Purpose</h2>
+<p>The New York Cooperative Network (NYCN) has been rehearsing, in a separate
+repo, how its Summit operations (registration/intake, sponsor pipeline, and
+similar external-system data) would eventually come into ICN-native custody.
+Those rehearsals are deliberately <strong>fake and repo-safe</strong> — no real data — but
+they surfaced a consistent set of demands on the ICN substrate.</p>
+<p>This document lifts those demands into ICN&#39;s own planning vocabulary — the
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/COOPERATIVE_TOOL_COMMONS">Cooperative Tool Commons</a>,
+<a href="/docs/spec/governed-service-binding">`GovernedServiceBinding`</a>,
+<a href="/docs/rfcs/RFC-0017-tool-install-infrastructure">`ToolManifest`/`ToolBinding` (RFC-0017)</a>,
+and <a href="/docs/spec/artifact-registry-and-scoped-vault">`ArtifactRegistry` / `ScopedVault`</a> —
+so that the substrate work can be planned against a concrete downstream
+consumer.</p>
+<p>It answers one question:</p>
+<blockquote>
+<p><strong>What must ICN provide before a governed bridge can safely move real NYCN
+operational rows from external systems into ICN custody?</strong></p>
+</blockquote>
+<p>What this document is <strong>not</strong>:</p>
+<ul>
+<li>not an implementation, and not a bridge connector;</li>
+<li>not a roadmap commitment or a sequencing promise;</li>
+<li>not a deployment, pilot-readiness, or live-federation claim;</li>
+<li>not a claim that current NYCN operations are ICN-native.</li>
+</ul>
+<h2>2. Source signal</h2>
+<p>The demand originates in these NYCN artifacts (cross-repo; cited by path, not
+linked):</p>
+<table>
+<thead>
+<tr>
+<th>NYCN artifact</th>
+<th>What it is</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>docs/architecture/OPERATIONS_TO_ICN_NATIVE_MIGRATION.md</code></td>
+<td>Migration doctrine: a 0–8 ladder (nine rungs) from external reality to external-tool retirement, plus a surface-by-surface sequencing table.</td>
+</tr>
+<tr>
+<td><code>docs/bridge-rehearsals/fake-intake-import-airlock/</code></td>
+<td>Fake registration/intake airlock rehearsal (fictional records → classification → dry-run → steward review).</td>
+</tr>
+<tr>
+<td><code>docs/bridge-rehearsals/fake-sponsor-pipeline-airlock/</code></td>
+<td>Fake sponsor-pipeline airlock rehearsal (adds finance/sponsor/publication-consent classes).</td>
+</tr>
+<tr>
+<td><code>docs/bridge-rehearsals/AIRLOCK_FIXTURE_CONVENTION.md</code></td>
+<td>The shared shape both rehearsals converged on.</td>
+</tr>
+<tr>
+<td><code>docs/bridge-rehearsals/BRIDGE_OUTPUT_REQUIREMENTS.md</code></td>
+<td>Maps the recurring rehearsal outputs (15 output classes, ~17 primitives, 12 promotion gates) onto required ICN primitives.</td>
+</tr>
+<tr>
+<td><code>tools/validate-airlock-fixtures.py</code></td>
+<td>A machine-checkable validator over the fake fixtures (structure, per-record coverage, privacy scan).</td>
+</tr>
+</tbody></table>
+<p>What those artifacts proved (all on fake data):</p>
+<ul>
+<li><strong>Airlock, not quarantine.</strong> The rule is not &quot;never bring data to ICN&quot;; it is
+&quot;no private data in git — real data comes home through a governed bridge into
+a vault.&quot; The repo is the map and safety boundary; the ICN node is the
+eventual custody home.</li>
+<li><strong>Rehearsals read shape only.</strong> A rehearsal reads a repo-safe <em>shape</em>, never a
+real row.</li>
+<li><strong>A real governed bridge eventually reads real rows</strong> — but only at migration
+rung 5→6 (governed bridge → ICN-native custody), once the promotion gates in
+§8 hold, and it routes those rows into vault/registry custody, <strong>never into
+git or a repo-safe artifact.</strong></li>
+<li><strong>Every field needs a full story:</strong> a source-authority classification, a
+privacy/custody class, a dry-run proposal, a steward decision, an expected
+receipt, and an export/delete path — before any real write.</li>
+<li><strong>Coverage is per <code>(record, field)</code>.</strong> The validator learned (through review)
+that coverage keyed on a bare field name is a false-pass trap: a field decided
+for one record must not count as decided for another record sharing the name.</li>
+</ul>
+<h2>3. Bridge capability model</h2>
+<p>The future governed bridge is best modeled as a <strong>tool/service under a
+<a href="/docs/spec/governed-service-binding">`GovernedServiceBinding`</a></strong> — an installed
+Tool Commons capability operating on institution-owned state, not a tool that
+owns institutional truth. To move real rows safely it must be able to:</p>
+<ul>
+<li><strong>read</strong> an external source export or connector stream <strong>only under explicit
+operator/steward authorization</strong> (never by default, never ambiently);</li>
+<li><strong>classify</strong> every field <em>before</em> writing anything;</li>
+<li><strong>produce a dry-run plan</strong> — a preview of proposed custody actions that writes
+nothing;</li>
+<li><strong>require steward confirmation</strong> before any write;</li>
+<li><strong>write only to allowed custody targets</strong> (the vault scopes / registry
+namespace / <strong>underlying governed object</strong> named in the binding — never an
+action card: a card is a derived read view, not a write target);</li>
+<li><strong>produce receipts</strong> for each decision and each write;</li>
+<li><strong>refuse by policy</strong> unbounded free text, credentials, payment instruments,
+and unsupported classes;</li>
+<li><strong>capture provenance</strong> — source id/hash, mapping version, target scope,
+privacy class — on every import decision;</li>
+<li><strong>support export / delete / recovery</strong> paths for anything it writes;</li>
+<li><strong>observe external settlement references without processing payment</strong> — a
+reference or status is recorded; no settlement action is taken.</li>
+</ul>
+<p>Three doctrine lines the rehearsals kept returning to:</p>
+<blockquote>
+<p>The bridge proposes custody; the steward authorizes custody.
+A dry-run is evidence, not authority.
+A receipt proves a decision happened, not that the decision was wise.</p>
+</blockquote>
+<h2>4. ToolManifest implications</h2>
+<p>What the bridge&#39;s <a href="/docs/rfcs/RFC-0017-tool-install-infrastructure">`ToolManifest` (RFC-0017)</a>
+capability declaration would need to express. <strong>Status is <code>planned</code> / <code>RFC</code>
+unless noted; <code>ToolManifest</code>/<code>ToolBinding</code> are RFC-0017 constructs with no code
+today.</strong></p>
+<table>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Why NYCN needs it</th>
+<th>ToolManifest / capability-declaration implication</th>
+<th>Safety gate</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Source-shape read mode</td>
+<td>Rehearsals read a repo-safe shape only</td>
+<td>Declare a read capability scoped to a <em>shape/schema</em>, no row access</td>
+<td>Never touches real rows</td>
+<td>Planned (RFC-0017)</td>
+</tr>
+<tr>
+<td>Real-row read mode</td>
+<td>Rung 5→6 bridge reads actual rows into custody</td>
+<td>Distinct, higher capability, gated on §8 promotion gates + operator authorization</td>
+<td>Off unless gates hold</td>
+<td>Planned (RFC-0017)</td>
+</tr>
+<tr>
+<td>No-default-write mode</td>
+<td>Refuse-by-default is the safe posture</td>
+<td>A declared mode where the default action is &quot;none&quot;; writes require explicit confirmation</td>
+<td>Fails closed</td>
+<td>Planned</td>
+</tr>
+<tr>
+<td>Classification output</td>
+<td>Every field classified before any write</td>
+<td>Declare a classification output the manifest binds to a custody taxonomy</td>
+<td>Precedes all writes</td>
+<td>Planned</td>
+</tr>
+<tr>
+<td>Dry-run output</td>
+<td>A preview must exist before a write</td>
+<td>Declare a dry-run/preview capability that produces evidence, not state</td>
+<td>Writes nothing</td>
+<td>Planned</td>
+</tr>
+<tr>
+<td>Steward review handoff</td>
+<td>The human gate authorizes custody</td>
+<td>Declare a review-handoff surface (steward cockpit) the bridge yields to</td>
+<td>No write without review</td>
+<td>Planned (see <a href="/docs/spec/steward-cockpit-v0">steward-cockpit-v0</a>)</td>
+</tr>
+<tr>
+<td>Custody-target write permissions</td>
+<td>Only allowed targets may be written</td>
+<td>Enumerate permitted vault scopes / registry namespace / underlying governed-object target (not the read-only action-card surface)</td>
+<td>Deny-by-default</td>
+<td>Planned</td>
+</tr>
+<tr>
+<td>Receipt emission</td>
+<td>Each decision/write needs evidence</td>
+<td>Declare which receipt classes the tool emits</td>
+<td>Receipt per write</td>
+<td>Only <code>ArtifactReceipt</code> implemented; bridge receipts planned</td>
+</tr>
+<tr>
+<td>Export/delete hooks</td>
+<td>Custody must be reversible</td>
+<td>Declare export/delete/recovery affordances per target</td>
+<td>No irreversible custody</td>
+<td>Planned</td>
+</tr>
+<tr>
+<td>External-custodian reference observation</td>
+<td>Settlement is observed, not processed</td>
+<td>Declare an observe-only reference capability (no payment path)</td>
+<td>No payment/settlement action</td>
+<td>Planned</td>
+</tr>
+<tr>
+<td>Credential / payment-instrument refusal</td>
+<td>Secrets/instruments never enter tool state</td>
+<td>Declare a refusal policy for these classes</td>
+<td>Rejected outright</td>
+<td>Planned</td>
+</tr>
+</tbody></table>
+<h2>5. GovernedServiceBinding implications</h2>
+<p>What the <a href="/docs/spec/governed-service-binding">`GovernedServiceBinding`</a> around
+the bridge would need to pin. All rows are <strong>planned / spec-WIP</strong> (the binding
+spec advances #1815; no code today).</p>
+<table>
+<thead>
+<tr>
+<th>Binding concern</th>
+<th>Requirement</th>
+<th>Reason</th>
+<th>Failure mode if missing</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Explicit authorization</td>
+<td>Operator/steward must authorize the binding and each real-import run</td>
+<td>Custody is a governed act, not an ambient tool power</td>
+<td>Silent/ambient import of real rows</td>
+<td>Planned</td>
+</tr>
+<tr>
+<td>Allowed source systems</td>
+<td>Enumerate the specific external systems the bridge may read</td>
+<td>An unbounded reader is an exfiltration surface in reverse</td>
+<td>Reads arbitrary sources</td>
+<td>Planned</td>
+</tr>
+<tr>
+<td>Allowed custody targets</td>
+<td>Enumerate the vault scopes / registry namespace / underlying governed-object target</td>
+<td>Writes must be to pre-approved destinations only</td>
+<td>Writes land anywhere</td>
+<td>Planned</td>
+</tr>
+<tr>
+<td>Vault scopes / classes</td>
+<td>Bind each field-class to a <code>ScopedVault</code> scope</td>
+<td>Care/sponsor/finance data are need-to-know</td>
+<td>Sensitive data mis-scoped</td>
+<td>Planned (<a href="/docs/spec/artifact-registry-and-scoped-vault">artifact-registry-and-scoped-vault</a>)</td>
+</tr>
+<tr>
+<td>Artifact registry namespace</td>
+<td>Bind public artifacts to an <code>ArtifactRegistry</code> namespace</td>
+<td>Public recognition/output must be addressable + governed</td>
+<td>Public artifacts ungoverned</td>
+<td>Planned (same spec)</td>
+</tr>
+<tr>
+<td>Follow-up governed object</td>
+<td>Bind a consent-gated follow-up to the <strong>underlying governed object</strong> the action-card surface derives from — the bridge writes that object, never the card (ADR-0027: cards are derived views with no mutation API)</td>
+<td>Follow-ups are member-facing consent-gated work realized through a governed object, not a card write</td>
+<td>Follow-ups bypass consent, or a non-existent card-write path gets designed</td>
+<td><code>GET /me/action-cards</code> read surface implemented; the governed follow-up object is planned</td>
+</tr>
+<tr>
+<td>Receipt sink</td>
+<td>Bind a durable sink for the emitted receipts</td>
+<td>Evidence must persist and be auditable</td>
+<td>Decisions leave no trail</td>
+<td>Planned; <code>ArtifactReceipt</code> is the only implemented class</td>
+</tr>
+<tr>
+<td>External custodian references</td>
+<td>Declare where observed external references live</td>
+<td>Settlement stays external; ICN records a reference only</td>
+<td>Payment logic pulled in-house</td>
+<td>Planned</td>
+</tr>
+<tr>
+<td>Rollback / export / delete</td>
+<td>A reversal path for any written custody</td>
+<td>Custody without deletion is a one-way trap</td>
+<td>No way to withdraw imported data</td>
+<td>Planned</td>
+</tr>
+<tr>
+<td>Audit visibility</td>
+<td>Steward + member surfaces can see what was imported and why</td>
+<td>Governance requires legibility</td>
+<td>Opaque imports</td>
+<td>Planned (member-shell / steward-cockpit specs)</td>
+</tr>
+<tr>
+<td>Denial policy</td>
+<td>Explicit refusal for credentials, instruments, unbounded free text, unsupported classes</td>
+<td>Some classes must never enter tool state</td>
+<td>Secrets/PII leak into custody</td>
+<td>Planned</td>
+</tr>
+</tbody></table>
+<h2>6. Required receipt vocabulary</h2>
+<p>The rehearsals coined a receipt family. <strong>Only <code>ArtifactReceipt</code> exists in code
+today</strong> (<code>icn/crates/icn-kernel-api/src/proofs.rs</code>); every bridge-specific
+receipt below is <strong>expected / future</strong> vocabulary, not an ICN type.</p>
+<p>One precision the airlock design must not lose: the implemented <code>ArtifactReceipt</code>
+proves a <strong>verified blob transfer</strong> (an action <em>on</em> an artifact), <strong>not</strong> that an
+artifact was recorded in the registry. Per
+<a href="/docs/spec/artifact-registry-and-scoped-vault">`artifact-registry-and-scoped-vault.md`</a>
+(§&quot;<code>ArtifactReceipt</code> vs <code>ArtifactRegistry</code>&quot;): &quot;the receipt proves a blob
+transfer; the registry records that an artifact exists and what governs it —
+these are distinct concepts.&quot; So a real bridge write into custody still owes the
+<strong>planned</strong> registry-recording (<code>ArtifactRegistrationReceipt</code>) and vault-write
+(<code>VaultObjectWriteReceipt</code>) evidence; <code>ArtifactReceipt</code> does not stand in for
+them.</p>
+<table>
+<thead>
+<tr>
+<th>Receipt</th>
+<th>Role</th>
+<th>Status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>ArtifactReceipt</code></td>
+<td>Proof a <strong>blob transfer completed and content was verified</strong> (ADR-0026 Layer 2) — an action <em>on</em> an artifact, <strong>not</strong> proof it was recorded in the registry</td>
+<td><strong>Implemented</strong> (<code>icn-kernel-api</code>)</td>
+</tr>
+<tr>
+<td><code>BridgeDryRunReceipt</code></td>
+<td>The dry-run pass itself</td>
+<td>Expected / future</td>
+</tr>
+<tr>
+<td><code>BridgeReviewDecisionReceipt</code></td>
+<td>A steward review decision (a human reviewed)</td>
+<td>Expected / future</td>
+</tr>
+<tr>
+<td><code>BridgeImportReceipt</code></td>
+<td>The import decision itself (source id/hash, mapping version, target scope, privacy class) — expected on <strong>every</strong> write path</td>
+<td>Expected / future</td>
+</tr>
+<tr>
+<td><code>VaultObjectWriteReceipt</code></td>
+<td>A write into a <code>ScopedVault</code></td>
+<td>Expected / future</td>
+</tr>
+<tr>
+<td><code>ArtifactRegistrationReceipt</code></td>
+<td>Proof an artifact was <strong>recorded in the <code>ArtifactRegistry</code></strong> (that it exists and what governs it) — distinct from <code>ArtifactReceipt</code>&#39;s transfer proof, and not satisfied by it</td>
+<td>Expected / future</td>
+</tr>
+<tr>
+<td><code>ExternalReferenceObservationReceipt</code></td>
+<td>An observed external reference (observed, not processed)</td>
+<td>Expected / future</td>
+</tr>
+<tr>
+<td><code>DiscardDecisionReceipt</code></td>
+<td>A discard decision</td>
+<td>Expected / future</td>
+</tr>
+<tr>
+<td><code>ConsentPolicyBlockReceipt</code></td>
+<td>An automatic no-consent block (no human review implied)</td>
+<td>Expected / future</td>
+</tr>
+<tr>
+<td><code>PublicationConsentBlockReceipt</code></td>
+<td>An automatic no-publication-permission block</td>
+<td>Expected / future</td>
+</tr>
+<tr>
+<td><code>ActionCardCreationReceipt</code></td>
+<td>Proof the <strong>underlying governed object</strong> behind a consent-gated follow-up was created (the card is <em>derived</em> from it per ADR-0027 — there is no card write; the name is subject to reconciliation with that object&#39;s own creation receipt)</td>
+<td>Expected / future</td>
+</tr>
+</tbody></table>
+<p>Open design question (§10): whether these should be a first-class bridge
+receipt family or projections of existing artifact receipts.</p>
+<h2>7. Custody targets and scopes</h2>
+<p>The rehearsals routed fields into a small set of custody classes. Each maps to a
+forward-direction ICN primitive:</p>
+<table>
+<thead>
+<tr>
+<th>Custody class</th>
+<th>ICN primitive it maps to</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Public artifact</td>
+<td><a href="/docs/spec/artifact-registry-and-scoped-vault">`ArtifactRegistry`</a> namespace (governed public output)</td>
+</tr>
+<tr>
+<td>Operational record</td>
+<td>On-node operational record (institution-owned state under the Tool Commons)</td>
+</tr>
+<tr>
+<td>Private vault object</td>
+<td><a href="/docs/spec/artifact-registry-and-scoped-vault">`ScopedVault`</a> — general private scope</td>
+</tr>
+<tr>
+<td>Care-restricted vault object</td>
+<td><code>ScopedVault</code> care-restricted scope (need-to-know)</td>
+</tr>
+<tr>
+<td>Sponsor-restricted vault object</td>
+<td><code>ScopedVault</code> sponsor-restricted scope</td>
+</tr>
+<tr>
+<td>Finance-restricted vault object</td>
+<td><code>ScopedVault</code> finance-restricted scope</td>
+</tr>
+<tr>
+<td>External bridge reference</td>
+<td>External-custodian reference model (observed, not processed)</td>
+</tr>
+<tr>
+<td>Action-card candidate</td>
+<td>The <strong>underlying governed object</strong> (a proposal / action-item / signal, or a governed follow-up object) that the action-card surface <em>derives</em> a read-only card from — <code>GET /v1/gov/me/action-cards</code> has <strong>no mutation API</strong> (ADR-0027); the bridge writes the object, never the card</td>
+</tr>
+<tr>
+<td>Discard / policy-block evidence</td>
+<td>Receipt-only evidence (no custody object)</td>
+</tr>
+</tbody></table>
+<p>The taxonomy above is NYCN&#39;s operational custody framing. It is deliberately
+<strong>mapped, not merged</strong>, onto ICN&#39;s forward-direction <code>PrivacyClass</code> /
+<code>ScopedVault</code> model — the two vocabularies stay distinct until an ICN spec
+unifies them.</p>
+<p>One row deserves emphasis: an <strong>action card is a derived read view, not a
+custody target.</strong> Per <a href="/docs/adr/ADR-0027-action-card-contract">ADR-0027</a>, cards
+are derived views with no mutation API — &quot;cards reference underlying objects;
+mutation flows through those.&quot; A consent-gated follow-up is therefore realized by
+creating or updating the underlying governed object; the card is derived from it.
+Designing a card-write path (or a stored <code>ActionCardCreationReceipt</code> against the
+card itself) would conflict with the existing <code>standing → card → action → receipt</code> proof loop.</p>
+<h2>8. Promotion gates before real bridge use</h2>
+<p>No real row may pass rung 5→6 until <strong>all</strong> of these hold. Until then the bridge
+stays a rehearsal:</p>
+<ol>
+<li>Source authority is registered (who asserts each field).</li>
+<li>Privacy/custody classes are defined for every field.</li>
+<li>The allowed source system is configured (not open-ended).</li>
+<li>The target <code>ScopedVault</code> scopes exist and are export/delete-capable.</li>
+<li>The <code>ArtifactRegistry</code> namespace exists.</li>
+<li>The receipt vocabulary exists (at least <code>BridgeImportReceipt</code> + the target-specific classes).</li>
+<li>A steward review flow exists (the human authorization gate).</li>
+<li>A dry-run preview capability exists.</li>
+<li>No-default-write is enforced (refuse-by-default).</li>
+<li>An export/delete/recovery path exists for every custody target.</li>
+<li>External settlement remains observe-only (no payment path).</li>
+<li>Private data never enters git — the invariant that outlives all of the above.</li>
+</ol>
+<h2>9. Non-goals / non-claims</h2>
+<p>To be explicit — this document claims none of the following:</p>
+<ul>
+<li>no raw Drive import;</li>
+<li>no live sync;</li>
+<li>no planning-database claim;</li>
+<li>no runtime implementation;</li>
+<li>no production claim;</li>
+<li>no pilot-readiness claim;</li>
+<li>no live-federation claim;</li>
+<li>no payment-processing / wallet / token / cryptocurrency framing;</li>
+<li>no private data;</li>
+<li>no claim that current NYCN operations are ICN-native.</li>
+</ul>
+<p>The bridge is an airlock: it may eventually move real rows into governed
+custody, but it must never spill them into git.</p>
+<h2>10. Open questions for ICN</h2>
+<p>Restrained, for ICN architecture to decide:</p>
+<ol>
+<li>Should the bridge receipts be a <strong>first-class receipt family</strong>, or folded
+into existing artifact-receipt projections?</li>
+<li>Where should <strong>external-custodian references</strong> live — a dedicated reference
+model, or an attribute on an existing custody object?</li>
+<li>How should <a href="/docs/rfcs/RFC-0017-tool-install-infrastructure">`ToolManifest`</a>
+express <strong>no-default-write / dry-run-only</strong> modes as declared capabilities?</li>
+<li>How should <a href="/docs/spec/governed-service-binding">`GovernedServiceBinding`</a>
+express <strong>per-field custody targets</strong> (a field-class → scope map), not just a
+whole-tool scope?</li>
+<li>What is the <strong>minimum steward review surface</strong> (the smallest
+<a href="/docs/spec/steward-cockpit-v0">steward-cockpit</a> affordance that can
+authorize an import)?</li>
+<li>How does <strong>member consent review</strong> appear later
+(<a href="/docs/spec/member-shell-v0">member-shell</a> /
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/MEMBER_STANDING">MEMBER_STANDING</a>) without exposing private organizer
+data?</li>
+<li>How should <strong>export / delete / recovery</strong> be <em>proven</em> — a receipt, a
+capability probe, or a periodic attestation?</li>
+</ol>
+<hr>
+<p><em>Provenance: derived from NYCN&#39;s fake airlock rehearsals and fixture validator
+(NYCN #85/#86/#87/#88/#89). This is a demand signal into ICN planning, not an
+ICN implementation or deployment claim.</em></p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
