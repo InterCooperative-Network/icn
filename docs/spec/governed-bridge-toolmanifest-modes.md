@@ -72,6 +72,7 @@ receipts" reference [`governed-bridge-receipts.md`](governed-bridge-receipts.md)
 | --- | --- | --- | --- | --- | --- |
 | `source_shape_read` | Reading a source **schema/shape** | reading any real row | — (a shape read writes nothing) | none beyond install/binding | Planned |
 | `real_row_read` | Reading actual source rows into a custody flow | reading rows unless promotion gates hold | contributes to `BridgeImportReceipt` provenance | **off unless** the §7 promotion gates in the requirements note hold | Planned |
+| `classification_output` | Emitting a per-field **source-authority + privacy/custody classification** for every field *before* any write | proposing or performing a write on any un-classified field | classification is an input carried in `BridgeDryRunReceipt` / `BridgeImportReceipt` provenance | every field classified; precedes `dry_run_preview` and all writes (requirements note §"Bridge capability model" / ToolManifest implications) | Planned |
 | `dry_run_preview` | Producing a preview plan of proposed custody actions | any write; any authorization | emits `BridgeDryRunReceipt` | none (writes nothing) | Planned |
 | `no_default_write` | Establishing that the default action is **none** | any write without a steward review decision | (guards writes; emits nothing itself) | fail-closed default | Planned |
 | `steward_review_handoff` | Yielding to a human review gate before any write | proceeding on the tool's own say-so | emits `BridgeReviewDecisionReceipt` | a review surface exists (#2369) | Planned |
@@ -96,6 +97,8 @@ bridge_modes:
   real_row_read:
     enabled: false
     requires_promotion_gates: true
+  classification_output:
+    classify_before_write: true   # every field gets source-authority + privacy/custody class
   dry_run_preview:
     emits:
       - BridgeDryRunReceipt
@@ -112,7 +115,7 @@ bridge_modes:
     emits_target_receipts: true
   external_reference_observe:
     process_settlement: false
-  refusal_policy:
+  refusal_policy_enforcement:
     refuse:
       - credentials
       - payment_instruments
@@ -135,6 +138,8 @@ modes imply a required receipt set; a run with a missing expected receipt is
 
 - a **dry-run-only** run (`dry_run_preview`, no `custody_write`) emits only a
   `BridgeDryRunReceipt` — evidence, never authority;
+- every field must be **classified** (`classification_output`) before it enters a
+  dry-run or write — the chain is `read → classify → dry-run → review → import`;
 - a **real import** must cite the dry-run preview (`BridgeDryRunReceipt` id /
   preview-plan hash) *and* the `BridgeReviewDecisionReceipt` it rests on, per the
   `dry-run → review → import` chain;
