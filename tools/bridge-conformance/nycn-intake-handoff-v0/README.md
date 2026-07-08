@@ -34,7 +34,7 @@ Four fixture files plus this README:
 
 ## NYCN intake → ICN custody, at a glance
 
-Three fake intake records map to eight actions across five custody kinds:
+Three fake intake records map to nine actions across five custody kinds:
 
 | NYCN source field (`attendee.*`) | privacy class | ICN custody kind | steward verb |
 |---|---|---|---|
@@ -43,6 +43,7 @@ Three fake intake records map to eight actions across five custody kinds:
 | `interpretation_language_need` | care_sensitive | `scoped_vault` (care-restricted) | approve |
 | `accessibility_need` | care_sensitive | `scoped_vault` (care-restricted) | approve |
 | `follow_up_consent` (consent present) | follow_up_only | `governed_object` | approve |
+| `follow_up_contact` | organizer_only | `scoped_vault` (attendees-internal) | approve |
 | `follow_up_consent` (consent absent) | follow_up_only | `governed_object` | block (automatic) |
 | `registration_reference` | external_reference | `external_reference` | approve |
 | `free_text_note` | discard | `discard` | discard |

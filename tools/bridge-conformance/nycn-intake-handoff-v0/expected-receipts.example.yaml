@@ -40,19 +40,24 @@ expected_receipts:
         - BridgeImportReceipt
         - FollowUpObjectCreationReceipt
     - action_id: act_005
-      custody_target_kind: discard
-      receipts:
-        - DiscardDecisionReceipt
-    - action_id: act_006
       custody_target_kind: scoped_vault
       receipts:
         - BridgeImportReceipt
         - VaultObjectWriteReceipt
+    - action_id: act_006
+      custody_target_kind: discard
+      receipts:
+        - DiscardDecisionReceipt
     - action_id: act_007
+      custody_target_kind: scoped_vault
+      receipts:
+        - BridgeImportReceipt
+        - VaultObjectWriteReceipt
+    - action_id: act_008
       custody_target_kind: governed_object
       receipts:
         - ConsentPolicyBlockReceipt
-    - action_id: act_008
+    - action_id: act_009
       custody_target_kind: external_reference
       receipts:
         - BridgeImportReceipt

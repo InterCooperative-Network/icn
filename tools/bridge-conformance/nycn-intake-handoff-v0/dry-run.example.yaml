@@ -64,6 +64,17 @@ proposed_actions:
     decision_required: true
   - action_id: act_005
     source_record_ref: nycn_rec_fake_001
+    field_path: attendee.follow_up_contact
+    source_authority: participant_provided
+    privacy_class: organizer_only
+    proposed_custody_target:
+      kind: scoped_vault          # organizer-only contact -> attendees-internal vault
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+    decision_required: true
+  - action_id: act_006
+    source_record_ref: nycn_rec_fake_001
     field_path: attendee.free_text_note
     source_authority: participant_provided
     privacy_class: discard
@@ -73,7 +84,7 @@ proposed_actions:
       - DiscardDecisionReceipt
     decision_required: true
   # --- record 002: care need present; does NOT consent to follow-up ---
-  - action_id: act_006
+  - action_id: act_007
     source_record_ref: nycn_rec_fake_002
     field_path: attendee.accessibility_need
     source_authority: participant_provided
@@ -84,7 +95,7 @@ proposed_actions:
       - BridgeImportReceipt
       - VaultObjectWriteReceipt
     decision_required: true
-  - action_id: act_007
+  - action_id: act_008
     source_record_ref: nycn_rec_fake_002
     field_path: attendee.follow_up_consent
     source_authority: participant_provided
@@ -96,7 +107,7 @@ proposed_actions:
       - FollowUpObjectCreationReceipt
     decision_required: true
   # --- record 003: minimal, public; carries an observe-only external reference ---
-  - action_id: act_008
+  - action_id: act_009
     source_record_ref: nycn_rec_fake_003
     field_path: attendee.registration_reference
     source_authority: external_registration_system
