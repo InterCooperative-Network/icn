@@ -120,6 +120,17 @@ WRITE_KINDS = frozenset(TARGET_RECEIPT.keys()) | {"governed_object"}
 POLICY_BLOCK_KINDS = frozenset({"policy_gate", "policy_block"})
 DISCARD_KIND = "discard"
 
+# Optional field-custody CONDITION (v0 record-state-dependent custody): a source-
+# state predicate declaring WHEN a field's single custody route is eligible. The
+# operator is a closed ICN vocabulary; the condition keys are strict and generic so
+# a package noun cannot ride in as a predicate key. source_field_path and value
+# stay opaque to core. present/absent take no value; in/not_in take a list;
+# equals/not_equals take a scalar.
+CONDITION_KEYS = frozenset({"source_field_path", "op", "value"})
+CONDITION_OPS = frozenset(
+    {"equals", "not_equals", "in", "not_in", "present", "absent"}
+)
+
 DECISION_VERBS = frozenset(
     {
         "approve",
@@ -247,6 +258,47 @@ def _is_opaque_ref(s: str) -> bool:
 # --------------------------------------------------------------------------- #
 # per-file checks
 # --------------------------------------------------------------------------- #
+def check_condition(cond, lbl, errors):
+    """Validate an OPTIONAL field-custody condition — a package-neutral source-state
+    predicate that declares WHEN a field's (single) custody route is eligible. Keys
+    are strict and generic so a package noun cannot ride in as a predicate key;
+    source_field_path and value are opaque to ICN core, and only the operator is a
+    closed ICN vocabulary. This validates the predicate SHAPE only — it neither
+    evaluates the predicate nor routes custody by state (per-state multi-kind
+    routing stays a documented future change; see the handoff-map spec)."""
+    if not isinstance(cond, dict):
+        require_mapping(cond, lbl, errors)  # emit the "expected a mapping" error
+        return
+    c = cond  # a present-but-empty {} must still fail the required-key checks below
+    extra = sorted(set(c) - CONDITION_KEYS)
+    if extra:
+        errors.append(
+            f"{lbl}: non-generic condition key(s) {extra}; only {sorted(CONDITION_KEYS)} "
+            f"are allowed (predicate keys must be generic, never package nouns)"
+        )
+    require_str(c.get("source_field_path"), f"{lbl}.source_field_path", errors)
+    op = require_str(c.get("op"), f"{lbl}.op", errors)
+    if op is None:
+        return
+    if op not in CONDITION_OPS:
+        errors.append(
+            f"{lbl}.op {op!r} is not an allowed condition operator {sorted(CONDITION_OPS)}"
+        )
+        return
+    if op in ("present", "absent"):
+        if "value" in c:
+            errors.append(f"{lbl}: op {op!r} takes no value")
+    elif op in ("in", "not_in"):
+        v = c.get("value")
+        if not isinstance(v, list) or not v:
+            errors.append(f"{lbl}.value must be a non-empty list for op {op!r}")
+        elif not all(isinstance(x, (str, int, float, bool)) for x in v):
+            errors.append(f"{lbl}.value list entries must be scalars")
+    else:  # equals / not_equals
+        if not isinstance(c.get("value"), (str, int, float, bool)):
+            errors.append(f"{lbl}.value must be a scalar for op {op!r}")
+
+
 def check_binding(data, errors, rel):
     b = require_mapping(data, rel, errors)
     if not b:
@@ -302,6 +354,8 @@ def check_binding(data, errors, rel):
         for r in rr:
             if r == FORBIDDEN_RECEIPT:
                 errors.append(f"{lbl}.required_receipts: {FORBIDDEN_RECEIPT} must not be used")
+        if "condition" in s:
+            check_condition(s.get("condition"), f"{lbl}.condition", errors)
         field_map[field_path] = (kind, rr)
 
     # real_row_read must be false unless every promotion gate is marked satisfied.
