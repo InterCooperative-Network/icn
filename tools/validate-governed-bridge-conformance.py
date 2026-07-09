@@ -97,16 +97,14 @@ CUSTODY_KINDS = frozenset(
         "discard",
     }
 )
-# custody-target kind -> the target-specific receipt an approved write requires
-# (governed_object is floor-checked against the GOVERNED_OBJECT_CREATION_RECEIPTS
-# family below, not this single name; its entry here keeps it a write kind.)
+# custody-target kind -> the single target-specific receipt an approved write
+# requires. governed_object is deliberately NOT here: it is floor-checked against
+# the GOVERNED_OBJECT_CREATION_RECEIPTS family (a single name would re-narrow it).
 TARGET_RECEIPT = {
     "scoped_vault": "VaultObjectWriteReceipt",
     "artifact_registry": "ArtifactRegistrationReceipt",
-    "governed_object": "FollowUpObjectCreationReceipt",
     "external_reference": "ExternalReferenceObservationReceipt",
 }
-WRITE_KINDS = frozenset(TARGET_RECEIPT.keys())
 # governed-object creation receipts: the generic receipt plus class-specific
 # instances that satisfy the governed-object floor while the governed-object
 # model reconciles. binding.required_receipts pins the per-field expectation.
@@ -116,6 +114,9 @@ GOVERNED_OBJECT_CREATION_RECEIPTS = frozenset(
         "FollowUpObjectCreationReceipt",  # follow-up class instance
     }
 )
+# governed_object is a write kind (family-floor-checked), the rest map to a
+# single TARGET_RECEIPT name.
+WRITE_KINDS = frozenset(TARGET_RECEIPT.keys()) | {"governed_object"}
 POLICY_BLOCK_KINDS = frozenset({"policy_gate", "policy_block"})
 DISCARD_KIND = "discard"
 
