@@ -2,18 +2,21 @@
 Status: draft spec / handoff map
 Canonical: no
 Authority: architecture / Tool Commons planning (downstream demand signal; not yet normative)
-Last Reviewed: 2026-07-08
+Last Reviewed: 2026-07-09
 ---
 
-# Governed Bridge — NYCN Intake Handoff Map
+# Governed Bridge — NYCN Handoff Map
 
-> **Status: draft spec, handoff map.** Maps NYCN's **fake** intake-import airlock
-> rehearsal output onto ICN's governed-bridge conformance contract, so the fake
-> fixture at `../../tools/bridge-conformance/nycn-intake-handoff-v0/` can be read
-> alongside its NYCN source. It defines a vocabulary/field mapping only — it
-> implements no bridge, adds no route, reads no source, and does not imply any
+> **Status: draft spec, handoff map.** Maps NYCN's **fake** airlock rehearsal
+> outputs onto ICN's governed-bridge conformance contract, so the fake fixtures
+> at `../../tools/bridge-conformance/nycn-intake-handoff-v0/` (§3–§12) and
+> `../../tools/bridge-conformance/nycn-relationship-handoff-v0/` (§14) can be
+> read alongside their NYCN sources. It defines vocabulary/field mappings only —
+> it implements no bridge, adds no route, reads no source, and does not imply any
 > bridge can import real rows today. Both sides are fake. It advances ICN #2377
-> without closing it.
+> without closing it. Package-local source nouns appear ONLY in NYCN-source
+> columns/labels; every ICN-side name is generic (ICN core does not know what the
+> package's local roles mean).
 
 ## 1. Purpose
 
@@ -170,14 +173,46 @@ follow-up (§13).
 
 ## 13. Candidate follow-ups (not opened by this document)
 
-- A sponsor-flow handoff fixture (exercises `policy_block` publication gates and
-  sponsor-domain receipts).
+- ~~A relationship-flow handoff fixture (exercises `policy_block` publication
+  gates)~~ — **landed** as `nycn-relationship-handoff-v0` (§14).
+- ~~A receipt-naming decision for non-follow-up governed objects~~ — **resolved**:
+  the generic `GovernedObjectCreationReceipt` landed in the receipts spec and
+  validator family floor; the binding pins the per-field receipt.
 - NYCN-side plan-hash / reviewed-plan-hash support in the airlock review shape.
 - NYCN-side verifiable reviewer authority reference (beyond the role-only field).
 - A stronger NYCN fake-fixture privacy scan (real-name and external-id shape
   detection, which the NYCN validator does not yet perform).
-- A receipt-naming decision for sponsor obligation / governed-object receipts
-  (the sponsor flow needs receipts the current `TARGET_RECEIPT` map does not
-  name).
+- Record-state-dependent custody (one field path currently has one custody
+  target; a declined record's public name cannot route differently from an
+  active record's — see §14).
 
 These are recorded as direction only; this document opens no issues.
+
+## 14. Relationship / recognition / obligation handoff (nycn-relationship-handoff-v0)
+
+Maps NYCN's **fake** sponsor-pipeline airlock rehearsal (its package-local
+name; `docs/bridge-rehearsals/fake-sponsor-pipeline-airlock/` in the NYCN repo)
+onto generic ICN custody. The word "sponsor" is NYCN source vocabulary and
+appears only in the source column below — the ICN fixture, field paths, custody
+kinds, and receipts are entirely generic.
+
+| NYCN source meaning (package-local) | Generic ICN field_path | Custody kind | Decision pattern | Expected generic receipts | Notes / limits |
+|---|---|---|---|---|---|
+| Sponsor public listing name + org category, gated on logo permission | `relationship.public_listing_name`, `relationship.public_listing_category` | `artifact_registry` (ns `public-recognition`) | approve where permission granted; **automatic block** where denied | review + import + `ArtifactRegistrationReceipt`; block: `PublicationConsentBlockReceipt` | NYCN's recognition-artifact receipt name is a package alias — translated to the generic registration receipt, never imported. |
+| Recognition preference | `relationship.public_recognition_preference` | `artifact_registry` | approve | same as above | Shapes the artifact; published only through it. |
+| Public logo/name permission | `relationship.public_recognition_permission` | `policy_block` | automatic block where denied; where granted, consumed as the approval basis (not proposed as its own action) | `PublicationConsentBlockReceipt` (no review receipt) | The one gate; `policy_gate` kind stays unexercised — nothing invented to reach it. |
+| Sponsor obligation record (tier, table, program-ad terms) | `relationship.commitment_level_label`, `relationship.fulfillment_request`, `relationship.fulfillment_preference` | `governed_object`, `object_class: commitment-record` (opaque) | approve (001); **hold** where the level is ambiguous (002) | review + import + **`GovernedObjectCreationReceipt`**; hold: review only | NYCN's obligation receipt name is a package alias — translated to the generic governed-object receipt with an opaque `object_class`. Levels are labels, never amounts; a commitment record is an institutional fact record, not a legal instrument. |
+| Private contact fields | `relationship.contact_role`, `relationship.contact_channel` | `scoped_vault` (`relationship-restricted`) | approve | review + import + `VaultObjectWriteReceipt` | No values are carried by the fixture. |
+| Invoice reference / certificate-of-insurance status | `relationship.external_invoice_reference`, `relationship.external_insurance_reference` | `scoped_vault` (`finance-restricted`) | approve | review + import + `VaultObjectWriteReceipt` | **Held references** — reference/status only; documents stay with the external custodian; nothing is processed. |
+| Payment status observed | `relationship.external_status_observed` | `external_reference` | approve | review + import + `ExternalReferenceObservationReceipt` | The only true observe-only external reference; observed, never processed. |
+| Consent-gated follow-up | `relationship.follow_up_consent` | `governed_object`, `object_class: follow-up-record` | approve where consent present (001, 003); **automatic block** where absent (002) | review + import + `FollowUpObjectCreationReceipt`; block: `ConsentPolicyBlockReceipt` | Same pattern as the intake handoff (§5); the follow-up class instance is its honest receipt. |
+| Declined prospect (declined ≠ obligation) | `relationship.closure_reason` | `scoped_vault` (`relationship-internal`) | approve | review + import + `VaultObjectWriteReceipt` — never a commitment receipt | **Record-state custody limit**: the declined record's public name is NOT proposed — `public_listing_name` is binding-bound to the publication registry and one field path has one custody kind. No renamed field is invented; the limit is a candidate future contract feature (§13). |
+| Recognition-fulfilment / follow-up "cards" | — (no conformance action) | — | — | — | Cards are derived read views over the commitment and follow-up objects, which are already receipted; the deprecated card-write receipt name never appears in the fixture. |
+| Free text | `relationship.free_text_note` | `discard` | discard | `DiscardDecisionReceipt` | Discard-by-default. |
+| Credential guard | — (no per-field counterpart) | — | — | — | Cross-cutting refusal doctrine, not a field decision; `reject` stays naturally unexercised. |
+
+Source authorities translate as: sponsor-provided → `counterparty_provided`,
+organizer-derived → `institution_derived`, external-accounting-system →
+`external_accounting_system`. Privacy classes translate as: sponsor_restricted →
+`relationship_restricted`, organizer_only → `internal_only`; the rest pass
+through. All are opaque strings to ICN core.

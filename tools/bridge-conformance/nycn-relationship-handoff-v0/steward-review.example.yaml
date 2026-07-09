@@ -1,0 +1,239 @@
+# Fake NYCN relationship steward review — FICTIONAL, conformance fixture only.
+#
+# The human review gate over the dry-run proposal. No real reviewer, no real
+# data, no writes. The reviewer is bound by a VERIFIABLE authority reference;
+# the display role is for legibility only and is never sufficient on its own.
+# Every proposed action gets exactly one decision, keyed by
+# (source_record_ref, field_path). reviewed_plan_hash must equal the dry-run
+# plan_hash. Automatic blocks (denied recognition permission, no-consent
+# follow-up) are NOT human review decisions and carry no review receipt.
+meta:
+  fictional: true
+
+review_id: review_rel_fake_001
+dry_run_id: dryrun_rel_fake_001
+binding_id: rel_handoff_binding_001
+reviewer_authority_ref: authref_rel_fake_did_sig_001   # verifiable; display role is not enough
+reviewer_display_role: relationship_data_steward
+reviewed_plan_hash: planhash_rel_fake_0001
+
+decisions:
+  - decision_id: dec_001
+    action_id: act_001
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.public_listing_name
+    decision: approve
+    reason: public listing authorized; recognition permission granted is the consumed approval basis
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+  - decision_id: dec_002
+    action_id: act_002
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.public_listing_category
+    decision: approve
+    reason: aggregate-safe listing category for the recognition artifact
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+  - decision_id: dec_003
+    action_id: act_003
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.public_recognition_preference
+    decision: approve
+    reason: preference shapes the recognition artifact; published only through it
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+  - decision_id: dec_004
+    action_id: act_004
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.commitment_level_label
+    decision: approve
+    reason: commitment level is a label only; underlying commitment record authorized as an institutional fact, never a legal instrument
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - GovernedObjectCreationReceipt
+  - decision_id: dec_005
+    action_id: act_005
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.fulfillment_request
+    decision: approve
+    reason: fulfillment term recorded on the commitment record; derived surfaces read from it
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - GovernedObjectCreationReceipt
+  - decision_id: dec_006
+    action_id: act_006
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.fulfillment_preference
+    decision: approve
+    reason: fulfillment preference recorded on the commitment record
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - GovernedObjectCreationReceipt
+  - decision_id: dec_007
+    action_id: act_007
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.contact_role
+    decision: approve
+    reason: restricted contact role; need-to-know vault custody without exposing the value
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  - decision_id: dec_008
+    action_id: act_008
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.contact_channel
+    decision: approve
+    reason: restricted contact channel; vault-bound, never repo, never published
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  - decision_id: dec_009
+    action_id: act_009
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.external_invoice_reference
+    decision: approve
+    reason: held reference only; the external document stays with its custodian, nothing is processed
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  - decision_id: dec_010
+    action_id: act_010
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.external_insurance_reference
+    decision: approve
+    reason: status reference only; the external document stays with its custodian
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  - decision_id: dec_011
+    action_id: act_011
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.external_status_observed
+    decision: approve
+    reason: observed external status; observe-only custody authorized, never processed
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - ExternalReferenceObservationReceipt
+  - decision_id: dec_012
+    action_id: act_012
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.follow_up_consent
+    decision: approve
+    reason: consent present; underlying governed follow-up object authorized (an action card derives from it)
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - FollowUpObjectCreationReceipt
+  - decision_id: dec_013
+    action_id: act_013
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.free_text_note
+    decision: discard
+    reason: unbounded free text; discard from the repo-safe path
+    expected_receipts:
+      - DiscardDecisionReceipt
+  - decision_id: dec_014
+    action_id: act_014
+    source_record_ref: rel_rec_fake_002
+    field_path: relationship.public_listing_name
+    decision: block
+    automatic: true                 # automatic policy block; NOT a human review decision
+    reason: recognition permission absent; publication automatically blocked until permission is explicit
+    expected_receipts:
+      - PublicationConsentBlockReceipt
+  - decision_id: dec_015
+    action_id: act_015
+    source_record_ref: rel_rec_fake_002
+    field_path: relationship.public_recognition_permission
+    decision: block
+    automatic: true                 # the gate itself blocks; consumed, never published
+    reason: permission not granted; gate blocks the recognition artifact, no human review implied
+    expected_receipts:
+      - PublicationConsentBlockReceipt
+  - decision_id: dec_016
+    action_id: act_016
+    source_record_ref: rel_rec_fake_002
+    field_path: relationship.commitment_level_label
+    decision: hold
+    reason: commitment level ambiguous; steward resolves before any commitment record exists
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+  - decision_id: dec_017
+    action_id: act_017
+    source_record_ref: rel_rec_fake_002
+    field_path: relationship.contact_role
+    decision: approve
+    reason: restricted contact role; vault custody for continuing the conversation
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  - decision_id: dec_018
+    action_id: act_018
+    source_record_ref: rel_rec_fake_002
+    field_path: relationship.contact_channel
+    decision: approve
+    reason: restricted contact channel; vault-bound, never repo
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  - decision_id: dec_019
+    action_id: act_019
+    source_record_ref: rel_rec_fake_002
+    field_path: relationship.follow_up_consent
+    decision: block
+    automatic: true                 # automatic consent block; NOT a human review decision
+    reason: follow-up consent absent; automatic block, no follow-up object created, no human review implied
+    expected_receipts:
+      - ConsentPolicyBlockReceipt
+  - decision_id: dec_020
+    action_id: act_020
+    source_record_ref: rel_rec_fake_002
+    field_path: relationship.free_text_note
+    decision: discard
+    reason: unbounded free text; discard from the repo-safe path
+    expected_receipts:
+      - DiscardDecisionReceipt
+  - decision_id: dec_021
+    action_id: act_021
+    source_record_ref: rel_rec_fake_003
+    field_path: relationship.closure_reason
+    decision: approve
+    reason: declined relationship; internal closure record only — never published, never a commitment object
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  - decision_id: dec_022
+    action_id: act_022
+    source_record_ref: rel_rec_fake_003
+    field_path: relationship.follow_up_consent
+    decision: approve
+    reason: consent present for a next-cycle follow-up; underlying governed follow-up object authorized
+    expected_receipts:
+      - BridgeReviewDecisionReceipt
+      - BridgeImportReceipt
+      - FollowUpObjectCreationReceipt
+  - decision_id: dec_023
+    action_id: act_023
+    source_record_ref: rel_rec_fake_003
+    field_path: relationship.free_text_note
+    decision: discard
+    reason: unbounded free text; discard from the repo-safe path
+    expected_receipts:
+      - DiscardDecisionReceipt

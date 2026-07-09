@@ -1,0 +1,282 @@
+# Fake NYCN relationship dry-run proposal — FICTIONAL, conformance fixture only.
+#
+# The preview a governed bridge WOULD propose over the fake relationship source
+# shape. It performs no writes and reaches no external service. Every proposed
+# action is decision-required and carries an opaque source-record reference —
+# never a raw natural or PII-bearing key. Field values are NOT included.
+#
+# Records mirror the three fake source records: an approved relationship with a
+# commitment and consented follow-up (001); a prospective relationship with
+# recognition permission denied, an ambiguous commitment, and no follow-up
+# consent (002); a declined/closed relationship kept internal only (003).
+meta:
+  fictional: true
+  performs_writes: false
+
+dry_run_id: dryrun_rel_fake_001
+binding_id: rel_handoff_binding_001
+source_system_id: src_sys_nycn_fake_relationship
+source_shape_ref: shape_rel_fake_001
+plan_hash: planhash_rel_fake_0001
+
+proposed_actions:
+  # --- record 001: recognition permission granted (consumed as the approval
+  #     basis for the public artifact; the permission field itself is proposed
+  #     only where it blocks — record 002) ---
+  - action_id: act_001
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.public_listing_name
+    source_authority: counterparty_provided
+    privacy_class: public_after_approval
+    proposed_custody_target:
+      kind: artifact_registry
+    required_receipts:
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+    decision_required: true
+  - action_id: act_002
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.public_listing_category
+    source_authority: counterparty_provided
+    privacy_class: public_after_approval
+    proposed_custody_target:
+      kind: artifact_registry
+    required_receipts:
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+    decision_required: true
+  - action_id: act_003
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.public_recognition_preference
+    source_authority: counterparty_provided
+    privacy_class: internal_only
+    proposed_custody_target:
+      kind: artifact_registry
+    required_receipts:
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+    decision_required: true
+  - action_id: act_004
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.commitment_level_label
+    source_authority: institution_derived
+    privacy_class: internal_only
+    proposed_custody_target:
+      kind: governed_object
+    required_receipts:
+      - BridgeImportReceipt
+      - GovernedObjectCreationReceipt
+    decision_required: true
+  - action_id: act_005
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.fulfillment_request
+    source_authority: counterparty_provided
+    privacy_class: internal_only
+    proposed_custody_target:
+      kind: governed_object
+    required_receipts:
+      - BridgeImportReceipt
+      - GovernedObjectCreationReceipt
+    decision_required: true
+  - action_id: act_006
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.fulfillment_preference
+    source_authority: counterparty_provided
+    privacy_class: internal_only
+    proposed_custody_target:
+      kind: governed_object
+    required_receipts:
+      - BridgeImportReceipt
+      - GovernedObjectCreationReceipt
+    decision_required: true
+  - action_id: act_007
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.contact_role
+    source_authority: counterparty_provided
+    privacy_class: relationship_restricted
+    proposed_custody_target:
+      kind: scoped_vault
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+    decision_required: true
+  - action_id: act_008
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.contact_channel
+    source_authority: counterparty_provided
+    privacy_class: relationship_restricted
+    proposed_custody_target:
+      kind: scoped_vault
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+    decision_required: true
+  - action_id: act_009
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.external_invoice_reference
+    source_authority: external_accounting_system
+    privacy_class: finance_restricted
+    proposed_custody_target:
+      kind: scoped_vault
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+    decision_required: true
+  - action_id: act_010
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.external_insurance_reference
+    source_authority: institution_derived
+    privacy_class: finance_restricted
+    proposed_custody_target:
+      kind: scoped_vault
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+    decision_required: true
+  - action_id: act_011
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.external_status_observed
+    source_authority: external_accounting_system
+    privacy_class: external_reference
+    proposed_custody_target:
+      kind: external_reference
+    required_receipts:
+      - BridgeImportReceipt
+      - ExternalReferenceObservationReceipt
+    decision_required: true
+  - action_id: act_012
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.follow_up_consent
+    source_authority: counterparty_provided
+    privacy_class: follow_up_only
+    proposed_custody_target:
+      kind: governed_object       # consent present -> follow-up record proposed
+    required_receipts:
+      - BridgeImportReceipt
+      - FollowUpObjectCreationReceipt
+    decision_required: true
+  - action_id: act_013
+    source_record_ref: rel_rec_fake_001
+    field_path: relationship.free_text_note
+    source_authority: institution_derived
+    privacy_class: discard
+    proposed_custody_target:
+      kind: discard
+    required_receipts:
+      - DiscardDecisionReceipt
+    decision_required: true
+  # --- record 002: recognition permission DENIED; ambiguous commitment; no
+  #     follow-up consent ---
+  - action_id: act_014
+    source_record_ref: rel_rec_fake_002
+    field_path: relationship.public_listing_name
+    source_authority: counterparty_provided
+    privacy_class: public_after_approval
+    proposed_custody_target:
+      kind: artifact_registry     # permission absent -> publication blocked (see review)
+    required_receipts:
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+    decision_required: true
+  - action_id: act_015
+    source_record_ref: rel_rec_fake_002
+    field_path: relationship.public_recognition_permission
+    source_authority: counterparty_provided
+    privacy_class: internal_only
+    proposed_custody_target:
+      kind: policy_block
+    required_receipts:
+      - PublicationConsentBlockReceipt
+    decision_required: true
+  - action_id: act_016
+    source_record_ref: rel_rec_fake_002
+    field_path: relationship.commitment_level_label
+    source_authority: institution_derived
+    privacy_class: internal_only
+    proposed_custody_target:
+      kind: governed_object       # ambiguous level -> steward holds (see review)
+    required_receipts:
+      - BridgeImportReceipt
+      - GovernedObjectCreationReceipt
+    decision_required: true
+  - action_id: act_017
+    source_record_ref: rel_rec_fake_002
+    field_path: relationship.contact_role
+    source_authority: counterparty_provided
+    privacy_class: relationship_restricted
+    proposed_custody_target:
+      kind: scoped_vault
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+    decision_required: true
+  - action_id: act_018
+    source_record_ref: rel_rec_fake_002
+    field_path: relationship.contact_channel
+    source_authority: counterparty_provided
+    privacy_class: relationship_restricted
+    proposed_custody_target:
+      kind: scoped_vault
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+    decision_required: true
+  - action_id: act_019
+    source_record_ref: rel_rec_fake_002
+    field_path: relationship.follow_up_consent
+    source_authority: counterparty_provided
+    privacy_class: follow_up_only
+    proposed_custody_target:
+      kind: governed_object       # consent ABSENT -> automatic block (see review)
+    required_receipts:
+      - BridgeImportReceipt
+      - FollowUpObjectCreationReceipt
+    decision_required: true
+  - action_id: act_020
+    source_record_ref: rel_rec_fake_002
+    field_path: relationship.free_text_note
+    source_authority: institution_derived
+    privacy_class: discard
+    proposed_custody_target:
+      kind: discard
+    required_receipts:
+      - DiscardDecisionReceipt
+    decision_required: true
+  # --- record 003: declined/closed relationship; internal closure record only;
+  #     consent present for a next-cycle follow-up. Its public name is
+  #     deliberately NOT proposed: the binding routes public_listing_name to the
+  #     publication registry, and a declined record's name must stay internal —
+  #     record-state-dependent custody is not expressible in a field-keyed
+  #     binding (documented limit; no renamed field is invented for it) ---
+  - action_id: act_021
+    source_record_ref: rel_rec_fake_003
+    field_path: relationship.closure_reason
+    source_authority: institution_derived
+    privacy_class: internal_only
+    proposed_custody_target:
+      kind: scoped_vault
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+    decision_required: true
+  - action_id: act_022
+    source_record_ref: rel_rec_fake_003
+    field_path: relationship.follow_up_consent
+    source_authority: counterparty_provided
+    privacy_class: follow_up_only
+    proposed_custody_target:
+      kind: governed_object       # consent present -> next-cycle follow-up record
+    required_receipts:
+      - BridgeImportReceipt
+      - FollowUpObjectCreationReceipt
+    decision_required: true
+  - action_id: act_023
+    source_record_ref: rel_rec_fake_003
+    field_path: relationship.free_text_note
+    source_authority: institution_derived
+    privacy_class: discard
+    proposed_custody_target:
+      kind: discard
+    required_receipts:
+      - DiscardDecisionReceipt
+    decision_required: true
