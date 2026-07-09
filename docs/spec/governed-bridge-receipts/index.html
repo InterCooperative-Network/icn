@@ -202,10 +202,18 @@ record are deliberately separable.</p>
 <td>—</td>
 </tr>
 <tr>
+<td><code>GovernedObjectCreationReceipt</code></td>
+<td>A <strong>governed object</strong> was created under a reviewed bridge decision — the <strong>generic</strong> governed-object creation receipt, for any institution-declared object class</td>
+<td>object id · <code>object_class</code> (institution-declared, <strong>opaque to core</strong>) · binding id · dry-run id · review id · review decision ref · bridge-import receipt ref · authorization basis ref · created-at timestamp</td>
+<td>that ICN core interprets <code>object_class</code> · that an action card was written · any specific institutional meaning for the object</td>
+<td>Expected / future</td>
+<td>governed-object model</td>
+</tr>
+<tr>
 <td><code>FollowUpObjectCreationReceipt</code> <em>(provisional name)</em></td>
-<td>The <strong>underlying governed object</strong> behind a consent-gated follow-up was created (a card is <em>derived</em> from it)</td>
-<td>underlying object id · object kind · consent basis ref · timestamp</td>
-<td>that an action card was written · that <code>GET /me/action-cards</code> mutated</td>
+<td>The <strong>follow-up class instance</strong> of governed-object creation: the underlying governed object behind a consent-gated follow-up was created (a card is <em>derived</em> from it)</td>
+<td><strong>all <code>GovernedObjectCreationReceipt</code> bridge-decision provenance</strong> (object id · <code>object_class</code> · binding/dry-run/review ids · review decision ref · bridge-import receipt ref · authorization basis ref · created-at) <strong>plus</strong> the follow-up-specific consent basis ref</td>
+<td>that an action card was written · that <code>GET /me/action-cards</code> mutated · that it covers non-follow-up governed objects (use the generic receipt)</td>
 <td>Expected / future</td>
 <td>ADR-0027 (cards derived)</td>
 </tr>
@@ -214,8 +222,15 @@ record are deliberately separable.</p>
 a <strong>deprecated placeholder</strong>: action cards are derived read views (ADR-0027), so
 no receipt should assert a card write. The provisional
 <code>FollowUpObjectCreationReceipt</code> (or <code>GovernedFollowUpCreationReceipt</code>) names the
-real event — the creation of the underlying governed object. <strong>The exact name is
-provisional and must reconcile with the eventual governed-object model.</strong></p>
+real event for <strong>follow-up objects specifically</strong> — the creation of the underlying
+governed object. <strong>The exact follow-up name is provisional and must reconcile with
+the eventual governed-object model.</strong> The generic event is named once by
+<code>GovernedObjectCreationReceipt</code>: a governed-object bridge write emits
+<code>BridgeImportReceipt</code> plus a governed-object creation receipt — the generic
+receipt, or a class-specific instance such as the follow-up receipt while the
+model reconciles — and the binding&#39;s per-field <code>required_receipts</code> pins which one
+each field expects. <code>object_class</code> values are institution-declared opaque strings:
+ICN core stores and carries them but never interprets them (Meaning Firewall).</p>
 <h2>5. <code>BridgeImportReceipt</code> minimum evidence</h2>
 <p><code>BridgeImportReceipt</code> is the coordinating record of a single import decision. Its
 minimum evidence set:</p>
@@ -284,9 +299,11 @@ recorded in <code>ArtifactRegistry</code>) — distinct from the <code>ArtifactR
 proof.</li>
 <li><strong>External reference observation</strong> → <code>ExternalReferenceObservationReceipt</code> (an
 external status/reference was observed, never processed).</li>
-<li><strong>Underlying follow-up object creation</strong> →
-<code>FollowUpObjectCreationReceipt</code> <em>(provisional)</em> (a governed object was created;
-a card is derived from it, never written directly).</li>
+<li><strong>Governed object creation</strong> → <code>GovernedObjectCreationReceipt</code> (generic; the
+object&#39;s class is institution-declared opaque data) or a class instance such as
+<code>FollowUpObjectCreationReceipt</code> <em>(provisional)</em> for consent-gated follow-ups (a
+governed object was created; where it backs a member surface, a card is derived
+from it, never written directly).</li>
 </ul>
 <p><code>BridgeImportReceipt</code> carries <code>receipt_refs</code> to whichever of these its decision
 produced. A completed import decision therefore points at its coordinated target
