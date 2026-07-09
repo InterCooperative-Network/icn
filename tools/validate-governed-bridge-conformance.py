@@ -266,9 +266,10 @@ def check_condition(cond, lbl, errors):
     closed ICN vocabulary. This validates the predicate SHAPE only — it neither
     evaluates the predicate nor routes custody by state (per-state multi-kind
     routing stays a documented future change; see the handoff-map spec)."""
-    c = require_mapping(cond, lbl, errors)
-    if not c:
+    if not isinstance(cond, dict):
+        require_mapping(cond, lbl, errors)  # emit the "expected a mapping" error
         return
+    c = cond  # a present-but-empty {} must still fail the required-key checks below
     extra = sorted(set(c) - CONDITION_KEYS)
     if extra:
         errors.append(
