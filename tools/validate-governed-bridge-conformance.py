@@ -97,14 +97,26 @@ CUSTODY_KINDS = frozenset(
         "discard",
     }
 )
-# custody-target kind -> the target-specific receipt an approved write requires
+# custody-target kind -> the single target-specific receipt an approved write
+# requires. governed_object is deliberately NOT here: it is floor-checked against
+# the GOVERNED_OBJECT_CREATION_RECEIPTS family (a single name would re-narrow it).
 TARGET_RECEIPT = {
     "scoped_vault": "VaultObjectWriteReceipt",
     "artifact_registry": "ArtifactRegistrationReceipt",
-    "governed_object": "FollowUpObjectCreationReceipt",
     "external_reference": "ExternalReferenceObservationReceipt",
 }
-WRITE_KINDS = frozenset(TARGET_RECEIPT.keys())
+# governed-object creation receipts: the generic receipt plus class-specific
+# instances that satisfy the governed-object floor while the governed-object
+# model reconciles. binding.required_receipts pins the per-field expectation.
+GOVERNED_OBJECT_CREATION_RECEIPTS = frozenset(
+    {
+        "GovernedObjectCreationReceipt",  # generic
+        "FollowUpObjectCreationReceipt",  # follow-up class instance
+    }
+)
+# governed_object is a write kind (family-floor-checked), the rest map to a
+# single TARGET_RECEIPT name.
+WRITE_KINDS = frozenset(TARGET_RECEIPT.keys()) | {"governed_object"}
 POLICY_BLOCK_KINDS = frozenset({"policy_gate", "policy_block"})
 DISCARD_KIND = "discard"
 
@@ -529,9 +541,20 @@ def check_expected_receipts(data, binding_ctx, dry_ctx, review_ctx, errors, rel)
         if verb == "approve" and kind in WRITE_KINDS:
             if "BridgeImportReceipt" not in rc:
                 errors.append(f"{lbl}: approved write to {kind!r} must include BridgeImportReceipt")
-            target = TARGET_RECEIPT[kind]
-            if target not in rc:
-                errors.append(f"{lbl}: approved write to {kind!r} must include {target}")
+            if kind == "governed_object":
+                # Family floor: the generic GovernedObjectCreationReceipt or a
+                # class instance (e.g. the follow-up receipt). The binding's
+                # required_receipts pins which one each field expects.
+                if not any(r_ in GOVERNED_OBJECT_CREATION_RECEIPTS for r_ in rc):
+                    errors.append(
+                        f"{lbl}: approved write to 'governed_object' must include a "
+                        f"governed-object creation receipt (one of "
+                        f"{sorted(GOVERNED_OBJECT_CREATION_RECEIPTS)})"
+                    )
+            else:
+                target = TARGET_RECEIPT[kind]
+                if target not in rc:
+                    errors.append(f"{lbl}: approved write to {kind!r} must include {target}")
             if kind == "artifact_registry" and ARTIFACT_TRANSFER_RECEIPT in rc and REGISTRATION_RECEIPT not in rc:
                 errors.append(
                     f"{lbl}: {ARTIFACT_TRANSFER_RECEIPT} does not satisfy {REGISTRATION_RECEIPT} "

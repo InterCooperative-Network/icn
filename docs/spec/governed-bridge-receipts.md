@@ -103,14 +103,22 @@ All rows below are **expected / future** vocabulary. None exists in code. The
 | `DiscardDecisionReceipt` | A discard decision was recorded | opaque/hash-bound source-record ref + field path (never a raw PII-bearing key; the pair preserves per-`(record, field)` coverage) · discard basis (policy or review) · timestamp | the discarded content was stored · that a human reviewed (unless basis = review) | Expected / future | — |
 | `ConsentPolicyBlockReceipt` | An **automatic** no-consent block was enforced | opaque/hash-bound source-record ref + field path (never a raw PII-bearing key; a bare field name loses per-record coverage) · policy id/basis · timestamp | a human reviewed · that the field was imported | Expected / future | — |
 | `PublicationConsentBlockReceipt` | An **automatic** no-publication-permission block was enforced | candidate artifact ref · missing-permission basis · timestamp | a human reviewed · that publication occurred | Expected / future | — |
-| `FollowUpObjectCreationReceipt` *(provisional name)* | The **underlying governed object** behind a consent-gated follow-up was created (a card is *derived* from it) | underlying object id · object kind · consent basis ref · timestamp | that an action card was written · that `GET /me/action-cards` mutated | Expected / future | ADR-0027 (cards derived) |
+| `GovernedObjectCreationReceipt` | A **governed object** was created under a reviewed bridge decision — the **generic** governed-object creation receipt, for any institution-declared object class | object id · `object_class` (institution-declared, **opaque to core**) · binding id · dry-run id · review id · review decision ref · bridge-import receipt ref · authorization basis ref · created-at timestamp | that ICN core interprets `object_class` · that an action card was written · any specific institutional meaning for the object | Expected / future | governed-object model |
+| `FollowUpObjectCreationReceipt` *(provisional name)* | The **follow-up class instance** of governed-object creation: the underlying governed object behind a consent-gated follow-up was created (a card is *derived* from it) | **all `GovernedObjectCreationReceipt` bridge-decision provenance** (object id · `object_class` · binding/dry-run/review ids · review decision ref · bridge-import receipt ref · authorization basis ref · created-at) **plus** the follow-up-specific consent basis ref | that an action card was written · that `GET /me/action-cards` mutated · that it covers non-follow-up governed objects (use the generic receipt) | Expected / future | ADR-0027 (cards derived) |
 
 **Do not use `ActionCardCreationReceipt` as a final name.** It is retained only as
 a **deprecated placeholder**: action cards are derived read views (ADR-0027), so
 no receipt should assert a card write. The provisional
 `FollowUpObjectCreationReceipt` (or `GovernedFollowUpCreationReceipt`) names the
-real event — the creation of the underlying governed object. **The exact name is
-provisional and must reconcile with the eventual governed-object model.**
+real event for **follow-up objects specifically** — the creation of the underlying
+governed object. **The exact follow-up name is provisional and must reconcile with
+the eventual governed-object model.** The generic event is named once by
+`GovernedObjectCreationReceipt`: a governed-object bridge write emits
+`BridgeImportReceipt` plus a governed-object creation receipt — the generic
+receipt, or a class-specific instance such as the follow-up receipt while the
+model reconciles — and the binding's per-field `required_receipts` pins which one
+each field expects. `object_class` values are institution-declared opaque strings:
+ICN core stores and carries them but never interprets them (Meaning Firewall).
 
 ## 5. `BridgeImportReceipt` minimum evidence
 
@@ -186,9 +194,11 @@ receipts prove the **effects**. Four distinct target effects:
   proof.
 - **External reference observation** → `ExternalReferenceObservationReceipt` (an
   external status/reference was observed, never processed).
-- **Underlying follow-up object creation** →
-  `FollowUpObjectCreationReceipt` *(provisional)* (a governed object was created;
-  a card is derived from it, never written directly).
+- **Governed object creation** → `GovernedObjectCreationReceipt` (generic; the
+  object's class is institution-declared opaque data) or a class instance such as
+  `FollowUpObjectCreationReceipt` *(provisional)* for consent-gated follow-ups (a
+  governed object was created; where it backs a member surface, a card is derived
+  from it, never written directly).
 
 `BridgeImportReceipt` carries `receipt_refs` to whichever of these its decision
 produced. A completed import decision therefore points at its coordinated target
