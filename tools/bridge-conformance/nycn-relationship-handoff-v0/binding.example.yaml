@@ -1,0 +1,199 @@
+# Fake NYCN relationship handoff binding — FICTIONAL, conformance fixture only.
+#
+# Expresses NYCN's fake relationship-pipeline airlock rehearsal (its package-local
+# source vocabulary lives in the NYCN repo; the handoff map documents the
+# translation) as the per-run binding a governed bridge WOULD refine from
+# GovernedServiceBinding (#2372). Every value is invented. No real data, no
+# connector, no runtime, no live sync. real_row_read_enabled stays false.
+#
+# All field paths, privacy classes, scopes, and object_class values below are
+# institution-declared opaque strings — ICN core carries them and never
+# interprets them.
+meta:
+  fictional: true
+  imports_real_data: false
+
+binding_id: rel_handoff_binding_001
+tool_manifest_id: manifest_rel_fake_001
+
+allowed_source_systems:
+  - src_sys_nycn_fake_relationship
+
+real_row_read_enabled: false        # off; would require every promotion gate satisfied
+promotion_gates:
+  - source_authority_registered
+  - privacy_classes_defined
+  - target_vault_scopes_exist
+  - artifact_namespace_exists
+  - governed_object_class_exists
+  - receipt_sink_exists
+  - steward_review_surface_exists
+  - dry_run_preview_exists
+  - no_default_write_enforced
+  - export_delete_recovery_path_exists
+  - external_reference_observe_only
+  - private_data_never_in_git
+
+# The relationship flow naturally exercises six custody kinds: artifact_registry
+# (consent-gated public recognition), policy_block (denied recognition
+# permission), governed_object (a commitment record and a follow-up record — two
+# object classes, two receipts), scoped_vault (restricted contact, held finance
+# references, internal closure record), external_reference (one observed external
+# status), and discard. policy_gate is NOT exercised — the flow's one gate is a
+# publication-permission block, not a distinct gate target — and no field was
+# invented to reach it.
+field_custody_map:
+  relationship.public_listing_name:
+    source_authority: counterparty_provided
+    privacy_class: public_after_approval
+    custody_target:
+      kind: artifact_registry
+      namespace: public-recognition
+    required_receipts:
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+  relationship.public_listing_category:
+    source_authority: counterparty_provided
+    privacy_class: public_after_approval
+    custody_target:
+      kind: artifact_registry
+      namespace: public-recognition
+    required_receipts:
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+  relationship.public_recognition_preference:
+    source_authority: counterparty_provided
+    privacy_class: internal_only
+    custody_target:
+      kind: artifact_registry      # shapes the recognition artifact; published only via it
+      namespace: public-recognition
+    required_receipts:
+      - BridgeImportReceipt
+      - ArtifactRegistrationReceipt
+  relationship.public_recognition_permission:
+    source_authority: counterparty_provided
+    privacy_class: internal_only
+    custody_target:
+      kind: policy_block           # a consent gate; consumed, never published
+    required_receipts:
+      - PublicationConsentBlockReceipt
+  relationship.commitment_level_label:
+    source_authority: institution_derived
+    privacy_class: internal_only
+    custody_target:
+      kind: governed_object
+      object_class: commitment-record   # institution-declared, opaque to core
+    required_receipts:
+      - BridgeImportReceipt
+      - GovernedObjectCreationReceipt
+  relationship.fulfillment_request:
+    source_authority: counterparty_provided
+    privacy_class: internal_only
+    custody_target:
+      kind: governed_object
+      object_class: commitment-record
+    required_receipts:
+      - BridgeImportReceipt
+      - GovernedObjectCreationReceipt
+  relationship.fulfillment_preference:
+    source_authority: counterparty_provided
+    privacy_class: internal_only
+    custody_target:
+      kind: governed_object
+      object_class: commitment-record
+    required_receipts:
+      - BridgeImportReceipt
+      - GovernedObjectCreationReceipt
+  relationship.contact_role:
+    source_authority: counterparty_provided
+    privacy_class: relationship_restricted
+    custody_target:
+      kind: scoped_vault
+      scope: relationship-restricted
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  relationship.contact_channel:
+    source_authority: counterparty_provided
+    privacy_class: relationship_restricted
+    custody_target:
+      kind: scoped_vault
+      scope: relationship-restricted
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  relationship.external_invoice_reference:
+    source_authority: external_accounting_system
+    privacy_class: finance_restricted
+    custody_target:
+      kind: scoped_vault           # a held reference; the document stays external
+      scope: finance-restricted
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  relationship.external_insurance_reference:
+    source_authority: institution_derived
+    privacy_class: finance_restricted
+    custody_target:
+      kind: scoped_vault           # status/reference only; never the document
+      scope: finance-restricted
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  relationship.external_status_observed:
+    source_authority: external_accounting_system
+    privacy_class: external_reference
+    custody_target:
+      kind: external_reference     # observed, never processed
+    required_receipts:
+      - BridgeImportReceipt
+      - ExternalReferenceObservationReceipt
+  relationship.follow_up_consent:
+    source_authority: counterparty_provided
+    privacy_class: follow_up_only
+    custody_target:
+      kind: governed_object        # underlying follow-up record; a card derives from it
+      object_class: follow-up-record
+    required_receipts:
+      - BridgeImportReceipt
+      - FollowUpObjectCreationReceipt
+  relationship.closure_reason:
+    source_authority: institution_derived
+    privacy_class: internal_only
+    custody_target:
+      kind: scoped_vault           # internal closure record; never published,
+      scope: relationship-internal #  never a commitment object
+    required_receipts:
+      - BridgeImportReceipt
+      - VaultObjectWriteReceipt
+  relationship.free_text_note:
+    source_authority: institution_derived
+    privacy_class: discard
+    custody_target:
+      kind: discard
+    required_receipts:
+      - DiscardDecisionReceipt
+
+receipt_sink: receipt_sink_rel_fake_001
+required_receipts:
+  - BridgeDryRunReceipt
+  - BridgeReviewDecisionReceipt
+  - BridgeImportReceipt
+  - ArtifactRegistrationReceipt
+  - VaultObjectWriteReceipt
+  - GovernedObjectCreationReceipt
+  - FollowUpObjectCreationReceipt
+  - ExternalReferenceObservationReceipt
+  - DiscardDecisionReceipt
+  - PublicationConsentBlockReceipt
+  - ConsentPolicyBlockReceipt
+
+steward_review_surface: steward_cockpit_bridge_review_panel
+
+external_reference_policy:
+  allowed_external_systems:
+    - src_sys_nycn_fake_relationship
+  observe_only: true                  # observed, never processed
+
+export_delete_recovery_refs:
+  - export_delete_path_rel_fake_001
