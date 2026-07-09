@@ -242,9 +242,12 @@ validator family floor; the binding pins the per-field receipt.</li>
 <li>NYCN-side verifiable reviewer authority reference (beyond the role-only field).</li>
 <li>A stronger NYCN fake-fixture privacy scan (real-name and external-id shape
 detection, which the NYCN validator does not yet perform).</li>
-<li>Record-state-dependent custody (one field path currently has one custody
-target; a declined record&#39;s public name cannot route differently from an
-active record&#39;s — see §14).</li>
+<li><del>Record-state-dependent custody</del> — <strong>partially addressed (v0)</strong>: a field&#39;s
+custody entry may now carry an optional <code>condition</code> predicate declaring the
+source-state precondition under which its route is eligible (§15). Per-state
+<em>multi-kind</em> routing — the same field path routing to a different custody kind by
+record state — remains a future change (one field path still has one custody
+kind).</li>
 </ul>
 <p>These are recorded as direction only; this document opens no issues.</p>
 <h2>14. Relationship / recognition / obligation handoff (nycn-relationship-handoff-v0)</h2>
@@ -334,7 +337,7 @@ kinds, and receipts are entirely generic.</p>
 <td><code>scoped_vault</code> (<code>relationship-internal</code>)</td>
 <td>approve</td>
 <td>review + import + <code>VaultObjectWriteReceipt</code> — never a commitment receipt</td>
-<td><strong>Record-state custody limit</strong>: the declined record&#39;s public name is NOT proposed — <code>public_listing_name</code> is binding-bound to the publication registry and one field path has one custody kind. No renamed field is invented; the limit is a candidate future contract feature (§13).</td>
+<td><strong>Record-state custody</strong>: the declined record&#39;s public name is NOT proposed — <code>public_listing_name</code> now carries a v0 <code>condition</code> (eligible only where <code>record_state == active</code>, §15), making that source-state precondition explicit instead of silent omission. One field path still has one custody kind; no renamed field is invented.</td>
 </tr>
 <tr>
 <td>Recognition-fulfillment / follow-up &quot;cards&quot;</td>
@@ -366,6 +369,50 @@ organizer-derived → <code>institution_derived</code>, external-accounting-syst
 <code>external_accounting_system</code>. Privacy classes translate as: sponsor_restricted →
 <code>relationship_restricted</code>, organizer_only → <code>internal_only</code>; the rest pass
 through. All are opaque strings to ICN core.</p>
+<h2>15. Record-state-dependent custody (v0: eligibility conditions)</h2>
+<p>§14&#39;s declined-prospect row exposed a real v0 limit: the custody <em>meaning</em> of a
+source field can depend on the source record&#39;s <strong>state</strong>. A declined record is an
+internal closure record, not a commitment; a public-recognition field must stay
+unproposed unless the record&#39;s state permits publication. The original fixture
+handled this by <strong>omission</strong> — the declined record simply does not propose
+<code>public_listing_name</code> — which is safe but invisible to the conformance validator,
+and the tempting-but-forbidden shortcut is to invent a renamed field to bypass
+source state.</p>
+<p><strong>v0 mechanism — an optional <code>condition</code> predicate on a <code>field_custody_map</code>
+entry.</strong> A field&#39;s custody entry may declare the source-state precondition under
+which its route is eligible:</p>
+<pre><code class="language-yaml">relationship.public_listing_name:
+  custody_target: { kind: artifact_registry, namespace: public-recognition }
+  required_receipts: [BridgeImportReceipt, ArtifactRegistrationReceipt]
+  condition:
+    source_field_path: relationship.record_state   # opaque source field
+    op: equals                                      # closed ICN operator set
+    value: active                                   # opaque literal
+</code></pre>
+<ul>
+<li><strong>Generic and opaque.</strong> <code>source_field_path</code> and <code>value</code> are opaque strings/scalars
+ICN core never interprets — exactly like <code>field_path</code>, <code>privacy_class</code>, and
+<code>object_class</code>. Only <code>op</code> is ICN vocabulary, drawn from a closed set: <code>equals</code>,
+<code>not_equals</code>, <code>in</code>, <code>not_in</code>, <code>present</code>, <code>absent</code>. The predicate&#39;s keys are
+<strong>strict</strong> (<code>source_field_path</code> / <code>op</code> / <code>value</code> only) so a package noun (e.g. a
+<code>sponsor_status</code> key) cannot ride in — the Meaning Firewall holds.</li>
+<li><strong>Explicit, not silent.</strong> The condition records <em>why</em> a field is unproposed for a
+given record (its state does not satisfy the predicate) rather than leaving it to
+omission. It is producer-declared intent the validator can shape-check.</li>
+<li><strong>v0 scope — shape only.</strong> The validator validates the predicate&#39;s shape; it does
+<strong>not</strong> evaluate it or route custody by state. A conditioned field must still be
+exercised by at least one dry-run action where its condition holds (the existing
+binding-coverage rule is unchanged), and a field path still has exactly <strong>one</strong>
+custody kind.</li>
+<li><strong>Deferred (future change).</strong> Per-state <em>multi-kind</em> routing — the same field
+routing to a different custody kind under different record states — would require
+the binding to hold per-condition custody variants and the dry-run kind-match
+check to become condition-aware. That is a larger change, recorded here as
+direction only; this v0 slice does not open it.</li>
+</ul>
+<p><strong>Non-claims.</strong> Fake-fixture / conformance design only: no runtime bridge, no
+connector, no live source scan, no real data, no package-specific ICN custody kind
+or receipt class, and no claim that NYCN operations are ICN-native today.</p>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');
     const navLinks = document.getElementById('nav-links');
