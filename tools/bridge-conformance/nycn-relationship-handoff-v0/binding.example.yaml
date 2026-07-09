@@ -49,6 +49,16 @@ field_custody_map:
     custody_target:
       kind: artifact_registry
       namespace: public-recognition
+    # v0 record-state custody: this publication route is eligible only where the
+    # source record's state permits a public listing. A declined/closed record does
+    # not propose this field (see the dry-run for rel_rec_fake_003 and §15 of the
+    # handoff map) — the condition makes that source-state precondition explicit,
+    # instead of relying on silent omission or a renamed field. source_field_path
+    # and value are opaque to ICN core; only `op` is ICN vocabulary.
+    condition:
+      source_field_path: relationship.record_state
+      op: equals
+      value: active
     required_receipts:
       - BridgeImportReceipt
       - ArtifactRegistrationReceipt

@@ -55,13 +55,15 @@ never a legal instrument or a claim about external enforceability.
 - **`policy_gate` is not exercised** — the flow's one gate (recognition
   permission) is a publication *block* where denied and a consumed approval
   basis where granted; no field was invented to reach the remaining kind.
-- **Record-state custody limit**: a field path has one custody target in the
-  binding. Record 003 (declined/closed relationship) therefore does **not**
-  propose its public name — the binding routes `public_listing_name` to the
-  publication registry, and a declined record's name must stay internal. The
-  declined record is carried by `closure_reason` into an internal vault scope,
-  never a commitment object, and no renamed field was invented to bypass the
-  limit (documented in the handoff map as a candidate future contract feature).
+- **Record-state custody**: a field path has one custody target in the binding.
+  Record 003 (declined/closed relationship) therefore does **not** propose its
+  public name — the binding routes `public_listing_name` to the publication
+  registry, and a declined record's name must stay internal. The declined record is
+  carried by `closure_reason` into an internal vault scope, never a commitment
+  object, and no renamed field was invented to bypass the limit. `public_listing_name`
+  now carries a v0 `condition` predicate (eligible only where `record_state ==
+  active`) so that source-state precondition is explicit rather than a silent
+  omission; per-state *multi-kind* routing remains a future change (handoff map §15).
 - **Held references vs observed status**: the external invoice/insurance
   references are **vault-held references** (reference/status only; the documents
   stay with their external custodian); only `external_status_observed` is a true

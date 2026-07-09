@@ -182,9 +182,12 @@ follow-up (§13).
 - NYCN-side verifiable reviewer authority reference (beyond the role-only field).
 - A stronger NYCN fake-fixture privacy scan (real-name and external-id shape
   detection, which the NYCN validator does not yet perform).
-- Record-state-dependent custody (one field path currently has one custody
-  target; a declined record's public name cannot route differently from an
-  active record's — see §14).
+- ~~Record-state-dependent custody~~ — **partially addressed (v0)**: a field's
+  custody entry may now carry an optional `condition` predicate declaring the
+  source-state precondition under which its route is eligible (§15). Per-state
+  *multi-kind* routing — the same field path routing to a different custody kind by
+  record state — remains a future change (one field path still has one custody
+  kind).
 
 These are recorded as direction only; this document opens no issues.
 
@@ -206,7 +209,7 @@ kinds, and receipts are entirely generic.
 | Invoice reference / certificate-of-insurance status | `relationship.external_invoice_reference`, `relationship.external_insurance_reference` | `scoped_vault` (`finance-restricted`) | approve | review + import + `VaultObjectWriteReceipt` | **Held references** — reference/status only; documents stay with the external custodian; nothing is processed. |
 | Payment status observed | `relationship.external_status_observed` | `external_reference` | approve | review + import + `ExternalReferenceObservationReceipt` | The only true observe-only external reference; observed, never processed. |
 | Consent-gated follow-up | `relationship.follow_up_consent` | `governed_object`, `object_class: follow-up-record` | approve where consent present (001, 003); **automatic block** where absent (002) | review + import + `FollowUpObjectCreationReceipt`; block: `ConsentPolicyBlockReceipt` | Same pattern as the intake handoff (§5); the follow-up class instance is its honest receipt. |
-| Declined prospect (declined ≠ obligation) | `relationship.closure_reason` | `scoped_vault` (`relationship-internal`) | approve | review + import + `VaultObjectWriteReceipt` — never a commitment receipt | **Record-state custody limit**: the declined record's public name is NOT proposed — `public_listing_name` is binding-bound to the publication registry and one field path has one custody kind. No renamed field is invented; the limit is a candidate future contract feature (§13). |
+| Declined prospect (declined ≠ obligation) | `relationship.closure_reason` | `scoped_vault` (`relationship-internal`) | approve | review + import + `VaultObjectWriteReceipt` — never a commitment receipt | **Record-state custody**: the declined record's public name is NOT proposed — `public_listing_name` now carries a v0 `condition` (eligible only where `record_state == active`, §15), making that source-state precondition explicit instead of silent omission. One field path still has one custody kind; no renamed field is invented. |
 | Recognition-fulfillment / follow-up "cards" | — (no conformance action) | — | — | — | Cards are derived read views over the commitment and follow-up objects, which are already receipted; the deprecated card-write receipt name never appears in the fixture. |
 | Free text | `relationship.free_text_note` | `discard` | discard | `DiscardDecisionReceipt` | Discard-by-default. |
 | Credential guard | — (no per-field counterpart) | — | — | — | Cross-cutting refusal doctrine, not a field decision; `reject` stays naturally unexercised. |
@@ -216,3 +219,52 @@ organizer-derived → `institution_derived`, external-accounting-system →
 `external_accounting_system`. Privacy classes translate as: sponsor_restricted →
 `relationship_restricted`, organizer_only → `internal_only`; the rest pass
 through. All are opaque strings to ICN core.
+
+## 15. Record-state-dependent custody (v0: eligibility conditions)
+
+§14's declined-prospect row exposed a real v0 limit: the custody *meaning* of a
+source field can depend on the source record's **state**. A declined record is an
+internal closure record, not a commitment; a public-recognition field must stay
+unproposed unless the record's state permits publication. The original fixture
+handled this by **omission** — the declined record simply does not propose
+`public_listing_name` — which is safe but invisible to the conformance validator,
+and the tempting-but-forbidden shortcut is to invent a renamed field to bypass
+source state.
+
+**v0 mechanism — an optional `condition` predicate on a `field_custody_map`
+entry.** A field's custody entry may declare the source-state precondition under
+which its route is eligible:
+
+```yaml
+relationship.public_listing_name:
+  custody_target: { kind: artifact_registry, namespace: public-recognition }
+  required_receipts: [BridgeImportReceipt, ArtifactRegistrationReceipt]
+  condition:
+    source_field_path: relationship.record_state   # opaque source field
+    op: equals                                      # closed ICN operator set
+    value: active                                   # opaque literal
+```
+
+- **Generic and opaque.** `source_field_path` and `value` are opaque strings/scalars
+  ICN core never interprets — exactly like `field_path`, `privacy_class`, and
+  `object_class`. Only `op` is ICN vocabulary, drawn from a closed set: `equals`,
+  `not_equals`, `in`, `not_in`, `present`, `absent`. The predicate's keys are
+  **strict** (`source_field_path` / `op` / `value` only) so a package noun (e.g. a
+  `sponsor_status` key) cannot ride in — the Meaning Firewall holds.
+- **Explicit, not silent.** The condition records *why* a field is unproposed for a
+  given record (its state does not satisfy the predicate) rather than leaving it to
+  omission. It is producer-declared intent the validator can shape-check.
+- **v0 scope — shape only.** The validator validates the predicate's shape; it does
+  **not** evaluate it or route custody by state. A conditioned field must still be
+  exercised by at least one dry-run action where its condition holds (the existing
+  binding-coverage rule is unchanged), and a field path still has exactly **one**
+  custody kind.
+- **Deferred (future change).** Per-state *multi-kind* routing — the same field
+  routing to a different custody kind under different record states — would require
+  the binding to hold per-condition custody variants and the dry-run kind-match
+  check to become condition-aware. That is a larger change, recorded here as
+  direction only; this v0 slice does not open it.
+
+**Non-claims.** Fake-fixture / conformance design only: no runtime bridge, no
+connector, no live source scan, no real data, no package-specific ICN custody kind
+or receipt class, and no claim that NYCN operations are ICN-native today.
