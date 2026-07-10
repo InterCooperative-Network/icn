@@ -98,6 +98,53 @@
   };
 
   // ---------------------------------------------------------------------
+  // #1726 pending-publish review-preview panel. Closed, fail-closed enums from
+  // urn:icn:contract:pending-publish-summary:v1, served by
+  // GET /v1/gov/me/pending-publish-summary (icn#1728). Values are catalog keys;
+  // displayed text comes from t(). An unknown enum value renders its raw string
+  // (never coerced to a guess), matching the server's fail-closed posture.
+  // ---------------------------------------------------------------------
+  var PP_ORIGIN_LABEL = {
+    committed_fixture: { glyph: "●", tone: "neutral", text: "pp.origin.committedFixture" },
+    live_runtime: { glyph: "◆", tone: "ok", text: "pp.origin.liveRuntime" }
+  };
+  var PP_KIND_LABEL = {
+    action_item: "pp.kind.actionItem",
+    decision: "pp.kind.decision",
+    attendance: "pp.kind.attendance",
+    obligation: "pp.kind.obligation",
+    allocation: "pp.kind.allocation",
+    settlement: "pp.kind.settlement",
+    evidence_note: "pp.kind.evidenceNote",
+    risk_note: "pp.kind.riskNote"
+  };
+  // Glyphs stay in code, never translated. Tone + text carry the meaning so
+  // status is never conveyed by color alone. Each status is rendered distinctly
+  // (human review states vs a policy/authority rejection are not collapsed).
+  var PP_STATUS_LABEL = {
+    pending_review: { glyph: "◔", tone: "neutral", text: "pp.status.pendingReview" },
+    approved_for_publish: { glyph: "✓", tone: "ok", text: "pp.status.approvedForPublish" },
+    rejected: { glyph: "✗", tone: "warn", text: "pp.status.rejected" },
+    needs_edit: { glyph: "✎", tone: "warn", text: "pp.status.needsEdit" },
+    needs_more_info: { glyph: "?", tone: "warn", text: "pp.status.needsMoreInfo" }
+  };
+  var PP_PROVENANCE_LABEL = {
+    committed_fixture: "pp.prov.committedFixture",
+    meeting_record: "pp.prov.meetingRecord",
+    governance_record: "pp.prov.governanceRecord",
+    example_snippet: "pp.prov.exampleSnippet",
+    repo_safe_paste: "pp.prov.repoSafePaste",
+    prior_evidence_packet: "pp.prov.priorEvidencePacket"
+  };
+  var PP_RECEIPT_LABEL = {
+    governance_receipt: "pp.receipt.governance",
+    attendance_receipt: "pp.receipt.attendance",
+    action_item_completion_receipt: "pp.receipt.actionItemCompletion",
+    settlement_receipt: "pp.receipt.settlement",
+    none: "pp.receipt.none"
+  };
+
+  // ---------------------------------------------------------------------
   // Mode + page state
   // ---------------------------------------------------------------------
   var params = new URLSearchParams(window.location.search);
@@ -154,7 +201,12 @@
     // member-shell-local receipt fixture (the pilot-ui pack carries no
     // receipt packet); wire-shaped per icn-governance proof.rs
     // ActionItemCompletionReceipt.
-    completionReceipt: "fixtures/demo-completion-receipt.json"
+    completionReceipt: "fixtures/demo-completion-receipt.json",
+    // member-shell-local pending-publish fixture in the RUNTIME response shape
+    // (PendingPublishSummaryResponse), so demo mode renders the same shape the
+    // live GET /v1/gov/me/pending-publish-summary endpoint serves. Fictional
+    // rehearsal data (origin=committed_fixture); never live participant state.
+    pendingPublish: "fixtures/pending-publish-summary.json"
   };
 
   // #2084 Community Proof Spine 0.1 — fixture/dev mirror of the civic loop.
@@ -498,6 +550,117 @@
     if (MODE === "live" && !reserved && assignedCompletion && !expired) {
       li.appendChild(buildCompleteFlow(card, statusChip));
     }
+    return li;
+  }
+
+  // ---------------------------------------------------------------------
+  // #1726 pending-publish review-preview panel. Read-only projection of
+  // GET /v1/gov/me/pending-publish-summary (icn#1728). It renders the rows a
+  // reviewer would see BEFORE anything is recorded or published. This surface
+  // has NO decision controls and issues NO write — it records nothing. The same
+  // renderer serves both a demo committed-fixture response and a live gateway
+  // response; a live_runtime response with no rows renders an honest empty
+  // state.
+  // ---------------------------------------------------------------------
+  function renderPendingPublish(response) {
+    var list = byId("pending-publish-list");
+    clear(list);
+    var origin = (response && response.origin) || "live_runtime";
+    var rows = (response && response.rows) || [];
+
+    // Origin chip: committed_fixture (fictional rehearsal data) vs live_runtime.
+    // role="status" announces it; glyph + text, never color alone.
+    var originMap = PP_ORIGIN_LABEL[origin];
+    var originChip = byId("pending-publish-origin");
+    originChip.className = "chip " + (originMap ? originMap.tone : "neutral");
+    originChip.textContent = (originMap ? originMap.glyph : "●") + " " +
+      (originMap ? t(originMap.text) : String(origin));
+
+    if (rows.length === 0) {
+      // Honest empty state. live_runtime serves no rows today; an empty
+      // committed_fixture is an empty rehearsal set.
+      var li = el("li");
+      li.appendChild(el("p", {
+        text: origin === "committed_fixture" ? t("pp.empty.fixture") : t("pp.empty.live")
+      }));
+      list.appendChild(li);
+      show("pending-publish-section");
+      return;
+    }
+
+    rows.forEach(function (row) { list.appendChild(renderPendingRow(row)); });
+    show("pending-publish-section");
+  }
+
+  function renderPendingRow(row) {
+    var li = el("li");
+    // Kind + plain summary lead. Kind is a plain label, never the raw enum.
+    var kind = PP_KIND_LABEL[row.kind] ? t(PP_KIND_LABEL[row.kind]) : String(row.kind);
+    li.appendChild(el("h3", { text: kind }));
+
+    // accessibility_hint as plain-language preamble BEFORE the detail (ADR-0028).
+    if (row.accessibility_hint) {
+      li.appendChild(el("p", { class: "muted", text: t("pp.beforeYouRead", { hint: row.accessibility_hint }) }));
+    }
+
+    li.appendChild(el("p", { text: row.plain_summary || "" }));
+
+    // Review-status chip (closed vocabulary). Glyph + tone + text; never color
+    // alone. Fail-closed: an unknown status renders its raw value, not a guess.
+    var st = PP_STATUS_LABEL[row.status];
+    var statusText = st ? t(st.text) : String(row.status);
+    var statusChip = el("span", {
+      class: "chip " + (st ? st.tone : "neutral"),
+      role: "status",
+      text: (st ? st.glyph : "●") + " " + statusText
+    });
+    li.appendChild(el("p", {}, [statusChip]));
+
+    var dl = el("dl", { class: "kv" });
+    kvRow(dl, t("pp.kv.whereApplies"), row.target_scope_label || "");
+    kvRow(dl, t("pp.kv.governingBody"), row.governing_body_label || "");
+    if (row.assignee_label) {
+      // The assignee is an organizer-readable label, NOT a DID. Identity
+      // binding is a separate private step and is never surfaced here.
+      var aWrap = el("span");
+      aWrap.appendChild(el("span", { text: row.assignee_label + " " }));
+      var aDet = el("details");
+      aDet.appendChild(el("summary", { text: t("pp.assignee.whatIsThis") }));
+      aDet.appendChild(el("p", { text: t("pp.assignee.note") }));
+      aWrap.appendChild(aDet);
+      kvRow(dl, t("pp.kv.assignee"), aWrap);
+    }
+    kvRow(dl, t("pp.kv.whyProposed"), row.authority_basis || t("pp.noAuthorityBasis"));
+
+    var risk = RISK_LABEL[row.risk_level]
+      ? { glyph: RISK_LABEL[row.risk_level].glyph, text: t(RISK_LABEL[row.risk_level].text) }
+      : { glyph: "●", text: String(row.risk_level) };
+    kvRow(dl, t("pp.kv.careLevel"), risk.glyph + " " + risk.text);
+
+    // Expected evidence (receipt) — an expectation for the reviewer, NOT
+    // authority, and NOT yet issued.
+    var rc = row.receipt_expected || {};
+    if (rc.expected) {
+      var cat = PP_RECEIPT_LABEL[rc.category] ? t(PP_RECEIPT_LABEL[rc.category]) : String(rc.category);
+      kvRow(dl, t("pp.kv.expectedEvidence"), t("pp.receipt.expected", { category: cat }));
+    } else {
+      kvRow(dl, t("pp.kv.expectedEvidence"), t("pp.receipt.notExpected"));
+    }
+    li.appendChild(dl);
+
+    // Technical identifiers under "details", never the primary surface.
+    var details = el("details");
+    details.appendChild(el("summary", { text: t("pp.showTechnical") }));
+    var tdl = el("dl", { class: "kv" });
+    kvRow(tdl, t("pp.kv.rowId"), row.id || "");
+    kvRow(tdl, t("pp.kv.provenance"),
+      PP_PROVENANCE_LABEL[row.source_provenance]
+        ? t(PP_PROVENANCE_LABEL[row.source_provenance])
+        : String(row.source_provenance));
+    kvRow(tdl, t("pp.kv.rawKind"), [row.kind, row.status, row.risk_level].join(" / "));
+    details.appendChild(tdl);
+    li.appendChild(details);
+
     return li;
   }
 
@@ -1131,7 +1294,10 @@
     Promise.all([
       fetchJson(FIXTURES.standing),
       fetchJson(FIXTURES.cards),
-      fetchJson(FIXTURES.completionReceipt)
+      fetchJson(FIXTURES.completionReceipt),
+      // #1726 pending-publish review preview. Resilient: a missing panel
+      // fixture must not fail the core standing/cards render.
+      fetchJson(FIXTURES.pendingPublish).catch(function () { return null; })
     ]).then(function (results) {
       state.standing = results[0];
       state.cards = results[1];
@@ -1141,6 +1307,7 @@
       renderStanding(state.standing);
       renderCards(state.cards, state.standing, anchor);
       addReceipt(results[2], t("demo.receiptContext"));
+      if (results[3]) { renderPendingPublish(results[3]); }
 
       setSyncChip(t(SYNC.SYNCED), "ok",
         t("demo.syncedDetail", { when: fmtAbs(anchor) }));
@@ -1244,6 +1411,8 @@
     clear(byId("domains-list"));
     clear(byId("roles-list"));
     clear(byId("cards-list"));
+    hide("pending-publish-section");
+    clear(byId("pending-publish-list"));
     renderReceipts();
 
     liveFetch("/v1/gov/me/standing").then(function (standing) {
@@ -1261,6 +1430,13 @@
       var anchor = Math.floor(Date.now() / 1000);
       renderCards(cardsResponse, state.standing, anchor);
       renderReceipts();
+      // #1726 pending-publish review preview. Independent + resilient: a node
+      // build without this endpoint (older gateway) must not break the
+      // standing/cards view. The seq guard stops a stale attempt rendering
+      // over a newer one. GET only — this panel never mutates.
+      liveFetch("/v1/gov/me/pending-publish-summary")
+        .then(function (pp) { if (seq === liveLoadSeq) { renderPendingPublish(pp); } })
+        .catch(function () { /* panel stays hidden; core live view already rendered */ });
       setSyncChip(t(SYNC.SYNCED), "ok",
         t("live.syncedDetail", { time: new Date().toLocaleString() }));
       byId("connect-status").textContent = t("live.connected");

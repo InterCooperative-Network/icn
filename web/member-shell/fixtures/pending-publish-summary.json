@@ -1,0 +1,83 @@
+{
+  "did": "did:icn:example-fixture-member-do-not-use",
+  "origin": "committed_fixture",
+  "rows": [
+    {
+      "id": "pending-row-action-item-001",
+      "kind": "action_item",
+      "plain_summary": "Draft task parsed from example meeting notes, awaiting review before it becomes an assignable action item.",
+      "status": "pending_review",
+      "target_scope_label": "Example working group",
+      "governing_body_label": "Example governing circle",
+      "assignee_label": "Example member (fictional)",
+      "authority_basis": "role_assignment_in_domain",
+      "risk_level": "normal",
+      "accessibility_hint": "Plain-language row. Status and receipt-expectation are read-only review context, not authority.",
+      "source_provenance": "committed_fixture",
+      "receipt_expected": { "expected": true, "category": "action_item_completion_receipt" }
+    },
+    {
+      "id": "pending-row-decision-001",
+      "kind": "decision",
+      "plain_summary": "Proposed governance decision summarized for review before any publish step.",
+      "status": "needs_more_info",
+      "target_scope_label": "Example governing circle",
+      "governing_body_label": "Example governing circle",
+      "assignee_label": null,
+      "authority_basis": "governing_body_agenda",
+      "risk_level": "elevated",
+      "accessibility_hint": "Plain-language row. Status and receipt-expectation are read-only review context, not authority.",
+      "source_provenance": "meeting_record",
+      "receipt_expected": { "expected": true, "category": "governance_receipt" }
+    },
+    {
+      "id": "pending-row-attendance-001",
+      "kind": "attendance",
+      "plain_summary": "Proposed attendance/participation record parsed from example notes, awaiting review.",
+      "status": "approved_for_publish",
+      "target_scope_label": "Example working group",
+      "governing_body_label": "Example governing circle",
+      "assignee_label": null,
+      "authority_basis": "meeting_attendee",
+      "risk_level": "low",
+      "accessibility_hint": "Plain-language row. Status and receipt-expectation are read-only review context, not authority.",
+      "source_provenance": "committed_fixture",
+      "receipt_expected": { "expected": true, "category": "attendance_receipt" }
+    },
+    {
+      "id": "pending-row-obligation-001",
+      "kind": "obligation",
+      "plain_summary": "Proposed shared commitment summarized for review; the reviewer set it aside as not ready to record.",
+      "status": "rejected",
+      "target_scope_label": "Example governing circle",
+      "governing_body_label": "Example governing circle",
+      "assignee_label": null,
+      "authority_basis": "governing_body_agenda",
+      "risk_level": "elevated",
+      "accessibility_hint": "Plain-language row. Status and receipt-expectation are read-only review context, not authority.",
+      "source_provenance": "governance_record",
+      "receipt_expected": { "expected": false, "category": "none" }
+    },
+    {
+      "id": "pending-row-allocation-001",
+      "kind": "allocation",
+      "plain_summary": "Proposed allocation of shared meeting-room time slots, awaiting an edit before it goes back for review.",
+      "status": "needs_edit",
+      "target_scope_label": "Example working group",
+      "governing_body_label": "Example governing circle",
+      "assignee_label": null,
+      "authority_basis": "governing_body_agenda",
+      "risk_level": "normal",
+      "accessibility_hint": "Plain-language row. Status and receipt-expectation are read-only review context, not authority.",
+      "source_provenance": "repo_safe_paste",
+      "receipt_expected": { "expected": true, "category": "settlement_receipt" }
+    }
+  ],
+  "non_claims": [
+    "read-only: no mutation, publish, export, or authority is granted",
+    "not production readiness, not a pilot, not live federation",
+    "committed-fixture rows are fictional rehearsal data, never live participant state",
+    "an expected receipt is an evidence expectation for the reviewer, not authority"
+  ],
+  "generated_at": 1751500000
+}
