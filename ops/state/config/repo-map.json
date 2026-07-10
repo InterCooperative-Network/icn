@@ -35,7 +35,10 @@
         "visibility": "private",
         "default_branch": "main",
         "local_store": "~/icn-dev/repos/nycn.git",
-        "lock": { "path": "ops/upstream/icn.lock.yaml", "format": "icn-upstream-lock/v1" },
+        "lock": {
+          "path": "ops/upstream/icn.lock.yaml",
+          "format": "icn-upstream-lock/v1"
+        },
         "status_envelope": "ops/status-envelope.json",
         "claim_enforcement": "reusable-claim-lint-caller (warning-mode, advisory; not blocking)",
         "stack_stage": 3,
@@ -64,7 +67,11 @@
         "visibility": "private",
         "default_branch": "main",
         "local_store": "~/icn-dev/repos/icn-learn.git",
-        "lock": { "path": "ops/upstream/icn.lock.yaml", "format": "icn-upstream-lock/v1", "review_status": "pending-human-signoff" },
+        "lock": {
+          "path": "ops/upstream/icn.lock.yaml",
+          "format": "icn-upstream-lock/v1",
+          "review_status": "pending-human-signoff"
+        },
         "status_envelope": "ops/status-envelope.json",
         "claim_enforcement": "reusable-claim-lint-caller (warning-mode, advisory; not blocking)",
         "stack_stage": 4,
@@ -75,7 +82,11 @@
         "visibility": "private",
         "default_branch": "main",
         "local_store": "~/icn-dev/repos/icn-community-bridge.git",
-        "lock": { "path": "ops/upstream/icn.lock.yaml", "format": "icn-upstream-lock/v1", "review_status": "pending-human-signoff" },
+        "lock": {
+          "path": "ops/upstream/icn.lock.yaml",
+          "format": "icn-upstream-lock/v1",
+          "review_status": "pending-human-signoff"
+        },
         "status_envelope": "ops/status-envelope.json",
         "claim_enforcement": "reusable-claim-lint-caller (warning-mode, advisory; not blocking)",
         "stack_stage": 5,
@@ -136,8 +147,11 @@
       "to": "k3s-cluster",
       "type": "deployment",
       "direction": "push",
-      "cluster_control": "10.8.30.40",
-      "workers": ["10.8.30.41", "10.8.30.42"]
+      "cluster_control": "role:k3s-control-plane (private:network-ops)",
+      "workers": [
+        "role:k3s-worker (private:network-ops)",
+        "role:k3s-worker (private:network-ops)"
+      ]
     },
     {
       "from": "homelab-inventory",
@@ -148,15 +162,19 @@
     }
   ],
   "infrastructure": {
+    "note": "Public map: ROLES ONLY. Concrete node/service addresses are private operational values (docs/ATLAS.md §5) held in the private network-ops repo; extraction requires the icn-infra scrub gate (ADR-0005). Never add host addresses, IPs, or provider values to this public map.",
     "k3s": {
-      "control": "10.8.30.40",
-      "workers": ["10.8.30.41", "10.8.30.42"],
-      "icn_dev": "10.8.30.45",
-      "ci_runner": "10.8.30.46",
+      "control": "role:k3s-control-plane (private:network-ops)",
+      "workers": [
+        "role:k3s-worker (private:network-ops)",
+        "role:k3s-worker (private:network-ops)"
+      ],
+      "icn_dev": "role:icn-dev-vm (private:network-ops)",
+      "ci_runner": "role:ci-runner (private:network-ops)",
       "services": {
-        "gateway": "10.8.30.40:30080",
-        "pilot_ui": "10.8.30.40:30030",
-        "metrics": "10.8.30.40:30090"
+        "gateway": "role:icn-gateway (private:network-ops)",
+        "pilot_ui": "role:pilot-ui (private:network-ops)",
+        "metrics": "role:metrics (private:network-ops)"
       }
     }
   }

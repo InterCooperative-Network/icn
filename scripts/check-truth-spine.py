@@ -9,16 +9,20 @@ ecosystem index (ops/state/ecosystem.json).
 
 Warning-mode by default: exits 0 with warnings printed unless --strict is passed
 (future ratchet, mirroring the readiness-overclaim linter's warning->blocking path).
-The only unconditional failure is an unreadable/unparseable sources.json.
+Unconditional (HARD, independent of --strict) failures: an unreadable/unparseable
+sources.json; and the public-map boundary guard — the public icn machine-readable
+maps (repo-map.json, ecosystem.json) must carry NO concrete host addresses or
+operational values (docs/ATLAS.md §5; icn-infra ADR-0005). Those live only in the
+private network-ops repo; this map lists infrastructure ROLES only.
 
-Deliberately NOT checked (v1): section-level owner overlap (cluster_topology is a
-documented pointer view into repo-map.json#infrastructure); content freshness of
-downstream lock files (needs private-repo access — VM-session concern, not CI).
+Deliberately NOT checked (v1): content freshness of downstream lock files (needs
+private-repo access — VM-session concern, not CI).
 """
 
 import argparse
 import datetime
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -31,7 +35,24 @@ STALENESS_DAYS = {"volatile": 14, "slow-changing": 120}
 # Date-ish keys we look for in JSON owner files, in preference order.
 DATE_KEYS = ("last_reviewed", "reviewed_at", "start_date")
 
+# Public-map boundary guard (docs/ATLAS.md §5; icn-infra ADR-0005): the PUBLIC
+# icn repo's machine-readable maps must never carry concrete host addresses or
+# operational values — those live only in the private network-ops repo. This is
+# a HARD failure (independent of --strict) if any reappear.
+PUBLIC_MAP_FILES = ("ops/state/config/repo-map.json", "ops/state/ecosystem.json")
+_IPV4_RE = re.compile(
+    r"(?<![\d.])(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?![\d.])"
+)
+# loopback / RFC5737 documentation ranges / QEMU slirp host alias are not sensitive
+_IPV4_ALLOWED_RE = re.compile(
+    r"^(?:127\.|0\.0\.0\.0$|255\.255|10\.0\.2\.2$|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.)"
+)
+_PRIVATE_HOST_RE = re.compile(
+    r"[A-Za-z0-9_-]+\.(?:lan|local|internal|home|homelab|lab)\b", re.IGNORECASE
+)
+
 warnings: list[str] = []
+errors: list[str] = []
 
 
 def warn(msg: str) -> None:
@@ -39,8 +60,38 @@ def warn(msg: str) -> None:
     print(f"  !!  {msg}")
 
 
+def err(msg: str) -> None:
+    errors.append(msg)
+    print(f"  FAIL  {msg}")
+
+
 def ok(msg: str) -> None:
     print(f"  ok  {msg}")
+
+
+def scan_public_map_boundary(root: Path) -> None:
+    """HARD-fail if any public machine-readable map carries a concrete host
+    address or private hostname. The public icn repo must not (docs/ATLAS.md §5;
+    icn-infra ADR-0005). Never echoes the offending value."""
+    for rel in PUBLIC_MAP_FILES:
+        try:
+            text = (root / rel).read_text()
+        except OSError:
+            continue
+        for m in _IPV4_RE.finditer(text):
+            if not _IPV4_ALLOWED_RE.match(m.group(0)):
+                err(
+                    f"{rel}: contains a concrete IPv4 host address — the public icn "
+                    f"repo must not (docs/ATLAS.md §5; icn-infra ADR-0005). Use "
+                    f"role-level/symbolic refs; concrete values live in the private "
+                    f"network-ops repo. (value withheld)"
+                )
+                break
+        if _PRIVATE_HOST_RE.search(text):
+            err(
+                f"{rel}: contains a private host name — the public icn repo must not "
+                f"(docs/ATLAS.md §5). Use role-level/symbolic refs. (value withheld)"
+            )
 
 
 def parse_date(value: str) -> datetime.date | None:
@@ -181,7 +232,16 @@ def main() -> int:
                 if ev and rv and ev != rv:
                     warn(f"visibility disagrees for {r}: ecosystem.json={ev} registry={rv}")
 
+    # 4. Public-map boundary guard — HARD fail regardless of --strict.
+    scan_public_map_boundary(root)
+
     # Result
+    if errors:
+        print(
+            f"check-truth-spine: {len(errors)} boundary error(s) — FAIL "
+            f"(public-map must not carry concrete host addresses / operational values)"
+        )
+        return 1
     if warnings:
         print(f"check-truth-spine: {len(warnings)} warning(s)")
         return 1 if args.strict else 0
