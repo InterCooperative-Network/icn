@@ -78,10 +78,11 @@ View source on GitHub →
 <p>This is a <strong>read-only / read-model contract</strong>. It describes the rows an organizer was shown. It does <strong>not</strong>:</p>
 <ul>
 <li>mutate, publish, apply, create, or export anything;</li>
-<li>implement any HTTP endpoint or production API surface;</li>
-<li>authorize a formal NYCN pilot;</li>
+<li>authorize any mutation or a formal NYCN pilot;</li>
+<li>serve fictional rows on a production surface (the runtime endpoint below returns no rows in the <code>production</code> build mode);</li>
 <li>permit private partner data in public git.</li>
 </ul>
+<p>A runtime projection of this shape is now served read-only over the gateway — see <a href="#runtime-read-model-endpoint-1728">Runtime read-model endpoint</a> — but the endpoint grants no authority, performs no write, and serves fictional rehearsal rows only in non-production build modes.</p>
 <p>Three fields make the read-only boundary explicit:</p>
 <ul>
 <li><strong><code>review_actions</code></strong> are <em>affordances</em> — the choices the organizer could make (<code>approve</code> / <code>reject</code> / <code>edit</code> / <code>request_info</code> / <code>defer</code>). They are not commands and not a record of actions taken. Rendering them performs nothing.</li>
@@ -97,6 +98,16 @@ View source on GitHub →
 <h2>How this fits the no-CLI organizer/member workflow</h2>
 <p>The no-CLI workflow at <a href="/docs/pilots/no-cli-organizer-member-rehearsal-workflow">`../pilots/no-cli-organizer-member-rehearsal-workflow.md`</a> describes the human path through a rehearsal. §3 step 6 (&quot;Preview before mutation&quot;) is the preview moment this contract serves (§3 step 3, &quot;Preview parsed proposals&quot;, is the separate <code>preview_kind: meeting_notes_action_items</code> moment). A <code>preview-review</code> packet with <code>preview_kind: pending_publish_summary</code> records the review boundary; the rows it summarizes conform to this contract. The contract runs none of those steps; it just names the read-model the human review surface renders.</p>
 <p>A surface that renders these rows is in scope for <a href="/docs/design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE">`../design/ORGANIZER_MEMBER_ACCESSIBILITY_GATE.md`</a> (§3.7 cognitive load, §3.11 receipts/provenance/evidence access, §3.12 governance/action access). Each row carries an <code>accessibility_hint</code> (ADR-0028 discipline, mirrored from action cards) so the gate has something concrete to check.</p>
+<h2>Runtime read-model endpoint (#1728)</h2>
+<p>The gateway serves a runtime projection of this shape so an organizer/member rehearsal shell can bind to a real endpoint (the same way it binds to <code>/me/standing</code> and <code>/me/action-cards</code>) instead of loading a static fixture file:</p>
+<pre><code>GET /v1/gov/me/pending-publish-summary
+</code></pre>
+<ul>
+<li><strong>Read-only and self-scoped.</strong> Requires the <code>governance:read</code> scope; the caller is the token subject. It performs no write, grants no authority, and creates no action card.</li>
+<li><strong><code>origin</code> tells the client which plane it is on.</strong> In the <code>production</code> build mode the endpoint returns <strong>no</strong> rows (<code>origin = live_runtime</code>) — there is no runtime pending-publish source object today, and fictional rehearsal rows must never appear on a production surface. In non-production (bootstrap/test) build modes it returns deterministic, fictional, clearly-labeled rows (<code>origin = committed_fixture</code>) so a rehearsal has real rows to render.</li>
+<li><strong>Not the whole contract.</strong> The runtime type mirrors the row shape (<code>kind</code>, <code>plain_summary</code>, <code>status</code>, <code>target_scope_label</code>, <code>governing_body_label</code>, <code>assignee_label</code>, <code>authority_basis</code>, <code>risk_level</code>, <code>accessibility_hint</code>, <code>source_provenance</code>, <code>receipt_expected</code>) with closed, fail-closed enums; it does not implement the <code>preview-review</code> wrapper, <code>review_actions</code>/<code>mutation_preview</code> affordances, or any producing/mutation path. Those remain doc-contract and separate-endpoint concerns.</li>
+<li><strong>Response type:</strong> <code>PendingPublishSummaryResponse</code> in <code>icn/apps/governance/src/http/models.rs</code>; handler <code>get_my_pending_publish_summary</code> in <code>.../http/handlers.rs</code>. It is the <strong>first runtime projection of the <code>pending-publish-summary</code> contract served over the gateway</strong> (other member read-models — <code>/v1/gov/me/standing</code>, <code>/v1/gov/me/action-cards</code> — already exist; this adds the pending-publish/preview-review shape they lacked). This is a dev/demo read surface — not production read-model serving, not organizer-ready, not a pilot.</li>
+</ul>
 <h2>Relationship to action cards, Member standing, receipts, and provenance</h2>
 <ul>
 <li><strong>Action cards</strong> (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/institution-package/action-card.schema.json">`institution-package/action-card.schema.json`</a>) are per-member <em>derived views</em> of what a holder can do now. Pending-publish rows are <em>organizer-facing previews</em> of what would be created. They share vocabulary deliberately: <code>authority_basis</code>, <code>risk_level</code> (<code>low</code>/<code>normal</code>/<code>elevated</code>), <code>accessibility_hint</code>, and <code>scope</code>-style labels mirror the action-card axes so a shell can render both with one design language. Pending-publish <code>receipt_expected</code> is an object (<code>expected</code> + <code>category</code>) rather than the action-card boolean, because a preview describes an <em>expected category</em>, not a live outcome.</li>
