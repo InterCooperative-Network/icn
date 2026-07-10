@@ -109,7 +109,21 @@ else
     printf '%s\n' "$SECRET_HITS" >&2
 fi
 
-# 6. typed manifest emit/verify round-trip (skip-aware / opt-in)
+# 6. demo netdev isolation construction (#1727 / #2386)
+#
+# Asserts smoke-local.sh constructs the QEMU user-net string with guest
+# isolation on by default in --demo (restrict=on + all hostfwds), with the
+# explicit ICN_APPLIANCE_ALLOW_OUTBOUND=1 override honored and the base
+# (non-demo) smoke unchanged. Static construction check only — the runtime
+# canary proof runs inside `smoke-local.sh --real --demo`.
+section "demo netdev isolation construction"
+if bash "$APPLIANCE_DIR/smoke/net-restrict-check.sh" >/dev/null; then
+    ok "netdev isolation construction (4/4 cases)"
+else
+    bad "netdev isolation construction (run: bash deploy/appliance/smoke/net-restrict-check.sh)"
+fi
+
+# 7. typed manifest emit/verify round-trip (skip-aware / opt-in)
 #
 # Proves the typed appliance manifest path (`icnctl appliance emit-manifest`
 # #2259 + `verify-manifest` #2260, wired into build-image.sh #2261) still honors

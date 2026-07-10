@@ -29,6 +29,12 @@
 #                                  then builds a seed via cloud-localds; it
 #                                  refuses the shipped placeholder key and does
 #                                  NOT derive the key from ICN_APPLIANCE_SSH_KEY)
+#   ICN_APPLIANCE_ALLOW_OUTBOUND   optional. The demo smoke ISOLATES the guest
+#                                  network by default (QEMU user-net
+#                                  restrict=on; loopback hostfwd unaffected)
+#                                  and proves it with an in-guest canary
+#                                  probe. Set 1 to permit guest outbound
+#                                  (skips the canary; loud in output).
 #
 # Env (open-running-node / verify-running-node — same contract as
 # open-proxmox-demo.sh):
@@ -39,6 +45,14 @@
 #   ICN_DEMO_SSH_USER     optional            VM ssh user (default: debian)
 #   Other launcher knobs (ICN_DEMO_GW_PORT, ICN_DEMO_SESSION_PORT,
 #   ICN_DEMO_NO_BROWSER, ...) pass through to open-proxmox-demo.sh unchanged.
+#
+# Network posture (be precise about which route guarantees what):
+#   smoke-image        guest outbound is BLOCKED BY DEFAULT and canary-proven
+#                      (see ICN_APPLIANCE_ALLOW_OUTBOUND above).
+#   open-running-node  network isolation is OPERATOR-PROVIDED. This launcher
+#                      only opens SSH tunnels; it does not seal the VM. A
+#                      bounded preflight WARNS if the node's gateway port is
+#                      directly reachable from this workstation.
 #
 # What this wrapper does NOT do:
 #   - does not build or download images (see build-image.sh)
@@ -59,6 +73,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APPLIANCE_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
 log()   { printf '[rehearsal-node] %s\n' "$*"; }
+warn()  { printf '[rehearsal-node] WARN: %s\n' "$*" >&2; }
 err()   { printf '[rehearsal-node] ERROR: %s\n' "$*" >&2; }
 fatal() { err "$*"; exit 2; }
 
@@ -152,6 +167,10 @@ dry_run() {
   log "  seed:     ICN_APPLIANCE_CLOUD_INIT_SEED, or an edited"
   log "            smoke/cloud-init/user-data.example.yaml carrying your real"
   log "            smoke public key (the shipped placeholder is refused)"
+  log "  network:  guest outbound is BLOCKED by default (QEMU user-net"
+  log "            restrict=on; loopback hostfwd unaffected) and proven by an"
+  log "            in-guest canary probe; ICN_APPLIANCE_ALLOW_OUTBOUND=1"
+  log "            permits outbound and skips the canary"
   log ""
   log "open-running-node would run:"
   log "  bash ${SCRIPT_DIR}/open-proxmox-demo.sh"
@@ -160,6 +179,9 @@ dry_run() {
   log "   shell with the no-paste 'Start local demo' launcher)"
   log "  requires: ICN_DEMO_VM_IP + ICN_DEMO_SSH_KEY (direct)"
   log "        or: ICN_DEMO_VM_IP + ICN_DEMO_JUMP + ICN_DEMO_REMOTE_KEY (jump)"
+  log "  network:  isolation is OPERATOR-PROVIDED (tunnels do not seal the"
+  log "            VM); a bounded preflight WARNS if the node's gateway port"
+  log "            is directly reachable from this workstation"
   log ""
   log "verify-running-node would print the in-VM verification commands"
   log "(sudo icn-demo-verify <item-id> | --chain); it never executes remotely."
@@ -182,6 +204,19 @@ case "$cmd" in
   open-running-node)
     banner
     require_open_env
+    log "network isolation for an already-running node is OPERATOR-PROVIDED:"
+    log "this launcher only opens SSH tunnels; it does not seal the VM's network."
+    # Bounded exposure preflight (warn-only). The demo profile binds services
+    # beyond loopback inside the VM; if the gateway port answers this
+    # workstation directly, the node is reachable from this network segment.
+    # The inverse is NOT proof of isolation — it only means no direct path
+    # from here.
+    if timeout 2 bash -c "exec 3<>/dev/tcp/${ICN_DEMO_VM_IP}/8080" 2>/dev/null; then
+      warn "exposure preflight: gateway port 8080 on ${ICN_DEMO_VM_IP} is DIRECTLY reachable from this workstation."
+      warn "Run this node only on a trusted/isolated network or behind an operator-provided firewall. Continuing (warning only)."
+    else
+      log "exposure preflight: no direct gateway reachability from here (NOT proof of isolation)."
+    fi
     log "delegating to open-proxmox-demo.sh ..."
     exec bash "${SCRIPT_DIR}/open-proxmox-demo.sh"
     ;;

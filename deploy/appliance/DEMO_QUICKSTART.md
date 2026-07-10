@@ -75,7 +75,12 @@ bash deploy/appliance/smoke/smoke-local.sh --real --demo
 
 That boots the VM on a disposable overlay, seeds the demo, drives the whole
 loop headlessly, and prints PASS/FAIL. It is the same path your browser
-will take.
+will take. The demo smoke also blocks guest-initiated outbound networking by
+default (QEMU user-net `restrict=on`; the loopback port forwards are
+unaffected) and proves it with an in-guest canary probe — set
+`ICN_APPLIANCE_ALLOW_OUTBOUND=1` to permit outbound. This applies to the QEMU
+smoke only; an already-running Proxmox/cloud node's network isolation is
+operator-provided (see the runbook's "Network posture" section).
 
 **Manual (for the browser demo):** boot QEMU yourself with the demo ports
 forwarded:

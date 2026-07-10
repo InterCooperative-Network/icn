@@ -20,9 +20,22 @@
 #                - drive the member loop from the HOST through the forwarded
 #                  gateway: standing -> action card -> complete -> receipt,
 #                  with the receipt binding check (32-byte record_hash)
+#                - block guest-initiated outbound networking by DEFAULT
+#                  (QEMU user-net restrict=on; explicitly set forwarding
+#                  rules are unaffected per the QEMU manual) and prove it
+#                  with an in-guest canary probe: a host-loopback listener
+#                  started by this script must be reachable from the HOST
+#                  and unreachable from the GUEST (via the 10.0.2.2 slirp
+#                  host alias — no public internet host involved, so an
+#                  offline runner cannot false-pass)
 #              A --demo pass means the demo loop works end-to-end against
 #              this image from a clean boot. It still does NOT mean
 #              production, pilot, or federation.
+#
+# Test hook:
+#   --print-netdev  Print the exact -netdev string this invocation would
+#                   pass to QEMU (honoring --demo and env) and exit. Used
+#                   by smoke/net-restrict-check.sh; no VM, no env needed.
 #
 # Required for --real:
 #   ICN_APPLIANCE_IMAGE      Path to the QCOW2 produced by build-image.sh.
@@ -47,6 +60,14 @@
 #                                VM gateway :8080; --demo only).
 #   ICN_APPLIANCE_SHELL_FWD_PORT Default: 18090 (host port forwarded to the
 #                                VM member-shell :8090; --demo only).
+#   ICN_APPLIANCE_ALLOW_OUTBOUND Set to 1 to SKIP the --demo default of
+#                                isolating the guest network (restrict=on).
+#                                The run then permits guest-initiated
+#                                outbound traffic and SKIPS the canary
+#                                probe; the output says so loudly.
+#   ICN_APPLIANCE_CANARY_PORT    Default: 18099. Host loopback port for the
+#                                outbound-isolation canary listener
+#                                (--demo restricted runs only).
 #
 # Required tools for --real:
 #   qemu-system-x86_64, ssh, curl, sha256sum
@@ -72,17 +93,19 @@ warn() { printf '[appliance-smoke] WARN: %s\n' "$*" >&2; }
 err()  { printf '[appliance-smoke] ERROR: %s\n' "$*" >&2; }
 
 usage() {
-    sed -n '2,42p' "$0"
+    awk 'NR==1{next} /^#/{sub(/^# ?/,""); print; next} {exit}' "$0"
     exit 0
 }
 
 DEMO=0
+PRINT_NETDEV=0
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --dry-run) MODE="dry-run" ; shift ;;
         --real)    MODE="real"    ; shift ;;
         --demo)    DEMO=1         ; shift ;;
+        --print-netdev) PRINT_NETDEV=1 ; shift ;;
         --help|-h) usage ;;
         *)
             err "unknown argument: $1"
@@ -101,6 +124,30 @@ VM_CPUS="${ICN_APPLIANCE_VM_CPUS:-2}"
 VM_TIMEOUT="${ICN_APPLIANCE_VM_TIMEOUT:-300}"
 GW_FWD_PORT="${ICN_APPLIANCE_GW_FWD_PORT:-18080}"
 SHELL_FWD_PORT="${ICN_APPLIANCE_SHELL_FWD_PORT:-18090}"
+ALLOW_OUTBOUND="${ICN_APPLIANCE_ALLOW_OUTBOUND:-0}"
+CANARY_PORT="${ICN_APPLIANCE_CANARY_PORT:-18099}"
+
+# Single source of truth for the QEMU -netdev string. --demo defaults to an
+# ISOLATED guest: user-net restrict=on blocks guest-initiated traffic to the
+# host and to the outside, while explicitly set hostfwd rules keep working
+# (QEMU manual, `restrict=on|off`). Base (non-demo) smoke is UNCHANGED.
+build_netdev() {
+    local nd="user,id=net0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22"
+    if [ "$DEMO" = 1 ]; then
+        nd="${nd},hostfwd=tcp:127.0.0.1:${GW_FWD_PORT}-:8080,hostfwd=tcp:127.0.0.1:${SHELL_FWD_PORT}-:8090"
+        if [ "$ALLOW_OUTBOUND" != "1" ]; then
+            nd="${nd},restrict=on"
+        fi
+    fi
+    printf '%s\n' "$nd"
+}
+
+# Test hook: print the constructed netdev and exit before any logging, env
+# requirement, or tool check — deterministic and VM-free.
+if [ "$PRINT_NETDEV" = 1 ]; then
+    build_netdev
+    exit 0
+fi
 
 log "Mode: $MODE"
 log "Demo add-on:      $DEMO"
@@ -139,6 +186,12 @@ cat <<'EOF_PLAN'
        - drive: working overlay
        - drive: cloud-init seed ISO (read-only)
        - no display; serial-on-stdout for diagnostics
+       - with --demo: gateway + member-shell hostfwd, and guest outbound
+         BLOCKED by default (user-net restrict=on; set
+         ICN_APPLIANCE_ALLOW_OUTBOUND=1 to permit outbound). A restricted
+         --demo run ends with an isolation canary: a host-loopback
+         listener must be reachable from the host and unreachable from
+         the guest.
 
   6) Wait for SSH on 127.0.0.1:${SSH_PORT}, bounded by VM_TIMEOUT.
 
@@ -220,6 +273,9 @@ log "Working dir: $WORK_DIR"
 
 cleanup() {
     local rc=$?
+    if [ -n "${CANARY_PID:-}" ] && kill -0 "$CANARY_PID" 2>/dev/null; then
+        kill "$CANARY_PID" 2>/dev/null || true
+    fi
     if [ -n "${QEMU_PID:-}" ] && kill -0 "$QEMU_PID" 2>/dev/null; then
         log "Terminating QEMU (pid $QEMU_PID)..."
         kill "$QEMU_PID" 2>/dev/null || true
@@ -290,12 +346,18 @@ log "Creating disposable overlay $OVERLAY (backing format: $BACKING_FORMAT) ..."
 qemu-img create -f qcow2 -b "$ICN_APPLIANCE_IMAGE" -F "$BACKING_FORMAT" "$OVERLAY" >/dev/null
 
 # Launch QEMU under user-mode networking. We do NOT touch host networking.
-NETDEV="user,id=net0,hostfwd=tcp:127.0.0.1:${SSH_PORT}-:22"
+# Demo add-on forwards the gateway and member-shell so the loop can be driven
+# from the host — the same path a stranger's browser takes — and isolates the
+# guest by default (see build_netdev).
+NETDEV="$(build_netdev)"
 if [ "$DEMO" = 1 ]; then
-    # Demo add-on: forward the gateway and member-shell so the loop can be
-    # driven from the host — the same path a stranger's browser takes.
-    NETDEV="${NETDEV},hostfwd=tcp:127.0.0.1:${GW_FWD_PORT}-:8080,hostfwd=tcp:127.0.0.1:${SHELL_FWD_PORT}-:8090"
     log "Launching QEMU (user-mode net, hostfwd ${SSH_PORT}->22, ${GW_FWD_PORT}->8080, ${SHELL_FWD_PORT}->8090)..."
+    if [ "$ALLOW_OUTBOUND" != "1" ]; then
+        log "Guest outbound: BLOCKED by default (user-net restrict=on; hostfwd unaffected)."
+        log "                Set ICN_APPLIANCE_ALLOW_OUTBOUND=1 to permit guest outbound."
+    else
+        warn "Guest outbound: ALLOWED (ICN_APPLIANCE_ALLOW_OUTBOUND=1) — the isolation canary probe will be SKIPPED."
+    fi
 else
     log "Launching QEMU (user-mode net, hostfwd ${SSH_PORT}->22)..."
 fi
@@ -519,6 +581,43 @@ if [ "$DEMO" = 1 ]; then
         | jq --arg id "$DEMO_ITEM" '[.cards[]? | select(.source_id==$id)] | length')"
     [ "$N_AFTER" = "0" ] || { err "[demo] card did not clear after completion"; exit 13; }
     log "[demo] loop complete: standing -> card -> discharge -> receipt -> card cleared."
+
+    # ---------- outbound-isolation canary (restricted runs only) ----------
+    if [ "$ALLOW_OUTBOUND" != "1" ]; then
+        log "[demo] outbound-isolation canary: guest must NOT reach a host listener..."
+        # 10.0.2.2 is the QEMU user-net (slirp) alias for the host. Without
+        # restrict=on a guest can open TCP connections to it; with restrict=on
+        # the QEMU-documented isolation must drop them. The listener is
+        # started by THIS script and verified reachable host-side first, so a
+        # guest-side connection failure is attributable to the isolation, not
+        # to a dead listener — and no public internet host is involved, so an
+        # offline runner cannot produce a false pass.
+        ( cd "$WORK_DIR" && exec python3 -m http.server "$CANARY_PORT" --bind 127.0.0.1 ) >/dev/null 2>&1 &
+        CANARY_PID=$!
+        CANARY_UP=0
+        for _ in 1 2 3 4 5; do
+            if curl -sf -m 2 "http://127.0.0.1:${CANARY_PORT}/" >/dev/null 2>&1; then
+                CANARY_UP=1
+                break
+            fi
+            sleep 1
+        done
+        if [ "$CANARY_UP" -ne 1 ]; then
+            err "[demo] canary listener never answered on 127.0.0.1:${CANARY_PORT}."
+            err "[demo] Set ICN_APPLIANCE_CANARY_PORT to a free host port and re-run."
+            exit 14
+        fi
+        if run_in_vm "curl -s -o /dev/null -m 4 http://10.0.2.2:${CANARY_PORT}/" 2>/dev/null; then
+            err "[demo] FAIL-OPEN: the guest REACHED the host canary listener."
+            err "[demo] Guest-initiated outbound is not blocked (restrict=on ineffective?)."
+            exit 14
+        fi
+        kill "$CANARY_PID" 2>/dev/null || true
+        CANARY_PID=""
+        log "[demo] outbound-isolation canary held: listener reachable from host, unreachable from guest."
+    else
+        warn "[demo] outbound isolation OVERRIDDEN (ICN_APPLIANCE_ALLOW_OUTBOUND=1) — canary probe SKIPPED; the guest may reach external networks."
+    fi
 fi
 
 cat <<EOF_PASS
@@ -538,6 +637,9 @@ if [ "$DEMO" = 1 ]; then
   shell:    http://127.0.0.1:${SHELL_FWD_PORT}/member-shell/ (host-forwarded)
   gateway:  http://127.0.0.1:${GW_FWD_PORT} (host-forwarded, JWT-auth)
   loop:     standing -> action card -> discharge -> receipt (verified host-side)
+  outbound: $( [ "$ALLOW_OUTBOUND" != "1" ] \
+      && echo "BLOCKED (restrict=on; in-guest canary probe held)" \
+      || echo "ALLOWED (ICN_APPLIANCE_ALLOW_OUTBOUND=1; canary skipped)" )
 
 NOTE: DEMO PASS means the member loop works end-to-end on this image from a
 clean boot, over the same forwarded ports a stranger's browser would use.
