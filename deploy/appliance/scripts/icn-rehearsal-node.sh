@@ -211,7 +211,9 @@ case "$cmd" in
     # workstation directly, the node is reachable from this network segment.
     # The inverse is NOT proof of isolation — it only means no direct path
     # from here.
-    if timeout 2 bash -c "exec 3<>/dev/tcp/${ICN_DEMO_VM_IP}/8080" 2>/dev/null; then
+    # The VM IP is passed as a positional parameter, never interpolated into
+    # the command string — a metacharacter-bearing value cannot become code.
+    if timeout 2 bash -c 'exec 3<>"/dev/tcp/${1}/8080"' _ "${ICN_DEMO_VM_IP}" 2>/dev/null; then
       warn "exposure preflight: gateway port 8080 on ${ICN_DEMO_VM_IP} is DIRECTLY reachable from this workstation."
       warn "Run this node only on a trusted/isolated network or behind an operator-provided firewall. Continuing (warning only)."
     else

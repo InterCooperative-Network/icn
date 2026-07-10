@@ -592,29 +592,45 @@ if [ "$DEMO" = 1 ]; then
         # guest-side connection failure is attributable to the isolation, not
         # to a dead listener — and no public internet host is involved, so an
         # offline runner cannot produce a false pass.
-        ( cd "$WORK_DIR" && exec python3 -m http.server "$CANARY_PORT" --bind 127.0.0.1 ) >/dev/null 2>&1 &
+        # Serve a dedicated directory containing only a per-run marker file, and
+        # validate the exact marker content — so a pre-existing squatter on the
+        # port (or a python that failed to bind) can never stand in as the
+        # control. The spawned PID is also re-checked AFTER the guest probe:
+        # a server that died mid-window would make "guest could not connect"
+        # unattributable, so that case fails closed instead of passing.
+        CANARY_DIR="$WORK_DIR/canary"
+        CANARY_MARKER="icn-canary-$$-$(date +%s)"
+        mkdir -p "$CANARY_DIR"
+        printf '%s' "$CANARY_MARKER" > "$CANARY_DIR/canary-marker.txt"
+        ( cd "$CANARY_DIR" && exec python3 -m http.server "$CANARY_PORT" --bind 127.0.0.1 ) >/dev/null 2>&1 &
         CANARY_PID=$!
         CANARY_UP=0
         for _ in 1 2 3 4 5; do
-            if curl -sf -m 2 "http://127.0.0.1:${CANARY_PORT}/" >/dev/null 2>&1; then
+            if [ "$(curl -sf -m 2 "http://127.0.0.1:${CANARY_PORT}/canary-marker.txt" 2>/dev/null)" = "$CANARY_MARKER" ]; then
                 CANARY_UP=1
                 break
             fi
             sleep 1
         done
-        if [ "$CANARY_UP" -ne 1 ]; then
-            err "[demo] canary listener never answered on 127.0.0.1:${CANARY_PORT}."
+        if [ "$CANARY_UP" -ne 1 ] || ! kill -0 "$CANARY_PID" 2>/dev/null; then
+            err "[demo] canary listener did not serve this run's marker on 127.0.0.1:${CANARY_PORT}"
+            err "[demo] (port in use by another process, or the listener failed to start)."
             err "[demo] Set ICN_APPLIANCE_CANARY_PORT to a free host port and re-run."
             exit 14
         fi
-        if run_in_vm "curl -s -o /dev/null -m 4 http://10.0.2.2:${CANARY_PORT}/" 2>/dev/null; then
+        if run_in_vm "curl -s -o /dev/null -m 4 http://10.0.2.2:${CANARY_PORT}/canary-marker.txt" 2>/dev/null; then
             err "[demo] FAIL-OPEN: the guest REACHED the host canary listener."
             err "[demo] Guest-initiated outbound is not blocked (restrict=on ineffective?)."
             exit 14
         fi
+        if ! kill -0 "$CANARY_PID" 2>/dev/null; then
+            err "[demo] canary listener died during the probe window — the guest's"
+            err "[demo] connection failure cannot be attributed to isolation. Re-run."
+            exit 14
+        fi
         kill "$CANARY_PID" 2>/dev/null || true
         CANARY_PID=""
-        log "[demo] outbound-isolation canary held: listener reachable from host, unreachable from guest."
+        log "[demo] outbound-isolation canary held: per-run marker served to the host, unreachable from the guest, listener alive throughout."
     else
         warn "[demo] outbound isolation OVERRIDDEN (ICN_APPLIANCE_ALLOW_OUTBOUND=1) — canary probe SKIPPED; the guest may reach external networks."
     fi
