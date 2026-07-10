@@ -150,13 +150,12 @@ const { mkdirSync, writeFileSync } = require('node:fs');
     if (report.steps.reduced_motion_standing_visible !== true) {
       failures.push('reduced-motion: standing pane not visible');
     }
-    // The pending-publish panel renders in the DEFAULT demo view (and the
-    // community set, which still runs loadDemo). The MSHELL_SET=process-evidence
-    // variant intentionally takes a different loader (loadProcessEvidenceDemo)
-    // that does not fetch this panel, so only require it when the panel is
-    // actually expected — otherwise this would break the process-evidence
-    // accessibility/evidence regeneration path.
-    const ppExpected = SET.indexOf('process-evidence') === -1;
+    // The pending-publish panel renders only in the DEFAULT demo view. The
+    // community (#2084) and process-evidence (#2289) sets are self-contained
+    // walkthroughs that intentionally omit it, so only require the panel when
+    // auditing the default view (SET unset) — otherwise this would break those
+    // variants' accessibility/evidence regeneration paths.
+    const ppExpected = SET === '';
     if (ppExpected && report.steps.pending_publish_visible !== true) {
       failures.push('pending-publish review-preview panel not visible in demo mode');
     }

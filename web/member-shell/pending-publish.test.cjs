@@ -110,6 +110,20 @@ async function openLive(browser, ppHandler) {
       await ctx.close();
     }
 
+    // ============ DEMO set=community (#2084) — panel must be ABSENT ============
+    console.log('DEMO set=community (panel must be absent)');
+    {
+      const ctx = await browser.newContext({ viewport: { width: 1280, height: 1024 } });
+      const page = await ctx.newPage();
+      await page.goto(`${BASE}/member-shell/?mode=demo&set=community`, { waitUntil: 'networkidle' });
+      await page.waitForSelector('#standing-section:not([hidden])', { timeout: 8000 }).catch(() => {});
+      check('community: standing still renders', await page.isVisible('#standing-section').catch(() => false));
+      check('community: review-preview panel NOT rendered (no generic rows in the #2084 slice)',
+        !(await page.isVisible('#pending-publish-section').catch(() => false)));
+      check('community: zero review rows', (await page.locator('#pending-publish-list > li').count().catch(() => -1)) === 0);
+      await ctx.close();
+    }
+
     // ============ LIVE MODE (route-intercepted; no real gateway) ============
     console.log('LIVE MODE — rows');
     {

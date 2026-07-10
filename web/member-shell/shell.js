@@ -1295,9 +1295,13 @@
       fetchJson(FIXTURES.standing),
       fetchJson(FIXTURES.cards),
       fetchJson(FIXTURES.completionReceipt),
-      // #1726 pending-publish review preview. Resilient: a missing panel
+      // #1726 pending-publish review preview — DEFAULT demo view only. The
+      // community (#2084) and process-evidence (#2289) sets are self-contained
+      // walkthroughs whose regenerated evidence must not include these generic
+      // review rows, so the panel is not loaded there. Resilient: a missing
       // fixture must not fail the core standing/cards render.
-      fetchJson(FIXTURES.pendingPublish).catch(function () { return null; })
+      (SET ? Promise.resolve(null)
+           : fetchJson(FIXTURES.pendingPublish).catch(function () { return null; }))
     ]).then(function (results) {
       state.standing = results[0];
       state.cards = results[1];
