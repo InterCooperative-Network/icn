@@ -175,11 +175,11 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * `GET /me/pending-publish-summary` — the runtime read-model for issue #1728.
+         * `GET /v1/gov/me/pending-publish-summary` — the runtime read-model for #1728.
          * @description Serves the shape of `urn:icn:contract:pending-publish-summary:v1` over the
          *     gateway so the organizer rehearsal shell (#1726) can bind to a real endpoint
          *     for the "preview parsed proposals before any publish/mutation" step, the same
-         *     way it binds to `/me/standing` and `/me/action-cards`.
+         *     way it binds to `/v1/gov/me/standing` and `/v1/gov/me/action-cards`.
          *
          *     Read-only and self-scoped (`governance:read`, caller = token subject). It
          *     performs no write, grants no authority, and creates no action card. There is
@@ -965,7 +965,7 @@ export interface components {
          */
         PendingPublishRowStatus: "pending_review" | "approved_for_publish" | "rejected" | "needs_edit" | "needs_more_info";
         /**
-         * @description Wrapper response for `GET /me/pending-publish-summary` (issue #1728).
+         * @description Wrapper response for `GET /v1/gov/me/pending-publish-summary` (issue #1728).
          *
          *     Runtime projection of `urn:icn:contract:pending-publish-summary:v1`. Serves
          *     the contract shape over the gateway so the organizer rehearsal shell has a
