@@ -618,11 +618,25 @@ if [ "$DEMO" = 1 ]; then
             err "[demo] Set ICN_APPLIANCE_CANARY_PORT to a free host port and re-run."
             exit 14
         fi
-        if run_in_vm "curl -s -o /dev/null -m 4 http://10.0.2.2:${CANARY_PORT}/canary-marker.txt" 2>/dev/null; then
-            err "[demo] FAIL-OPEN: the guest REACHED the host canary listener."
-            err "[demo] Guest-initiated outbound is not blocked (restrict=on ineffective?)."
-            exit 14
-        fi
+        # The remote command always emits a sentinel when it actually ran, so
+        # an SSH/transport failure (no sentinel) is distinguishable from
+        # blocked guest traffic (BLOCKED) and cannot masquerade as isolation.
+        CANARY_PROBE="$(run_in_vm "curl -s -o /dev/null -m 4 http://10.0.2.2:${CANARY_PORT}/canary-marker.txt && echo CANARY_REACHED || echo CANARY_BLOCKED" 2>/dev/null || true)"
+        case "$CANARY_PROBE" in
+            *CANARY_REACHED*)
+                err "[demo] FAIL-OPEN: the guest REACHED the host canary listener."
+                err "[demo] Guest-initiated outbound is not blocked (restrict=on ineffective?)."
+                exit 14
+                ;;
+            *CANARY_BLOCKED*)
+                : # probe ran in the guest and the connection was blocked — the desired outcome
+                ;;
+            *)
+                err "[demo] canary probe could not RUN in the guest (SSH failed; no sentinel returned)."
+                err "[demo] The connection failure cannot be attributed to isolation — failing closed."
+                exit 14
+                ;;
+        esac
         if ! kill -0 "$CANARY_PID" 2>/dev/null; then
             err "[demo] canary listener died during the probe window — the guest's"
             err "[demo] connection failure cannot be attributed to isolation. Re-run."
