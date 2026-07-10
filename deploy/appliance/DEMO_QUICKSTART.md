@@ -75,17 +75,26 @@ bash deploy/appliance/smoke/smoke-local.sh --real --demo
 
 That boots the VM on a disposable overlay, seeds the demo, drives the whole
 loop headlessly, and prints PASS/FAIL. It is the same path your browser
-will take.
+will take. The demo smoke also blocks guest-initiated outbound networking by
+default (QEMU user-net `restrict=on`; the loopback port forwards are
+unaffected) and proves it with an in-guest canary probe — set
+`ICN_APPLIANCE_ALLOW_OUTBOUND=1` to permit outbound. This applies to the QEMU
+smoke only; an already-running Proxmox/cloud node's network isolation is
+operator-provided (see the runbook's "Network posture" section).
 
 **Manual (for the browser demo):** boot QEMU yourself with the demo ports
-forwarded:
+forwarded. `restrict=on` matches the scripted smoke's default posture —
+guest-initiated outbound is blocked while the loopback port forwards keep
+working. Drop `,restrict=on` only if you deliberately want guest outbound;
+note the manual path never runs the smoke's isolation canary either way, so
+the scripted smoke remains the proven route:
 
 ```bash
 qemu-img create -f qcow2 -b "$IMAGE" -F qcow2 overlay.qcow2
 qemu-system-x86_64 -machine accel=kvm:tcg -m 2048 -smp 2 -display none \
   -drive if=virtio,format=qcow2,file=overlay.qcow2 \
   -drive if=virtio,format=raw,file=seed.iso,readonly=on \
-  -netdev user,id=net0,hostfwd=tcp:127.0.0.1:2222-:22,hostfwd=tcp:127.0.0.1:18080-:8080,hostfwd=tcp:127.0.0.1:18090-:8090 \
+  -netdev user,id=net0,hostfwd=tcp:127.0.0.1:2222-:22,hostfwd=tcp:127.0.0.1:18080-:8080,hostfwd=tcp:127.0.0.1:18090-:8090,restrict=on \
   -device virtio-net-pci,netdev=net0 -nographic
 ```
 

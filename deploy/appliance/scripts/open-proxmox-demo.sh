@@ -74,6 +74,27 @@ err()  { printf '[demo-open] ERROR: %s\n' "$*" >&2; }
 # curl is used for the post-tunnel readiness wait — require it up front.
 command -v curl >/dev/null 2>&1 || { err "curl is required but not found on PATH."; exit 2; }
 
+# ---- preflight: overridable ports must be strict decimal 1..65535 ----
+# The jump route flattens the forward flags into a remote shell command
+# (printf -v INNER ... "${FWD[*]}"), so a non-numeric port value would be
+# word-split and executed on the jump host. The free-port /dev/tcp probe
+# below silently tolerates junk values (a failed redirect just skips the
+# branch), so validate BEFORE any use. SHELL_PORT is a fixed literal.
+for pv in "ICN_DEMO_GW_PORT=$GW_PORT" "ICN_DEMO_SESSION_PORT=$SESSION_PORT"; do
+  pv_name="${pv%%=*}"
+  pv_val="${pv#*=}"
+  case "$pv_val" in
+    ''|*[!0-9]*)
+      err "$pv_name must be a decimal TCP port (1-65535); got: '$pv_val'"
+      exit 2
+      ;;
+  esac
+  if [ "$pv_val" -lt 1 ] || [ "$pv_val" -gt 65535 ]; then
+    err "$pv_name out of range 1-65535: $pv_val"
+    exit 2
+  fi
+done
+
 # ---- preflight: required host ports free ----
 for p in "$GW_PORT" "$SHELL_PORT" "$SESSION_PORT"; do
   if (exec 3<>"/dev/tcp/127.0.0.1/$p") 2>/dev/null; then
