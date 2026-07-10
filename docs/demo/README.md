@@ -19,6 +19,7 @@
 | [JULY_DEMO_OPERATOR_CHECKLIST.md](JULY_DEMO_OPERATOR_CHECKLIST.md) | **Keep-open live-demo card** — preflight, launch command, expected states, and panic fixes. |
 | [JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md](JULY_DEMO_CANDIDATE_0.1_OPERATOR_SCRIPT.md) | **Reviewer / evidence-hygiene handoff** — claim boundary by proof level, secret/evidence capture, known-gaps map, reviewer checklist. |
 | [deploy/appliance/DEMO_QUICKSTART.md](../../deploy/appliance/DEMO_QUICKSTART.md) | **Appliance build/run** — image build, the one-command launcher, and the manual fallback. |
+| [ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md](ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md) | **Rehearsal Node v0.1 operator runbook** — the named wrapper entrypoint over the appliance DEV/DEMO profile (smoke an image, open a running node, print verification steps), what it proves / does not prove, and how it relates to the other run paths. |
 | [JULY_DEMO_CANDIDATE_0.1_ACCESSIBILITY_WALKTHROUGH.md](JULY_DEMO_CANDIDATE_0.1_ACCESSIBILITY_WALKTHROUGH.md) | **Accessibility + rendered-browser evidence** — the 12-category organizer/member gate outcome, automated axe + keyboard results, what a reviewer can verify, and the human screen-reader/zoom pass still owed. |
 
 > The sections below describe the older one-click tool-library / devnet demo,

@@ -127,6 +127,17 @@ independent organizations — it demonstrates that nodes are
 self-contained, not that production federation exists (that remains
 design-only).
 
+## Appliance rehearsal node (VM route)
+
+If you want the Path 1/2 single-node loop as a disposable local VM with a
+browser launcher instead of a workstation process, the appliance DEV/DEMO
+profile has a named wrapper: `deploy/appliance/scripts/icn-rehearsal-node.sh`
+— see
+[docs/demo/ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md](../docs/demo/ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md).
+It requires a locally built demo-profile image first (not a two-minute path).
+Same honesty tier as Paths 1–2: live-local — not production, not a pilot, not
+federation.
+
 ## Presenter path — scripted flows on owned infrastructure
 
 `demo/scripts/flow-1-governance.sh` through `flow-5-compute.sh` (plus
