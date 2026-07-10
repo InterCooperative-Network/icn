@@ -57,7 +57,11 @@ use icn_governance_actor::{ActionItemCompletionReceipt, ActionItemTransition};
 
 use icn_governance_actor::http::models::{
     ActionCard, ActionCardActionKind, ActionCardRiskLevel, ActionCardScope, ActionCardSourceKind,
-    ActionCardsResponse, StandingDomainMembership, StandingResponse, StandingRoleAssignment,
+    ActionCardsResponse, PendingPublishOrigin, PendingPublishProvenance,
+    PendingPublishReceiptCategory, PendingPublishReceiptExpectation, PendingPublishRiskLevel,
+    PendingPublishRow, PendingPublishRowKind, PendingPublishRowStatus,
+    PendingPublishSummaryResponse, StandingDomainMembership, StandingResponse,
+    StandingRoleAssignment,
 };
 
 /// OpenAPI documentation for ICN Gateway
@@ -75,6 +79,7 @@ use icn_governance_actor::http::models::{
         // standing → action card → discharge → receipt.
         icn_governance_actor::http::handlers::get_my_standing,
         icn_governance_actor::http::handlers::get_my_action_cards,
+        icn_governance_actor::http::handlers::get_my_pending_publish_summary,
         icn_governance_actor::http::handlers::get_action_item_completion_receipt,
     ),
     modifiers(&SecurityAddon),
@@ -151,6 +156,11 @@ use icn_governance_actor::http::models::{
             StandingResponse, StandingDomainMembership, StandingRoleAssignment,
             ActionCardsResponse, ActionCard, ActionCardSourceKind, ActionCardActionKind,
             ActionCardScope, ActionCardRiskLevel,
+            // Pending-publish preview/review read model (#1728)
+            PendingPublishSummaryResponse, PendingPublishRow, PendingPublishOrigin,
+            PendingPublishRowKind, PendingPublishRowStatus, PendingPublishRiskLevel,
+            PendingPublishProvenance, PendingPublishReceiptExpectation,
+            PendingPublishReceiptCategory,
             ActionItemCompletionReceipt, ActionItemTransition,
             // Shared types
             DeviceInfo, Platform, InAppNotification,

@@ -869,6 +869,10 @@ where
         .service(
             web::resource("/me/action-cards")
                 .route(web::get().to(handlers::get_my_action_cards::<E>)),
+        )
+        .service(
+            web::resource("/me/pending-publish-summary")
+                .route(web::get().to(handlers::get_my_pending_publish_summary::<E>)),
         );
 }
 

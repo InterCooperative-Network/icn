@@ -167,6 +167,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/gov/me/pending-publish-summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * `GET /v1/gov/me/pending-publish-summary` — the runtime read-model for #1728.
+         * @description Serves the shape of `urn:icn:contract:pending-publish-summary:v1` over the
+         *     gateway so the organizer rehearsal shell (#1726) can bind to a real endpoint
+         *     for the "preview parsed proposals before any publish/mutation" step, the same
+         *     way it binds to `/v1/gov/me/standing` and `/v1/gov/me/action-cards`.
+         *
+         *     Read-only and self-scoped (`governance:read`, caller = token subject). It
+         *     performs no write, grants no authority, and creates no action card. There is
+         *     no runtime pending-publish source object today, so:
+         *       - in the `production` build mode it returns **no** rows
+         *         (`origin = live_runtime`) — nothing fictional is ever served on a
+         *         production surface;
+         *       - in non-production (bootstrap/test) modes it returns deterministic,
+         *         clearly-labeled committed-fixture rows (`origin = committed_fixture`) so
+         *         the rehearsal shell has real rows to render. These rows are fictional and
+         *         generic (no institution-specific nouns, no DIDs, no private paths).
+         */
+        get: operations["get_my_pending_publish_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/gov/me/standing": {
         parameters: {
             query?: never;
@@ -852,6 +886,116 @@ export interface components {
             total?: number | null;
         };
         /**
+         * @description Where the rows in a [`PendingPublishSummaryResponse`] come from. Closed
+         *     taxonomy so a client can never confuse fixture rehearsal data with live state.
+         * @enum {string}
+         */
+        PendingPublishOrigin: "live_runtime" | "committed_fixture";
+        /**
+         * @description Provenance category of a row's source material. Closed taxonomy mirroring the
+         *     contract's `source_provenance_ref.category`.
+         * @enum {string}
+         */
+        PendingPublishProvenance: "committed_fixture" | "meeting_record" | "governance_record" | "example_snippet" | "repo_safe_paste" | "prior_evidence_packet";
+        /**
+         * @description Expected-receipt class for a pending-publish row. Closed taxonomy mirroring
+         *     the contract's `receipt_expected.category`. This labels an evidence
+         *     EXPECTATION for the reviewer — it is not an issued receipt and grants no
+         *     authority.
+         * @enum {string}
+         */
+        PendingPublishReceiptCategory: "governance_receipt" | "attendance_receipt" | "action_item_completion_receipt" | "settlement_receipt" | "none";
+        /**
+         * @description Whether a pending-publish row is expected to produce a receipt if published,
+         *     and of which class. Evidence expectation only.
+         */
+        PendingPublishReceiptExpectation: {
+            category: components["schemas"]["PendingPublishReceiptCategory"];
+            expected: boolean;
+        };
+        /**
+         * @description Coarse risk indicator for a pending-publish row. Same three-level vocabulary
+         *     as [`ActionCardRiskLevel`]; UI may sort or annotate but must not hide rows.
+         * @enum {string}
+         */
+        PendingPublishRiskLevel: "low" | "normal" | "elevated";
+        /**
+         * @description One pending-publish preview/review row. Read-only description of something an
+         *     organizer would review *before* any publish/mutation. All labels are plain
+         *     language and generic; there are no DIDs, no private paths, and no
+         *     institution-specific nouns.
+         */
+        PendingPublishRow: {
+            /** @description Accessibility note for the rendering shell (ADR-0028). */
+            accessibility_hint: string;
+            /** @description Plain-language assignee label (never a DID). `None` when not applicable. */
+            assignee_label?: string | null;
+            /**
+             * @description Why review/action here is legitimate, in plain language. Mirrors
+             *     `ActionCard.authority_basis`.
+             */
+            authority_basis: string;
+            /** @description Plain-language label of the governing body that would own the result. */
+            governing_body_label: string;
+            /** @description Stable, opaque row id. */
+            id: string;
+            kind: components["schemas"]["PendingPublishRowKind"];
+            /** @description One-line plain-language summary of what would be published. */
+            plain_summary: string;
+            receipt_expected: components["schemas"]["PendingPublishReceiptExpectation"];
+            risk_level: components["schemas"]["PendingPublishRiskLevel"];
+            source_provenance: components["schemas"]["PendingPublishProvenance"];
+            status: components["schemas"]["PendingPublishRowStatus"];
+            /** @description Plain-language label of what this row targets (a scope label, never a DID). */
+            target_scope_label: string;
+        };
+        /**
+         * @description Closed taxonomy of pending-publish row kinds. Mirrors the `kind` enum of
+         *     `urn:icn:contract:pending-publish-summary:v1`. Economic-adjacent kinds use
+         *     regulatory-safe vocabulary only: `obligation`, `allocation`, and `settlement`
+         *     describe internal cooperative coordination primitives, never money
+         *     transmission or stored value.
+         * @enum {string}
+         */
+        PendingPublishRowKind: "action_item" | "decision" | "attendance" | "obligation" | "allocation" | "settlement" | "evidence_note" | "risk_note";
+        /**
+         * @description Review disposition of a pending-publish row. Closed taxonomy mirroring the
+         *     contract's row `status`. A status is a review state, never an authorization.
+         * @enum {string}
+         */
+        PendingPublishRowStatus: "pending_review" | "approved_for_publish" | "rejected" | "needs_edit" | "needs_more_info";
+        /**
+         * @description Wrapper response for `GET /v1/gov/me/pending-publish-summary` (issue #1728).
+         *
+         *     Runtime projection of `urn:icn:contract:pending-publish-summary:v1`. Serves
+         *     the contract shape over the gateway so the organizer rehearsal shell has a
+         *     real endpoint to bind to. In the `production` build mode `rows` is always
+         *     empty (`origin = live_runtime`); non-production modes serve deterministic
+         *     committed-fixture rows (`origin = committed_fixture`).
+         */
+        PendingPublishSummaryResponse: {
+            /** @description The authenticated caller's DID. */
+            did: string;
+            /**
+             * Format: int64
+             * @description Unix-seconds when this snapshot was computed. Nothing is cached
+             *     server-side.
+             */
+            generated_at: number;
+            /**
+             * @description Standing non-claims restated on the wire so a consumer cannot read the
+             *     rows as live/authoritative.
+             */
+            non_claims: string[];
+            /** @description Where `rows` come from — live runtime (empty) or committed fixtures. */
+            origin: components["schemas"]["PendingPublishOrigin"];
+            /**
+             * @description Pending-publish rows to review. May be empty. Read-only; nothing here is
+             *     authorization or a target write.
+             */
+            rows: components["schemas"]["PendingPublishRow"][];
+        };
+        /**
          * @description Device platform type
          * @enum {string}
          */
@@ -1433,6 +1577,40 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ActionCardsResponse"];
+                };
+            };
+            /** @description Missing or invalid bearer token */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Token lacks the `governance:read` scope */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    get_my_pending_publish_summary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Pending-publish preview/review rows for the caller, wrapped in `PendingPublishSummaryResponse` (`{did, origin, rows, non_claims, generated_at}`). Runtime projection of `urn:icn:contract:pending-publish-summary:v1`. Read-only: there is no mutation API on this surface, no authority is granted, and no action card is created. `origin = live_runtime` (production) returns no rows; `origin = committed_fixture` (non-production) returns deterministic, fictional rehearsal rows. Row `kind`, `status`, `risk_level`, `source_provenance`, and `receipt_expected.category` use closed enums. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PendingPublishSummaryResponse"];
                 };
             };
             /** @description Missing or invalid bearer token */
