@@ -19,8 +19,19 @@ for a merge of that number in `git log <ref>` (full commit message, strict
 `#N` boundary). Confirmation is POSITIVE-evidence-only: if a merge cannot be
 confirmed from git history, the check stays silent rather than cry wolf.
 
+WHAT THIS CHECK DOES NOT CATCH (known limitation, #2384): merged work with NO
+sync block at all. The stale-claim scan validates text that exists; it cannot
+see silence — 62 commits landed 2026-07-02..2026-07-09 with no truth-root
+block and this guard stayed green. As a floor, the check now also emits a
+WARN-ONLY commit-lag advisory: commits on --ref since the last commit that
+touched STATE.md, `::warning::` above --max-commit-lag (default 25; 0
+disables). The advisory never changes the exit code — it detects silence, not
+substance, and only surfaces when this script actually runs (the CI trigger is
+path-filtered to STATE.md/script/workflow changes; a scheduled run is #2384's
+scope, not claimed here).
+
 Exit codes (mirrors generate_repo_record.py / the generated-truth gate):
-    0  no lag found (or nothing to check)
+    0  no lag found (or nothing to check; commit-lag advisory alone never flips this)
     1  lag found -> advisory; CI maps this to ::warning::, does not block
     2  checker error (STATE.md unreadable, non-git checkout, or unresolvable --ref) -> real breakage
 
@@ -117,6 +128,50 @@ def git_merge_evidence(ref_num: str, repo: Path, gitref: str) -> str | None:
     return None
 
 
+def commit_lag_advisory(repo: Path, gitref: str, state: Path, threshold: int) -> None:
+    """WARN-ONLY: count commits on `gitref` since the last commit touching STATE.md.
+
+    Detects the missing-sync-block class of drift (#2384) as an annotation, never
+    an exit-code change: a high count means main moved without a truth-root edit.
+    Silent when under threshold, when the pathspec cannot be derived (STATE.md
+    outside the repo), when STATE.md has no commit history on the ref, or when
+    `threshold` is 0. On a SHALLOW clone the count is wrong (the graft boundary
+    masquerades as the last STATE.md edit), so the advisory announces itself as
+    skipped instead of reporting a false low count — CI must fetch full history
+    for this to work (generated-truth.yml sets fetch-depth: 0)."""
+    if threshold <= 0:
+        return
+    try:
+        pathspec = str(state.resolve().relative_to(repo))
+    except ValueError:
+        return
+    try:
+        shallow = subprocess.check_output(
+            ["git", "-C", str(repo), "rev-parse", "--is-shallow-repository"],
+            text=True, stderr=subprocess.DEVNULL).strip()
+    except subprocess.CalledProcessError:
+        return
+    if shallow == "true":
+        print("commit-lag advisory: skipped on shallow clone — truncated history would "
+              "yield a false low count. Fetch full history (fetch-depth: 0) to enable; see #2384.")
+        return
+    try:
+        last = subprocess.check_output(
+            ["git", "-C", str(repo), "log", "-1", "--format=%H", gitref, "--", pathspec],
+            text=True, stderr=subprocess.DEVNULL).strip()
+        if not last:
+            return
+        count = int(subprocess.check_output(
+            ["git", "-C", str(repo), "rev-list", "--count", f"{last}..{gitref}"],
+            text=True, stderr=subprocess.DEVNULL).strip())
+    except (subprocess.CalledProcessError, ValueError):
+        return
+    if count > threshold:
+        print(f"::warning::truth-root commit lag: {count} commit(s) on {gitref} since "
+              f"{pathspec} was last edited ({last[:8]}) — above --max-commit-lag={threshold}. "
+              "Merged work may lack a truth-root sync block; see #2384. Advisory only.")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Canonical-state lag check for docs/STATE.md")
     ap.add_argument("--repo", default=str(repo_root()), help="repo root (default: git toplevel)")
@@ -124,6 +179,9 @@ def main() -> int:
     ap.add_argument("--ref", default="HEAD", help="git ref to treat as merged history (default: HEAD)")
     ap.add_argument("--all", action="store_true",
                     help="scan ALL sync blocks, not just the newest (audit mode)")
+    ap.add_argument("--max-commit-lag", type=int, default=25, metavar="N",
+                    help="warn (advisory only, exit code unchanged) when more than N commits "
+                         "landed on --ref since STATE.md was last edited; 0 disables (default: 25)")
     args = ap.parse_args()
 
     repo = Path(args.repo).resolve()
@@ -145,6 +203,8 @@ def main() -> int:
         print(f"::error::not a git work tree at {repo}, or unresolvable --ref {args.ref!r}",
               file=sys.stderr)
         return 2
+
+    commit_lag_advisory(repo, args.ref, state, args.max_commit_lag)
 
     text = state.read_text(encoding="utf-8")
     scope = all_blocks(text) if args.all else newest_block(text)
