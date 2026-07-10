@@ -159,8 +159,10 @@ one command away inside the same VM.
 - The demo-profile image must be built or staged separately
   (`build-image.sh --real` with `ICN_APPLIANCE_DEMO_PROFILE=1`); the wrapper
   does not build or download images.
-- The wrapper does not create the Debian base image or the cloud-init seed by
-  itself.
+- The wrapper does not create the Debian base image or a cloud-init seed
+  itself; it only preflights the seed precondition described in Fast path A
+  (pre-built ISO, or an edited `user-data.example.yaml` from which smoke-local
+  builds one).
 - The shell is the member-shell v0 reference client, not a production app and
   not the #1726 organizer rehearsal shell; the human assistive-technology pass
   (#2041) is still owed, and only automated accessibility evidence exists.

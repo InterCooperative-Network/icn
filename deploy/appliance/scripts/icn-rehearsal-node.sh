@@ -36,6 +36,9 @@
 #   ICN_DEMO_SSH_KEY      direct route        SSH key on this workstation
 #   ICN_DEMO_JUMP         jump route          user@jump-host
 #   ICN_DEMO_REMOTE_KEY   jump route          key path on the jump host
+#   ICN_DEMO_SSH_USER     optional            VM ssh user (default: debian)
+#   Other launcher knobs (ICN_DEMO_GW_PORT, ICN_DEMO_SESSION_PORT,
+#   ICN_DEMO_NO_BROWSER, ...) pass through to open-proxmox-demo.sh unchanged.
 #
 # What this wrapper does NOT do:
 #   - does not build or download images (see build-image.sh)
