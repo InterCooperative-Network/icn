@@ -133,13 +133,27 @@ def commit_lag_advisory(repo: Path, gitref: str, state: Path, threshold: int) ->
 
     Detects the missing-sync-block class of drift (#2384) as an annotation, never
     an exit-code change: a high count means main moved without a truth-root edit.
-    Silent when the pathspec cannot be derived (STATE.md outside the repo), when
-    STATE.md has no commit history on the ref, or when `threshold` is 0."""
+    Silent when under threshold, when the pathspec cannot be derived (STATE.md
+    outside the repo), when STATE.md has no commit history on the ref, or when
+    `threshold` is 0. On a SHALLOW clone the count is wrong (the graft boundary
+    masquerades as the last STATE.md edit), so the advisory announces itself as
+    skipped instead of reporting a false low count — CI must fetch full history
+    for this to work (generated-truth.yml sets fetch-depth: 0)."""
     if threshold <= 0:
         return
     try:
         pathspec = str(state.resolve().relative_to(repo))
     except ValueError:
+        return
+    try:
+        shallow = subprocess.check_output(
+            ["git", "-C", str(repo), "rev-parse", "--is-shallow-repository"],
+            text=True, stderr=subprocess.DEVNULL).strip()
+    except subprocess.CalledProcessError:
+        return
+    if shallow == "true":
+        print("commit-lag advisory: skipped on shallow clone — truncated history would "
+              "yield a false low count. Fetch full history (fetch-depth: 0) to enable; see #2384.")
         return
     try:
         last = subprocess.check_output(
@@ -156,9 +170,6 @@ def commit_lag_advisory(repo: Path, gitref: str, state: Path, threshold: int) ->
         print(f"::warning::truth-root commit lag: {count} commit(s) on {gitref} since "
               f"{pathspec} was last edited ({last[:8]}) — above --max-commit-lag={threshold}. "
               "Merged work may lack a truth-root sync block; see #2384. Advisory only.")
-    else:
-        print(f"commit-lag advisory: {count} commit(s) since {pathspec} last edited "
-              f"(threshold {threshold}) — OK.")
 
 
 def main() -> int:

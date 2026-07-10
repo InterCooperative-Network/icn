@@ -56,6 +56,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          # Full history: check-state-lag.py's commit-lag advisory counts commits
+          # since docs/STATE.md was last edited; on the default shallow (depth-1)
+          # checkout that count is wrong (the graft boundary masquerades as the
+          # last edit), and the script skips itself on shallow clones (#2384).
+          fetch-depth: 0
 
       - name: Set up Python
         uses: actions/setup-python@v6
