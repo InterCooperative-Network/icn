@@ -80,6 +80,14 @@ h3 { font-size: 1.05rem; }
 .lede { color: var(--ink-muted); }
 .muted { color: var(--ink-muted); }
 .explain { color: var(--ink-muted); }
+/* #1726 review-preview boundary note: prominent, full-contrast (not muted),
+   marked with an accent rule. Uses existing tokens only (no new colors). */
+.explain.boundary {
+  color: var(--ink);
+  border-left: 3px solid var(--accent);
+  padding-left: 0.6rem;
+  font-weight: 600;
+}
 
 .mode-nav {
   list-style: none;

@@ -143,6 +143,28 @@
     <ul id="cards-list" class="card-list"></ul>
   </section>
 
+  <!-- Pending-publish review preview (#1726 / #2386): read-only rendering of
+       GET /v1/gov/me/pending-publish-summary. Preview rows are evidence
+       presented for review — not authorization, publication, custody writes,
+       or completed actions. There are NO decision controls here; this surface
+       records nothing. In demo mode the rows come from a committed fixture
+       (fictional rehearsal data); in live mode they come from the gateway. -->
+  <section id="pending-publish-section" hidden aria-labelledby="pending-publish-h">
+    <h2 id="pending-publish-h" data-i18n="pendingPublish.heading">Review preview</h2>
+    <p class="explain" data-i18n="pendingPublish.explain">
+      These are items proposed for review before anything is recorded or
+      published. Each shows what it is, where it applies, its review status,
+      and what evidence is expected later. Nothing here authorizes, publishes,
+      or completes anything.
+    </p>
+    <p id="pending-publish-origin" class="chip" role="status" aria-live="polite"></p>
+    <p class="explain boundary" data-i18n="pendingPublish.boundary">
+      Preview rows are evidence presented for review. They are not
+      authorization, publication, custody writes, or completed actions.
+    </p>
+    <ul id="pending-publish-list" class="card-list"></ul>
+  </section>
+
   <!-- Receipts -->
   <section id="receipts-section" hidden aria-labelledby="receipts-h">
     <h2 id="receipts-h" data-i18n="receipts.heading">Receipts</h2>

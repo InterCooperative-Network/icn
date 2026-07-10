@@ -64,6 +64,14 @@ const { mkdirSync, writeFileSync } = require('node:fs');
     log('cards_count', await page.locator('#cards-list > li').count().catch(() => -1));
     log('receipts_visible', await page.isVisible('#receipts-section').catch(() => false));
     log('receipts_count', await page.locator('#receipts-list > li').count().catch(() => -1));
+    // #1726 pending-publish review-preview panel (demo mode renders it from the
+    // committed fixture). axe (below) already scans it as part of the full page.
+    const ppText = (await page.textContent('#pending-publish-section').catch(() => '')) || '';
+    log('pending_publish_visible', await page.isVisible('#pending-publish-section').catch(() => false));
+    log('pending_publish_count', await page.locator('#pending-publish-list > li').count().catch(() => -1));
+    log('pending_publish_origin', ((await page.textContent('#pending-publish-origin').catch(() => '')) || '').trim());
+    log('pending_publish_no_did_leak', !/did:icn:/i.test(ppText));
+    log('pending_publish_boundary_present', /evidence presented for review|not authorization/i.test(ppText));
     const bodyText = (await page.textContent('body')) || '';
     log('evidence_language_present', /evidence|receipt|provenance|proves|Show evidence/i.test(bodyText));
     log('receipt_show_evidence_control', await page.locator('text=/Show evidence detail/i').count().catch(() => 0));
@@ -141,6 +149,18 @@ const { mkdirSync, writeFileSync } = require('node:fs');
     }
     if (report.steps.reduced_motion_standing_visible !== true) {
       failures.push('reduced-motion: standing pane not visible');
+    }
+    // The pending-publish panel renders only in the DEFAULT demo view. The
+    // community (#2084) and process-evidence (#2289) sets are self-contained
+    // walkthroughs that intentionally omit it, so only require the panel when
+    // auditing the default view (SET unset) — otherwise this would break those
+    // variants' accessibility/evidence regeneration paths.
+    const ppExpected = SET === '';
+    if (ppExpected && report.steps.pending_publish_visible !== true) {
+      failures.push('pending-publish review-preview panel not visible in demo mode');
+    }
+    if (ppExpected && report.steps.pending_publish_no_did_leak !== true) {
+      failures.push('pending-publish panel leaked a did:icn: identifier');
     }
     if (failures.length) {
       throw new Error('accessibility checks FAILED — ' + failures.join('; ') +
