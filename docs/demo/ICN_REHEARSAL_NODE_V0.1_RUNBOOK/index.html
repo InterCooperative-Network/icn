@@ -191,6 +191,46 @@ gateway and emits a repo-safe evidence packet conforming to
 prints these steps (and ready-to-copy ssh one-liners when the route env vars
 are set); it never executes anything remotely.</li>
 </ul>
+<h2>Network posture (which route guarantees what)</h2>
+<p>The two fast paths make <strong>different</strong> isolation promises. Do not collapse
+them.</p>
+<p><strong>Fast path A (<code>smoke-image</code>) — enforced and proven.</strong> The demo smoke boots
+the disposable VM with QEMU user-net <code>restrict=on</code> by default. Per the QEMU
+manual, the guest &quot;will not be able to contact the host and no guest IP
+packets will be routed over the host to the outside,&quot; while explicitly set
+<code>hostfwd</code> rules (SSH, gateway, member shell) are unaffected. Two proofs back
+this:</p>
+<ul>
+<li><em>Static (runs everywhere, including offline CI):</em>
+<code>deploy/appliance/smoke/net-restrict-check.sh</code> asserts the constructed
+<code>-netdev</code> string — demo default restricted, override honored, base smoke
+unchanged — and is wired into <code>deploy/appliance/check.sh</code>.</li>
+<li><em>Runtime (runs on every real <code>--demo</code> smoke):</em> the smoke starts a canary
+listener on host loopback, verifies it is reachable <strong>from the host</strong>, then
+proves it is <strong>unreachable from the guest</strong> via the <code>10.0.2.2</code> slirp host
+alias. No public internet host is involved, so an offline runner cannot
+false-pass; a guest that reaches the listener fails the smoke loudly
+(FAIL-OPEN). Setting <code>ICN_APPLIANCE_ALLOW_OUTBOUND=1</code> permits outbound,
+skips the canary, and says so in the output and the PASS footer.</li>
+</ul>
+<p>What was tested <strong>statically</strong> in this change: the netdev construction matrix
+(4 cases) and all script negative paths. What was tested <strong>through a running
+VM</strong>: nothing in this change — no built demo-profile image is staged on this
+development VM, so the restricted boot and in-guest canary run for the first
+time on the next real <code>smoke-image</code> execution. Until then, &quot;blocked by
+default&quot; is a documented-QEMU-semantics + static-construction claim, not a
+witnessed runtime result. If the restricted boot misbehaves, rerun with
+<code>ICN_APPLIANCE_ALLOW_OUTBOUND=1</code> and file the finding.</p>
+<p><strong>Fast path B (<code>open-running-node</code>) — operator-provided, not enforced.</strong> The
+launcher opens SSH tunnels to an already-running VM; it cannot and does not
+seal that VM&#39;s network. The demo profile binds its services beyond loopback
+inside the VM, so an already-running node on a bridged network is reachable
+from that network regardless of anything this wrapper does. The wrapper
+states this on every run and adds a bounded, warn-only exposure preflight: if
+the node&#39;s gateway port answers this workstation directly, it warns; if it
+does not, that is explicitly <strong>not</strong> proof of isolation. A real sealed-node
+firewall profile does not exist yet; until it does, the no-outbound-by-default
+claim is scoped to the disposable local QEMU route only.</p>
 <h2>Relationship to other ICN run paths</h2>
 <table>
 <thead>
@@ -243,9 +283,12 @@ builds one).</li>
 <li>The shell is the member-shell v0 reference client, not a production app and
 not the #1726 organizer rehearsal shell; the human assistive-technology pass
 (#2041) is still owed, and only automated accessibility evidence exists.</li>
-<li>Demo mode&#39;s &quot;no outbound network&quot; property is by construction of the VM and
-tunnels, not yet proven by a dedicated guard/test — that is #1727&#39;s
-deliverable, not this runbook&#39;s claim.</li>
+<li>The no-outbound guarantee is scoped to the <code>smoke-image</code> QEMU route (see
+&quot;Network posture&quot;): enforced by default, statically tested, canary-proven on
+each real <code>--demo</code> run — but not yet witnessed on a live VM from this change
+itself. The <code>open-running-node</code> route stays operator-provided. #1727&#39;s
+shell-level demo-mode criteria (fixture loader as default, live mode as a
+labeled opt-in with a mutation warning) remain open.</li>
 <li>Action cards derive from three of five source paths; <code>signal_rule</code> and
 <code>obligation_lifecycle</code> are reserved and not emitted.</li>
 <li>v0.2 (a two-node local proof) is a separate follow-up issue, not this path.</li>
