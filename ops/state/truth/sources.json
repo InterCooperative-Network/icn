@@ -12,7 +12,7 @@
       "owner": "ops/state/config/repo-map.json",
       "sections": ["repos", "org_repos", "worktrees", "relationships", "infrastructure"],
       "stability": "slow-changing",
-      "description": "Monorepo layout, subdirectory purposes, org-repo coordination metadata (org_repos), worktree root, K3s cluster IPs. org_repos is repo discovery / coordination metadata, not architectural truth — role/boundary meaning stays with docs/ATLAS.md + ops/state/ecosystem.json, and ops/state/truth/sources.json (this arbiter file, not repo-map.json) wins on truth-ownership conflicts."
+      "description": "Monorepo layout, subdirectory purposes, org-repo coordination metadata (org_repos), worktree root, K3s cluster ROLES (concrete addresses are private — network-ops). org_repos is repo discovery / coordination metadata, not architectural truth — role/boundary meaning stays with docs/ATLAS.md + ops/state/ecosystem.json, and ops/state/truth/sources.json (this arbiter file, not repo-map.json) wins on truth-ownership conflicts."
     },
     "sprint_state": {
       "owner": "ops/state/sprint/current.json",
@@ -53,7 +53,7 @@
     "cluster_topology": {
       "owner": "ops/state/config/repo-map.json#infrastructure",
       "stability": "slow-changing",
-      "description": "K3s node IPs, service ports. Source: repo-map.json .infrastructure.k3s"
+      "description": "K3s node/service ROLES only (role:<name> tokens). Concrete node IPs / service ports are private operational values (docs/ATLAS.md §5) held in the private network-ops repo, never in this public map; repo-map.json .infrastructure.k3s lists roles, resolve to addresses only from the private source."
     },
     "invariants": {
       "owner": "AGENTS.md",
@@ -88,7 +88,7 @@
   "forbidden": [
     "Do NOT hardcode sprint numbers in skills or agents — read ops/state/sprint/current.json",
     "Do NOT hardcode PR numbers or branch lists — query via gh",
-    "Do NOT hardcode cluster IPs — read from repo-map.json#infrastructure",
+    "Do NOT hardcode cluster IPs — repo-map.json#infrastructure lists ROLES only; resolve concrete addresses from the private network-ops source",
     "Do NOT use icn-ops/state paths — canonical is ops/state/ (inside monorepo)",
     "Do NOT use icn-website/ paths — canonical is website/ (inside monorepo)",
     "Do NOT reference sync-from-icn.sh — the website reads docs directly"
