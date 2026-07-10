@@ -6164,12 +6164,12 @@ pub async fn get_my_action_cards<E: GovernanceEventEmitter + Clone + 'static>(
     }))
 }
 
-/// `GET /me/pending-publish-summary` — the runtime read-model for issue #1728.
+/// `GET /v1/gov/me/pending-publish-summary` — the runtime read-model for #1728.
 ///
 /// Serves the shape of `urn:icn:contract:pending-publish-summary:v1` over the
 /// gateway so the organizer rehearsal shell (#1726) can bind to a real endpoint
 /// for the "preview parsed proposals before any publish/mutation" step, the same
-/// way it binds to `/me/standing` and `/me/action-cards`.
+/// way it binds to `/v1/gov/me/standing` and `/v1/gov/me/action-cards`.
 ///
 /// Read-only and self-scoped (`governance:read`, caller = token subject). It
 /// performs no write, grants no authority, and creates no action card. There is

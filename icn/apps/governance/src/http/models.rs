@@ -480,7 +480,7 @@ pub struct ActionCardsResponse {
 
 // ============================================================================
 // Pending-publish preview/review read model
-// (read model for `GET /me/pending-publish-summary`, issue #1728)
+// (read model for `GET /v1/gov/me/pending-publish-summary`, issue #1728)
 // ============================================================================
 //
 // This is the runtime projection of `urn:icn:contract:pending-publish-summary:v1`
@@ -497,7 +497,7 @@ pub struct ActionCardsResponse {
 //   - No institution-specific vocabulary. All labels are generic strings; the
 //     closed enums carry no package nouns. Institution packages translate their
 //     local templates into these generic kinds (same firewall as `ActionCard`).
-//   - `expected_receipt` labels an evidence EXPECTATION, not an issued receipt
+//   - `receipt_expected` labels an evidence EXPECTATION, not an issued receipt
 //     and not authority.
 
 /// Where the rows in a [`PendingPublishSummaryResponse`] come from. Closed
@@ -619,7 +619,7 @@ pub struct PendingPublishRow {
     pub receipt_expected: PendingPublishReceiptExpectation,
 }
 
-/// Wrapper response for `GET /me/pending-publish-summary` (issue #1728).
+/// Wrapper response for `GET /v1/gov/me/pending-publish-summary` (issue #1728).
 ///
 /// Runtime projection of `urn:icn:contract:pending-publish-summary:v1`. Serves
 /// the contract shape over the gateway so the organizer rehearsal shell has a
