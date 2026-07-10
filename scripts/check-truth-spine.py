@@ -47,11 +47,21 @@ _IPV4_RE = re.compile(
 _IPV4_ALLOWED_RE = re.compile(
     r"^(?:127\.|0\.0\.0\.0$|10\.0\.2\.2$|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.)"
 )
-# IPv6 literals: full/partial (>=5 hex:hex groups — safely above a HH:MM:SS time)
-# or any "::" compression. Broad on purpose (a boundary guard should fail closed).
+# IPv6 literals — comprehensive: full 8-group, or any "::" compression anywhere in
+# the token (including mid-address). Requires 8 groups (7 colons) or a "::", so a
+# HH:MM:SS time (2 colons, no "::") is NOT matched. A boundary guard fails closed.
 _IPV6_RE = re.compile(
-    r"(?<![\w:.])(?:[A-Fa-f0-9]{1,4}:){4,7}[A-Fa-f0-9]{1,4}(?![\w:.])"
-    r"|(?<![\w:.])[A-Fa-f0-9]{0,4}::[A-Fa-f0-9:]*[A-Fa-f0-9](?![\w:.])"
+    r"(?<![:.\w])(?:"
+    r"(?:[A-Fa-f0-9]{1,4}:){7}[A-Fa-f0-9]{1,4}"
+    r"|(?:[A-Fa-f0-9]{1,4}:){1,7}:"
+    r"|(?:[A-Fa-f0-9]{1,4}:){1,6}:[A-Fa-f0-9]{1,4}"
+    r"|(?:[A-Fa-f0-9]{1,4}:){1,5}(?::[A-Fa-f0-9]{1,4}){1,2}"
+    r"|(?:[A-Fa-f0-9]{1,4}:){1,4}(?::[A-Fa-f0-9]{1,4}){1,3}"
+    r"|(?:[A-Fa-f0-9]{1,4}:){1,3}(?::[A-Fa-f0-9]{1,4}){1,4}"
+    r"|(?:[A-Fa-f0-9]{1,4}:){1,2}(?::[A-Fa-f0-9]{1,4}){1,5}"
+    r"|[A-Fa-f0-9]{1,4}:(?::[A-Fa-f0-9]{1,4}){1,6}"
+    r"|:(?::[A-Fa-f0-9]{1,4}){1,7}"
+    r")(?![:.\w])"
 )
 # ::1 loopback / :: unspecified / RFC3849 documentation range 2001:db8::/32
 _IPV6_ALLOWED_RE = re.compile(r"^(?:::1$|2001:0?db8:)", re.IGNORECASE)
