@@ -2,8 +2,8 @@
   "schema": "icn-agent-context-spine/v0",
   "status": "generated",
   "canonical": false,
-  "generated": "2026-06-21T14:08:16+00:00",
-  "source_commit": "cb3ac76d36ea64f25d65e59d614f2f1c048496e2",
+  "generated": "2026-07-10T23:48:18+00:00",
+  "source_commit": "0708cd5c6764df3fa3d743030b00badb567542fe",
   "generator": "scripts/generate-agent-context-spine.py",
   "regenerate": "python3 scripts/generate-agent-context-spine.py --write",
   "check": "python3 scripts/generate-agent-context-spine.py --check",
@@ -35,7 +35,7 @@
     "verifies"
   ],
   "counts": {
-    "nodes": 131,
+    "nodes": 134,
     "edges": 92
   },
   "nodes": [
@@ -300,6 +300,26 @@
         },
         {
           "source": "icn/crates/icn-api",
+          "kind": "crate-dir"
+        }
+      ]
+    },
+    {
+      "id": "crate:icn-appliance",
+      "type": "crate",
+      "name": "icn-appliance",
+      "group": "crates",
+      "path": "icn/crates/icn-appliance",
+      "description": "Workspace member crate (crates). v0 spine records membership and path only; it does not parse module internals.",
+      "source_of_truth": "icn/Cargo.toml",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "icn/Cargo.toml",
+          "kind": "workspace-member"
+        },
+        {
+          "source": "icn/crates/icn-appliance",
           "kind": "crate-dir"
         }
       ]
@@ -2496,7 +2516,7 @@
       "type": "truth_source",
       "name": "cluster_topology",
       "owner": "ops/state/config/repo-map.json#infrastructure",
-      "description": "K3s node IPs, service ports. Source: repo-map.json .infrastructure.k3s",
+      "description": "K3s node/service ROLES only (role:<name> tokens). Concrete node IPs / service ports are private operational values (docs/ATLAS.md §5) held in the private network-ops repo, never in this public map; repo-map.json .infrastructure.k3s lists roles, resolve to addresses only from the private source.",
       "stability": "slow-changing",
       "source_of_truth": "ops/state/truth/sources.json",
       "status": "present",
@@ -2508,6 +2528,42 @@
         {
           "source": "ops/state/config/repo-map.json",
           "kind": "truth-owner"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:cross_repo_pr_stacks",
+      "type": "truth_source",
+      "name": "cross_repo_pr_stacks",
+      "owner": "ops/coordination/stacks/",
+      "description": "Cross-repo PR merge order and per-stack state: machine-readable stack manifests (<slug>.stack.yaml, format icn-pr-stack/v1, validated by scripts/check-pr-stack.sh). ops/coordination/PR_STACK_PROTOCOL.md documents the discipline; the manifests own stack state. Coordination metadata only — plan/order facts, never runtime or readiness truth.",
+      "stability": "slow-changing",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
+        },
+        {
+          "source": "ops/coordination/stacks/",
+          "kind": "truth-owner"
+        }
+      ]
+    },
+    {
+      "id": "truth_source:downstream_dependency_locks",
+      "type": "truth_source",
+      "name": "downstream_dependency_locks",
+      "owner": "downstream-repos",
+      "description": "Review attestations pinning the ICN ref each downstream repo (nycn, icn-learn, icn-community-bridge) was last reviewed against. Format: icn-upstream-lock/v1 (docs/reference/upstream-lock-format.md). A lock is human-signed once a person fills `reviewer`; a first machine-prepared lock carries `reviewer: pending` with no `reviewed_at` and is registered in org_repos with `lock.review_status: pending-human-signoff` so tooling does NOT treat it as a completed human attestation — icn-learn and icn-community-bridge are in that state today, while nycn carries a human-signed prior review (previous_review). The lock files live in the downstream repos, never in this repo — a lock is a review attestation, not an automated dependency constraint.",
+      "stability": "slow-changing",
+      "source_of_truth": "ops/state/truth/sources.json",
+      "status": "present",
+      "evidence": [
+        {
+          "source": "ops/state/truth/sources.json",
+          "kind": "truth-domain"
         }
       ]
     },
@@ -2624,7 +2680,7 @@
       "type": "truth_source",
       "name": "repo_topology",
       "owner": "ops/state/config/repo-map.json",
-      "description": "Monorepo layout, subdirectory purposes, worktree root, K3s cluster IPs",
+      "description": "Monorepo layout, subdirectory purposes, org-repo coordination metadata (org_repos), worktree root, K3s cluster ROLES (concrete addresses are private — network-ops). org_repos is repo discovery / coordination metadata, not architectural truth — role/boundary meaning stays with docs/ATLAS.md + ops/state/ecosystem.json, and ops/state/truth/sources.json (this arbiter file, not repo-map.json) wins on truth-ownership conflicts.",
       "stability": "slow-changing",
       "source_of_truth": "ops/state/truth/sources.json",
       "status": "present",
