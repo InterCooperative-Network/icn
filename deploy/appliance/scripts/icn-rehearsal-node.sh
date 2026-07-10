@@ -23,8 +23,12 @@
 # Env (smoke-image — same contract as smoke-local.sh):
 #   ICN_APPLIANCE_IMAGE            required  path to DEMO-profile QCOW2
 #   ICN_APPLIANCE_SSH_KEY          required  smoke-only SSH private key
-#   ICN_APPLIANCE_CLOUD_INIT_SEED  optional  seed ISO (built via cloud-localds
-#                                            from the key when unset)
+#   ICN_APPLIANCE_CLOUD_INIT_SEED  seed ISO. May be left unset ONLY after
+#                                  editing smoke/cloud-init/user-data.example.yaml
+#                                  with your smoke-only PUBLIC key (smoke-local
+#                                  then builds a seed via cloud-localds; it
+#                                  refuses the shipped placeholder key and does
+#                                  NOT derive the key from ICN_APPLIANCE_SSH_KEY)
 #
 # Env (open-running-node / verify-running-node — same contract as
 # open-proxmox-demo.sh):
@@ -76,7 +80,19 @@ require_smoke_env() {
   fi
   if [ "$missing" -ne 0 ]; then
     err "smoke-image needs an image built with ICN_APPLIANCE_DEMO_PROFILE=1."
-    err "ICN_APPLIANCE_CLOUD_INIT_SEED is optional (smoke-local builds one via cloud-localds when unset)."
+    fatal "$DOCS_HINT"
+  fi
+  # Fail fast on the seed precondition instead of mid-run: without a pre-built
+  # seed ISO, smoke-local builds one from smoke/cloud-init/*.example.yaml and
+  # refuses the shipped placeholder key (it never derives the public key from
+  # ICN_APPLIANCE_SSH_KEY).
+  local ex_user="${APPLIANCE_DIR}/smoke/cloud-init/user-data.example.yaml"
+  if [ -z "${ICN_APPLIANCE_CLOUD_INIT_SEED:-}" ] && [ -f "$ex_user" ] \
+     && grep -q "INVALIDREPLACEME" "$ex_user"; then
+    err "no ICN_APPLIANCE_CLOUD_INIT_SEED set, and ${ex_user}"
+    err "still contains the placeholder SSH key — smoke-local will refuse it."
+    err "Either point ICN_APPLIANCE_CLOUD_INIT_SEED at a pre-built seed ISO, or"
+    err "edit that file to carry the smoke-only PUBLIC key matching ICN_APPLIANCE_SSH_KEY."
     fatal "$DOCS_HINT"
   fi
 }
@@ -108,8 +124,10 @@ print_verify_steps() {
       log "  ssh -i \"${ICN_DEMO_SSH_KEY}\" ${ssh_user}@${ICN_DEMO_VM_IP} 'sudo icn-demo-verify --chain'"
     fi
     if [ -n "${ICN_DEMO_JUMP:-}" ] && [ -n "${ICN_DEMO_REMOTE_KEY:-}" ]; then
-      log "Ready-to-copy (jump route):"
-      log "  ssh -J \"${ICN_DEMO_JUMP}\" -i \"${ICN_DEMO_REMOTE_KEY}\" ${ssh_user}@${ICN_DEMO_VM_IP} 'sudo icn-demo-verify --chain'"
+      log "Ready-to-copy (jump route — the demo key lives on the jump host, so"
+      log "the inner ssh runs THERE, mirroring open-proxmox-demo.sh):"
+      log "  ssh -o StrictHostKeyChecking=accept-new \"${ICN_DEMO_JUMP}\" \\"
+      log "    \"ssh -o StrictHostKeyChecking=accept-new -i '${ICN_DEMO_REMOTE_KEY}' ${ssh_user}@${ICN_DEMO_VM_IP} 'sudo icn-demo-verify --chain'\""
     fi
   else
     log "Set ICN_DEMO_VM_IP (plus a route, as for open-running-node) to get a"
@@ -128,7 +146,9 @@ dry_run() {
   log "   drives the loop headlessly: health -> member shell -> seed ->"
   log "   standing -> action card -> complete -> receipt)"
   log "  requires: ICN_APPLIANCE_IMAGE, ICN_APPLIANCE_SSH_KEY"
-  log "  optional: ICN_APPLIANCE_CLOUD_INIT_SEED"
+  log "  seed:     ICN_APPLIANCE_CLOUD_INIT_SEED, or an edited"
+  log "            smoke/cloud-init/user-data.example.yaml carrying your real"
+  log "            smoke public key (the shipped placeholder is refused)"
   log ""
   log "open-running-node would run:"
   log "  bash ${SCRIPT_DIR}/open-proxmox-demo.sh"

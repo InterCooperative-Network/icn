@@ -82,11 +82,20 @@ bash deploy/appliance/scripts/icn-rehearsal-node.sh smoke-image
 
 This boots a disposable local QEMU overlay (the image is never modified) and
 drives the demo loop headlessly: health → member shell → seed → standing →
-action card → complete → receipt. `ICN_APPLIANCE_CLOUD_INIT_SEED` is optional
-— when unset, smoke-local builds a seed ISO from the SSH key via
-`cloud-localds` (and refuses the placeholder key shipped in-tree). The image
-must have been built with `ICN_APPLIANCE_DEMO_PROFILE=1`; building it is a
-separate step documented in `deploy/appliance/DEMO_QUICKSTART.md`.
+action card → complete → receipt.
+
+Cloud-init seed: one of two preconditions must hold, or the run fails before
+the VM boots (the wrapper preflights this):
+
+- `ICN_APPLIANCE_CLOUD_INIT_SEED` points at a pre-built seed ISO, **or**
+- `deploy/appliance/smoke/cloud-init/user-data.example.yaml` has been edited
+  to carry the smoke-only **public** key matching `ICN_APPLIANCE_SSH_KEY`
+  (smoke-local then builds a seed via `cloud-localds`). smoke-local refuses
+  the shipped `INVALIDREPLACEME` placeholder and does **not** derive the
+  public key from `ICN_APPLIANCE_SSH_KEY`.
+
+The image must have been built with `ICN_APPLIANCE_DEMO_PROFILE=1`; building
+it is a separate step documented in `deploy/appliance/DEMO_QUICKSTART.md`.
 
 ## Fast path B — open an already-running node instance
 
