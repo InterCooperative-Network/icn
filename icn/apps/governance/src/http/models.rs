@@ -479,6 +479,171 @@ pub struct ActionCardsResponse {
 }
 
 // ============================================================================
+// Pending-publish preview/review read model
+// (read model for `GET /me/pending-publish-summary`, issue #1728)
+// ============================================================================
+//
+// This is the runtime projection of `urn:icn:contract:pending-publish-summary:v1`
+// (docs/contracts/pending-publish-summary.schema.json). It gives an organizer /
+// member rehearsal shell (#1726) a real gateway endpoint to bind to for the
+// "preview parsed proposals before any publish/mutation" step (§3 of the no-CLI
+// organizer/member rehearsal workflow), matching how the shell already binds to
+// `GET /me/standing` and `GET /me/action-cards`.
+//
+// Boundary (enforced by the handler and the non-claims on the response):
+//   - Read-only. No mutation, no publish, no export, no action-card creation,
+//     no authority is granted. A preview row is evidence presented for review;
+//     it is not authorization and it is not a target write.
+//   - No institution-specific vocabulary. All labels are generic strings; the
+//     closed enums carry no package nouns. Institution packages translate their
+//     local templates into these generic kinds (same firewall as `ActionCard`).
+//   - `expected_receipt` labels an evidence EXPECTATION, not an issued receipt
+//     and not authority.
+
+/// Where the rows in a [`PendingPublishSummaryResponse`] come from. Closed
+/// taxonomy so a client can never confuse fixture rehearsal data with live state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PendingPublishOrigin {
+    /// The live runtime holds no pending-publish read-model source, so `rows` is
+    /// empty. Returned in the `production` build mode: nothing fictional is ever
+    /// served on a production surface.
+    LiveRuntime,
+    /// `rows` are deterministic, committed rehearsal fixtures — fictional, never
+    /// live participant state. Served only in non-production (bootstrap/test)
+    /// build modes so the organizer rehearsal shell can exercise the endpoint.
+    CommittedFixture,
+}
+
+/// Closed taxonomy of pending-publish row kinds. Mirrors the `kind` enum of
+/// `urn:icn:contract:pending-publish-summary:v1`. Economic-adjacent kinds use
+/// regulatory-safe vocabulary only: `obligation`, `allocation`, and `settlement`
+/// describe internal cooperative coordination primitives, never money
+/// transmission or stored value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PendingPublishRowKind {
+    ActionItem,
+    Decision,
+    Attendance,
+    Obligation,
+    Allocation,
+    Settlement,
+    EvidenceNote,
+    RiskNote,
+}
+
+/// Review disposition of a pending-publish row. Closed taxonomy mirroring the
+/// contract's row `status`. A status is a review state, never an authorization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PendingPublishRowStatus {
+    PendingReview,
+    ApprovedForPublish,
+    Rejected,
+    NeedsEdit,
+    NeedsMoreInfo,
+}
+
+/// Coarse risk indicator for a pending-publish row. Same three-level vocabulary
+/// as [`ActionCardRiskLevel`]; UI may sort or annotate but must not hide rows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PendingPublishRiskLevel {
+    Low,
+    Normal,
+    Elevated,
+}
+
+/// Provenance category of a row's source material. Closed taxonomy mirroring the
+/// contract's `source_provenance_ref.category`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PendingPublishProvenance {
+    CommittedFixture,
+    MeetingRecord,
+    GovernanceRecord,
+    ExampleSnippet,
+    RepoSafePaste,
+    PriorEvidencePacket,
+}
+
+/// Expected-receipt class for a pending-publish row. Closed taxonomy mirroring
+/// the contract's `receipt_expected.category`. This labels an evidence
+/// EXPECTATION for the reviewer — it is not an issued receipt and grants no
+/// authority.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum PendingPublishReceiptCategory {
+    GovernanceReceipt,
+    AttendanceReceipt,
+    ActionItemCompletionReceipt,
+    SettlementReceipt,
+    None,
+}
+
+/// Whether a pending-publish row is expected to produce a receipt if published,
+/// and of which class. Evidence expectation only.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PendingPublishReceiptExpectation {
+    pub expected: bool,
+    pub category: PendingPublishReceiptCategory,
+}
+
+/// One pending-publish preview/review row. Read-only description of something an
+/// organizer would review *before* any publish/mutation. All labels are plain
+/// language and generic; there are no DIDs, no private paths, and no
+/// institution-specific nouns.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PendingPublishRow {
+    /// Stable, opaque row id.
+    pub id: String,
+    pub kind: PendingPublishRowKind,
+    /// One-line plain-language summary of what would be published.
+    pub plain_summary: String,
+    pub status: PendingPublishRowStatus,
+    /// Plain-language label of what this row targets (a scope label, never a DID).
+    pub target_scope_label: String,
+    /// Plain-language label of the governing body that would own the result.
+    pub governing_body_label: String,
+    /// Plain-language assignee label (never a DID). `None` when not applicable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub assignee_label: Option<String>,
+    /// Why review/action here is legitimate, in plain language. Mirrors
+    /// `ActionCard.authority_basis`.
+    pub authority_basis: String,
+    pub risk_level: PendingPublishRiskLevel,
+    /// Accessibility note for the rendering shell (ADR-0028).
+    pub accessibility_hint: String,
+    pub source_provenance: PendingPublishProvenance,
+    pub receipt_expected: PendingPublishReceiptExpectation,
+}
+
+/// Wrapper response for `GET /me/pending-publish-summary` (issue #1728).
+///
+/// Runtime projection of `urn:icn:contract:pending-publish-summary:v1`. Serves
+/// the contract shape over the gateway so the organizer rehearsal shell has a
+/// real endpoint to bind to. In the `production` build mode `rows` is always
+/// empty (`origin = live_runtime`); non-production modes serve deterministic
+/// committed-fixture rows (`origin = committed_fixture`).
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PendingPublishSummaryResponse {
+    /// The authenticated caller's DID.
+    pub did: String,
+    /// Where `rows` come from — live runtime (empty) or committed fixtures.
+    pub origin: PendingPublishOrigin,
+    /// Pending-publish rows to review. May be empty. Read-only; nothing here is
+    /// authorization or a target write.
+    pub rows: Vec<PendingPublishRow>,
+    /// Standing non-claims restated on the wire so a consumer cannot read the
+    /// rows as live/authoritative.
+    pub non_claims: Vec<String>,
+    /// Unix-seconds when this snapshot was computed. Nothing is cached
+    /// server-side.
+    pub generated_at: u64,
+}
+
+// ============================================================================
 // Proposals
 // ============================================================================
 

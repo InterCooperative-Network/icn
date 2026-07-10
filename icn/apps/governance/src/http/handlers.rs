@@ -22,7 +22,9 @@ use icn_http_kit::{
 };
 use icn_identity::Did;
 
-use super::configure::{DispatchEvidenceSpec, GovernanceContext, GovernanceEffect};
+use super::configure::{
+    DispatchEvidenceSpec, GovernanceContext, GovernanceContextBuildMode, GovernanceEffect,
+};
 use super::models::*;
 use super::validation as val;
 use crate::domain_policy_adoption::{
@@ -6162,6 +6164,190 @@ pub async fn get_my_action_cards<E: GovernanceEventEmitter + Clone + 'static>(
     }))
 }
 
+/// `GET /me/pending-publish-summary` — the runtime read-model for issue #1728.
+///
+/// Serves the shape of `urn:icn:contract:pending-publish-summary:v1` over the
+/// gateway so the organizer rehearsal shell (#1726) can bind to a real endpoint
+/// for the "preview parsed proposals before any publish/mutation" step, the same
+/// way it binds to `/me/standing` and `/me/action-cards`.
+///
+/// Read-only and self-scoped (`governance:read`, caller = token subject). It
+/// performs no write, grants no authority, and creates no action card. There is
+/// no runtime pending-publish source object today, so:
+///   - in the `production` build mode it returns **no** rows
+///     (`origin = live_runtime`) — nothing fictional is ever served on a
+///     production surface;
+///   - in non-production (bootstrap/test) modes it returns deterministic,
+///     clearly-labeled committed-fixture rows (`origin = committed_fixture`) so
+///     the rehearsal shell has real rows to render. These rows are fictional and
+///     generic (no institution-specific nouns, no DIDs, no private paths).
+#[utoipa::path(
+    get,
+    path = "/gov/me/pending-publish-summary",
+    tag = "governance",
+    responses(
+        (status = 200,
+            description = "Pending-publish preview/review rows for the caller, wrapped in \
+                `PendingPublishSummaryResponse` (`{did, origin, rows, non_claims, \
+                generated_at}`). Runtime projection of \
+                `urn:icn:contract:pending-publish-summary:v1`. Read-only: there is no \
+                mutation API on this surface, no authority is granted, and no action \
+                card is created. `origin = live_runtime` (production) returns no rows; \
+                `origin = committed_fixture` (non-production) returns deterministic, \
+                fictional rehearsal rows. Row `kind`, `status`, `risk_level`, \
+                `source_provenance`, and `receipt_expected.category` use closed enums.",
+            body = PendingPublishSummaryResponse),
+        (status = 401, description = "Missing or invalid bearer token"),
+        (status = 403, description = "Token lacks the `governance:read` scope")
+    ),
+    security(("bearer_auth" = []))
+)]
+pub async fn get_my_pending_publish_summary<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: web::Data<GovernanceContext<E>>,
+    http_req: HttpRequest,
+) -> Result<HttpResponse, ApiError> {
+    let claims = require_scope::<BasicClaims>(&http_req, "governance:read")?;
+    let caller = parse_did(&claims.sub, "Invalid DID in token")?;
+    let now = current_time_secs();
+
+    // Production serves no pending-publish rows: there is no runtime source
+    // object, and fictional rehearsal rows must never appear on a production
+    // surface. Non-production build modes serve deterministic fixture rows.
+    let (origin, rows) = pending_publish_projection(ctx.build_mode);
+
+    Ok(HttpResponse::Ok().json(PendingPublishSummaryResponse {
+        did: caller.to_string(),
+        origin,
+        rows,
+        non_claims: vec![
+            "read-only: no mutation, publish, export, or authority is granted".to_string(),
+            "not production readiness, not a pilot, not live federation".to_string(),
+            "committed-fixture rows are fictional rehearsal data, never live participant state"
+                .to_string(),
+            "an expected receipt is an evidence expectation for the reviewer, not authority"
+                .to_string(),
+        ],
+        generated_at: now,
+    }))
+}
+
+/// Row selection for `GET /me/pending-publish-summary`, split out so the
+/// build-mode gate can be unit-tested without standing up a fully-wired
+/// production gateway. (A Production-mode `configure` fail-closes when
+/// standing/mandate dependencies are missing — the #2075 doctrine — so a bare
+/// production actix app cannot be built in a test.) Production serves no rows
+/// (`live_runtime`); non-production serves deterministic committed fixtures.
+fn pending_publish_projection(
+    build_mode: GovernanceContextBuildMode,
+) -> (PendingPublishOrigin, Vec<PendingPublishRow>) {
+    if matches!(build_mode, GovernanceContextBuildMode::Production) {
+        (PendingPublishOrigin::LiveRuntime, Vec::new())
+    } else {
+        (
+            PendingPublishOrigin::CommittedFixture,
+            demo_pending_publish_rows(),
+        )
+    }
+}
+
+/// Unit tests for the `GET /me/pending-publish-summary` build-mode gate (#1728).
+/// Kept in a dedicated module (no `use actix_web::test`) so a plain `#[test]`
+/// resolves to the built-in test attribute; the actix-flavored `mod tests`
+/// below re-binds `test` to the async attribute macro.
+#[cfg(test)]
+mod pending_publish_gate_tests {
+    use super::{pending_publish_projection, PendingPublishOrigin};
+    use crate::http::configure::GovernanceContextBuildMode;
+
+    #[test]
+    fn production_serves_no_rows_non_production_serves_fixtures() {
+        // Production serves NO fixture rows — fictional rehearsal data must
+        // never appear on a production surface.
+        let (origin, rows) = pending_publish_projection(GovernanceContextBuildMode::Production);
+        assert_eq!(origin, PendingPublishOrigin::LiveRuntime);
+        assert!(rows.is_empty());
+
+        // Non-production serves deterministic committed-fixture rows.
+        for mode in [
+            GovernanceContextBuildMode::Bootstrap,
+            GovernanceContextBuildMode::Test,
+        ] {
+            let (origin, rows) = pending_publish_projection(mode);
+            assert_eq!(origin, PendingPublishOrigin::CommittedFixture);
+            assert!(!rows.is_empty(), "{mode:?} should serve rehearsal rows");
+        }
+    }
+}
+
+/// Deterministic, generic, fictional rehearsal rows for the non-production
+/// `GET /me/pending-publish-summary` response. No institution-specific nouns, no
+/// DIDs, no private paths — labels are generic scope/body/assignee strings. The
+/// set is stable so two requests return identical rows.
+fn demo_pending_publish_rows() -> Vec<PendingPublishRow> {
+    let hint = "Plain-language row. Status and receipt-expectation are read-only \
+                review context, not authority."
+        .to_string();
+    vec![
+        PendingPublishRow {
+            id: "pending-row-action-item-001".to_string(),
+            kind: PendingPublishRowKind::ActionItem,
+            plain_summary: "Draft task parsed from example meeting notes, awaiting review \
+                            before it becomes an assignable action item."
+                .to_string(),
+            status: PendingPublishRowStatus::PendingReview,
+            target_scope_label: "Example working group".to_string(),
+            governing_body_label: "Example governing circle".to_string(),
+            assignee_label: Some("Example member (fictional)".to_string()),
+            authority_basis: "role_assignment_in_domain".to_string(),
+            risk_level: PendingPublishRiskLevel::Normal,
+            accessibility_hint: hint.clone(),
+            source_provenance: PendingPublishProvenance::CommittedFixture,
+            receipt_expected: PendingPublishReceiptExpectation {
+                expected: true,
+                category: PendingPublishReceiptCategory::ActionItemCompletionReceipt,
+            },
+        },
+        PendingPublishRow {
+            id: "pending-row-decision-001".to_string(),
+            kind: PendingPublishRowKind::Decision,
+            plain_summary: "Proposed governance decision summarized for review before any \
+                            publish step."
+                .to_string(),
+            status: PendingPublishRowStatus::NeedsMoreInfo,
+            target_scope_label: "Example governing circle".to_string(),
+            governing_body_label: "Example governing circle".to_string(),
+            assignee_label: None,
+            authority_basis: "governing_body_agenda".to_string(),
+            risk_level: PendingPublishRiskLevel::Elevated,
+            accessibility_hint: hint.clone(),
+            source_provenance: PendingPublishProvenance::MeetingRecord,
+            receipt_expected: PendingPublishReceiptExpectation {
+                expected: true,
+                category: PendingPublishReceiptCategory::GovernanceReceipt,
+            },
+        },
+        PendingPublishRow {
+            id: "pending-row-attendance-001".to_string(),
+            kind: PendingPublishRowKind::Attendance,
+            plain_summary: "Proposed attendance/participation record parsed from example \
+                            notes, awaiting review."
+                .to_string(),
+            status: PendingPublishRowStatus::ApprovedForPublish,
+            target_scope_label: "Example working group".to_string(),
+            governing_body_label: "Example governing circle".to_string(),
+            assignee_label: None,
+            authority_basis: "meeting_attendee".to_string(),
+            risk_level: PendingPublishRiskLevel::Low,
+            accessibility_hint: hint,
+            source_provenance: PendingPublishProvenance::CommittedFixture,
+            receipt_expected: PendingPublishReceiptExpectation {
+                expected: true,
+                category: PendingPublishReceiptCategory::AttendanceReceipt,
+            },
+        },
+    ]
+}
+
 // ============================================================================
 // Tests — governance → execution bridge
 // ============================================================================
@@ -6173,6 +6359,7 @@ mod tests {
 
     use actix_web::dev::Service as _;
     use actix_web::{test, web, App, HttpMessage};
+
     use icn_governance::{
         GovernanceDomain, GovernanceDomainId, GovernanceParams, MembershipConfig,
         MembershipResolver, MembershipSource, ProposalId, ProposalPayload, ProposalScope,
