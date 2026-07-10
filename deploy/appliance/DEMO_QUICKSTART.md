@@ -98,6 +98,15 @@ ssh -p 2222 debian@127.0.0.1 sudo icn-demo-seed
 The seed prints the member-shell URLs, the open action item, and a dev
 session JWT (local VM only).
 
+## Rehearsal Node v0.1 wrapper
+
+The appliance DEV/DEMO paths on this page have one named operator entrypoint:
+`deploy/appliance/scripts/icn-rehearsal-node.sh` (`smoke-image`,
+`open-running-node`, `verify-running-node`, `--dry-run`, `--help`). It only
+delegates to the commands documented here — same env vars, same safety
+boundaries, same non-claims. Runbook:
+[docs/demo/ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md](../../docs/demo/ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md).
+
 ## One-command launcher (recommended for a live human demo)
 
 If a node instance is already running (e.g. a Proxmox VM at `192.0.2.50` — use your node's real IP),
