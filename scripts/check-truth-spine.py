@@ -43,10 +43,18 @@ PUBLIC_MAP_FILES = ("ops/state/config/repo-map.json", "ops/state/ecosystem.json"
 _IPV4_RE = re.compile(
     r"(?<![\d.])(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)(?![\d.])"
 )
-# loopback / RFC5737 documentation ranges / QEMU slirp host alias are not sensitive
+# loopback / bind-all / RFC5737 documentation ranges / QEMU slirp host alias are not sensitive
 _IPV4_ALLOWED_RE = re.compile(
-    r"^(?:127\.|0\.0\.0\.0$|255\.255|10\.0\.2\.2$|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.)"
+    r"^(?:127\.|0\.0\.0\.0$|10\.0\.2\.2$|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.)"
 )
+# IPv6 literals: full/partial (>=5 hex:hex groups — safely above a HH:MM:SS time)
+# or any "::" compression. Broad on purpose (a boundary guard should fail closed).
+_IPV6_RE = re.compile(
+    r"(?<![\w:.])(?:[A-Fa-f0-9]{1,4}:){4,7}[A-Fa-f0-9]{1,4}(?![\w:.])"
+    r"|(?<![\w:.])[A-Fa-f0-9]{0,4}::[A-Fa-f0-9:]*[A-Fa-f0-9](?![\w:.])"
+)
+# ::1 loopback / :: unspecified / RFC3849 documentation range 2001:db8::/32
+_IPV6_ALLOWED_RE = re.compile(r"^(?:::1$|2001:0?db8:)", re.IGNORECASE)
 _PRIVATE_HOST_RE = re.compile(
     r"[A-Za-z0-9_-]+\.(?:lan|local|internal|home|homelab|lab)\b", re.IGNORECASE
 )
@@ -75,8 +83,14 @@ def scan_public_map_boundary(root: Path) -> None:
     icn-infra ADR-0005). Never echoes the offending value."""
     for rel in PUBLIC_MAP_FILES:
         try:
-            text = (root / rel).read_text()
-        except OSError:
+            text = (root / rel).read_text(encoding="utf-8")
+        except FileNotFoundError:
+            continue  # not every checkout carries every map
+        except (OSError, UnicodeError) as e:
+            err(
+                f"{rel}: present but unreadable/undecodable ({type(e).__name__}) — "
+                f"cannot boundary-scan a public map; failing closed."
+            )
             continue
         for m in _IPV4_RE.finditer(text):
             if not _IPV4_ALLOWED_RE.match(m.group(0)):
@@ -85,6 +99,14 @@ def scan_public_map_boundary(root: Path) -> None:
                     f"repo must not (docs/ATLAS.md §5; icn-infra ADR-0005). Use "
                     f"role-level/symbolic refs; concrete values live in the private "
                     f"network-ops repo. (value withheld)"
+                )
+                break
+        for m in _IPV6_RE.finditer(text):
+            if not _IPV6_ALLOWED_RE.match(m.group(0)):
+                err(
+                    f"{rel}: contains a concrete IPv6 host address — the public icn "
+                    f"repo must not (docs/ATLAS.md §5; icn-infra ADR-0005). Use "
+                    f"role-level/symbolic refs. (value withheld)"
                 )
                 break
         if _PRIVATE_HOST_RE.search(text):

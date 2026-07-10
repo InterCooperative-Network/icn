@@ -79,7 +79,7 @@ The `state/truth/` directory is the canonical truth spine. It owns the authorita
 
 **Critical rules:**
 - Never hardcode sprint numbers, PR numbers, branch names, or blockers in skills or agents.
-- Never hardcode cluster IPs in agent files — read from `repo-map.json#infrastructure`.
+- Never hardcode cluster IPs in agent files — `repo-map.json#infrastructure` lists ROLES only; concrete addresses are private (network-ops), never in this public repo.
 - `ops/automation/skills/` is the canonical source for shared operational skills.
 - `.claude/skills/{status,sync-and-build,worktree}` must be symlinks to `ops/automation/skills/` — run `bash ops/scripts/setup-skill-symlinks.sh` to create/verify.
 - Run `bash ops/scripts/what-matters-now.sh` at session start for live truth synthesis.
@@ -94,4 +94,4 @@ See `state/config/repo-map.json` for the authoritative map. Key relationships:
 - `icn/` is the Cargo workspace root (not repo root)
 - Worktrees live under `~/icn-dev/worktrees/<repo>/` on the dev VM (root of record:
   `state/config/repo-map.json#worktrees.root`; the older repo-adjacent `../icn-wt/` layout is retired/legacy)
-- K3s cluster: control at `10.8.30.40`, workers at `.41`/`.42` (VLAN 30, post Feb 2026 migration)
+- K3s cluster: roles `role:k3s-control-plane` + `role:k3s-worker` ×2 (concrete addresses are private — network-ops; VLAN 30 post Feb 2026 migration)

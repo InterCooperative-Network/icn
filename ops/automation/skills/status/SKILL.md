@@ -4,7 +4,7 @@ description: Show full ICN development status dashboard — active sessions, spr
 truth_contract:
   canonical_sources:
     - ops/state/sprint/current.json     # sprint state (always live-read — never hardcode sprint number)
-    - ops/state/config/repo-map.json    # cluster IPs, service ports
+    - ops/state/config/repo-map.json    # cluster ROLES (concrete addresses are private/network-ops)
     - ops/state/truth/policy.json       # required checks list
   live_load_required:
     - "cat \"$(git rev-parse --show-toplevel)/ops/state/sprint/current.json\""
@@ -13,7 +13,7 @@ truth_contract:
   examples_only: []
   never_hardcode:
     - sprint number or name
-    - cluster IPs (read from repo-map.json)
+    - cluster IPs (repo-map.json lists ROLES only; concrete addresses are private/network-ops)
     - open PR list
 ---
 
@@ -70,7 +70,7 @@ Use this structure with ✅ ⏳ ❌ ⚠️ symbols:
   ✅ ci · 3 min ago
   ✅ ci · 2 hrs ago
 
-**Cluster** 10.8.30.40
+**Cluster** role:k3s-control-plane
   ✅ 3/3 pods healthy · gateway ✅ · pilot-ui ✅ · metrics ✅
 
 **Build Cache** sccache hit rate: 74%
