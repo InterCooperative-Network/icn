@@ -87,6 +87,19 @@ pub enum GovernanceContextBuildMode {
     /// dependencies do not reject startup — but distinguishable in logs
     /// so test runs are not confused with production misconfiguration.
     Test,
+
+    /// Explicit rehearsal mode for the isolated Rehearsal Node (#2386,
+    /// #1726).
+    ///
+    /// Identical permissive dependency posture to
+    /// [`Bootstrap`](Self::Bootstrap), plus it is the ONLY mode in which
+    /// the rehearsal pending-publish review/mutation surface is mounted
+    /// (see [`Self::allows_rehearsal_mutation`]). Opt-in is by the exact
+    /// value `rehearsal` in `ICN_GOVERNANCE_BUILD_MODE`; every unknown or
+    /// missing value falls back to `Bootstrap`, which keeps the surface
+    /// absent — a typo can never open a mutation path (fail-closed, the
+    /// #2075 posture applied to build modes).
+    Rehearsal,
 }
 
 impl GovernanceContextBuildMode {
@@ -97,14 +110,25 @@ impl GovernanceContextBuildMode {
     /// directly rather than this helper.
     ///
     /// Recognized values (case-insensitive): `bootstrap`, `production`,
-    /// `test`. Unrecognized values fall back to `Bootstrap` to preserve
-    /// existing behavior; the gateway logs the unrecognized value.
+    /// `test`, `rehearsal`. Unrecognized values fall back to `Bootstrap`
+    /// to preserve existing behavior; the gateway logs the unrecognized
+    /// value.
     pub fn from_env() -> Self {
-        match std::env::var("ICN_GOVERNANCE_BUILD_MODE") {
-            Ok(raw) => match raw.trim().to_ascii_lowercase().as_str() {
+        Self::parse(std::env::var("ICN_GOVERNANCE_BUILD_MODE").ok().as_deref())
+    }
+
+    /// Parse a raw mode value (already read from the environment or a
+    /// launcher). `None` and every unrecognized value resolve to
+    /// [`Bootstrap`](Self::Bootstrap) — the historical fallback — and
+    /// Bootstrap never enables the rehearsal mutation surface, so an
+    /// absent or misspelled mode fails closed.
+    pub fn parse(raw: Option<&str>) -> Self {
+        match raw {
+            Some(raw) => match raw.trim().to_ascii_lowercase().as_str() {
                 "bootstrap" | "" => Self::Bootstrap,
                 "production" => Self::Production,
                 "test" => Self::Test,
+                "rehearsal" => Self::Rehearsal,
                 other => {
                     warn!(
                         mode = %other,
@@ -113,7 +137,7 @@ impl GovernanceContextBuildMode {
                     Self::Bootstrap
                 }
             },
-            Err(_) => Self::Bootstrap,
+            None => Self::Bootstrap,
         }
     }
 
@@ -121,6 +145,16 @@ impl GovernanceContextBuildMode {
     /// missing optional standing checkers or the membership resolver.
     pub fn rejects_unresolved_standing(self) -> bool {
         matches!(self, Self::Production)
+    }
+
+    /// Returns `true` only for [`Rehearsal`](Self::Rehearsal): the single
+    /// mode in which the rehearsal pending-publish review/mutation routes
+    /// are mounted at all. Production, Bootstrap (the unknown/missing
+    /// fallback), and Test never mount them — in those modes the routes do
+    /// not exist, so the surface fails closed as 404 rather than trusting
+    /// a handler-level check.
+    pub fn allows_rehearsal_mutation(self) -> bool {
+        matches!(self, Self::Rehearsal)
     }
 }
 
@@ -469,10 +503,11 @@ impl<E> GovernanceContext<E> {
     /// a hard configuration error and this returns
     /// [`GovernanceContextValidationError`] naming all of them.
     ///
-    /// In [`GovernanceContextBuildMode::Bootstrap`] and
-    /// [`GovernanceContextBuildMode::Test`] this emits a `tracing::warn!`
-    /// for each missing dependency (so operators can see the fall-open
-    /// state in logs) but returns `Ok(())`.
+    /// In [`GovernanceContextBuildMode::Bootstrap`],
+    /// [`GovernanceContextBuildMode::Test`], and
+    /// [`GovernanceContextBuildMode::Rehearsal`] this emits a
+    /// `tracing::warn!` for each missing dependency (so operators can see
+    /// the fall-open state in logs) but returns `Ok(())`.
     ///
     /// Callers should invoke this at daemon/gateway startup before
     /// routes are registered, not lazily inside a handler.
@@ -487,7 +522,9 @@ impl<E> GovernanceContext<E> {
                 mode: self.build_mode,
                 missing,
             }),
-            mode @ (GovernanceContextBuildMode::Bootstrap | GovernanceContextBuildMode::Test) => {
+            mode @ (GovernanceContextBuildMode::Bootstrap
+            | GovernanceContextBuildMode::Test
+            | GovernanceContextBuildMode::Rehearsal) => {
                 self.warn_missing_dependencies(mode, &missing);
                 Ok(())
             }
@@ -954,6 +991,40 @@ mod build_mode_tests {
         assert!(GovernanceContextBuildMode::Production.rejects_unresolved_standing());
         assert!(!GovernanceContextBuildMode::Bootstrap.rejects_unresolved_standing());
         assert!(!GovernanceContextBuildMode::Test.rejects_unresolved_standing());
+        // Rehearsal keeps Bootstrap's permissive dependency posture: it is a
+        // fixture rehearsal, not a partner/production deployment.
+        assert!(!GovernanceContextBuildMode::Rehearsal.rejects_unresolved_standing());
+    }
+
+    #[test]
+    fn rehearsal_mode_parses_by_exact_value_only() {
+        // The rehearsal mutation surface is opt-in by the EXACT value
+        // "rehearsal" (case-insensitive, trimmed). Every unknown or missing
+        // value keeps the historical Bootstrap fallback — and Bootstrap never
+        // enables rehearsal mutations, so a typo can never open the surface.
+        use GovernanceContextBuildMode as M;
+        assert_eq!(M::parse(Some("rehearsal")), M::Rehearsal);
+        assert_eq!(M::parse(Some("  REHEARSAL ")), M::Rehearsal);
+        assert_eq!(M::parse(Some("production")), M::Production);
+        assert_eq!(M::parse(Some("bootstrap")), M::Bootstrap);
+        assert_eq!(M::parse(Some("test")), M::Test);
+        assert_eq!(M::parse(Some("")), M::Bootstrap);
+        assert_eq!(M::parse(Some("rehearsa")), M::Bootstrap);
+        assert_eq!(M::parse(Some("rehearsal-mode")), M::Bootstrap);
+        assert_eq!(M::parse(Some("prod")), M::Bootstrap);
+        assert_eq!(M::parse(None), M::Bootstrap);
+    }
+
+    #[test]
+    fn rehearsal_mutation_surface_is_rehearsal_only() {
+        // Fail-closed gate for every rehearsal-only mutation route: exactly
+        // one mode enables the surface. Production, Bootstrap (the unknown/
+        // missing fallback), and Test all keep it absent.
+        use GovernanceContextBuildMode as M;
+        assert!(M::Rehearsal.allows_rehearsal_mutation());
+        assert!(!M::Production.allows_rehearsal_mutation());
+        assert!(!M::Bootstrap.allows_rehearsal_mutation());
+        assert!(!M::Test.allows_rehearsal_mutation());
     }
 
     #[test]
