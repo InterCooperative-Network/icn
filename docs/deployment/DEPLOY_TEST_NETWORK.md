@@ -544,7 +544,7 @@ Once the network is running successfully:
 ### Docker Compose
 - **File**: `docker-compose.test.yml`
 - **Services**: node1, node2, node3, node4 (optional), prometheus, grafana
-- **Networks**: icn_test (192.0.2.0/16)
+- **Networks**: icn_test (operator-supplied bridge subnet)
 - **Volumes**: 6 persistent volumes
 
 ### Security Configuration

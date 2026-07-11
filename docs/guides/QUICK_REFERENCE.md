@@ -77,7 +77,7 @@ cat DEPLOY_TO_K3S.md
 
 ### 1. Get Admin Token
 ```bash
-ssh ubuntu@${ICN_GATEWAY_HOST}
+ssh ubuntu@${ICN_K3S_CONTROL}
 POD=$(sudo kubectl get pods -n icn -l component=daemon -o jsonpath='{.items[0].metadata.name}')
 sudo kubectl exec -it -n icn $POD -- icnctl id show
 sudo kubectl exec -it -n icn $POD -- icnctl auth login \
@@ -153,26 +153,26 @@ make logs
 
 **Pods not starting?**
 ```bash
-ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl get pods -n icn"
-ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl describe pod -n icn -l component=daemon"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl get pods -n icn"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl describe pod -n icn -l component=daemon"
 ```
 
 **Gateway not responding?**
 ```bash
 curl http://${ICN_GATEWAY_HOST}:30080/v1/health
-ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl logs -n icn -l component=daemon"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl logs -n icn -l component=daemon"
 ```
 
 **UI not loading?**
 ```bash
 curl http://${ICN_GATEWAY_HOST}:30030/
-ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl logs -n icn -l component=pilot-ui"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl logs -n icn -l component=pilot-ui"
 ```
 
 **Disk space issues?**
 ```bash
-ssh ubuntu@${ICN_GATEWAY_HOST} "df -h /"
-ssh ubuntu@${ICN_GATEWAY_HOST} "sudo docker system prune -a"
+ssh ubuntu@${ICN_K3S_CONTROL} "df -h /"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo docker system prune -a"
 ```
 
 ---

@@ -21,6 +21,7 @@ private-repo access — VM-session concern, not CI).
 
 import argparse
 import datetime
+import ipaddress
 import json
 import re
 import sys
@@ -130,9 +131,10 @@ def scan_public_map_boundary(root: Path) -> None:
 # Public docs/agent/test address boundary guard (icn#2393). The non-runtime
 # public surfaces cleaned in the #2393 docs slice must never carry a concrete
 # provider IPv4/IPv6 host address. Reuses the #2392 IPv4 regex/allowlist; the
-# IPv6 rule is tightened (bracketed [..] OR >=3 hextets) so hex-looking Rust
-# path segments and short capability-action strings are NOT false-flagged.
-# HARD failure, value always withheld. Hostname detection is
+# IPv6 rule: bracketed [..], >=3 hextets, or short 2-hextet forms that parse
+# into a ULA / link-local range (fc00::/7, fe80::/10) are flagged; hex-looking
+# global-range identifiers (Rust path segments, short capability strings) are
+# NOT false-flagged. HARD failure, value always withheld. Hostname detection is
 # intentionally omitted here — on prose it false-positives on filenames like
 # `.env.local` and illustrative `*.internal`/`*.example` config; the §5
 # provider concern on these surfaces is IP literals.
@@ -159,10 +161,12 @@ def docs_address_violations(text: str) -> list[tuple[int, str]]:
     """Return [(line_no, category)] for disallowed concrete host literals in a
     cleaned public-docs surface. Never includes the value. Category is
     'ipv4-host' or 'ipv6-host'. Allowed: loopback / bind-all / QEMU slirp alias
-    / RFC5737 (v4); ::1 / :: / RFC3849 2001:db8::/32 (v6). IPv6 is flagged only
-    when bracketed ([..]) or written with >=3 hextets, so hex-looking
-    identifiers (Rust path segments, short capability strings) are not
-    false-flagged."""
+    / RFC5737 (v4); ::1 / :: / RFC3849 2001:db8::/32 (v6). IPv6 is flagged when
+    bracketed ([..]), written with >=3 hextets, OR (for short 2-hextet forms)
+    when it parses into a ULA / link-local range (fc00::/7, fe80::/10) — so real
+    provider IPv6 hosts like `fd00::1` are caught while hex-looking global-range
+    identifiers (Rust path segments, short capability strings such as `dead:beef::`)
+    are not false-flagged."""
     out: list[tuple[int, str]] = []
     for i, line in enumerate(text.splitlines(), 1):
         for m in _IPV4_RE.finditer(line):
@@ -176,7 +180,17 @@ def docs_address_violations(text: str) -> list[tuple[int, str]]:
             s, e = m.start(), m.end()
             bracketed = s > 0 and line[s - 1] == "[" and e < len(line) and line[e] == "]"
             hextets = [g for g in tok.split(":") if g]
-            if bracketed or len(hextets) >= 3:
+            flag = bracketed or len(hextets) >= 3
+            if not flag:
+                # short (<=2 hextet) compressed forms: flag only if the token
+                # actually parses into a ULA / link-local address range so that
+                # hex-looking global-range identifiers are not false-flagged.
+                try:
+                    a = ipaddress.IPv6Address(tok.strip("[]"))
+                    flag = a.is_private or a.is_link_local
+                except ValueError:
+                    flag = False
+            if flag:
                 out.append((i, "ipv6-host"))
                 break
     return out

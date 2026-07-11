@@ -56,7 +56,7 @@ curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health
 ## Common Issues
 
 ### "Cannot connect to gateway"
-- Check gateway is running: `ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl -n icn get pods"`
+- Check gateway is running: `ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl -n icn get pods"`
 - Test endpoint: `curl http://${ICN_GATEWAY_HOST}:30080/v1/health`
 
 ### "Authentication failed"
@@ -99,12 +99,12 @@ curl -H "Authorization: Bearer $TOKEN" \
 
 ### Check Pod Status
 ```bash
-ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl -n icn get pods"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl -n icn get pods"
 ```
 
 ### View Logs
 ```bash
-ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl -n icn logs -f deployment/icn-daemon"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl -n icn logs -f deployment/icn-daemon"
 ```
 
 ### Grafana Dashboard

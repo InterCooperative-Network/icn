@@ -332,7 +332,7 @@ QR codes contain enrollment data:
   "type": "icn-enrollment",
   "enrollment_id": "enroll_abc123...",
   "challenge": "base64-challenge",
-  "gateway_url": "http://${ICN_GATEWAY_HOST}:30080"
+  "gateway_url": "http://<ICN_GATEWAY_HOST>:30080"
 }
 ```
 

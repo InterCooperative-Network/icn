@@ -59,7 +59,7 @@ All protected endpoints are properly secured and require JWT authentication.
 
 **Configuration** (`src/config.ts`):
 ```typescript
-export const GATEWAY_URL = 'http://${ICN_GATEWAY_HOST}:30080';  // ✅ Correctly configured
+export const GATEWAY_URL = 'http://<ICN_GATEWAY_HOST>:30080';  // ✅ Correctly configured
 ```
 
 **Features**:

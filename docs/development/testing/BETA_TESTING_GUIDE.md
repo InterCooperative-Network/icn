@@ -142,13 +142,13 @@ ICN_PASSPHRASE="your-passphrase" ./target/release/icnctl auth token \
 curl -s http://${ICN_GATEWAY_HOST}:30080/v1/health | jq .
 
 # Node status
-ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl -n icn get pods"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl -n icn get pods"
 
 # Node logs
-ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl -n icn logs -f deployment/icn-daemon --tail=50"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl -n icn logs -f deployment/icn-daemon --tail=50"
 
 # Pilot UI logs
-ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl -n icn logs -f deployment/pilot-ui"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl -n icn logs -f deployment/pilot-ui"
 ```
 
 ### Grafana Dashboard

@@ -155,8 +155,11 @@ spec:
     - ipBlock:
         cidr: 0.0.0.0/0
         except:
-        - 192.0.2.0/8      # block intra-cluster non-mesh traffic via external path
-        - 198.51.100.0/16
+        # operator-supplied: your cluster's private CIDRs (node subnet + pod/service
+        # ranges) so intra-cluster non-mesh traffic is not permitted via the external
+        # path. Resolve from the private network-ops source; do not hardcode here.
+        - <cluster-node-cidr>
+        - <pod-service-cidr>
     ports:
     - port: 7825    # QUIC range covering all coops + main daemon
       protocol: UDP

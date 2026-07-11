@@ -154,7 +154,7 @@ The app is pre-configured for your homelab deployment:
 
 **File**: `src/config.ts`
 ```typescript
-export const GATEWAY_URL = 'http://${ICN_GATEWAY_HOST}:30080';
+export const GATEWAY_URL = 'http://<ICN_GATEWAY_HOST>:30080';
 ```
 
 To change gateway URL:
@@ -243,12 +243,12 @@ curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health
 
 ### View gateway logs
 ```bash
-ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl -n icn logs -f deployment/icn-daemon"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl -n icn logs -f deployment/icn-daemon"
 ```
 
 ### Check pod status
 ```bash
-ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl -n icn get pods"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl -n icn get pods"
 ```
 
 ---

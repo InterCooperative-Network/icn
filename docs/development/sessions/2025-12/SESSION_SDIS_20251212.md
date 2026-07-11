@@ -175,7 +175,7 @@ curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/enrollment/complete \
 
 1. **SSH to K3s node:**
    ```bash
-   ssh ubuntu@${ICN_GATEWAY_HOST}
+   ssh ubuntu@${ICN_K3S_CONTROL}
    ```
 
 2. **Check current deployment:**

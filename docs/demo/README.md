@@ -131,8 +131,12 @@ To access the demo from another machine on your network:
 
 ### 2. Set CORS origins for your LAN IP
 
+Set `ICN_LAN_HOST` to the workstation/LAN address that browsers use to reach the
+UI and gateway (this is the request Origin that must be allow-listed — not
+necessarily the in-cluster gateway host).
+
 ```bash
-export ICN_CORS_ORIGINS="http://${ICN_GATEWAY_HOST}:3000,http://${ICN_GATEWAY_HOST}:8080"
+export ICN_CORS_ORIGINS="http://${ICN_LAN_HOST}:3000,http://${ICN_LAN_HOST}:8080"
 ```
 
 ### 3. Start UI server on all interfaces

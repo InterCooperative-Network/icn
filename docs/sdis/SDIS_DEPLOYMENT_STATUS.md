@@ -178,12 +178,12 @@ curl http://${ICN_GATEWAY_HOST}:30080/v1/health
 
 ### Check Pod Status
 ```bash
-ssh ubuntu@${ICN_GATEWAY_HOST} 'sudo kubectl get pods -n icn'
+ssh ubuntu@${ICN_K3S_CONTROL} 'sudo kubectl get pods -n icn'
 ```
 
 ### View Gateway Logs
 ```bash
-ssh ubuntu@${ICN_GATEWAY_HOST} 'sudo kubectl logs -n icn -l component=daemon --tail=50'
+ssh ubuntu@${ICN_K3S_CONTROL} 'sudo kubectl logs -n icn -l component=daemon --tail=50'
 ```
 
 ---

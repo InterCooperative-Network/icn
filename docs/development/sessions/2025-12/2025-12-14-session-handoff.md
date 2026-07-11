@@ -34,8 +34,8 @@ cd /home/matt/projects/icn/icn
 
 ### Check Deployment Status
 ```bash
-ssh matt@${ICN_GATEWAY_HOST} "kubectl -n icn-coop-alpha get pods"
-ssh matt@${ICN_GATEWAY_HOST} "kubectl -n icn-coop-alpha logs deployment/icn-alpha --tail=50"
+ssh matt@${ICN_K3S_CONTROL} "kubectl -n icn-coop-alpha get pods"
+ssh matt@${ICN_K3S_CONTROL} "kubectl -n icn-coop-alpha logs deployment/icn-alpha --tail=50"
 ```
 
 ### Test API Endpoints

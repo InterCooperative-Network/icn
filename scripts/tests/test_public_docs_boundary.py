@@ -49,6 +49,8 @@ FLAG = [
     ("full 8-group IPv6", "fd00:1:2:3:4:5:6:7 up"),
     ("bracketed IPv6 URL (2-group, bracket forces flag)", "http://[fdff::1]:8080/x"),
     ("bracketed IPv6 URL (>=3 group)", "ws://[fd12:3456::1]:30080/ws"),
+    ("bare 2-hextet ULA (fd00::1)", "note fd00::1 somewhere"),
+    ("bare 2-hextet link-local (fe80::1)", "iface fe80::1 up"),
 ]
 
 # ---- MUST NOT FLAG (allowed documentation / bind / protocol-safe forms) ------
@@ -73,7 +75,8 @@ ALLOW = [
     ("capability action a::b (2 groups)", 'Action::new("read::write")'),
     ("four-plus-part version string", "version 1.2.3.4.5 released"),
     ("semver three-part", "release 1.2.3 shipped"),
-    ("bare 2-group IPv6 (intentional FP-avoidance gap)", "note fd00::1 somewhere"),
+    ("global-range hex identifier (cafe::)", "type cafe:: marker"),
+    ("global-range hex identifier (face:: 2-hextet)", "face::b00c token"),
 ]
 
 print("== MUST FLAG ==")

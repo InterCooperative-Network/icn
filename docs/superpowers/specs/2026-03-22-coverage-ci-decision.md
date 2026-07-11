@@ -88,7 +88,7 @@ Full inventory of accessible nodes from icn-dev:
 | **k3s-worker-1** | ${ICN_K3S_WORKER1} | i5-6500 4c/4t @ 3.2GHz | 15GB | **14GB** | 28GB | ICN pods; no Rust installed; disk may be tight |
 | **k3s-worker-2** | ${ICN_K3S_WORKER2} | i5-6500 4c/4t @ 3.2GHz | 15GB | **14GB** | 29GB | ICN pods; no Rust installed; disk may be tight |
 | **Hyperion** | ${ICN_HYPERION_HOST} | Ryzen 9 3900X 12c/24t | 15GB (bad) | — | — | Proxmox; RAM RMA in progress; offline for CI |
-| **Zentith** | ${ICN_ZENITH_HOST} | Ryzen 7 7800X3D 8c/16t | **54GB** | high | — | Matt's workstation; WSL2 Ubuntu 24.04; strongest available |
+| **Zentith** | ${ICN_WORKSTATION_HOST} | Ryzen 7 7800X3D 8c/16t | **54GB** | high | — | Matt's workstation; WSL2 Ubuntu 24.04; strongest available |
 
 Proxmox nodes node-1 through node-4 (operator-supplied range): SSH not authorized from icn-dev; capacity unknown.
 
