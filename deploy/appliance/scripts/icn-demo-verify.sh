@@ -72,7 +72,8 @@ if [ "${1:-}" = "--pending-publish" ]; then
   # Steward verification of the pending-publish review-preview evidence packet.
   # Fixture-only + offline: maps the committed pending-publish rows into a
   # urn:icn:contract:rehearsal-evidence-export:v1 packet and validates it.
-  # No gateway, no network, no writes. Fails closed on any validation drift.
+  # No gateway, no network egress, no custody/gateway writes; the only writes are
+  # local repo-safe evidence artifacts under /var/lib/icn-demo/. Fails closed on drift.
   GEN="$REPO/scripts/rehearsal_pending_publish_evidence.py"
   [ -f "$GEN" ] || fatal "bundled pending-publish evidence generator missing at $GEN"
   command -v python3 >/dev/null || fatal "python3 missing"

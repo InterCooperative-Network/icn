@@ -70,6 +70,11 @@
     {
       "kind": "meeting-attendance-receipt",
       "status": "not-attempted"
+    },
+    {
+      "kind": "validator-output-category",
+      "public_id_or_category": "settlement-receipt-expected",
+      "status": "not-attempted"
     }
   ],
   "privacy_review": {

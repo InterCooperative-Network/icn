@@ -6,10 +6,9 @@ GET /v1/gov/me/pending-publish-summary in a non-production build mode,
 origin=committed_fixture) into a repo-safe evidence packet conforming to
 urn:icn:contract:rehearsal-evidence-export:v1, then validates it.
 
-Honest operator/steward layer — NOT the browser. The packet:
-  * carries rehearsal_mode="fixture-only" (or "local-dry-run" only if a real
-    loopback GET was performed by the caller; this script never touches the
-    network);
+Honest operator/steward layer — NOT the browser. This generator is OFFLINE and
+never touches the network. The packet:
+  * carries rehearsal_mode="fixture-only";
   * NEVER copies the caller `did`, any credential, or any private path;
   * maps every review row to a `deferred` decision_outcome — a preview row is
     evidence for review, never an authorization; `approved_for_publish` is a
@@ -63,30 +62,62 @@ FIXED_RECORDED_AT = "2026-07-10T00:00:00Z"  # committed-packet anchor (documente
 
 
 def build_packet(recorded_at: str) -> dict:
-    rows = json.loads(ROWS_FIXTURE.read_text()).get("rows", [])
+    data = json.loads(ROWS_FIXTURE.read_text())
+    rows = data.get("rows")
+    if not isinstance(rows, list) or not rows:
+        raise SystemExit(f"FAIL: {ROWS_FIXTURE} has no non-empty 'rows' list (fail closed).")
     decision_outcomes = []
-    receipt_kinds: list[str] = []
-    for row in rows:
-        cat = STATUS_TO_OUTCOME.get(row.get("status"), "deferred")
-        decision_outcomes.append(
-            {
-                "category": cat,
-                "plain_summary": row.get("plain_summary", "")
-                + " Preview only — no decision was recorded.",
-            }
-        )
-        rc = (row.get("receipt_expected") or {})
-        if rc.get("expected"):
-            k = RECEIPT_TO_PLR_KIND.get(rc.get("category"))
-            if k and k not in receipt_kinds:
-                receipt_kinds.append(k)
+    # provenance ref is always first; each EXPECTED receipt then follows, deduped.
     proof_loop_references = [
         {
             "kind": "provenance-summary",
             "public_id_or_category": "pending-publish-committed-fixture",
             "status": "closed",
         }
-    ] + [{"kind": k, "status": "not-attempted"} for k in receipt_kinds]
+    ]
+    seen: set[str] = set()
+    for row in rows:
+        status = row.get("status")
+        if status not in STATUS_TO_OUTCOME:
+            raise SystemExit(
+                f"FAIL: unknown pending-publish row status {status!r} — refusing to map "
+                f"(fail closed). Add it to STATUS_TO_OUTCOME with a repo-safe outcome."
+            )
+        decision_outcomes.append(
+            {
+                "category": STATUS_TO_OUTCOME[status],
+                "plain_summary": row.get("plain_summary", "")
+                + " Preview only — no decision was recorded.",
+            }
+        )
+        rc = row.get("receipt_expected") or {}
+        if not rc.get("expected"):
+            continue
+        # Every EXPECTED receipt is represented — never silently dropped. A category
+        # with a dedicated proof-loop kind uses it; any other expected category (e.g.
+        # settlement_receipt) becomes a validator-output-category so the expectation
+        # stays explicit. Status is always "not-attempted" (an expectation, never issued).
+        cat = rc.get("category")
+        if cat in RECEIPT_TO_PLR_KIND:
+            entry = {"kind": RECEIPT_TO_PLR_KIND[cat], "status": "not-attempted"}
+            key = "k:" + RECEIPT_TO_PLR_KIND[cat]
+        elif cat and cat != "none":
+            entry = {
+                "kind": "validator-output-category",
+                "public_id_or_category": cat.replace("_", "-") + "-expected",
+                "status": "not-attempted",
+            }
+            key = "v:" + cat
+        else:
+            entry = {
+                "kind": "validator-output-category",
+                "public_id_or_category": "receipt-expected-unspecified",
+                "status": "not-attempted",
+            }
+            key = "v:unspecified"
+        if key not in seen:
+            seen.add(key)
+            proof_loop_references.append(entry)
     return {
         "schema_version": "0.1.0",
         "recorded_at": recorded_at,
@@ -167,6 +198,11 @@ def main() -> int:
     # --check: the committed packet must equal a fresh generation apart from recorded_at,
     # and both must validate. This is the determinism + drift guard.
     committed = json.loads(COMMITTED_PACKET.read_text())
+    if committed.get("recorded_at") != FIXED_RECORDED_AT:
+        raise SystemExit(
+            f"FAIL: committed packet recorded_at {committed.get('recorded_at')!r} != documented "
+            f"anchor {FIXED_RECORDED_AT!r}; regenerate the committed packet from this generator."
+        )
     generated = build_packet(committed["recorded_at"])
     validate(COMMITTED_PACKET)
     if generated != committed:
