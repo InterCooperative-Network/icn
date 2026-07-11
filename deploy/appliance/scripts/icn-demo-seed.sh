@@ -21,10 +21,13 @@
 #      per-VM at first boot and is never printed.
 #      TWO least-privilege credentials are minted (issue #2396 hardening):
 #        - a SETUP JWT (never printed) that provisions the demo loop, and
-#        - a narrow BROWSER JWT — governance:read + the single action-item
-#          completion class only — which is the ONLY JWT handed to the member
-#          shell. It cannot reach cooperative-admin, entity, or broad governance
-#          mutation routes.
+#        - a narrow BROWSER JWT (governance:read + governance:meeting:write) — the
+#          ONLY JWT handed to the member shell. meeting:write is the narrowest
+#          gateway scope that authorizes the shell's action-item completion; as a
+#          member of the seeded fictional domain it ALSO permits creating action
+#          items / meetings there (a completion-only scope decomposition is a
+#          tracked follow-up), but it canNOT reach cooperative-admin, entity,
+#          treasury, or the broad/other governance write classes.
 #   3. Applies the in-tree NYCN institution package (fictional fixture
 #      institution — same package the nycn-dogfood rehearsal kit uses).
 #   4. Dev-gated standing bootstrap for the operator DID (so the shell's

@@ -16,8 +16,8 @@
 #      CLI flag / never a literal), so it cannot leak to a process list or journal.
 #   5. The seed bakes NO credential: no hardcoded JWT/bearer literal.
 #   6. The seed never calls the self-asserted /v1/auth/verify endpoint directly.
-#   7. The BROWSER JWT is least-privilege: governance:read + the single
-#      action-item completion class only — no coop:* and no broad governance:write.
+#   7. The BROWSER JWT is least-privilege: governance:read + governance:meeting:write
+#      (the narrowest scope for completion) — no coop:* and no broad governance:write.
 #   8. The SETUP JWT is internal: only the browser JWT is ever emitted/printed.
 #   9. The icn child process gets a MINIMAL environment (no --preserve-environment;
 #      an explicit allowlist), so unrelated root env never reaches icnctl.
