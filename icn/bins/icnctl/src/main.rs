@@ -7631,7 +7631,6 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
     Ok(())
 }
 
-/// Handle authentication commands
 /// Trusted LOCAL capability-token issuance for a co-located operator.
 ///
 /// Mints a capability token by signing it with `secret` — THIS node's own
@@ -7652,21 +7651,29 @@ pub(crate) fn mint_trusted_token_with_secret(
     if secret.is_empty() {
         bail!("gateway JWT secret is empty");
     }
+    // Apply the SAME input validation the gateway runs at /auth/verify
+    // (icn-gateway `validation::validate_coop_id` / `validate_scopes`) so the
+    // local path rejects a malformed coop_id or a typo/unknown scope up front,
+    // instead of minting a token that only 403s later at the endpoint.
+    icn_gateway::validation::validate_coop_id(coop_id)
+        .map_err(|e| anyhow::anyhow!("invalid coop_id: {e}"))?;
+    icn_gateway::validation::validate_scopes(&scopes)
+        .map_err(|e| anyhow::anyhow!("invalid scopes: {e}"))?;
     icn_gateway::auth::AuthManager::new(secret.to_vec())
         .issue_token(did, coop_id, scopes)
         .context("trusted local token mint failed")
 }
 
 /// Read the instance-local gateway signing secret from `ICN_GATEWAY_JWT_SECRET`
-/// (hex) in the environment and mint a trusted local token. The secret is read
-/// ONLY from the environment — never a CLI argument — and is never printed.
+/// in the environment and mint a trusted local token. The secret is read ONLY
+/// from the environment — never a CLI argument — and is never printed.
 /// Fail-closed with a non-secret diagnostic when the secret is absent.
 pub(crate) fn mint_local_trusted_token(
     did: &icn_identity::Did,
     coop_id: &str,
     scopes: Vec<String>,
 ) -> Result<String> {
-    let secret_hex = std::env::var("ICN_GATEWAY_JWT_SECRET").map_err(|_| {
+    let secret = std::env::var("ICN_GATEWAY_JWT_SECRET").map_err(|_| {
         anyhow::anyhow!(
             "--local-mint needs this node's own gateway signing secret in \
              ICN_GATEWAY_JWT_SECRET (e.g. from /etc/icn/icnd.env). It is read only from the \
@@ -7675,9 +7682,12 @@ pub(crate) fn mint_local_trusted_token(
              flow, which stays fail-closed on routable binds (issue #2075)."
         )
     })?;
-    let secret =
-        hex::decode(secret_hex.trim()).context("ICN_GATEWAY_JWT_SECRET must be hex-encoded")?;
-    mint_trusted_token_with_secret(&secret, did, coop_id, scopes)
+    // Match the gateway EXACTLY: icn-core `init_gateway.rs` builds the signing key
+    // as `config.jwt_secret.clone().into_bytes()` — the secret string's bytes
+    // VERBATIM, never a hex-decode — and icnd stores ICN_GATEWAY_JWT_SECRET
+    // verbatim. Using the raw bytes here is what makes the minted JWT verify on
+    // the live gateway.
+    mint_trusted_token_with_secret(secret.as_bytes(), did, coop_id, scopes)
 }
 
 #[cfg(test)]
@@ -7738,8 +7748,62 @@ mod trusted_local_mint_tests {
         let bundle = icn_identity::IdentityBundle::generate().unwrap();
         assert!(mint_trusted_token_with_secret(&[], bundle.did(), "nycn", vec![]).is_err());
     }
+
+    /// The gateway builds its signing key as `config.jwt_secret.into_bytes()`
+    /// (raw string bytes), NOT a hex-decode. A hex-looking secret must sign with
+    /// its ASCII bytes so the token verifies on the live gateway; the same token
+    /// must NOT verify under the hex-DECODED key. This guards against
+    /// re-introducing a `hex::decode` that would silently 401 every demo token.
+    #[test]
+    fn local_mint_uses_secret_bytes_verbatim_like_the_gateway() {
+        let secret_str = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"; // hex-looking; used verbatim
+        let bundle = icn_identity::IdentityBundle::generate().unwrap();
+        let token = mint_trusted_token_with_secret(
+            secret_str.as_bytes(),
+            bundle.did(),
+            "nycn",
+            vec!["governance:read".to_string()],
+        )
+        .unwrap();
+        // The gateway (raw string-byte key, as in init_gateway.rs) accepts it.
+        icn_gateway::auth::AuthManager::new(secret_str.as_bytes().to_vec())
+            .verify_token(&token)
+            .expect("gateway must accept a token signed with the raw secret-string bytes");
+        // A hex-decoded key must NOT verify it.
+        let decoded = hex::decode(secret_str).unwrap();
+        assert!(
+            icn_gateway::auth::AuthManager::new(decoded)
+                .verify_token(&token)
+                .is_err(),
+            "token must not verify under the hex-decoded secret; the gateway uses raw string bytes"
+        );
+    }
+
+    /// The local mint runs the same input validation as /auth/verify: a malformed
+    /// coop_id or an unknown scope is rejected up front, not minted into a token
+    /// that only 403s later at the endpoint.
+    #[test]
+    fn local_mint_rejects_invalid_coop_id_and_scopes() {
+        let secret = b"instance-local-gateway-secret".to_vec();
+        let bundle = icn_identity::IdentityBundle::generate().unwrap();
+        assert!(
+            mint_trusted_token_with_secret(&secret, bundle.did(), "bad@coop#id!", vec![]).is_err(),
+            "malformed coop_id must be rejected up front"
+        );
+        assert!(
+            mint_trusted_token_with_secret(
+                &secret,
+                bundle.did(),
+                "nycn",
+                vec!["governance:read".to_string(), "totally:bogus".to_string()],
+            )
+            .is_err(),
+            "an unknown scope must be rejected up front"
+        );
+    }
 }
 
+/// Handle authentication commands
 async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
     match cmd {
         AuthCommands::Token {
