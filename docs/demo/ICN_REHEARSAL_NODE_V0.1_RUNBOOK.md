@@ -190,14 +190,16 @@ this:
   (FAIL-OPEN). Setting `ICN_APPLIANCE_ALLOW_OUTBOUND=1` permits outbound,
   skips the canary, and says so in the output and the PASS footer.
 
-What was tested **statically** in this change: the netdev construction matrix
-(4 cases) and all script negative paths. What was tested **through a running
-VM**: nothing in this change — no built demo-profile image is staged on this
-development VM, so the restricted boot and in-guest canary run for the first
-time on the next real `smoke-image` execution. Until then, "blocked by
-default" is a documented-QEMU-semantics + static-construction claim, not a
-witnessed runtime result. If the restricted boot misbehaves, rerun with
-`ICN_APPLIANCE_ALLOW_OUTBOUND=1` and file the finding.
+What was tested **statically** in the change that introduced this posture: the
+netdev construction matrix (4 cases) and all script negative paths. **Since
+witnessed through a running VM:** the restricted boot and in-guest
+outbound-isolation canary have been exercised on real KVM boots (2026-07-10, and
+again on freshly built demo-profile images 2026-07-11) — the guest could not
+reach a per-run host listener while the loopback demo loop completed. "Blocked
+by default" is therefore a witnessed runtime result on the `smoke-image` route,
+not only a documented-QEMU-semantics + static-construction claim. If the
+restricted boot misbehaves, rerun with `ICN_APPLIANCE_ALLOW_OUTBOUND=1` and file
+the finding.
 
 **Fast path B (`open-running-node`) — operator-provided, not enforced.** The
 launcher opens SSH tunnels to an already-running VM; it cannot and does not
@@ -239,9 +241,9 @@ one command away inside the same VM.
   not the #1726 organizer rehearsal shell; the human assistive-technology pass
   (#2041) is still owed, and only automated accessibility evidence exists.
 - The no-outbound guarantee is scoped to the `smoke-image` QEMU route (see
-  "Network posture"): enforced by default, statically tested, canary-proven on
-  each real `--demo` run — but not yet witnessed on a live VM from this change
-  itself. The `open-running-node` route stays operator-provided. #1727's
+  "Network posture"): enforced by default, statically tested, and canary-proven
+  on real KVM boots (witnessed 2026-07-10 and 2026-07-11). The
+  `open-running-node` route stays operator-provided. #1727's
   shell-level demo-mode criteria (fixture loader as default, live mode as a
   labeled opt-in with a mutation warning) remain open.
 - Action cards derive from three of five source paths; `signal_rule` and
