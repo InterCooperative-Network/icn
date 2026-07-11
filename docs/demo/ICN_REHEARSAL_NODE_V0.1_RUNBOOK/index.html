@@ -107,7 +107,7 @@ governed coordination with provenance receipts.</li>
 </tr>
 <tr>
 <td><code>deploy/appliance/scripts/icn-demo-seed.sh</code></td>
-<td>In-VM: mints a short-lived DEV/DEMO JWT, bootstraps the fixture institution, creates one action item. Not idempotent — use reset for a clean slate.</td>
+<td>In-VM: mints a short-lived DEV/DEMO session JWT via <strong>trusted local issuance</strong> (signs with this VM&#39;s own per-instance gateway secret — see the auth-boundary note below), bootstraps the fixture institution, creates one action item. Not idempotent — use reset for a clean slate.</td>
 </tr>
 <tr>
 <td><code>deploy/appliance/scripts/icn-demo-verify.sh</code></td>
@@ -138,6 +138,20 @@ governed coordination with provenance receipts.</li>
 <td>The strongest single proof artifact (governed proposal → vote → close → allocation, 13/13 audit, repo-safe evidence packet); bundled in-VM as <code>icn-demo-verify --chain</code>.</td>
 </tr>
 </tbody></table>
+<h2>Auth boundary — trusted local issuance vs self-asserted (#2075)</h2>
+<p>The demo profile binds the gateway to <code>0.0.0.0:8080</code> so a browser on the host
+reaches it through QEMU host-forwarding. On any non-loopback bind the public
+self-asserted <code>/auth/verify</code> path is <strong>fail-closed</strong> (issue #2075): a DID that
+proves only key ownership can never mint a JWT carrying an arbitrary <code>coop_id</code>.</p>
+<p>The seed therefore mints its session JWT by <strong>trusted local issuance</strong>:
+<code>icnctl auth token --local-mint</code> signs the JWT in-process with the node&#39;s own
+per-instance gateway secret (<code>ICN_GATEWAY_JWT_SECRET</code>, generated at first boot,
+root-only). That is the gateway issuing a JWT for itself to its local operator —
+categorically distinct from an untrusted remote self-asserting a coop over the
+network. It makes no network call, adds no endpoint, and leaves <code>/auth/verify</code>
+fail-closed. <code>institution bootstrap apply --local-mint</code> uses the same path. The
+secret never leaves the VM and is never baked into the image; a JWT minted with
+one VM&#39;s secret does not verify on any other node.</p>
 <h2>Fast path A — smoke an already-built demo image</h2>
 <pre><code class="language-bash">ICN_APPLIANCE_IMAGE=/path/to/icn-appliance-demo.qcow2 \
 ICN_APPLIANCE_SSH_KEY=/path/to/smoke_ed25519 \
