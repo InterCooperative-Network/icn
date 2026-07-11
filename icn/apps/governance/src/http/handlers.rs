@@ -2923,13 +2923,32 @@ pub async fn update_action_item_status<E: GovernanceEventEmitter + Clone + 'stat
     path: web::Path<(String, String)>,
     req: web::Json<StatusUpdateRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    // Record the scope that actually authorized the request (evidence): the
-    // narrowed class scope when present, else the legacy broad scope during
-    // the compatibility period. Listed narrowest-first so it is preferred.
-    let (claims, presented_scope) = require_any_scope_matched::<BasicClaims>(
-        &http_req,
-        &["governance:meeting:write", "governance:write"],
-    )?;
+    // Parse the requested transition first. The body was already deserialized by
+    // the extractor, so this value is server-validated and trustworthy — the
+    // point at which value-sensitive authorization is safe. An unknown
+    // transition fails closed here (400) before any authorization or state
+    // change, so the scope gate below can never act on an untrusted value.
+    let new_status = parse_status(&req.status)?;
+
+    // Value-sensitive authorization (#2400). The completion-only capability
+    // `governance:action-item:complete` authorizes ONLY the transition into
+    // `completed`; every transition continues to accept the broad
+    // `governance:meeting:write` class scope and the legacy `governance:write`
+    // fallback (accepted-also, #1868). Listed narrowest-first so
+    // `require_any_scope_matched` prefers and records the finest scope actually
+    // held as completion evidence (`capability_scope_presented`) — an existing
+    // meeting:write/write client is recorded exactly as before.
+    let candidates: &[&str] = if matches!(new_status, ActionItemStatus::Completed) {
+        &[
+            "governance:action-item:complete",
+            "governance:meeting:write",
+            "governance:write",
+        ]
+    } else {
+        &["governance:meeting:write", "governance:write"]
+    };
+    let (claims, presented_scope) =
+        require_any_scope_matched::<BasicClaims>(&http_req, candidates)?;
     let user_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (domain_id, item_id) = path.into_inner();
@@ -2952,7 +2971,6 @@ pub async fn update_action_item_status<E: GovernanceEventEmitter + Clone + 'stat
         ));
     }
 
-    let new_status = parse_status(&req.status)?;
     let item = ctx
         .manager
         .update_action_item_status(&domain, &id, new_status, &user_did, &presented_scope)

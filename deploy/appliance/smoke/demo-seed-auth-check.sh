@@ -16,8 +16,9 @@
 #      CLI flag / never a literal), so it cannot leak to a process list or journal.
 #   5. The seed bakes NO credential: no hardcoded JWT/bearer literal.
 #   6. The seed never calls the self-asserted /v1/auth/verify endpoint directly.
-#   7. The BROWSER JWT is least-privilege: governance:read + governance:meeting:write
-#      (the narrowest scope for completion) — no coop:* and no broad governance:write.
+#   7. The BROWSER JWT is least-privilege: governance:read + governance:action-item:complete
+#      (the completion-only capability, #2400) — no governance:meeting:write (which
+#      would also authorize creating items/meetings), no coop:*, no broad governance:write.
 #   8. The SETUP JWT is internal: only the browser JWT is ever emitted/printed.
 #   9. The icn child process gets a MINIMAL environment (no --preserve-environment;
 #      an explicit allowlist), so unrelated root env never reaches icnctl.
@@ -84,13 +85,14 @@ else
     ok "seed does not call /v1/auth/verify directly"
 fi
 
-# 7. Browser JWT is least-privilege: governance:read + the single completion
-#    class, and NOTHING broader.
+# 7. Browser JWT is least-privilege: governance:read + the completion-only
+#    action-item capability (#2400), and NOTHING broader — in particular NOT
+#    governance:meeting:write, which would also authorize creating items/meetings.
 browser_scopes="$(awk -F'"' '/^BROWSER_SCOPES=/{print $2; exit}' "$SEED")"
-if [ "$browser_scopes" = "governance:read,governance:meeting:write" ]; then
-    ok "browser JWT is least-privilege: governance:read,governance:meeting:write"
+if [ "$browser_scopes" = "governance:read,governance:action-item:complete" ]; then
+    ok "browser JWT is completion-only least-privilege: governance:read,governance:action-item:complete"
 else
-    bad "BROWSER_SCOPES is not the expected least-privilege set (got: '${browser_scopes:-<unset>}'); it must not carry coop:* or broad governance:write"
+    bad "BROWSER_SCOPES is not the expected completion-only set (got: '${browser_scopes:-<unset>}'); it must be governance:read,governance:action-item:complete — no governance:meeting:write, no coop:*, no broad governance:write"
 fi
 
 # 8. SETUP JWT is internal — only the BROWSER JWT is emitted/printed.
