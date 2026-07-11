@@ -987,6 +987,37 @@ pub mod scopes {
         GOVERNANCE_PROCESS_WRITE,
     ];
 
+    // Governance sub-capability scopes (finer than the class-level write scopes).
+    //
+    // These carve a single, specific act out of a class scope so a consumer can
+    // be granted exactly that act and nothing more. They are NOT members of
+    // `GOVERNANCE_CLASS_WRITE` — a class-write scope authorizes a whole family of
+    // acts; a sub-capability authorizes one.
+
+    /// Completion-only action-item capability (#2400).
+    ///
+    /// Authorizes *only* the transition of an action item into `completed` on
+    /// `PUT /gov/domains/{domain_id}/action-items/{item_id}/status`. It does
+    /// **not** authorize creating action items or meetings, non-completion
+    /// status transitions (in-progress / cancelled / deferred / pending), or any
+    /// broad governance write. Decomposed from `GOVERNANCE_MEETING_WRITE` — the
+    /// narrowest scope that previously reached action-item completion — so a
+    /// browser/member credential can complete an assigned item without also
+    /// being able to create items or meetings.
+    ///
+    /// When this scope authorizes the status request, the route additionally
+    /// requires the caller to be the item's **assignee** (not merely its
+    /// creator): the capability is "complete *my* assigned action item".
+    /// Creator-based status updates remain available to the broader
+    /// `GOVERNANCE_MEETING_WRITE` / `GOVERNANCE_WRITE` scopes.
+    ///
+    /// By the sub-scope matching rule (`icn-http-kit`) this scope is a sibling
+    /// of `GOVERNANCE_MEETING_WRITE` and `GOVERNANCE_WRITE`: it neither implies
+    /// nor is implied by them. The completion route lists it narrowest-first and
+    /// keeps the broad meeting/write scopes as accepted-also fallbacks for the
+    /// full transition range during the migration.
+    pub const GOVERNANCE_ACTION_ITEM_COMPLETE: &str = "governance:action-item:complete";
+
     // Admin scopes
     pub const ADMIN: &str = "admin";
 

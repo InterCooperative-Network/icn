@@ -2923,13 +2923,30 @@ pub async fn update_action_item_status<E: GovernanceEventEmitter + Clone + 'stat
     path: web::Path<(String, String)>,
     req: web::Json<StatusUpdateRequest>,
 ) -> Result<HttpResponse, ApiError> {
-    // Record the scope that actually authorized the request (evidence): the
-    // narrowed class scope when present, else the legacy broad scope during
-    // the compatibility period. Listed narrowest-first so it is preferred.
-    let (claims, presented_scope) = require_any_scope_matched::<BasicClaims>(
-        &http_req,
-        &["governance:meeting:write", "governance:write"],
-    )?;
+    // Parse the requested transition first. The body was already deserialized by
+    // the extractor, so this value is server-validated and trustworthy — the
+    // point at which value-sensitive authorization is safe. An unknown
+    // transition fails closed here (400) before any authorization or state
+    // change, so the scope gate below can never act on an untrusted value.
+    let new_status = parse_status(&req.status)?;
+
+    // Value-sensitive authorization (#2400). The completion-only capability
+    // `governance:action-item:complete` authorizes ONLY the transition into
+    // `completed`; every transition continues to accept the broad
+    // `governance:meeting:write` class scope and the legacy `governance:write`
+    // fallback (accepted-also, #1868). Listed narrowest-first so
+    // `require_any_scope_matched` prefers the finest scope actually held. This is
+    // the gate that rejects an unauthorized scope with a stable 403.
+    let candidates: &[&str] = if matches!(new_status, ActionItemStatus::Completed) {
+        &[
+            "governance:action-item:complete",
+            "governance:meeting:write",
+            "governance:write",
+        ]
+    } else {
+        &["governance:meeting:write", "governance:write"]
+    };
+    let (claims, matched_scope) = require_any_scope_matched::<BasicClaims>(&http_req, candidates)?;
     let user_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (domain_id, item_id) = path.into_inner();
@@ -2946,13 +2963,55 @@ pub async fn update_action_item_status<E: GovernanceEventEmitter + Clone + 'stat
 
     let is_creator = existing.created_by == user_did;
     let is_assignee = existing.assignee.as_ref().is_some_and(|a| a == &user_did);
-    if !is_creator && !is_assignee {
-        return Err(ApiError::Forbidden(
-            "Only the creator or assignee can update action item status".into(),
-        ));
+    // Ownership + evidence keyed on the caller's ACTUAL authority, not merely the
+    // narrowest scope matched (#2400). The completion-only capability
+    // `governance:action-item:complete` authorizes completing an item the caller
+    // is ASSIGNED. Creator-based status updates require a broad
+    // `governance:meeting:write` / `governance:write` scope — which stays
+    // available to an operator/steward even if their token also carries the
+    // completion-only scope. So the ownership decision turns on whether a broad
+    // scope authorized, not on the (narrowest) scope recorded for evidence.
+    let broad_scope = require_any_scope_matched::<BasicClaims>(
+        &http_req,
+        &["governance:meeting:write", "governance:write"],
+    )
+    .ok()
+    .map(|(_, scope)| scope);
+    let owner_ok = is_assignee || (is_creator && broad_scope.is_some());
+    if !owner_ok {
+        // A creator who is not the assignee reached here only via the
+        // completion-only scope (no broad scope); everyone else is neither
+        // creator nor assignee.
+        let msg = if is_creator {
+            "The completion-only capability can only complete an action item assigned to you"
+        } else {
+            "Only the creator or assignee can update action item status"
+        };
+        return Err(ApiError::Forbidden(msg.into()));
     }
 
-    let new_status = parse_status(&req.status)?;
+    // Idempotent PUT: re-requesting the status the item already holds is a no-op.
+    // Returning the item unchanged (rather than re-saving) keeps a repeated
+    // "completion" from bumping proof-visible metadata (e.g. `updated_at`) after
+    // the item is already completed, without emitting a new receipt — so the
+    // completion-only capability cannot become a repeatable metadata-mutation
+    // lever (#2400 Codex review).
+    if existing.status == new_status {
+        return Ok(HttpResponse::Ok().json(action_item_to_response(&existing)));
+    }
+
+    // Record the scope that actually authorized THIS request as evidence
+    // (`capability_scope_presented`). An assignee-completion is authorized by —
+    // and records — the narrowest matched scope (the completion-only capability
+    // when held). A creator-completion is authorized by the broad scope, so
+    // record that truthfully rather than the completion-only capability the
+    // caller may also carry.
+    let presented_scope = if is_assignee {
+        matched_scope
+    } else {
+        broad_scope.unwrap_or(matched_scope)
+    };
+
     let item = ctx
         .manager
         .update_action_item_status(&domain, &id, new_status, &user_did, &presented_scope)

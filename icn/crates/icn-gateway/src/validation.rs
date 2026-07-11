@@ -7,9 +7,9 @@
 
 use crate::error::{GatewayError, Result};
 use icn_rpc::auth::scopes::{
-    GOVERNANCE_ACTIVITY_WRITE, GOVERNANCE_CHARTER_WRITE, GOVERNANCE_COMMENT_WRITE,
-    GOVERNANCE_FEDERATION_WRITE, GOVERNANCE_MEETING_WRITE, GOVERNANCE_PROCESS_WRITE,
-    GOVERNANCE_PROPOSAL_WRITE, GOVERNANCE_STEWARD_WRITE,
+    GOVERNANCE_ACTION_ITEM_COMPLETE, GOVERNANCE_ACTIVITY_WRITE, GOVERNANCE_CHARTER_WRITE,
+    GOVERNANCE_COMMENT_WRITE, GOVERNANCE_FEDERATION_WRITE, GOVERNANCE_MEETING_WRITE,
+    GOVERNANCE_PROCESS_WRITE, GOVERNANCE_PROPOSAL_WRITE, GOVERNANCE_STEWARD_WRITE,
 };
 
 /// Maximum length for cooperative ID
@@ -72,6 +72,14 @@ pub const ALLOWED_SCOPES: &[&str] = &[
     GOVERNANCE_ACTIVITY_WRITE,
     GOVERNANCE_COMMENT_WRITE,
     GOVERNANCE_PROCESS_WRITE,
+    // Governance sub-capability scopes (finer than the class-level write scopes).
+    // A completion-only action-item capability (#2400), decomposed from
+    // `governance:meeting:write`: it authorizes only the `completed` transition on
+    // the action-item status route, so a browser/member credential can complete an
+    // assigned item without also being able to create items or meetings. Sourced
+    // from `icn_rpc::auth::scopes`; locked by
+    // `test_allowed_scopes_contains_action_item_complete`.
+    GOVERNANCE_ACTION_ITEM_COMPLETE,
     // Settlement operations
     "settlements:read",
     "settlements:write",
@@ -901,6 +909,38 @@ mod tests {
         assert!(
             validate_scopes(&bundled).is_ok(),
             "all of GOVERNANCE_CLASS_WRITE must be acceptable in a single request"
+        );
+    }
+
+    /// Cross-crate invariant: the completion-only action-item capability
+    /// (`icn_rpc::auth::scopes::GOVERNANCE_ACTION_ITEM_COMPLETE`, #2400) must be
+    /// issuable by the gateway auth endpoint. Without this lock a browser
+    /// credential scoped to completion-only could never be minted, and the
+    /// appliance `BROWSER_SCOPES` migration off `governance:meeting:write` would
+    /// silently fail at token issuance. It is a *finer* capability than the
+    /// class-level `GOVERNANCE_*_WRITE` scopes, so it is deliberately NOT a
+    /// member of `GOVERNANCE_CLASS_WRITE`.
+    #[test]
+    fn test_allowed_scopes_contains_action_item_complete() {
+        use icn_rpc::auth::scopes::{GOVERNANCE_ACTION_ITEM_COMPLETE, GOVERNANCE_CLASS_WRITE};
+
+        assert_eq!(
+            GOVERNANCE_ACTION_ITEM_COMPLETE, "governance:action-item:complete",
+            "canonical wire string must not drift"
+        );
+        assert!(
+            ALLOWED_SCOPES.contains(&GOVERNANCE_ACTION_ITEM_COMPLETE),
+            "icn-rpc canonical scope {GOVERNANCE_ACTION_ITEM_COMPLETE:?} must be in the gateway ALLOWED_SCOPES"
+        );
+        assert!(
+            validate_scopes(&[GOVERNANCE_ACTION_ITEM_COMPLETE.to_string()]).is_ok(),
+            "icn-rpc canonical scope {GOVERNANCE_ACTION_ITEM_COMPLETE:?} must pass validate_scopes"
+        );
+        // A finer capability, not a class-write: it must NOT be conflated with
+        // the class-level decomposition set.
+        assert!(
+            !GOVERNANCE_CLASS_WRITE.contains(&GOVERNANCE_ACTION_ITEM_COMPLETE),
+            "the completion-only scope must not be a member of GOVERNANCE_CLASS_WRITE"
         );
     }
 

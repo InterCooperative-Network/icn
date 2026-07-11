@@ -93,12 +93,14 @@ one VM's secret does not verify on any other node.
 
 The seed mints two least-privilege credentials: an internal **setup** token that
 provisions the demo (never printed), and the **browser** token it hands to the
-member shell — scoped to `governance:read` plus `governance:meeting:write`, the
-narrowest gateway scope that authorizes the action-item completion the shell
-performs. As a member of the seeded fictional domain that scope also permits
-creating action items / meetings there (a completion-only scope decomposition is
-a tracked follow-up), but the browser token cannot reach cooperative-admin,
-entity, treasury, or the broad / other governance write classes.
+member shell — scoped to `governance:read` plus `governance:action-item:complete`,
+the completion-only capability (#2400). That capability authorizes only the
+`completed` transition of an action item the caller is assigned, so the browser
+token cannot create action items or meetings, drive other status transitions,
+administer a cooperative, read entities, touch treasury, or reach the broad /
+other governance write classes. The internal setup token retains
+`governance:meeting:write` because it creates the fixture action item; it is
+never emitted.
 
 ## Fast path A — smoke an already-built demo image
 

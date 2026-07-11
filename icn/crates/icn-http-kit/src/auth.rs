@@ -406,6 +406,60 @@ mod tests {
         ));
     }
 
+    /// Least-privilege boundary for the completion-only browser credential shape
+    /// (`governance:read governance:action-item:complete`, #2400). It must satisfy
+    /// the action-item completion candidate list and the read surface, and be
+    /// denied everything broader — including the `governance:meeting:write` class
+    /// that authorizes *creating* items/meetings, the broad/sibling governance
+    /// writes, entity mutation, and cooperative admin. Guards the credential split
+    /// against a browser session silently regaining create/admin authority.
+    #[test]
+    fn narrow_read_plus_action_item_complete_cannot_create_or_reach_broad_routes() {
+        const COMPLETE: &str = "governance:action-item:complete";
+        let req = req_with_scope(Some("governance:read governance:action-item:complete"));
+
+        // MUST satisfy the member-shell read surface and the completion PUT
+        // (the completion candidate list is narrowest-first).
+        assert!(require_scope::<BasicClaims>(&req, "governance:read").is_ok());
+        assert!(
+            require_any_scope::<BasicClaims>(&req, &[COMPLETE, MEETING, BROAD]).is_ok(),
+            "completion candidate list must accept the completion-only scope"
+        );
+        // Evidence must record the narrow completion scope, not a broad fallback.
+        let (_c, matched) =
+            require_any_scope_matched::<BasicClaims>(&req, &[COMPLETE, MEETING, BROAD]).unwrap();
+        assert_eq!(
+            matched, COMPLETE,
+            "evidence must record the completion-only scope"
+        );
+
+        // MUST NOT reach creation / broader authority. The completion scope is a
+        // sibling of meeting:write and governance:write — it neither implies nor
+        // is implied by them (no accidental sub-scope escalation).
+        for denied in [
+            MEETING,
+            BROAD,
+            CHARTER,
+            "entity:write",
+            "coop:admin",
+            "coop:write",
+        ] {
+            assert!(
+                matches!(
+                    require_scope::<BasicClaims>(&req, denied).unwrap_err(),
+                    ApiError::Forbidden(_)
+                ),
+                "completion-only session must NOT grant {denied}"
+            );
+        }
+        // The create / non-completion-transition gate (meeting:write | write)
+        // must reject the completion-only session outright.
+        assert!(matches!(
+            require_any_scope::<BasicClaims>(&req, &[MEETING, BROAD]).unwrap_err(),
+            ApiError::Forbidden(_)
+        ));
+    }
+
     #[test]
     fn require_any_scope_honors_sub_scope_match() {
         // `governance:write:admin` satisfies the broad `governance:write` candidate.

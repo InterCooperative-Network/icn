@@ -21,12 +21,12 @@
 #      per-VM at first boot and is never printed.
 #      TWO least-privilege credentials are minted (issue #2396 hardening):
 #        - a SETUP JWT (never printed) that provisions the demo loop, and
-#        - a narrow BROWSER JWT (governance:read + governance:meeting:write) — the
-#          ONLY JWT handed to the member shell. meeting:write is the narrowest
-#          gateway scope that authorizes the shell's action-item completion; as a
-#          member of the seeded fictional domain it ALSO permits creating action
-#          items / meetings there (a completion-only scope decomposition is a
-#          tracked follow-up), but it canNOT reach cooperative-admin, entity,
+#        - a narrow BROWSER JWT (governance:read + governance:action-item:complete)
+#          — the ONLY JWT handed to the member shell. governance:action-item:complete
+#          is the completion-only capability (#2400): as a member of the seeded
+#          fictional domain it lets the operator complete their assigned action
+#          item and NOTHING more — it canNOT create action items or meetings,
+#          administer a cooperative, read entities, or reach cooperative-admin,
 #          treasury, or the broad/other governance write classes.
 #   3. Applies the in-tree NYCN institution package (fictional fixture
 #      institution — same package the nycn-dogfood rehearsal kit uses).
@@ -64,12 +64,15 @@ DOMAIN="${ICN_DEMO_DOMAIN:-nycn-federation-gov}"
 #     standing-bootstrap. NEVER emitted to the browser.
 #   - BROWSER: the member-shell's live routes — standing / action-cards /
 #     pending-publish / completion-receipt (governance:read) and the action-item
-#     completion PUT (governance:meeting:write). This is the ONLY JWT printed.
-# Neither needs any coop:* scope, and the browser JWT carries NO broad
-# governance:write, entity:write, or coop:admin — so it cannot reach
-# cooperative-admin, entity, or broad governance-mutation routes.
+#     completion PUT (governance:action-item:complete, the completion-only
+#     capability from #2400 — accepted only for the `completed` transition). This
+#     is the ONLY JWT printed.
+# Neither needs any coop:* scope, and the browser JWT carries NO governance:write,
+# NO governance:meeting:write, NO entity:write, and NO coop:admin — so it cannot
+# create action items or meetings, administer a cooperative, read entities, or
+# reach broad governance-mutation routes.
 SETUP_SCOPES="governance:meeting:write"
-BROWSER_SCOPES="governance:read,governance:meeting:write"
+BROWSER_SCOPES="governance:read,governance:action-item:complete"
 JSON_OUT=0
 [ "${1:-}" = "--json" ] && JSON_OUT=1
 

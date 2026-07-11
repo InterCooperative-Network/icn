@@ -668,7 +668,7 @@
   // The single mutation: complete an action item (live mode).
   // PUT /v1/gov/domains/{domain_id}/action-items/{item_id}/status
   //   body {"status": "completed"}
-  //   scopes: governance:meeting:write OR governance:write
+  //   scopes: governance:action-item:complete (completion-only) OR governance:meeting:write OR governance:write
   //   (caller must also be the item's creator or assignee and a domain
   //   member — the gateway enforces this; we render its answer honestly.)
   // Then GET .../completion-receipt (scope governance:read).
