@@ -9,14 +9,22 @@
 #
 # What it does (all against THIS VM's own gateway on 127.0.0.1:8080):
 #   1. Waits for the gateway to be healthy.
-#   2. Resolves the node operator DID and mints a session JWT by TRUSTED LOCAL
-#      issuance: icnctl signs it in-process (the `--local-mint` path) with this
+#   2. Resolves the node operator DID and mints session JWTs by TRUSTED LOCAL
+#      issuance: icnctl signs them in-process (the `--local-mint` path) with this
 #      VM's own per-instance gateway JWT secret (ICN_GATEWAY_JWT_SECRET from
-#      /etc/icn/icnd.env, root-only). That is the gateway issuing a JWT for
-#      itself to its local operator — it does NOT use the public self-asserted
-#      /auth/verify path, which stays fail-closed on the demo's routable
-#      0.0.0.0 bind (issue #2075). No credential is baked into the image; the
-#      secret is generated per-VM at first boot and is never printed.
+#      /etc/icn/icnd.env — an INSTANCE-LOCAL secret, mode 0600 owned icn:icn; any
+#      process running as the icn service account can read it and exercise gateway
+#      signing authority). That is the gateway issuing a JWT for itself to its
+#      local operator — it does NOT use the public self-asserted /auth/verify
+#      path, which stays fail-closed on the demo's routable 0.0.0.0 bind (issue
+#      #2075). No credential is baked into the image; the secret is generated
+#      per-VM at first boot and is never printed.
+#      TWO least-privilege credentials are minted (issue #2396 hardening):
+#        - a SETUP JWT (never printed) that provisions the demo loop, and
+#        - a narrow BROWSER JWT — governance:read + the single action-item
+#          completion class only — which is the ONLY JWT handed to the member
+#          shell. It cannot reach cooperative-admin, entity, or broad governance
+#          mutation routes.
 #   3. Applies the in-tree NYCN institution package (fictional fixture
 #      institution — same package the nycn-dogfood rehearsal kit uses).
 #   4. Dev-gated standing bootstrap for the operator DID (so the shell's
@@ -24,7 +32,7 @@
 #      dev gate is unavailable the seed continues and says so.
 #   5. Creates ONE open action item assigned to the operator DID — this is
 #      the action card the operator discharges in the member-shell.
-#   6. Prints the demo JWT + URLs + honesty labels (or JSON with --json).
+#   6. Prints the narrow BROWSER JWT + URLs + honesty labels (or JSON with --json).
 #
 # What it does NOT do:
 #   - No production claims. Fictional institution, test posture, local VM.
@@ -46,7 +54,19 @@ ENV_FILE=/etc/icn/icnd.env
 PKG=/usr/share/icn/demo/institutions/nycn
 COOP_ID="${ICN_DEMO_COOP_ID:-nycn}"
 DOMAIN="${ICN_DEMO_DOMAIN:-nycn-federation-gov}"
-SCOPES="governance:read,governance:write,coop:read,coop:write,coop:admin"
+# Least-privilege scope sets (issue #2396 hardening). Proven against the live
+# gateway route guards (icn-http-kit require_scope / require_any_scope_matched):
+#   - SETUP: creates the demo action item (POST .../action-items accepts the
+#     narrow governance:meeting:write class). Also drives the no-scope dev
+#     standing-bootstrap. NEVER emitted to the browser.
+#   - BROWSER: the member-shell's live routes — standing / action-cards /
+#     pending-publish / completion-receipt (governance:read) and the action-item
+#     completion PUT (governance:meeting:write). This is the ONLY JWT printed.
+# Neither needs any coop:* scope, and the browser JWT carries NO broad
+# governance:write, entity:write, or coop:admin — so it cannot reach
+# cooperative-admin, entity, or broad governance-mutation routes.
+SETUP_SCOPES="governance:meeting:write"
+BROWSER_SCOPES="governance:read,governance:meeting:write"
 JSON_OUT=0
 [ "${1:-}" = "--json" ] && JSON_OUT=1
 
@@ -64,24 +84,41 @@ command -v python3 >/dev/null || fatal "python3 missing"
 . "$ENV_FILE"
 [ -n "${ICN_KEYSTORE_PASSPHRASE:-}" ] || fatal "ICN_KEYSTORE_PASSPHRASE not present in $ENV_FILE"
 # Instance-local gateway signing secret — the trusted lever for local JWT
-# issuance (icnctl --local-mint). Generated per-VM by firstboot; root-only.
+# issuance (icnctl --local-mint). Generated per-VM by firstboot; stored mode 0600
+# owned icn:icn (readable by the icn service account, not root-exclusive).
 [ -n "${ICN_GATEWAY_JWT_SECRET:-}" ] || fatal "ICN_GATEWAY_JWT_SECRET not present in $ENV_FILE — needed for trusted local JWT issuance (icnctl --local-mint)"
+# icnctl accepts the keystore passphrase from ICN_PASSPHRASE too; mirror it here so
+# as_icn() forwards a single, explicit passphrase pair.
+ICN_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE"
+
+# Allowlist of variables the icn child process may see. Everything else in root's
+# environment is stripped before dropping privilege, so no unrelated root state
+# (or a stray secret exported by some other tool) reaches icnctl.
+ICN_CHILD_ENV_KEEP="ICN_KEYSTORE_PASSPHRASE ICN_PASSPHRASE ICN_GATEWAY_JWT_SECRET LANG LC_ALL LC_CTYPE TERM"
 
 as_icn(){
-  # Drop from root to the icn user with `runuser`, NOT `sudo`. sudo records
-  # both its command line AND its environment in the auth journal, so any form
-  # of `sudo … ICN_KEYSTORE_PASSPHRASE=… …` (command-line assignment OR
-  # --preserve-env) leaks the keystore passphrase into the journal. This
-  # script already runs as root, so it does not need sudo to gain privilege —
-  # runuser drops privilege without writing the command or env to any log.
-  # The passphrase is exported only for the runuser call and passed through
-  # with --preserve-environment. The gateway signing secret is passed the same
-  # way (env only, never a command line, never logged) so `icnctl --local-mint`
-  # can issue a trusted local JWT as the icn user.
-  ICN_KEYSTORE_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" \
-  ICN_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" \
-  ICN_GATEWAY_JWT_SECRET="$ICN_GATEWAY_JWT_SECRET" \
-    runuser -u icn --preserve-environment -- "$@"
+  # Drop from root to the icn user with `runuser`, NOT `sudo`: sudo records both
+  # its command line AND its environment in the auth journal, so any
+  # `sudo … ICN_KEYSTORE_PASSPHRASE=… …` (assignment OR --preserve-env) leaks the
+  # passphrase into the journal. This script already runs as root, so runuser only
+  # drops privilege — it writes neither command nor env to any log.
+  #
+  # runuser forwards exported variables to the child, so we FIRST strip the
+  # inherited environment down to the explicit allowlist in a subshell, then export
+  # only the secrets icnctl needs. runuser (no --preserve-environment) resets
+  # HOME/USER/PATH for the icn user itself. Secrets travel via the ENVIRONMENT,
+  # never a command line — so they never appear in argv/ps or the journal.
+  (
+    for _name in $(compgen -e); do
+      case " $ICN_CHILD_ENV_KEEP " in
+        *" $_name "*) : ;;
+        *) unset "$_name" 2>/dev/null || true ;;
+      esac
+    done
+    export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    export ICN_KEYSTORE_PASSPHRASE ICN_PASSPHRASE ICN_GATEWAY_JWT_SECRET
+    runuser -u icn -- "$@"
+  )
 }
 
 log "waiting for gateway health at $GW ..."
@@ -97,11 +134,27 @@ DID="$(grep -oE 'did:icn:[A-Za-z0-9]+' <<<"$id_out" | head -1)"
 [ -n "$DID" ] || fatal "could not resolve node operator DID (icnctl --data-dir $DATA_DIR id show)"
 log "operator DID: $DID"
 
-jwt_out="$(as_icn /usr/local/bin/icnctl --data-dir "$DATA_DIR" auth token --gateway "$GW" --coop-id "$COOP_ID" -s "$SCOPES" --local-mint 2>/dev/null || true)" # vocab-ok: icnctl CLI subcommand name
-SESSION_JWT="$(grep -oE 'eyJ[A-Za-z0-9_.-]+' <<<"$jwt_out" | head -1)"
-[ -n "$SESSION_JWT" ] || fatal "trusted local session-JWT mint failed (icnctl --local-mint). Check ICN_GATEWAY_JWT_SECRET is present in $ENV_FILE and the keystore unlocks. This path signs with THIS VM's own gateway secret and never uses the public self-asserted /auth/verify flow (issue #2075)."
-AUTH="Authorization: Bearer $SESSION_JWT"
-log "session JWT minted via trusted local issuance (this VM's own gateway secret; printed at the end — local VM only)."
+# Mint a trusted-local JWT for the given scope set ($1) and echo the bare JWT.
+# icnctl reads the gateway secret from the environment, never a CLI argument.
+mint_local_jwt(){
+  local out
+  out="$(as_icn /usr/local/bin/icnctl --data-dir "$DATA_DIR" auth token --gateway "$GW" --coop-id "$COOP_ID" -s "$1" --local-mint 2>/dev/null || true)" # vocab-ok: icnctl CLI subcommand name
+  grep -oE 'eyJ[A-Za-z0-9_.-]+' <<<"$out" | head -1
+}
+
+# SETUP JWT — provisions the demo loop (dev standing-bootstrap + action-item
+# creation). Internal to this root-invoked seed; NEVER printed or returned.
+SETUP_JWT="$(mint_local_jwt "$SETUP_SCOPES")"
+[ -n "$SETUP_JWT" ] || fatal "trusted local SETUP-JWT mint failed (icnctl --local-mint). Check ICN_GATEWAY_JWT_SECRET is present in $ENV_FILE and the keystore unlocks. This path signs with THIS VM's own gateway secret and never uses the public self-asserted /auth/verify flow (issue #2075)."
+AUTH_SETUP="Authorization: Bearer $SETUP_JWT"
+
+# BROWSER JWT — the narrow, least-privilege credential handed to the member
+# shell (governance:read + the single action-item completion class). The ONLY
+# JWT this seed prints.
+BROWSER_JWT="$(mint_local_jwt "$BROWSER_SCOPES")"
+[ -n "$BROWSER_JWT" ] || fatal "trusted local BROWSER-JWT mint failed (icnctl --local-mint). Check ICN_GATEWAY_JWT_SECRET is present in $ENV_FILE and the keystore unlocks."
+AUTH_BROWSER="Authorization: Bearer $BROWSER_JWT"
+log "minted two trusted-local JWTs: a setup JWT (internal, never printed) and a narrow browser JWT (printed at the end — local VM only)."
 
 log "applying NYCN institution package (fictional fixture institution)..."
 as_icn /usr/local/bin/icnctl --data-dir "$DATA_DIR" institution bootstrap apply \
@@ -115,14 +168,14 @@ log "institution package applied."
 # given jurisdiction — the body carries jurisdiction_id only, never a DID
 # (see icn-gateway api/commons dev_bootstrap_standing).
 standing_note="bootstrap-standing: ok"
-if ! curl -sf -m 5 -X POST -H "$AUTH" -H 'Content-Type: application/json' \
+if ! curl -sf -m 5 -X POST -H "$AUTH_SETUP" -H 'Content-Type: application/json' \
       -d "{\"jurisdiction_id\":\"$DOMAIN\"}" "$GW/v1/commons/dev/bootstrap-standing" >/dev/null 2>&1; then
   standing_note="bootstrap-standing: unavailable (dev gate off or endpoint shape changed) — standing pane may be sparse; action-item loop unaffected"
   log "WARN: $standing_note"
 fi
 
 log "creating one open action item assigned to $DID ..."
-item_json="$(curl -s -m 10 -X POST -H "$AUTH" -H 'Content-Type: application/json' \
+item_json="$(curl -s -m 10 -X POST -H "$AUTH_SETUP" -H 'Content-Type: application/json' \
   -d "{\"title\":\"Confirm Summit 2026 venue booking\",\"description\":\"Demo obligation (fictional): confirm the venue contract for the 2026 Summit\",\"assignee\":\"$DID\",\"priority\":\"high\",\"meeting_context\":\"demo organizing team\"}" \
   "$GW/v1/gov/domains/$DOMAIN/action-items")"
 ITEM_ID="$(python3 -c 'import json,sys
@@ -133,7 +186,9 @@ except Exception:
 [ -n "$ITEM_ID" ] || fatal "action item creation failed: $item_json"
 log "action item created: $ITEM_ID"
 
-cards_json="$(curl -s -m 10 -H "$AUTH" "$GW/v1/gov/me/action-cards")"
+# Verify with the BROWSER JWT (its governance:read scope) that the card is
+# visible — this is exactly the read the member shell performs.
+cards_json="$(curl -s -m 10 -H "$AUTH_BROWSER" "$GW/v1/gov/me/action-cards")"
 card_n="$(python3 -c 'import json,sys
 try:
     d = json.load(sys.stdin)
@@ -148,7 +203,7 @@ if [ "$JSON_OUT" = 1 ]; then
 print(json.dumps({"did": sys.argv[1], "jwt": sys.argv[2], "item_id": sys.argv[3],
                   "domain": sys.argv[4], "gateway": sys.argv[5],
                   "standing_note": sys.argv[6]}))' \
-    "$DID" "$SESSION_JWT" "$ITEM_ID" "$DOMAIN" "$GW" "$standing_note"
+    "$DID" "$BROWSER_JWT" "$ITEM_ID" "$DOMAIN" "$GW" "$standing_note"
   exit 0
 fi
 
@@ -164,9 +219,10 @@ cat <<EOF
  Open action item:   $ITEM_ID
  $standing_note
 
- Session JWT (LOCAL VM ONLY — trusted local issuance signed with this VM's
- own per-instance gateway secret; paste into the shell's live mode):
- $SESSION_JWT
+ Browser session JWT (LOCAL VM ONLY — trusted local issuance signed with this
+ VM's own per-instance gateway secret; least-privilege: governance:read +
+ action-item completion only; paste into the shell's live mode):
+ $BROWSER_JWT
 
  Honesty labels:
    live-local : node, gateway, standing/action-card/receipt endpoints,

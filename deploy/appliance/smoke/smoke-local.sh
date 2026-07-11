@@ -116,6 +116,10 @@ done
 
 # ---------- common context ----------
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Redaction-safe seed diagnostic (never echoes the seed JWT). Shared with the
+# VM-free regression test smoke/seed-redaction-check.sh.
+# shellcheck source=deploy/appliance/smoke/lib-seed-diag.sh
+. "$SCRIPT_DIR/lib-seed-diag.sh"
 SSH_USER="${ICN_APPLIANCE_SSH_USER:-debian}"
 SSH_PORT="${ICN_APPLIANCE_SSH_PORT:-2222}"
 HEALTH_PORT="${ICN_APPLIANCE_HEALTH_PORT:-8080}"
@@ -534,8 +538,16 @@ if [ "$DEMO" = 1 ]; then
     DEMO_ITEM="$(jq -r '.item_id // empty' <<<"$SEED_JSON")"
     DEMO_DOMAIN="$(jq -r '.domain // empty' <<<"$SEED_JSON")"
     DEMO_DID="$(jq -r '.did // empty' <<<"$SEED_JSON")"
-    if [ -z "$DEMO_JWT" ] || [ -z "$DEMO_ITEM" ] || [ -z "$DEMO_DOMAIN" ]; then
-        err "[demo] seed output incomplete: $SEED_JSON"
+    if [ -z "$DEMO_JWT" ] || [ -z "$DEMO_ITEM" ] || [ -z "$DEMO_DOMAIN" ] || [ -z "$DEMO_DID" ]; then
+        # NEVER echo $SEED_JSON — it carries the browser session JWT. seed_incomplete_diag
+        # reports which required fields are missing and whether the payload parsed
+        # as JSON, without ever reproducing the JWT (see lib-seed-diag.sh).
+        _missing=""
+        [ -z "$DEMO_JWT" ]    && _missing="$_missing jwt"
+        [ -z "$DEMO_ITEM" ]   && _missing="$_missing item_id"
+        [ -z "$DEMO_DOMAIN" ] && _missing="$_missing domain"
+        [ -z "$DEMO_DID" ]    && _missing="$_missing did"
+        err "[demo] $(seed_incomplete_diag "$SEED_JSON" "$_missing")"
         exit 12
     fi
     # Fail closed if the standing bootstrap silently degraded — the standing
@@ -581,6 +593,22 @@ if [ "$DEMO" = 1 ]; then
         | jq --arg id "$DEMO_ITEM" '[.cards[]? | select(.source_id==$id)] | length')"
     [ "$N_AFTER" = "0" ] || { err "[demo] card did not clear after completion"; exit 13; }
     log "[demo] loop complete: standing -> card -> discharge -> receipt -> card cleared."
+
+    # ---------- least-privilege negative (issue #2396 hardening) ----------
+    # The browser session JWT is scoped to governance:read + the action-item
+    # completion class ONLY. Prove it cannot reach entity/administrative routes:
+    # GET /v1/entities/{id} guards on entity:read as its FIRST line (before any
+    # lookup), which the browser JWT does not carry — so it MUST return 403,
+    # not 200/404. This is the runtime counterpart to the deterministic scope-
+    # boundary unit test in icn-http-kit (auth.rs).
+    log "[demo] least-privilege: browser JWT must be denied entity routes (entity:read)..."
+    LP_CODE="$(curl -s -o /dev/null -w '%{http_code}' -m 10 -H "$AUTH" \
+        "$GWH/v1/entities/probe-nonexistent-entity")"
+    if [ "$LP_CODE" != "403" ]; then
+        err "[demo] SECURITY: browser JWT got HTTP $LP_CODE (expected 403) on GET /v1/entities/{id} — the browser credential must not reach entity/admin routes"
+        exit 14
+    fi
+    log "[demo] least-privilege OK: browser JWT 403'd on the entity route (no entity:read)."
 
     # ---------- outbound-isolation canary (restricted runs only) ----------
     if [ "$ALLOW_OUTBOUND" != "1" ]; then

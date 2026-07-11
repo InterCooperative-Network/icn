@@ -158,6 +158,22 @@ pub struct AuthManager {
     allow_self_asserted_coop: bool,
 }
 
+/// Canonical derivation of the HMAC signing-key bytes from the configured
+/// gateway secret **string**: its raw UTF-8 bytes, verbatim.
+///
+/// SECURITY / correctness (follow-up to #2396): the configured secret is treated
+/// as an opaque passphrase and keyed directly — it is **never** hex- or
+/// base64-decoded. Every component that signs or verifies gateway JWTs (the
+/// daemon at `icn-core` `init_gateway`, and the `icnctl --local-mint`
+/// trusted-local issuer) MUST derive the key through this one function, or a
+/// token minted by one silently fails verification under the other. A review of
+/// #2396 caught exactly that: a co-issuer that `hex::decode`d a hex-looking
+/// secret produced tokens the daemon rejected. Centralizing here makes that
+/// divergence impossible to reintroduce.
+pub fn signing_key_bytes(secret: &str) -> Vec<u8> {
+    secret.as_bytes().to_vec()
+}
+
 impl AuthManager {
     /// Create new auth manager.
     ///
@@ -172,6 +188,17 @@ impl AuthManager {
             token_ttl: Duration::from_secs(3600),    // 1 hour
             allow_self_asserted_coop: false,
         }
+    }
+
+    /// Construct an [`AuthManager`] from the configured secret **string**, keying
+    /// HMAC with [`signing_key_bytes`] (its raw UTF-8 bytes, verbatim).
+    ///
+    /// This is the single canonical constructor for both the gateway daemon and
+    /// the `icnctl --local-mint` trusted-local issuer, so the two can never drift
+    /// in how they turn the secret string into signing-key bytes (see
+    /// [`signing_key_bytes`]).
+    pub fn from_secret_string(secret: &str) -> Self {
+        Self::new(signing_key_bytes(secret))
     }
 
     /// Enable (or disable) self-service capability-token issuance via the

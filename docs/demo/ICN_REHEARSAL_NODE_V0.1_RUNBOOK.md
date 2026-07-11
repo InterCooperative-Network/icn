@@ -79,15 +79,23 @@ reaches it through QEMU host-forwarding. On any non-loopback bind the public
 self-asserted `/auth/verify` path is **fail-closed** (issue #2075): a DID that
 proves only key ownership can never mint a JWT carrying an arbitrary `coop_id`.
 
-The seed therefore mints its session JWT by **trusted local issuance**:
-`icnctl auth token --local-mint` signs the JWT in-process with the node's own
+The seed therefore mints its session JWTs by **trusted local issuance**:
+`icnctl auth token --local-mint` signs a JWT in-process with the node's own
 per-instance gateway secret (`ICN_GATEWAY_JWT_SECRET`, generated at first boot,
-root-only). That is the gateway issuing a JWT for itself to its local operator —
+stored mode 0600 owned `icn:icn` — readable by the icn service account, not
+root-exclusive; any process running as `icn` can exercise gateway signing
+authority). That is the gateway issuing a JWT for itself to its local operator —
 categorically distinct from an untrusted remote self-asserting a coop over the
 network. It makes no network call, adds no endpoint, and leaves `/auth/verify`
 fail-closed. `institution bootstrap apply --local-mint` uses the same path. The
 secret never leaves the VM and is never baked into the image; a JWT minted with
 one VM's secret does not verify on any other node.
+
+The seed mints two least-privilege credentials: an internal **setup** token that
+provisions the demo (never printed), and the **browser** token it hands to the
+member shell — scoped to `governance:read` plus the single action-item completion
+class only, so a pasted browser token cannot reach cooperative-admin, entity, or
+broad governance-mutation routes.
 
 ## Fast path A — smoke an already-built demo image
 

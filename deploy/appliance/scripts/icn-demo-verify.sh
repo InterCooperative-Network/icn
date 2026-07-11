@@ -100,12 +100,35 @@ command -v python3 >/dev/null || fatal "python3 missing"
 
 # shellcheck disable=SC1090
 . "$ENV_FILE"
-# Drop to the icn user with runuser (this script runs as root), passing the
-# passphrase through exported env. NOT sudo: sudo logs its command + env to
-# the auth journal, leaking the keystore passphrase. See icn-demo-seed.sh
-# as_icn() for the rationale.
-SESSION_JWT="$(ICN_KEYSTORE_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" ICN_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" runuser -u icn --preserve-environment -- /usr/local/bin/icnctl --data-dir "$DATA_DIR" auth token --gateway "$GW" --coop-id "$COOP_ID" -s "governance:read" 2>/dev/null | grep -oE 'eyJ[A-Za-z0-9_.-]+' | head -1)" # vocab-ok: icnctl CLI subcommand name
-[ -n "$SESSION_JWT" ] || fatal "could not mint a read JWT"
+[ -n "${ICN_KEYSTORE_PASSPHRASE:-}" ] || fatal "ICN_KEYSTORE_PASSPHRASE not present in $ENV_FILE"
+# The read-JWT is minted by TRUSTED LOCAL issuance (--local-mint), signing with
+# THIS VM's own instance-local gateway secret (mode 0600 owned icn:icn). It does
+# NOT use the public self-asserted /auth/verify flow, which stays fail-closed on
+# the demo's routable 0.0.0.0 bind (#2075) — so the mint needs the secret present.
+[ -n "${ICN_GATEWAY_JWT_SECRET:-}" ] || fatal "ICN_GATEWAY_JWT_SECRET not present in $ENV_FILE — needed for trusted local read-JWT issuance (icnctl --local-mint)"
+ICN_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE"
+
+# Allowlist for the icn child process (see icn-demo-seed.sh as_icn() for the full
+# rationale): strip the inherited root environment down to just what icnctl needs,
+# then drop privilege with runuser (NOT sudo — sudo journals its command+env,
+# leaking the passphrase). Secrets travel via the ENVIRONMENT, never argv, so they
+# never reach ps/journal. A governance:read JWT is the least privilege that reads
+# a completion receipt.
+ICN_CHILD_ENV_KEEP="ICN_KEYSTORE_PASSPHRASE ICN_PASSPHRASE ICN_GATEWAY_JWT_SECRET LANG LC_ALL LC_CTYPE TERM"
+SESSION_JWT="$(
+  (
+    for _name in $(compgen -e); do
+      case " $ICN_CHILD_ENV_KEEP " in
+        *" $_name "*) : ;;
+        *) unset "$_name" 2>/dev/null || true ;;
+      esac
+    done
+    export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+    export ICN_KEYSTORE_PASSPHRASE ICN_PASSPHRASE ICN_GATEWAY_JWT_SECRET
+    runuser -u icn -- /usr/local/bin/icnctl --data-dir "$DATA_DIR" auth token --gateway "$GW" --coop-id "$COOP_ID" -s "governance:read" --local-mint 2>/dev/null # vocab-ok: icnctl CLI subcommand name
+  ) | grep -oE 'eyJ[A-Za-z0-9_.-]+' | head -1
+)"
+[ -n "$SESSION_JWT" ] || fatal "could not mint a read JWT via trusted local issuance (icnctl --local-mint). Check ICN_GATEWAY_JWT_SECRET is present in $ENV_FILE and the keystore unlocks."
 
 receipt="$(curl -s -m 10 -H "Authorization: Bearer $SESSION_JWT" \
   "$GW/v1/gov/domains/$DOMAIN/action-items/$ITEM_ID/completion-receipt")"

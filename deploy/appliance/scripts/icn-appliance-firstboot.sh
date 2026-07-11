@@ -260,7 +260,7 @@ init_identity_block() {
     log "Generating per-instance JWT secret + keystore passphrase (NOT embedded in image)."
     if [ "$DRY_RUN" -eq 1 ]; then
         printf '[firstboot] (dry-run) would generate JWT + keystore passphrase, write %s mode 600.\n' "$ICND_ENV_FILE"
-        printf '[firstboot] (dry-run) would run: ICN_KEYSTORE_PASSPHRASE=<REDACTED> runuser -u %s --preserve-environment -- icnd --init --data-dir %s --init-gateway-port %s --init-gossip-port %s\n' \
+        printf '[firstboot] (dry-run) would run (minimal env, passphrase via env only): runuser -u %s -- icnd --init --data-dir %s --init-gateway-port %s --init-gossip-port %s\n' \
             "$ICN_USER" "$ICN_DATA_DIR" "$ICN_FIRSTBOOT_INIT_GATEWAY_PORT" "$ICN_FIRSTBOOT_INIT_GOSSIP_PORT"
         return 0
     fi
@@ -297,19 +297,30 @@ init_identity_block() {
     # drift from the runtime bind and from appliance.env's documented ports.
     # The runtime --gateway-bind flag in deploy/icnd.service still wins for
     # the bind address; this just keeps the on-disk config honest.
-    # Drop to the icn user with `runuser`, NOT `sudo -u`. sudo logs the full
+    # Drop to the icn user with `runuser`, NOT `sudo -u`: sudo logs the full
     # command (including ICN_KEYSTORE_PASSPHRASE=<value>) to the auth journal;
     # runuser does not. firstboot already runs as root, so no outer sudo is
-    # needed (an outer sudo would re-strip the env before runuser). The
-    # passphrase is passed via the environment with --preserve-environment.
+    # needed. We build a MINIMAL environment for the child — strip the inherited
+    # environment down to an explicit allowlist, then export only the keystore
+    # passphrase (via the `export` builtin, so its value is never in argv/ps).
+    # runuser (no --preserve-environment) sets HOME/USER/PATH for the icn user.
     # Same hardening as icn-demo-{seed,verify}.
     log "Initializing icnd identity (icnd --init) as $ICN_USER..."
-    if ICN_KEYSTORE_PASSPHRASE="$pass" \
-        runuser -u "$ICN_USER" --preserve-environment -- \
-        icnd --init \
-            --data-dir "$ICN_DATA_DIR" \
-            --init-gateway-port "$ICN_FIRSTBOOT_INIT_GATEWAY_PORT" \
-            --init-gossip-port "$ICN_FIRSTBOOT_INIT_GOSSIP_PORT"; then
+    if (
+        for _name in $(compgen -e); do
+            case "$_name" in
+                ICN_KEYSTORE_PASSPHRASE|ICN_PASSPHRASE|LANG|LC_ALL|LC_CTYPE|TERM) : ;;
+                *) unset "$_name" 2>/dev/null || true ;;
+            esac
+        done
+        export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+        export ICN_KEYSTORE_PASSPHRASE="$pass"
+        runuser -u "$ICN_USER" -- \
+            icnd --init \
+                --data-dir "$ICN_DATA_DIR" \
+                --init-gateway-port "$ICN_FIRSTBOOT_INIT_GATEWAY_PORT" \
+                --init-gossip-port "$ICN_FIRSTBOOT_INIT_GOSSIP_PORT"
+    ); then
         log "icnd --init succeeded."
     else
         warn "icnd --init failed. icnd.service may not start until identity is initialized."
