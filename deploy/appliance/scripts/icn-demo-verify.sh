@@ -24,6 +24,13 @@
 #       `icnctl audit verify` reports a complete 13/13 receipt chain and
 #       emits a schema-validated, repo-safe evidence packet.
 #       Output: /var/lib/icn-demo/receipt-chain-13of13/
+#
+#   sudo icn-demo-verify --pending-publish
+#       Steward-verifies the pending-publish review-preview evidence packet:
+#       maps the committed pending-publish rows into a
+#       urn:icn:contract:rehearsal-evidence-export:v1 packet and validates it
+#       (fixture-only, offline, no gateway, no writes; fails closed on drift).
+#       Output: /var/lib/icn-demo/pending-publish-evidence/
 # ============================================================================
 set -uo pipefail
 
@@ -61,9 +68,32 @@ if [ "${1:-}" = "--chain" ]; then
   exit "$rc"
 fi
 
+if [ "${1:-}" = "--pending-publish" ]; then
+  # Steward verification of the pending-publish review-preview evidence packet.
+  # Fixture-only + offline: maps the committed pending-publish rows into a
+  # urn:icn:contract:rehearsal-evidence-export:v1 packet and validates it.
+  # No gateway, no network, no writes. Fails closed on any validation drift.
+  GEN="$REPO/scripts/rehearsal_pending_publish_evidence.py"
+  [ -f "$GEN" ] || fatal "bundled pending-publish evidence generator missing at $GEN"
+  command -v python3 >/dev/null || fatal "python3 missing"
+  OUT=/var/lib/icn-demo
+  mkdir -p "$OUT"
+  log "verifying the committed pending-publish evidence packet (determinism + :v1 schema, fixture-only, no network)..."
+  python3 "$GEN" --check || fatal "committed pending-publish evidence packet failed the determinism/drift + :v1 schema guard"
+  log "generating a fresh timestamped packet + re-validating..."
+  python3 "$GEN" --write || fatal "pending-publish evidence packet failed generation/validation"
+  if [ -d "$REPO/demo/output/pending-publish-evidence" ]; then
+    rm -rf "$OUT/pending-publish-evidence"
+    cp -r "$REPO/demo/output/pending-publish-evidence" "$OUT/" 2>/dev/null || true
+    log "evidence copied to $OUT/pending-publish-evidence/"
+  fi
+  log "OK: pending-publish evidence packet validates against urn:icn:contract:rehearsal-evidence-export:v1"
+  exit 0
+fi
+
 ITEM_ID="${1:-}"
 DOMAIN="${2:-nycn-federation-gov}"
-[ -n "$ITEM_ID" ] || fatal "usage: icn-demo-verify <item-id> [domain]   (or --chain)"
+[ -n "$ITEM_ID" ] || fatal "usage: icn-demo-verify <item-id> [domain]   (or --chain, or --pending-publish)"
 [ -f "$ENV_FILE" ] || fatal "$ENV_FILE missing — has firstboot run?"
 command -v python3 >/dev/null || fatal "python3 missing"
 

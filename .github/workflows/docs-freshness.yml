@@ -243,6 +243,10 @@ jobs:
       - name: Validate rehearsal-shell fixture bundle (offline, deterministic)
         run: |
           python3 docs/scripts/validate-rehearsal-shell-fixtures.py
+          # The committed pending-publish evidence packet must equal the generator's
+          # output (deterministic apart from recorded_at), so a fixture edit cannot
+          # silently drift the committed packet. Offline, fail-closed.
+          python3 scripts/rehearsal_pending_publish_evidence.py --check
         continue-on-error: false
 
   bridge_conformance:

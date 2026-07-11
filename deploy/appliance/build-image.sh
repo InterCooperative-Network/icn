@@ -356,6 +356,9 @@ if [ "$DEMO_PROFILE" = "1" ]; then
     done
     for f in "$REPO_ROOT/scripts/local_receipt_chain_13of13_rehearsal.sh" \
              "$REPO_ROOT/scripts/local_economic_receipt_chain_demo.sh" \
+             "$REPO_ROOT/scripts/rehearsal_pending_publish_evidence.py" \
+             "$REPO_ROOT/web/member-shell/fixtures/pending-publish-summary.json" \
+             "$REPO_ROOT/web/member-shell/fixtures/pending-publish-evidence-export.json" \
              "$REPO_ROOT/docs/scripts/validate-rehearsal-evidence.py"; do
         if [ ! -f "$f" ]; then
             err "Demo profile payload file missing: $f"
@@ -378,6 +381,7 @@ if [ "$DEMO_PROFILE" = "1" ]; then
         "$DEMO_STAGE/demo/institutions" \
         "$DEMO_STAGE/demo/repo/scripts" \
         "$DEMO_STAGE/demo/repo/docs/scripts" \
+        "$DEMO_STAGE/demo/repo/web/member-shell/fixtures" \
         "$DEMO_STAGE/demo/repo/demo"
     cp -r "$REPO_ROOT/web/member-shell"            "$DEMO_STAGE/static/web/"
     cp -r "$REPO_ROOT/web/pilot-ui/fixtures"       "$DEMO_STAGE/static/web/pilot-ui/"
@@ -385,9 +389,15 @@ if [ "$DEMO_PROFILE" = "1" ]; then
     cp -r "$REPO_ROOT/demo/nycn-dogfood"           "$DEMO_STAGE/demo/repo/demo/"
     cp "$REPO_ROOT/scripts/local_receipt_chain_13of13_rehearsal.sh" \
        "$REPO_ROOT/scripts/local_economic_receipt_chain_demo.sh" \
+       "$REPO_ROOT/scripts/rehearsal_pending_publish_evidence.py" \
        "$DEMO_STAGE/demo/repo/scripts/"
     cp "$REPO_ROOT/docs/scripts/validate-rehearsal-evidence.py" \
        "$DEMO_STAGE/demo/repo/docs/scripts/"
+    # Fixtures the pending-publish evidence generator reads (icn-demo-verify
+    # --pending-publish resolves ROOT as demo/repo, so co-locate them there).
+    cp "$REPO_ROOT/web/member-shell/fixtures/pending-publish-summary.json" \
+       "$REPO_ROOT/web/member-shell/fixtures/pending-publish-evidence-export.json" \
+       "$DEMO_STAGE/demo/repo/web/member-shell/fixtures/"
     if [ -d "$REPO_ROOT/docs/contracts" ]; then
         cp -r "$REPO_ROOT/docs/contracts" "$DEMO_STAGE/demo/repo/docs/"
     fi
