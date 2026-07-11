@@ -136,6 +136,45 @@ with tempfile.TemporaryDirectory() as td:
         cts.scan_public_docs_boundary(root)
     check("excluded illustration file is not flagged", len(cts.errors) == 0)
 
+# ---- .github/agents public-agent surfaces are scanned (icn#2393 slice 2) -----
+print("== .github/agents coverage ==")
+cts.errors.clear()
+cts.warnings.clear()
+with tempfile.TemporaryDirectory() as td:
+    root = pathlib.Path(td)
+    (root / ".github" / "agents").mkdir(parents=True)
+    (root / ".github" / "agents" / "planted-agent.md").write_text(
+        "gateway: 'http://10.77.66.55:30080'\n", encoding="utf-8"
+    )
+    with contextlib.redirect_stdout(io.StringIO()):
+        cts.scan_public_docs_boundary(root)
+    msgs = "\n".join(cts.errors)
+    check(
+        "planted .github/agents violation is flagged",
+        ".github/agents/planted-agent.md:1" in msgs,
+    )
+    check("agents diagnostic does NOT contain the planted value", "10.77.66.55" not in msgs)
+
+# ---- corrected SDIS shipped source stays provider-free (icn#2393 slice 2) ----
+print("== sdis simple_enrollment shipped-source coverage ==")
+cts.errors.clear()
+cts.warnings.clear()
+with tempfile.TemporaryDirectory() as td:
+    root = pathlib.Path(td)
+    sdis_rel = "icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs"
+    sdis = root / sdis_rel
+    sdis.parent.mkdir(parents=True)
+    sdis.write_text('.insert_header(("host", "10.44.33.22:30080"))\n', encoding="utf-8")
+    with contextlib.redirect_stdout(io.StringIO()):
+        cts.scan_public_docs_boundary(root)
+    msgs = "\n".join(cts.errors)
+    check("planted SDIS source violation is flagged", f"{sdis_rel}:1" in msgs)
+    check("sdis diagnostic does NOT contain the planted value", "10.44.33.22" not in msgs)
+    check(
+        "RFC5737 doc-range fixture in SDIS source is allowed",
+        not cts.docs_address_violations('.insert_header(("host", "192.0.2.10:30080"))'),
+    )
+
 print()
 if failures:
     print(f"FAILED: {len(failures)} case(s)")

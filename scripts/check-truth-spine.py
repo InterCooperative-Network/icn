@@ -141,10 +141,18 @@ def scan_public_map_boundary(root: Path) -> None:
 # intentionally omitted here — on prose it false-positives on filenames like
 # `.env.local` and illustrative `*.internal`/`*.example` config; the §5
 # provider concern on these surfaces is IP literals.
-_PUBLIC_DOCS_DIRS = ("docs", ".claude", ".agents")   # scanned recursively for *.md
+_PUBLIC_DOCS_DIRS = (                                 # scanned recursively for *.md
+    "docs",
+    ".claude",
+    ".agents",
+    ".github/agents",  # public agent definitions (icn#2393 slice 2)
+)
 _PUBLIC_DOCS_EXTRA = (                                # specific non-.md cleaned surfaces
     "CHANGELOG.md",
     "web/pilot-ui/tests/steward-gateway-url.test.js",
+    # Shipped SDIS gateway source cleaned in icn#2393 slice 2: its gateway-url
+    # test fixture must stay a documentation-range host, never provider topology.
+    "icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs",
 )
 # Deferred to a separate targeted review (NOT ATLAS §5 provider topology, so
 # excluded to keep this guard free of false positives): IPv6 address-TYPE

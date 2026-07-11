@@ -34,7 +34,7 @@ You have deep expertise in:
 ```typescript
 // Client initialization
 const client = new IcnClient({
-  gateway: 'http://10.8.10.40:30080',
+  gateway: 'http://192.0.2.10:30080',
   identity: keypair,
 });
 

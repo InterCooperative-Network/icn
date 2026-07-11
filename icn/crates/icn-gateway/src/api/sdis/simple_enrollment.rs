@@ -1170,7 +1170,7 @@ mod tests {
 
         let req = actix_web::test::TestRequest::post()
             .uri("/v1/sdis/enrollment/start")
-            .insert_header(("host", "10.8.30.40:30080"))
+            .insert_header(("host", "192.0.2.10:30080"))
             .insert_header(("content-type", "application/json"))
             .set_payload(r#"{"identity_name":"Test User","coop_id":"test-coop"}"#)
             .to_request();
@@ -1181,7 +1181,7 @@ mod tests {
             resp["qr_code"]
                 .as_str()
                 .unwrap()
-                .contains("\"gateway_url\":\"http://10.8.30.40:30080\""),
+                .contains("\"gateway_url\":\"http://192.0.2.10:30080\""),
             "qr payload should advertise the current request gateway"
         );
     }
