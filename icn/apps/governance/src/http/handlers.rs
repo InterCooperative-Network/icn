@@ -2935,9 +2935,8 @@ pub async fn update_action_item_status<E: GovernanceEventEmitter + Clone + 'stat
     // `completed`; every transition continues to accept the broad
     // `governance:meeting:write` class scope and the legacy `governance:write`
     // fallback (accepted-also, #1868). Listed narrowest-first so
-    // `require_any_scope_matched` prefers and records the finest scope actually
-    // held as completion evidence (`capability_scope_presented`) — an existing
-    // meeting:write/write client is recorded exactly as before.
+    // `require_any_scope_matched` prefers the finest scope actually held. This is
+    // the gate that rejects an unauthorized scope with a stable 403.
     let candidates: &[&str] = if matches!(new_status, ActionItemStatus::Completed) {
         &[
             "governance:action-item:complete",
@@ -2947,8 +2946,7 @@ pub async fn update_action_item_status<E: GovernanceEventEmitter + Clone + 'stat
     } else {
         &["governance:meeting:write", "governance:write"]
     };
-    let (claims, presented_scope) =
-        require_any_scope_matched::<BasicClaims>(&http_req, candidates)?;
+    let (claims, matched_scope) = require_any_scope_matched::<BasicClaims>(&http_req, candidates)?;
     let user_did = parse_did(&claims.sub, "Invalid DID in token")?;
 
     let (domain_id, item_id) = path.into_inner();
@@ -2965,25 +2963,44 @@ pub async fn update_action_item_status<E: GovernanceEventEmitter + Clone + 'stat
 
     let is_creator = existing.created_by == user_did;
     let is_assignee = existing.assignee.as_ref().is_some_and(|a| a == &user_did);
-    // The completion-only capability (#2400) authorizes completing an item the
-    // caller is ASSIGNED — not one they merely created. Creator-based status
-    // updates remain available to the broader `governance:meeting:write` /
-    // `governance:write` scopes. Keying on the scope that actually authorized the
-    // request keeps a completion-only browser/session credential from marking
-    // another member's assigned card done.
-    let owner_ok = if presented_scope == "governance:action-item:complete" {
-        is_assignee
-    } else {
-        is_creator || is_assignee
-    };
+    // Ownership + evidence keyed on the caller's ACTUAL authority, not merely the
+    // narrowest scope matched (#2400). The completion-only capability
+    // `governance:action-item:complete` authorizes completing an item the caller
+    // is ASSIGNED. Creator-based status updates require a broad
+    // `governance:meeting:write` / `governance:write` scope — which stays
+    // available to an operator/steward even if their token also carries the
+    // completion-only scope. So the ownership decision turns on whether a broad
+    // scope authorized, not on the (narrowest) scope recorded for evidence.
+    let broad_scope = require_any_scope_matched::<BasicClaims>(
+        &http_req,
+        &["governance:meeting:write", "governance:write"],
+    )
+    .ok()
+    .map(|(_, scope)| scope);
+    let owner_ok = is_assignee || (is_creator && broad_scope.is_some());
     if !owner_ok {
-        let msg = if presented_scope == "governance:action-item:complete" {
+        // A creator who is not the assignee reached here only via the
+        // completion-only scope (no broad scope); everyone else is neither
+        // creator nor assignee.
+        let msg = if is_creator {
             "The completion-only capability can only complete an action item assigned to you"
         } else {
             "Only the creator or assignee can update action item status"
         };
         return Err(ApiError::Forbidden(msg.into()));
     }
+
+    // Record the scope that actually authorized THIS request as evidence
+    // (`capability_scope_presented`). An assignee-completion is authorized by —
+    // and records — the narrowest matched scope (the completion-only capability
+    // when held). A creator-completion is authorized by the broad scope, so
+    // record that truthfully rather than the completion-only capability the
+    // caller may also carry.
+    let presented_scope = if is_assignee {
+        matched_scope
+    } else {
+        broad_scope.unwrap_or(matched_scope)
+    };
 
     let item = ctx
         .manager

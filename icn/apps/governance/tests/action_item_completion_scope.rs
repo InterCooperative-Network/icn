@@ -557,3 +557,65 @@ async fn meeting_scope_creator_can_still_complete_item_assigned_to_another() {
         "the broad meeting:write scope must retain creator-based completion"
     );
 }
+
+// ── A caller holding BOTH the completion-only scope AND a broad scope keeps
+// broad-scope creator-completion; the recorded evidence is the broad scope that
+// actually authorized it, not the completion-only capability (Codex #2400
+// review — the ownership mode turns on whether a broad scope authorized, not on
+// the narrowest scope matched). ──
+
+#[actix_web::test]
+async fn dual_scope_creator_completes_item_for_another_and_records_broad_scope() {
+    let store = Arc::new(V2CapturingStore::default());
+    let manager = GovernanceManager::new()
+        .with_receipt_store(store.clone() as Arc<dyn GovernanceReceiptBackend>);
+    let alice = fresh_did();
+    let bob = fresh_did();
+    let ctx = ctx_from_manager(manager);
+    let domain = seed_domain(&ctx.manager, vec![alice.clone(), bob.clone()], "test-coop").await;
+    // Item created BY alice, assigned TO bob.
+    let item = ctx
+        .manager
+        .create_action_item(
+            domain.clone(),
+            "alice's item for bob".to_string(),
+            None,
+            alice.clone(),
+            Some(bob.clone()),
+            None,
+            ActionItemPriority::Medium,
+            None,
+            None,
+            vec![],
+        )
+        .expect("create_action_item");
+    let item_id = item.id.to_string();
+
+    // Alice holds the completion-only scope AND the broad meeting:write scope.
+    let app = gov_app!(ctx, &alice, format!("{READ} {COMPLETE} {MEETING_CLASS}"));
+    let req = test::TestRequest::put()
+        .uri(&format!(
+            "/domains/{}/action-items/{}/status",
+            domain.0, item_id
+        ))
+        .set_json(json!({ "status": "completed" }))
+        .to_request();
+    let status = test::call_service(&app, req).await.status();
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "a broad-scope creator must retain creator-based completion even if the \
+         token also carries the completion-only scope"
+    );
+
+    let v2 = store.v2.lock().unwrap();
+    let receipt = v2
+        .iter()
+        .find(|r| r.item_id == item_id)
+        .expect("a v2 completion receipt must be persisted");
+    assert_eq!(
+        receipt.capability_scope_presented, MEETING_CLASS,
+        "a creator-completion must record the broad scope that authorized it, \
+         not the completion-only capability the caller also carries"
+    );
+}
