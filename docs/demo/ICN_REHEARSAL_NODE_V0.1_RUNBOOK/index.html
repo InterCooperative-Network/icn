@@ -156,12 +156,14 @@ secret never leaves the VM and is never baked into the image; a JWT minted with
 one VM&#39;s secret does not verify on any other node.</p>
 <p>The seed mints two least-privilege credentials: an internal <strong>setup</strong> token that
 provisions the demo (never printed), and the <strong>browser</strong> token it hands to the
-member shell — scoped to <code>governance:read</code> plus <code>governance:meeting:write</code>, the
-narrowest gateway scope that authorizes the action-item completion the shell
-performs. As a member of the seeded fictional domain that scope also permits
-creating action items / meetings there (a completion-only scope decomposition is
-a tracked follow-up), but the browser token cannot reach cooperative-admin,
-entity, treasury, or the broad / other governance write classes.</p>
+member shell — scoped to <code>governance:read</code> plus <code>governance:action-item:complete</code>,
+the completion-only capability (#2400). That capability authorizes only the
+<code>completed</code> transition of an action item the caller is assigned, so the browser
+token cannot create action items or meetings, drive other status transitions,
+administer a cooperative, read entities, touch treasury, or reach the broad /
+other governance write classes. The internal setup token retains
+<code>governance:meeting:write</code> because it creates the fixture action item; it is
+never emitted.</p>
 <h2>Fast path A — smoke an already-built demo image</h2>
 <pre><code class="language-bash">ICN_APPLIANCE_IMAGE=/path/to/icn-appliance-demo.qcow2 \
 ICN_APPLIANCE_SSH_KEY=/path/to/smoke_ed25519 \
