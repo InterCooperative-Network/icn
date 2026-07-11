@@ -121,7 +121,11 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
 
     info!("Gateway JWT secret verified, spawning server...");
 
-    let jwt_secret = config.jwt_secret.clone().into_bytes();
+    // Derive the HMAC signing key through the ONE canonical function shared with
+    // the `icnctl --local-mint` trusted-local issuer, so the daemon and any
+    // co-issuer can never diverge on how the secret string becomes key bytes
+    // (raw UTF-8, never hex/base64-decoded). See `icn_gateway::auth`.
+    let jwt_secret = icn_gateway::auth::signing_key_bytes(&config.jwt_secret);
 
     // Get event broadcaster if available
     let broadcaster_for_gateway = if let Some(ref broadcaster) = handles.event_broadcaster {

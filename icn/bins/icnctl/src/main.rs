@@ -7643,7 +7643,7 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
 /// call, and adds no endpoint. `entity_id` stays `None` (the legacy mint shape):
 /// the trusted-local path issues coop authority, never a fabricated typed entity.
 pub(crate) fn mint_trusted_token_with_secret(
-    secret: &[u8],
+    secret: &str,
     did: &icn_identity::Did,
     coop_id: &str,
     scopes: Vec<String>,
@@ -7659,7 +7659,12 @@ pub(crate) fn mint_trusted_token_with_secret(
         .map_err(|e| anyhow::anyhow!("invalid coop_id: {e}"))?;
     icn_gateway::validation::validate_scopes(&scopes)
         .map_err(|e| anyhow::anyhow!("invalid scopes: {e}"))?;
-    icn_gateway::auth::AuthManager::new(secret.to_vec())
+    // Key HMAC through the ONE canonical derivation the gateway daemon also uses
+    // (`AuthManager::from_secret_string` -> `signing_key_bytes`): the secret's raw
+    // bytes, verbatim, never hex/base64-decoded. This is what makes a token minted
+    // here verify on this VM's live gateway (the divergence bug caught in review
+    // of #2396 is now structurally impossible — one function, both call sites).
+    icn_gateway::auth::AuthManager::from_secret_string(secret)
         .issue_token(did, coop_id, scopes)
         .context("trusted local token mint failed")
 }
@@ -7682,12 +7687,12 @@ pub(crate) fn mint_local_trusted_token(
              flow, which stays fail-closed on routable binds (issue #2075)."
         )
     })?;
-    // Match the gateway EXACTLY: icn-core `init_gateway.rs` builds the signing key
-    // as `config.jwt_secret.clone().into_bytes()` — the secret string's bytes
-    // VERBATIM, never a hex-decode — and icnd stores ICN_GATEWAY_JWT_SECRET
-    // verbatim. Using the raw bytes here is what makes the minted JWT verify on
-    // the live gateway.
-    mint_trusted_token_with_secret(secret.as_bytes(), did, coop_id, scopes)
+    // Pass the secret STRING straight through; the shared
+    // `AuthManager::from_secret_string` derives the key bytes exactly as the
+    // daemon does (see `icn_gateway::auth::signing_key_bytes`). icnd stores
+    // ICN_GATEWAY_JWT_SECRET verbatim, so the minted JWT verifies on the live
+    // gateway.
+    mint_trusted_token_with_secret(&secret, did, coop_id, scopes)
 }
 
 #[cfg(test)]
@@ -7700,16 +7705,16 @@ mod trusted_local_mint_tests {
     /// NO typed entity context (the trusted-local path fabricates none). No network.
     #[test]
     fn local_mint_produces_a_gateway_verifiable_coop_token() {
-        let secret = b"instance-local-gateway-secret".to_vec();
+        let secret = "instance-local-gateway-secret";
         let bundle = icn_identity::IdentityBundle::generate().unwrap();
         let token = mint_trusted_token_with_secret(
-            &secret,
+            secret,
             bundle.did(),
             "nycn",
             vec!["governance:read".to_string(), "coop:admin".to_string()],
         )
         .unwrap();
-        let claims = icn_gateway::auth::AuthManager::new(secret.clone())
+        let claims = icn_gateway::auth::AuthManager::from_secret_string(secret)
             .verify_token(&token)
             .expect("gateway must accept a token signed with its own secret");
         assert_eq!(claims.coop_id, "nycn");
@@ -7728,14 +7733,14 @@ mod trusted_local_mint_tests {
     fn local_mint_token_is_rejected_by_a_different_secret() {
         let bundle = icn_identity::IdentityBundle::generate().unwrap();
         let token = mint_trusted_token_with_secret(
-            b"secret-A",
+            "secret-A",
             bundle.did(),
             "nycn",
             vec!["governance:read".to_string()],
         )
         .unwrap();
         assert!(
-            icn_gateway::auth::AuthManager::new(b"secret-B".to_vec())
+            icn_gateway::auth::AuthManager::from_secret_string("secret-B")
                 .verify_token(&token)
                 .is_err(),
             "a token minted with one node's secret must not verify under another's"
@@ -7746,7 +7751,7 @@ mod trusted_local_mint_tests {
     #[test]
     fn local_mint_rejects_empty_secret() {
         let bundle = icn_identity::IdentityBundle::generate().unwrap();
-        assert!(mint_trusted_token_with_secret(&[], bundle.did(), "nycn", vec![]).is_err());
+        assert!(mint_trusted_token_with_secret("", bundle.did(), "nycn", vec![]).is_err());
     }
 
     /// The gateway builds its signing key as `config.jwt_secret.into_bytes()`
@@ -7759,14 +7764,15 @@ mod trusted_local_mint_tests {
         let secret_str = "a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"; // hex-looking; used verbatim
         let bundle = icn_identity::IdentityBundle::generate().unwrap();
         let token = mint_trusted_token_with_secret(
-            secret_str.as_bytes(),
+            secret_str,
             bundle.did(),
             "nycn",
             vec!["governance:read".to_string()],
         )
         .unwrap();
-        // The gateway (raw string-byte key, as in init_gateway.rs) accepts it.
-        icn_gateway::auth::AuthManager::new(secret_str.as_bytes().to_vec())
+        // The gateway (raw string-byte key, via the shared `from_secret_string`)
+        // accepts it.
+        icn_gateway::auth::AuthManager::from_secret_string(secret_str)
             .verify_token(&token)
             .expect("gateway must accept a token signed with the raw secret-string bytes");
         // A hex-decoded key must NOT verify it.
@@ -7784,15 +7790,15 @@ mod trusted_local_mint_tests {
     /// that only 403s later at the endpoint.
     #[test]
     fn local_mint_rejects_invalid_coop_id_and_scopes() {
-        let secret = b"instance-local-gateway-secret".to_vec();
+        let secret = "instance-local-gateway-secret";
         let bundle = icn_identity::IdentityBundle::generate().unwrap();
         assert!(
-            mint_trusted_token_with_secret(&secret, bundle.did(), "bad@coop#id!", vec![]).is_err(),
+            mint_trusted_token_with_secret(secret, bundle.did(), "bad@coop#id!", vec![]).is_err(),
             "malformed coop_id must be rejected up front"
         );
         assert!(
             mint_trusted_token_with_secret(
-                &secret,
+                secret,
                 bundle.did(),
                 "nycn",
                 vec!["governance:read".to_string(), "totally:bogus".to_string()],

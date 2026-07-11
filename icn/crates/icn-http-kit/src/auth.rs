@@ -367,6 +367,45 @@ mod tests {
         assert!(matches!(err, ApiError::Unauthenticated));
     }
 
+    /// Least-privilege boundary for a narrow read + single-class-write session
+    /// token (the shape the appliance demo hands the browser:
+    /// `governance:read governance:meeting:write`). It must authorize the
+    /// member-shell's read and action-item-completion routes and be denied
+    /// everything broader — entity mutation, cooperative admin, and the broad or
+    /// sibling governance write classes. This guards the credential split against
+    /// silently regranting broad authority to a browser session.
+    #[test]
+    fn narrow_read_plus_meeting_write_cannot_reach_admin_or_broad_routes() {
+        let req = req_with_scope(Some("governance:read governance:meeting:write"));
+
+        // MUST satisfy the member-shell live routes:
+        //   standing / action-cards / pending-publish / completion-receipt (read)
+        assert!(require_scope::<BasicClaims>(&req, "governance:read").is_ok());
+        //   action-item completion PUT (accepts the narrow meeting class)
+        assert!(
+            require_any_scope::<BasicClaims>(&req, &["governance:meeting:write", BROAD]).is_ok()
+        );
+
+        // MUST be denied broader authority (representative admin / broad-mutation
+        // routes): create entity, create domain, cooperative admin — and the
+        // narrow meeting class MUST NOT be silently escalated to the broad write.
+        for denied in ["entity:write", "coop:admin", "coop:write", BROAD, CHARTER] {
+            assert!(
+                matches!(
+                    require_scope::<BasicClaims>(&req, denied).unwrap_err(),
+                    ApiError::Forbidden(_)
+                ),
+                "narrow session token must NOT grant {denied}"
+            );
+        }
+        // create_domain / assign_role use require_any_scope([class, broad]) — the
+        // narrow session has neither, so it is rejected there too.
+        assert!(matches!(
+            require_any_scope::<BasicClaims>(&req, &[CHARTER, BROAD]).unwrap_err(),
+            ApiError::Forbidden(_)
+        ));
+    }
+
     #[test]
     fn require_any_scope_honors_sub_scope_match() {
         // `governance:write:admin` satisfies the broad `governance:write` candidate.
