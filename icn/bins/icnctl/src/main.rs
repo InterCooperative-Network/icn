@@ -574,6 +574,16 @@ enum AuthCommands {
             default_value = "ledger:read,ledger:write,coop:read,governance:read,governance:write"
         )]
         scopes: String,
+
+        /// Trusted LOCAL issuance for a co-located operator: mint the token
+        /// in-process by signing with this node's own gateway JWT secret
+        /// (read from ICN_GATEWAY_JWT_SECRET in the environment) instead of the
+        /// network /auth/verify challenge/verify flow. For an operator who
+        /// already controls the gateway (holds its signing secret). Does NOT
+        /// use — or weaken — the public self-asserted /auth/verify path
+        /// (issue #2075), which stays fail-closed on routable binds.
+        #[arg(long, default_value_t = false)]
+        local_mint: bool,
     },
 }
 
@@ -7622,12 +7632,121 @@ fn handle_snapshot_command(cmd: SnapshotCommands, data_dir: &Path) -> Result<()>
 }
 
 /// Handle authentication commands
+/// Trusted LOCAL capability-token issuance for a co-located operator.
+///
+/// Mints a capability token by signing it with `secret` — THIS node's own
+/// gateway JWT secret. That secret verifies every bearer token the gateway
+/// accepts, so holding it is equivalent to controlling the gateway; minting a
+/// token with it is simply the gateway issuing a token for itself. This is
+/// categorically distinct from the PUBLIC, self-asserted `/auth/verify`
+/// challenge/verify flow, which stays fail-closed on any routable bind
+/// (issue #2075). This path never touches `/auth/verify`, makes no network
+/// call, and adds no endpoint. `entity_id` stays `None` (the legacy mint shape):
+/// the trusted-local path issues coop authority, never a fabricated typed entity.
+pub(crate) fn mint_trusted_token_with_secret(
+    secret: &[u8],
+    did: &icn_identity::Did,
+    coop_id: &str,
+    scopes: Vec<String>,
+) -> Result<String> {
+    if secret.is_empty() {
+        bail!("gateway JWT secret is empty");
+    }
+    icn_gateway::auth::AuthManager::new(secret.to_vec())
+        .issue_token(did, coop_id, scopes)
+        .context("trusted local token mint failed")
+}
+
+/// Read the instance-local gateway signing secret from `ICN_GATEWAY_JWT_SECRET`
+/// (hex) in the environment and mint a trusted local token. The secret is read
+/// ONLY from the environment — never a CLI argument — and is never printed.
+/// Fail-closed with a non-secret diagnostic when the secret is absent.
+pub(crate) fn mint_local_trusted_token(
+    did: &icn_identity::Did,
+    coop_id: &str,
+    scopes: Vec<String>,
+) -> Result<String> {
+    let secret_hex = std::env::var("ICN_GATEWAY_JWT_SECRET").map_err(|_| {
+        anyhow::anyhow!(
+            "--local-mint needs this node's own gateway signing secret in \
+             ICN_GATEWAY_JWT_SECRET (e.g. from /etc/icn/icnd.env). It is read only from the \
+             environment, never the command line, and never logged. This is a TRUSTED LOCAL \
+             operator path; it does not use — or weaken — the public /auth/verify self-asserted \
+             flow, which stays fail-closed on routable binds (issue #2075)."
+        )
+    })?;
+    let secret =
+        hex::decode(secret_hex.trim()).context("ICN_GATEWAY_JWT_SECRET must be hex-encoded")?;
+    mint_trusted_token_with_secret(&secret, did, coop_id, scopes)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used, clippy::expect_used)]
+mod trusted_local_mint_tests {
+    use super::*;
+
+    /// A trusted local mint signs with the node's own gateway secret and yields a
+    /// token the SAME gateway accepts, carrying the requested coop_id + scopes and
+    /// NO typed entity context (the trusted-local path fabricates none). No network.
+    #[test]
+    fn local_mint_produces_a_gateway_verifiable_coop_token() {
+        let secret = b"instance-local-gateway-secret".to_vec();
+        let bundle = icn_identity::IdentityBundle::generate().unwrap();
+        let token = mint_trusted_token_with_secret(
+            &secret,
+            bundle.did(),
+            "nycn",
+            vec!["governance:read".to_string(), "coop:admin".to_string()],
+        )
+        .unwrap();
+        let claims = icn_gateway::auth::AuthManager::new(secret.clone())
+            .verify_token(&token)
+            .expect("gateway must accept a token signed with its own secret");
+        assert_eq!(claims.coop_id, "nycn");
+        assert_eq!(claims.sub, bundle.did().to_string());
+        assert!(claims.scopes.contains(&"coop:admin".to_string()));
+        assert_eq!(
+            claims.entity_id, None,
+            "trusted local mint sets no typed entity context"
+        );
+    }
+
+    /// A token minted with one node's secret is rejected under a different secret:
+    /// the credential is intrinsically per-instance and non-portable, so it is
+    /// never a reusable credential that could be baked into the shared image.
+    #[test]
+    fn local_mint_token_is_rejected_by_a_different_secret() {
+        let bundle = icn_identity::IdentityBundle::generate().unwrap();
+        let token = mint_trusted_token_with_secret(
+            b"secret-A",
+            bundle.did(),
+            "nycn",
+            vec!["governance:read".to_string()],
+        )
+        .unwrap();
+        assert!(
+            icn_gateway::auth::AuthManager::new(b"secret-B".to_vec())
+                .verify_token(&token)
+                .is_err(),
+            "a token minted with one node's secret must not verify under another's"
+        );
+    }
+
+    /// An empty secret fails closed rather than minting an unsigned/weak token.
+    #[test]
+    fn local_mint_rejects_empty_secret() {
+        let bundle = icn_identity::IdentityBundle::generate().unwrap();
+        assert!(mint_trusted_token_with_secret(&[], bundle.did(), "nycn", vec![]).is_err());
+    }
+}
+
 async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
     match cmd {
         AuthCommands::Token {
             gateway,
             coop_id,
             scopes,
+            local_mint,
         } => {
             // Get keystore path and unlock
             let keystore_path = get_keystore_path(data_dir);
@@ -7653,6 +7772,16 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
 
             // Parse scopes
             let scope_list: Vec<String> = scopes.split(',').map(|s| s.trim().to_string()).collect();
+
+            if local_mint {
+                // Trusted local issuance: sign with this node's own gateway
+                // secret in-process — no network call, no /auth/verify. Print
+                // ONLY the token (callers / the demo seed capture it from
+                // stdout); the signing secret is never printed.
+                let token = mint_local_trusted_token(keypair.did(), &coop_id, scope_list)?;
+                println!("{token}");
+                return Ok(());
+            }
 
             println!("Getting token for DID: {did}");
             println!("Gateway: {gateway}");

@@ -123,6 +123,19 @@ else
     bad "netdev isolation construction (run: bash deploy/appliance/smoke/net-restrict-check.sh)"
 fi
 
+# 6b. demo seed trusted-local auth construction (#2386 / #2075)
+#
+# Asserts icn-demo-seed.sh authenticates via trusted local issuance
+# (icnctl --local-mint, signing with this node's own gateway secret) and NOT the
+# self-asserted /auth/verify path that #2075 fail-closes on the demo's routable
+# bind. Static structure check; the runtime proof is `smoke-image`.
+section "demo seed trusted-local auth construction"
+if bash "$APPLIANCE_DIR/smoke/demo-seed-auth-check.sh" >/dev/null; then
+    ok "demo seed trusted-local auth (6/6 checks)"
+else
+    bad "demo seed trusted-local auth (run: bash deploy/appliance/smoke/demo-seed-auth-check.sh)"
+fi
+
 # 7. typed manifest emit/verify round-trip (skip-aware / opt-in)
 #
 # Proves the typed appliance manifest path (`icnctl appliance emit-manifest`

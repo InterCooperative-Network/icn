@@ -9,8 +9,14 @@
 #
 # What it does (all against THIS VM's own gateway on 127.0.0.1:8080):
 #   1. Waits for the gateway to be healthy.
-#   2. Resolves the node operator DID and mints a dev session JWT
-#      (signed with this VM's per-instance JWT secret).
+#   2. Resolves the node operator DID and mints a session JWT by TRUSTED LOCAL
+#      issuance: icnctl signs it in-process (the `--local-mint` path) with this
+#      VM's own per-instance gateway JWT secret (ICN_GATEWAY_JWT_SECRET from
+#      /etc/icn/icnd.env, root-only). That is the gateway issuing a JWT for
+#      itself to its local operator — it does NOT use the public self-asserted
+#      /auth/verify path, which stays fail-closed on the demo's routable
+#      0.0.0.0 bind (issue #2075). No credential is baked into the image; the
+#      secret is generated per-VM at first boot and is never printed.
 #   3. Applies the in-tree NYCN institution package (fictional fixture
 #      institution — same package the nycn-dogfood rehearsal kit uses).
 #   4. Dev-gated standing bootstrap for the operator DID (so the shell's
@@ -57,6 +63,9 @@ command -v python3 >/dev/null || fatal "python3 missing"
 # shellcheck disable=SC1090
 . "$ENV_FILE"
 [ -n "${ICN_KEYSTORE_PASSPHRASE:-}" ] || fatal "ICN_KEYSTORE_PASSPHRASE not present in $ENV_FILE"
+# Instance-local gateway signing secret — the trusted lever for local JWT
+# issuance (icnctl --local-mint). Generated per-VM by firstboot; root-only.
+[ -n "${ICN_GATEWAY_JWT_SECRET:-}" ] || fatal "ICN_GATEWAY_JWT_SECRET not present in $ENV_FILE — needed for trusted local JWT issuance (icnctl --local-mint)"
 
 as_icn(){
   # Drop from root to the icn user with `runuser`, NOT `sudo`. sudo records
@@ -66,9 +75,12 @@ as_icn(){
   # script already runs as root, so it does not need sudo to gain privilege —
   # runuser drops privilege without writing the command or env to any log.
   # The passphrase is exported only for the runuser call and passed through
-  # with --preserve-environment.
+  # with --preserve-environment. The gateway signing secret is passed the same
+  # way (env only, never a command line, never logged) so `icnctl --local-mint`
+  # can issue a trusted local JWT as the icn user.
   ICN_KEYSTORE_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" \
   ICN_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE" \
+  ICN_GATEWAY_JWT_SECRET="$ICN_GATEWAY_JWT_SECRET" \
     runuser -u icn --preserve-environment -- "$@"
 }
 
@@ -85,15 +97,15 @@ DID="$(grep -oE 'did:icn:[A-Za-z0-9]+' <<<"$id_out" | head -1)"
 [ -n "$DID" ] || fatal "could not resolve node operator DID (icnctl --data-dir $DATA_DIR id show)"
 log "operator DID: $DID"
 
-jwt_out="$(as_icn /usr/local/bin/icnctl --data-dir "$DATA_DIR" auth token --gateway "$GW" --coop-id "$COOP_ID" -s "$SCOPES" 2>/dev/null || true)" # vocab-ok: icnctl CLI subcommand name
+jwt_out="$(as_icn /usr/local/bin/icnctl --data-dir "$DATA_DIR" auth token --gateway "$GW" --coop-id "$COOP_ID" -s "$SCOPES" --local-mint 2>/dev/null || true)" # vocab-ok: icnctl CLI subcommand name
 SESSION_JWT="$(grep -oE 'eyJ[A-Za-z0-9_.-]+' <<<"$jwt_out" | head -1)"
-[ -n "$SESSION_JWT" ] || fatal "session JWT mint failed (icnctl auth subcommand)"
+[ -n "$SESSION_JWT" ] || fatal "trusted local session-JWT mint failed (icnctl --local-mint). Check ICN_GATEWAY_JWT_SECRET is present in $ENV_FILE and the keystore unlocks. This path signs with THIS VM's own gateway secret and never uses the public self-asserted /auth/verify flow (issue #2075)."
 AUTH="Authorization: Bearer $SESSION_JWT"
-log "dev session JWT minted (printed at the end — local VM only)."
+log "session JWT minted via trusted local issuance (this VM's own gateway secret; printed at the end — local VM only)."
 
 log "applying NYCN institution package (fictional fixture institution)..."
 as_icn /usr/local/bin/icnctl --data-dir "$DATA_DIR" institution bootstrap apply \
-  -g "$GW" -c "$COOP_ID" --package "$PKG" >/tmp/icn-demo-seed-bootstrap.log 2>&1 \
+  -g "$GW" -c "$COOP_ID" --package "$PKG" --local-mint >/tmp/icn-demo-seed-bootstrap.log 2>&1 \
   || fatal "institution bootstrap apply failed (see /tmp/icn-demo-seed-bootstrap.log)"
 log "institution package applied."
 
@@ -152,7 +164,8 @@ cat <<EOF
  Open action item:   $ITEM_ID
  $standing_note
 
- Dev session JWT (LOCAL VM ONLY — paste into the shell's live mode):
+ Session JWT (LOCAL VM ONLY — trusted local issuance signed with this VM's
+ own per-instance gateway secret; paste into the shell's live mode):
  $SESSION_JWT
 
  Honesty labels:
