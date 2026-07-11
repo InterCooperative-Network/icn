@@ -5,7 +5,7 @@ Complete guide to using the Secure Distributed Identity System (SDIS) API.
 ## Base URL
 
 ```
-http://10.8.30.40:30080/v1/sdis
+http://${ICN_GATEWAY_HOST}:30080/v1/sdis
 ```
 
 ## Authentication
@@ -29,7 +29,7 @@ kubectl exec -it -n icn $POD -- icnctl auth token --coop-id <COOP_ID> --gateway 
 Check if SDIS is operational.
 
 ```bash
-curl http://10.8.30.40:30080/v1/sdis/health
+curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health
 ```
 
 **Response:**
@@ -51,7 +51,7 @@ Begin the SDIS enrollment process to create a new identity.
 **POST** `/v1/sdis/enrollment/start`
 
 ```bash
-curl -X POST http://10.8.30.40:30080/v1/sdis/enrollment/start \
+curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/enrollment/start \
   -H "Content-Type: application/json" \
   -d '{
     "identity_name": "Alice",
@@ -76,7 +76,7 @@ Finalize enrollment after verification.
 **POST** `/v1/sdis/enrollment/complete`
 
 ```bash
-curl -X POST http://10.8.30.40:30080/v1/sdis/enrollment/complete \
+curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/enrollment/complete \
   -H "Content-Type: application/json" \
   -d '{
     "enrollment_id": "enroll_abc123...",
@@ -110,7 +110,7 @@ Verify device possession via QR scan.
 **POST** `/v1/sdis/verify/level1`
 
 ```bash
-curl -X POST http://10.8.30.40:30080/v1/sdis/verify/level1 \
+curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/verify/level1 \
   -H "Content-Type: application/json" \
   -d '{
     "enrollment_id": "enroll_abc123...",
@@ -125,7 +125,7 @@ Get vouched by a trusted steward.
 **POST** `/v1/sdis/verify/level2`
 
 ```bash
-curl -X POST http://10.8.30.40:30080/v1/sdis/verify/level2 \
+curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/verify/level2 \
   -H "Authorization: Bearer <steward-token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -145,7 +145,7 @@ Get all trusted devices for a specific anchor.
 **GET** `/v1/sdis/anchor/{anchor_id}/devices`
 
 ```bash
-curl http://10.8.30.40:30080/v1/sdis/anchor/anchor_123/devices \
+curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/anchor/anchor_123/devices \
   -H "Authorization: Bearer <your-token>"
 ```
 
@@ -170,7 +170,7 @@ Add a new anchor device.
 **POST** `/v1/sdis/anchor/devices/add`
 
 ```bash
-curl -X POST http://10.8.30.40:30080/v1/sdis/anchor/devices/add \
+curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/anchor/devices/add \
   -H "Authorization: Bearer <your-token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -187,7 +187,7 @@ Get anchor metadata and rotation/device information.
 **GET** `/v1/sdis/anchor/{anchor_id}`
 
 ```bash
-curl http://10.8.30.40:30080/v1/sdis/anchor/anchor_123 \
+curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/anchor/anchor_123 \
   -H "Authorization: Bearer <your-token>"
 ```
 
@@ -198,7 +198,7 @@ Rotate keys for an existing anchor.
 **POST** `/v1/sdis/anchor/rotate-keys`
 
 ```bash
-curl -X POST http://10.8.30.40:30080/v1/sdis/anchor/rotate-keys \
+curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/anchor/rotate-keys \
   -H "Authorization: Bearer <your-token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -224,7 +224,7 @@ Start identity recovery ceremony using anchor/vui context and verification data.
 **POST** `/v1/sdis/recovery/start`
 
 ```bash
-curl -X POST http://10.8.30.40:30080/v1/sdis/recovery/start \
+curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/recovery/start \
   -H "Content-Type: application/json" \
   -d '{
     "anchor_id": "anchor_123",
@@ -251,7 +251,7 @@ curl -X POST http://10.8.30.40:30080/v1/sdis/recovery/start \
 **GET** `/v1/sdis/recovery/{recovery_id}`
 
 ```bash
-curl http://10.8.30.40:30080/v1/sdis/recovery/recovery_xyz... \
+curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/recovery/recovery_xyz... \
   -H "Authorization: Bearer <your-token>"
 ```
 
@@ -262,7 +262,7 @@ Finalize recovery with challenge response.
 **POST** `/v1/sdis/recovery/{recovery_id}/complete`
 
 ```bash
-curl -X POST http://10.8.30.40:30080/v1/sdis/recovery/recovery_xyz.../complete \
+curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/recovery/recovery_xyz.../complete \
   -H "Content-Type: application/json" \
   -d '{
     "recovery_share": "optional-share-fragment"
@@ -280,7 +280,7 @@ Get a temporary DID for device pairing.
 **POST** `/v1/sdis/ephemeral/generate`
 
 ```bash
-curl -X POST http://10.8.30.40:30080/v1/sdis/ephemeral/generate \
+curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/ephemeral/generate \
   -H "Content-Type: application/json" \
   -d '{
     "purpose": "enrollment",
@@ -332,7 +332,7 @@ QR codes contain enrollment data:
   "type": "icn-enrollment",
   "enrollment_id": "enroll_abc123...",
   "challenge": "base64-challenge",
-  "gateway_url": "http://10.8.30.40:30080"
+  "gateway_url": "http://${ICN_GATEWAY_HOST}:30080"
 }
 ```
 
@@ -408,17 +408,17 @@ Test the full flow:
 
 ```bash
 # 1. Health check
-curl http://10.8.30.40:30080/v1/sdis/health
+curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health
 
 # 2. Start enrollment
-ENROLLMENT=$(curl -X POST http://10.8.30.40:30080/v1/sdis/enrollment/start \
+ENROLLMENT=$(curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/enrollment/start \
   -H "Content-Type: application/json" \
   -d '{"identity_name":"TestUser","coop_id":"test-coop"}' | jq -r '.enrollment_id')
 
 echo "Enrollment ID: $ENROLLMENT"
 
 # 3. Generate ephemeral DID for device
-EPHEMERAL=$(curl -X POST http://10.8.30.40:30080/v1/sdis/ephemeral/generate \
+EPHEMERAL=$(curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/ephemeral/generate \
   -H "Content-Type: application/json" \
   -d '{"purpose":"enrollment","ttl_seconds":3600}' | jq -r '.ephemeral_did')
 

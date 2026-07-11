@@ -23,7 +23,7 @@ const deriveGatewayUrl = loadDeriveGatewayUrl();
 
 describe('deriveGatewayUrl', () => {
     test('explicit localStorage override wins over everything', () => {
-        expect(deriveGatewayUrl('10.8.30.40', 'http:', 'http://custom-gateway:9000'))
+        expect(deriveGatewayUrl('192.0.2.10', 'http:', 'http://custom-gateway:9000'))
             .toBe('http://custom-gateway:9000');
     });
 
@@ -33,8 +33,8 @@ describe('deriveGatewayUrl', () => {
     });
 
     test('non-localhost host derives port 30080 from same hostname', () => {
-        expect(deriveGatewayUrl('10.8.30.40', 'http:', null))
-            .toBe('http://10.8.30.40:30080');
+        expect(deriveGatewayUrl('192.0.2.10', 'http:', null))
+            .toBe('http://192.0.2.10:30080');
     });
 
     test('preserves https protocol for TLS deployments', () => {
@@ -53,8 +53,8 @@ describe('deriveGatewayUrl', () => {
     });
 
     test('undefined savedGateway treated as no override', () => {
-        expect(deriveGatewayUrl('10.8.30.40', 'http:', undefined))
-            .toBe('http://10.8.30.40:30080');
+        expect(deriveGatewayUrl('192.0.2.10', 'http:', undefined))
+            .toBe('http://192.0.2.10:30080');
     });
 
     test('empty string savedGateway treated as no override', () => {

@@ -24,10 +24,10 @@
 
 | Host | IP | Role |
 |------|-----|------|
-| k3s-control | 10.8.30.40 | K3s control plane |
-| k3s-worker-1 | 10.8.30.41 | K3s worker node |
-| k3s-worker-2 | 10.8.30.42 | K3s worker node |
-| Atlas | 10.8.10.25 | NFS storage (`atlas-nfs` StorageClass) |
+| k3s-control | ${ICN_K3S_CONTROL} | K3s control plane |
+| k3s-worker-1 | ${ICN_K3S_WORKER1} | K3s worker node |
+| k3s-worker-2 | ${ICN_K3S_WORKER2} | K3s worker node |
+| Atlas | ${ICN_NFS_HOST} | NFS storage (`atlas-nfs` StorageClass) |
 
 **Current ICN Identity**: `did:icn:z3TE1ei6B4L5j6Jp29RmJKt1FYonGaQAXQoYHJL3GULR3`
 
@@ -35,7 +35,7 @@
 
 ```bash
 # SSH to K3s control plane
-ssh ubuntu@10.8.30.40
+ssh ubuntu@${ICN_K3S_CONTROL}
 
 # Check cluster status
 sudo kubectl get nodes
@@ -56,7 +56,7 @@ curl http://localhost:9100/metrics
 
 | Service | Access |
 |---------|--------|
-| **Grafana** | http://10.8.30.40:30300 |
+| **Grafana** | http://${ICN_K3S_CONTROL}:30300 |
 | **ICN Metrics** | Port-forward to 9100 |
 | **Dashboard** | ICN Node Dashboard |
 
@@ -544,7 +544,7 @@ Once the network is running successfully:
 ### Docker Compose
 - **File**: `docker-compose.test.yml`
 - **Services**: node1, node2, node3, node4 (optional), prometheus, grafana
-- **Networks**: icn_test (172.20.0.0/16)
+- **Networks**: icn_test (192.0.2.0/16)
 - **Volumes**: 6 persistent volumes
 
 ### Security Configuration

@@ -1,7 +1,7 @@
 # ICN Crate Reference — Accurate Technical Inventory
 # Generated from live repo exploration, 2026-03-12
 
-**Source:** `~/projects/icn` on icn-dev (10.8.30.45)
+**Source:** `~/projects/icn` on icn-dev (${ICN_DEV_HOST})
 **Workspace root:** `icn/` (38 members in Cargo.toml)
 **Binaries:** `icnd`, `icnctl`, `icn-console`
 **Last explored commit:** `72a8b7a3` (docs: FORWARD_PLAN_2026-03)
@@ -671,10 +671,10 @@ These are Phase 2 Track A deliverables. They're the "governance constitution tem
 
 ## Current Deployment State
 
-**K3s cluster on icn-dev (10.8.30.45):**
+**K3s cluster on icn-dev (${ICN_DEV_HOST}):**
 - 4 pods: icn-alpha, icn-beta, icn-gamma (+ delta)
-- Gateway API accessible at `10.8.30.40:30080` (K3s NodePort)
-- SDIS API: `http://10.8.30.40:30080/v1/sdis/health`
+- Gateway API accessible at `${ICN_GATEWAY_HOST}:30080` (K3s NodePort)
+- SDIS API: `http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health`
 
 **Known gaps in K3s deployment:**
 - `treasury:read/write` scopes not in `ALLOWED_SCOPES` → treasury API unreachable

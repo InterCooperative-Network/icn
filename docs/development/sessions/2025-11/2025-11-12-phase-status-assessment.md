@@ -358,7 +358,7 @@ Supervisor:
 **Status:** mDNS working, bootstrap peers working, trust integration pending
 
 **Current State:**
-- mDNS local discovery (broadcast/receive on 224.0.0.251:5353)
+- mDNS local discovery (broadcast/receive on the mDNS multicast group, port 5353)
 - Bootstrap peer configuration in TOML
 - Automatic dialing on startup
 - Connection pooling and reuse

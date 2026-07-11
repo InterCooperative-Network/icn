@@ -29,7 +29,7 @@ have been run against the current cluster. Pod rebuilds change the DID.
 
 ## Pre-Conditions
 
-- K3s cluster is running (k3s-control at 10.8.30.40, workers at .41/.42)
+- K3s cluster is running (k3s-control at ${ICN_K3S_CONTROL}, workers at ${ICN_K3S_WORKER1}/${ICN_K3S_WORKER2})
 - `kubectl` access from icn-dev
 - `demo/scripts/reseed-federation-demo.sh` exists and is runnable
 - NodePort access: `localhost:18081` routes to BrightWorks node gateway (K3s mode)
@@ -50,7 +50,7 @@ If pods are down, start the cluster before continuing. This checklist assumes ru
 ### Step 2 — Verify NodePort routing
 
 ```bash
-# From icn-dev (10.8.30.45), test the BrightWorks gateway health endpoint
+# From icn-dev (${ICN_DEV_HOST}), test the BrightWorks gateway health endpoint
 curl -s http://localhost:18081/v1/health
 # Expected: 200 with JSON body
 # If: connection refused → NodePort 18081 not mapped, check K3s service config
@@ -189,7 +189,7 @@ Sprint 24 kickoff on #925/#947/#964 can proceed without this as a distraction.
 **Method:** kubectl port-forward + icnctl auth token + direct curl
 
 ### Environment
-- icn-dev (10.8.30.45), kubectl access to K3s cluster
+- icn-dev (${ICN_DEV_HOST}), kubectl access to K3s cluster
 - `kubectl port-forward -n icn-coop-alpha svc/icn-alpha 18081:8080`
 - Token acquired via `kubectl exec ... icnctl auth token --coop-id brightworks-cooperative`
 

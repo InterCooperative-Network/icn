@@ -1,6 +1,6 @@
 # Mobile App Deployment Test Results
 **Date**: 2025-12-16
-**Gateway**: http://10.8.10.40:30080
+**Gateway**: http://${ICN_GATEWAY_HOST}:30080
 **Environment**: K3s Homelab Cluster
 
 ---
@@ -14,7 +14,7 @@
 - **Health Check**: ✅ Responding at `/v1/health`
 
 ### Services Exposed
-- **Gateway API**: http://10.8.10.40:30080 (NodePort 30080)
+- **Gateway API**: http://${ICN_GATEWAY_HOST}:30080 (NodePort 30080)
 - **Prometheus Metrics**: Port 9100
 - **QUIC P2P**: Port 7777/UDP (NodePort 30777)
 - **RPC**: Port 5601/TCP (NodePort 30601)
@@ -59,7 +59,7 @@ All protected endpoints are properly secured and require JWT authentication.
 
 **Configuration** (`src/config.ts`):
 ```typescript
-export const GATEWAY_URL = 'http://10.8.10.40:30080';  // ✅ Correctly configured
+export const GATEWAY_URL = 'http://${ICN_GATEWAY_HOST}:30080';  // ✅ Correctly configured
 ```
 
 **Features**:
@@ -205,7 +205,7 @@ The mobile app backend is **fully operational** and ready for:
 2. **Test SDIS Enrollment Flow**:
    - Use the app to create a new identity
    - Complete device verification
-   - Get steward to vouch (can use steward dashboard at http://10.8.10.40:30030/steward-dashboard.html)
+   - Get steward to vouch (can use steward dashboard at http://${ICN_GATEWAY_HOST}:30030/steward-dashboard.html)
 
 3. **Test Authenticated Features**:
    - View balance

@@ -162,7 +162,7 @@ Lessons:  none new
 
 - Required gates: `Build Release`, `Test`, `Clippy`, `Format Check` (from branch protection API).
 - Non-blocking: `Test Coverage`, `Compare Against Base`, `Benchmarks`, `claude-review`.
-- Single self-hosted runner (`ci-runner` at 10.8.30.46) means parallel PRs queue up. A PR
+- Single self-hosted runner (`ci-runner` at operator-supplied host) means parallel PRs queue up. A PR
   showing `pending / 0s` for >30 min is likely queue-stalled, not failing.
 - `mergeStateStatus=UNSTABLE` with `mergeable=MERGEABLE` means only non-blocking checks failed.
   Safe to merge with `--admin`.

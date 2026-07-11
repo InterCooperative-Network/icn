@@ -82,7 +82,7 @@ Tip: Ensure other ICN nodes are running on the network.
 
 #### Dial a Peer (Example)
 ```bash
-./target/debug/icnctl network dial did:icn:z6MkpTHR8VNs... --addr 192.168.1.100:7777
+./target/debug/icnctl network dial did:icn:z6MkpTHR8VNs... --addr 192.0.2.10:7777
 ```
 
 Note: This requires a valid peer DID and address.

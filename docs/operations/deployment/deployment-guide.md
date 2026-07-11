@@ -492,7 +492,7 @@ Error: Permission denied
 
 **Manual peer dialing:**
 ```bash
-icnctl network dial did:icn:abc123... 192.168.1.100:7777
+icnctl network dial did:icn:abc123... 192.0.2.10:7777
 ```
 
 ### High memory usage

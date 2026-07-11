@@ -123,7 +123,7 @@ Volumes:
 - Config mounted read-only
 
 Networks:
-- Bridge network (172.20.0.0/16)
+- Bridge network (private bridge subnet)
 - Isolated from host
 - Inter-container communication
 

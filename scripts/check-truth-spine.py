@@ -126,6 +126,101 @@ def scan_public_map_boundary(root: Path) -> None:
             )
 
 
+# ---------------------------------------------------------------------------
+# Public docs/agent/test address boundary guard (icn#2393). The non-runtime
+# public surfaces cleaned in the #2393 docs slice must never carry a concrete
+# provider IPv4/IPv6 host address. Reuses the #2392 IPv4 regex/allowlist; the
+# IPv6 rule is tightened (bracketed [..] OR >=3 hextets) so hex-looking Rust
+# paths / capability-action strings (e.g. `aead::`, `read::write`) are NOT
+# false-flagged. HARD failure, value always withheld. Hostname detection is
+# intentionally omitted here — on prose it false-positives on filenames like
+# `.env.local` and illustrative `*.internal`/`*.example` config; the §5
+# provider concern on these surfaces is IP literals.
+_PUBLIC_DOCS_DIRS = ("docs", ".claude", ".agents")   # scanned recursively for *.md
+_PUBLIC_DOCS_EXTRA = (                                # specific non-.md cleaned surfaces
+    "CHANGELOG.md",
+    "web/pilot-ui/tests/steward-gateway-url.test.js",
+)
+# Deferred to a separate targeted review (NOT ATLAS §5 provider topology, so
+# excluded to keep this guard free of false positives): IPv6 address-TYPE
+# illustrations (ULA / global / link-local / CGN format examples in
+# protocol-design docs) and Rust-syntax / capability-action-string matches.
+_PUBLIC_DOCS_EXCLUDE = frozenset({
+    "docs/adr/ADR-0003-ipv6-dual-stack-transport-with-endpoint-sets.md",
+    "docs/architecture/ARCHITECTURE_MAP.md",
+    "docs/design/ipv6-endpoint-sets-design.md",
+    "docs/features/ACTION_ITEMS_EXCHANGE.md",
+    "docs/plans/2026-02-23-authz-capability-graph-design.md",
+    "docs/plans/2026-02-23-authz-capability-graph-impl-plan.md",
+})
+
+
+def docs_address_violations(text: str) -> list[tuple[int, str]]:
+    """Return [(line_no, category)] for disallowed concrete host literals in a
+    cleaned public-docs surface. Never includes the value. Category is
+    'ipv4-host' or 'ipv6-host'. Allowed: loopback / bind-all / QEMU slirp alias
+    / RFC5737 (v4); ::1 / :: / RFC3849 2001:db8::/32 (v6). IPv6 is flagged only
+    when bracketed ([..]) or written with >=3 hextets, so hex-looking
+    identifiers such as `aead::` or `read::write` are not false-flagged."""
+    out: list[tuple[int, str]] = []
+    for i, line in enumerate(text.splitlines(), 1):
+        for m in _IPV4_RE.finditer(line):
+            if not _IPV4_ALLOWED_RE.match(m.group(0)):
+                out.append((i, "ipv4-host"))
+                break
+        for m in _IPV6_RE.finditer(line):
+            tok = m.group(0)
+            if _IPV6_ALLOWED_RE.match(tok):
+                continue
+            s, e = m.start(), m.end()
+            bracketed = s > 0 and line[s - 1] == "[" and e < len(line) and line[e] == "]"
+            hextets = [g for g in tok.split(":") if g]
+            if bracketed or len(hextets) >= 3:
+                out.append((i, "ipv6-host"))
+                break
+    return out
+
+
+def scan_public_docs_boundary(root: Path) -> None:
+    """HARD-fail if a cleaned public docs/agent/test surface (icn#2393 slice)
+    carries a concrete provider IPv4/IPv6 host address — public icn must not
+    (docs/ATLAS.md §5; icn-infra ADR-0005). Never echoes the offending value;
+    fails closed on unreadable/undecodable surfaces."""
+    seen: set[str] = set()
+    surfaces: list[tuple[str, Path]] = []
+    for d in _PUBLIC_DOCS_DIRS:
+        base = root / d
+        if not base.is_dir():
+            continue
+        for p in sorted(base.rglob("*.md")):
+            rel = p.relative_to(root).as_posix()
+            if rel in _PUBLIC_DOCS_EXCLUDE or rel in seen:
+                continue
+            seen.add(rel)
+            surfaces.append((rel, p))
+    for extra in _PUBLIC_DOCS_EXTRA:
+        p = root / extra
+        if p.is_file() and extra not in _PUBLIC_DOCS_EXCLUDE and extra not in seen:
+            seen.add(extra)
+            surfaces.append((extra, p))
+    for rel, p in surfaces:
+        try:
+            text = p.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as e:
+            err(
+                f"{rel}: present but unreadable/undecodable ({type(e).__name__}) — "
+                f"cannot boundary-scan a public docs surface; failing closed."
+            )
+            continue
+        for ln, cat in docs_address_violations(text):
+            err(
+                f"{rel}:{ln}: contains a concrete {cat} address — public icn docs "
+                f"must not (docs/ATLAS.md §5; icn#2393). Use ${{ICN_*}} env vars / "
+                f"symbolic roles / RFC5737 / RFC3849 examples; concrete values live "
+                f"in the private network-ops repo. (value withheld)"
+            )
+
+
 def parse_date(value: str) -> datetime.date | None:
     try:
         return datetime.date.fromisoformat(str(value)[:10])
@@ -266,6 +361,9 @@ def main() -> int:
 
     # 4. Public-map boundary guard — HARD fail regardless of --strict.
     scan_public_map_boundary(root)
+
+    # 5. Public docs/agent/test address boundary guard (icn#2393) — HARD fail.
+    scan_public_docs_boundary(root)
 
     # Result
     if errors:

@@ -108,7 +108,7 @@ mod tests {
         let quinn_socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
         let fake_turn_server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
         let turn_addr = fake_turn_server.local_addr().unwrap();
-        let peer_relay_addr: SocketAddr = "10.0.0.99:5000".parse().unwrap();
+        let peer_relay_addr: SocketAddr = "192.0.2.10:5000".parse().unwrap();
 
         let proxy = TurnRelayProxy::start_test(
             turn_addr,
@@ -149,7 +149,7 @@ mod tests {
         let quinn_socket = UdpSocket::bind("127.0.0.1:0").await.unwrap();
         let fake_turn_server = UdpSocket::bind("127.0.0.1:0").await.unwrap();
         let turn_addr = fake_turn_server.local_addr().unwrap();
-        let peer_relay_addr: SocketAddr = "10.0.0.99:5000".parse().unwrap();
+        let peer_relay_addr: SocketAddr = "192.0.2.10:5000".parse().unwrap();
 
         let proxy = TurnRelayProxy::start_test(
             turn_addr,

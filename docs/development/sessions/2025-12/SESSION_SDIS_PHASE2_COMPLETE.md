@@ -312,7 +312,7 @@ Prover → Generate → Sign → Share → Verifier → Verify → Accept/Reject
 - Tests: `icn/crates/icn-gateway/src/api/sdis/tests/`
 
 **Deployment:**
-- K3s cluster: `10.8.10.40`
+- K3s cluster: `${ICN_NODE_HOST}`
 - Node ports: 30080 (UI), 30081 (Gateway)
 - Docker images: `icn:latest`, `icn-pilot-ui:latest`
 

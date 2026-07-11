@@ -23,7 +23,7 @@ Flag any:
 **Step 2: Daemon Health**
 
 ```
-curl -s http://10.8.30.40:8080/health | python3 -m json.tool
+curl -s http://${ICN_GATEWAY_HOST}:8080/health | python3 -m json.tool
 ```
 
 Expected: `{"status": "healthy"}` or similar. Flag any unhealthy components.

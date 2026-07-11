@@ -1,8 +1,15 @@
 # ICN Invite System - K3s Deployment Guide
 
-**Infrastructure:** K3s on Hyperion (10.8.30.40-42)
+**Infrastructure:** K3s on Hyperion — private cluster node range (operator-supplied; addresses via private `network-ops`)
 **Date:** 2025-12-12  
 **Status:** Ready to Deploy
+
+> **Operator inputs (ATLAS §5 boundary):** the commands below use operator-supplied
+> host variables — export `ICN_GATEWAY_HOST` (NodePort HTTP/WS entry), `ICN_K3S_CONTROL`
+> (control node for SSH/admin), `ICN_K3S_WORKER1`, and `ICN_K3S_WORKER2` with your
+> private cluster node addresses, resolved from the private `network-ops` source. In a
+> single-entry setup `ICN_GATEWAY_HOST` and `ICN_K3S_CONTROL` are the same node address.
+> Concrete provider addresses must never be committed to this public repo.
 
 ---
 
@@ -12,7 +19,7 @@
 
 ```bash
 # 1. SSH access works
-ssh ubuntu@10.8.30.40 "echo 'SSH OK'"
+ssh ubuntu@${ICN_K3S_CONTROL} "echo 'SSH OK'"
 
 # 2. In ICN repo with latest code
 cd /home/matt/projects/icn
@@ -34,7 +41,7 @@ make full-deploy-with-ui
 This single command will:
 1. ✅ Build `icn:latest` Docker image from source
 2. ✅ Build `icn-pilot-ui:latest` Docker image
-3. ✅ Sync both images to all K3s nodes (10.8.30.40-42)
+3. ✅ Sync both images to all K3s nodes (private cluster node range — operator-supplied)
 4. ✅ Deploy ICN daemon to Kubernetes
 5. ✅ Deploy Pilot UI to Kubernetes
 6. ✅ Apply all configs, secrets, services
@@ -52,8 +59,8 @@ make logs
 make ui-logs
 
 # Test access
-curl http://10.8.30.40:30080/v1/health  # Gateway API
-curl http://10.8.30.40:30030/           # Pilot UI
+curl http://${ICN_GATEWAY_HOST}:30080/v1/health  # Gateway API
+curl http://${ICN_GATEWAY_HOST}:30030/           # Pilot UI
 ```
 
 ---
@@ -97,9 +104,9 @@ make sync-all-images
 ```
 
 This copies images to:
-- k3s-control (10.8.30.40)
-- k3s-worker-1 (10.8.30.41)
-- k3s-worker-2 (10.8.30.42)
+- k3s-control (${ICN_K3S_CONTROL})
+- k3s-worker-1 (${ICN_K3S_WORKER1})
+- k3s-worker-2 (${ICN_K3S_WORKER2})
 
 ### Step 3: Configure Secrets (First Time Only)
 
@@ -114,7 +121,7 @@ if [ ! -f secret.yaml ]; then
 fi
 
 # Deploy secrets
-ssh ubuntu@10.8.30.40 "sudo kubectl apply -f -" < secret.yaml
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl apply -f -" < secret.yaml
 ```
 
 ### Step 4: Deploy to Kubernetes (1 min)
@@ -132,7 +139,7 @@ make deploy-ui        # Pilot UI
 
 ```bash
 # Check all pods are running
-ssh ubuntu@10.8.30.40 "sudo kubectl get pods -n icn"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl get pods -n icn"
 
 # Expected output:
 # NAME                              READY   STATUS    RESTARTS   AGE
@@ -140,7 +147,7 @@ ssh ubuntu@10.8.30.40 "sudo kubectl get pods -n icn"
 # pilot-ui-xxxxxxxxxx-xxxxx         1/1     Running   0          2m
 
 # Check services
-ssh ubuntu@10.8.30.40 "sudo kubectl get svc -n icn"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl get svc -n icn"
 
 # Expected output:
 # NAME              TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)
@@ -157,14 +164,14 @@ ssh ubuntu@10.8.30.40 "sudo kubectl get svc -n icn"
 After deployment, the services are available at:
 
 ### ICN Gateway API
-- **URL:** `http://10.8.30.40:30080`
+- **URL:** `http://${ICN_GATEWAY_HOST}:30080`
 - **Endpoints:**
-  - Health: `http://10.8.30.40:30080/v1/health`
-  - Invites: `http://10.8.30.40:30080/v1/invites`
-  - WebSocket: `ws://10.8.30.40:30080/v1/ws`
+  - Health: `http://${ICN_GATEWAY_HOST}:30080/v1/health`
+  - Invites: `http://${ICN_GATEWAY_HOST}:30080/v1/invites`
+  - WebSocket: `ws://${ICN_GATEWAY_HOST}:30080/v1/ws`
 
 ### Pilot UI
-- **URL:** `http://10.8.30.40:30030`
+- **URL:** `http://${ICN_GATEWAY_HOST}:30030`
 - **Features:**
   - Login screen
   - Join via invite code
@@ -173,7 +180,7 @@ After deployment, the services are available at:
   - Invite creation (admin)
 
 ### Metrics (Prometheus)
-- **URL:** `http://10.8.30.40:30090/metrics`
+- **URL:** `http://${ICN_GATEWAY_HOST}:30090/metrics`
 
 ---
 
@@ -183,7 +190,7 @@ After deployment, the services are available at:
 
 ```bash
 # SSH into K3s control node
-ssh ubuntu@10.8.30.40
+ssh ubuntu@${ICN_K3S_CONTROL}
 
 # Get pod name
 POD=$(sudo kubectl get pods -n icn -l component=daemon -o jsonpath='{.items[0].metadata.name}')
@@ -201,9 +208,9 @@ Save the token that's printed!
 
 ### 2. Create Invite via UI
 
-1. Open browser: `http://10.8.30.40:30030`
+1. Open browser: `http://${ICN_GATEWAY_HOST}:30030`
 2. Login with:
-   - Gateway URL: `http://10.8.30.40:30080`
+   - Gateway URL: `http://${ICN_GATEWAY_HOST}:30080`
    - Coop ID: `test-coop`
    - Your DID: (from step 1)
    - Token: (from step 1)
@@ -216,10 +223,10 @@ Save the token that's printed!
 
 ### 3. Test Join Flow
 
-1. Open incognito window: `http://10.8.30.40:30030`
+1. Open incognito window: `http://${ICN_GATEWAY_HOST}:30030`
 2. Click **Join with Invite Code**
 3. Enter:
-   - Gateway URL: `http://10.8.30.40:30080`
+   - Gateway URL: `http://${ICN_GATEWAY_HOST}:30080`
    - Invite Code: (paste from step 2)
 4. Click **Join Cooperative**
 5. Verify:
@@ -232,7 +239,7 @@ Save the token that's printed!
 
 ```bash
 # Check invite metrics
-curl http://10.8.30.40:30090/metrics | grep invite
+curl http://${ICN_GATEWAY_HOST}:30090/metrics | grep invite
 
 # Expected:
 # icn_gateway_invites_created_total{coop_id="test-coop"} 1
@@ -297,22 +304,22 @@ make ui-port-forward     # Forward UI to localhost:3000
 
 ```bash
 # Check pod status
-ssh ubuntu@10.8.30.40 "sudo kubectl get pods -n icn"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl get pods -n icn"
 
 # Check pod logs
-ssh ubuntu@10.8.30.40 "sudo kubectl logs -n icn -l component=daemon"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl logs -n icn -l component=daemon"
 
 # Check events
-ssh ubuntu@10.8.30.40 "sudo kubectl get events -n icn --sort-by='.lastTimestamp'"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl get events -n icn --sort-by='.lastTimestamp'"
 ```
 
 ### Issue: Image not found
 
 ```bash
 # Verify image exists on nodes
-ssh ubuntu@10.8.30.40 "sudo ctr -n k8s.io images ls | grep icn"
-ssh ubuntu@10.8.30.41 "sudo ctr -n k8s.io images ls | grep icn"
-ssh ubuntu@10.8.30.42 "sudo ctr -n k8s.io images ls | grep icn"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo ctr -n k8s.io images ls | grep icn"
+ssh ubuntu@${ICN_K3S_WORKER1} "sudo ctr -n k8s.io images ls | grep icn"
+ssh ubuntu@${ICN_K3S_WORKER2} "sudo ctr -n k8s.io images ls | grep icn"
 
 # Re-sync if missing
 cd /home/matt/projects/icn/deploy/k8s
@@ -323,27 +330,27 @@ make sync-all-images
 
 ```bash
 # Check services are exposed
-ssh ubuntu@10.8.30.40 "sudo kubectl get svc -n icn"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl get svc -n icn"
 
 # Check NodePorts
 # Gateway should be on port 30080
 # Pilot UI should be on port 30030
 
 # Test from local machine
-curl -v http://10.8.30.40:30080/v1/health
-curl -v http://10.8.30.40:30030/
+curl -v http://${ICN_GATEWAY_HOST}:30080/v1/health
+curl -v http://${ICN_GATEWAY_HOST}:30030/
 ```
 
 ### Issue: Invite creation fails
 
 ```bash
 # Check gateway logs
-ssh ubuntu@10.8.30.40 "sudo kubectl logs -n icn -l component=daemon | grep invite"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl logs -n icn -l component=daemon | grep invite"
 
 # Verify token is valid
 # Verify user has admin role
 # Check gateway metrics endpoint
-curl http://10.8.30.40:30090/metrics | grep auth
+curl http://${ICN_GATEWAY_HOST}:30090/metrics | grep auth
 ```
 
 ---
@@ -377,33 +384,33 @@ The entire cycle takes about 3-5 minutes.
 
 ```bash
 # Gateway health
-curl http://10.8.30.40:30080/v1/health
+curl http://${ICN_GATEWAY_HOST}:30080/v1/health
 
 # Prometheus metrics
-curl http://10.8.30.40:30090/metrics | grep icn_gateway
+curl http://${ICN_GATEWAY_HOST}:30090/metrics | grep icn_gateway
 ```
 
 ### View Logs
 
 ```bash
 # Live daemon logs
-ssh ubuntu@10.8.30.40 "sudo kubectl logs -f -n icn -l component=daemon"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl logs -f -n icn -l component=daemon"
 
 # Live UI logs
-ssh ubuntu@10.8.30.40 "sudo kubectl logs -f -n icn -l component=pilot-ui"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl logs -f -n icn -l component=pilot-ui"
 
 # Last 100 lines
-ssh ubuntu@10.8.30.40 "sudo kubectl logs --tail=100 -n icn -l component=daemon"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl logs --tail=100 -n icn -l component=daemon"
 ```
 
 ### Resource Usage
 
 ```bash
 # Pod resource usage
-ssh ubuntu@10.8.30.40 "sudo kubectl top pods -n icn"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl top pods -n icn"
 
 # Node resource usage
-ssh ubuntu@10.8.30.40 "sudo kubectl top nodes"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl top nodes"
 ```
 
 ---
@@ -464,9 +471,9 @@ make logs
 make restart
 
 # Access points
-Gateway: http://10.8.30.40:30080
-UI:      http://10.8.30.40:30030
-Metrics: http://10.8.30.40:30090/metrics
+Gateway: http://${ICN_GATEWAY_HOST}:30080
+UI:      http://${ICN_GATEWAY_HOST}:30030
+Metrics: http://${ICN_GATEWAY_HOST}:30090/metrics
 ```
 
 ---

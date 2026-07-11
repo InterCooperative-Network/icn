@@ -2,13 +2,13 @@
 
 ## icn-dev VM
 
-Dedicated development VM for ICN work, hosted on Hyperion (10.8.10.15).
+Dedicated development VM for ICN work, hosted on Hyperion (${ICN_HYPERION_HOST}).
 
 | Setting | Value |
 |---------|-------|
 | **VMID** | 600 |
 | **Name** | icn-dev |
-| **IP** | 10.8.10.45 |
+| **IP** | ${ICN_DEV_HOST} |
 | **RAM** | 12GB |
 | **CPU** | 6 vCPUs |
 | **Disk** | 100GB |
@@ -18,10 +18,10 @@ Dedicated development VM for ICN work, hosted on Hyperion (10.8.10.15).
 
 ```bash
 # SSH
-ssh ubuntu@10.8.10.45
+ssh ubuntu@${ICN_DEV_HOST}
 
 # Web VSCode (code-server)
-http://10.8.10.45:8443
+http://${ICN_DEV_HOST}:8443
 # Access credential: retrieve from secure channel (vault/team secret manager)
 ```
 
@@ -88,7 +88,7 @@ To set up Claude Code on the dev VM:
 
 ```bash
 # SSH to dev VM
-ssh ubuntu@10.8.10.45
+ssh ubuntu@${ICN_DEV_HOST}
 
 # Install Claude Code
 curl -fsSL https://claude.ai/code/install.sh | sh
@@ -110,16 +110,16 @@ The ICN repo contains `CLAUDE.md` with all project-specific instructions.
 ```
 Workstation (matt)
     |
-    +-- SSH --> icn-dev (10.8.10.45) --> ~/projects/icn
+    +-- SSH --> icn-dev (${ICN_DEV_HOST}) --> ~/projects/icn
     |              |
     |              +-- kubectl --> K3s Cluster
     |                                  |
-    +-- SSH --> k3s-control (10.8.30.40)
+    +-- SSH --> k3s-control (${ICN_K3S_CONTROL})
                     |
-                    +-- k3s-worker-1 (10.8.30.41)
-                    +-- k3s-worker-2 (10.8.30.42)
+                    +-- k3s-worker-1 (${ICN_K3S_WORKER1})
+                    +-- k3s-worker-2 (${ICN_K3S_WORKER2})
                            |
-                           +-- ICN pods (NFS from Atlas 10.8.10.25)
+                           +-- ICN pods (NFS from Atlas ${ICN_NFS_HOST})
 ```
 
 ## Related Documentation

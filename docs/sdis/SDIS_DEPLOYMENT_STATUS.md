@@ -8,9 +8,9 @@
 ## 🎯 What's Working Now
 
 ### 1. ICN Gateway Deployed ✅
-- **URL:** `http://10.8.30.40:30080`
-- **Health Check:** `http://10.8.30.40:30080/v1/health` → Working
-- **SDIS Health:** `http://10.8.30.40:30080/v1/sdis/health` → Working
+- **URL:** `http://${ICN_GATEWAY_HOST}:30080`
+- **Health Check:** `http://${ICN_GATEWAY_HOST}:30080/v1/health` → Working
+- **SDIS Health:** `http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health` → Working
 
 ### 2. SDIS API Endpoints ✅
 All SDIS endpoints are deployed and accessible:
@@ -52,7 +52,7 @@ icn/crates/icn-gateway/src/api/sdis/
 ```
 
 ### 4. Pilot UI Deployed ✅
-- **URL:** `http://10.8.30.40:30030`
+- **URL:** `http://${ICN_GATEWAY_HOST}:30030`
 - Static files served via nginx
 - Ready for SDIS UI integration
 
@@ -168,22 +168,22 @@ Level 3: Anchor Created    → Permanent DID issued
 
 ### Test SDIS Health
 ```bash
-curl http://10.8.30.40:30080/v1/sdis/health
+curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health
 ```
 
 ### Test Gateway Health
 ```bash
-curl http://10.8.30.40:30080/v1/health
+curl http://${ICN_GATEWAY_HOST}:30080/v1/health
 ```
 
 ### Check Pod Status
 ```bash
-ssh ubuntu@10.8.30.40 'sudo kubectl get pods -n icn'
+ssh ubuntu@${ICN_GATEWAY_HOST} 'sudo kubectl get pods -n icn'
 ```
 
 ### View Gateway Logs
 ```bash
-ssh ubuntu@10.8.30.40 'sudo kubectl logs -n icn -l component=daemon --tail=50'
+ssh ubuntu@${ICN_GATEWAY_HOST} 'sudo kubectl logs -n icn -l component=daemon --tail=50'
 ```
 
 ---

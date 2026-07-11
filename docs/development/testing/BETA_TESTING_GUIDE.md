@@ -10,10 +10,10 @@
 
 | Service | URL | Notes |
 |---------|-----|-------|
-| **Web UI** | http://10.8.30.40:30030 | Timebank pilot interface |
-| **Gateway API** | http://10.8.30.40:30080 | REST + WebSocket API |
-| **Grafana** | http://10.8.30.40:30300 | Monitoring dashboard |
-| **Prometheus** | http://10.8.30.40:30090 | Metrics (internal) |
+| **Web UI** | http://${ICN_GATEWAY_HOST}:30030 | Timebank pilot interface |
+| **Gateway API** | http://${ICN_GATEWAY_HOST}:30080 | REST + WebSocket API |
+| **Grafana** | http://${ICN_GATEWAY_HOST}:30300 | Monitoring dashboard |
+| **Prometheus** | http://${ICN_GATEWAY_HOST}:30090 | Metrics (internal) |
 
 ---
 
@@ -139,21 +139,21 @@ ICN_PASSPHRASE="your-passphrase" ./target/release/icnctl auth token \
 
 ```bash
 # Gateway health
-curl -s http://10.8.30.40:30080/v1/health | jq .
+curl -s http://${ICN_GATEWAY_HOST}:30080/v1/health | jq .
 
 # Node status
-ssh ubuntu@10.8.30.40 "sudo kubectl -n icn get pods"
+ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl -n icn get pods"
 
 # Node logs
-ssh ubuntu@10.8.30.40 "sudo kubectl -n icn logs -f deployment/icn-daemon --tail=50"
+ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl -n icn logs -f deployment/icn-daemon --tail=50"
 
 # Pilot UI logs
-ssh ubuntu@10.8.30.40 "sudo kubectl -n icn logs -f deployment/pilot-ui"
+ssh ubuntu@${ICN_GATEWAY_HOST} "sudo kubectl -n icn logs -f deployment/pilot-ui"
 ```
 
 ### Grafana Dashboard
 
-Open http://10.8.30.40:30300 for metrics:
+Open http://${ICN_GATEWAY_HOST}:30300 for metrics:
 - **ICN Node Dashboard**: Network, gossip, ledger metrics
 - **Byzantine Detection**: Quarantine status, anomalies
 - **Performance**: Latency, throughput, errors

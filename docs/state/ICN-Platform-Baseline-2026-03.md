@@ -150,7 +150,7 @@ not attested receipts.
 `cargo-tarpaulin` v0.35.2 consistently times out on GitHub-hosted runners due to
 instrumented build time. The gate is classified `observational` (does not block merges).
 Resolution options include scoping tarpaulin to a subset of crates or switching to the
-self-hosted `ci-runner` at `10.8.30.46`. No resolution is required before Sprint 24 begins.
+self-hosted `ci-runner` at `${ICN_CI_RUNNER_HOST}`. No resolution is required before Sprint 24 begins.
 See `ops/state/ci-exceptions.md` for full technical detail.
 
 ### Commons Compute Layer — Not Yet Started
@@ -201,6 +201,6 @@ Full Sprint 24 planning is out of scope for this document.
 | Kernel API | `icn/crates/icn-kernel-api/src/` |
 | Storage spec | `docs/state/storage-governance-spec.md` |
 | Gateway port | 8080 (local), 30080 (K3s NodePort) |
-| K3s cluster | control `10.8.30.40`, workers `.41` `.42` (VLAN 30) |
+| K3s cluster | control `${ICN_K3S_CONTROL}`, workers `${ICN_K3S_WORKER1}` `${ICN_K3S_WORKER2}` (VLAN 30) |
 | Demo flows | `demo/scripts/flow-1-governance.sh`, `flow-2-patronage.sh`, `flow-3-federation.sh` |
 | Demo entry point | `demo/scripts/present-governance.sh --port 9080` |

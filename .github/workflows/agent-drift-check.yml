@@ -10,10 +10,15 @@ on:
       - 'ops/scripts/drift-check.sh'
       - 'scripts/check-preflight-consistency.sh'
       - 'scripts/check-truth-spine.py'
+      - 'scripts/tests/test_public_docs_boundary.py'
       - 'ops/state/config/**'
       - 'CLAUDE.md'
       - 'ops/CLAUDE.md'
       - 'AGENTS.md'
+      # icn#2393 public docs/agent/test address-boundary surfaces
+      - 'docs/**'
+      - 'CHANGELOG.md'
+      - 'web/pilot-ui/tests/**'
   pull_request:
     # No paths filter: run on ALL PRs so any new skill/agent is checked for truth_contract
     # and registry entries. The check is fast (~5s) and catches silent drift early.
@@ -39,6 +44,9 @@ jobs:
 
       - name: Truth-spine validation (warning-mode, Refs icn#2141)
         run: python3 scripts/check-truth-spine.py
+
+      - name: Public docs address-boundary guard tests (Refs icn#2393)
+        run: python3 scripts/tests/test_public_docs_boundary.py
 
       - name: Validate JSON truth files are parseable
         run: |

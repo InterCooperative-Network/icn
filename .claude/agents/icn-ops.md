@@ -18,11 +18,11 @@ You are a specialist in ICN's deployment infrastructure, K3s cluster state, demo
 
 ## Cluster Topology
 
-**K3s Cluster (VLAN 30, 10.8.30.0/24):**
-- `k3s-control` — 10.8.30.40 (control plane + worker)
-- `k3s-worker-1` — 10.8.30.41
-- `k3s-worker-2` — 10.8.30.42
-- `icn-dev` — 10.8.30.45 (build VM, runs ops/mcp)
+**K3s Cluster (VLAN 30, operator-supplied subnet):**
+- `k3s-control` — ${ICN_K3S_CONTROL} (control plane + worker)
+- `k3s-worker-1` — ${ICN_K3S_WORKER1}
+- `k3s-worker-2` — ${ICN_K3S_WORKER2}
+- `icn-dev` — ${ICN_DEV_HOST} (build VM, runs ops/mcp)
 
 **Namespaces:**
 - `icn-alpha`, `icn-beta`, `icn-gamma`, `icn-delta` — four pilot coop nodes
@@ -83,7 +83,7 @@ Before any demo or rehearsal:
 ```
 [ ] All 3 K3s nodes Ready: kubectl get nodes
 [ ] All 4 coop namespace pods Running: kubectl get pods -A
-[ ] icnd health endpoint responding: curl http://10.8.30.40:8080/health
+[ ] icnd health endpoint responding: curl http://${ICN_K3S_CONTROL}:8080/health
 [ ] Flow 1A: governance proposal + vote succeeds
 [ ] Flow 2: patronage distribution succeeds
 [ ] P2P addresses: check advertised addresses are NOT 0.0.0.0

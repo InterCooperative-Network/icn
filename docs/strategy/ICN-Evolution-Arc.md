@@ -197,11 +197,11 @@ The language shift is telling. August 2025: "here is the exact bytecode and wire
 
 ### K3s Deployment: December 3, 2025
 
-ICN deploys to a real K3s cluster: three nodes at 10.8.30.40-42. No longer specification. Running code.
+ICN deploys to a real K3s cluster: three nodes on the private cluster (operator-supplied node range). No longer specification. Running code.
 
 ### The VLAN Migration: February 28, 2026
 
-K3s migrates from VLAN 10 to VLAN 30 (10.8.30.40-42) — same VLAN as icn-dev. Flannel reconfigured, NFS ACLs fixed, DNS updated, SOPS/Age secrets management deployed. This is production infrastructure work.
+K3s migrates from VLAN 10 to VLAN 30 (private cluster node range — operator-supplied) — same VLAN as icn-dev. Flannel reconfigured, NFS ACLs fixed, DNS updated, SOPS/Age secrets management deployed. This is production infrastructure work.
 
 ### The Governance Demo Sprint: March 13-14, 2026
 
