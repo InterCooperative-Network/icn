@@ -63,6 +63,15 @@
       "validate": "schema",
       "validator": "docs/scripts/validate-rehearsal-evidence.py",
       "schema": "docs/contracts/rehearsal-evidence-export.schema.json"
+    },
+    {
+      "name": "pending_publish_evidence_export",
+      "surface": "Repo-safe evidence packet for the pending-publish review-preview rehearsal; the member-shell renders a committed copy read-only",
+      "urn": "urn:icn:contract:rehearsal-evidence-export:v1",
+      "path": "web/member-shell/fixtures/pending-publish-evidence-export.json",
+      "validate": "schema",
+      "validator": "docs/scripts/validate-rehearsal-evidence.py",
+      "schema": "docs/contracts/rehearsal-evidence-export.schema.json"
     }
   ],
   "url_allowlist_hosts": ["github.com", "raw.githubusercontent.com"],

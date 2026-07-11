@@ -1,0 +1,92 @@
+{
+  "schema_version": "0.1.0",
+  "recorded_at": "2026-07-10T00:00:00Z",
+  "rehearsal_label": "Pending-publish review preview — committed-fixture rehearsal evidence",
+  "rehearsal_mode": "fixture-only",
+  "audience_categories": [
+    "organizer",
+    "steward",
+    "reviewer"
+  ],
+  "source_material": [
+    {
+      "kind": "committed-fixture",
+      "basename": "pending-publish-summary.json",
+      "summary": "Committed pending-publish review-preview rows, as served by GET /v1/gov/me/pending-publish-summary in a non-production build mode (origin = committed_fixture). Fictional rehearsal data; no real people or organization."
+    }
+  ],
+  "workflow_steps_completed": [
+    "start",
+    "select-material",
+    "preview",
+    "surface-result",
+    "export-evidence"
+  ],
+  "decision_outcomes": [
+    {
+      "category": "deferred",
+      "plain_summary": "Draft task parsed from example meeting notes, awaiting review before it becomes an assignable action item. Preview only — no decision was recorded."
+    },
+    {
+      "category": "deferred",
+      "plain_summary": "Proposed governance decision summarized for review before any publish step. Preview only — no decision was recorded."
+    },
+    {
+      "category": "deferred",
+      "plain_summary": "Proposed attendance/participation record parsed from example notes, awaiting review. Preview only — no decision was recorded."
+    },
+    {
+      "category": "rejected",
+      "plain_summary": "Proposed shared commitment summarized for review; the reviewer set it aside as not ready to record. Preview only — no decision was recorded."
+    },
+    {
+      "category": "edit-and-resubmit",
+      "plain_summary": "Proposed allocation of shared meeting-room time slots, awaiting an edit before it goes back for review. Preview only — no decision was recorded."
+    }
+  ],
+  "preview_review_boundary": {
+    "enforced": true,
+    "notes": "Preview rows are evidence presented for review — not authorization, publication, custody writes, or completed actions."
+  },
+  "mutation_boundary": {
+    "executed": false,
+    "target": "none",
+    "notes": "Read-only projection (GET only). No write, no publish, no action-card creation, no custody write; no network egress in fixture mode."
+  },
+  "proof_loop_references": [
+    {
+      "kind": "provenance-summary",
+      "public_id_or_category": "pending-publish-committed-fixture",
+      "status": "closed"
+    },
+    {
+      "kind": "action-item-completion-receipt",
+      "status": "not-attempted"
+    },
+    {
+      "kind": "governance-decision-receipt",
+      "status": "not-attempted"
+    },
+    {
+      "kind": "meeting-attendance-receipt",
+      "status": "not-attempted"
+    },
+    {
+      "kind": "validator-output-category",
+      "public_id_or_category": "settlement-receipt-expected",
+      "status": "not-attempted"
+    }
+  ],
+  "privacy_review": {
+    "reviewer_role": "reviewer",
+    "status": "reviewed-clean",
+    "notes": "Rows carry only generic plain-language labels — no DIDs, no private paths, no partner data. The runtime response's caller DID is deliberately not carried into this packet."
+  },
+  "export_safety_classification": "repo-safe",
+  "non_claims": [
+    "Not production readiness and not a formal pilot.",
+    "No live federation, no cloud sync.",
+    "No private participant data is handled; the rows are fictional committed-fixture rehearsal data, never live participant state.",
+    "An expected receipt is an evidence expectation for the reviewer, not authority. No preview row was authorized, published, or turned into a custody write; no receipt was issued."
+  ]
+}
