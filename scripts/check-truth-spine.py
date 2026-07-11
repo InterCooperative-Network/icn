@@ -48,6 +48,9 @@ _IPV4_RE = re.compile(
 _IPV4_ALLOWED_RE = re.compile(
     r"^(?:127\.|0\.0\.0\.0$|10\.0\.2\.2$|192\.0\.2\.|198\.51\.100\.|203\.0\.113\.)"
 )
+# RFC5737 documentation ranges (each a /24) — used to reject a doc-range base
+# carrying a CIDR mask that escapes its reserved /24 (e.g. 192.0.2.0/8).
+_RFC5737_RE = re.compile(r"^(?:192\.0\.2\.|198\.51\.100\.|203\.0\.113\.)")
 # IPv6 literals — comprehensive: full 8-group, or any "::" compression anywhere in
 # the token (including mid-address). Requires 8 groups (7 colons) or a "::", so a
 # HH:MM:SS time (2 colons, no "::") is NOT matched. A boundary guard fails closed.
@@ -170,12 +173,27 @@ def docs_address_violations(text: str) -> list[tuple[int, str]]:
     out: list[tuple[int, str]] = []
     for i, line in enumerate(text.splitlines(), 1):
         for m in _IPV4_RE.finditer(line):
-            if not _IPV4_ALLOWED_RE.match(m.group(0)):
+            tok = m.group(0)
+            if not _IPV4_ALLOWED_RE.match(tok):
                 out.append((i, "ipv4-host"))
                 break
+            # A permitted RFC5737 base with a CIDR mask that escapes its reserved
+            # /24 (e.g. 192.0.2.0/8) is NOT a valid documentation range — reject
+            # it so an over-broad or policy-changing subnet cannot slip through.
+            if _RFC5737_RE.match(tok):
+                mm = re.match(r"/(\d{1,3})", line[m.end():])
+                if mm and int(mm.group(1)) < 24:
+                    out.append((i, "ipv4-doc-mask"))
+                    break
         for m in _IPV6_RE.finditer(line):
             tok = m.group(0)
             if _IPV6_ALLOWED_RE.match(tok):
+                # RFC3849 2001:db8::/32 with a mask escaping /32 is likewise invalid.
+                if tok.lower().startswith("2001:"):
+                    mm = re.match(r"/(\d{1,3})", line[m.end():])
+                    if mm and int(mm.group(1)) < 32:
+                        out.append((i, "ipv6-doc-mask"))
+                        break
                 continue
             s, e = m.start(), m.end()
             bracketed = s > 0 and line[s - 1] == "[" and e < len(line) and line[e] == "]"

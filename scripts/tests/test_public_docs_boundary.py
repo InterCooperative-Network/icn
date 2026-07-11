@@ -51,6 +51,9 @@ FLAG = [
     ("bracketed IPv6 URL (>=3 group)", "ws://[fd12:3456::1]:30080/ws"),
     ("bare 2-hextet ULA (fd00::1)", "note fd00::1 somewhere"),
     ("bare 2-hextet link-local (fe80::1)", "iface fe80::1 up"),
+    ("RFC5737 base with oversized /8 mask", "range 192.0.2.0/8 here"),
+    ("RFC5737 base with oversized /16 mask", "range 198.51.100.0/16 here"),
+    ("RFC3849 base with oversized /16 mask", "prefix 2001:db8::/16 here"),
 ]
 
 # ---- MUST NOT FLAG (allowed documentation / bind / protocol-safe forms) ------
@@ -62,6 +65,11 @@ ALLOW = [
     ("RFC5737 198.51.100.x", "peer 198.51.100.9"),
     ("RFC5737 203.0.113.x", "peer 203.0.113.7"),
     ("RFC5737 network form", "subnet 192.0.2.0/24"),
+    ("RFC5737 valid /25 mask", "subnet 192.0.2.0/25"),
+    ("RFC5737 host /32 mask", "host 192.0.2.10/32"),
+    ("RFC3849 valid /32 mask", "prefix 2001:db8::/32"),
+    ("RFC3849 valid /48 mask", "prefix 2001:db8:1::/48"),
+    ("loopback /8 mask allowed (not RFC5737)", "net 127.0.0.0/8"),
     ("IPv6 loopback", "bind ::1 only"),
     ("IPv6 unspecified", "bind [::]:8080"),
     ("RFC3849 2001:db8::1", "example v6 2001:db8::1"),
