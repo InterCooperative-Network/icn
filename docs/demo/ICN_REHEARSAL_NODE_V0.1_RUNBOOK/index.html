@@ -237,14 +237,16 @@ false-pass; a guest that reaches the listener fails the smoke loudly
 (FAIL-OPEN). Setting <code>ICN_APPLIANCE_ALLOW_OUTBOUND=1</code> permits outbound,
 skips the canary, and says so in the output and the PASS footer.</li>
 </ul>
-<p>What was tested <strong>statically</strong> in this change: the netdev construction matrix
-(4 cases) and all script negative paths. What was tested <strong>through a running
-VM</strong>: nothing in this change — no built demo-profile image is staged on this
-development VM, so the restricted boot and in-guest canary run for the first
-time on the next real <code>smoke-image</code> execution. Until then, &quot;blocked by
-default&quot; is a documented-QEMU-semantics + static-construction claim, not a
-witnessed runtime result. If the restricted boot misbehaves, rerun with
-<code>ICN_APPLIANCE_ALLOW_OUTBOUND=1</code> and file the finding.</p>
+<p>What was tested <strong>statically</strong> in the change that introduced this posture: the
+netdev construction matrix (4 cases) and all script negative paths. <strong>Since
+witnessed through a running VM:</strong> the restricted boot and in-guest
+outbound-isolation canary have been exercised on real KVM boots (2026-07-10, and
+again on freshly built demo-profile images 2026-07-11) — the guest could not
+reach a per-run host listener while the loopback demo loop completed. &quot;Blocked
+by default&quot; is therefore a witnessed runtime result on the <code>smoke-image</code> route,
+not only a documented-QEMU-semantics + static-construction claim. If the
+restricted boot misbehaves, rerun with <code>ICN_APPLIANCE_ALLOW_OUTBOUND=1</code> and file
+the finding.</p>
 <p><strong>Fast path B (<code>open-running-node</code>) — operator-provided, not enforced.</strong> The
 launcher opens SSH tunnels to an already-running VM; it cannot and does not
 seal that VM&#39;s network. The demo profile binds its services beyond loopback
@@ -308,9 +310,9 @@ builds one).</li>
 not the #1726 organizer rehearsal shell; the human assistive-technology pass
 (#2041) is still owed, and only automated accessibility evidence exists.</li>
 <li>The no-outbound guarantee is scoped to the <code>smoke-image</code> QEMU route (see
-&quot;Network posture&quot;): enforced by default, statically tested, canary-proven on
-each real <code>--demo</code> run — but not yet witnessed on a live VM from this change
-itself. The <code>open-running-node</code> route stays operator-provided. #1727&#39;s
+&quot;Network posture&quot;): enforced by default, statically tested, and canary-proven
+on real KVM boots (witnessed 2026-07-10 and 2026-07-11). The
+<code>open-running-node</code> route stays operator-provided. #1727&#39;s
 shell-level demo-mode criteria (fixture loader as default, live mode as a
 labeled opt-in with a mutation warning) remain open.</li>
 <li>Action cards derive from three of five source paths; <code>signal_rule</code> and
