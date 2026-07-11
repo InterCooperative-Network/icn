@@ -470,3 +470,90 @@ async fn completion_scope_cannot_complete_another_members_item() {
         "a completion-scoped member must NOT complete another member's item"
     );
 }
+
+// ── The completion-only capability completes an item ASSIGNED to the caller —
+// not one they merely created. Creator-based completion is reserved for the
+// broader meeting:write / write scopes (Codex #2400 review). ──
+
+#[actix_web::test]
+async fn completion_scope_cannot_complete_item_it_created_for_another_assignee() {
+    let alice = fresh_did();
+    let bob = fresh_did();
+    let ctx = ctx_from_manager(GovernanceManager::new());
+    let domain = seed_domain(&ctx.manager, vec![alice.clone(), bob.clone()], "test-coop").await;
+    // Item created BY alice, assigned TO bob.
+    let item = ctx
+        .manager
+        .create_action_item(
+            domain.clone(),
+            "alice's item for bob".to_string(),
+            None,
+            alice.clone(),
+            Some(bob.clone()),
+            None,
+            ActionItemPriority::Medium,
+            None,
+            None,
+            vec![],
+        )
+        .expect("create_action_item");
+    let item_id = item.id.to_string();
+
+    // Alice holds the completion-only scope and is the creator, but NOT the assignee.
+    let app = gov_app!(ctx, &alice, format!("{READ} {COMPLETE}"));
+    let req = test::TestRequest::put()
+        .uri(&format!(
+            "/domains/{}/action-items/{}/status",
+            domain.0, item_id
+        ))
+        .set_json(json!({ "status": "completed" }))
+        .to_request();
+    let status = test::call_service(&app, req).await.status();
+    assert_eq!(
+        status,
+        StatusCode::FORBIDDEN,
+        "the completion-only scope must NOT complete an item the caller created but is not assigned"
+    );
+}
+
+#[actix_web::test]
+async fn meeting_scope_creator_can_still_complete_item_assigned_to_another() {
+    let alice = fresh_did();
+    let bob = fresh_did();
+    let ctx = ctx_from_manager(GovernanceManager::new());
+    let domain = seed_domain(&ctx.manager, vec![alice.clone(), bob.clone()], "test-coop").await;
+    // Item created BY alice, assigned TO bob.
+    let item = ctx
+        .manager
+        .create_action_item(
+            domain.clone(),
+            "alice's item for bob".to_string(),
+            None,
+            alice.clone(),
+            Some(bob.clone()),
+            None,
+            ActionItemPriority::Medium,
+            None,
+            None,
+            vec![],
+        )
+        .expect("create_action_item");
+    let item_id = item.id.to_string();
+
+    // The broader meeting:write scope retains creator-or-assignee status updates:
+    // alice (creator) may complete an item assigned to bob.
+    let app = gov_app!(ctx, &alice, format!("{READ} {MEETING_CLASS}"));
+    let req = test::TestRequest::put()
+        .uri(&format!(
+            "/domains/{}/action-items/{}/status",
+            domain.0, item_id
+        ))
+        .set_json(json!({ "status": "completed" }))
+        .to_request();
+    let status = test::call_service(&app, req).await.status();
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "the broad meeting:write scope must retain creator-based completion"
+    );
+}

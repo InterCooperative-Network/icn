@@ -70,7 +70,7 @@ see `docs/dev/openapi-member-surface-gaps.md`):
 |---|---|---|
 | Standing | `GET /v1/gov/me/standing` | `governance:read` |
 | Action cards | `GET /v1/gov/me/action-cards` | `governance:read` |
-| Mark task complete | `PUT /v1/gov/domains/{domain_id}/action-items/{item_id}/status` body `{"status":"completed"}` | `governance:action-item:complete` (completion-only, least-privilege — accepted only for the `completed` transition) — or the broader `governance:meeting:write` / `governance:write` (plus: caller must be the item's creator or assignee, and a member of the domain — enforced server-side) |
+| Mark task complete | `PUT /v1/gov/domains/{domain_id}/action-items/{item_id}/status` body `{"status":"completed"}` | `governance:action-item:complete` (completion-only, least-privilege — accepted only for the `completed` transition, and only for an item **assigned to the caller**) — or the broader `governance:meeting:write` / `governance:write` (creator **or** assignee). Caller must also be a member of the domain — all enforced server-side. |
 | Completion receipt | `GET /v1/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt` | `governance:read` |
 
 **The one mutation shipped (dogfood loop):** marking an `action_item` /

@@ -1005,6 +1005,12 @@ pub mod scopes {
     /// browser/member credential can complete an assigned item without also
     /// being able to create items or meetings.
     ///
+    /// When this scope authorizes the status request, the route additionally
+    /// requires the caller to be the item's **assignee** (not merely its
+    /// creator): the capability is "complete *my* assigned action item".
+    /// Creator-based status updates remain available to the broader
+    /// `GOVERNANCE_MEETING_WRITE` / `GOVERNANCE_WRITE` scopes.
+    ///
     /// By the sub-scope matching rule (`icn-http-kit`) this scope is a sibling
     /// of `GOVERNANCE_MEETING_WRITE` and `GOVERNANCE_WRITE`: it neither implies
     /// nor is implied by them. The completion route lists it narrowest-first and

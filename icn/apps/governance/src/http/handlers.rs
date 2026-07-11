@@ -2965,10 +2965,24 @@ pub async fn update_action_item_status<E: GovernanceEventEmitter + Clone + 'stat
 
     let is_creator = existing.created_by == user_did;
     let is_assignee = existing.assignee.as_ref().is_some_and(|a| a == &user_did);
-    if !is_creator && !is_assignee {
-        return Err(ApiError::Forbidden(
-            "Only the creator or assignee can update action item status".into(),
-        ));
+    // The completion-only capability (#2400) authorizes completing an item the
+    // caller is ASSIGNED — not one they merely created. Creator-based status
+    // updates remain available to the broader `governance:meeting:write` /
+    // `governance:write` scopes. Keying on the scope that actually authorized the
+    // request keeps a completion-only browser/session credential from marking
+    // another member's assigned card done.
+    let owner_ok = if presented_scope == "governance:action-item:complete" {
+        is_assignee
+    } else {
+        is_creator || is_assignee
+    };
+    if !owner_ok {
+        let msg = if presented_scope == "governance:action-item:complete" {
+            "The completion-only capability can only complete an action item assigned to you"
+        } else {
+            "Only the creator or assignee can update action item status"
+        };
+        return Err(ApiError::Forbidden(msg.into()));
     }
 
     let item = ctx
