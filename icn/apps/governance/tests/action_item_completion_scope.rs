@@ -619,3 +619,87 @@ async fn dual_scope_creator_completes_item_for_another_and_records_broad_scope()
          not the completion-only capability the caller also carries"
     );
 }
+
+// ── Re-completing an already-completed item is an idempotent no-op: the
+// completion-only capability must not become a repeatable lever to mutate
+// proof-visible metadata (updated_at) after completion (Codex #2400 review). ──
+
+#[actix_web::test]
+async fn completion_scope_recomplete_does_not_bump_metadata() {
+    let store = Arc::new(V2CapturingStore::default());
+    let manager = GovernanceManager::new()
+        .with_receipt_store(store.clone() as Arc<dyn GovernanceReceiptBackend>);
+    let caller = fresh_did();
+    let ctx = ctx_from_manager(manager);
+    let domain = seed_domain(&ctx.manager, vec![caller.clone()], "test-coop").await;
+    let item = ctx
+        .manager
+        .create_action_item(
+            domain.clone(),
+            "complete me".to_string(),
+            None,
+            caller.clone(),
+            Some(caller.clone()),
+            None,
+            ActionItemPriority::Medium,
+            None,
+            None,
+            vec![],
+        )
+        .expect("create_action_item");
+    let item_id = item.id.to_string();
+    let mgr = ctx.manager.clone();
+    let app = gov_app!(ctx, &caller, format!("{READ} {COMPLETE}"));
+    let uri = format!("/domains/{}/action-items/{}/status", domain.0, item_id);
+
+    // First completion succeeds and emits a receipt.
+    let r1 = test::call_service(
+        &app,
+        test::TestRequest::put()
+            .uri(&uri)
+            .set_json(json!({ "status": "completed" }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(r1.status(), StatusCode::OK);
+    let after_first = mgr
+        .get_action_item(&domain, &item.id)
+        .unwrap()
+        .unwrap()
+        .updated_at;
+
+    // Advance the wall clock so a redundant save would be observable via updated_at.
+    std::thread::sleep(std::time::Duration::from_millis(1_100));
+
+    // Re-completing the already-completed item must be an idempotent no-op.
+    let r2 = test::call_service(
+        &app,
+        test::TestRequest::put()
+            .uri(&uri)
+            .set_json(json!({ "status": "completed" }))
+            .to_request(),
+    )
+    .await;
+    assert_eq!(r2.status(), StatusCode::OK);
+    let after_second = mgr
+        .get_action_item(&domain, &item.id)
+        .unwrap()
+        .unwrap()
+        .updated_at;
+
+    assert_eq!(
+        after_second, after_first,
+        "re-completing an already-completed item must not bump updated_at (idempotent no-op)"
+    );
+    assert_eq!(
+        store
+            .v2
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|r| r.item_id == item_id)
+            .count(),
+        1,
+        "re-completion must not emit a second completion receipt"
+    );
+}

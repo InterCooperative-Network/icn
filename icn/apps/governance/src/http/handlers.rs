@@ -2990,6 +2990,16 @@ pub async fn update_action_item_status<E: GovernanceEventEmitter + Clone + 'stat
         return Err(ApiError::Forbidden(msg.into()));
     }
 
+    // Idempotent PUT: re-requesting the status the item already holds is a no-op.
+    // Returning the item unchanged (rather than re-saving) keeps a repeated
+    // "completion" from bumping proof-visible metadata (e.g. `updated_at`) after
+    // the item is already completed, without emitting a new receipt — so the
+    // completion-only capability cannot become a repeatable metadata-mutation
+    // lever (#2400 Codex review).
+    if existing.status == new_status {
+        return Ok(HttpResponse::Ok().json(action_item_to_response(&existing)));
+    }
+
     // Record the scope that actually authorized THIS request as evidence
     // (`capability_scope_presented`). An assignee-completion is authorized by —
     // and records — the narrowest matched scope (the completion-only capability
