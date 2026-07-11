@@ -30,6 +30,11 @@ on:
       # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
       # under docs/scripts + docs/contracts are already covered by docs/**
       - 'web/pilot-ui/fixtures/**'
+      # pending-publish evidence-export inputs the generator --check reads (the
+      # committed packet + its source rows) and the generator itself, so a
+      # fixture/generator edit fires the drift guard, not just a manifest edit.
+      - 'web/member-shell/fixtures/**'
+      - 'scripts/rehearsal_pending_publish_evidence.py'
       # governed bridge conformance fixtures + validator: the fixtures live under
       # tools/ (outside docs/**), so trigger the workflow when they or the
       # validator change, otherwise a fixtures-only PR would not fire this check.
@@ -67,6 +72,11 @@ on:
       # rehearsal-shell fixture bundle (manifest + packets) — validators/schemas
       # under docs/scripts + docs/contracts are already covered by docs/**
       - 'web/pilot-ui/fixtures/**'
+      # pending-publish evidence-export inputs the generator --check reads (the
+      # committed packet + its source rows) and the generator itself, so a
+      # fixture/generator edit fires the drift guard, not just a manifest edit.
+      - 'web/member-shell/fixtures/**'
+      - 'scripts/rehearsal_pending_publish_evidence.py'
       # governed bridge conformance fixtures + validator: the fixtures live under
       # tools/ (outside docs/**), so trigger the workflow when they or the
       # validator change, otherwise a fixtures-only PR would not fire this check.
