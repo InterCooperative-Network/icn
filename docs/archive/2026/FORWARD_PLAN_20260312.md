@@ -119,7 +119,7 @@ icnctl coop create
 
 | Component | Status |
 |---|---|
-| K3s cluster | 3 nodes Ready, v1.34.4+k3s1, up 12 days at 10.8.30.40–42 |
+| K3s cluster | 3 nodes Ready, v1.34.4+k3s1, up 12 days on the private cluster (operator-supplied node range) |
 | ICN pods | alpha/beta/delta/gamma all 1/1 Running (5d16h), daemon + pilot-ui (12d) |
 | Monitoring | Prometheus + Grafana + Alertmanager running |
 | etcd snapshots | Completing on schedule |

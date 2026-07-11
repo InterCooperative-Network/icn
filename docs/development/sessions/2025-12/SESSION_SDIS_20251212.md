@@ -111,7 +111,7 @@ docker push username/icn:0bf1f61
 cd icn && cargo build --release --bin icnd
 
 # Copy to K3s node
-scp target/release/icnd ubuntu@10.8.10.40:/tmp/
+scp target/release/icnd ubuntu@${ICN_GATEWAY_HOST}:/tmp/
 
 # On K3s node, replace binary in running pod
 POD=$(sudo kubectl get pods -n icn -l component=daemon -o jsonpath='{.items[0].metadata.name}')
@@ -125,10 +125,10 @@ Once deployment is fixed, these endpoints are ready:
 
 ```bash
 # 1. Health check (already working)
-curl http://10.8.10.40:30080/v1/sdis/health
+curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health
 
 # 2. Start enrollment (NEW)
-curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/start \
+curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/enrollment/start \
   -H "Content-Type: application/json" \
   -d '{"identity_name":"Alice","coop_id":"test-coop"}'
 
@@ -141,18 +141,18 @@ curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/start \
 }
 
 # 3. Level 1 verification (NEW)
-curl -X POST http://10.8.10.40:30080/v1/sdis/verify/level1 \
+curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/verify/level1 \
   -H "Content-Type: application/json" \
   -d '{"enrollment_id":"uuid...","device_proof":"base64..."}'
 
 # 4. Level 2 verification (NEW)
-curl -X POST http://10.8.10.40:30080/v1/sdis/verify/level2 \
+curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/verify/level2 \
   -H "Authorization: Bearer <steward-token>" \
   -H "Content-Type: application/json" \
   -d '{"enrollment_id":"uuid...","vouch_statement":"I vouch for Alice"}'
 
 # 5. Complete enrollment (NEW)
-curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/complete \
+curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/enrollment/complete \
   -H "Content-Type: application/json" \
   -d '{
     "enrollment_id":"uuid...",
@@ -175,7 +175,7 @@ curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/complete \
 
 1. **SSH to K3s node:**
    ```bash
-   ssh ubuntu@10.8.10.40
+   ssh ubuntu@${ICN_K3S_CONTROL}
    ```
 
 2. **Check current deployment:**
@@ -189,7 +189,7 @@ curl -X POST http://10.8.10.40:30080/v1/sdis/enrollment/complete \
    # On local machine
    cd /home/matt/projects/icn/icn
    cargo build --release --bin icnd
-   scp target/release/icnd ubuntu@10.8.10.40:/tmp/
+   scp target/release/icnd ubuntu@${ICN_GATEWAY_HOST}:/tmp/
    
    # On K3s node
    POD=$(sudo kubectl get pods -n icn -l component=daemon -o jsonpath='{.items[0].metadata.name}')

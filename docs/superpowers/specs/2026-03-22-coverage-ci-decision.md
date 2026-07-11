@@ -10,10 +10,10 @@
 
 - `.github/workflows/ci.yml` (lines 414–466, the `coverage` job)
 - `ops/state/ci-exceptions.md` (exception classification from s23-t1)
-- ci-runner (10.8.30.46) — SSH live testing
-- k3s-worker-1 (10.8.30.41) — SSH census
-- k3s-worker-2 (10.8.30.42) — SSH census
-- k3s-control (10.8.30.40) — SSH census
+- ci-runner (${ICN_CI_RUNNER_HOST}) — SSH live testing
+- k3s-worker-1 (${ICN_K3S_WORKER1}) — SSH census
+- k3s-worker-2 (${ICN_K3S_WORKER2}) — SSH census
+- k3s-control (${ICN_K3S_CONTROL}) — SSH census
 
 ---
 
@@ -51,7 +51,7 @@ This is not OOM. It is spot preemption — the runner is killed mid-build becaus
 
 ### What was tested
 
-Attempted two runs of `cargo-llvm-cov` on ci-runner (10.8.30.46):
+Attempted two runs of `cargo-llvm-cov` on ci-runner (${ICN_CI_RUNNER_HOST}):
 
 **Run 1 — full workspace:**
 ```bash
@@ -83,14 +83,14 @@ Full inventory of accessible nodes from icn-dev:
 
 | Node | IP | CPU | RAM | RAM Free | Disk Free | Notes |
 |------|-----|-----|-----|----------|-----------|-------|
-| **ci-runner** | 10.8.30.46 | i7-7700K 4c/4t @ 4.2GHz | 3.8GB | ~0.3GB | 39GB | Hyperion VM 446; current GH runner; **proven insufficient** |
-| **k3s-control** | 10.8.30.40 | 4c | 7.8GB | 6.5GB | unknown | Control plane, tainted NoSchedule; not a CI candidate |
-| **k3s-worker-1** | 10.8.30.41 | i5-6500 4c/4t @ 3.2GHz | 15GB | **14GB** | 28GB | ICN pods; no Rust installed; disk may be tight |
-| **k3s-worker-2** | 10.8.30.42 | i5-6500 4c/4t @ 3.2GHz | 15GB | **14GB** | 29GB | ICN pods; no Rust installed; disk may be tight |
-| **Hyperion** | 10.8.10.15 | Ryzen 9 3900X 12c/24t | 15GB (bad) | — | — | Proxmox; RAM RMA in progress; offline for CI |
-| **Zentith** | 10.8.10.100 | Ryzen 7 7800X3D 8c/16t | **54GB** | high | — | Matt's workstation; WSL2 Ubuntu 24.04; strongest available |
+| **ci-runner** | ${ICN_CI_RUNNER_HOST} | i7-7700K 4c/4t @ 4.2GHz | 3.8GB | ~0.3GB | 39GB | Hyperion VM 446; current GH runner; **proven insufficient** |
+| **k3s-control** | ${ICN_K3S_CONTROL} | 4c | 7.8GB | 6.5GB | unknown | Control plane, tainted NoSchedule; not a CI candidate |
+| **k3s-worker-1** | ${ICN_K3S_WORKER1} | i5-6500 4c/4t @ 3.2GHz | 15GB | **14GB** | 28GB | ICN pods; no Rust installed; disk may be tight |
+| **k3s-worker-2** | ${ICN_K3S_WORKER2} | i5-6500 4c/4t @ 3.2GHz | 15GB | **14GB** | 29GB | ICN pods; no Rust installed; disk may be tight |
+| **Hyperion** | ${ICN_HYPERION_HOST} | Ryzen 9 3900X 12c/24t | 15GB (bad) | — | — | Proxmox; RAM RMA in progress; offline for CI |
+| **Zentith** | ${ICN_WORKSTATION_HOST} | Ryzen 7 7800X3D 8c/16t | **54GB** | high | — | Matt's workstation; WSL2 Ubuntu 24.04; strongest available |
 
-Proxmox nodes node-1 through node-4 (10.8.10.11–14): SSH not authorized from icn-dev; capacity unknown.
+Proxmox nodes node-1 through node-4 (operator-supplied range): SSH not authorized from icn-dev; capacity unknown.
 
 ---
 

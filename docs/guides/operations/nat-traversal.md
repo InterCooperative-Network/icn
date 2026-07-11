@@ -191,11 +191,11 @@ If TURN is unavailable or unreliable, a VPN provides guaranteed connectivity:
 
 ```bash
 # On each node, create a WireGuard interface
-# Peers see each other on the WireGuard subnet (e.g., 10.10.0.0/24)
+# Peers see each other on the WireGuard subnet (e.g., 192.0.2.0/24)
 # ICN nodes listen on the WireGuard IP instead of the public interface
 
-icnd --listen 10.10.0.1:4433  # Node A on WireGuard IP
-icnd --listen 10.10.0.2:4433  # Node B on WireGuard IP
+icnd --listen 192.0.2.11:4433  # Node A on WireGuard IP
+icnd --listen 192.0.2.12:4433  # Node B on WireGuard IP
 ```
 
 With a VPN, nodes appear to be on the same network. No STUN or TURN is needed — direct dial works because the VPN handles NAT traversal at the network layer.

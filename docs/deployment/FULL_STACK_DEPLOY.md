@@ -350,7 +350,7 @@ curl http://localhost:8080/v1/health
 ifconfig | grep "inet "
 
 # Update app.json with your local IP:
-# "apiUrl": "http://192.168.1.100:8080"
+# "apiUrl": "http://<ICN_GATEWAY_HOST>:8080"
 
 # Ensure phone and computer are on same network
 ```

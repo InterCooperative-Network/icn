@@ -104,7 +104,7 @@ Total: ~10K LOC (app + SDK), 21 screens
 
 **i18n**: EN + ES via `i18next` + `react-i18next`.
 
-**Gateway target**: `http://10.8.10.40:30080` (homelab staging), configurable in `src/config.ts`.
+**Gateway target**: `http://${ICN_GATEWAY_HOST}:30080` (homelab staging), configurable in `src/config.ts`.
 
 ### 1.4 icnctl Command Coverage
 

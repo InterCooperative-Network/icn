@@ -53,7 +53,7 @@ Base route: **`/v1/sdis`**
 
 **Verified Working:**
 ```bash
-$ curl http://10.8.30.40:30080/v1/sdis/health
+$ curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health
 {"status":"healthy","timestamp":"2025-12-12T22:00:00Z"}
 ```
 
@@ -158,13 +158,13 @@ $ curl http://10.8.30.40:30080/v1/sdis/health
 1. **Test SDIS API end-to-end:**
    ```bash
    # Test enrollment
-   curl -X POST http://10.8.30.40:30080/v1/sdis/enrollment/start \
+   curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/enrollment/start \
      -H "Content-Type: application/json" \
      -d '{"identity_name":"TestUser","coop_id":"test-coop"}'
    ```
 
 2. **Verify Pilot UI enrollment wizard:**
-   - Access Pilot UI at `http://10.8.30.40:30030`
+   - Access Pilot UI at `http://${ICN_GATEWAY_HOST}:30030`
    - Test enrollment flow
    - Verify QR code generation
    - Test verification levels
@@ -237,10 +237,10 @@ $ curl http://10.8.30.40:30080/v1/sdis/health
 
 ```bash
 # 1. Health check
-curl http://10.8.30.40:30080/v1/sdis/health
+curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health
 
 # 2. Start enrollment
-ENROLLMENT=$(curl -X POST http://10.8.30.40:30080/v1/sdis/enrollment/start \
+ENROLLMENT=$(curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/enrollment/start \
   -H "Content-Type: application/json" \
   -d '{"identity_name":"Alice","coop_id":"test-coop"}' \
   | jq -r '.enrollment_id')
@@ -248,7 +248,7 @@ ENROLLMENT=$(curl -X POST http://10.8.30.40:30080/v1/sdis/enrollment/start \
 echo "Enrollment ID: $ENROLLMENT"
 
 # 3. Generate ephemeral DID
-EPHEMERAL=$(curl -X POST http://10.8.30.40:30080/v1/sdis/ephemeral/generate \
+EPHEMERAL=$(curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/ephemeral/generate \
   -H "Content-Type: application/json" \
   -d '{"purpose":"enrollment","ttl_seconds":3600}' \
   | jq -r '.ephemeral_did')
@@ -262,7 +262,7 @@ TOKEN=$(kubectl exec -it -n icn $POD -- icnctl auth token \
   --gateway http://localhost:8080)
 
 # 5. Steward vouches for enrollment
-curl -X POST http://10.8.30.40:30080/v1/sdis/verify/level2 \
+curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/verify/level2 \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $TOKEN" \
   -d "{\"enrollment_id\":\"$ENROLLMENT\",\"vouch_statement\":\"I vouch for Alice\"}"
@@ -272,7 +272,7 @@ curl -X POST http://10.8.30.40:30080/v1/sdis/verify/level2 \
 
 1. **Access Pilot UI:**
    ```
-   http://10.8.30.40:30030
+   http://${ICN_GATEWAY_HOST}:30030
    ```
 
 2. **Test enrollment flow:**

@@ -72,7 +72,7 @@ data_dir = "/var/lib/icn"
 listen_addr = "0.0.0.0:7777"
 mdns_enabled = true
 bootstrap_peers = [
-    "icn://did:icn:abc@192.168.1.10:7777",
+    "icn://did:icn:abc@192.0.2.10:7777",
 ]
 
 [gateway]

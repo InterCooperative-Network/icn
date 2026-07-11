@@ -109,7 +109,7 @@ grep bootstrap ~/.icn/config.toml
 
 # Add bootstrap peer
 # [network]
-# bootstrap_peers = ["icn://did:icn:...@1.2.3.4:7777"]
+# bootstrap_peers = ["icn://did:icn:...@192.0.2.10:7777"]
 ```
 
 **3. mDNS not working (LAN only)**

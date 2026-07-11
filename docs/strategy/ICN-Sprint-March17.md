@@ -143,7 +143,7 @@ Sprint is complete when:
 
 Right now, in order:
 
-1. **SSH into icn-dev** (10.8.30.45). Check `icnd` is running on K3s. If not, start it with `--gateway-enable`.
+1. **SSH into icn-dev** (operator-supplied host). Check `icnd` is running on K3s. If not, start it with `--gateway-enable`.
 2. **Run `demo-governance.py`** against the live gateway. Record output.
 3. **Hit the proof endpoint** manually: `curl https://<gateway>/v1/gov/proposals/{id}/proof`. See what comes back.
 4. **Run the other 3 demo scripts** (patronage, federation, reporting). Record what passes and what breaks.

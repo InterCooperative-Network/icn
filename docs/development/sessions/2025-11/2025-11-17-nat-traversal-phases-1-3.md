@@ -89,7 +89,7 @@ Implemented comprehensive NAT traversal infrastructure enabling ICN nodes behind
 ```rust
 ConnectionCandidate {
     did: Did,
-    local_addr: SocketAddr,      // 192.168.1.100:7777
+    local_addr: SocketAddr,      // 192.0.2.10:7777
     public_addr: SocketAddr,     // 203.0.113.5:12345 (STUN)
     relay_addr: Option<...>,     // Future: TURN relay
     timestamp: u64,              // Unix timestamp
@@ -152,7 +152,7 @@ ConnectionCandidate {
 
 **Connection Logging**:
 ```
-✅ Connected to did:icn:abc via local address 192.168.1.100:7777
+✅ Connected to did:icn:abc via local address 192.0.2.10:7777
 ✅ Connected to did:icn:xyz via public address 203.0.113.5:12345 (NAT traversal)
 Could not establish direct connection to did:icn:def
 ```

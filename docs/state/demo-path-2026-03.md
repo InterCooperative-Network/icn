@@ -43,7 +43,7 @@ The following Sprint 23 items do NOT affect demo execution:
 ## Prerequisites
 
 **For K3s cluster flows (flow-1, flow-2, flow-3)**:
-- `kubectl` with access to the K3s cluster at 10.8.30.40
+- `kubectl` with access to the K3s cluster at ${ICN_CLUSTER_ENDPOINT}
 - `icnctl` binary present inside each cooperative pod (confirmed present)
 - `python3` (for JSON parsing in scripts)
 - All four gateways reachable via `kubectl port-forward`

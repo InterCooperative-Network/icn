@@ -546,9 +546,9 @@ Use nginx or HAProxy to distribute gateway API traffic:
 
 ```nginx
 upstream icn_gateways {
-    server 10.0.0.1:8080;
-    server 10.0.0.2:8080;
-    server 10.0.0.3:8080;
+    server 192.0.2.11:8080;
+    server 192.0.2.12:8080;
+    server 192.0.2.13:8080;
 }
 
 server {

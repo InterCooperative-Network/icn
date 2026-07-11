@@ -622,7 +622,7 @@ Appeal Endpoints:
 **Deployment Verification**:
 - All CI checks passing (formatting, clippy, tests)
 - K3s deployment successful with image `icn:b84f0d4`
-- Gateway health endpoint operational at `http://10.8.10.40:30080/v1/health`
+- Gateway health endpoint operational at `http://${ICN_GATEWAY_HOST}:30080/v1/health`
 
 **Authentication Flow**:
 - Created new identity with `icnctl id init`

@@ -63,8 +63,8 @@ gh run list --repo InterCooperative-Network/icn --branch main --limit 3 --json s
 ```
 
 **Cluster endpoints** (post Feb-2026 VLAN 30 migration):
-- Control: `10.8.30.40`, Workers: `10.8.30.41`, `10.8.30.42`, Dev VM: `10.8.30.45`
-- Gateway: `10.8.30.40:30080`, Pilot UI: `10.8.30.40:30030`, Metrics: `10.8.30.40:30090`
+- Control: `${ICN_K3S_CONTROL}`, Workers: `${ICN_K3S_WORKER1}`, `${ICN_K3S_WORKER2}`, Dev VM: `${ICN_DEV_HOST}`
+- Gateway: `${ICN_K3S_CONTROL}:30080`, Pilot UI: `${ICN_K3S_CONTROL}:30030`, Metrics: `${ICN_K3S_CONTROL}:30090`
 
 ## Convention Enforcement
 
@@ -98,7 +98,7 @@ icn-ledger, icn-ccl, icn-compute, icn-gateway, icn-governance, icn-federation, i
 **Launchpad docs** (on Zentith / Launchpad HQ — not on this dev VM):
 - `~/.claude_launchpad/projects/icn/icn-crate-reference.md`
 - `~/.claude_launchpad/projects/icn/icn-forward-plan.md`
-- Only accessible if SSH'd to Zentith (10.8.10.100) or running locally there.
+- Only accessible if SSH'd to Zentith (operator-supplied host) or running locally there.
 
 ## Commands
 

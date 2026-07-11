@@ -420,7 +420,7 @@ Cooperatives share bootstrap information through:
 1. **Connect to bootstrap node**:
    ```bash
    # Add to config or run directly
-   icnctl network add-peer 192.168.1.100:7777 did:icn:BOOTSTRAP_DID
+   icnctl network add-peer 192.0.2.10:7777 did:icn:BOOTSTRAP_DID
    ```
 
 2. **Request trust attestation**:
@@ -916,8 +916,8 @@ data_dir = "~/.icn"
 [network]
 listen_addr = "0.0.0.0:7777"
 bootstrap_peers = [
-  "icn://did:icn:PEER1_DID@192.168.1.100:7777",
-  "icn://did:icn:PEER2_DID@192.168.1.101:7777"
+  "icn://did:icn:PEER1_DID@192.0.2.10:7777",
+  "icn://did:icn:PEER2_DID@192.0.2.11:7777"
 ]
 
 [gateway]
@@ -1109,7 +1109,7 @@ sudo ufw allow 7777/udp
 grep bootstrap ~/.icn/config.toml
 
 # Manually add peer
-icnctl network add-peer 192.168.1.100:7777 did:icn:PEER_DID
+icnctl network add-peer 192.0.2.10:7777 did:icn:PEER_DID
 ```
 
 #### "Transaction rejected: insufficient credit"
@@ -1493,8 +1493,8 @@ listen_addr = "0.0.0.0:7777"
 
 # Bootstrap peers for initial network discovery
 bootstrap_peers = [
-  "icn://did:icn:PEER1@192.168.1.100:7777",
-  "icn://did:icn:PEER2@192.168.1.101:7777"
+  "icn://did:icn:PEER1@192.0.2.10:7777",
+  "icn://did:icn:PEER2@192.0.2.11:7777"
 ]
 
 # Enable mDNS for local network discovery

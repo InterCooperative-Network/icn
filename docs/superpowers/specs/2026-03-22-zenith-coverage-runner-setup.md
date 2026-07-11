@@ -231,7 +231,7 @@ If Zenith goes offline after the PR merges and the `coverage` label has no activ
 
 If k3s-worker becomes the temporary fallback:
 ```bash
-# On k3s-worker-1 (10.8.30.41, 15GB RAM, 28GB disk):
+# On k3s-worker-1 (${ICN_K3S_WORKER1}, 15GB RAM, 28GB disk):
 curl -fsSL https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
 source ~/.cargo/env
 rustup component add llvm-tools-preview

@@ -68,7 +68,7 @@ This section provides K3s-specific commands for the live homelab deployment.
 
 ```bash
 # SSH to control plane
-ssh ubuntu@10.8.30.40
+ssh ubuntu@${ICN_K3S_CONTROL}
 
 # All kubectl commands require sudo on control plane
 sudo kubectl -n icn <command>
@@ -103,13 +103,13 @@ sudo kubectl -n icn get pvc
 
 ```bash
 # ICN health endpoint
-curl http://10.8.30.40:30080/v1/health
+curl http://${ICN_K3S_CONTROL}:30080/v1/health
 
 # Prometheus metrics
-curl http://10.8.30.40:30090/metrics | head -50
+curl http://${ICN_K3S_CONTROL}:30090/metrics | head -50
 
 # Grafana dashboard
-# Open: http://10.8.30.40:30300
+# Open: http://${ICN_K3S_CONTROL}:30300
 
 # Check node identity
 sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show
@@ -165,10 +165,10 @@ sudo kubectl -n icn get svc
 
 ```bash
 # View active alerts
-curl -s http://10.8.30.40:30093/api/v1/alerts | jq '.data[] | {labels: .labels, state: .status.state}'
+curl -s http://${ICN_K3S_CONTROL}:30093/api/v1/alerts | jq '.data[] | {labels: .labels, state: .status.state}'
 
 # Silence an alert (for maintenance)
-# Use Alertmanager UI: http://10.8.30.40:30093
+# Use Alertmanager UI: http://${ICN_K3S_CONTROL}:30093
 ```
 
 ---
@@ -595,7 +595,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 1. **Check network connectivity**:
    ```bash
    # Test internet connection
-   ping 8.8.8.8
+   ping "$PING_TARGET"          # set PING_TARGET to a reliable public host (e.g. your upstream resolver)
 
    # Test DNS
    nslookup google.com
@@ -670,7 +670,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 1. **Check pod status**:
    ```bash
-   ssh ubuntu@10.8.30.40
+   ssh ubuntu@${ICN_K3S_CONTROL}
    sudo kubectl -n icn get pods -o wide
    ```
 
@@ -766,7 +766,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 3. **Check NFS server** (Atlas):
    ```bash
    ssh atlas "systemctl status nfs-kernel-server"
-   showmount -e 10.8.10.25
+   showmount -e ${ICN_NFS_HOST}
    ```
 
 ### Prevention
@@ -894,7 +894,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 1. **Check PVC status**:
    ```bash
-   ssh ubuntu@10.8.30.40
+   ssh ubuntu@${ICN_K3S_CONTROL}
    sudo kubectl -n icn get pvc
    sudo kubectl -n icn describe pvc icn-data
    ```
@@ -927,7 +927,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 1. **Check network connectivity**:
    ```bash
-   ping 10.8.10.25
+   ping ${ICN_NFS_HOST}
    ```
 
 2. **Restart NFS service**:
@@ -937,7 +937,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 3. **Verify exports**:
    ```bash
-   showmount -e 10.8.10.25
+   showmount -e ${ICN_NFS_HOST}
    ```
 
 4. **Restart ICN pod** (to remount):
@@ -1009,7 +1009,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 
 1. **Check backup job status**:
    ```bash
-   ssh ubuntu@10.8.30.40
+   ssh ubuntu@${ICN_K3S_CONTROL}
    sudo kubectl -n icn get jobs -l component=backup
    sudo kubectl -n icn get jobs -l component=backup-verify
    ```
@@ -1147,7 +1147,7 @@ journalctl -u icnd --since "1 week ago" | grep upgrade
 6. **Verify restoration**:
    ```bash
    # Check health
-   curl http://10.8.30.40:30080/v1/health
+   curl http://${ICN_K3S_CONTROL}:30080/v1/health
 
    # Check identity
    sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show

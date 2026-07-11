@@ -5,7 +5,7 @@
 - ✅ Node.js v20.19.4 (installed)
 - ✅ npm v11.7.0 (installed)
 - ✅ Expo v54.0.19 (installed)
-- ✅ ICN Gateway running at http://10.8.30.40:30080
+- ✅ ICN Gateway running at http://${ICN_GATEWAY_HOST}:30080
 
 ## Option 1: Test in Web Browser (Easiest) 🌐
 
@@ -99,8 +99,8 @@ npm run ios
 
 1. **App launches** - You'll see the Login screen
 
-2. **Enter Gateway URL**: `http://10.8.30.40:30080`
-   - If testing from phone and can't reach 10.8.30.40, use tunnel mode or your computer's IP
+2. **Enter Gateway URL**: `http://${ICN_GATEWAY_HOST}:30080`
+   - If testing from phone and can't reach ${ICN_GATEWAY_HOST}, use tunnel mode or your computer's IP
 
 3. **Choose Login Method**:
 
@@ -154,7 +154,7 @@ The app is pre-configured for your homelab deployment:
 
 **File**: `src/config.ts`
 ```typescript
-export const GATEWAY_URL = 'http://10.8.30.40:30080';
+export const GATEWAY_URL = 'http://<ICN_GATEWAY_HOST>:30080';
 ```
 
 To change gateway URL:
@@ -168,17 +168,17 @@ To change gateway URL:
 
 ### Test Gateway from Your Computer
 ```bash
-curl http://10.8.30.40:30080/v1/health
+curl http://${ICN_GATEWAY_HOST}:30080/v1/health
 # Should return: {"status":"ok","version":"0.1.0"}
 ```
 
 ### Test Gateway from Your Phone's Network
 If you can access your homelab from your phone:
 ```bash
-curl http://10.8.30.40:30080/v1/health
+curl http://${ICN_GATEWAY_HOST}:30080/v1/health
 ```
 
-If you can't reach 10.8.30.40 from your phone:
+If you can't reach ${ICN_GATEWAY_HOST} from your phone:
 - Use tunnel mode: `npx expo start --tunnel`
 - Or update gateway URL to your computer's IP
 
@@ -193,8 +193,8 @@ If you can't reach 10.8.30.40 from your phone:
 
 ### "Network request failed" in app
 - Gateway URL might be incorrect
-- Phone can't reach 10.8.30.40 (use tunnel or your computer's IP)
-- Test connectivity: `curl http://10.8.30.40:30080/v1/health`
+- Phone can't reach ${ICN_GATEWAY_HOST} (use tunnel or your computer's IP)
+- Test connectivity: `curl http://${ICN_GATEWAY_HOST}:30080/v1/health`
 
 ### "Authentication failed"
 - Make sure you completed the enrollment or have valid credentials
@@ -237,18 +237,18 @@ npx expo start --clear
 
 ### Check if gateway is healthy
 ```bash
-curl http://10.8.30.40:30080/v1/health
-curl http://10.8.30.40:30080/v1/sdis/health
+curl http://${ICN_GATEWAY_HOST}:30080/v1/health
+curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health
 ```
 
 ### View gateway logs
 ```bash
-ssh ubuntu@10.8.30.40 "sudo kubectl -n icn logs -f deployment/icn-daemon"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl -n icn logs -f deployment/icn-daemon"
 ```
 
 ### Check pod status
 ```bash
-ssh ubuntu@10.8.30.40 "sudo kubectl -n icn get pods"
+ssh ubuntu@${ICN_K3S_CONTROL} "sudo kubectl -n icn get pods"
 ```
 
 ---

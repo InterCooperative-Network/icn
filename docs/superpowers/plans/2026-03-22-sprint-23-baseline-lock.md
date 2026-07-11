@@ -963,7 +963,7 @@ All hardcoded policy constants extracted to typed configuration structs:
 
 **Infrastructure:**
 - K3s cluster (3 workers + control) — deployed Dec 2025, migrated VLAN 30 Feb 2026
-- Registry at 10.8.30.40:30500, gateway at :30080, Pilot UI at :30030
+- Registry at ${ICN_NODE_HOST}:30500, gateway at :30080, Pilot UI at :30030
 - Prometheus + Grafana at :30090 / :30300
 - Backup CronJobs running (etcd-snapshot + ICN state backup)
 
@@ -1126,7 +1126,7 @@ Record actual output. This demonstrates: three autonomous nodes, cross-coop coor
 
 **Date:** 2026-03-22
 **Branch:** main
-**Cluster:** Local devnet (localhost) OR K3s (10.8.30.40)
+**Cluster:** Local devnet (localhost) OR K3s (${ICN_NODE_HOST})
 
 > This document is tested against reality. Commands are exact.
 > If something fails, update the doc — do not leave aspirational commands.

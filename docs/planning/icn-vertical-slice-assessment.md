@@ -1,7 +1,7 @@
 # ICN Vertical Slice: Phase 1 Assessment
 
 **Date:** 2026-03-13
-**Source:** Direct code audit of /home/ubuntu/projects/icn/icn on icn-dev (10.8.30.45)
+**Source:** Direct code audit of /home/ubuntu/projects/icn/icn on icn-dev (operator-supplied host)
 **Branch:** main (post feat/demo-federation-system merge)
 
 ---

@@ -1,6 +1,6 @@
 # Demo Audit — 2026-03-19
 
-**Cluster target:** K3s at 10.8.30.40:30080
+**Cluster target:** K3s at ${ICN_GATEWAY_HOST}:30080
 **Auditor:** Claude Code (s15-t1)
 **Reseed:** `reseed-federation-demo.sh` — seeded 4, skipped 9, failed 0
 **Timestamp:** 2026-03-19, sprint 15 phase B

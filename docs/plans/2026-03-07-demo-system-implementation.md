@@ -6,7 +6,7 @@
 
 **Architecture:** Four live K3s coop nodes (alpha/beta/gamma/delta) are reseeded with canonical personas and story data. Bash flow scripts use `kubectl port-forward` to access each coop's gateway (ClusterIP-only, no NodePort on port 8080). A shared port library handles setup/teardown so each flow script stays focused on narration.
 
-**Tech Stack:** Bash, kubectl, curl, icnctl CLI, K3s cluster at 10.8.30.40, coop gateways behind ClusterIP services
+**Tech Stack:** Bash, kubectl, curl, icnctl CLI, K3s cluster at ${ICN_CLUSTER_ENDPOINT}, coop gateways behind ClusterIP services
 
 **Design doc:** `docs/plans/2026-03-07-demo-system-design.md`
 
@@ -16,10 +16,10 @@
 
 | Persona | Node | K8s Namespace | ClusterIP | Local port (port-forward) |
 |---|---|---|---|---|
-| BrightWorks Cooperative (worker) | icn-alpha | icn-coop-alpha | 10.43.97.80:8080 | 18081 |
-| River City Tool Library (resource) | icn-beta | icn-coop-beta | 10.43.194.7:8080 | 18082 |
-| Harbor Homes Cooperative (housing) | icn-gamma | icn-coop-gamma | 10.43.12.70:8080 | 18083 |
-| Finger Lakes CDN (intermediate org) | icn-delta | icn-coop-delta | 10.43.110.197:8080 | 18084 |
+| BrightWorks Cooperative (worker) | icn-alpha | icn-coop-alpha | 192.0.2.11:8080 | 18081 |
+| River City Tool Library (resource) | icn-beta | icn-coop-beta | 192.0.2.12:8080 | 18082 |
+| Harbor Homes Cooperative (housing) | icn-gamma | icn-coop-gamma | 192.0.2.13:8080 | 18083 |
+| Finger Lakes CDN (intermediate org) | icn-delta | icn-coop-delta | 192.0.2.14:8080 | 18084 |
 
 Use ports 18081–18084 to avoid collision with the main icn-daemon NodePort (30080).
 
@@ -32,7 +32,7 @@ Use ports 18081–18084 to avoid collision with the main icn-daemon NodePort (30
 kubectl get pods -A | grep -E "icn-(alpha|beta|gamma|delta)" | grep -v Succeeded
 
 # Confirm you can reach the main gateway
-curl -s http://10.8.30.40:30080/v1/health | python3 -m json.tool
+curl -s http://${ICN_CLUSTER_ENDPOINT}:30080/v1/health | python3 -m json.tool
 
 # Confirm kubectl works
 kubectl get nodes

@@ -11,7 +11,7 @@ ICN uses GitHub branch protection with four required status checks:
 `Build Release`, `Test`, `Clippy`, `Format Check`.
 
 All four run on `ubuntu-latest` (GitHub-hosted runners). The self-hosted `ci-runner`
-(VM 446, 10.8.30.46, labels `homelab,k3s`) handles Docker build/deploy
+(VM 446, operator-supplied host, labels `homelab,k3s`) handles Docker build/deploy
 (`docker-build-deploy.yml`) only — it is not in the required-check path.
 
 Required jobs queue at `pending / 0s` when the GitHub-hosted runner pool for the

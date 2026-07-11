@@ -34,7 +34,7 @@ All other namespaces (`icn-coop-*`, `monitoring`, `registry`) have **no policies
 
 Each coop also has a NodePort service exposing QUIC and RPC externally for P2P federation.
 
-**mDNS note**: All coop configs have `mdns_enabled = true`. mDNS uses multicast UDP to `224.0.0.251:5353`. Kubernetes NetworkPolicies operate on unicast only — multicast bypasses them entirely. Do not rely on NetworkPolicy to control mDNS; it will still broadcast within the node's subnet regardless.
+**mDNS note**: All coop configs have `mdns_enabled = true`. mDNS uses multicast UDP to the mDNS multicast group (UDP 5353). Kubernetes NetworkPolicies operate on unicast only — multicast bypasses them entirely. Do not rely on NetworkPolicy to control mDNS; it will still broadcast within the node's subnet regardless.
 
 ---
 
@@ -155,8 +155,11 @@ spec:
     - ipBlock:
         cidr: 0.0.0.0/0
         except:
-        - 10.0.0.0/8      # block intra-cluster non-mesh traffic via external path
-        - 192.168.0.0/16
+        # operator-supplied: your cluster's private CIDRs (node subnet + pod/service
+        # ranges) so intra-cluster non-mesh traffic is not permitted via the external
+        # path. Resolve from the private network-ops source; do not hardcode here.
+        - <cluster-node-cidr>
+        - <pod-service-cidr>
     ports:
     - port: 7825    # QUIC range covering all coops + main daemon
       protocol: UDP
@@ -193,8 +196,8 @@ Prometheus needs to scrape all namespaces — its egress must remain fully open.
 
 ## Design: `registry` Namespace
 
-The in-cluster registry (`10.8.30.40:30500`) is accessed two ways:
-1. **ci-runner** (external, 10.8.30.46) → NodePort 30500 (Docker push)
+The in-cluster registry (`${ICN_K3S_CONTROL}:30500`) is accessed two ways:
+1. **ci-runner** (external, ${ICN_CI_RUNNER_HOST}) → NodePort 30500 (Docker push)
 2. **K3s containerd** on each node → NodePort 30500 (image pull via `registries.yaml`)
 
 Both paths go through NodePort/iptables at the node level, not through pod-to-pod networking. The registry pod IP (`10.43.x.x`) is only directly accessed by in-cluster actors (e.g., `kubectl` commands against the registry API).
@@ -226,7 +229,7 @@ Both paths go through NodePort/iptables at the node level, not through pod-to-po
 kubectl exec -n icn-coop-alpha deploy/icn-alpha -- icnctl peer list
 
 # Confirm Prometheus is scraping all coop metrics endpoints
-curl -s http://10.8.30.40:30090/api/v1/targets | jq '.data.activeTargets | length'
+curl -s http://${ICN_K3S_CONTROL}:30090/api/v1/targets | jq '.data.activeTargets | length'
 
 # After applying any policy, immediately recheck mesh formation
 kubectl exec -n icn-coop-alpha deploy/icn-alpha -- icnctl peer list
@@ -240,6 +243,6 @@ During active development:
 - Developers need `kubectl exec` / `kubectl port-forward` into any pod freely
 - Feature branches may add new ports or communication patterns before they're documented
 - Broken NetworkPolicy is subtle — a misconfigured egress rule silently drops gossip messages with no error visible in app logs
-- The cluster is on a private VLAN (10.8.30.0/24) behind OPNsense — the perimeter is already controlled
+- The cluster is on a private VLAN (operator-supplied subnet) behind OPNsense — the perimeter is already controlled
 
 **Re-evaluate when**: First external pilot participant connects, OR when coop namespaces start holding real identity/ledger data.
