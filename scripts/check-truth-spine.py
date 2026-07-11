@@ -131,8 +131,8 @@ def scan_public_map_boundary(root: Path) -> None:
 # public surfaces cleaned in the #2393 docs slice must never carry a concrete
 # provider IPv4/IPv6 host address. Reuses the #2392 IPv4 regex/allowlist; the
 # IPv6 rule is tightened (bracketed [..] OR >=3 hextets) so hex-looking Rust
-# paths / capability-action strings (e.g. `aead::`, `read::write`) are NOT
-# false-flagged. HARD failure, value always withheld. Hostname detection is
+# path segments and short capability-action strings are NOT false-flagged.
+# HARD failure, value always withheld. Hostname detection is
 # intentionally omitted here — on prose it false-positives on filenames like
 # `.env.local` and illustrative `*.internal`/`*.example` config; the §5
 # provider concern on these surfaces is IP literals.
@@ -161,7 +161,8 @@ def docs_address_violations(text: str) -> list[tuple[int, str]]:
     'ipv4-host' or 'ipv6-host'. Allowed: loopback / bind-all / QEMU slirp alias
     / RFC5737 (v4); ::1 / :: / RFC3849 2001:db8::/32 (v6). IPv6 is flagged only
     when bracketed ([..]) or written with >=3 hextets, so hex-looking
-    identifiers such as `aead::` or `read::write` are not false-flagged."""
+    identifiers (Rust path segments, short capability strings) are not
+    false-flagged."""
     out: list[tuple[int, str]] = []
     for i, line in enumerate(text.splitlines(), 1):
         for m in _IPV4_RE.finditer(line):

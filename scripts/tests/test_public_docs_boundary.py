@@ -40,9 +40,9 @@ def flagged(text):
 # ---- MUST FLAG (disallowed concrete host literals) ---------------------------
 FLAG = [
     ("planted disallowed IPv4 (private)", "peer at 10.20.30.40 here"),
-    ("planted disallowed IPv4 (public)", "resolver 8.8.8.8"),
+    ("planted disallowed IPv4 (public)", "resolver 9.9.9.9"),
     ("planted disallowed IPv4 (rfc1918 172.16)", "node 172.16.9.9"),
-    ("URL authority with disallowed IPv4", "curl http://10.0.0.5:8080/v1/health"),
+    ("URL authority with disallowed IPv4", "curl http://172.31.254.7:8080/v1/health"),
     ("compressed IPv6 at start (>=3 groups)", "addr ::a:b:c:d listening"),
     ("compressed IPv6 in middle (>=3 groups)", "route 1:2::3:4:5 via mesh"),
     ("compressed IPv6 at end (>=3 groups)", "fd12:3456:789a::1 reachable"),
