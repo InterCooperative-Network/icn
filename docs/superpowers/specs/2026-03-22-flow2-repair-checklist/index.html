@@ -63,7 +63,7 @@ have been run against the current cluster. Pod rebuilds change the DID.</p>
 <hr>
 <h2>Pre-Conditions</h2>
 <ul>
-<li>K3s cluster is running (k3s-control at 10.8.30.40, workers at .41/.42)</li>
+<li>K3s cluster is running (k3s-control at ${ICN_K3S_CONTROL}, workers at ${ICN_K3S_WORKER1}/${ICN_K3S_WORKER2})</li>
 <li><code>kubectl</code> access from icn-dev</li>
 <li><code>demo/scripts/reseed-federation-demo.sh</code> exists and is runnable</li>
 <li>NodePort access: <code>localhost:18081</code> routes to BrightWorks node gateway (K3s mode)</li>
@@ -76,7 +76,7 @@ have been run against the current cluster. Pod rebuilds change the DID.</p>
 </code></pre>
 <p>If pods are down, start the cluster before continuing. This checklist assumes running pods.</p>
 <h3>Step 2 — Verify NodePort routing</h3>
-<pre><code class="language-bash"># From icn-dev (10.8.30.45), test the BrightWorks gateway health endpoint
+<pre><code class="language-bash"># From icn-dev (${ICN_DEV_HOST}), test the BrightWorks gateway health endpoint
 curl -s http://localhost:18081/v1/health
 # Expected: 200 with JSON body
 # If: connection refused → NodePort 18081 not mapped, check K3s service config
@@ -189,7 +189,7 @@ may still have their own state requirements. Success condition is limited to the
 <strong>Method:</strong> kubectl port-forward + icnctl auth token + direct curl</p>
 <h3>Environment</h3>
 <ul>
-<li>icn-dev (10.8.30.45), kubectl access to K3s cluster</li>
+<li>icn-dev (${ICN_DEV_HOST}), kubectl access to K3s cluster</li>
 <li><code>kubectl port-forward -n icn-coop-alpha svc/icn-alpha 18081:8080</code></li>
 <li>Token acquired via <code>kubectl exec ... icnctl auth token --coop-id brightworks-cooperative</code></li>
 </ul>

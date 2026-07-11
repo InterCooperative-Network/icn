@@ -44,7 +44,7 @@ View source on GitHub →
 </blockquote>
 <p><strong>Goal:</strong> Build a canonical &quot;A Federation in Motion&quot; demo system with four cooperative personas, three modular flows, presenter runbook, and self-serve handoff path.</p>
 <p><strong>Architecture:</strong> Four live K3s coop nodes (alpha/beta/gamma/delta) are reseeded with canonical personas and story data. Bash flow scripts use <code>kubectl port-forward</code> to access each coop&#39;s gateway (ClusterIP-only, no NodePort on port 8080). A shared port library handles setup/teardown so each flow script stays focused on narration.</p>
-<p><strong>Tech Stack:</strong> Bash, kubectl, curl, icnctl CLI, K3s cluster at 10.8.30.40, coop gateways behind ClusterIP services</p>
+<p><strong>Tech Stack:</strong> Bash, kubectl, curl, icnctl CLI, K3s cluster at ${ICN_CLUSTER_ENDPOINT}, coop gateways behind ClusterIP services</p>
 <p><strong>Design doc:</strong> <code>docs/plans/2026-03-07-demo-system-design.md</code></p>
 <hr>
 <h2>Cluster Topology Reference</h2>
@@ -62,28 +62,28 @@ View source on GitHub →
 <td>BrightWorks Cooperative (worker)</td>
 <td>icn-alpha</td>
 <td>icn-coop-alpha</td>
-<td>10.43.97.80:8080</td>
+<td>192.0.2.11:8080</td>
 <td>18081</td>
 </tr>
 <tr>
 <td>River City Tool Library (resource)</td>
 <td>icn-beta</td>
 <td>icn-coop-beta</td>
-<td>10.43.194.7:8080</td>
+<td>192.0.2.12:8080</td>
 <td>18082</td>
 </tr>
 <tr>
 <td>Harbor Homes Cooperative (housing)</td>
 <td>icn-gamma</td>
 <td>icn-coop-gamma</td>
-<td>10.43.12.70:8080</td>
+<td>192.0.2.13:8080</td>
 <td>18083</td>
 </tr>
 <tr>
 <td>Finger Lakes CDN (intermediate org)</td>
 <td>icn-delta</td>
 <td>icn-coop-delta</td>
-<td>10.43.110.197:8080</td>
+<td>192.0.2.14:8080</td>
 <td>18084</td>
 </tr>
 </tbody></table>
@@ -94,7 +94,7 @@ View source on GitHub →
 kubectl get pods -A | grep -E &quot;icn-(alpha|beta|gamma|delta)&quot; | grep -v Succeeded
 
 # Confirm you can reach the main gateway
-curl -s http://10.8.30.40:30080/v1/health | python3 -m json.tool
+curl -s http://${ICN_CLUSTER_ENDPOINT}:30080/v1/health | python3 -m json.tool
 
 # Confirm kubectl works
 kubectl get nodes

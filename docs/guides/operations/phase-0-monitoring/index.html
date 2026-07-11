@@ -299,7 +299,7 @@ icn_gateway_governance_proposals_closed_total
 <h3>1. Test Auth Failure Alert</h3>
 <pre><code class="language-bash"># Generate 10 auth failures quickly
 for i in {1..10}; do
-  curl -X POST http://10.8.30.40:30080/v1/auth/verify \
+  curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/auth/verify \
     -H &quot;Content-Type: application/json&quot; \
     -d &quot;{\&quot;did\&quot;: \&quot;did:icn:test$i\&quot;, \&quot;challenge_id\&quot;: \&quot;bad\&quot;, \&quot;signature\&quot;: \&quot;fake\&quot;}&quot; &amp;
 done

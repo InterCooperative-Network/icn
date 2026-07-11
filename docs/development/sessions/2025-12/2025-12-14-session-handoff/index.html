@@ -44,11 +44,11 @@ View source on GitHub →
 <h2>Current State</h2>
 <h3>Deployment Status</h3>
 <ul>
-<li><strong>K3s Cluster</strong>: Running on <code>10.8.10.40</code></li>
+<li><strong>K3s Cluster</strong>: Running on <code>${ICN_GATEWAY_HOST}</code></li>
 <li><strong>ICN Pod</strong>: <code>icn-alpha</code> in <code>icn-coop-alpha</code> namespace</li>
 <li><strong>Image</strong>: <code>icn:b84f0d4</code> (latest from main branch)</li>
-<li><strong>Gateway</strong>: <code>http://10.8.10.40:30080</code></li>
-<li><strong>Pilot UI</strong>: <code>http://10.8.10.40:30030</code></li>
+<li><strong>Gateway</strong>: <code>http://${ICN_GATEWAY_HOST}:30080</code></li>
+<li><strong>Pilot UI</strong>: <code>http://${ICN_GATEWAY_HOST}:30030</code></li>
 </ul>
 <h3>Test Identity</h3>
 <ul>
@@ -64,22 +64,22 @@ View source on GitHub →
 <h2>Quick Commands</h2>
 <h3>Get New Token (when current expires)</h3>
 <pre><code class="language-bash">cd /home/matt/projects/icn/icn
-./target/release/icnctl auth token --gateway http://10.8.10.40:30080 --coop-id test-coop --scopes &quot;coop:read,coop:write,coop:admin,ledger:read,ledger:write,gov:read,gov:write&quot;
+./target/release/icnctl auth token --gateway http://${ICN_GATEWAY_HOST}:30080 --coop-id test-coop --scopes &quot;coop:read,coop:write,coop:admin,ledger:read,ledger:write,gov:read,gov:write&quot;
 # Passphrase is empty (just press Enter)
 </code></pre>
 <h3>Check Deployment Status</h3>
-<pre><code class="language-bash">ssh matt@10.8.10.40 &quot;kubectl -n icn-coop-alpha get pods&quot;
-ssh matt@10.8.10.40 &quot;kubectl -n icn-coop-alpha logs deployment/icn-alpha --tail=50&quot;
+<pre><code class="language-bash">ssh matt@${ICN_K3S_CONTROL} &quot;kubectl -n icn-coop-alpha get pods&quot;
+ssh matt@${ICN_K3S_CONTROL} &quot;kubectl -n icn-coop-alpha logs deployment/icn-alpha --tail=50&quot;
 </code></pre>
 <h3>Test API Endpoints</h3>
 <pre><code class="language-bash"># Health check
-curl http://10.8.10.40:30080/v1/health
+curl http://${ICN_GATEWAY_HOST}:30080/v1/health
 
 # Get coop (requires auth)
-curl -H &quot;Authorization: Bearer TOKEN&quot; http://10.8.10.40:30080/v1/coops/test-coop
+curl -H &quot;Authorization: Bearer TOKEN&quot; http://${ICN_GATEWAY_HOST}:30080/v1/coops/test-coop
 
 # Get balance
-curl -H &quot;Authorization: Bearer TOKEN&quot; &quot;http://10.8.10.40:30080/v1/ledger/test-coop/balance/did:icn:z8p6hkHaFFM2aMjWfhsksvUx3AWt7ZVFhjTsxLn93MaRR&quot;
+curl -H &quot;Authorization: Bearer TOKEN&quot; &quot;http://${ICN_GATEWAY_HOST}:30080/v1/ledger/test-coop/balance/did:icn:z8p6hkHaFFM2aMjWfhsksvUx3AWt7ZVFhjTsxLn93MaRR&quot;
 </code></pre>
 <h3>Redeploy</h3>
 <pre><code class="language-bash">cd /home/matt/projects/icn/deploy/k8s
@@ -116,7 +116,7 @@ make full-deploy-dev
 <ol>
 <li><strong>Token expiry display bug</strong>: <code>icnctl auth token</code> shows &quot;Expires: 1970-01-01&quot; but tokens work correctly</li>
 <li><strong>Pilot UI services loading</strong>: May show loading state if no services have been created yet</li>
-<li><strong>SSH to cluster</strong>: May need password or key setup for <code>matt@10.8.10.40</code></li>
+<li><strong>SSH to cluster</strong>: May need password or key setup for <code>matt@${ICN_GATEWAY_HOST}</code></li>
 </ol>
 <h2>Files Modified This Session</h2>
 <ul>

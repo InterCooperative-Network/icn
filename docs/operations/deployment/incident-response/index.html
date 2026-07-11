@@ -101,7 +101,7 @@ Adjust paths according to your local setup.</p>
 </blockquote>
 <h3>Cluster Access</h3>
 <pre><code class="language-bash"># SSH to control plane
-ssh ubuntu@10.8.30.40
+ssh ubuntu@${ICN_K3S_CONTROL}
 
 # All kubectl commands require sudo on control plane
 sudo kubectl -n icn &lt;command&gt;
@@ -130,13 +130,13 @@ sudo kubectl -n icn get pvc
 </code></pre>
 <h3>Health Checks</h3>
 <pre><code class="language-bash"># ICN health endpoint
-curl http://10.8.30.40:30080/v1/health
+curl http://${ICN_K3S_CONTROL}:30080/v1/health
 
 # Prometheus metrics
-curl http://10.8.30.40:30090/metrics | head -50
+curl http://${ICN_K3S_CONTROL}:30090/metrics | head -50
 
 # Grafana dashboard
-# Open: http://10.8.30.40:30300
+# Open: http://${ICN_K3S_CONTROL}:30300
 
 # Check node identity
 sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show
@@ -180,10 +180,10 @@ sudo kubectl -n icn get svc
 </code></pre>
 <h3>Alertmanager</h3>
 <pre><code class="language-bash"># View active alerts
-curl -s http://10.8.30.40:30093/api/v1/alerts | jq &#39;.data[] | {labels: .labels, state: .status.state}&#39;
+curl -s http://${ICN_K3S_CONTROL}:30093/api/v1/alerts | jq &#39;.data[] | {labels: .labels, state: .status.state}&#39;
 
 # Silence an alert (for maintenance)
-# Use Alertmanager UI: http://10.8.30.40:30093
+# Use Alertmanager UI: http://${ICN_K3S_CONTROL}:30093
 </code></pre>
 <hr>
 <h2>Incident: Node Compromise</h2>
@@ -600,7 +600,7 @@ icnctl device list
 <ol>
 <li><p><strong>Check network connectivity</strong>:</p>
 <pre><code class="language-bash"># Test internet connection
-ping 8.8.8.8
+ping &quot;$PING_TARGET&quot;          # set PING_TARGET to a reliable public host (e.g. your upstream resolver)
 
 # Test DNS
 nslookup google.com
@@ -670,7 +670,7 @@ icnctl network dial &lt;peer-multiaddr&gt; &lt;peer-did&gt;
 <h3>Diagnosis</h3>
 <ol>
 <li><p><strong>Check pod status</strong>:</p>
-<pre><code class="language-bash">ssh ubuntu@10.8.30.40
+<pre><code class="language-bash">ssh ubuntu@${ICN_K3S_CONTROL}
 sudo kubectl -n icn get pods -o wide
 </code></pre>
 </li>
@@ -758,7 +758,7 @@ sudo kubectl -n icn describe pvc icn-data
 </li>
 <li><p><strong>Check NFS server</strong> (Atlas):</p>
 <pre><code class="language-bash">ssh atlas &quot;systemctl status nfs-kernel-server&quot;
-showmount -e 10.8.10.25
+showmount -e ${ICN_NFS_HOST}
 </code></pre>
 </li>
 </ol>
@@ -883,7 +883,7 @@ icnctl ledger quarantine purge
 <h3>Diagnosis</h3>
 <ol>
 <li><p><strong>Check PVC status</strong>:</p>
-<pre><code class="language-bash">ssh ubuntu@10.8.30.40
+<pre><code class="language-bash">ssh ubuntu@${ICN_K3S_CONTROL}
 sudo kubectl -n icn get pvc
 sudo kubectl -n icn describe pvc icn-data
 </code></pre>
@@ -911,7 +911,7 @@ sudo kubectl -n icn exec deploy/icn-daemon -- ls -la /data
 <h4>Scenario 1: NFS Server Unreachable</h4>
 <ol>
 <li><p><strong>Check network connectivity</strong>:</p>
-<pre><code class="language-bash">ping 10.8.10.25
+<pre><code class="language-bash">ping ${ICN_NFS_HOST}
 </code></pre>
 </li>
 <li><p><strong>Restart NFS service</strong>:</p>
@@ -919,7 +919,7 @@ sudo kubectl -n icn exec deploy/icn-daemon -- ls -la /data
 </code></pre>
 </li>
 <li><p><strong>Verify exports</strong>:</p>
-<pre><code class="language-bash">showmount -e 10.8.10.25
+<pre><code class="language-bash">showmount -e ${ICN_NFS_HOST}
 </code></pre>
 </li>
 <li><p><strong>Restart ICN pod</strong> (to remount):</p>
@@ -985,7 +985,7 @@ consider stopping the daemon and using Sled tools directly.</p>
 <h3>Diagnosis</h3>
 <ol>
 <li><p><strong>Check backup job status</strong>:</p>
-<pre><code class="language-bash">ssh ubuntu@10.8.30.40
+<pre><code class="language-bash">ssh ubuntu@${ICN_K3S_CONTROL}
 sudo kubectl -n icn get jobs -l component=backup
 sudo kubectl -n icn get jobs -l component=backup-verify
 </code></pre>
@@ -1108,7 +1108,7 @@ sudo kubectl -n icn rollout status deployment/icn-daemon
 </li>
 <li><p><strong>Verify restoration</strong>:</p>
 <pre><code class="language-bash"># Check health
-curl http://10.8.30.40:30080/v1/health
+curl http://${ICN_K3S_CONTROL}:30080/v1/health
 
 # Check identity
 sudo kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show

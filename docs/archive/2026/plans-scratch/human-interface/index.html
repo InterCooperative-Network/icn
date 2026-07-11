@@ -370,7 +370,7 @@ Total: ~10K LOC (app + SDK), 21 screens</p>
 <p><strong>Crypto</strong>: Ed25519 via <code>@noble/ed25519</code> for all signing. Post-quantum hybrid (Ed25519 + ML-DSA-65 Dilithium) available via <code>hybrid-crypto.ts</code>. Keys stored in SecureStore (iOS Keychain / Android Keystore).</p>
 <p><strong>Offline Queue</strong>: <code>QueueManager</code> in <code>sdk/react-native/src/queue-manager.ts</code>. Queues payments, votes, proposals, trust attestations. Persistent (AsyncStorage). 3 retries with exponential backoff (1s, 2s, 4s). <code>useQueue()</code> hook exposes pending/failed counts. <code>useNetworkState()</code> triggers processing on reconnect.</p>
 <p><strong>i18n</strong>: EN + ES via <code>i18next</code> + <code>react-i18next</code>.</p>
-<p><strong>Gateway target</strong>: <code>http://10.8.10.40:30080</code> (homelab staging), configurable in <code>src/config.ts</code>.</p>
+<p><strong>Gateway target</strong>: <code>http://${ICN_GATEWAY_HOST}:30080</code> (homelab staging), configurable in <code>src/config.ts</code>.</p>
 <h3>1.4 icnctl Command Coverage</h3>
 <p><strong>32 command groups, 100+ subcommands, 10,191 lines in single main.rs</strong></p>
 <table>

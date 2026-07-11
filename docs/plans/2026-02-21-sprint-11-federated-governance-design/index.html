@@ -255,8 +255,8 @@ git commit -m &quot;feat(gateway): map ProposalScopeRequest to ProposalScope in 
 <pre><code class="language-bash">cd /home/ubuntu/projects/icn &amp;&amp; docker build -f deploy/Dockerfile.icnd -t icn:latest .
 </code></pre>
 <p><strong>Step 3: Push to registry</strong></p>
-<pre><code class="language-bash">docker tag icn:latest 10.8.30.40:30500/icn:latest
-docker push 10.8.30.40:30500/icn:latest
+<pre><code class="language-bash">docker tag icn:latest ${ICN_NODE_HOST}:30500/icn:latest
+docker push ${ICN_NODE_HOST}:30500/icn:latest
 </code></pre>
 <p><strong>Step 4: Create PR</strong></p>
 <pre><code class="language-bash">git push -u origin feat/proposal-scope
@@ -299,7 +299,7 @@ spec:
 <p><strong>Step 2: Add CORS env var to deployment template</strong></p>
 <p>In the deployment YAML (line 259-268), add after the HOME env var:</p>
 <pre><code class="language-yaml">        - name: ICN_CORS_ORIGINS
-          value: &quot;http://10.8.30.40:30030&quot;
+          value: &quot;http://${ICN_NODE_HOST}:30030&quot;
 </code></pre>
 <p><strong>Step 3: Print gateway port in summary</strong></p>
 <p>After line 76 (<code>echo &quot;  Metrics: $METRICS_PORT&quot;</code>), add:</p>
@@ -355,11 +355,11 @@ done
 <p>For each coop, patch the deployment to add <code>ICN_CORS_ORIGINS</code>:</p>
 <pre><code class="language-bash">for COOP in alpha beta gamma delta; do
     NS=&quot;icn-coop-${COOP}&quot;
-    kubectl -n $NS set env deployment/icn-${COOP} ICN_CORS_ORIGINS=&quot;http://10.8.30.40:30030&quot;
+    kubectl -n $NS set env deployment/icn-${COOP} ICN_CORS_ORIGINS=&quot;http://${ICN_NODE_HOST}:30030&quot;
 done
 </code></pre>
 <p><strong>Step 3: Verify all 4 coop gateways respond</strong></p>
-<pre><code class="language-bash">NODE_IP=10.8.30.40
+<pre><code class="language-bash">NODE_IP=${ICN_NODE_HOST}
 for PORT in 30081 30082 30083 30084; do
     echo -n &quot;Port $PORT: &quot;
     curl -s &quot;http://${NODE_IP}:${PORT}/v1/health&quot; | jq -r &#39;.status&#39;
@@ -383,7 +383,7 @@ gh pr create --title &quot;feat(deploy): add gateway NodePorts for coop instance
 # Idempotent: re-running is safe.
 set -euo pipefail
 
-NODE_IP=&quot;${NODE_IP:-10.8.30.40}&quot;
+NODE_IP=&quot;${NODE_IP:-${ICN_NODE_HOST}}&quot;
 COOPS=(&quot;alpha:30081&quot; &quot;beta:30082&quot; &quot;gamma:30083&quot; &quot;delta:30084&quot;)
 FED_ID=&quot;${FED_ID:-pilot-fed}&quot;
 

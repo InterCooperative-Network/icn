@@ -41,7 +41,7 @@
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Development Environment</h1>
 <h2>icn-dev VM</h2>
-<p>Dedicated development VM for ICN work, hosted on Hyperion (10.8.10.15).</p>
+<p>Dedicated development VM for ICN work, hosted on Hyperion (${ICN_HYPERION_HOST}).</p>
 <table>
 <thead>
 <tr>
@@ -59,7 +59,7 @@ View source on GitHub →
 </tr>
 <tr>
 <td><strong>IP</strong></td>
-<td>10.8.10.45</td>
+<td>${ICN_DEV_HOST}</td>
 </tr>
 <tr>
 <td><strong>RAM</strong></td>
@@ -80,10 +80,10 @@ View source on GitHub →
 </tbody></table>
 <h3>Access</h3>
 <pre><code class="language-bash"># SSH
-ssh ubuntu@10.8.10.45
+ssh ubuntu@${ICN_DEV_HOST}
 
 # Web VSCode (code-server)
-http://10.8.10.45:8443
+http://${ICN_DEV_HOST}:8443
 # Access credential: retrieve from secure channel (vault/team secret manager)
 </code></pre>
 <h3>Installed Tools</h3>
@@ -165,7 +165,7 @@ kubectl -n icn exec deploy/icn-daemon -- /usr/local/bin/icnctl id show
 <h2>Claude Code Setup</h2>
 <p>To set up Claude Code on the dev VM:</p>
 <pre><code class="language-bash"># SSH to dev VM
-ssh ubuntu@10.8.10.45
+ssh ubuntu@${ICN_DEV_HOST}
 
 # Install Claude Code
 curl -fsSL https://claude.ai/code/install.sh | sh
@@ -183,16 +183,16 @@ claude
 <h2>Network Diagram</h2>
 <pre><code>Workstation (matt)
     |
-    +-- SSH --&gt; icn-dev (10.8.10.45) --&gt; ~/projects/icn
+    +-- SSH --&gt; icn-dev (${ICN_DEV_HOST}) --&gt; ~/projects/icn
     |              |
     |              +-- kubectl --&gt; K3s Cluster
     |                                  |
-    +-- SSH --&gt; k3s-control (10.8.30.40)
+    +-- SSH --&gt; k3s-control (${ICN_K3S_CONTROL})
                     |
-                    +-- k3s-worker-1 (10.8.30.41)
-                    +-- k3s-worker-2 (10.8.30.42)
+                    +-- k3s-worker-1 (${ICN_K3S_WORKER1})
+                    +-- k3s-worker-2 (${ICN_K3S_WORKER2})
                            |
-                           +-- ICN pods (NFS from Atlas 10.8.10.25)
+                           +-- ICN pods (NFS from Atlas ${ICN_NFS_HOST})
 </code></pre>
 <h2>Related Documentation</h2>
 <ul>

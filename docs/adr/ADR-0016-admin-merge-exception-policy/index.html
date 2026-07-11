@@ -47,7 +47,7 @@ View source on GitHub →
 <p>ICN uses GitHub branch protection with four required status checks:
 <code>Build Release</code>, <code>Test</code>, <code>Clippy</code>, <code>Format Check</code>.</p>
 <p>All four run on <code>ubuntu-latest</code> (GitHub-hosted runners). The self-hosted <code>ci-runner</code>
-(VM 446, 10.8.30.46, labels <code>homelab,k3s</code>) handles Docker build/deploy
+(VM 446, operator-supplied host, labels <code>homelab,k3s</code>) handles Docker build/deploy
 (<code>docker-build-deploy.yml</code>) only — it is not in the required-check path.</p>
 <p>Required jobs queue at <code>pending / 0s</code> when the GitHub-hosted runner pool for the
 repository is saturated. The principal cause is <code>benchmark.yml</code> lacking a concurrency

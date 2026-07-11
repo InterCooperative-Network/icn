@@ -518,7 +518,7 @@ icnctl device list
 <ol>
 <li><p><strong>Connect to bootstrap node</strong>:</p>
 <pre><code class="language-bash"># Add to config or run directly
-icnctl network add-peer 192.168.1.100:7777 did:icn:BOOTSTRAP_DID
+icnctl network add-peer 192.0.2.10:7777 did:icn:BOOTSTRAP_DID
 </code></pre>
 </li>
 <li><p><strong>Request trust attestation</strong>:
@@ -944,8 +944,8 @@ nano ~/.icn/config.toml
 [network]
 listen_addr = &quot;0.0.0.0:7777&quot;
 bootstrap_peers = [
-  &quot;icn://did:icn:PEER1_DID@192.168.1.100:7777&quot;,
-  &quot;icn://did:icn:PEER2_DID@192.168.1.101:7777&quot;
+  &quot;icn://did:icn:PEER1_DID@192.0.2.10:7777&quot;,
+  &quot;icn://did:icn:PEER2_DID@192.0.2.11:7777&quot;
 ]
 
 [gateway]
@@ -1121,7 +1121,7 @@ sudo ufw allow 7777/udp
 grep bootstrap ~/.icn/config.toml
 
 # Manually add peer
-icnctl network add-peer 192.168.1.100:7777 did:icn:PEER_DID
+icnctl network add-peer 192.0.2.10:7777 did:icn:PEER_DID
 </code></pre>
 <h4>&quot;Transaction rejected: insufficient credit&quot;</h4>
 <p>You&#39;ve hit your credit limit. Options:</p>
@@ -1487,8 +1487,8 @@ listen_addr = &quot;0.0.0.0:7777&quot;
 
 # Bootstrap peers for initial network discovery
 bootstrap_peers = [
-  &quot;icn://did:icn:PEER1@192.168.1.100:7777&quot;,
-  &quot;icn://did:icn:PEER2@192.168.1.101:7777&quot;
+  &quot;icn://did:icn:PEER1@192.0.2.10:7777&quot;,
+  &quot;icn://did:icn:PEER2@192.0.2.11:7777&quot;
 ]
 
 # Enable mDNS for local network discovery

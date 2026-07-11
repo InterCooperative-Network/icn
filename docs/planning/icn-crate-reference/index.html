@@ -40,7 +40,7 @@
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN Crate Reference — Accurate Technical Inventory</h1>
 <h1>Generated from live repo exploration, 2026-03-12</h1>
-<p><strong>Source:</strong> <code>~/projects/icn</code> on icn-dev (10.8.30.45)
+<p><strong>Source:</strong> <code>~/projects/icn</code> on icn-dev (${ICN_DEV_HOST})
 <strong>Workspace root:</strong> <code>icn/</code> (38 members in Cargo.toml)
 <strong>Binaries:</strong> <code>icnd</code>, <code>icnctl</code>, <code>icn-console</code>
 <strong>Last explored commit:</strong> <code>72a8b7a3</code> (docs: FORWARD_PLAN_2026-03)</p>
@@ -702,11 +702,11 @@ just audit          # cargo audit + cargo deny
 <p>These are Phase 2 Track A deliverables. They&#39;re the &quot;governance constitution templates&quot; that let someone do <code>icnctl coop-init --charter worker-coop</code> and get a real working governance setup.</p>
 <hr>
 <h2>Current Deployment State</h2>
-<p><strong>K3s cluster on icn-dev (10.8.30.45):</strong></p>
+<p><strong>K3s cluster on icn-dev (${ICN_DEV_HOST}):</strong></p>
 <ul>
 <li>4 pods: icn-alpha, icn-beta, icn-gamma (+ delta)</li>
-<li>Gateway API accessible at <code>10.8.30.40:30080</code> (K3s NodePort)</li>
-<li>SDIS API: <code>http://10.8.30.40:30080/v1/sdis/health</code></li>
+<li>Gateway API accessible at <code>${ICN_GATEWAY_HOST}:30080</code> (K3s NodePort)</li>
+<li>SDIS API: <code>http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health</code></li>
 </ul>
 <p><strong>Known gaps in K3s deployment:</strong></p>
 <ul>

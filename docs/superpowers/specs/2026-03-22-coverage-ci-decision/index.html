@@ -48,10 +48,10 @@ View source on GitHub →
 <ul>
 <li><code>.github/workflows/ci.yml</code> (lines 414–466, the <code>coverage</code> job)</li>
 <li><code>ops/state/ci-exceptions.md</code> (exception classification from s23-t1)</li>
-<li>ci-runner (10.8.30.46) — SSH live testing</li>
-<li>k3s-worker-1 (10.8.30.41) — SSH census</li>
-<li>k3s-worker-2 (10.8.30.42) — SSH census</li>
-<li>k3s-control (10.8.30.40) — SSH census</li>
+<li>ci-runner (${ICN_CI_RUNNER_HOST}) — SSH live testing</li>
+<li>k3s-worker-1 (${ICN_K3S_WORKER1}) — SSH census</li>
+<li>k3s-worker-2 (${ICN_K3S_WORKER2}) — SSH census</li>
+<li>k3s-control (${ICN_K3S_CONTROL}) — SSH census</li>
 </ul>
 <hr>
 <h2>Current Setup</h2>
@@ -80,7 +80,7 @@ View source on GitHub →
 <hr>
 <h2>Live Validation Results (2026-03-22)</h2>
 <h3>What was tested</h3>
-<p>Attempted two runs of <code>cargo-llvm-cov</code> on ci-runner (10.8.30.46):</p>
+<p>Attempted two runs of <code>cargo-llvm-cov</code> on ci-runner (${ICN_CI_RUNNER_HOST}):</p>
 <p><strong>Run 1 — full workspace:</strong></p>
 <pre><code class="language-bash">cargo +1.88.0 llvm-cov --workspace --lcov --output-path /tmp/lcov.info
 </code></pre>
@@ -118,7 +118,7 @@ View source on GitHub →
 </thead>
 <tbody><tr>
 <td><strong>ci-runner</strong></td>
-<td>10.8.30.46</td>
+<td>${ICN_CI_RUNNER_HOST}</td>
 <td>i7-7700K 4c/4t @ 4.2GHz</td>
 <td>3.8GB</td>
 <td>~0.3GB</td>
@@ -127,7 +127,7 @@ View source on GitHub →
 </tr>
 <tr>
 <td><strong>k3s-control</strong></td>
-<td>10.8.30.40</td>
+<td>${ICN_K3S_CONTROL}</td>
 <td>4c</td>
 <td>7.8GB</td>
 <td>6.5GB</td>
@@ -136,7 +136,7 @@ View source on GitHub →
 </tr>
 <tr>
 <td><strong>k3s-worker-1</strong></td>
-<td>10.8.30.41</td>
+<td>${ICN_K3S_WORKER1}</td>
 <td>i5-6500 4c/4t @ 3.2GHz</td>
 <td>15GB</td>
 <td><strong>14GB</strong></td>
@@ -145,7 +145,7 @@ View source on GitHub →
 </tr>
 <tr>
 <td><strong>k3s-worker-2</strong></td>
-<td>10.8.30.42</td>
+<td>${ICN_K3S_WORKER2}</td>
 <td>i5-6500 4c/4t @ 3.2GHz</td>
 <td>15GB</td>
 <td><strong>14GB</strong></td>
@@ -154,7 +154,7 @@ View source on GitHub →
 </tr>
 <tr>
 <td><strong>Hyperion</strong></td>
-<td>10.8.10.15</td>
+<td>${ICN_HYPERION_HOST}</td>
 <td>Ryzen 9 3900X 12c/24t</td>
 <td>15GB (bad)</td>
 <td>—</td>
@@ -163,7 +163,7 @@ View source on GitHub →
 </tr>
 <tr>
 <td><strong>Zentith</strong></td>
-<td>10.8.10.100</td>
+<td>${ICN_WORKSTATION_HOST}</td>
 <td>Ryzen 7 7800X3D 8c/16t</td>
 <td><strong>54GB</strong></td>
 <td>high</td>
@@ -171,7 +171,7 @@ View source on GitHub →
 <td>Matt&#39;s workstation; WSL2 Ubuntu 24.04; strongest available</td>
 </tr>
 </tbody></table>
-<p>Proxmox nodes node-1 through node-4 (10.8.10.11–14): SSH not authorized from icn-dev; capacity unknown.</p>
+<p>Proxmox nodes node-1 through node-4 (operator-supplied range): SSH not authorized from icn-dev; capacity unknown.</p>
 <hr>
 <h2>Corrected Problem Statement</h2>
 <p>The problem is not &quot;tarpaulin vs llvm-cov.&quot; It is &quot;the current ci-runner has insufficient RAM (3.8GB) for any full-workspace Rust coverage instrumentation on a 34-crate codebase.&quot; Both tarpaulin and llvm-cov fail at compilation before reaching test execution. The tool choice is secondary to the hardware constraint.</p>

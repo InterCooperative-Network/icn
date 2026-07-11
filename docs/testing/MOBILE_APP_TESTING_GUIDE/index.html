@@ -44,7 +44,7 @@ View source on GitHub →
 <li>✅ Node.js v20.19.4 (installed)</li>
 <li>✅ npm v11.7.0 (installed)</li>
 <li>✅ Expo v54.0.19 (installed)</li>
-<li>✅ ICN Gateway running at <a href="http://10.8.30.40:30080" target="_blank" rel="noopener">http://10.8.30.40:30080</a></li>
+<li>✅ ICN Gateway running at http://${ICN_GATEWAY_HOST}:30080</li>
 </ul>
 <h2>Option 1: Test in Web Browser (Easiest) 🌐</h2>
 <h3>Quick Start</h3>
@@ -125,9 +125,9 @@ npm run ios
 <ol>
 <li><p><strong>App launches</strong> - You&#39;ll see the Login screen</p>
 </li>
-<li><p><strong>Enter Gateway URL</strong>: <code>http://10.8.30.40:30080</code></p>
+<li><p><strong>Enter Gateway URL</strong>: <code>http://${ICN_GATEWAY_HOST}:30080</code></p>
 <ul>
-<li>If testing from phone and can&#39;t reach 10.8.30.40, use tunnel mode or your computer&#39;s IP</li>
+<li>If testing from phone and can&#39;t reach ${ICN_GATEWAY_HOST}, use tunnel mode or your computer&#39;s IP</li>
 </ul>
 </li>
 <li><p><strong>Choose Login Method</strong>:</p>
@@ -185,7 +185,7 @@ npm run ios
 <h2>Configuration</h2>
 <p>The app is pre-configured for your homelab deployment:</p>
 <p><strong>File</strong>: <code>src/config.ts</code></p>
-<pre><code class="language-typescript">export const GATEWAY_URL = &#39;http://10.8.30.40:30080&#39;;
+<pre><code class="language-typescript">export const GATEWAY_URL = &#39;http://&lt;ICN_GATEWAY_HOST&gt;:30080&#39;;
 </code></pre>
 <p>To change gateway URL:</p>
 <ol>
@@ -196,14 +196,14 @@ npm run ios
 <hr>
 <h2>Verifying Backend Connectivity</h2>
 <h3>Test Gateway from Your Computer</h3>
-<pre><code class="language-bash">curl http://10.8.30.40:30080/v1/health
+<pre><code class="language-bash">curl http://${ICN_GATEWAY_HOST}:30080/v1/health
 # Should return: {&quot;status&quot;:&quot;ok&quot;,&quot;version&quot;:&quot;0.1.0&quot;}
 </code></pre>
 <h3>Test Gateway from Your Phone&#39;s Network</h3>
 <p>If you can access your homelab from your phone:</p>
-<pre><code class="language-bash">curl http://10.8.30.40:30080/v1/health
+<pre><code class="language-bash">curl http://${ICN_GATEWAY_HOST}:30080/v1/health
 </code></pre>
-<p>If you can&#39;t reach 10.8.30.40 from your phone:</p>
+<p>If you can&#39;t reach ${ICN_GATEWAY_HOST} from your phone:</p>
 <ul>
 <li>Use tunnel mode: <code>npx expo start --tunnel</code></li>
 <li>Or update gateway URL to your computer&#39;s IP</li>
@@ -219,8 +219,8 @@ npm run ios
 <h3>&quot;Network request failed&quot; in app</h3>
 <ul>
 <li>Gateway URL might be incorrect</li>
-<li>Phone can&#39;t reach 10.8.30.40 (use tunnel or your computer&#39;s IP)</li>
-<li>Test connectivity: <code>curl http://10.8.30.40:30080/v1/health</code></li>
+<li>Phone can&#39;t reach ${ICN_GATEWAY_HOST} (use tunnel or your computer&#39;s IP)</li>
+<li>Test connectivity: <code>curl http://${ICN_GATEWAY_HOST}:30080/v1/health</code></li>
 </ul>
 <h3>&quot;Authentication failed&quot;</h3>
 <ul>
@@ -252,14 +252,14 @@ npm run ios
 <hr>
 <h2>Backend Monitoring</h2>
 <h3>Check if gateway is healthy</h3>
-<pre><code class="language-bash">curl http://10.8.30.40:30080/v1/health
-curl http://10.8.30.40:30080/v1/sdis/health
+<pre><code class="language-bash">curl http://${ICN_GATEWAY_HOST}:30080/v1/health
+curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health
 </code></pre>
 <h3>View gateway logs</h3>
-<pre><code class="language-bash">ssh ubuntu@10.8.30.40 &quot;sudo kubectl -n icn logs -f deployment/icn-daemon&quot;
+<pre><code class="language-bash">ssh ubuntu@${ICN_K3S_CONTROL} &quot;sudo kubectl -n icn logs -f deployment/icn-daemon&quot;
 </code></pre>
 <h3>Check pod status</h3>
-<pre><code class="language-bash">ssh ubuntu@10.8.30.40 &quot;sudo kubectl -n icn get pods&quot;
+<pre><code class="language-bash">ssh ubuntu@${ICN_K3S_CONTROL} &quot;sudo kubectl -n icn get pods&quot;
 </code></pre>
 <hr>
 <h2>What to Test</h2>

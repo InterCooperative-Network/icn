@@ -226,7 +226,7 @@ gh pr create --title &quot;chore(ci): migrate coverage to llvm-cov on self-hoste
 <li>Options: (a) restart Zenith WSL2 runner, (b) temporarily re-point label to a k3s-worker</li>
 </ul>
 <p>If k3s-worker becomes the temporary fallback:</p>
-<pre><code class="language-bash"># On k3s-worker-1 (10.8.30.41, 15GB RAM, 28GB disk):
+<pre><code class="language-bash"># On k3s-worker-1 (${ICN_K3S_WORKER1}, 15GB RAM, 28GB disk):
 curl -fsSL https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
 source ~/.cargo/env
 rustup component add llvm-tools-preview

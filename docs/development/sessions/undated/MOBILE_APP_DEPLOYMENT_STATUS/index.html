@@ -42,7 +42,7 @@
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Mobile App Deployment Test Results</h1>
 <p><strong>Date</strong>: 2025-12-16
-<strong>Gateway</strong>: <a href="http://10.8.10.40:30080" target="_blank" rel="noopener">http://10.8.10.40:30080</a>
+<strong>Gateway</strong>: http://${ICN_GATEWAY_HOST}:30080
 <strong>Environment</strong>: K3s Homelab Cluster</p>
 <hr>
 <h2>Deployment Status ✅</h2>
@@ -55,7 +55,7 @@ View source on GitHub →
 </ul>
 <h3>Services Exposed</h3>
 <ul>
-<li><strong>Gateway API</strong>: <a href="http://10.8.10.40:30080" target="_blank" rel="noopener">http://10.8.10.40:30080</a> (NodePort 30080)</li>
+<li><strong>Gateway API</strong>: http://${ICN_GATEWAY_HOST}:30080 (NodePort 30080)</li>
 <li><strong>Prometheus Metrics</strong>: Port 9100</li>
 <li><strong>QUIC P2P</strong>: Port 7777/UDP (NodePort 30777)</li>
 <li><strong>RPC</strong>: Port 5601/TCP (NodePort 30601)</li>
@@ -103,7 +103,7 @@ View source on GitHub →
 <h3>CoopWallet (React Native)</h3>
 <p><strong>Location</strong>: <code>/home/matt/projects/icn/sdk/react-native/examples/CoopWallet</code></p>
 <p><strong>Configuration</strong> (<code>src/config.ts</code>):</p>
-<pre><code class="language-typescript">export const GATEWAY_URL = &#39;http://10.8.10.40:30080&#39;;  // ✅ Correctly configured
+<pre><code class="language-typescript">export const GATEWAY_URL = &#39;http://&lt;ICN_GATEWAY_HOST&gt;:30080&#39;;  // ✅ Correctly configured
 </code></pre>
 <p><strong>Features</strong>:</p>
 <ul>
@@ -240,7 +240,7 @@ npm start
 <ul>
 <li>Use the app to create a new identity</li>
 <li>Complete device verification</li>
-<li>Get steward to vouch (can use steward dashboard at <a href="http://10.8.10.40:30030/steward-dashboard.html" target="_blank" rel="noopener">http://10.8.10.40:30030/steward-dashboard.html</a>)</li>
+<li>Get steward to vouch (can use steward dashboard at http://${ICN_GATEWAY_HOST}:30030/steward-dashboard.html)</li>
 </ul>
 </li>
 <li><p><strong>Test Authenticated Features</strong>:</p>

@@ -179,7 +179,7 @@ not attested receipts.</p>
 <p><code>cargo-tarpaulin</code> v0.35.2 consistently times out on GitHub-hosted runners due to
 instrumented build time. The gate is classified <code>observational</code> (does not block merges).
 Resolution options include scoping tarpaulin to a subset of crates or switching to the
-self-hosted <code>ci-runner</code> at <code>10.8.30.46</code>. No resolution is required before Sprint 24 begins.
+self-hosted <code>ci-runner</code> at <code>${ICN_CI_RUNNER_HOST}</code>. No resolution is required before Sprint 24 begins.
 See <code>ops/state/ci-exceptions.md</code> for full technical detail.</p>
 <h3>Commons Compute Layer — Not Yet Started</h3>
 <p>The commons compute architecture (resource pooling, unaffiliated node participation,
@@ -251,7 +251,7 @@ required for pool health before commons compute can be trusted in production.</p
 </tr>
 <tr>
 <td>K3s cluster</td>
-<td>control <code>10.8.30.40</code>, workers <code>.41</code> <code>.42</code> (VLAN 30)</td>
+<td>control <code>${ICN_K3S_CONTROL}</code>, workers <code>${ICN_K3S_WORKER1}</code> <code>${ICN_K3S_WORKER2}</code> (VLAN 30)</td>
 </tr>
 <tr>
 <td>Demo flows</td>

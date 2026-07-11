@@ -67,7 +67,7 @@ View source on GitHub →
 </thead>
 <tbody><tr>
 <td>K3s control plane</td>
-<td><code>k3s-control</code> (10.8.30.40)</td>
+<td><code>k3s-control</code> (${ICN_K3S_CONTROL})</td>
 <td><code>kubectl get nodes</code></td>
 </tr>
 <tr>
@@ -77,7 +77,7 @@ View source on GitHub →
 </tr>
 <tr>
 <td>Atlas NFS</td>
-<td>10.8.10.25</td>
+<td>${ICN_NFS_HOST}</td>
 <td><code>kubectl get pvc -n icn</code> — must be <code>Bound</code></td>
 </tr>
 </tbody></table>
@@ -103,33 +103,33 @@ jq --version
 <tbody><tr>
 <td>30080</td>
 <td>Default gateway</td>
-<td><a href="http://10.8.30.40:30080" target="_blank" rel="noopener">http://10.8.30.40:30080</a></td>
+<td>http://${ICN_K3S_CONTROL}:30080</td>
 </tr>
 <tr>
 <td>30081</td>
 <td>Coop instance 1</td>
-<td><a href="http://10.8.30.40:30081" target="_blank" rel="noopener">http://10.8.30.40:30081</a></td>
+<td>http://${ICN_K3S_CONTROL}:30081</td>
 </tr>
 <tr>
 <td>30082</td>
 <td>Coop instance 2</td>
-<td><a href="http://10.8.30.40:30082" target="_blank" rel="noopener">http://10.8.30.40:30082</a></td>
+<td>http://${ICN_K3S_CONTROL}:30082</td>
 </tr>
 <tr>
 <td>30083</td>
 <td>Coop instance 3</td>
-<td><a href="http://10.8.30.40:30083" target="_blank" rel="noopener">http://10.8.30.40:30083</a></td>
+<td>http://${ICN_K3S_CONTROL}:30083</td>
 </tr>
 <tr>
 <td>30084</td>
 <td>Coop instance 4</td>
-<td><a href="http://10.8.30.40:30084" target="_blank" rel="noopener">http://10.8.30.40:30084</a></td>
+<td>http://${ICN_K3S_CONTROL}:30084</td>
 </tr>
 </tbody></table>
 <hr>
 <h2>2. Environment Setup</h2>
 <p>Set these in your shell before running any commands:</p>
-<pre><code class="language-bash">export HOST=&quot;http://10.8.30.40:30080&quot;   # default gateway
+<pre><code class="language-bash">export HOST=&quot;http://${ICN_K3S_CONTROL}:30080&quot;   # default gateway
 export COOP_ID=&quot;pilot-coop-1&quot;           # your cooperative ID
 export TOKEN=&quot;&quot;                         # filled in after auth (§4)
 </code></pre>
@@ -145,7 +145,7 @@ export TOKEN=&quot;&quot;                         # filled in after auth (§4)
 <p>HTTP 200 means the gateway is up and accepting requests.</p>
 <h3>All five gateway ports</h3>
 <pre><code class="language-bash">for port in 30080 30081 30082 30083 30084; do
-    code=$(curl -s -o /dev/null -w &quot;%{http_code}&quot; --max-time 5 &quot;http://10.8.30.40:${port}/v1/health&quot;)
+    code=$(curl -s -o /dev/null -w &quot;%{http_code}&quot; --max-time 5 &quot;http://${ICN_K3S_CONTROL}:${port}/v1/health&quot;)
     echo &quot;port $port → $code&quot;
 done
 </code></pre>
@@ -436,7 +436,7 @@ echo &quot;$TOKEN&quot; | cut -d. -f2 | base64 -d 2&gt;/dev/null | jq &#39;{sub,
 </code></pre>
 <h3>Checking metrics</h3>
 <p>Prometheus scrapes on port 30090:</p>
-<pre><code class="language-bash">curl -s http://10.8.30.40:30090/metrics | grep gateway_governance
+<pre><code class="language-bash">curl -s http://${ICN_K3S_CONTROL}:30090/metrics | grep gateway_governance
 </code></pre>
 <p>Key metrics:</p>
 <ul>

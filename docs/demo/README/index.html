@@ -198,7 +198,10 @@ make demo     # run demo against node-a
 <pre><code class="language-bash">./target/release/icnd --gateway-enable --gateway-bind 0.0.0.0:8080
 </code></pre>
 <h3>2. Set CORS origins for your LAN IP</h3>
-<pre><code class="language-bash">export ICN_CORS_ORIGINS=&quot;http://10.8.10.45:3000,http://10.8.10.45:8080&quot;
+<p>Set <code>ICN_LAN_HOST</code> to the workstation/LAN address that browsers use to reach the
+UI and gateway (this is the request Origin that must be allow-listed — not
+necessarily the in-cluster gateway host).</p>
+<pre><code class="language-bash">export ICN_CORS_ORIGINS=&quot;http://${ICN_LAN_HOST}:3000,http://${ICN_LAN_HOST}:8080&quot;
 </code></pre>
 <h3>3. Start UI server on all interfaces</h3>
 <pre><code class="language-bash">cd web/pilot-ui

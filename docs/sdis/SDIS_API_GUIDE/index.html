@@ -41,7 +41,7 @@ View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>SDIS API Guide</h1>
 <p>Complete guide to using the Secure Distributed Identity System (SDIS) API.</p>
 <h2>Base URL</h2>
-<pre><code>http://10.8.30.40:30080/v1/sdis
+<pre><code>http://${ICN_GATEWAY_HOST}:30080/v1/sdis
 </code></pre>
 <h2>Authentication</h2>
 <p>Most SDIS endpoints require authentication via Bearer token:</p>
@@ -54,7 +54,7 @@ kubectl exec -it -n icn $POD -- icnctl auth token --coop-id &lt;COOP_ID&gt; --ga
 <h2>API Endpoints</h2>
 <h3>1. Health Check</h3>
 <p>Check if SDIS is operational.</p>
-<pre><code class="language-bash">curl http://10.8.30.40:30080/v1/sdis/health
+<pre><code class="language-bash">curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health
 </code></pre>
 <p><strong>Response:</strong></p>
 <pre><code class="language-json">{
@@ -67,7 +67,7 @@ kubectl exec -it -n icn $POD -- icnctl auth token --coop-id &lt;COOP_ID&gt; --ga
 <h4>Start Enrollment</h4>
 <p>Begin the SDIS enrollment process to create a new identity.</p>
 <p><strong>POST</strong> <code>/v1/sdis/enrollment/start</code></p>
-<pre><code class="language-bash">curl -X POST http://10.8.30.40:30080/v1/sdis/enrollment/start \
+<pre><code class="language-bash">curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/enrollment/start \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{
     &quot;identity_name&quot;: &quot;Alice&quot;,
@@ -85,7 +85,7 @@ kubectl exec -it -n icn $POD -- icnctl auth token --coop-id &lt;COOP_ID&gt; --ga
 <h4>Complete Enrollment</h4>
 <p>Finalize enrollment after verification.</p>
 <p><strong>POST</strong> <code>/v1/sdis/enrollment/complete</code></p>
-<pre><code class="language-bash">curl -X POST http://10.8.30.40:30080/v1/sdis/enrollment/complete \
+<pre><code class="language-bash">curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/enrollment/complete \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{
     &quot;enrollment_id&quot;: &quot;enroll_abc123...&quot;,
@@ -110,7 +110,7 @@ kubectl exec -it -n icn $POD -- icnctl auth token --coop-id &lt;COOP_ID&gt; --ga
 <h4>Level 1 Verification (Basic)</h4>
 <p>Verify device possession via QR scan.</p>
 <p><strong>POST</strong> <code>/v1/sdis/verify/level1</code></p>
-<pre><code class="language-bash">curl -X POST http://10.8.30.40:30080/v1/sdis/verify/level1 \
+<pre><code class="language-bash">curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/verify/level1 \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{
     &quot;enrollment_id&quot;: &quot;enroll_abc123...&quot;,
@@ -120,7 +120,7 @@ kubectl exec -it -n icn $POD -- icnctl auth token --coop-id &lt;COOP_ID&gt; --ga
 <h4>Level 2 Verification (Steward Vouching)</h4>
 <p>Get vouched by a trusted steward.</p>
 <p><strong>POST</strong> <code>/v1/sdis/verify/level2</code></p>
-<pre><code class="language-bash">curl -X POST http://10.8.30.40:30080/v1/sdis/verify/level2 \
+<pre><code class="language-bash">curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/verify/level2 \
   -H &quot;Authorization: Bearer &lt;steward-token&gt;&quot; \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{
@@ -133,7 +133,7 @@ kubectl exec -it -n icn $POD -- icnctl auth token --coop-id &lt;COOP_ID&gt; --ga
 <h4>List Anchor Devices</h4>
 <p>Get all trusted devices for a specific anchor.</p>
 <p><strong>GET</strong> <code>/v1/sdis/anchor/{anchor_id}/devices</code></p>
-<pre><code class="language-bash">curl http://10.8.30.40:30080/v1/sdis/anchor/anchor_123/devices \
+<pre><code class="language-bash">curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/anchor/anchor_123/devices \
   -H &quot;Authorization: Bearer &lt;your-token&gt;&quot;
 </code></pre>
 <p><strong>Response:</strong></p>
@@ -151,7 +151,7 @@ kubectl exec -it -n icn $POD -- icnctl auth token --coop-id &lt;COOP_ID&gt; --ga
 <h4>Add Anchor</h4>
 <p>Add a new anchor device.</p>
 <p><strong>POST</strong> <code>/v1/sdis/anchor/devices/add</code></p>
-<pre><code class="language-bash">curl -X POST http://10.8.30.40:30080/v1/sdis/anchor/devices/add \
+<pre><code class="language-bash">curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/anchor/devices/add \
   -H &quot;Authorization: Bearer &lt;your-token&gt;&quot; \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{
@@ -163,13 +163,13 @@ kubectl exec -it -n icn $POD -- icnctl auth token --coop-id &lt;COOP_ID&gt; --ga
 <h4>Get Anchor Details</h4>
 <p>Get anchor metadata and rotation/device information.</p>
 <p><strong>GET</strong> <code>/v1/sdis/anchor/{anchor_id}</code></p>
-<pre><code class="language-bash">curl http://10.8.30.40:30080/v1/sdis/anchor/anchor_123 \
+<pre><code class="language-bash">curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/anchor/anchor_123 \
   -H &quot;Authorization: Bearer &lt;your-token&gt;&quot;
 </code></pre>
 <h4>Rotate Anchor Keys</h4>
 <p>Rotate keys for an existing anchor.</p>
 <p><strong>POST</strong> <code>/v1/sdis/anchor/rotate-keys</code></p>
-<pre><code class="language-bash">curl -X POST http://10.8.30.40:30080/v1/sdis/anchor/rotate-keys \
+<pre><code class="language-bash">curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/anchor/rotate-keys \
   -H &quot;Authorization: Bearer &lt;your-token&gt;&quot; \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{
@@ -188,7 +188,7 @@ kubectl exec -it -n icn $POD -- icnctl auth token --coop-id &lt;COOP_ID&gt; --ga
 <h4>Initiate Recovery</h4>
 <p>Start identity recovery ceremony using anchor/vui context and verification data.</p>
 <p><strong>POST</strong> <code>/v1/sdis/recovery/start</code></p>
-<pre><code class="language-bash">curl -X POST http://10.8.30.40:30080/v1/sdis/recovery/start \
+<pre><code class="language-bash">curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/recovery/start \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{
     &quot;anchor_id&quot;: &quot;anchor_123&quot;,
@@ -209,13 +209,13 @@ kubectl exec -it -n icn $POD -- icnctl auth token --coop-id &lt;COOP_ID&gt; --ga
 </code></pre>
 <h4>Check Recovery Status</h4>
 <p><strong>GET</strong> <code>/v1/sdis/recovery/{recovery_id}</code></p>
-<pre><code class="language-bash">curl http://10.8.30.40:30080/v1/sdis/recovery/recovery_xyz... \
+<pre><code class="language-bash">curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/recovery/recovery_xyz... \
   -H &quot;Authorization: Bearer &lt;your-token&gt;&quot;
 </code></pre>
 <h4>Complete Recovery</h4>
 <p>Finalize recovery with challenge response.</p>
 <p><strong>POST</strong> <code>/v1/sdis/recovery/{recovery_id}/complete</code></p>
-<pre><code class="language-bash">curl -X POST http://10.8.30.40:30080/v1/sdis/recovery/recovery_xyz.../complete \
+<pre><code class="language-bash">curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/recovery/recovery_xyz.../complete \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{
     &quot;recovery_share&quot;: &quot;optional-share-fragment&quot;
@@ -226,7 +226,7 @@ kubectl exec -it -n icn $POD -- icnctl auth token --coop-id &lt;COOP_ID&gt; --ga
 <h4>Generate Ephemeral DID</h4>
 <p>Get a temporary DID for device pairing.</p>
 <p><strong>POST</strong> <code>/v1/sdis/ephemeral/generate</code></p>
-<pre><code class="language-bash">curl -X POST http://10.8.30.40:30080/v1/sdis/ephemeral/generate \
+<pre><code class="language-bash">curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/ephemeral/generate \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{
     &quot;purpose&quot;: &quot;enrollment&quot;,
@@ -273,7 +273,7 @@ kubectl exec -it -n icn $POD -- icnctl auth token --coop-id &lt;COOP_ID&gt; --ga
   &quot;type&quot;: &quot;icn-enrollment&quot;,
   &quot;enrollment_id&quot;: &quot;enroll_abc123...&quot;,
   &quot;challenge&quot;: &quot;base64-challenge&quot;,
-  &quot;gateway_url&quot;: &quot;http://10.8.30.40:30080&quot;
+  &quot;gateway_url&quot;: &quot;http://&lt;ICN_GATEWAY_HOST&gt;:30080&quot;
 }
 </code></pre>
 <hr>
@@ -337,17 +337,17 @@ kubectl exec -it -n icn $POD -- icnctl auth token --coop-id &lt;COOP_ID&gt; --ga
 <h2>Testing</h2>
 <p>Test the full flow:</p>
 <pre><code class="language-bash"># 1. Health check
-curl http://10.8.30.40:30080/v1/sdis/health
+curl http://${ICN_GATEWAY_HOST}:30080/v1/sdis/health
 
 # 2. Start enrollment
-ENROLLMENT=$(curl -X POST http://10.8.30.40:30080/v1/sdis/enrollment/start \
+ENROLLMENT=$(curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/enrollment/start \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{&quot;identity_name&quot;:&quot;TestUser&quot;,&quot;coop_id&quot;:&quot;test-coop&quot;}&#39; | jq -r &#39;.enrollment_id&#39;)
 
 echo &quot;Enrollment ID: $ENROLLMENT&quot;
 
 # 3. Generate ephemeral DID for device
-EPHEMERAL=$(curl -X POST http://10.8.30.40:30080/v1/sdis/ephemeral/generate \
+EPHEMERAL=$(curl -X POST http://${ICN_GATEWAY_HOST}:30080/v1/sdis/ephemeral/generate \
   -H &quot;Content-Type: application/json&quot; \
   -d &#39;{&quot;purpose&quot;:&quot;enrollment&quot;,&quot;ttl_seconds&quot;:3600}&#39; | jq -r &#39;.ephemeral_did&#39;)
 

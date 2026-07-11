@@ -80,29 +80,29 @@ For current readiness, rely on live CI/runtime verification and <code>docs/ci/CI
 </thead>
 <tbody><tr>
 <td>k3s-control</td>
-<td>10.8.30.40</td>
+<td>${ICN_K3S_CONTROL}</td>
 <td>K3s control plane</td>
 </tr>
 <tr>
 <td>k3s-worker-1</td>
-<td>10.8.30.41</td>
+<td>${ICN_K3S_WORKER1}</td>
 <td>K3s worker node</td>
 </tr>
 <tr>
 <td>k3s-worker-2</td>
-<td>10.8.30.42</td>
+<td>${ICN_K3S_WORKER2}</td>
 <td>K3s worker node</td>
 </tr>
 <tr>
 <td>Atlas</td>
-<td>10.8.10.25</td>
+<td>${ICN_NFS_HOST}</td>
 <td>NFS storage (<code>atlas-nfs</code> StorageClass)</td>
 </tr>
 </tbody></table>
 <p><strong>Current ICN Identity</strong>: <code>did:icn:z3TE1ei6B4L5j6Jp29RmJKt1FYonGaQAXQoYHJL3GULR3</code></p>
 <h3>Quick Access</h3>
 <pre><code class="language-bash"># SSH to K3s control plane
-ssh ubuntu@10.8.30.40
+ssh ubuntu@${ICN_K3S_CONTROL}
 
 # Check cluster status
 sudo kubectl get nodes
@@ -128,7 +128,7 @@ curl http://localhost:9100/metrics
 </thead>
 <tbody><tr>
 <td><strong>Grafana</strong></td>
-<td><a href="http://10.8.30.40:30300" target="_blank" rel="noopener">http://10.8.30.40:30300</a></td>
+<td>http://${ICN_K3S_CONTROL}:30300</td>
 </tr>
 <tr>
 <td><strong>ICN Metrics</strong></td>
@@ -565,7 +565,7 @@ docker system prune -a
 <ul>
 <li><strong>File</strong>: <code>docker-compose.test.yml</code></li>
 <li><strong>Services</strong>: node1, node2, node3, node4 (optional), prometheus, grafana</li>
-<li><strong>Networks</strong>: icn_test (172.20.0.0/16)</li>
+<li><strong>Networks</strong>: icn_test (operator-supplied bridge subnet)</li>
 <li><strong>Volumes</strong>: 6 persistent volumes</li>
 </ul>
 <h3>Security Configuration</h3>
