@@ -59,6 +59,13 @@ pub enum InstitutionBootstrapCommands {
         #[arg(short, long)]
         coop_id: String,
 
+        /// Trusted LOCAL issuance for a co-located operator: mint the bootstrap
+        /// token in-process with this node's own gateway JWT secret
+        /// (ICN_GATEWAY_JWT_SECRET in the environment) instead of the network
+        /// /auth/verify flow. Does not use — or weaken — #2075.
+        #[arg(long, default_value_t = false)]
+        local_mint: bool,
+
         /// Output machine-readable JSON
         #[arg(long)]
         json: bool,
@@ -184,9 +191,11 @@ pub async fn handle_institution_command(cmd: InstitutionCommands, data_dir: &Pat
                 package,
                 gateway,
                 coop_id,
+                local_mint,
                 json,
             } => {
-                let report = apply_package(&package, &gateway, &coop_id, data_dir).await?;
+                let report =
+                    apply_package(&package, &gateway, &coop_id, data_dir, local_mint).await?;
                 if json {
                     println!("{}", serde_json::to_string_pretty(&report)?);
                 } else {
@@ -427,10 +436,11 @@ pub async fn apply_package(
     gateway: &str,
     coop_id: &str,
     data_dir: &Path,
+    local_mint: bool,
 ) -> Result<BootstrapApplyReport> {
     let loaded = load_package(package_dir)?;
     let plan = make_plan(&loaded);
-    let auth = get_bootstrap_gateway_token(gateway, coop_id, data_dir).await?;
+    let auth = get_bootstrap_gateway_token(gateway, coop_id, data_dir, local_mint).await?;
     run_apply_plan(&loaded, &plan, gateway, &auth).await
 }
 
@@ -1287,6 +1297,7 @@ async fn get_bootstrap_gateway_token(
     gateway: &str,
     coop_id: &str,
     data_dir: &Path,
+    local_mint: bool,
 ) -> Result<BootstrapAuthContext> {
     use icn_identity::{AgeKeyStore, KeyStore};
 
@@ -1300,6 +1311,26 @@ async fn get_bootstrap_gateway_token(
     keystore.unlock(&passphrase)?;
     let keypair = keystore.get_keypair()?;
     let did = keypair.did().to_string();
+
+    if local_mint {
+        // Trusted local issuance: mint the bootstrap token in-process by signing
+        // with this node's own gateway secret, instead of the network
+        // self-asserted /auth/verify flow (which fail-closes on a routable bind,
+        // issue #2075). Same trust boundary as `icnctl auth token --local-mint`.
+        let token = crate::mint_local_trusted_token(
+            keypair.did(),
+            coop_id,
+            vec![
+                "entity:write".to_string(),
+                "governance:read".to_string(),
+                "governance:write".to_string(),
+            ],
+        )?;
+        return Ok(BootstrapAuthContext {
+            token,
+            subject_did: did,
+        });
+    }
 
     let client = reqwest::Client::new();
     let challenge_url = format!("{gateway}/v1/auth/challenge");

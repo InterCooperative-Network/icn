@@ -63,7 +63,7 @@ as cryptographic verification.
 |---|---|
 | `deploy/appliance/build-image.sh` | Builds the QCOW2 appliance image; `ICN_APPLIANCE_DEMO_PROFILE=1` adds the DEMO profile. Run separately — the wrapper never builds. |
 | `deploy/appliance/smoke/smoke-local.sh --real --demo` | Boots a disposable QEMU overlay and drives the full loop headlessly over the same forwarded ports a browser would use. |
-| `deploy/appliance/scripts/icn-demo-seed.sh` | In-VM: mints a short-lived DEV/DEMO JWT, bootstraps the fixture institution, creates one action item. Not idempotent — use reset for a clean slate. |
+| `deploy/appliance/scripts/icn-demo-seed.sh` | In-VM: mints a short-lived DEV/DEMO session JWT via **trusted local issuance** (signs with this VM's own per-instance gateway secret — see the auth-boundary note below), bootstraps the fixture institution, creates one action item. Not idempotent — use reset for a clean slate. |
 | `deploy/appliance/scripts/icn-demo-verify.sh` | In-VM: per-item receipt consistency check; `--chain` runs the bundled 13-of-13 receipt-chain rehearsal. |
 | `deploy/appliance/scripts/icn-demo-reset.sh` | In-VM: marker-gated demo-state reset (does not reseed). |
 | `deploy/appliance/scripts/icn-demo-session.py` | In-VM loopback (`127.0.0.1:8091`) session endpoint behind a double dev-gate and an Origin allow-list; powers the shell's no-paste "Start local demo" button. |
@@ -71,6 +71,23 @@ as cryptographic verification.
 | `web/member-shell/` | The browser surface the appliance serves (`:8090` in-VM): standing, action cards, the single completion mutation, receipt rendering, permanent honesty banner, i18n seam, automated accessibility harness. |
 | `demo/nycn-dogfood/run.sh` | The workstation-native sibling of the same loop (deliberately on gateway `:8085`); useful for development without a VM. |
 | `scripts/local_receipt_chain_13of13_rehearsal.sh` | The strongest single proof artifact (governed proposal → vote → close → allocation, 13/13 audit, repo-safe evidence packet); bundled in-VM as `icn-demo-verify --chain`. |
+
+## Auth boundary — trusted local issuance vs self-asserted (#2075)
+
+The demo profile binds the gateway to `0.0.0.0:8080` so a browser on the host
+reaches it through QEMU host-forwarding. On any non-loopback bind the public
+self-asserted `/auth/verify` path is **fail-closed** (issue #2075): a DID that
+proves only key ownership can never mint a JWT carrying an arbitrary `coop_id`.
+
+The seed therefore mints its session JWT by **trusted local issuance**:
+`icnctl auth token --local-mint` signs the JWT in-process with the node's own
+per-instance gateway secret (`ICN_GATEWAY_JWT_SECRET`, generated at first boot,
+root-only). That is the gateway issuing a JWT for itself to its local operator —
+categorically distinct from an untrusted remote self-asserting a coop over the
+network. It makes no network call, adds no endpoint, and leaves `/auth/verify`
+fail-closed. `institution bootstrap apply --local-mint` uses the same path. The
+secret never leaves the VM and is never baked into the image; a JWT minted with
+one VM's secret does not verify on any other node.
 
 ## Fast path A — smoke an already-built demo image
 
