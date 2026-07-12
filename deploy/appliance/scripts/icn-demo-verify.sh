@@ -31,6 +31,17 @@
 #       urn:icn:contract:rehearsal-evidence-export:v1 packet and validates it
 #       (fixture-only, offline, no gateway, no writes; fails closed on drift).
 #       Output: /var/lib/icn-demo/pending-publish-evidence/
+#
+#   sudo icn-demo-verify --rehearsal [domain]     (#2386)
+#       Steward-verifies the Rehearsal Node organizer->member loop against THIS
+#       VM's live rehearsal-mode gateway (run after
+#       `sudo icn-demo-seed --session organizer`): the least-privilege capability
+#       matrix (organizer read+review+confirm, canNOT bind/broad-write/complete;
+#       member read+complete, canNOT review/bind), one action item created by
+#       confirmation, the member completion receipt, the process-receipt ladder,
+#       and the value-withheld evidence packet (no DID / no credential). Drives
+#       the loop itself when the browser has not (idempotent on an executed row).
+#       Fictional data on an isolated node; not production, not a pilot.
 # ============================================================================
 set -uo pipefail
 
@@ -89,6 +100,153 @@ if [ "${1:-}" = "--pending-publish" ]; then
     log "evidence copied to $OUT/pending-publish-evidence/"
   fi
   log "OK: pending-publish evidence packet validates against urn:icn:contract:rehearsal-evidence-export:v1"
+  exit 0
+fi
+
+if [ "${1:-}" = "--rehearsal" ]; then
+  # Steward verification of the Rehearsal Node organizer->member loop (#2386):
+  # the least-privilege capability matrix + the end-to-end loop + value-withheld
+  # evidence, against THIS VM's live rehearsal-mode gateway. Run after
+  # `sudo icn-demo-seed --session organizer`. Fail-closed (first mismatch aborts).
+  DOMAIN="${2:-nycn-federation-gov}"
+  [ -f "$ENV_FILE" ] || fatal "$ENV_FILE missing — has firstboot run?"
+  command -v python3 >/dev/null || fatal "python3 missing"
+  # shellcheck disable=SC1090
+  . "$ENV_FILE"
+  [ -n "${ICN_KEYSTORE_PASSPHRASE:-}" ] || fatal "ICN_KEYSTORE_PASSPHRASE not present in $ENV_FILE"
+  [ -n "${ICN_GATEWAY_JWT_SECRET:-}" ] || fatal "ICN_GATEWAY_JWT_SECRET not present in $ENV_FILE — needed for trusted local JWT issuance (icnctl --local-mint)"
+  ICN_PASSPHRASE="$ICN_KEYSTORE_PASSPHRASE"
+  ICN_CHILD_ENV_KEEP="ICN_KEYSTORE_PASSPHRASE ICN_PASSPHRASE ICN_GATEWAY_JWT_SECRET LANG LC_ALL LC_CTYPE TERM"
+
+  # Trusted-local mint (same env-scrub + runuser discipline as the read-JWT below).
+  mint_jwt(){  # $1=scopes -> bare JWT
+    (
+      for _name in $(compgen -e); do
+        case " $ICN_CHILD_ENV_KEEP " in *" $_name "*) : ;; *) unset "$_name" 2>/dev/null || true ;; esac
+      done
+      export PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+      export ICN_KEYSTORE_PASSPHRASE ICN_PASSPHRASE ICN_GATEWAY_JWT_SECRET
+      runuser -u icn -- /usr/local/bin/icnctl --data-dir "$DATA_DIR" auth token --gateway "$GW" --coop-id "$COOP_ID" -s "$1" --local-mint 2>/dev/null # vocab-ok: icnctl CLI subcommand name
+    ) | grep -oE 'eyJ[A-Za-z0-9_.-]+' | head -1
+  }
+  rstatus(){  # $1=METHOD $2=PATH $3=JWT [$4=BODY] -> HTTP code
+    if [ -n "${4:-}" ]; then
+      curl -s -o /dev/null -m 10 -w '%{http_code}' -X "$1" -H "Authorization: Bearer $3" -H 'Content-Type: application/json' -d "$4" "$GW$2"
+    else
+      curl -s -o /dev/null -m 10 -w '%{http_code}' -X "$1" -H "Authorization: Bearer $3" "$GW$2"
+    fi
+  }
+  rbody(){    # $1=METHOD $2=PATH $3=JWT [$4=BODY] -> body
+    if [ -n "${4:-}" ]; then
+      curl -s -m 10 -X "$1" -H "Authorization: Bearer $3" -H 'Content-Type: application/json' -d "$4" "$GW$2"
+    else
+      curl -s -m 10 -X "$1" -H "Authorization: Bearer $3" "$GW$2"
+    fi
+  }
+  expect(){   # $1=desc $2=want $3=got
+    [ "$3" = "$2" ] && log "  OK   $1 (HTTP $3)" || fatal "$1 — expected HTTP $2, got $3"
+  }
+
+  ORG_JWT="$(mint_jwt "governance:read,governance:pending-publish:review,governance:pending-publish:confirm")"
+  MEM_JWT="$(mint_jwt "governance:read,governance:action-item:complete")"
+  { [ -n "$ORG_JWT" ] && [ -n "$MEM_JWT" ]; } || fatal "trusted local token mint failed (icnctl --local-mint). Check ICN_GATEWAY_JWT_SECRET + keystore."
+  log "minted organizer / member tokens (trusted-local; never printed). Setup/init is the seed's job."
+
+  s="$(rstatus GET "/v1/gov/domains/$DOMAIN/rehearsal/pending-publish" "$ORG_JWT")"
+  [ "$s" = "200" ] || fatal "rehearsal workspace not reachable (HTTP $s) — is icnd in ICN_GOVERNANCE_BUILD_MODE=rehearsal and did 'icn-demo-seed --session organizer' run?"
+  log "rehearsal routes mounted; organizer reads the workspace (HTTP 200)."
+
+  # ---- least-privilege NEGATIVE matrix ----
+  probe_bind="$(python3 -c 'import json;print(json.dumps({"label":"probe-x","did":"did:icn:probe"}))')"
+  expect "organizer canNOT bind labels (setup-only)"          403 "$(rstatus POST "/v1/gov/domains/$DOMAIN/rehearsal/bindings" "$ORG_JWT" "$probe_bind")"
+  expect "organizer canNOT create action items (broad write)" 403 "$(rstatus POST "/v1/gov/domains/$DOMAIN/action-items" "$ORG_JWT" '{"title":"x","description":"x","priority":"low"}')"
+  expect "member canNOT bind labels"                          403 "$(rstatus POST "/v1/gov/domains/$DOMAIN/rehearsal/bindings" "$MEM_JWT" "$probe_bind")"
+
+  # ---- locate the fictional action_item row ----
+  list="$(rbody GET "/v1/gov/domains/$DOMAIN/rehearsal/pending-publish" "$ORG_JWT")"
+  ROW="$(python3 -c 'import json,sys
+d=json.load(sys.stdin)
+for r in d.get("rows",[]):
+    if r.get("kind")=="action_item":
+        print(r["id"]); break' <<<"$list")"
+  [ -n "$ROW" ] || fatal "no action_item row in the rehearsal workspace: $list"
+  expect "member canNOT review a row" 403 "$(rstatus POST "/v1/gov/domains/$DOMAIN/rehearsal/pending-publish/$ROW/review" "$MEM_JWT" '{"decision":"approve"}')"
+
+  # ---- ensure the row is confirmed (drive it if the browser has not) ----
+  detail="$(rbody GET "/v1/gov/domains/$DOMAIN/rehearsal/pending-publish/$ROW" "$ORG_JWT")"
+  AI_ID="$(python3 -c 'import json,sys
+d=json.load(sys.stdin).get("row",{})
+print((d.get("execution") or {}).get("action_item_id","") if d.get("executed") else "")' <<<"$detail")"
+  if [ -z "$AI_ID" ]; then
+    expect "organizer approves the fictional item" 200 "$(rstatus POST "/v1/gov/domains/$DOMAIN/rehearsal/pending-publish/$ROW/review" "$ORG_JWT" '{"decision":"approve"}')"
+    preview="$(rbody GET "/v1/gov/domains/$DOMAIN/rehearsal/pending-publish/$ROW/preview" "$ORG_JWT")"
+    digest="$(python3 -c 'import json,sys;print(json.load(sys.stdin).get("preview_digest",""))' <<<"$preview")"
+    [ -n "$digest" ] || fatal "preview returned no digest (is the assignee label bound? run 'icn-demo-seed --session organizer'): $preview"
+    confirm="$(rbody POST "/v1/gov/domains/$DOMAIN/rehearsal/pending-publish/$ROW/confirm" "$ORG_JWT" "$(python3 -c 'import json,sys;print(json.dumps({"preview_digest":sys.argv[1]}))' "$digest")")"
+    AI_ID="$(python3 -c 'import json,sys;print(json.load(sys.stdin).get("action_item_id",""))' <<<"$confirm")"
+    [ -n "$AI_ID" ] || fatal "confirm did not create an action item: $confirm"
+    log "organizer confirmed -> created one real action item: $AI_ID"
+  else
+    log "action item already confirmed (browser walkthrough): $AI_ID"
+  fi
+
+  # ---- completion: organizer canNOT; member CAN (if not already completed) ----
+  crec="$(rbody GET "/v1/gov/domains/$DOMAIN/action-items/$AI_ID/completion-receipt" "$MEM_JWT")"
+  already="$(python3 -c 'import json,sys
+try:
+    print("1" if json.load(sys.stdin).get("transition")=="completed" else "")
+except Exception:
+    print("")' <<<"$crec")"
+  if [ -z "$already" ]; then
+    expect "organizer canNOT complete the member item" 403 "$(rstatus PUT "/v1/gov/domains/$DOMAIN/action-items/$AI_ID/status" "$ORG_JWT" '{"status":"completed"}')"
+    expect "member completes the assigned item"        200 "$(rstatus PUT "/v1/gov/domains/$DOMAIN/action-items/$AI_ID/status" "$MEM_JWT" '{"status":"completed"}')"
+    crec="$(rbody GET "/v1/gov/domains/$DOMAIN/action-items/$AI_ID/completion-receipt" "$MEM_JWT")"
+  else
+    log "item already completed (browser walkthrough)."
+  fi
+
+  # ---- completion receipt binding check (32-byte record_hash + fields) ----
+  if ! RECEIPT_JSON="$crec" python3 - "$AI_ID" "$DOMAIN" <<'PY'
+import json,os,sys
+r=json.loads(os.environ["RECEIPT_JSON"])
+item,dom=sys.argv[1],sys.argv[2]
+h=r.get("record_hash")
+ok=(isinstance(h,list) and len(h)==32 and all(isinstance(b,int) and 0<=b<=255 for b in h)
+    and r.get("item_id")==item and r.get("domain_id")==dom
+    and r.get("transition")=="completed"
+    and isinstance(r.get("completed_at"),(int,float)) and r.get("completed_at")>0)
+sys.exit(0 if ok else 1)
+PY
+  then fatal "completion receipt failed the 32-byte binding check: $crec"; fi
+  log "member completion receipt validates (32-byte record_hash + field binding)."
+
+  # ---- process receipts + value-withheld evidence (no DID / no credential) ----
+  receipts="$(rbody GET "/v1/gov/domains/$DOMAIN/rehearsal/receipts" "$ORG_JWT")"
+  evidence="$(rbody GET "/v1/gov/domains/$DOMAIN/rehearsal/evidence-export" "$ORG_JWT")"
+  if ! RC="$receipts" EV="$evidence" python3 - <<'PY'
+import json,os,re,sys
+rc=json.loads(os.environ["RC"]); ev=json.loads(os.environ["EV"])
+classes={x.get("class") for x in rc.get("receipts",[])}
+for need in ("process_gate_result","activation_crossed","mutation_plan_recorded","mutation_applied"):
+    if need not in classes: sys.exit("process receipts missing "+need)
+for k in ("contract","run_id","generation","rows","packet_hash","packet_hash_sha256","non_claims","privacy_review_result"):
+    if k not in ev: sys.exit("evidence missing "+k)
+if ev["contract"]!="urn:icn:contract:rehearsal-workflow-evidence:v1": sys.exit("evidence wrong contract")
+blob=json.dumps(rc)+json.dumps(ev)
+if re.search(r'did:icn:',blob): sys.exit("receipts/evidence leaked a did:icn:")
+if re.search(r'eyJ[A-Za-z0-9_-]{20,}\.',blob): sys.exit("receipts/evidence leaked a JWT")
+pr=ev.get("privacy_review",{})
+if pr.get("dids_exported") or pr.get("credentials_exported"): sys.exit("privacy_review flags a leak")
+PY
+  then fatal "process receipts / evidence failed validation or the value-withheld (no-DID / no-credential) check"; fi
+  log "process receipts (gate/activation/plan/applied) + value-withheld evidence validate (no DID, no credential)."
+
+  log "PASS — Rehearsal Node organizer->member loop verified end-to-end on THIS VM:"
+  log "  least-privilege matrix (organizer read+review+confirm, canNOT bind/broad-write/complete;"
+  log "  member read+complete, canNOT review/bind); one action item created by confirm; member"
+  log "  completion receipt + process receipts + value-withheld evidence validate."
+  log "  Fictional data on an isolated node. NOT production, NOT a pilot, NOT federation;"
+  log "  receipts record process facts and grant no authority."
   exit 0
 fi
 

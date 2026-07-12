@@ -483,6 +483,9 @@
       "organizer.connect.body": "Enter a locally running ICN gateway started in Rehearsal mode and paste an organizer review credential. It is kept only on this page while it is open, is never saved, and is sent only to the gateway address you enter.",
       "organizer.connect.credentialHelp": "Needs governance:read, governance:pending-publish:review, and governance:pending-publish:confirm. It must not carry setup, write, completion, or admin authority, and it never contains a DID.",
       "organizer.connect.submit": "Connect and load the rehearsal workspace",
+      "organizer.launch.heading": "Start the organizer rehearsal",
+      "organizer.launch.body": "This page was opened by the local Rehearsal Node launcher. Select Start to begin a fresh organizer session — review one fictional item, confirm it, then continue as the assigned member. There is no address to type and no credential to paste. Fictional data on an isolated node; not a pilot, not live federation.",
+      "organizer.launch.start": "Start organizer rehearsal",
 
       "organizer.domain.heading": "Which domain are you rehearsing in?",
       "organizer.domain.explain": "You are a member of more than one domain. Choose the one whose proposed work you are reviewing.",

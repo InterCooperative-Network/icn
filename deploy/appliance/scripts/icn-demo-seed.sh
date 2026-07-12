@@ -5,7 +5,16 @@
 # DEMO PROFILE ONLY. Installed by build-image.sh when
 # ICN_APPLIANCE_DEMO_PROFILE=1. Run as root inside the appliance VM:
 #
-#     sudo icn-demo-seed [--json]
+#     sudo icn-demo-seed [--json]                       # legacy member action-item loop
+#     sudo icn-demo-seed --session organizer [--json]   # Rehearsal Node organizer session (#2386)
+#     sudo icn-demo-seed --session member   [--json]    # Rehearsal Node member session (#2386)
+#
+# The --session path drives the Rehearsal Node organizer review->confirm loop
+# (requires the daemon in ICN_GOVERNANCE_BUILD_MODE=rehearsal). It initializes
+# the rehearsal workspace + binds a fictional assignee label to the operator DID
+# ONCE, then mints a least-privilege per-role browser session (organizer =
+# read+review+confirm; member = read+complete). It does NOT pre-seed an action
+# item — the organizer creates it by confirming, and the member completes it.
 #
 # What it does (all against THIS VM's own gateway on 127.0.0.1:8080):
 #   1. Waits for the gateway to be healthy.
@@ -46,8 +55,11 @@
 #     this command, in your terminal, on request.
 #
 # Idempotency: re-running re-applies the institution package (a no-op when
-# already applied) and creates an additional open action item. For a clean
-# slate use icn-demo-reset.
+# already applied). The default (legacy) path creates an additional open action
+# item each run. The --session (Rehearsal Node) path is idempotent: it
+# initializes the rehearsal workspace + binds the fictional label ONCE (only if
+# absent, so an organizer-created item is never wiped) and mints a fresh
+# least-privilege per-role session. For a clean slate use icn-demo-reset.
 # ============================================================================
 set -uo pipefail
 
@@ -73,11 +85,39 @@ DOMAIN="${ICN_DEMO_DOMAIN:-nycn-federation-gov}"
 # reach broad governance-mutation routes.
 SETUP_SCOPES="governance:meeting:write"
 BROWSER_SCOPES="governance:read,governance:action-item:complete"
+# Rehearsal-loop scope sets (#2386) — narrow, non-write, allowlisted, --local-mint-issuable:
+#   REHEARSAL_SETUP: initializes the workspace + binds fictional labels. INTERNAL — never printed.
+#     governance:read is the minimum genuinely required for the idempotent GET
+#     probe (the read routes need it); governance:rehearsal:setup authorizes the
+#     reset (init) + bindings. It carries NO write/admin/complete class.
+#   ORGANIZER (browser): read + review + confirm. Cannot bind, initialize, complete, or write.
+#   MEMBER (browser): read + completion-only (#2400). Cannot review, confirm, bind, or initialize.
+REHEARSAL_SETUP_SCOPES="governance:read,governance:rehearsal:setup"
+ORGANIZER_SCOPES="governance:read,governance:pending-publish:review,governance:pending-publish:confirm"
+MEMBER_SCOPES="$BROWSER_SCOPES"
+REHEARSAL_LABEL="Example member (fictional)"
+
 JSON_OUT=0
-[ "${1:-}" = "--json" ] && JSON_OUT=1
+SESSION_ROLE=""   # "" = legacy pre-seeded member loop; "organizer"|"member" = Rehearsal Node role session
 
 log(){ [ "$JSON_OUT" = 1 ] || echo "[demo-seed] $*"; }
 fatal(){ echo "[demo-seed] FATAL: $*" >&2; exit 1; }
+
+# Argument parse. A --session role is validated against a CLOSED allowlist and
+# only ever selects a scope constant above — it is never interpolated into any
+# command (preserving the fixed-command safety property).
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --json) JSON_OUT=1; shift ;;
+    --session) shift; SESSION_ROLE="${1:-__missing__}"; [ $# -gt 0 ] && shift ;;
+    --session=*) SESSION_ROLE="${1#--session=}"; shift ;;
+    *) fatal "unknown argument: $1 (usage: icn-demo-seed [--json] [--session organizer|member])" ;;
+  esac
+done
+case "$SESSION_ROLE" in
+  ""|organizer|member) : ;;
+  *) fatal "unknown --session role '$SESSION_ROLE' (allowed: organizer, member)" ;;
+esac
 
 [ "$(id -u)" -eq 0 ] || fatal "run as root: sudo icn-demo-seed"
 [ -f "$ENV_FILE" ]   || fatal "$ENV_FILE missing — has icn-appliance-firstboot run?"
@@ -148,19 +188,57 @@ mint_local_jwt(){
   grep -oE 'eyJ[A-Za-z0-9_.-]+' <<<"$out" | head -1
 }
 
-# SETUP JWT — provisions the demo loop (dev standing-bootstrap + action-item
-# creation). Internal to this root-invoked seed; NEVER printed or returned.
-SETUP_JWT="$(mint_local_jwt "$SETUP_SCOPES")"
-[ -n "$SETUP_JWT" ] || fatal "trusted local SETUP-JWT mint failed (icnctl --local-mint). Check ICN_GATEWAY_JWT_SECRET is present in $ENV_FILE and the keystore unlocks. This path signs with THIS VM's own gateway secret and never uses the public self-asserted /auth/verify flow (issue #2075)."
-AUTH_SETUP="Authorization: Bearer $SETUP_JWT"
+# ---- Rehearsal Node helpers (#2386) ----
+# HTTP status of a rehearsal-route call (curl runs as root against loopback,
+# exactly like the standing-bootstrap / action-item calls below). A JSON body,
+# when present, is built by python json.dumps so labels/DIDs are safely encoded.
+rehearsal_status(){  # $1=METHOD $2=PATH $3=JWT [$4=BODY]
+  local method="$1" path="$2" jwt="$3" body="${4:-}"
+  if [ -n "$body" ]; then
+    curl -s -o /dev/null -m 10 -w '%{http_code}' -X "$method" \
+      -H "Authorization: Bearer $jwt" -H 'Content-Type: application/json' \
+      -d "$body" "$GW$path"
+  else
+    curl -s -o /dev/null -m 10 -w '%{http_code}' -X "$method" \
+      -H "Authorization: Bearer $jwt" "$GW$path"
+  fi
+}
 
-# BROWSER JWT — the narrow, least-privilege credential handed to the member
-# shell (governance:read + the single action-item completion class). The ONLY
-# JWT this seed prints.
-BROWSER_JWT="$(mint_local_jwt "$BROWSER_SCOPES")"
-[ -n "$BROWSER_JWT" ] || fatal "trusted local BROWSER-JWT mint failed (icnctl --local-mint). Check ICN_GATEWAY_JWT_SECRET is present in $ENV_FILE and the keystore unlocks."
-AUTH_BROWSER="Authorization: Bearer $BROWSER_JWT"
-log "minted two trusted-local JWTs: a setup JWT (internal, never printed) and a narrow browser JWT (printed at the end — local VM only)."
+# Idempotent one-time rehearsal setup: initialize the workspace and bind the
+# fictional assignee label to the operator DID (a StaticList member of $DOMAIN
+# via the applied package). Runs init+bind ONLY when the workspace does not
+# already exist, so a re-mint never wipes an organizer-created item (reset =
+# "new generation").
+ensure_rehearsal_workspace(){  # $1=SETUP_JWT
+  local setup="$1" status body
+  status="$(rehearsal_status GET "/v1/gov/domains/$DOMAIN/rehearsal/pending-publish" "$setup")"
+  if [ "$status" = "200" ]; then
+    log "rehearsal workspace already initialized (generation preserved)."
+    return 0
+  fi
+  [ "$status" = "404" ] || fatal "unexpected HTTP $status probing the rehearsal workspace — is icnd in ICN_GOVERNANCE_BUILD_MODE=rehearsal? (rehearsal routes 404 otherwise)"
+  log "initializing the rehearsal workspace for $DOMAIN ..."
+  status="$(rehearsal_status POST "/v1/gov/domains/$DOMAIN/rehearsal/reset" "$setup" '{}')"
+  [ "$status" = "200" ] || fatal "rehearsal workspace init (reset) failed: HTTP $status (setup scope governance:rehearsal:setup)"
+  body="$(python3 -c 'import json,sys; print(json.dumps({"label": sys.argv[1], "did": sys.argv[2]}))' "$REHEARSAL_LABEL" "$DID")"
+  status="$(rehearsal_status POST "/v1/gov/domains/$DOMAIN/rehearsal/bindings" "$setup" "$body")"
+  [ "$status" = "200" ] || fatal "rehearsal label binding failed: HTTP $status (label '$REHEARSAL_LABEL' -> operator DID; the operator must be a domain member — it is, via the package StaticList)"
+  log "rehearsal workspace ready (label '$REHEARSAL_LABEL' bound to the operator DID)."
+}
+
+# ---- internal SETUP credential (scope depends on the path) ----
+# Legacy path: governance:meeting:write (creates the pre-seeded action item).
+# Rehearsal path (#2386): governance:rehearsal:setup (initializes the workspace
+# + binds the fictional label). Either way the SETUP JWT is INTERNAL — never
+# printed or returned.
+if [ -n "$SESSION_ROLE" ]; then
+  SETUP_JWT="$(mint_local_jwt "$REHEARSAL_SETUP_SCOPES")"
+  [ -n "$SETUP_JWT" ] || fatal "trusted local rehearsal-setup JWT mint failed (icnctl --local-mint). Check ICN_GATEWAY_JWT_SECRET is present in $ENV_FILE and the keystore unlocks. This path signs with THIS VM's own gateway secret and never uses the public self-asserted /auth/verify flow (issue #2075)."
+else
+  SETUP_JWT="$(mint_local_jwt "$SETUP_SCOPES")"
+  [ -n "$SETUP_JWT" ] || fatal "trusted local SETUP-JWT mint failed (icnctl --local-mint). Check ICN_GATEWAY_JWT_SECRET is present in $ENV_FILE and the keystore unlocks. This path signs with THIS VM's own gateway secret and never uses the public self-asserted /auth/verify flow (issue #2075)."
+fi
+AUTH_SETUP="Authorization: Bearer $SETUP_JWT"
 
 log "applying NYCN institution package (fictional fixture institution)..."
 as_icn /usr/local/bin/icnctl --data-dir "$DATA_DIR" institution bootstrap apply \
@@ -168,17 +246,82 @@ as_icn /usr/local/bin/icnctl --data-dir "$DATA_DIR" institution bootstrap apply 
   || fatal "institution bootstrap apply failed (see /tmp/icn-demo-seed-bootstrap.log)"
 log "institution package applied."
 
-# Dev-gated standing bootstrap (best-effort; the action-item loop does not
-# strictly require it, but the shell's standing pane is richer with it).
-# The endpoint bootstraps the AUTHENTICATED caller's DID (claims.sub) in the
-# given jurisdiction — the body carries jurisdiction_id only, never a DID
-# (see icn-gateway api/commons dev_bootstrap_standing).
+# Dev-gated standing bootstrap (best-effort; the loops do not strictly require
+# it, but the shell's standing pane is richer with it). The endpoint bootstraps
+# the AUTHENTICATED caller's DID (claims.sub) in the given jurisdiction — the
+# body carries jurisdiction_id only, never a DID.
 standing_note="bootstrap-standing: ok"
 if ! curl -sf -m 5 -X POST -H "$AUTH_SETUP" -H 'Content-Type: application/json' \
       -d "{\"jurisdiction_id\":\"$DOMAIN\"}" "$GW/v1/commons/dev/bootstrap-standing" >/dev/null 2>&1; then
-  standing_note="bootstrap-standing: unavailable (dev gate off or endpoint shape changed) — standing pane may be sparse; action-item loop unaffected"
+  standing_note="bootstrap-standing: unavailable (dev gate off or endpoint shape changed) — standing pane may be sparse; loop unaffected"
   log "WARN: $standing_note"
 fi
+
+# ============================================================================
+# Rehearsal Node organizer->member loop (#2386): idempotent one-time workspace
+# init + a least-privilege per-role session. No pre-seeded action item — the
+# organizer creates it by confirming; the member completes it.
+# ============================================================================
+if [ -n "$SESSION_ROLE" ]; then
+  ensure_rehearsal_workspace "$SETUP_JWT"
+  case "$SESSION_ROLE" in
+    organizer) ROLE_SCOPES="$ORGANIZER_SCOPES" ;;
+    member)    ROLE_SCOPES="$MEMBER_SCOPES" ;;
+  esac
+  ROLE_JWT="$(mint_local_jwt "$ROLE_SCOPES")"
+  [ -n "$ROLE_JWT" ] || fatal "trusted local $SESSION_ROLE-JWT mint failed (icnctl --local-mint)."
+  log "minted a least-privilege $SESSION_ROLE session (the setup JWT stays internal, never printed)."
+  # The organizer opens ?surface=organizer; the member opens the plain member surface.
+  if [ "$SESSION_ROLE" = "organizer" ]; then SHELL_SUFFIX="?mode=live&surface=organizer"; else SHELL_SUFFIX="?mode=live"; fi
+
+  if [ "$JSON_OUT" = 1 ]; then
+    python3 -c 'import json,sys
+print(json.dumps({"did": sys.argv[1], "jwt": sys.argv[2], "role": sys.argv[3],
+                  "surface": sys.argv[3], "domain": sys.argv[4], "gateway": sys.argv[5],
+                  "standing_note": sys.argv[6]}))' \
+      "$DID" "$ROLE_JWT" "$SESSION_ROLE" "$DOMAIN" "$GW" "$standing_note"
+    exit 0
+  fi
+
+  cat <<EOF
+
+===================== ICN REHEARSAL NODE — $SESSION_ROLE session =====================
+ Gateway (in-VM):    $GW
+ Member shell:       http://localhost:8090/member-shell/$SHELL_SUFFIX
+ Operator DID:       $DID
+ Domain:             $DOMAIN   (fictional StaticList rehearsal domain)
+ Bound label:        $REHEARSAL_LABEL  ->  the operator DID
+ $standing_note
+
+ $SESSION_ROLE session JWT (LOCAL VM ONLY — trusted local issuance, this VM's own
+ per-instance gateway secret; least-privilege $ROLE_SCOPES):
+ $ROLE_JWT
+
+ Honesty labels:
+   rehearsal : fictional data on an isolated node. Not a pilot, not live
+               federation. Confirming creates REAL receipts + one action item
+               on THIS VM only; receipts record process facts, grant no authority.
+   NOT real  : no production, no pilot, no federation, no real members.
+
+ Loop: organizer reviews -> confirms one fictional item -> a fresh least-privilege
+ member session completes it -> steward verifies.
+ Verify: sudo icn-demo-verify --rehearsal $DOMAIN
+ Reset:  sudo icn-demo-reset   (then re-run icn-demo-seed --session organizer)
+====================================================================================
+EOF
+  exit 0
+fi
+
+# ============================================================================
+# Legacy pre-seeded member action-item loop (unchanged behavior).
+# ============================================================================
+# BROWSER JWT — the narrow, least-privilege credential handed to the member
+# shell (governance:read + the single action-item completion class). The ONLY
+# JWT this legacy path prints.
+BROWSER_JWT="$(mint_local_jwt "$BROWSER_SCOPES")"
+[ -n "$BROWSER_JWT" ] || fatal "trusted local BROWSER-JWT mint failed (icnctl --local-mint). Check ICN_GATEWAY_JWT_SECRET is present in $ENV_FILE and the keystore unlocks."
+AUTH_BROWSER="Authorization: Bearer $BROWSER_JWT"
+log "minted the narrow browser JWT (governance:read + action-item completion only)."
 
 log "creating one open action item assigned to $DID ..."
 item_json="$(curl -s -m 10 -X POST -H "$AUTH_SETUP" -H 'Content-Type: application/json' \

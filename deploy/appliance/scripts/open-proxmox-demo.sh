@@ -65,7 +65,10 @@ JUMP="${ICN_DEMO_JUMP:-}"
 # Carry the chosen ports to the shell so it talks to the gateway + session
 # endpoint on whatever ports this launcher actually forwarded (honoring the
 # ICN_DEMO_*_PORT overrides), not hard-coded defaults.
-SHELL_URL="http://localhost:${SHELL_PORT}/member-shell/?mode=live&demo=launcher&gw=${GW_PORT}&session=${SESSION_PORT}"
+# The Rehearsal Node headline surface is the organizer review->confirm flow
+# (?surface=organizer). The page's "Continue as the assigned member" link drops
+# surface=organizer and mints a fresh member session from the same launcher ports.
+SHELL_URL="http://localhost:${SHELL_PORT}/member-shell/?mode=live&surface=organizer&demo=launcher&gw=${GW_PORT}&session=${SESSION_PORT}"
 GATEWAY_URL="http://localhost:${GW_PORT}"
 
 log()  { printf '[demo-open] %s\n' "$*"; }
@@ -175,13 +178,15 @@ open_browser() {
 
 cat <<EOF
 
-  ============================ ICN LOCAL DEMO OPEN ============================
-   Member shell : ${SHELL_URL}
-   Gateway      : ${GATEWAY_URL}  (pre-filled in the page; do not type it)
-   In the browser: click "Start local demo" — standing + an action card load.
+  ===================== ICN REHEARSAL NODE — LOCAL OPEN =====================
+   Organizer shell : ${SHELL_URL}
+   Gateway         : ${GATEWAY_URL}  (pre-filled in the page; do not type it)
+   In the browser: click "Start organizer rehearsal" — review one fictional
+   item, confirm it, then "Continue as the assigned member" and complete it.
    No JWT to copy. No gateway to type. No terminal needed after this.
+   Fictional rehearsal data on an isolated node — not a pilot, not federation.
    Stop the demo: press Ctrl-C in this terminal to close the tunnel.
-  ============================================================================
+  ==========================================================================
 
 EOF
 

@@ -25,9 +25,12 @@ ConditionPathExists=/usr/local/sbin/icn-demo-seed
 [Service]
 Type=simple
 # Dev gates passed through so the endpoint's posture check matches icnd's.
+# `rehearsal` (matching the icnd drop-in) keeps the endpoint's non-production
+# gate satisfied AND ensures the seed subprocess it spawns reaches the
+# Rehearsal-mode organizer/member routes on the daemon.
 EnvironmentFile=-/etc/icn/icnd.env
 Environment=ICN_ENABLE_ADMIN_ENDPOINTS=true
-Environment=ICN_GOVERNANCE_BUILD_MODE=test
+Environment=ICN_GOVERNANCE_BUILD_MODE=rehearsal
 ExecStart=/usr/bin/python3 /usr/local/sbin/icn-demo-session.py
 Restart=on-failure
 RestartSec=5

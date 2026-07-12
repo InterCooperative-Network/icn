@@ -2419,16 +2419,36 @@
       byId("nav-demo").setAttribute("aria-current", "true");
       loadDemo();
     } else if (SURFACE === "organizer") {
-      // #2386 organizer rehearsal surface: manual organizer credential, then the
-      // review→confirm workflow against a Rehearsal-mode node. No demo launcher
-      // path — the organizer enters a credential manually in this PR.
+      // #2386 organizer rehearsal surface. Manual organizer credential, OR — on
+      // the assembled appliance (?demo=launcher) — a no-paste organizer session
+      // minted by the loopback demo-session endpoint.
       banner.textContent = t("banner.organizer");
       banner.className = "banner live";
       byId("nav-live").setAttribute("aria-current", "true");
       applyOrganizerConnectCopy();
       wireConnectForm(loadOrganizer);
-      show("connect-section");
-      setSyncChip(t(SYNC.DELAYED), "neutral", t("launcher.notConnected"));
+      if (DEMO_LAUNCHER) {
+        // Point the member-transition link at the MEMBER launcher URL so the
+        // organizer continues as the member via a FRESH least-privilege session
+        // (never a token upgrade), and offer the one-click organizer start.
+        var ml = byId("organizer-member-link");
+        if (ml) {
+          var mp = new URLSearchParams();
+          mp.set("mode", "live"); mp.set("demo", "launcher");
+          if (params.get("gw")) { mp.set("gw", params.get("gw")); }
+          if (params.get("session")) { mp.set("session", params.get("session")); }
+          if (langParam) { mp.set("lang", langParam); }
+          ml.setAttribute("href", "?" + mp.toString());
+        }
+        byId("gateway-url").value = DEMO_GATEWAY;
+        setOrganizerLaunchCopy();
+        show("demo-launch-section");
+        setSyncChip(t(SYNC.DELAYED), "neutral", t("launcher.ready"));
+        wireDemoLaunch("organizer", loadOrganizer);
+      } else {
+        show("connect-section");
+        setSyncChip(t(SYNC.DELAYED), "neutral", t("launcher.notConnected"));
+      }
     } else {
       banner.textContent = t("banner.live");
       banner.className = "banner live";
@@ -2441,12 +2461,22 @@
         byId("gateway-url").value = DEMO_GATEWAY;
         show("demo-launch-section");
         setSyncChip(t(SYNC.DELAYED), "neutral", t("launcher.ready"));
-        wireDemoLaunch();
+        wireDemoLaunch("member", loadLive);
       } else {
         show("connect-section");
         setSyncChip(t(SYNC.DELAYED), "neutral", t("launcher.notConnected"));
       }
     }
+  }
+
+  // On the assembled appliance the organizer launch panel re-uses the demo-launch
+  // section; give it organizer-rehearsal copy (the manual-connect fallback is the
+  // organizer connect form, already wired above).
+  function setOrganizerLaunchCopy() {
+    byId("demo-launch-h").textContent = t("organizer.launch.heading");
+    var body = document.querySelector("#demo-launch-section p[data-i18n=\"demoLaunch.body\"]");
+    if (body) { body.textContent = t("organizer.launch.body"); }
+    byId("demo-launch-button").textContent = t("organizer.launch.start");
   }
 
   // Apply the catalog to every static node carrying data-i18n (textContent)
@@ -2493,7 +2523,11 @@
   // a fresh demo session, hold it in page memory (never persisted, never in a
   // URL), then load standing + cards — the same render path as the manual
   // flow. Falls back to the manual connect form on any failure.
-  function wireDemoLaunch() {
+  // role is the CLOSED session intent ("member" | "organizer"); loader is the
+  // surface loader to run once the session is minted. The manual-connect fallback
+  // uses the connect form already wired for this surface in init().
+  function wireDemoLaunch(role, loader) {
+    loader = loader || loadLive;
     var btn = byId("demo-launch-button");
     var adv = byId("demo-advanced-button");
     var st = byId("demo-launch-status");
@@ -2506,8 +2540,15 @@
     btn.addEventListener("click", function () {
       btn.disabled = true;
       st.textContent = t("launcher.starting");
-      // Simple cross-origin POST (no custom headers) — no preflight needed.
-      fetch(DEMO_SESSION_URL, { method: "POST" }).then(function (resp) {
+      // JSON body carries the CLOSED role intent; the loopback session endpoint
+      // maps it to a fixed command and mints a least-privilege per-role session.
+      // This triggers a CORS preflight, which the endpoint answers for the
+      // demo-shell origin. The credential lives only in page memory.
+      fetch(DEMO_SESSION_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role: role })
+      }).then(function (resp) {
         if (!resp.ok) { throw new Error("HTTP " + resp.status); }
         return resp.json();
       }).then(function (session) {
@@ -2519,7 +2560,7 @@
         state.credential = cred;
         hide("demo-launch-section");
         show("connect-section");
-        loadLive();
+        loader();
       }).catch(function (err) {
         btn.disabled = false;
         st.textContent = t("launcher.startFailed", { error: err.message });
