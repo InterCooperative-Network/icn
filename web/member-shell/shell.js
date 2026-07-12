@@ -1681,8 +1681,11 @@
     domains.forEach(function (d, i) {
       var choice = el("div", { class: "organizer-choice" });
       var id = "org-domain-" + i;
+      // Deliberately NOT pre-checked: with more than one eligible domain the
+      // organizer must make an explicit choice (the chooseFirst guard below
+      // refuses to open until one is selected), so they can never land in the
+      // wrong rehearsal workspace by just pressing Open/Enter.
       var radio = el("input", { type: "radio", name: "org-domain", id: id, value: d.domain_id });
-      if (i === 0) { radio.setAttribute("checked", "checked"); }
       var label = el("label", { for: id,
         text: (d.domain_name || d.domain_id) + " (" + t("organizer.domain.member") + ")" });
       choice.appendChild(radio);
@@ -2175,6 +2178,10 @@
     var rowId = org.selectedRowId, seq = orgSeq;
     var summary = (summaryVal || "").trim();
     if (!summary) { setOrgStatus(t("organizer.edit.empty")); return; }
+    // The runtime bounds plain_summary to 256 BYTES; maxlength counts UTF-16 code
+    // units, so validate the UTF-8 byte length here to fail friendly rather than
+    // as a raw backend error on non-ASCII input.
+    if (new TextEncoder().encode(summary).length > 256) { setOrgStatus(t("organizer.edit.tooLong")); return; }
     org.busy = true; setOrgControlsDisabled(true);
     setOrgStatus(t("organizer.edit.saving"));
     liveFetch(orgRowPath(rowId), { method: "PUT", body: JSON.stringify({ plain_summary: summary }) }).then(function (resp) {
@@ -2253,7 +2260,7 @@
 
   function doConfirm(confirmBtn) {
     if (org.busy) { return; }
-    var rowId = org.selectedRowId, version = org.detail.row.version, seq = orgSeq;
+    var rowId = org.selectedRowId, seq = orgSeq;
     var digest = org.preview && org.preview.preview_digest;
     if (!digest) { return; }
     org.busy = true;

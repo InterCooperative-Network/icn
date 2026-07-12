@@ -526,6 +526,7 @@
       "organizer.edit.saving": "Saving the summary…",
       "organizer.edit.saved": "Summary updated; this item is awaiting review again.",
       "organizer.edit.empty": "Enter a summary before saving.",
+      "organizer.edit.tooLong": "The summary is too long (over 256 bytes). Shorten it and try again.",
 
       "organizer.assign.heading": "Assign to a registered label",
       "organizer.assign.label": "Assignee label",

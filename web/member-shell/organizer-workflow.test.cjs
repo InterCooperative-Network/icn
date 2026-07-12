@@ -127,10 +127,18 @@ async function driveToApproved(page) {
       const { ctx, page } = await connect(browser, { standing: standing(DOMAIN_TWO), workspaces: { 'dom-1': makeWorkspace(), 'dom-2': makeWorkspace() } });
       await page.waitForSelector('#organizer-domain-section:not([hidden])', { timeout: 8000 });
       check('two domains → explicit picker shown', (await page.locator('#organizer-domain-choices input[type="radio"]').count()) === 2);
+      check('no radio pre-selected (deliberate choice required)', (await page.locator('#organizer-domain-choices input[type="radio"]:checked').count()) === 0);
       check('workspace NOT auto-opened before choice', !(await page.isVisible('#organizer-workspace-section').catch(() => true)));
+      // Pressing Open with nothing chosen must refuse and prompt, not open a domain.
+      await page.click('#organizer-domain-open');
+      check('Open with no selection is refused + prompts',
+        !(await page.isVisible('#organizer-workspace-section').catch(() => true)) &&
+        /choose a domain/i.test((await page.textContent('#organizer-domain-status')) || ''));
+      // Make a deliberate choice, then open.
+      await page.check('#org-domain-1');
       await page.click('#organizer-domain-open');
       await page.waitForSelector('#organizer-workspace-section:not([hidden])', { timeout: 8000 });
-      check('after choice, workspace opens', (await page.locator('#organizer-rows-list > li').count()) === 2);
+      check('after an explicit choice, workspace opens', (await page.locator('#organizer-rows-list > li').count()) === 2);
       await ctx.close();
     }
 
