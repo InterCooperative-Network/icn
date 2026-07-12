@@ -1,0 +1,349 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Rehearsal review workflow — runtime contract (v1) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>contracts</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>rehearsal review workflow</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/contracts/rehearsal-review-workflow.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Rehearsal review workflow — runtime contract (v1)</h1>
+<p><strong>Surface:</strong> organizer pending-publish review/confirm on an isolated
+Rehearsal Node. <strong>Issues:</strong> #1726, #1728, #2386, #1746.</p>
+<h2>Where it exists</h2>
+<p>These routes are mounted <strong>only</strong> when the governance context is built in
+<code>GovernanceContextBuildMode::Rehearsal</code> (<code>ICN_GOVERNANCE_BUILD_MODE=rehearsal</code>,
+exact value; unknown or missing values fall back to Bootstrap, which does NOT
+mount them). In Production, Bootstrap, and Test the routes do not exist
+(404). They are deliberately <strong>not</strong> part of the public OpenAPI document:
+they never exist on a production surface, so the production API contract
+does not advertise them. This document is their contract.</p>
+<p>Everything reviewable here is <strong>fictional rehearsal material</strong> seeded from the
+same deterministic in-code generator that backs the committed-fixture
+pending-publish summary. Confirmed mutations, however, are <strong>real governance
+records</strong> on the rehearsal node: one action item per confirmed row, plus the
+real ADR-0026 process receipts. Receipts record process facts; nothing on
+this surface grants authority.</p>
+<h2>Capabilities</h2>
+<table>
+<thead>
+<tr>
+<th>Scope</th>
+<th>Grants</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>governance:rehearsal:setup</code></td>
+<td>DESIGNATING a rehearsal domain (its first workspace initialization) and binding labels to fictional identities — internal setup credential only</td>
+</tr>
+<tr>
+<td><code>governance:pending-publish:review</code></td>
+<td>review decisions, bounded edits, label assignment (labels only), previews, RE-resetting an already-designated workspace</td>
+</tr>
+<tr>
+<td><code>governance:pending-publish:confirm</code></td>
+<td>executing an approved, digest-bound mutation</td>
+</tr>
+<tr>
+<td><code>governance:read</code></td>
+<td>all read surfaces (list, detail, bindings, receipts, evidence)</td>
+</tr>
+<tr>
+<td><code>governance:write</code> (broad, technical operators)</td>
+<td>accepted-also fallback for all three, per sub-capability doctrine (tested)</td>
+</tr>
+</tbody></table>
+<p>All three rehearsal capabilities are non-implying siblings and
+<code>governance:read</code> grants none of them. The organizer browser credential
+carries review+confirm+read only: it can neither turn an arbitrary domain
+into a rehearsal workspace (designation needs setup) nor bind identities —
+and it never sees, stores, or submits a DID. A binding grants no authority,
+must reference an identity that already holds domain membership, and any
+rebinding invalidates outstanding previews (except while an interrupted
+execution references the label — see recovery below — when rebinding is
+refused with 409). Every route additionally requires the caller&#39;s own
+domain membership; the path domain is the authority context.</p>
+<p><strong>The binding-target membership check never falls open.</strong> Membership must
+be affirmatively established: a <code>StaticList</code> domain resolves it from the
+source; a <code>TrustThreshold</code> domain requires a wired membership resolver that
+confirms standing. A missing resolver, a resolver failure, or any other
+indeterminate outcome DENIES the binding — this invariant is not deferred
+to appliance wiring. Every deny is the same 422 with the same message, so
+the response never distinguishes &quot;provable non-member&quot; from &quot;membership
+unknowable&quot; and reveals nothing about hidden identities or standing in
+other domains. (The CALLER-side gate keeps the permissive Bootstrap
+dependency posture in Rehearsal mode, like every non-production surface;
+only the binding target is held to the stricter affirmative rule, because
+a binding feeds the completion loop.)</p>
+<h2>Routes</h2>
+<p>All under <code>/v1/gov</code> (gateway mount). <code>{d}</code> = domain id, <code>{r}</code> = row id.</p>
+<table>
+<thead>
+<tr>
+<th>Method + path</th>
+<th>Scope</th>
+<th>Behavior</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>POST /domains/{d}/rehearsal/reset</code></td>
+<td>setup (first) / review (re-reset)</td>
+<td>start a new rehearsal generation with the deterministic seed and a fresh restart-safe <code>run_id</code>; invalidates all previews; the prior run&#39;s fictional action items are cancelled through the normal status machinery (completed items and all receipts remain). Retirement scans the DURABLE item store for this surface&#39;s <code>meeting_context</code> marker in addition to the in-memory workspace, so items orphaned by a daemon restart are retired too (<code>prior_item_scan: complete|failed</code> reports the scan outcome)</td>
+</tr>
+<tr>
+<td><code>GET /domains/{d}/rehearsal/pending-publish</code></td>
+<td>read</td>
+<td>rows + review state (<code>404</code> until first reset)</td>
+</tr>
+<tr>
+<td><code>GET /domains/{d}/rehearsal/pending-publish/{r}</code></td>
+<td>read</td>
+<td>row detail (<code>assignee_bound</code>, <code>executed</code>, version)</td>
+</tr>
+<tr>
+<td><code>POST .../{r}/review</code> <code>{decision, note?}</code></td>
+<td>review</td>
+<td>decision ∈ {approve, reject, needs_edit, needs_more_info}; records a real <code>DecisionRecordedReceipt</code>; note ≤ 2000 bytes</td>
+</tr>
+<tr>
+<td><code>PUT .../{r}</code> <code>{plain_summary}</code></td>
+<td>review</td>
+<td>bounded edit (≤ 256 bytes; the ONLY editable field); resets status to pending_review and clears approval</td>
+</tr>
+<tr>
+<td><code>POST .../{r}/assign</code> <code>{assignee_label?}</code></td>
+<td>review</td>
+<td>assign by registered human label (≤ 120 bytes); unknown label → 422; resets status/approval; <code>null</code> clears</td>
+</tr>
+<tr>
+<td><code>POST /domains/{d}/rehearsal/bindings</code> <code>{label, did}</code></td>
+<td>setup</td>
+<td>bind label → fictional DID (target must already hold domain membership, else 422); DID accepted on write, never echoed</td>
+</tr>
+<tr>
+<td><code>GET /domains/{d}/rehearsal/bindings</code></td>
+<td>read</td>
+<td>labels + <code>bound</code> flags only</td>
+</tr>
+<tr>
+<td><code>GET .../{r}/preview</code></td>
+<td>review</td>
+<td>pure read; requires current approval; returns the exact mutation fields + <code>preview_digest</code>; non-action-item kinds → 422 (reviewable, not executable)</td>
+</tr>
+<tr>
+<td><code>POST .../{r}/confirm</code> <code>{preview_digest}</code></td>
+<td>confirm</td>
+<td>digest-verified execution (below); duplicate identical confirm → 200 idempotent replay; different digest after execution → 409</td>
+</tr>
+<tr>
+<td><code>GET /domains/{d}/rehearsal/receipts</code></td>
+<td>read</td>
+<td>ladder receipts recorded this workspace lifetime (ids + hashes, no DIDs)</td>
+</tr>
+<tr>
+<td><code>GET /domains/{d}/rehearsal/evidence-export</code></td>
+<td>read</td>
+<td>value-withheld evidence packet (below)</td>
+</tr>
+</tbody></table>
+<p>All request bodies use <code>#[serde(deny_unknown_fields)]</code> — unknown fields are
+rejected (400), not ignored.</p>
+<h2>Preview→confirm binding</h2>
+<p>Preview computes a <strong>domain-separated BLAKE3 digest</strong> (tag
+<code>icn:gov:rehearsal_plan:v1</code>) over the canonical plan document
+<code>urn:icn:rehearsal-plan:v1</code>: domain, row id, workspace generation, row
+version, action kind, exact title/description, assignee label <strong>and its
+currently bound DID</strong>, due date, priority, authority basis, risk, expected
+receipt category, provenance, origin, reversibility. The browser receives the
+human-readable fields plus the digest — never the DID.</p>
+<p>Confirm <strong>recomputes the digest from current state</strong> and compares
+(constant-time; <code>blake3::Hash</code> equality). Any intervening edit, review
+decision, re-assignment, label re-binding, or workspace reset changes the
+digest, so the stale preview fails closed (409) and a fresh preview is
+required. The digest bytes are persisted as the plan <code>body_hash</code>, so the
+binding is auditable in the receipt chain.</p>
+<p><strong>Interrupted-confirm recovery (same process only):</strong> the created action
+item is marked in the workspace the moment it exists, before the
+mutation-applied receipt. If any ladder step fails, an identical retried
+confirm — same preview digest, same facilitator identity, same running
+process — resumes exactly where the interruption happened:</p>
+<ul>
+<li>failure BEFORE item creation (gate/activation/plan recording): no item
+exists; the retry re-runs the remaining steps, reusing the gate receipt
+already recorded for this row version (gate record hashes include their
+timestamp, so recording a fresh observation in a later second would
+change the activation&#39;s gate basis and hard-conflict with an
+already-recorded activation);</li>
+<li>failure AFTER item creation but before the applied receipt: the row
+carries the pending item marker; review mutations on the row AND
+rebinding of the row&#39;s assignee label are blocked (409) so the recomputed
+digest still matches, and the retry resumes the SAME item — a retry can
+never create a second one;</li>
+<li>a retry by a DIFFERENT confirm-capable identity fails closed (409
+activation conflict): recovery belongs to the facilitator who started it,
+or to a reset.</li>
+</ul>
+<p><strong>This recovery state is in-memory and does NOT survive a daemon restart.</strong>
+Cross-restart confirm idempotency is explicitly not claimed. After a
+restart the workspace is gone (routes answer 404 until a new designation
+reset); a partially confirmed row cannot be resumed, and its receipts stop
+at the last recorded rung (e.g. a plan without an applied record — an
+honest partial trail, readable by an operator from the receipt store). The
+created-but-unreceipted action item is durable; the recovery path is the
+next reset, which retires it (below). Every persistent identifier (session,
+decision, activation, plan, application) carries the workspace <code>run_id</code>, so
+identifiers are never reused across resets or daemon restarts even though
+the seed content is deterministic.</p>
+<p><strong>Concurrency:</strong> the entire review surface is serialized under one lock
+with no awaits inside critical sections; confirm&#39;s verify-then-execute is a
+single critical section. Two simultaneous confirms of one row cannot both
+execute — the loser observes the winner&#39;s execution and replays
+idempotently (same digest) or conflicts (different digest).</p>
+<h2>Confirm execution (real machinery)</h2>
+<p>On a verified confirm the node records, in order, through the existing
+<code>GovernanceManager</code> ladder (#ADR-0026): <code>ProcessSessionOpened</code> (once per
+workspace generation) → <code>ProcessGateResult</code> (<code>ScopeConfirmation</code>/<code>Pass</code>) →
+<code>ActivationCrossed</code> (referencing the approving <code>DecisionRecordedReceipt</code> and
+the gate hash) → <code>MutationPlanRecorded</code> (<code>body_hash</code> = preview digest) → <strong>one
+real action item</strong> via <code>create_action_item</code> (priority medium, fictional
+assignee DID if bound, else unassigned) → <code>MutationApplied</code> (referencing the
+plan and a result hash binding the created item). The response returns every
+id and record hash. Assigned items surface on the normal member action-card
+view and are completable with the existing completion-only capability
+(<code>governance:action-item:complete</code>, #2400) — unchanged by this surface.</p>
+<p>Rows whose assignee label is <strong>unbound</strong> cannot be confirmed (409).
+Non-action-item kinds are reviewable and previewable but <strong>not executable</strong>
+in this slice (422).</p>
+<h2>Summary origin</h2>
+<p><code>GET /v1/gov/me/pending-publish-summary</code> gains one origin value:
+<code>rehearsal_runtime</code> — served only in Rehearsal mode, and only for workspaces
+in domains where the CALLER holds membership standing. A caller with no
+member-visible workspace receives the static <code>committed_fixture</code> response,
+exactly as if no workspace existed anywhere: one domain&#39;s rehearsal rows,
+review state, and workspace existence are never observable from another
+domain. <code>committed_fixture</code> (Bootstrap/Test, and Rehearsal before any
+member-visible reset) and <code>live_runtime</code> (Production: no rows) are
+unchanged.</p>
+<p>The isolation filter fails closed on any provably-non-member domain and
+never exports a DID. One posture caveat, symmetric with the caller gate on
+every read route: the CALLER-side membership check keeps the permissive
+Bootstrap posture, so on a <code>TrustThreshold</code> domain with <strong>no</strong> wired
+membership resolver it resolves every caller as a member — there, a domain&#39;s
+fictional (label-only, DID-free) review state is visible to any
+authenticated <code>governance:read</code> caller. This is the deliberate asymmetry
+noted under Capabilities: only the binding <em>target</em> is held to the
+affirmative rule. Run rehearsals on <code>StaticList</code> fictional domains (as the
+appliance profile does) or wire a resolver for strict cross-caller read
+isolation.</p>
+<h2>Evidence packet (<code>urn:icn:contract:rehearsal-workflow-evidence:v1</code>)</h2>
+<p>Derived from actual workspace outcomes: per-row outcome
+(<code>executed | interrupted-execution | approved-not-executed | rejected | edit-and-resubmit | deferred</code>), versions, preview digests and
+plan/application record hashes for executed rows, the decision log (ids +
+record hashes + <code>note_present</code> flags), label binding states, the <code>run_id</code>
+and generation, non-claims, a privacy-review result, and TWO hashes over the
+canonical packet content (the packet&#39;s JSON serialization with only the two
+hash fields removed — <code>generated_at</code> and every other exported field are
+bound): <code>packet_hash</code> (domain-separated BLAKE3, tag
+<code>icn:gov:rehearsal_workflow_evidence:v1</code>, the ICN receipt convention) and
+<code>packet_hash_sha256</code> (a mirror so a browser steward view can verify via
+WebCrypto). A reusable validator
+(<code>icn_governance_actor::rehearsal_workspace::validate_evidence_packet</code>)
+recomputes both; tampering with any field fails verification. The packet
+contains no DIDs, credentials, private-overlay values, paths, or topology.</p>
+<h2>Non-claims</h2>
+<p>Not production governance, not a pilot, not live federation, not durable
+workflow storage (the review workspace is node-lifetime and resettable; the
+created items and receipts are the durable records). Identity binding here
+is a fictional-rehearsal convenience, not the production private-overlay
+architecture.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
