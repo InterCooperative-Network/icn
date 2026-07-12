@@ -259,7 +259,7 @@ paths:
       operationId: get_my_pending_publish_summary
       responses:
         '200':
-          description: 'Pending-publish preview/review rows for the caller, wrapped in `PendingPublishSummaryResponse` (`{did, origin, rows, non_claims, generated_at}`). Runtime projection of `urn:icn:contract:pending-publish-summary:v1`. Read-only: there is no mutation API on this surface, no authority is granted, and no action card is created. `origin = live_runtime` (production) returns no rows; `origin = committed_fixture` (non-production) returns deterministic, fictional rehearsal rows. Row `kind`, `status`, `risk_level`, `source_provenance`, and `receipt_expected.category` use closed enums.'
+          description: 'Pending-publish preview/review rows for the caller, wrapped in `PendingPublishSummaryResponse` (`{did, origin, rows, non_claims, generated_at}`). Runtime projection of `urn:icn:contract:pending-publish-summary:v1`. Read-only: there is no mutation API on this surface, no authority is granted, and no action card is created. `origin = live_runtime` (production) returns no rows; `origin = committed_fixture` (non-production) returns deterministic, fictional rehearsal rows; `origin = rehearsal_runtime` (rehearsal build mode, after an explicit workspace reset) returns the live rehearsal review workspace rows — still fictional, never production state. Row `kind`, `status`, `risk_level`, `source_provenance`, and `receipt_expected.category` use closed enums.'
           content:
             application/json:
               schema:
@@ -1644,6 +1644,7 @@ components:
       enum:
       - live_runtime
       - committed_fixture
+      - rehearsal_runtime
     PendingPublishProvenance:
       type: string
       description: |-

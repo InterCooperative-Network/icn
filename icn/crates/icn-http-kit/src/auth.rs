@@ -460,6 +460,74 @@ mod tests {
         ));
     }
 
+    /// Least-privilege boundary for the rehearsal ORGANIZER credential shape
+    /// (`governance:read governance:pending-publish:review
+    /// governance:pending-publish:confirm`, #1726/#2386). It must satisfy the
+    /// rehearsal review and confirm candidate lists and the read surface, and
+    /// be denied every broader capability — creation via `meeting:write`, the
+    /// completion-only member capability, broad/sibling governance writes,
+    /// entity mutation, and cooperative admin. Also pins that review and
+    /// confirm are mutually non-implying siblings: a review-only credential
+    /// must fail the confirm gate and vice versa.
+    #[test]
+    fn narrow_organizer_rehearsal_shape_cannot_reach_broad_or_member_routes() {
+        const REVIEW: &str = "governance:pending-publish:review";
+        const CONFIRM: &str = "governance:pending-publish:confirm";
+        const COMPLETE: &str = "governance:action-item:complete";
+        let req = req_with_scope(Some(
+            "governance:read governance:pending-publish:review governance:pending-publish:confirm",
+        ));
+
+        assert!(require_scope::<BasicClaims>(&req, "governance:read").is_ok());
+        let (_c, matched) =
+            require_any_scope_matched::<BasicClaims>(&req, &[REVIEW, BROAD]).unwrap();
+        assert_eq!(
+            matched, REVIEW,
+            "evidence must record the review capability"
+        );
+        let (_c, matched) =
+            require_any_scope_matched::<BasicClaims>(&req, &[CONFIRM, BROAD]).unwrap();
+        assert_eq!(
+            matched, CONFIRM,
+            "evidence must record the confirm capability"
+        );
+
+        // The organizer shape must NOT hold member-completion, creation,
+        // fixture setup (designation/binding), or any broader authority.
+        // Siblings never imply each other.
+        for denied in [
+            COMPLETE,
+            MEETING,
+            BROAD,
+            CHARTER,
+            "governance:rehearsal:setup",
+            "entity:write",
+            "coop:admin",
+            "coop:write",
+        ] {
+            assert!(
+                matches!(
+                    require_scope::<BasicClaims>(&req, denied).unwrap_err(),
+                    ApiError::Forbidden(_)
+                ),
+                "organizer rehearsal session must NOT grant {denied}"
+            );
+        }
+
+        // Review-only cannot confirm; confirm-only cannot review.
+        let review_only = req_with_scope(Some("governance:read governance:pending-publish:review"));
+        assert!(matches!(
+            require_any_scope::<BasicClaims>(&review_only, &[CONFIRM, BROAD]).unwrap_err(),
+            ApiError::Forbidden(_)
+        ));
+        let confirm_only =
+            req_with_scope(Some("governance:read governance:pending-publish:confirm"));
+        assert!(matches!(
+            require_any_scope::<BasicClaims>(&confirm_only, &[REVIEW, BROAD]).unwrap_err(),
+            ApiError::Forbidden(_)
+        ));
+    }
+
     #[test]
     fn require_any_scope_honors_sub_scope_match() {
         // `governance:write:admin` satisfies the broad `governance:write` candidate.

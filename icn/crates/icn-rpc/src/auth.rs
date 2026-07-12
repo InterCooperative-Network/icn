@@ -1018,6 +1018,49 @@ pub mod scopes {
     /// full transition range during the migration.
     pub const GOVERNANCE_ACTION_ITEM_COMPLETE: &str = "governance:action-item:complete";
 
+    /// Rehearsal pending-publish review capability (#1726/#2386).
+    ///
+    /// Authorizes review decisions (approve / reject / needs-edit /
+    /// needs-more-info), bounded edits, label assignment (labels only),
+    /// previews, and **re-reset** of an already-designated workspace on the
+    /// rehearsal pending-publish surface — routes that exist ONLY on an
+    /// isolated Rehearsal Node (`ICN_GOVERNANCE_BUILD_MODE=rehearsal`). It
+    /// authorizes no mutation of real governance state: reviewing, editing,
+    /// and assigning change only the fictional rehearsal workspace.
+    ///
+    /// **Not** included here (held by [`GOVERNANCE_REHEARSAL_SETUP`]
+    /// instead): the first workspace designation for a domain and
+    /// label→fictional-DID binding. The organizer browser credential carries
+    /// review+confirm+read only and never binds identities.
+    ///
+    /// Sibling of the class-level write scopes: it neither implies nor is
+    /// implied by `GOVERNANCE_WRITE`; the rehearsal routes accept the broad
+    /// scope as a fallback consistent with the sub-capability doctrine.
+    pub const GOVERNANCE_PENDING_PUBLISH_REVIEW: &str = "governance:pending-publish:review";
+
+    /// Rehearsal pending-publish confirm capability (#1726/#2386).
+    ///
+    /// Authorizes executing an approved, digest-bound rehearsal mutation
+    /// (creating ONE real action item through the manager machinery plus the
+    /// ADR-0026 receipt ladder) on the Rehearsal-Node-only confirm route.
+    /// Held separately from `GOVERNANCE_PENDING_PUBLISH_REVIEW` so a
+    /// review-only credential can never mutate governance state and a
+    /// confirm-only credential can never manufacture the review state it
+    /// confirms.
+    pub const GOVERNANCE_PENDING_PUBLISH_CONFIRM: &str = "governance:pending-publish:confirm";
+
+    /// Rehearsal fixture-setup capability (#1726/#2386).
+    ///
+    /// Operator/setup acts on the Rehearsal-Node-only surface: DESIGNATING a
+    /// fictional rehearsal domain (its first workspace initialization) and
+    /// binding human-readable labels to fictional member identities. Held by
+    /// the internal setup credential only — an organizer browser credential
+    /// never carries it, so it can neither turn an arbitrary domain into a
+    /// rehearsal workspace nor bind identities (and never handles a DID).
+    /// A binding grants no authority; bound identities must already hold
+    /// domain membership.
+    pub const GOVERNANCE_REHEARSAL_SETUP: &str = "governance:rehearsal:setup";
+
     // Admin scopes
     pub const ADMIN: &str = "admin";
 

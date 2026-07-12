@@ -9,7 +9,9 @@ use crate::error::{GatewayError, Result};
 use icn_rpc::auth::scopes::{
     GOVERNANCE_ACTION_ITEM_COMPLETE, GOVERNANCE_ACTIVITY_WRITE, GOVERNANCE_CHARTER_WRITE,
     GOVERNANCE_COMMENT_WRITE, GOVERNANCE_FEDERATION_WRITE, GOVERNANCE_MEETING_WRITE,
-    GOVERNANCE_PROCESS_WRITE, GOVERNANCE_PROPOSAL_WRITE, GOVERNANCE_STEWARD_WRITE,
+    GOVERNANCE_PENDING_PUBLISH_CONFIRM, GOVERNANCE_PENDING_PUBLISH_REVIEW,
+    GOVERNANCE_PROCESS_WRITE, GOVERNANCE_PROPOSAL_WRITE, GOVERNANCE_REHEARSAL_SETUP,
+    GOVERNANCE_STEWARD_WRITE,
 };
 
 /// Maximum length for cooperative ID
@@ -80,6 +82,14 @@ pub const ALLOWED_SCOPES: &[&str] = &[
     // from `icn_rpc::auth::scopes`; locked by
     // `test_allowed_scopes_contains_action_item_complete`.
     GOVERNANCE_ACTION_ITEM_COMPLETE,
+    // Rehearsal pending-publish review/confirm capabilities (#1726/#2386):
+    // organizer review decisions and digest-bound confirm on the isolated
+    // Rehearsal Node surface (routes exist only in `rehearsal` build mode).
+    // Sourced from `icn_rpc::auth::scopes`; locked by
+    // `test_allowed_scopes_contains_pending_publish_capabilities`.
+    GOVERNANCE_PENDING_PUBLISH_REVIEW,
+    GOVERNANCE_PENDING_PUBLISH_CONFIRM,
+    GOVERNANCE_REHEARSAL_SETUP,
     // Settlement operations
     "settlements:read",
     "settlements:write",
@@ -920,6 +930,43 @@ mod tests {
     /// silently fail at token issuance. It is a *finer* capability than the
     /// class-level `GOVERNANCE_*_WRITE` scopes, so it is deliberately NOT a
     /// member of `GOVERNANCE_CLASS_WRITE`.
+    /// Cross-crate invariant: the rehearsal pending-publish capabilities
+    /// (#1726/#2386) must be issuable by the gateway auth endpoint so the
+    /// Rehearsal Node can mint least-privilege organizer credentials
+    /// (`governance:read` + review + confirm) without falling back to broad
+    /// `governance:write`. Finer capabilities, deliberately NOT members of
+    /// `GOVERNANCE_CLASS_WRITE`.
+    #[test]
+    fn test_allowed_scopes_contains_pending_publish_capabilities() {
+        use icn_rpc::auth::scopes::GOVERNANCE_CLASS_WRITE;
+
+        for (scope, wire) in [
+            (
+                GOVERNANCE_PENDING_PUBLISH_REVIEW,
+                "governance:pending-publish:review",
+            ),
+            (
+                GOVERNANCE_PENDING_PUBLISH_CONFIRM,
+                "governance:pending-publish:confirm",
+            ),
+            (GOVERNANCE_REHEARSAL_SETUP, "governance:rehearsal:setup"),
+        ] {
+            assert_eq!(scope, wire, "canonical wire string must not drift");
+            assert!(
+                ALLOWED_SCOPES.contains(&scope),
+                "icn-rpc canonical scope {scope:?} must be in the gateway ALLOWED_SCOPES"
+            );
+            assert!(
+                validate_scopes(&[scope.to_string()]).is_ok(),
+                "icn-rpc canonical scope {scope:?} must pass validate_scopes"
+            );
+            assert!(
+                !GOVERNANCE_CLASS_WRITE.contains(&scope),
+                "rehearsal capabilities must not be members of GOVERNANCE_CLASS_WRITE"
+            );
+        }
+    }
+
     #[test]
     fn test_allowed_scopes_contains_action_item_complete() {
         use icn_rpc::auth::scopes::{GOVERNANCE_ACTION_ITEM_COMPLETE, GOVERNANCE_CLASS_WRITE};

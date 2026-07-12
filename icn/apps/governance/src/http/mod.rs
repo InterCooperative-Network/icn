@@ -8,6 +8,7 @@
 pub mod configure;
 pub mod handlers;
 pub mod models;
+pub mod rehearsal;
 pub mod validation;
 
 pub use configure::{

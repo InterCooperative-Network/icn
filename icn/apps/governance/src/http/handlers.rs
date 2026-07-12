@@ -66,7 +66,7 @@ fn anyhow_to_api(e: anyhow::Error) -> ApiError {
 }
 
 /// Parse a DID string, returning ApiError::BadRequest on failure.
-fn parse_did(s: &str, context: &str) -> Result<Did, ApiError> {
+pub(crate) fn parse_did(s: &str, context: &str) -> Result<Did, ApiError> {
     s.parse::<Did>()
         .map_err(|e| err_bad(format!("{context}: {e}")))
 }
@@ -80,7 +80,7 @@ fn parse_did(s: &str, context: &str) -> Result<Did, ApiError> {
 /// endpoints this shared gate backs). Unresolved standing fails closed under
 /// `Production` posture (surfacing `unresolved_standing`); `Bootstrap`/`Test`
 /// stay permissive for dev/devnet.
-async fn check_domain_membership<E>(
+pub(crate) async fn check_domain_membership<E>(
     ctx: &GovernanceContext<E>,
     domain_id: &GovernanceDomainId,
     user_did: &Did,
@@ -6253,7 +6253,10 @@ pub async fn get_my_action_cards<E: GovernanceEventEmitter + Clone + 'static>(
                 mutation API on this surface, no authority is granted, and no action \
                 card is created. `origin = live_runtime` (production) returns no rows; \
                 `origin = committed_fixture` (non-production) returns deterministic, \
-                fictional rehearsal rows. Row `kind`, `status`, `risk_level`, \
+                fictional rehearsal rows; `origin = rehearsal_runtime` (rehearsal \
+                build mode, after an explicit workspace reset) returns the live \
+                rehearsal review workspace rows — still fictional, never \
+                production state. Row `kind`, `status`, `risk_level`, \
                 `source_provenance`, and `receipt_expected.category` use closed enums.",
             body = PendingPublishSummaryResponse),
         (status = 401, description = "Missing or invalid bearer token"),
@@ -6272,7 +6275,45 @@ pub async fn get_my_pending_publish_summary<E: GovernanceEventEmitter + Clone + 
     // Production serves no pending-publish rows: there is no runtime source
     // object, and fictional rehearsal rows must never appear on a production
     // surface. Non-production build modes serve deterministic fixture rows.
-    let (origin, rows) = pending_publish_projection(ctx.build_mode);
+    // In Rehearsal mode, an initialized review workspace replaces the static
+    // fixture: same fictional material, but reflecting live review state and
+    // honestly labeled as such. Production continues to serve no rows.
+    //
+    // Isolation: only workspaces in domains where the CALLER holds membership
+    // standing are visible — a workspace's rows, labels, and very existence
+    // in one domain must never be observable from another (#2052
+    // object-context doctrine applied to this self-scoped summary). A caller
+    // with no member-visible workspace falls through to the static fixture,
+    // exactly as if no workspace existed anywhere.
+    // Serve live rehearsal rows only from a SINGLE member-visible workspace.
+    // Fixture rows carry no `domain_id` and every workspace seeds the same
+    // generic row ids, so concatenating two domains would yield duplicate,
+    // indistinguishable ids a client could act on against the wrong
+    // `/domains/{id}/rehearsal/...` route. The authoritative surface is
+    // per-domain; this self-scoped summary is a convenience mirror, so a
+    // caller who is a member of more than one initialized rehearsal domain
+    // falls through to the honest static `committed_fixture` response rather
+    // than an ambiguous aggregate.
+    let mut rehearsal_rows: Option<Vec<PendingPublishRow>> = None;
+    if ctx.build_mode.allows_rehearsal_mutation() {
+        let mut member_visible: Vec<String> = Vec::new();
+        for domain_id in ctx.manager.rehearsal_state().initialized_domains() {
+            let domain = GovernanceDomainId(domain_id.clone());
+            if check_domain_membership(&ctx, &domain, &caller)
+                .await
+                .is_ok()
+            {
+                member_visible.push(domain_id);
+            }
+        }
+        if let [only] = member_visible.as_slice() {
+            rehearsal_rows = ctx.manager.rehearsal_state().domain_rows(only);
+        }
+    }
+    let (origin, rows) = match rehearsal_rows {
+        Some(rows) => (PendingPublishOrigin::RehearsalRuntime, rows),
+        None => pending_publish_projection(ctx.build_mode),
+    };
 
     Ok(HttpResponse::Ok().json(PendingPublishSummaryResponse {
         did: caller.to_string(),
@@ -6342,7 +6383,7 @@ mod pending_publish_gate_tests {
 /// `GET /me/pending-publish-summary` response. No institution-specific nouns, no
 /// DIDs, no private paths — labels are generic scope/body/assignee strings. The
 /// set is stable so two requests return identical rows.
-fn demo_pending_publish_rows() -> Vec<PendingPublishRow> {
+pub(crate) fn demo_pending_publish_rows() -> Vec<PendingPublishRow> {
     let hint = "Plain-language row. Status and receipt-expectation are read-only \
                 review context, not authority."
         .to_string();
