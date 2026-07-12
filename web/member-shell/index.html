@@ -63,7 +63,7 @@
   <!-- Live-mode connect panel. Hidden in demo mode. -->
   <section id="connect-section" hidden aria-labelledby="connect-h">
     <h2 id="connect-h" data-i18n="connect.heading">Connect to a local node</h2>
-    <p data-i18n="connect.body">
+    <p id="connect-body" data-i18n="connect.body">
       Enter the address of a locally running ICN gateway and paste an access
       credential (the signed authorization string issued by the gateway's
       sign-in flow). Your credential is kept only on this page while it is
@@ -163,6 +163,59 @@
       authorization, publication, custody writes, or completed actions.
     </p>
     <ul id="pending-publish-list" class="card-list"></ul>
+  </section>
+
+  <!-- ================= Organizer rehearsal workflow (#2386) =================
+       Shown only for ?surface=organizer in live mode, against a Rehearsal-mode
+       gateway. Interactive review → edit → assign → preview → confirm, driving
+       the merged runtime routes under /v1/gov/domains/{d}/rehearsal/*. All
+       controls are enabled and their consequences are shown before confirm.
+       The organizer credential never holds setup/write/completion authority and
+       never handles a DID. See docs/design/ORGANIZER_REHEARSAL_WORKFLOW_WIREFRAME.md.
+       Every section starts hidden and is revealed by shell.js. -->
+  <section id="organizer-domain-section" hidden aria-labelledby="organizer-domain-h">
+    <h2 id="organizer-domain-h" data-i18n="organizer.domain.heading">Which domain are you rehearsing in?</h2>
+    <p class="explain" data-i18n="organizer.domain.explain">Choose the domain whose proposed work you are reviewing.</p>
+    <form id="organizer-domain-form">
+      <fieldset>
+        <legend data-i18n="organizer.domain.legend">Domain</legend>
+        <div id="organizer-domain-choices"></div>
+      </fieldset>
+      <button type="submit" id="organizer-domain-open" data-i18n="organizer.domain.open">Open workspace</button>
+    </form>
+    <p id="organizer-domain-status" role="status" aria-live="polite"></p>
+  </section>
+
+  <section id="organizer-workspace-section" hidden aria-labelledby="organizer-workspace-h">
+    <h2 id="organizer-workspace-h" data-i18n="organizer.workspace.heading">Proposed work</h2>
+    <p id="organizer-workspace-context" class="explain boundary"></p>
+    <p id="organizer-workspace-status" role="status" aria-live="polite"></p>
+    <div id="organizer-workspace-body" class="organizer-workspace">
+      <ul id="organizer-rows-list" class="card-list"></ul>
+      <div id="organizer-row-detail"></div>
+      <!-- Persistent action-status live region: it must exist in the DOM before
+           its text changes so screen readers announce review/confirm outcomes.
+           It is not rebuilt by the detail re-render. -->
+      <p id="organizer-action-status" class="muted" role="status" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section id="organizer-receipts-section" hidden aria-labelledby="organizer-receipts-h">
+    <h2 id="organizer-receipts-h" data-i18n="organizer.receipts.heading">Process receipts</h2>
+    <p class="explain" data-i18n="organizer.receipts.explain">These record what happened on the node — ids and hashes only. They grant no authority.</p>
+    <ul id="organizer-receipts-list" class="card-list"></ul>
+  </section>
+
+  <section id="organizer-evidence-section" hidden aria-labelledby="organizer-evidence-h">
+    <h2 id="organizer-evidence-h" data-i18n="organizer.evidence.heading">Evidence summary</h2>
+    <p class="explain" data-i18n="organizer.evidence.explain">A value-withheld summary of this rehearsal. No identities. The node computes both packet hashes; a steward verifies them.</p>
+    <div id="organizer-evidence-body"></div>
+  </section>
+
+  <section id="organizer-member-section" hidden aria-labelledby="organizer-member-h">
+    <h2 id="organizer-member-h" data-i18n="organizer.member.heading">Continue as the assigned member</h2>
+    <p data-i18n="organizer.member.explain">Open the member surface and connect with a member credential to complete the action card. This organizer credential cannot complete items.</p>
+    <p><a id="organizer-member-link" href="?mode=live" data-i18n="organizer.member.link">Open the member surface</a></p>
   </section>
 
   <!-- Receipts -->

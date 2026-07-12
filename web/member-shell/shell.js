@@ -106,7 +106,10 @@
   // ---------------------------------------------------------------------
   var PP_ORIGIN_LABEL = {
     committed_fixture: { glyph: "●", tone: "neutral", text: "pp.origin.committedFixture" },
-    live_runtime: { glyph: "◆", tone: "ok", text: "pp.origin.liveRuntime" }
+    live_runtime: { glyph: "◆", tone: "ok", text: "pp.origin.liveRuntime" },
+    // #2386: the /me/pending-publish-summary read model can now report a
+    // membership-scoped rehearsal workspace on a Rehearsal-mode node.
+    rehearsal_runtime: { glyph: "◆", tone: "ok", text: "pp.origin.rehearsalRuntime" }
   };
   var PP_KIND_LABEL = {
     action_item: "pp.kind.actionItem",
@@ -145,6 +148,35 @@
   };
 
   // ---------------------------------------------------------------------
+  // #2386 organizer workflow enums. Closed values from the Rehearsal-mode
+  // runtime (docs/contracts/rehearsal-review-workflow.md). Values are catalog
+  // keys; an unknown value renders its raw string (fail-closed). The raw enum
+  // value is placed in a data-* attribute for tests, never in organizer copy.
+  // ---------------------------------------------------------------------
+  var ORG_REVIEW_DECISIONS = [
+    { value: "approve", key: "organizer.review.approve", primary: true },
+    { value: "reject", key: "organizer.review.reject", primary: false },
+    { value: "needs_edit", key: "organizer.review.needsEdit", primary: false },
+    { value: "needs_more_info", key: "organizer.review.needsMoreInfo", primary: false }
+  ];
+  var ORG_OUTCOME_LABEL = {
+    "executed": "organizer.outcome.executed",
+    "interrupted-execution": "organizer.outcome.interruptedExecution",
+    "rejected": "organizer.outcome.rejected",
+    "edit-and-resubmit": "organizer.outcome.editAndResubmit",
+    "approved-not-executed": "organizer.outcome.approvedNotExecuted",
+    "deferred": "organizer.outcome.deferred"
+  };
+  var ORG_RECEIPT_CLASS_LABEL = {
+    process_session_opened: "organizer.receipts.class.processSessionOpened",
+    decision_recorded: "organizer.receipts.class.decisionRecorded",
+    process_gate_result: "organizer.receipts.class.processGateResult",
+    activation_crossed: "organizer.receipts.class.activationCrossed",
+    mutation_plan_recorded: "organizer.receipts.class.mutationPlanRecorded",
+    mutation_applied: "organizer.receipts.class.mutationApplied"
+  };
+
+  // ---------------------------------------------------------------------
   // Mode + page state
   // ---------------------------------------------------------------------
   var params = new URLSearchParams(window.location.search);
@@ -162,6 +194,14 @@
   // demo hash label), and the surface renders read views only — no download,
   // no mutation. `set` is demo-only.
   var SET = MODE === "demo" ? params.get("set") : null;
+
+  // #2386 organizer rehearsal review→confirm surface. `?surface=organizer` is
+  // honoured ONLY in live mode: the workflow requires a running Rehearsal-mode
+  // node and a review/confirm credential. There is deliberately no fixture
+  // "organizer demo" — a surface that appeared to confirm work would be fake
+  // success — so demo mode keeps its non-mutating guarantee and SURFACE is null
+  // there. See docs/design/ORGANIZER_REHEARSAL_WORKFLOW_WIREFRAME.md.
+  var SURFACE = MODE === "live" && params.get("surface") === "organizer" ? "organizer" : null;
 
   // DEV/DEMO one-click launcher context. The local launcher
   // (deploy/appliance/scripts/open-proxmox-demo.sh) opens this page with
@@ -192,6 +232,29 @@
     cards: null,       // ActionCardsResponse
     receipts: []       // rendered receipt objects {receipt, plainContext}
   };
+
+  // #2386 organizer workflow state — one object (not scattered booleans),
+  // guarded by a monotonic orgSeq so an abandoned response never renders into a
+  // newer connection/domain. Row-level preview staleness is additionally caught
+  // by the (rowId, version) checks in the preview/confirm handlers.
+  var org = {
+    standing: null,     // organizer's own StandingResponse
+    eligible: [],       // domains the caller is a member of
+    domain: null,       // selected { domain_id, domain_name }
+    generation: null,   // workspace generation
+    rows: [],           // listing rows for the selected domain
+    bindings: [],       // [{ label, bound }] — never a DID
+    selectedRowId: null,
+    detail: null,       // GET .../{row}          → { row, assignee_bound }
+    preview: null,      // GET .../{row}/preview   → carries preview_digest
+    result: null,       // POST .../{row}/confirm  → ladder ids + hashes
+    receipts: null,     // GET .../receipts
+    evidence: null,     // GET .../evidence-export
+    confirming: false,  // the explicit confirm screen is showing
+    busy: false,        // a review/edit/assign/preview/confirm is in flight
+    pendingStatus: null // one-shot status message to show after a re-render
+  };
+  var orgSeq = 0;
 
   // Fixture paths are relative to this page. They resolve only when the
   // serve root is web/ (see README): /member-shell/.. → /pilot-ui/...
@@ -1380,7 +1443,13 @@
           var reason;
           try { reason = JSON.parse(bodyText).error || bodyText; }
           catch (e) { reason = bodyText || ("HTTP " + resp.status); }
-          throw new Error(t("live.nodeAnswered", { status: resp.status, reason: String(reason).slice(0, 300) }));
+          // Attach the numeric status so status-aware callers (the organizer
+          // workflow) can render distinct 401/403/404/409/422/500 copy. The
+          // message is unchanged, so existing callers that read only .message
+          // are unaffected.
+          var err = new Error(t("live.nodeAnswered", { status: resp.status, reason: String(reason).slice(0, 300) }));
+          err.status = resp.status;
+          throw err;
         });
       }
       return resp.json();
@@ -1454,7 +1523,7 @@
     });
   }
 
-  function wireConnectForm() {
+  function wireConnectForm(loader) {
     byId("connect-form").addEventListener("submit", function (ev) {
       ev.preventDefault();
       var url;
@@ -1482,7 +1551,7 @@
       // The credential now lives only in page memory; clear the DOM input
       // so it is not left readable in the field.
       credentialInput.value = "";
-      loadLive();
+      (loader || loadLive)();
     });
   }
 
@@ -1491,6 +1560,830 @@
       if (!resp.ok) { throw new Error("HTTP " + resp.status + " for " + path); }
       return resp.json();
     });
+  }
+
+  // =====================================================================
+  // #2386 Organizer rehearsal review → confirm surface (live-only).
+  // Drives the Rehearsal-mode runtime routes under
+  //   /v1/gov/domains/{domain}/rehearsal/*
+  // plus the shared /v1/gov/me/standing. The organizer credential holds only
+  // governance:read + pending-publish:review + pending-publish:confirm; it never
+  // binds a label, never initializes a workspace, and never handles a DID. See
+  // docs/design/ORGANIZER_REHEARSAL_WORKFLOW_WIREFRAME.md and
+  // docs/contracts/rehearsal-review-workflow.md.
+  // =====================================================================
+  var ORG_SECTIONS = [
+    "organizer-domain-section", "organizer-workspace-section",
+    "organizer-receipts-section", "organizer-evidence-section",
+    "organizer-member-section"
+  ];
+
+  // Point the connect panel's copy at the organizer credential requirements
+  // without changing the single, security-sensitive credential-capture path.
+  function applyOrganizerConnectCopy() {
+    byId("connect-h").textContent = t("organizer.connect.heading");
+    byId("connect-body").textContent = t("organizer.connect.body");
+    byId("connect-button").textContent = t("organizer.connect.submit");
+    var help = byId("credential-help");
+    clear(help);
+    help.appendChild(document.createTextNode(t("organizer.connect.credentialHelp")));
+  }
+
+  // Map a liveFetch error (carrying .status) to plain organizer-facing copy.
+  // The raw backend detail is never the primary surface.
+  function orgErrorText(err) {
+    var s = err && err.status;
+    if (s === 401) { return t("organizer.error.401"); }
+    if (s === 403) { return t("organizer.error.403"); }
+    if (s === 404) { return t("organizer.error.404"); }
+    if (s === 409) { return t("organizer.error.409"); }
+    if (s === 422) { return t("organizer.error.422"); }
+    if (s === 500) { return t("organizer.error.500"); }
+    return t("organizer.error.generic");
+  }
+
+  function orgDomainPath(suffix) {
+    return "/v1/gov/domains/" + encodeURIComponent(org.domain.domain_id) + "/rehearsal" + suffix;
+  }
+
+  function orgRowPath(rowId, suffix) {
+    return orgDomainPath("/pending-publish/" + encodeURIComponent(rowId) + (suffix || ""));
+  }
+
+  // Entry after a successful organizer connect (mirrors loadLive()). A new or
+  // failed connect attempt bumps orgSeq and clears any prior organizer's rows
+  // BEFORE the fetch, so nothing from a previous connection lingers on screen.
+  function loadOrganizer() {
+    var seq = ++orgSeq;
+    resetOrganizerSurface();
+    setSyncChip(t(SYNC.VERIFYING), "neutral", t("live.askingStanding"));
+    byId("connect-status").textContent = "";
+
+    liveFetch("/v1/gov/me/standing").then(function (standing) {
+      if (seq !== orgSeq) { return; }
+      org.standing = standing;
+      // Render the organizer's OWN standing (memberships/roles). renderIdentity
+      // is deliberately NOT called: it is the only place a DID enters the DOM,
+      // and the organizer surface stays DID-free by construction.
+      renderStanding(standing);
+      org.eligible = (standing.domains || []).filter(function (d) { return d.status === "member"; });
+      setSyncChip(t(SYNC.SYNCED), "ok", t("live.syncedDetail", { time: new Date().toLocaleString() }));
+      byId("connect-status").textContent = t("live.connected");
+      if (org.eligible.length === 0) {
+        show("organizer-domain-section");
+        clear(byId("organizer-domain-choices"));
+        byId("organizer-domain-status").textContent = t("organizer.domain.none");
+        byId("organizer-domain-open").disabled = true;
+        return;
+      }
+      if (org.eligible.length === 1) { openWorkspace(org.eligible[0]); return; }
+      renderDomainChoices(org.eligible, seq);
+    }).catch(function (err) {
+      if (seq !== orgSeq) { return; }
+      setSyncChip(t(SYNC.DEGRADED), "warn", t("live.standingUnavailable"));
+      byId("connect-status").textContent = t("live.couldNotLoad", { error: orgErrorText(err) });
+    });
+  }
+
+  function resetOrganizerSurface() {
+    org.standing = null; org.eligible = []; org.domain = null; org.generation = null;
+    org.rows = []; org.bindings = []; org.selectedRowId = null; org.detail = null;
+    org.preview = null; org.result = null; org.receipts = null; org.evidence = null;
+    org.confirming = false; org.busy = false; org.pendingStatus = null;
+    ORG_SECTIONS.forEach(hide);
+    clear(byId("organizer-domain-choices"));
+    clear(byId("organizer-rows-list"));
+    clear(byId("organizer-row-detail"));
+    clear(byId("organizer-receipts-list"));
+    clear(byId("organizer-evidence-body"));
+    byId("organizer-domain-status").textContent = "";
+    byId("organizer-workspace-status").textContent = "";
+    byId("organizer-workspace-context").textContent = "";
+    byId("organizer-action-status").textContent = "";
+    byId("organizer-domain-open").disabled = false;
+    // The organizer surface never renders the member action-card, read-only
+    // pending-publish, DID identity, or member-receipts sections.
+    hide("identity-section");
+    hide("cards-section");
+    hide("pending-publish-section");
+    hide("receipts-section");
+    // Clear the prior organizer's STANDING too: on a FAILED reconnect the
+    // standing is not repopulated, so it must not linger on a shared browser
+    // (mirrors loadLive()'s clear-before-fetch discipline for the member view).
+    hide("standing-section");
+    clear(byId("domains-list"));
+    clear(byId("roles-list"));
+  }
+
+  function renderDomainChoices(domains, seq) {
+    var wrap = byId("organizer-domain-choices");
+    clear(wrap);
+    domains.forEach(function (d, i) {
+      var choice = el("div", { class: "organizer-choice" });
+      var id = "org-domain-" + i;
+      // Deliberately NOT pre-checked: with more than one eligible domain the
+      // organizer must make an explicit choice (the chooseFirst guard below
+      // refuses to open until one is selected), so they can never land in the
+      // wrong rehearsal workspace by just pressing Open/Enter.
+      var radio = el("input", { type: "radio", name: "org-domain", id: id, value: d.domain_id });
+      var label = el("label", { for: id,
+        text: (d.domain_name || d.domain_id) + " (" + t("organizer.domain.member") + ")" });
+      choice.appendChild(radio);
+      choice.appendChild(label);
+      wrap.appendChild(choice);
+    });
+    show("organizer-domain-section");
+    // onsubmit (not addEventListener) so a re-render never stacks handlers.
+    byId("organizer-domain-form").onsubmit = function (ev) {
+      ev.preventDefault();
+      if (seq !== orgSeq) { return; }
+      var checked = wrap.querySelector('input[name="org-domain"]:checked');
+      if (!checked) { byId("organizer-domain-status").textContent = t("organizer.domain.chooseFirst"); return; }
+      var chosen = domains.filter(function (d) { return d.domain_id === checked.value; })[0];
+      if (chosen) { openWorkspace(chosen); }
+    };
+  }
+
+  // Select a domain and load its workspace. Bumps orgSeq so any in-flight load
+  // from a previous domain is dropped, and clears prior rows/preview/result.
+  function openWorkspace(domain) {
+    var seq = ++orgSeq;
+    org.domain = { domain_id: domain.domain_id, domain_name: domain.domain_name || domain.domain_id };
+    org.rows = []; org.bindings = []; org.selectedRowId = null; org.detail = null;
+    org.preview = null; org.result = null; org.receipts = null; org.evidence = null;
+    org.confirming = false;
+    hide("organizer-domain-section");
+    hide("organizer-receipts-section");
+    hide("organizer-evidence-section");
+    hide("organizer-member-section");
+    clear(byId("organizer-row-detail"));
+    clear(byId("organizer-rows-list"));
+    byId("organizer-workspace-context").textContent = "";
+    byId("organizer-action-status").textContent = "";
+    byId("organizer-workspace-status").textContent = t("organizer.workspace.loading");
+    show("organizer-workspace-section");
+    loadWorkspace(seq);
+  }
+
+  function loadWorkspace(seq) {
+    liveFetch(orgDomainPath("/pending-publish")).then(function (resp) {
+      if (seq !== orgSeq) { return; }
+      org.generation = resp.generation;
+      org.rows = resp.rows || [];
+      byId("organizer-workspace-status").textContent = "";
+      byId("organizer-workspace-context").textContent = t("organizer.workspace.context", {
+        domain: org.domain.domain_name, generation: String(resp.generation)
+      });
+      renderOrgRows();
+      // Labels + any receipts/evidence for this workspace. Independent and
+      // resilient: a failure of any does not break the list.
+      refreshOrgBindings(seq);
+      loadOrgReceipts(seq);
+      loadOrgEvidence(seq);
+    }).catch(function (err) {
+      if (seq !== orgSeq) { return; }
+      if (err && err.status === 404) {
+        // Workspace not initialized. Explain; do NOT call reset; keep standing.
+        org.rows = [];
+        clear(byId("organizer-rows-list"));
+        byId("organizer-workspace-context").textContent = "";
+        byId("organizer-workspace-status").textContent = "";
+        var detail = byId("organizer-row-detail");
+        clear(detail);
+        detail.appendChild(el("p", { class: "explain boundary", text: t("organizer.workspace.uninitialized") }));
+        var again = el("button", { class: "secondary", text: t("organizer.workspace.checkAgain") });
+        again.addEventListener("click", function () {
+          byId("organizer-workspace-status").textContent = t("organizer.workspace.loading");
+          clear(byId("organizer-row-detail"));
+          loadWorkspace(seq);
+        });
+        detail.appendChild(again);
+        return;
+      }
+      byId("organizer-workspace-status").textContent = orgErrorText(err);
+    });
+  }
+
+  function refreshOrgBindings(seq) {
+    liveFetch(orgDomainPath("/bindings")).then(function (resp) {
+      if (seq !== orgSeq) { return; }
+      org.bindings = (resp && resp.bindings) || [];
+      // Re-render the detail ONLY if a row is open and the assign control is not
+      // yet showing (labels arrived after the row was opened). Never rebuild once
+      // the assign <select> exists — that would clobber an in-progress note/edit
+      // and drop focus.
+      if (org.selectedRowId && org.detail && !byId("organizer-assign-select")) { renderOrgDetail(); }
+    }).catch(function () { /* labels unavailable; the assign control shows none */ });
+  }
+
+  function updateOrgListRow(rowId, patch) {
+    org.rows.forEach(function (r) {
+      if (r.id === rowId) { Object.keys(patch).forEach(function (k) { r[k] = patch[k]; }); }
+    });
+  }
+
+  function renderOrgRows() {
+    var list = byId("organizer-rows-list");
+    clear(list);
+    if (org.rows.length === 0) {
+      list.appendChild(el("li", { text: t("organizer.workspace.empty") }));
+      return;
+    }
+    org.rows.forEach(function (row) {
+      var li = el("li");
+      var selected = row.id === org.selectedRowId;
+      if (selected) { li.className = "selected"; }
+      var kind = PP_KIND_LABEL[row.kind] ? t(PP_KIND_LABEL[row.kind]) : String(row.kind);
+      li.appendChild(el("h3", { text: kind }));
+      li.appendChild(el("p", { text: row.plain_summary || "" }));
+      var st = PP_STATUS_LABEL[row.status];
+      li.appendChild(el("p", {}, [ el("span", {
+        class: "chip " + (st ? st.tone : "neutral"),
+        text: (st ? st.glyph : "●") + " " + (st ? t(st.text) : String(row.status))
+      }) ]));
+      if (row.assignee_label) {
+        li.appendChild(el("p", { class: "muted", text: t("pp.kv.assignee") + ": " + row.assignee_label }));
+      }
+      if (row.executed) {
+        li.appendChild(el("p", { class: "muted", text: t("organizer.detail.executed") }));
+      }
+      var btn = el("button", { text: selected ? t("organizer.row.selected") : t("organizer.row.reviewButton") });
+      btn.setAttribute("data-row-id", row.id);
+      btn.disabled = selected;
+      btn.addEventListener("click", function () {
+        if (org.busy) { return; }   // never switch rows mid-mutation
+        selectOrgRow(row.id);
+      });
+      li.appendChild(btn);
+      list.appendChild(li);
+    });
+  }
+
+  function selectOrgRow(rowId) {
+    var seq = orgSeq;
+    org.selectedRowId = rowId;
+    org.preview = null; org.result = null; org.confirming = false;
+    setOrgStatus("");
+    renderOrgRows();
+    var detail = byId("organizer-row-detail");
+    clear(detail);
+    detail.appendChild(el("p", { class: "muted", text: t("organizer.workspace.loading") }));
+    liveFetch(orgRowPath(rowId)).then(function (resp) {
+      if (seq !== orgSeq || org.selectedRowId !== rowId) { return; }
+      org.detail = resp;
+      renderOrgDetail();
+      focusById("organizer-detail-h");
+    }).catch(function (err) {
+      if (seq !== orgSeq || org.selectedRowId !== rowId) { return; }
+      clear(detail);
+      setOrgStatus(orgErrorText(err));
+    });
+  }
+
+  function focusById(id) {
+    var node = byId(id);
+    if (node) { node.setAttribute("tabindex", "-1"); node.focus(); }
+  }
+
+  function setOrgControlsDisabled(disabled) {
+    var controls = byId("organizer-row-detail").querySelectorAll("button, input, textarea, select");
+    Array.prototype.forEach.call(controls, function (c) { c.disabled = disabled; });
+  }
+
+  function appendBackToList(host) {
+    var back = el("button", { class: "secondary", text: t("organizer.detail.backToList") });
+    back.addEventListener("click", function () {
+      if (org.busy) { return; }
+      org.selectedRowId = null; org.detail = null; org.preview = null;
+      org.result = null; org.confirming = false;
+      clear(byId("organizer-row-detail"));
+      setOrgStatus("");
+      renderOrgRows();
+    });
+    host.appendChild(back);
+  }
+
+  // The action-status live region is a PERSISTENT node (index.html), so it exists
+  // in the a11y tree before its text changes and screen readers announce outcomes.
+  function orgStatusNode() { return byId("organizer-action-status"); }
+  function setOrgStatus(text) { orgStatusNode().textContent = text; }
+  function flushOrgPendingStatus() {
+    if (org.pendingStatus) { setOrgStatus(org.pendingStatus); org.pendingStatus = null; }
+  }
+
+  // Rebuild the selected-row detail pane from org.detail (+ preview/result). The
+  // persistent action-status node is NOT rebuilt here.
+  function renderOrgDetail() {
+    var host = byId("organizer-row-detail");
+    clear(host);
+    if (!org.detail || !org.detail.row) { return; }
+    var row = org.detail.row;
+    var executed = !!row.executed;
+
+    var kind = PP_KIND_LABEL[row.kind] ? t(PP_KIND_LABEL[row.kind]) : String(row.kind);
+    host.appendChild(el("h3", { id: "organizer-detail-h", text: t("organizer.detail.heading", { kind: kind }) }));
+    host.appendChild(el("p", { class: "muted", text: t("organizer.detail.version", { version: String(row.version) }) }));
+    host.appendChild(el("p", { text: row.plain_summary || "" }));
+    var st = PP_STATUS_LABEL[row.status];
+    host.appendChild(el("p", {}, [ el("span", {
+      class: "chip " + (st ? st.tone : "neutral"),
+      text: (st ? st.glyph : "●") + " " + (st ? t(st.text) : String(row.status))
+    }) ]));
+    var dl = el("dl", { class: "kv" });
+    kvRow(dl, t("pp.kv.whereApplies"), row.target_scope_label || "");
+    kvRow(dl, t("pp.kv.governingBody"), row.governing_body_label || "");
+    kvRow(dl, t("pp.kv.whyProposed"), row.authority_basis || t("pp.noAuthorityBasis"));
+    var rk = RISK_LABEL[row.risk_level];
+    kvRow(dl, t("pp.kv.careLevel"), rk ? (rk.glyph + " " + t(rk.text)) : ("● " + String(row.risk_level)));
+    if (row.note) { kvRow(dl, t("organizer.review.noteLabel"), row.note); }
+    host.appendChild(dl);
+
+    if (executed) {
+      host.appendChild(el("p", { class: "explain boundary", text: t("organizer.detail.executed") }));
+      renderOrgResultInto(host, row);
+      appendBackToList(host);
+      flushOrgPendingStatus();
+      return;
+    }
+
+    host.appendChild(renderOrgReviewControls());
+    host.appendChild(renderOrgEditControl());
+    host.appendChild(renderOrgAssignControl());
+
+    if (org.preview && org.preview.row_id === row.id && org.preview.version === row.version) {
+      host.appendChild(org.confirming ? renderOrgConfirmPanel() : renderOrgPreviewPanel());
+    } else {
+      host.appendChild(renderOrgPreviewTrigger());
+    }
+
+    appendBackToList(host);
+    flushOrgPendingStatus();
+  }
+
+  function renderOrgReviewControls() {
+    var panel = el("div", { class: "organizer-panel" });
+    panel.appendChild(el("h4", { text: t("organizer.review.heading") }));
+    var noteId = "organizer-review-note";
+    panel.appendChild(el("label", { for: noteId, text: t("organizer.review.noteLabel") }));
+    var note = el("textarea", { id: noteId, rows: "2", maxlength: "2000" });
+    note.setAttribute("placeholder", t("organizer.review.notePlaceholder"));
+    panel.appendChild(note);
+    var actions = el("div", { class: "organizer-actions" });
+    ORG_REVIEW_DECISIONS.forEach(function (dec) {
+      var btn = el("button", dec.primary ? {} : { class: "secondary" });
+      btn.textContent = t(dec.key);
+      btn.setAttribute("data-review-action", dec.value);
+      btn.disabled = org.busy;
+      btn.addEventListener("click", function () { doReview(dec.value, note.value); });
+      actions.appendChild(btn);
+    });
+    panel.appendChild(actions);
+    panel.appendChild(el("p", { class: "muted", text: t("organizer.review.approveNote") }));
+    return panel;
+  }
+
+  function renderOrgEditControl() {
+    var panel = el("div", { class: "organizer-panel" });
+    panel.appendChild(el("h4", { text: t("organizer.edit.heading") }));
+    var id = "organizer-edit-summary";
+    panel.appendChild(el("label", { for: id, text: t("organizer.edit.label") }));
+    var input = el("textarea", { id: id, rows: "2", maxlength: "256" });
+    input.value = org.detail.row.plain_summary || "";
+    panel.appendChild(input);
+    var save = el("button", { class: "secondary" });
+    save.textContent = t("organizer.edit.save");
+    save.setAttribute("data-org-action", "edit-save");
+    save.disabled = org.busy;
+    save.addEventListener("click", function () { doEdit(input.value); });
+    panel.appendChild(el("div", { class: "organizer-actions" }, [save]));
+    panel.appendChild(el("p", { class: "muted", text: t("organizer.edit.note") }));
+    return panel;
+  }
+
+  function renderOrgAssignControl() {
+    var panel = el("div", { class: "organizer-panel" });
+    panel.appendChild(el("h4", { text: t("organizer.assign.heading") }));
+    if (!org.bindings || org.bindings.length === 0) {
+      panel.appendChild(el("p", { class: "muted", text: t("organizer.assign.noLabels") }));
+      return panel;
+    }
+    var id = "organizer-assign-select";
+    panel.appendChild(el("label", { for: id, text: t("organizer.assign.label") }));
+    var select = el("select", { id: id, class: "assign-select" });
+    var none = el("option", { value: "", text: t("organizer.assign.none") });
+    if (!org.detail.row.assignee_label) { none.setAttribute("selected", "selected"); }
+    select.appendChild(none);
+    org.bindings.forEach(function (b) {
+      var suffix = b.bound ? t("organizer.assign.bound") : t("organizer.assign.unbound");
+      var opt = el("option", { value: b.label, text: b.label + " (" + suffix + ")" });
+      if (org.detail.row.assignee_label === b.label) { opt.setAttribute("selected", "selected"); }
+      select.appendChild(opt);
+    });
+    panel.appendChild(select);
+    var save = el("button", { class: "secondary" });
+    save.textContent = t("organizer.assign.save");
+    save.setAttribute("data-org-action", "assign-save");
+    save.disabled = org.busy;
+    save.addEventListener("click", function () { doAssign(select.value); });
+    var clearBtn = el("button", { class: "secondary" });
+    clearBtn.textContent = t("organizer.assign.clear");
+    clearBtn.setAttribute("data-org-action", "assign-clear");
+    clearBtn.disabled = org.busy;
+    clearBtn.addEventListener("click", function () { doAssign(""); });
+    panel.appendChild(el("div", { class: "organizer-actions" }, [save, clearBtn]));
+    panel.appendChild(el("p", { class: "muted", text: t("organizer.assign.note") }));
+    return panel;
+  }
+
+  function renderOrgPreviewTrigger() {
+    var panel = el("div", { class: "organizer-panel" });
+    var row = org.detail.row;
+    if (row.kind !== "action_item") {
+      panel.appendChild(el("p", { class: "muted", text: t("organizer.preview.notExecutable") }));
+      return panel;
+    }
+    if (row.status !== "approved_for_publish") {
+      panel.appendChild(el("p", { class: "muted", text: t("organizer.preview.needsApproval") }));
+      return panel;
+    }
+    var btn = el("button", {});
+    btn.textContent = t("organizer.preview.button");
+    btn.setAttribute("data-org-action", "preview");
+    btn.disabled = org.busy;
+    btn.addEventListener("click", function () { doPreview(); });
+    panel.appendChild(btn);
+    return panel;
+  }
+
+  function previewAssigneeText(p) {
+    if (!p.assignee_label) { return t("organizer.preview.assigneeNone"); }
+    return p.assignee_bound
+      ? t("organizer.preview.assigneeBound", { label: p.assignee_label })
+      : t("organizer.preview.assigneeUnbound", { label: p.assignee_label });
+  }
+
+  function previewReceiptsText(p) {
+    var arr = p.expected_receipts || [];
+    if (arr.length === 0) { return t("pp.receipt.none"); }
+    return arr.map(function (c) {
+      return ORG_RECEIPT_CLASS_LABEL[c] ? t(ORG_RECEIPT_CLASS_LABEL[c]) : String(c);
+    }).join(" · ");
+  }
+
+  function renderOrgPreviewPanel() {
+    var p = org.preview;
+    var panel = el("div", { class: "confirm-panel" });
+    panel.appendChild(el("h4", { id: "organizer-preview-h", text: t("organizer.preview.heading") }));
+    var dl = el("dl", { class: "kv" });
+    kvRow(dl, t("organizer.preview.kv.action"), t("organizer.preview.action"));
+    kvRow(dl, t("organizer.preview.kv.title"), p.title || "");
+    kvRow(dl, t("organizer.preview.kv.description"), p.description || "");
+    kvRow(dl, t("organizer.preview.kv.domain"), org.domain.domain_name);
+    kvRow(dl, t("organizer.preview.kv.assignee"), previewAssigneeText(p));
+    kvRow(dl, t("organizer.preview.kv.authority"), p.authority_basis || t("pp.noAuthorityBasis"));
+    var rk = RISK_LABEL[p.risk_level];
+    kvRow(dl, t("organizer.preview.kv.risk"), rk ? (rk.glyph + " " + t(rk.text)) : ("● " + String(p.risk_level)));
+    kvRow(dl, t("organizer.preview.kv.receipts"), previewReceiptsText(p));
+    kvRow(dl, t("organizer.preview.kv.reversible"), t("organizer.preview.reversibleNo"));
+    kvRow(dl, t("organizer.preview.kv.createsItem"), t("organizer.preview.createsYes"));
+    panel.appendChild(dl);
+    if (p.permanence_note) { panel.appendChild(el("p", { text: p.permanence_note })); }
+    panel.appendChild(el("p", { class: "muted", text: p.privacy_note || t("organizer.preview.privacy") }));
+
+    var det = el("details");
+    det.appendChild(el("summary", { text: t("organizer.preview.showTechnical") }));
+    var tdl = el("dl", { class: "kv" });
+    kvRow(tdl, t("organizer.preview.kv.digest"), p.preview_digest || "");
+    kvRow(tdl, t("organizer.preview.kv.planId"), p.plan_id || "");
+    det.appendChild(tdl);
+    panel.appendChild(det);
+
+    var actions = el("div", { class: "actions" });
+    if (p.confirmable !== false) {
+      var cont = el("button", {});
+      cont.textContent = t("organizer.preview.continue");
+      cont.setAttribute("data-org-action", "continue");
+      cont.disabled = org.busy;
+      cont.addEventListener("click", function () { org.confirming = true; renderOrgDetail(); focusById("organizer-confirm-h"); });
+      actions.appendChild(cont);
+    } else {
+      panel.appendChild(el("p", { class: "explain boundary", text: t("organizer.preview.notConfirmable") }));
+    }
+    var cancel = el("button", { class: "secondary" });
+    cancel.textContent = t("organizer.preview.cancel");
+    cancel.disabled = org.busy;
+    cancel.addEventListener("click", function () { org.preview = null; org.confirming = false; renderOrgDetail(); });
+    actions.appendChild(cancel);
+    panel.appendChild(actions);
+    return panel;
+  }
+
+  function renderOrgConfirmPanel() {
+    var panel = el("div", { class: "confirm-panel" });
+    panel.appendChild(el("h4", { id: "organizer-confirm-h", text: t("organizer.confirm.heading") }));
+    panel.appendChild(el("p", { class: "explain boundary", text: t("organizer.confirm.warning") }));
+    var actions = el("div", { class: "actions" });
+    var confirm = el("button", {});
+    confirm.textContent = t("organizer.confirm.button");
+    confirm.setAttribute("data-org-action", "confirm");
+    confirm.disabled = org.busy;
+    confirm.addEventListener("click", function () { doConfirm(confirm); });
+    var back = el("button", { class: "secondary" });
+    back.textContent = t("organizer.confirm.back");
+    back.disabled = org.busy;
+    back.addEventListener("click", function () { org.confirming = false; renderOrgDetail(); focusById("organizer-preview-h"); });
+    actions.appendChild(confirm);
+    actions.appendChild(back);
+    panel.appendChild(actions);
+    return panel;
+  }
+
+  function renderOrgResultInto(host, executedRow) {
+    var panel = el("div", { class: "confirm-panel" });
+    panel.appendChild(el("h4", { id: "organizer-result-h", text: t("organizer.result.heading") }));
+    var r = org.result;
+    var label = (org.detail && org.detail.row && org.detail.row.assignee_label) ||
+                (executedRow && executedRow.assignee_label);
+    panel.appendChild(el("p", { text: label
+      ? t("organizer.result.body", { label: label })
+      : t("organizer.result.bodyUnassigned") }));
+    if (r && r.idempotent) { panel.appendChild(el("p", { class: "muted", text: t("organizer.result.idempotent") })); }
+
+    var det = el("details");
+    det.appendChild(el("summary", { text: t("organizer.result.showTechnical") }));
+    var tdl = el("dl", { class: "kv" });
+    if (r) {
+      kvRow(tdl, t("organizer.result.kv.actionItemId"), r.action_item_id || "");
+      kvRow(tdl, t("organizer.result.kv.sessionId"), r.session_id || "");
+      kvRow(tdl, t("organizer.result.kv.decisionId"), r.decision_id || "");
+      kvRow(tdl, t("organizer.result.kv.activationId"), r.activation_id || "");
+      kvRow(tdl, t("organizer.result.kv.planId"), r.plan_id || "");
+      kvRow(tdl, t("organizer.result.kv.applicationId"), r.application_id || "");
+      kvRow(tdl, t("organizer.result.kv.resultHash"), r.result_hash || "");
+    } else if (executedRow && executedRow.execution) {
+      kvRow(tdl, t("organizer.result.kv.actionItemId"), executedRow.execution.action_item_id || "");
+    }
+    det.appendChild(tdl);
+    panel.appendChild(det);
+
+    var actions = el("div", { class: "actions" });
+    var vr = el("button", { class: "secondary" });
+    vr.textContent = t("organizer.result.viewReceipts");
+    vr.addEventListener("click", function () { show("organizer-receipts-section"); focusById("organizer-receipts-h"); });
+    var ve = el("button", { class: "secondary" });
+    ve.textContent = t("organizer.result.viewEvidence");
+    ve.addEventListener("click", function () { show("organizer-evidence-section"); focusById("organizer-evidence-h"); });
+    actions.appendChild(vr);
+    actions.appendChild(ve);
+    panel.appendChild(actions);
+    host.appendChild(panel);
+    show("organizer-member-section");
+  }
+
+  // ---- mutation handlers (each disables its controls, guards staleness) ----
+
+  function doReview(decision, noteVal) {
+    if (org.busy) { return; }
+    var rowId = org.selectedRowId, seq = orgSeq;
+    org.busy = true; setOrgControlsDisabled(true);
+    setOrgStatus(t("organizer.review.submitting"));
+    var body = { decision: decision };
+    var note = (noteVal || "").trim();
+    if (note) { body.note = note; }
+    liveFetch(orgRowPath(rowId, "/review"), { method: "POST", body: JSON.stringify(body) }).then(function (resp) {
+      org.busy = false;
+      if (seq !== orgSeq || org.selectedRowId !== rowId) { return; }
+      org.detail.row.status = resp.row.status;
+      org.detail.row.version = resp.version;
+      org.detail.row.note = note || null;
+      org.preview = null; org.confirming = false;
+      updateOrgListRow(rowId, { status: resp.row.status, version: resp.version });
+      renderOrgRows();
+      renderOrgDetail();
+      var st = PP_STATUS_LABEL[resp.row.status];
+      setOrgStatus(t("organizer.review.recorded", { status: st ? t(st.text) : String(resp.row.status) }));
+      focusById("organizer-detail-h");   // keep keyboard/switch users on the item, not thrown to <body>
+      loadOrgReceipts(seq);   // the review recorded a DecisionRecordedReceipt
+    }).catch(function (err) {
+      org.busy = false;
+      if (seq !== orgSeq || org.selectedRowId !== rowId) { return; }
+      renderOrgDetail();
+      setOrgStatus(orgErrorText(err));
+      focusById("organizer-detail-h");
+    });
+  }
+
+  function doEdit(summaryVal) {
+    if (org.busy) { return; }
+    var rowId = org.selectedRowId, seq = orgSeq;
+    var summary = (summaryVal || "").trim();
+    if (!summary) { setOrgStatus(t("organizer.edit.empty")); return; }
+    // The runtime bounds plain_summary to 256 BYTES; maxlength counts UTF-16 code
+    // units, so validate the UTF-8 byte length here to fail friendly rather than
+    // as a raw backend error on non-ASCII input.
+    if (new TextEncoder().encode(summary).length > 256) { setOrgStatus(t("organizer.edit.tooLong")); return; }
+    org.busy = true; setOrgControlsDisabled(true);
+    setOrgStatus(t("organizer.edit.saving"));
+    liveFetch(orgRowPath(rowId), { method: "PUT", body: JSON.stringify({ plain_summary: summary }) }).then(function (resp) {
+      org.busy = false;
+      if (seq !== orgSeq || org.selectedRowId !== rowId) { return; }
+      org.detail.row.plain_summary = resp.row.plain_summary;
+      org.detail.row.status = resp.row.status || "pending_review";
+      org.detail.row.version = resp.version;
+      org.preview = null; org.confirming = false;
+      updateOrgListRow(rowId, { status: org.detail.row.status, version: resp.version, plain_summary: resp.row.plain_summary });
+      renderOrgRows();
+      renderOrgDetail();
+      setOrgStatus(t("organizer.edit.saved"));
+      focusById("organizer-detail-h");
+    }).catch(function (err) {
+      org.busy = false;
+      if (seq !== orgSeq || org.selectedRowId !== rowId) { return; }
+      renderOrgDetail();
+      setOrgStatus(orgErrorText(err));
+      focusById("organizer-detail-h");
+    });
+  }
+
+  function doAssign(label) {
+    if (org.busy) { return; }
+    var rowId = org.selectedRowId, seq = orgSeq;
+    org.busy = true; setOrgControlsDisabled(true);
+    setOrgStatus(t("organizer.assign.saving"));
+    var trimmed = (label || "").trim();
+    var body = { assignee_label: trimmed ? trimmed : null };
+    liveFetch(orgRowPath(rowId, "/assign"), { method: "POST", body: JSON.stringify(body) }).then(function (resp) {
+      org.busy = false;
+      if (seq !== orgSeq || org.selectedRowId !== rowId) { return; }
+      org.detail.row.assignee_label = resp.row.assignee_label || null;
+      org.detail.row.status = resp.row.status || "pending_review";
+      org.detail.row.version = resp.version;
+      org.detail.assignee_bound = resp.assignee_bound;
+      org.preview = null; org.confirming = false;
+      updateOrgListRow(rowId, {
+        status: org.detail.row.status, version: resp.version,
+        assignee_label: resp.row.assignee_label || null, assignee_bound: resp.assignee_bound
+      });
+      renderOrgRows();
+      renderOrgDetail();
+      setOrgStatus(t("organizer.assign.saved"));
+      focusById("organizer-detail-h");
+    }).catch(function (err) {
+      org.busy = false;
+      if (seq !== orgSeq || org.selectedRowId !== rowId) { return; }
+      renderOrgDetail();
+      setOrgStatus(orgErrorText(err));
+      focusById("organizer-detail-h");
+    });
+  }
+
+  function doPreview() {
+    if (org.busy) { return; }
+    var rowId = org.selectedRowId, version = org.detail.row.version, seq = orgSeq;
+    org.busy = true; setOrgControlsDisabled(true);
+    setOrgStatus(t("organizer.preview.loading"));
+    liveFetch(orgRowPath(rowId, "/preview")).then(function (resp) {
+      org.busy = false;
+      if (seq !== orgSeq || org.selectedRowId !== rowId || org.detail.row.version !== version) { return; }
+      org.preview = resp; org.confirming = false;
+      setOrgStatus("");
+      renderOrgDetail();
+      focusById("organizer-preview-h");
+    }).catch(function (err) {
+      org.busy = false;
+      if (seq !== orgSeq || org.selectedRowId !== rowId) { return; }
+      renderOrgDetail();
+      setOrgStatus(orgErrorText(err));
+      focusById("organizer-detail-h");
+    });
+  }
+
+  function doConfirm(confirmBtn) {
+    if (org.busy) { return; }
+    var rowId = org.selectedRowId, seq = orgSeq;
+    var digest = org.preview && org.preview.preview_digest;
+    if (!digest) { return; }
+    org.busy = true;
+    confirmBtn.disabled = true;   // one interaction → one request
+    setOrgControlsDisabled(true);
+    setOrgStatus(t("organizer.confirm.submitting"));
+    liveFetch(orgRowPath(rowId, "/confirm"), {
+      method: "POST", body: JSON.stringify({ preview_digest: digest })
+    }).then(function (resp) {
+      org.busy = false;
+      if (seq !== orgSeq || org.selectedRowId !== rowId) { return; }
+      org.result = resp; org.preview = null; org.confirming = false;
+      org.detail.row.executed = true;
+      updateOrgListRow(rowId, { executed: true });
+      setOrgStatus("");
+      renderOrgRows();
+      renderOrgDetail();
+      focusById("organizer-result-h");
+      loadOrgReceipts(seq);
+      loadOrgEvidence(seq);
+      show("organizer-member-section");
+    }).catch(function (err) {
+      org.busy = false;
+      if (seq !== orgSeq || org.selectedRowId !== rowId) { return; }
+      if (err && err.status === 409) {
+        // Stale preview / conflict: clear the local preview, re-fetch the row so
+        // no enabled Confirm survives a stale state, and announce it plainly.
+        org.preview = null; org.confirming = false;
+        org.pendingStatus = t("organizer.confirm.stale");
+        selectOrgRow(rowId);
+        return;
+      }
+      renderOrgDetail();
+      setOrgStatus(orgErrorText(err));
+      focusById("organizer-detail-h");
+    });
+  }
+
+  // ---- receipts + evidence (read-back) ----
+
+  function loadOrgReceipts(seq) {
+    liveFetch(orgDomainPath("/receipts")).then(function (resp) {
+      if (seq !== orgSeq) { return; }
+      org.receipts = resp;
+      renderOrgReceipts();
+    }).catch(function () { /* receipts unavailable; section left as-is */ });
+  }
+
+  function renderOrgReceipts() {
+    var list = byId("organizer-receipts-list");
+    clear(list);
+    var receipts = (org.receipts && org.receipts.receipts) || [];
+    if (receipts.length === 0) {
+      list.appendChild(el("li", { text: t("organizer.receipts.none") }));
+      return;   // nothing to reveal yet
+    }
+    receipts.forEach(function (rc) {
+      var li = el("li");
+      li.appendChild(el("h3", { text: ORG_RECEIPT_CLASS_LABEL[rc.class] ? t(ORG_RECEIPT_CLASS_LABEL[rc.class]) : String(rc.class) }));
+      var dl = el("dl", { class: "kv" });
+      if (rc.id) { kvRow(dl, t("organizer.receipts.kv.id"), rc.id); }
+      if (rc.record_hash) { kvRow(dl, t("organizer.receipts.kv.recordHash"), rc.record_hash); }
+      if (rc.row_id) { kvRow(dl, t("organizer.receipts.kv.rowId"), rc.row_id); }
+      if (rc.decision) { kvRow(dl, t("organizer.receipts.kv.decision"), rc.decision); }
+      if (rc.body_hash) { kvRow(dl, t("organizer.receipts.kv.bodyHash"), rc.body_hash); }
+      if (rc.action_item_id) { kvRow(dl, t("organizer.receipts.kv.actionItemId"), rc.action_item_id); }
+      var refs = rc.references_decision || rc.references_activation || rc.references_plan;
+      if (refs) { kvRow(dl, t("organizer.receipts.kv.references"), refs); }
+      li.appendChild(dl);
+      list.appendChild(li);
+    });
+    show("organizer-receipts-section");
+  }
+
+  function loadOrgEvidence(seq) {
+    liveFetch(orgDomainPath("/evidence-export")).then(function (resp) {
+      if (seq !== orgSeq) { return; }
+      org.evidence = resp;
+      renderOrgEvidence();
+    }).catch(function () { /* evidence unavailable; section left as-is */ });
+  }
+
+  function renderOrgEvidence() {
+    var host = byId("organizer-evidence-body");
+    clear(host);
+    var e = org.evidence;
+    if (!e) { host.appendChild(el("p", { text: t("organizer.evidence.none") })); return; }
+    var dl = el("dl", { class: "kv" });
+    kvRow(dl, t("organizer.evidence.kv.contract"), e.contract || "");
+    kvRow(dl, t("organizer.evidence.kv.domain"), org.domain ? org.domain.domain_name : (e.domain_id || ""));
+    kvRow(dl, t("organizer.evidence.kv.generation"), String(e.generation));
+    kvRow(dl, t("organizer.evidence.kv.run"), e.run_id || "");
+    host.appendChild(dl);
+    host.appendChild(el("h3", { text: t("organizer.evidence.outcomesHeading") }));
+    var ul = el("ul", { class: "card-list" });
+    (e.rows || []).forEach(function (r) {
+      var kind = PP_KIND_LABEL[r.kind] ? t(PP_KIND_LABEL[r.kind]) : String(r.kind);
+      var outcome = ORG_OUTCOME_LABEL[r.outcome] ? t(ORG_OUTCOME_LABEL[r.outcome]) : String(r.outcome);
+      ul.appendChild(el("li", { text: t("organizer.evidence.rowLine", { kind: kind, outcome: outcome }) }));
+    });
+    host.appendChild(ul);
+    if (e.privacy_review_result) {
+      host.appendChild(el("p", { class: "explain boundary", text: t("organizer.evidence.privacyReview", { result: e.privacy_review_result }) }));
+    }
+    if (e.non_claims && e.non_claims.length) {
+      host.appendChild(el("h3", { text: t("organizer.evidence.nonClaimsHeading") }));
+      var ncl = el("ul");
+      e.non_claims.forEach(function (nc) { ncl.appendChild(el("li", { text: nc })); });
+      host.appendChild(ncl);
+    }
+    var det = el("details");
+    det.appendChild(el("summary", { text: t("organizer.evidence.showTechnical") }));
+    var tdl = el("dl", { class: "kv" });
+    kvRow(tdl, t("organizer.evidence.kv.packetHash"), e.packet_hash || "");
+    kvRow(tdl, t("organizer.evidence.kv.packetHashSha256"), e.packet_hash_sha256 || "");
+    det.appendChild(tdl);
+    host.appendChild(det);
+    // Reveal only once something has actually been confirmed (an executed row),
+    // so the pre-confirm surface stays focused. The result panel's "View
+    // evidence" button reveals it explicitly after a confirm.
+    if (org.domain && (e.rows || []).some(function (r) { return r.mutation_executed; })) {
+      show("organizer-evidence-section");
+    }
   }
 
   // ---------------------------------------------------------------------
@@ -1515,6 +2408,8 @@
       var lp = encodeURIComponent(langParam);
       byId("nav-demo").setAttribute("href", "?mode=demo&lang=" + lp);
       byId("nav-live").setAttribute("href", "?mode=live&lang=" + lp);
+      var memberLink = byId("organizer-member-link");
+      if (memberLink) { memberLink.setAttribute("href", "?mode=live&lang=" + lp); }
     }
 
     var banner = byId("honesty-banner");
@@ -1523,6 +2418,17 @@
       banner.className = "banner demo";
       byId("nav-demo").setAttribute("aria-current", "true");
       loadDemo();
+    } else if (SURFACE === "organizer") {
+      // #2386 organizer rehearsal surface: manual organizer credential, then the
+      // review→confirm workflow against a Rehearsal-mode node. No demo launcher
+      // path — the organizer enters a credential manually in this PR.
+      banner.textContent = t("banner.organizer");
+      banner.className = "banner live";
+      byId("nav-live").setAttribute("aria-current", "true");
+      applyOrganizerConnectCopy();
+      wireConnectForm(loadOrganizer);
+      show("connect-section");
+      setSyncChip(t(SYNC.DELAYED), "neutral", t("launcher.notConnected"));
     } else {
       banner.textContent = t("banner.live");
       banner.className = "banner live";
