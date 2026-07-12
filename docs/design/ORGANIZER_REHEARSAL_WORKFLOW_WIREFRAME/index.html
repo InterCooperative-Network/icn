@@ -1,0 +1,523 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Organizer rehearsal review → confirm workflow wireframe (interactive) | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>design</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ORGANIZER REHEARSAL WORKFLOW WIREFRAME</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/design/ORGANIZER_REHEARSAL_WORKFLOW_WIREFRAME.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Organizer rehearsal review → confirm workflow wireframe (interactive)</h1>
+<h2>Purpose</h2>
+<p>This wireframe defines the <strong>interactive</strong> organizer surface for the
+<a href="/docs/pilots/no-cli-organizer-member-rehearsal-workflow">no-CLI organizer/member rehearsal workflow</a>:
+review proposed work, request a bounded edit, ask for more information, reject,
+assign by registered label, preview the exact mutation a node would make, and
+<strong>confirm</strong> it — creating one real action item and its ADR-0026 receipt ladder on
+an <strong>isolated Rehearsal Node</strong>, which the assigned member then completes on the
+existing member surface.</p>
+<p>It is rendered by the canonical browser client <code>web/member-shell/</code> behind an
+explicit <strong><code>?surface=organizer</code></strong> selector, <strong>live-mode only</strong>, against a
+gateway started in Rehearsal mode (<code>ICN_GOVERNANCE_BUILD_MODE=rehearsal</code>). It
+drives the merged runtime contract in
+<a href="/docs/contracts/rehearsal-review-workflow">`rehearsal-review-workflow.md`</a>
+without inventing endpoint shapes.</p>
+<h2>Relationship to the read-only preview wireframe</h2>
+<p>This document <strong>extends</strong> — it does not replace —
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/ORGANIZER_REVIEW_PREVIEW_WIREFRAME">`ORGANIZER_REVIEW_PREVIEW_WIREFRAME.md`</a>.
+That wireframe remains the honest record of the <strong>first</strong> slice: a read-only,
+fixture-backed <code>?mode=demo</code> preview whose review affordances are real <strong>disabled</strong>
+buttons that record nothing (PR #2237). Nothing in this document retcons that one
+into a mutation surface.</p>
+<p>The change since then is that the <strong>runtime now exists</strong> (PR #2406): a
+Rehearsal-mode-only gateway surface that records real decisions, binds a preview
+digest to a confirmation, walks the real receipt ladder, and creates one real
+action item. This wireframe describes the browser rendering of that runtime —
+with <strong>enabled</strong> controls whose consequences are shown before any confirm — and
+is the design of record for the browser slice (PR 1 of the browser/appliance
+tranche). The read-only doc&#39;s disabled-affordance frames still describe the
+demo surface, which is unchanged.</p>
+<h2>Why <code>?surface=organizer</code>, live-only</h2>
+<p>The existing member-shell grain is <code>?mode=(demo|live)</code> plus a demo-only <code>?set=</code>
+fixture selector plus resilient section toggles for live data. The organizer
+workflow is a whole <strong>role</strong> view with its own multi-step state machine, its own
+credential, and its own capabilities. The smallest honest seam is one new,
+explicit role selector — <code>?surface=organizer</code> — that is <strong>absent by default</strong>
+(the member surface is the default) and is honoured <strong>only in live mode</strong>,
+because the workflow requires a running Rehearsal-mode node and a review/confirm
+credential. There is no fixture &quot;organizer demo&quot;: a fixture surface that <em>looked</em>
+like it confirmed work would be fake success. Demo mode therefore keeps its
+fixture-only, non-mutating guarantee, and <code>?mode=demo&amp;surface=organizer</code> exposes
+no mutation controls. Accessibility and behaviour are exercised against the live
+surface with Playwright route interception (real DOM, real wire shapes, no real
+node).</p>
+<h2>Authority boundary (make it visible and semantic)</h2>
+<p>The surface must express three distinct authority levels; the organizer browser
+credential is the narrow middle band and <strong>never</strong> holds the outer two:</p>
+<pre><code class="language-text">setup / steward authority (internal credential — NOT in the browser):
+  initialize the first workspace for a domain (designation)
+  bind a registered label to a fictional identity (holds a DID)
+
+organizer authority (the browser credential in this PR):
+  read · review · bounded edit · assign an existing label · preview · confirm
+
+member authority (a separate credential / the member surface):
+  read · complete their assigned action item
+</code></pre>
+<p>The organizer surface <strong>never</strong> initializes a workspace, <strong>never</strong> binds a label
+to an identity, and <strong>never</strong> handles, accepts, infers, displays, or transmits a
+DID. Unbound labels are shown as <em>&quot;needs steward setup&quot;</em>; the browser cannot fix
+that. This mirrors the runtime scopes: the browser credential carries
+<code>governance:read</code>, <code>governance:pending-publish:review</code>, and
+<code>governance:pending-publish:confirm</code> — never <code>governance:rehearsal:setup</code>,
+<code>governance:write</code>, <code>governance:action-item:complete</code>, <code>governance:meeting:write</code>,
+<code>entity:write</code>, or <code>coop:admin</code>.</p>
+<h2>Runtime contract binding (screen → route)</h2>
+<p>All paths are under the gateway&#39;s <code>/v1/gov</code> mount. <code>{d}</code> is the selected domain.</p>
+<table>
+<thead>
+<tr>
+<th>Screen / action</th>
+<th>Method + route</th>
+<th>Scope used</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Standing / eligible domains</td>
+<td><code>GET /me/standing</code></td>
+<td><code>governance:read</code></td>
+</tr>
+<tr>
+<td>Proposed-work list</td>
+<td><code>GET /domains/{d}/rehearsal/pending-publish</code></td>
+<td><code>governance:read</code></td>
+</tr>
+<tr>
+<td>Row detail</td>
+<td><code>GET /domains/{d}/rehearsal/pending-publish/{row}</code></td>
+<td><code>governance:read</code></td>
+</tr>
+<tr>
+<td>Registered labels</td>
+<td><code>GET /domains/{d}/rehearsal/bindings</code></td>
+<td><code>governance:read</code></td>
+</tr>
+<tr>
+<td>Review decision</td>
+<td><code>POST …/{row}/review</code></td>
+<td><code>pending-publish:review</code></td>
+</tr>
+<tr>
+<td>Bounded edit (<code>plain_summary</code> ≤256B)</td>
+<td><code>PUT …/{row}</code></td>
+<td><code>pending-publish:review</code></td>
+</tr>
+<tr>
+<td>Assign / clear label</td>
+<td><code>POST …/{row}/assign</code></td>
+<td><code>pending-publish:review</code></td>
+</tr>
+<tr>
+<td>Exact mutation preview</td>
+<td><code>GET …/{row}/preview</code></td>
+<td><code>pending-publish:review</code></td>
+</tr>
+<tr>
+<td>Confirm (digest only)</td>
+<td><code>POST …/{row}/confirm</code></td>
+<td><code>pending-publish:confirm</code></td>
+</tr>
+<tr>
+<td>Receipts read-back</td>
+<td><code>GET /domains/{d}/rehearsal/receipts</code></td>
+<td><code>governance:read</code></td>
+</tr>
+<tr>
+<td>Evidence packet</td>
+<td><code>GET /domains/{d}/rehearsal/evidence-export</code></td>
+<td><code>governance:read</code></td>
+</tr>
+</tbody></table>
+<p>The organizer surface never calls <code>POST …/rehearsal/bindings</code> (setup) or
+<code>POST …/rehearsal/reset</code> (steward/designation). Those are the internal credential&#39;s.</p>
+<h2>Human sequence</h2>
+<pre><code class="language-text">Open ?surface=organizer (live) → connect with the organizer credential
+  → see standing and the permanent Rehearsal-mode boundary
+  → select a domain (explicit choice when standing shows more than one)
+  → inspect proposed work (list → one row)
+  → review: approve / reject / request an edit / ask for more information
+  → where appropriate, edit the one allowlisted summary field
+  → assign by registered label (or leave/clear)
+  → preview exactly what the node will create
+  → confirm the bound preview (a separate, explicit screen)
+  → see the created action item and the process receipts
+  → continue as the assigned member (member surface) to complete the card
+  → inspect the completion receipt and the privacy-safe evidence summary
+</code></pre>
+<h2>Frames</h2>
+<h3>Frame 0 — entry, connect, permanent Rehearsal boundary</h3>
+<pre><code class="language-text">┌──────────────────────────────────────────────────────────────────┐
+│ ICN Member Shell — Organizer rehearsal                            │
+│ REHEARSAL MODE · fictional data · not a pilot, not live federation │  ← text banner, always visible
+│                                                                    │
+│ Connect to a local Rehearsal-mode node                             │
+│ Gateway address [http://localhost:8080          ]                  │
+│ Organizer credential [ •••••••••••••••••••••• ]                    │
+│   Needs governance:read, governance:pending-publish:review, and    │
+│   governance:pending-publish:confirm. It must NOT carry setup,     │
+│   write, or completion authority, and never contains a DID.        │
+│ [ Connect and load the rehearsal workspace ]                       │
+└──────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p>Required behavior: the Rehearsal boundary is <strong>text</strong>, not a color-only badge,
+and is present before any control. The credential is captured into page memory
+only and the input is blanked immediately after capture (existing discipline);
+it is transmitted only as an <code>Authorization</code> header to the entered gateway.</p>
+<h3>Frame 1 — domain selection</h3>
+<pre><code class="language-text">┌──────────────────────────────────────────────────────────────────┐
+│ Which domain are you rehearsing in?                                │
+│ ( ) Example Working Group   (member)                               │
+│ ( ) Example Stewards Circle  (member)                              │
+│ [ Open workspace ]                                                 │
+└──────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p>Derive eligible domains from <code>standing.domains[]</code>. <strong>Auto-select</strong> when exactly
+one is eligible; <strong>require an explicit choice</strong> when more than one. Zero eligible
+→ plain explanation (&quot;you are not a member of a domain with a rehearsal
+workspace&quot;), standing still shown.</p>
+<h3>Frame 2 — workspace not initialized (404)</h3>
+<pre><code class="language-text">┌──────────────────────────────────────────────────────────────────┐
+│ This domain&#39;s rehearsal workspace has not been set up yet.         │
+│ A steward initializes the fictional workspace using an internal    │
+│ setup credential. This organizer view cannot create it.            │
+│ [ Check again ]                                                    │
+└──────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p>On <code>GET …/pending-publish</code> → 404: explain; <strong>do not</strong> silently call reset; <strong>do
+not</strong> ask for or acquire setup authority; keep standing usable.</p>
+<h3>Frame 3 — proposed-work list → one row</h3>
+<pre><code class="language-text">┌──────────────────────────────┬───────────────────────────────────┐
+│ Proposed work (generation 1) │ Draft a sample agenda for the next │
+│ 1 Action item · Awaiting rev.│ organizing cycle.                  │
+│ 2 Decision · Needs more info │ Kind: Action item   Status: Await… │
+│ 3 Attendance · Approved      │ Scope: Example Working Group        │
+│                              │ Governing body: Example Stewards   │
+│                              │ Assignee label: Example member      │
+│                              │   (label only — not an identity)    │
+│                              │ Authority: assigned action item     │
+│                              │ Risk: ○ Low   Expected: completion │
+│                              │ Source: committed fixture           │
+└──────────────────────────────┴───────────────────────────────────┘
+</code></pre>
+<p>Single-column on narrow screens (list precedes the selected row). The selected
+row is an <code>&lt;article&gt;</code> with a heading; the list is a semantic list. Status, risk,
+and origin always carry words + glyph, never color alone. Assignee is always
+<strong>Assignee label</strong>, never DID.</p>
+<h3>Frame 4 — review, edit, assign</h3>
+<pre><code class="language-text">┌──────────────────────────────────────────────────────────────────┐
+│ Review this proposed work                                          │
+│ [ Approve for the next step ] [ Reject ]                           │
+│ [ Request an edit ] [ Ask for more information ]                   │
+│ Note (optional, ≤2000) [__________________________________]        │
+│ Approving does not by itself publish or create anything.           │
+│                                                                    │
+│ Edit the summary (only field you can change, ≤256 characters)      │
+│ [ Draft a sample agenda for the next organizing cycle.        ]    │
+│ Editing returns this to “awaiting review” and clears any prior     │
+│ approval and preview.                                              │
+│                                                                    │
+│ Assign to a registered label                                       │
+│ [ Example member ▼ ]  (bound)   [ Clear assignment ]               │
+│ An unbound label needs steward setup before you can confirm.       │
+└──────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p>Only the four runtime decisions are offered (<code>approve</code>, <code>reject</code>, <code>needs_edit</code>,
+<code>needs_more_info</code>), rendered as the plain labels above; the raw value lives in a
+<code>data-*</code> attribute for tests, never in copy. Editing targets only <code>plain_summary</code>
+(≤256 bytes) — no raw-JSON or hidden-field editing. Assignment lists registered
+labels from the bindings route with a bound/unbound flag; the organizer may
+select or clear an existing label, never create or rebind one, and never sees a
+DID. Any review/edit/assignment invalidates a prior preview.</p>
+<h3>Frame 5 — exact mutation preview</h3>
+<pre><code class="language-text">┌──────────────────────────────────────────────────────────────────┐
+│ Preview: what confirming will create                              │
+│ Action: Create one action item on this Rehearsal Node             │
+│ Title:        Draft a sample agenda for the next organizing cycle │
+│ Description:  &lt;generated plan description&gt;                         │
+│ Domain:       Example Working Group                               │
+│ Assignee:     Example member (label, bound)                       │
+│ Authority basis: assigned action item                             │
+│ Risk:         ○ Low                                               │
+│ Expected receipts: gate result · activation · plan · applied      │
+│ Reversible:   No — creates a real item and permanent receipts     │
+│ Creates a real action item: Yes                                   │
+│ Privacy: value-withheld — identities appear only as labels        │
+│ ▸ Technical details (digest, ids)                                 │
+│ [ Continue to confirm ]  [ Cancel ]                               │
+└──────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p>The preview is a pure <code>GET</code>; it is requested only when the row is currently
+approved and its assignment is valid. Render <strong>every</strong> human-relevant mutation
+field returned by the runtime (<code>title</code>, <code>description</code>, <code>domain_id</code>,
+<code>assignee_label</code> + bound flag, <code>authority_basis</code>, <code>risk_level</code>,
+<code>receipt_expected</code>/<code>expected_receipts</code>, <code>reversible</code> = No, <code>permanence_note</code>,
+<code>privacy_note</code>, <code>confirmable</code>, and that a real action item is created). The
+64-hex <code>preview_digest</code> lives under <strong>Technical details</strong> only; the client
+<strong>never</strong> recomputes or reinterprets it. <code>confirmable: false</code> (unbound assignee)
+disables Continue with a plain reason.</p>
+<h3>Frame 6 — confirm (separate, explicit)</h3>
+<pre><code class="language-text">┌──────────────────────────────────────────────────────────────────┐
+│ Confirm this rehearsal mutation                                    │
+│ You are about to create one real action item and permanent process │
+│ receipts on this isolated Rehearsal Node. Fictional data; not a    │
+│ pilot; receipts record process facts and grant no authority.       │
+│ [ Confirm and create the action item ]   [ Go back ]               │
+└──────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p>Confirmation is a <strong>separate screen</strong> from preview. It sends <strong>only</strong> the
+<code>preview_digest</code>. The Confirm button disables itself on submit so one interaction
+cannot emit two confirm requests. Success (201 first / 200 idempotent replay both
+read as success):</p>
+<pre><code class="language-text">┌──────────────────────────────────────────────────────────────────┐
+│ ✓ Created one action item on this Rehearsal Node                   │
+│ It is now assigned to “Example member” and appears as an action    │
+│ card. Receipts below record what happened; they grant no authority.│
+│ ▸ Technical details (action_item_id, ladder ids + hashes)          │
+│ [ View receipts ]  [ View evidence summary ]                       │
+│ [ Continue as the assigned member ]                                │
+└──────────────────────────────────────────────────────────────────┘
+</code></pre>
+<p>An idempotent replay is rendered honestly (&quot;this preview was already confirmed;
+nothing new was created&quot;).</p>
+<h3>Frame 7 — interrupted / stale preview</h3>
+<p>A stale preview (<code>409</code>) clears the local preview and returns the organizer to the
+refreshed row with: <em>&quot;The proposed work changed since this preview was made.
+Review the current version and preview again.&quot;</em> No Confirm button remains enabled
+across a stale state. An interrupted execution (a pending item recorded but the
+applied receipt not yet written) is surfaced as an honest <strong>partial</strong> state that
+an identical retry resumes — never as a second item and never as false success.</p>
+<h3>Frame 8 — receipts and evidence</h3>
+<p>Receipts (<code>GET …/receipts</code>) list the ladder classes with ids + hashes only (no
+DIDs), each in plain language (&quot;Process session opened&quot;, &quot;Gate result&quot;,
+&quot;Activation crossed&quot;, &quot;Mutation plan recorded&quot;, &quot;Mutation applied&quot;, plus the
+per-row decisions). Evidence (<code>GET …/evidence-export</code>) renders the value-withheld
+packet summary: per-row outcome, decision log with real receipt hashes,
+run/generation, binding <strong>flags</strong> (no DIDs), the privacy-review result, and the
+non-claims. Both packet hashes (<code>packet_hash</code> BLAKE3 + <code>packet_hash_sha256</code>) are
+shown under technical detail and described as server-computed and independently
+verifiable by a steward; <strong>the browser does not claim to have verified them</strong>
+(steward/appliance cryptographic verification is the next slice).</p>
+<h3>Frame 9 — continue as the assigned member</h3>
+<p>&quot;Continue as the assigned member&quot; navigates to the member surface (drop
+<code>?surface=organizer</code>) where the member connects with a member credential
+(<code>governance:read</code> + <code>governance:action-item:complete</code>) and completes the card on
+the existing, unchanged completion flow. In this PR the role transition is a
+navigation with a fresh credential entry; the appliance PR replaces manual entry
+with a fresh least-privilege local session (never a token upgrade).</p>
+<h2>State machine</h2>
+<p>A single organizer workflow state (not scattered booleans), guarded by a
+monotonic request generation so an abandoned response can never render into a
+newer connection/domain/row:</p>
+<pre><code class="language-text">disconnected → loading-standing → domain-selection → loading-workspace
+  → workspace-uninitialized (404, terminal-until-retry)
+  → row-list → row-selected → editing → review-submitting → preview-ready
+  → confirming → confirmed
+                     ↘ stale (409 → back to row-selected, preview cleared)
+                     ↘ error (surfaced, recoverable)
+</code></pre>
+<p>Invariants:</p>
+<ul>
+<li>changing the domain clears prior rows, preview, and selection;</li>
+<li>changing the selected row clears the prior preview;</li>
+<li>any edit / review / assignment clears the prior preview;</li>
+<li>a control is disabled during its own in-flight mutation;</li>
+<li>a stale or failed request can never leave an <strong>enabled</strong> Confirm button;</li>
+<li>one interaction never emits two confirm requests;</li>
+<li>a new or failed connection attempt never retains a previous organizer&#39;s rows.</li>
+</ul>
+<p>Implemented with a monotonic <code>organizerSeq</code> (mirroring the existing <code>liveLoadSeq</code>
+pattern) and/or <code>AbortController</code>; every async continuation bails when its
+captured generation is stale.</p>
+<h2>Error states (organizer-facing copy, not raw codes)</h2>
+<table>
+<thead>
+<tr>
+<th>Status</th>
+<th>Meaning shown to the organizer</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>401</td>
+<td>Your session is unavailable or expired — connect again.</td>
+</tr>
+<tr>
+<td>403</td>
+<td>This credential lacks the authority for that step.</td>
+</tr>
+<tr>
+<td>404</td>
+<td>The workspace is not set up, or that item is no longer available.</td>
+</tr>
+<tr>
+<td>409</td>
+<td>The item changed (stale preview / conflict / pending recovery / reassignment) — review the refreshed state.</td>
+</tr>
+<tr>
+<td>422</td>
+<td>That label is not bound, or this kind of work cannot be confirmed here.</td>
+</tr>
+<tr>
+<td>500</td>
+<td>The node could not complete the request — nothing was assumed done.</td>
+</tr>
+</tbody></table>
+<p>Raw backend detail goes to the console, never as the primary surface (existing
+<code>liveFetch</code> discipline). A stale <code>409</code> clears the local preview.</p>
+<h2>Accessibility &amp; i18n (in scope for the 12-category gate)</h2>
+<p>Every new string uses the i18n catalog (<code>t()</code> / <code>data-i18n</code>), preserving the
+pseudo-locale (<code>?lang=qps-ploc</code>) and RTL (<code>?lang=ar</code>). DOM is built only with
+<code>createElement</code>/<code>textContent</code> (no dynamic <code>innerHTML</code>), native controls, visible
+focus, logical keyboard order, ≥44×44 targets, 200% zoom reflow, a 375px
+single-column layout with no horizontal scroll, and reduced-motion behavior; no
+meaning by color alone. After mutations, focus moves to the resulting heading /
+status summary and restrained <code>aria-live</code> announces the outcome; errors and help
+are associated with the responsible control; the consequence text is available
+before Confirm.</p>
+<p><strong>An automated axe/Playwright pass does not close #2041.</strong> The 12-category
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/ORGANIZER_MEMBER_ACCESSIBILITY_GATE">accessibility gate</a> categories that
+require a human assistive-technology pass (3.2 screen reader, 3.9 AT + non-mouse
+input, 3.3 human 200% zoom + contrast tool, 3.5 switch control) are marked
+&quot;Pass with documented follow-ups → #2041&quot; in the PR, never &quot;Pass&quot;.</p>
+<h2>Credential handling (this PR)</h2>
+<p>Manual organizer credential entry, memory-only: held only in the in-page state
+object, never localStorage/sessionStorage/cookies/IndexedDB/URL/service-worker,
+blanked from the input after capture, never displayed after submission, never
+logged, sent only to the entered gateway as a Bearer header, and dropped on a new
+or failed connection attempt. A later appliance PR removes manual entry from the
+normal assembled walkthrough in favor of a fresh least-privilege local session.</p>
+<h2>Implementation boundary (PR 1)</h2>
+<p>In scope: the <code>?surface=organizer</code> live surface in <code>web/member-shell/</code> driving
+the merged runtime routes above; the organizer workflow state machine; manual
+memory-only credential entry; full i18n + accessibility; Playwright
+route-interception behavioral + axe coverage; this wireframe.</p>
+<p>Out of scope (later PRs, explicitly): appliance/session wiring and the
+one-command assembled loop; a real assembled-image witness; removing manual
+credential entry; NYCN packaging or facilitator materials; the human
+assistive-technology pass; post-merge truth-sync. The browser reuses the runtime
+contract unchanged; if a runtime defect is found, the smallest correction is
+isolated in its own commit/PR, not folded into the browser change.</p>
+<h2>Non-claims</h2>
+<p>Carried verbatim from the runtime contract
+(<a href="/docs/contracts/rehearsal-review-workflow">`rehearsal-review-workflow.md`</a>):</p>
+<blockquote>
+<p>Not production governance, not a pilot, not live federation, not durable
+workflow storage (the review workspace is node-lifetime and resettable; the
+created items and receipts are the durable records). Identity binding here is a
+fictional-rehearsal convenience, not the production private-overlay
+architecture.</p>
+</blockquote>
+<p>And for this browser slice specifically:</p>
+<ul>
+<li>Not an organizer-ready, organizer-validated, or accessibility-validated
+surface; automated accessibility is not a human assistive-technology pass.</li>
+<li>Not a production or pilot deployment, not live federation, not private-data
+handling.</li>
+<li>The browser never handles a DID and never holds setup, write, completion, or
+admin authority.</li>
+<li>Receipts record process facts and grant no authority; a successful software
+rehearsal is not organizer approval.</li>
+<li>Does not complete #1726, #1728, #2386, #1746, or #2041 — the human gates
+(#2041 assistive technology, #1703 organizer presentation / first operator
+rehearsal, #1746 operable-rehearsal milestone) stay open.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
