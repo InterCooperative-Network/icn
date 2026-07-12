@@ -481,18 +481,26 @@ mod tests {
         assert!(require_scope::<BasicClaims>(&req, "governance:read").is_ok());
         let (_c, matched) =
             require_any_scope_matched::<BasicClaims>(&req, &[REVIEW, BROAD]).unwrap();
-        assert_eq!(matched, REVIEW, "evidence must record the review capability");
+        assert_eq!(
+            matched, REVIEW,
+            "evidence must record the review capability"
+        );
         let (_c, matched) =
             require_any_scope_matched::<BasicClaims>(&req, &[CONFIRM, BROAD]).unwrap();
-        assert_eq!(matched, CONFIRM, "evidence must record the confirm capability");
+        assert_eq!(
+            matched, CONFIRM,
+            "evidence must record the confirm capability"
+        );
 
-        // The organizer shape must NOT hold member-completion, creation, or
-        // any broader authority. Siblings never imply each other.
+        // The organizer shape must NOT hold member-completion, creation,
+        // fixture setup (designation/binding), or any broader authority.
+        // Siblings never imply each other.
         for denied in [
             COMPLETE,
             MEETING,
             BROAD,
             CHARTER,
+            "governance:rehearsal:setup",
             "entity:write",
             "coop:admin",
             "coop:write",

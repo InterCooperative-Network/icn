@@ -1047,6 +1047,18 @@ pub mod scopes {
     /// confirms.
     pub const GOVERNANCE_PENDING_PUBLISH_CONFIRM: &str = "governance:pending-publish:confirm";
 
+    /// Rehearsal fixture-setup capability (#1726/#2386).
+    ///
+    /// Operator/setup acts on the Rehearsal-Node-only surface: DESIGNATING a
+    /// fictional rehearsal domain (its first workspace initialization) and
+    /// binding human-readable labels to fictional member identities. Held by
+    /// the internal setup credential only — an organizer browser credential
+    /// never carries it, so it can neither turn an arbitrary domain into a
+    /// rehearsal workspace nor bind identities (and never handles a DID).
+    /// A binding grants no authority; bound identities must already hold
+    /// domain membership.
+    pub const GOVERNANCE_REHEARSAL_SETUP: &str = "governance:rehearsal:setup";
+
     // Admin scopes
     pub const ADMIN: &str = "admin";
 

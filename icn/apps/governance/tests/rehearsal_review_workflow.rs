@@ -47,6 +47,7 @@ use icn_kernel_api::{AllocationReceipt, Hash};
 use serde_json::{json, Value};
 
 const REVIEW: &str = "governance:pending-publish:review";
+const SETUP: &str = "governance:rehearsal:setup";
 const CONFIRM: &str = "governance:pending-publish:confirm";
 const READ: &str = "governance:read";
 const BROAD: &str = "governance:write";
@@ -72,6 +73,17 @@ type ChainEntry = (u64, [u8; 32], Vec<u8>);
 struct OpaqueUniqueBackend {
     chains: Mutex<HashMap<ChainKey, Vec<ChainEntry>>>,
     unique: Mutex<HashMap<ChainKey, [u8; 32]>>,
+    /// Failure injection: `put_opaque_if_absent` fails for these classes.
+    fail_classes: Mutex<std::collections::HashSet<String>>,
+}
+
+impl OpaqueUniqueBackend {
+    fn fail_class(&self, class: &str) {
+        self.fail_classes.lock().unwrap().insert(class.to_string());
+    }
+    fn clear_failures(&self) {
+        self.fail_classes.lock().unwrap().clear();
+    }
 }
 
 impl GovernanceReceiptBackend for OpaqueUniqueBackend {
@@ -124,6 +136,9 @@ impl GovernanceReceiptBackend for OpaqueUniqueBackend {
         record_hash: [u8; 32],
         payload: &[u8],
     ) -> Result<Option<[u8; 32]>, String> {
+        if self.fail_classes.lock().unwrap().contains(class) {
+            return Err(format!("injected failure for class {class}"));
+        }
         let key = (class.to_string(), key1.to_string(), key2.map(String::from));
         let mut unique = self.unique.lock().unwrap();
         if let Some(winner) = unique.get(&key) {
@@ -167,9 +182,26 @@ impl GovernanceReceiptBackend for OpaqueUniqueBackend {
 
 // ── Context / app harness ──────────────────────────────────────────────────
 
+fn make_ctx_with_backend(
+    mode: GovernanceContextBuildMode,
+) -> (
+    GovernanceContext<NoopEventEmitter>,
+    Arc<OpaqueUniqueBackend>,
+) {
+    let backend = Arc::new(OpaqueUniqueBackend::default());
+    let ctx = make_ctx_on_backend(mode, backend.clone());
+    (ctx, backend)
+}
+
 fn make_ctx(mode: GovernanceContextBuildMode) -> GovernanceContext<NoopEventEmitter> {
-    let manager =
-        GovernanceManager::new().with_receipt_store(Arc::new(OpaqueUniqueBackend::default()));
+    make_ctx_with_backend(mode).0
+}
+
+fn make_ctx_on_backend(
+    mode: GovernanceContextBuildMode,
+    backend: Arc<OpaqueUniqueBackend>,
+) -> GovernanceContext<NoopEventEmitter> {
+    let manager = GovernanceManager::new().with_receipt_store(backend);
     GovernanceContext {
         manager: Arc::new(manager),
         emitter: NoopEventEmitter,
@@ -269,18 +301,20 @@ macro_rules! rehearsal_app_reset {
         let ctx = make_ctx(GovernanceContextBuildMode::Rehearsal);
         let organizer = fresh_did();
         seed_domain(&ctx.manager, vec![organizer.clone()]).await;
-        let app = gov_app!(ctx, &organizer, $scope);
+        // First initialization (designation) is a SETUP act; the app under
+        // test then carries only the scopes the test declares.
+        let setup_app = gov_app!(ctx.clone(), &organizer, format!("{READ} {SETUP}"));
         let reset = test::TestRequest::post()
             .uri(&format!("/domains/{DOMAIN}/rehearsal/reset"))
             .set_json(json!({}))
             .to_request();
-        let resp = test::call_service(&app, reset).await;
+        let resp = test::call_service(&setup_app, reset).await;
         assert_eq!(
             resp.status(),
             StatusCode::OK,
-            "reset must succeed for scope {}",
-            $scope
+            "designation reset must succeed"
         );
+        let app = gov_app!(ctx, &organizer, $scope);
         (app, organizer)
     }};
 }
@@ -481,7 +515,7 @@ async fn non_member_is_rejected_even_with_review_scope() {
     let member = fresh_did();
     let outsider = fresh_did();
     seed_domain(&ctx.manager, vec![member]).await;
-    let app = gov_app!(ctx, &outsider, format!("{READ} {REVIEW} {CONFIRM}"));
+    let app = gov_app!(ctx, &outsider, format!("{READ} {REVIEW} {CONFIRM} {SETUP}"));
     let resp = post!(
         &app,
         format!("/domains/{DOMAIN}/rehearsal/reset"),
@@ -627,7 +661,7 @@ async fn edit_bounds_fields_and_reapproval_is_required_after_edit() {
 
 #[actix_web::test]
 async fn assignment_uses_labels_and_binding_state_is_visible_without_dids() {
-    let (app, organizer) = rehearsal_app_reset!(format!("{READ} {REVIEW}"));
+    let (app, organizer) = rehearsal_app_reset!(format!("{READ} {REVIEW} {SETUP}"));
 
     // Bind a label to a DID (organizer/operator act). Response withholds the DID.
     let resp = post!(
@@ -781,7 +815,7 @@ async fn confirm_requires_matching_digest_and_fails_closed_on_stale_preview() {
 
 #[actix_web::test]
 async fn confirm_executes_ladder_creates_real_item_and_is_idempotent() {
-    let (app, organizer) = rehearsal_app_reset!(format!("{READ} {REVIEW} {CONFIRM}"));
+    let (app, organizer) = rehearsal_app_reset!(format!("{READ} {REVIEW} {CONFIRM} {SETUP}"));
 
     // Bind + assign so the created item is completable by the member.
     let resp = post!(
@@ -941,7 +975,7 @@ async fn summary_without_workspace_keeps_committed_fixture_origin_in_rehearsal_m
 
 #[actix_web::test]
 async fn evidence_export_is_value_withheld_hash_bound_and_reflects_outcomes() {
-    let (app, organizer) = rehearsal_app_reset!(format!("{READ} {REVIEW} {CONFIRM}"));
+    let (app, organizer) = rehearsal_app_reset!(format!("{READ} {REVIEW} {CONFIRM} {SETUP}"));
 
     // Full loop on the action row.
     post!(
@@ -980,8 +1014,31 @@ async fn evidence_export_is_value_withheld_hash_bound_and_reflects_outcomes() {
         "urn:icn:contract:rehearsal-workflow-evidence:v1"
     );
     assert_eq!(packet["origin"], "rehearsal_runtime");
-    assert_eq!(packet["hash_algorithm"], "sha256");
     assert_eq!(packet["packet_hash"].as_str().map(str::len), Some(64));
+    assert_eq!(
+        packet["packet_hash_sha256"].as_str().map(str::len),
+        Some(64)
+    );
+
+    // The reusable validator accepts the pristine packet and rejects EVERY
+    // semantically meaningful tamper — including generated_at, which is
+    // bound by the hashes like every other exported field.
+    use icn_governance_actor::rehearsal_workspace::validate_evidence_packet;
+    validate_evidence_packet(&packet).expect("pristine packet must validate");
+    let tamper = |mutate: &dyn Fn(&mut Value)| {
+        let mut copy = packet.clone();
+        mutate(&mut copy);
+        assert!(
+            validate_evidence_packet(&copy).is_err(),
+            "tampered packet must fail validation"
+        );
+    };
+    tamper(&|p| p["rows"][0]["outcome"] = json!("deferred"));
+    tamper(&|p| p["decisions"][0]["record_hash"] = json!("00".repeat(32)));
+    tamper(&|p| p["generation"] = json!(999));
+    tamper(&|p| p["generated_at"] = json!(0));
+    tamper(&|p| p["non_claims"] = json!([]));
+    tamper(&|p| p["run_id"] = json!("forged"));
 
     // Value-withheld: no DIDs anywhere in the packet.
     assert!(
@@ -1080,7 +1137,7 @@ async fn member_of_another_domain_cannot_touch_this_domains_workspace() {
 
     // The outsider holds full rehearsal scopes and real standing — in the
     // OTHER domain. The path domain must be the authority context.
-    let app = gov_app!(ctx, &outsider, format!("{READ} {REVIEW} {CONFIRM}"));
+    let app = gov_app!(ctx, &outsider, format!("{READ} {REVIEW} {CONFIRM} {SETUP}"));
     let resp = post!(
         &app,
         format!("/domains/{DOMAIN}/rehearsal/reset"),
@@ -1101,7 +1158,24 @@ async fn member_of_another_domain_cannot_touch_this_domains_workspace() {
 
 #[actix_web::test]
 async fn rebinding_a_label_between_preview_and_confirm_invalidates_digest() {
-    let (app, organizer) = rehearsal_app_reset!(format!("{READ} {REVIEW} {CONFIRM}"));
+    // Both identities are domain members (a binding target must hold
+    // standing), so the rebinding itself is legal — what must fail closed is
+    // the STALE PREVIEW after it.
+    let ctx = make_ctx(GovernanceContextBuildMode::Rehearsal);
+    let organizer = fresh_did();
+    let other = fresh_did();
+    seed_domain(&ctx.manager, vec![organizer.clone(), other.clone()]).await;
+    let app = gov_app!(
+        ctx,
+        &organizer,
+        format!("{READ} {REVIEW} {CONFIRM} {SETUP}")
+    );
+    let resp = post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
 
     let resp = post!(
         &app,
@@ -1121,7 +1195,6 @@ async fn rebinding_a_label_between_preview_and_confirm_invalidates_digest() {
 
     // Re-bind the SAME label to a different identity: the mutation the
     // organizer previewed is no longer the mutation that would execute.
-    let other = fresh_did();
     let resp = post!(
         &app,
         format!("/domains/{DOMAIN}/rehearsal/bindings"),
@@ -1145,7 +1218,7 @@ async fn rebinding_a_label_between_preview_and_confirm_invalidates_digest() {
 
 #[actix_web::test]
 async fn reset_invalidates_previews_from_earlier_generations() {
-    let (app, organizer) = rehearsal_app_reset!(format!("{READ} {REVIEW} {CONFIRM}"));
+    let (app, organizer) = rehearsal_app_reset!(format!("{READ} {REVIEW} {CONFIRM} {SETUP}"));
 
     post!(
         &app,
@@ -1202,4 +1275,503 @@ async fn organizer_supplied_markup_stays_inert_text() {
         "markup is stored and returned verbatim as inert JSON text — \
          never interpreted, never mangled, escaping is the renderer's job"
     );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 8. Design-audit regressions: capability separation, summary isolation,
+//    restart safety, confirm atomicity, reset retirement, broad fallback
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[actix_web::test]
+async fn review_scope_cannot_designate_but_can_re_reset() {
+    let ctx = make_ctx(GovernanceContextBuildMode::Rehearsal);
+    let organizer = fresh_did();
+    seed_domain(&ctx.manager, vec![organizer.clone()]).await;
+
+    // Designation (first reset) is a setup act: a review-scoped member
+    // cannot turn an arbitrary domain into a rehearsal workspace.
+    let review_app = gov_app!(ctx.clone(), &organizer, format!("{READ} {REVIEW}"));
+    let resp = post!(
+        &review_app,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "review scope must not designate a rehearsal domain"
+    );
+
+    // Setup designates; the organizer may then repeat the rehearsal.
+    let setup_app = gov_app!(ctx.clone(), &organizer, format!("{READ} {SETUP}"));
+    let resp = post!(
+        &setup_app,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "setup designates the workspace"
+    );
+    let resp = post!(
+        &review_app,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "review scope re-resets an already-designated workspace"
+    );
+}
+
+#[actix_web::test]
+async fn organizer_shape_cannot_bind_and_setup_cannot_review_or_confirm() {
+    let (app, organizer) = rehearsal_app_reset!(format!("{READ} {REVIEW} {CONFIRM}"));
+
+    // The organizer browser shape never binds identities.
+    let resp = post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": organizer.to_string()})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "organizer credential must not bind identities"
+    );
+
+    // A setup-only credential can bind a MEMBER identity but cannot review
+    // or confirm anything.
+    let ctx = make_ctx(GovernanceContextBuildMode::Rehearsal);
+    let operator = fresh_did();
+    seed_domain(&ctx.manager, vec![operator.clone()]).await;
+    let setup_app = gov_app!(ctx, &operator, format!("{READ} {SETUP}"));
+    let resp = post!(
+        &setup_app,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
+    let resp = post!(
+        &setup_app,
+        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": operator.to_string()})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "setup binds a member identity"
+    );
+    let resp = post!(
+        &setup_app,
+        review_uri(ROW_ACTION),
+        &json!({"decision": "approve"})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "setup must not review"
+    );
+    let resp = post!(
+        &setup_app,
+        confirm_uri(ROW_ACTION),
+        &json!({"preview_digest": "0".repeat(64)})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::FORBIDDEN,
+        "setup must not confirm"
+    );
+}
+
+#[actix_web::test]
+async fn binding_a_non_member_identity_fails_closed() {
+    let ctx = make_ctx(GovernanceContextBuildMode::Rehearsal);
+    let operator = fresh_did();
+    let stranger = fresh_did();
+    seed_domain(&ctx.manager, vec![operator.clone()]).await;
+    let setup_app = gov_app!(ctx, &operator, format!("{READ} {SETUP}"));
+    let resp = post!(
+        &setup_app,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
+    let resp = post!(
+        &setup_app,
+        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": stranger.to_string()})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "a binding target must already hold domain membership"
+    );
+}
+
+#[actix_web::test]
+async fn summary_is_isolated_to_the_callers_own_domains() {
+    // Two domains, two members. A workspace exists ONLY in DOMAIN (member:
+    // insider). The outsider — a member of other-domain only — must not
+    // observe DOMAIN's rows, review state, or even that a workspace exists.
+    let ctx = make_ctx(GovernanceContextBuildMode::Rehearsal);
+    let insider = fresh_did();
+    let outsider = fresh_did();
+    seed_domain(&ctx.manager, vec![insider.clone()]).await;
+    seed_named_domain(&ctx.manager, vec![outsider.clone()], "other-domain").await;
+
+    let insider_app = gov_app!(ctx.clone(), &insider, format!("{READ} {REVIEW} {SETUP}"));
+    let resp = post!(
+        &insider_app,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
+    let resp = post!(
+        &insider_app,
+        review_uri(ROW_ACTION),
+        &json!({"decision": "approve"})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Insider sees their live workspace.
+    let body = body_json(get!(&insider_app, "/me/pending-publish-summary")).await;
+    assert_eq!(body["origin"], "rehearsal_runtime");
+
+    // Outsider gets the static fixture — indistinguishable from "no
+    // workspace exists anywhere", with no approved row state leaking.
+    let outsider_app = gov_app!(ctx, &outsider, format!("{READ} {REVIEW}"));
+    let body = body_json(get!(&outsider_app, "/me/pending-publish-summary")).await;
+    assert_eq!(
+        body["origin"], "committed_fixture",
+        "another domain's workspace must be unobservable"
+    );
+    let rows = body["rows"].as_array().unwrap();
+    let action = rows.iter().find(|r| r["id"] == ROW_ACTION).unwrap();
+    assert_eq!(
+        action["status"], "pending_review",
+        "review state from a foreign domain must not leak into the fixture view"
+    );
+}
+
+#[actix_web::test]
+async fn restart_with_persisted_receipts_does_not_collide_or_resolve_to_prior_run() {
+    // Run 1 on manager A; then a "daemon restart": fresh manager B (fresh
+    // in-memory rehearsal state) sharing the SAME persistent receipt
+    // backend. Every persistent identifier is run-scoped, so run 2 must
+    // complete end-to-end without colliding with — or silently resolving to
+    // — run 1's receipts.
+    let (ctx1, backend) = make_ctx_with_backend(GovernanceContextBuildMode::Rehearsal);
+    let organizer = fresh_did();
+    seed_domain(&ctx1.manager, vec![organizer.clone()]).await;
+    let app1 = gov_app!(
+        ctx1,
+        &organizer,
+        format!("{READ} {REVIEW} {CONFIRM} {SETUP}")
+    );
+    let resp = post!(
+        &app1,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
+    post!(
+        &app1,
+        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": organizer.to_string()})
+    );
+    post!(
+        &app1,
+        format!("/domains/{DOMAIN}/rehearsal/pending-publish/{ROW_ACTION}/assign"),
+        &json!({"assignee_label": "Example member (fictional)"})
+    );
+    let preview1 = approve_and_preview!(&app1);
+    let d1 = preview1["preview_digest"].as_str().unwrap().to_string();
+    let resp = post!(
+        &app1,
+        confirm_uri(ROW_ACTION),
+        &json!({"preview_digest": d1})
+    );
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let confirm1 = body_json(resp).await;
+
+    // "Restart": new manager, same receipt store.
+    let ctx2 = make_ctx_on_backend(GovernanceContextBuildMode::Rehearsal, backend);
+    seed_domain(&ctx2.manager, vec![organizer.clone()]).await;
+    let app2 = gov_app!(
+        ctx2,
+        &organizer,
+        format!("{READ} {REVIEW} {CONFIRM} {SETUP}")
+    );
+    let resp = post!(
+        &app2,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "post-restart designation succeeds"
+    );
+    post!(
+        &app2,
+        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": organizer.to_string()})
+    );
+    post!(
+        &app2,
+        format!("/domains/{DOMAIN}/rehearsal/pending-publish/{ROW_ACTION}/assign"),
+        &json!({"assignee_label": "Example member (fictional)"})
+    );
+    let preview2 = approve_and_preview!(&app2);
+    let d2 = preview2["preview_digest"].as_str().unwrap().to_string();
+    let resp = post!(
+        &app2,
+        confirm_uri(ROW_ACTION),
+        &json!({"preview_digest": d2})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::CREATED,
+        "post-restart confirm must succeed with fresh run-scoped receipt ids"
+    );
+    let confirm2 = body_json(resp).await;
+
+    // Fresh receipts, not silent resolutions of run 1's.
+    for key in ["session_id", "decision_id", "plan_id", "application_id"] {
+        assert_ne!(
+            confirm2[key], confirm1[key],
+            "{key} must be run-scoped, never reused after restart"
+        );
+    }
+    assert_ne!(confirm2["plan_record_hash"], confirm1["plan_record_hash"]);
+    assert_ne!(confirm2["action_item_id"], confirm1["action_item_id"]);
+}
+
+#[actix_web::test]
+async fn confirm_failure_before_item_creation_leaves_no_item_and_retry_succeeds() {
+    let (ctx, backend) = make_ctx_with_backend(GovernanceContextBuildMode::Rehearsal);
+    let organizer = fresh_did();
+    seed_domain(&ctx.manager, vec![organizer.clone()]).await;
+    let app = gov_app!(
+        ctx,
+        &organizer,
+        format!("{READ} {REVIEW} {CONFIRM} {SETUP}")
+    );
+    let resp = post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
+    post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": organizer.to_string()})
+    );
+    post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/pending-publish/{ROW_ACTION}/assign"),
+        &json!({"assignee_label": "Example member (fictional)"})
+    );
+    let preview = approve_and_preview!(&app);
+    let digest = preview["preview_digest"].as_str().unwrap().to_string();
+
+    // Plan-receipt failure happens BEFORE the item exists: no item, clean
+    // retry. (An action-item creation failure is the same class: nothing to
+    // resume, nothing duplicated.)
+    backend.fail_class("mutation_plan_recorded");
+    let resp = post!(
+        &app,
+        confirm_uri(ROW_ACTION),
+        &json!({"preview_digest": digest})
+    );
+    assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    let listing = body_json(get!(&app, format!("/domains/{DOMAIN}/action-items"))).await;
+    assert_eq!(
+        listing.as_array().map(Vec::len),
+        Some(0),
+        "no action item may exist after a pre-creation failure"
+    );
+
+    backend.clear_failures();
+    let resp = post!(
+        &app,
+        confirm_uri(ROW_ACTION),
+        &json!({"preview_digest": digest})
+    );
+    assert_eq!(resp.status(), StatusCode::CREATED, "clean retry succeeds");
+    let listing = body_json(get!(&app, format!("/domains/{DOMAIN}/action-items"))).await;
+    assert_eq!(
+        listing.as_array().map(Vec::len),
+        Some(1),
+        "exactly one item"
+    );
+}
+
+#[actix_web::test]
+async fn confirm_retry_after_applied_failure_resumes_same_item_never_duplicates() {
+    let (ctx, backend) = make_ctx_with_backend(GovernanceContextBuildMode::Rehearsal);
+    let organizer = fresh_did();
+    seed_domain(&ctx.manager, vec![organizer.clone()]).await;
+    let app = gov_app!(
+        ctx,
+        &organizer,
+        format!("{READ} {REVIEW} {CONFIRM} {SETUP}")
+    );
+    let resp = post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
+    post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": organizer.to_string()})
+    );
+    post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/pending-publish/{ROW_ACTION}/assign"),
+        &json!({"assignee_label": "Example member (fictional)"})
+    );
+    let preview = approve_and_preview!(&app);
+    let digest = preview["preview_digest"].as_str().unwrap().to_string();
+
+    // The item is created, then the mutation-applied receipt fails.
+    backend.fail_class("mutation_applied");
+    let resp = post!(
+        &app,
+        confirm_uri(ROW_ACTION),
+        &json!({"preview_digest": digest})
+    );
+    assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+    let listing = body_json(get!(&app, format!("/domains/{DOMAIN}/action-items"))).await;
+    assert_eq!(
+        listing.as_array().map(Vec::len),
+        Some(1),
+        "the real item exists after the interrupted confirm"
+    );
+    let interrupted_id = listing[0]["id"].as_str().unwrap().to_string();
+
+    // Review mutations are blocked while the interrupted execution exists.
+    let resp = post!(&app, review_uri(ROW_ACTION), &json!({"decision": "reject"}));
+    assert_eq!(
+        resp.status(),
+        StatusCode::CONFLICT,
+        "review is blocked while an interrupted execution exists"
+    );
+
+    // The identical retry RESUMES the same item — never a second one.
+    backend.clear_failures();
+    let resp = post!(
+        &app,
+        confirm_uri(ROW_ACTION),
+        &json!({"preview_digest": digest})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::CREATED,
+        "retry completes the execution"
+    );
+    let confirm = body_json(resp).await;
+    assert_eq!(confirm["action_item_id"], interrupted_id.as_str());
+    let listing = body_json(get!(&app, format!("/domains/{DOMAIN}/action-items"))).await;
+    assert_eq!(
+        listing.as_array().map(Vec::len),
+        Some(1),
+        "an interrupted-then-retried confirm must never duplicate the item"
+    );
+}
+
+#[actix_web::test]
+async fn reset_retires_prior_fictional_items_from_the_active_queue() {
+    let (app, organizer) = rehearsal_app_reset!(format!("{READ} {REVIEW} {CONFIRM} {SETUP}"));
+    post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": organizer.to_string()})
+    );
+    post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/pending-publish/{ROW_ACTION}/assign"),
+        &json!({"assignee_label": "Example member (fictional)"})
+    );
+    let preview = approve_and_preview!(&app);
+    let digest = preview["preview_digest"].as_str().unwrap().to_string();
+    let resp = post!(
+        &app,
+        confirm_uri(ROW_ACTION),
+        &json!({"preview_digest": digest})
+    );
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let item_id = body_json(resp).await["action_item_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // Reset = "start a new rehearsal generation": the prior run's fictional
+    // item leaves the active queue through the normal status machinery.
+    let resp = post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert!(
+        body["cancelled_action_items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == item_id.as_str()),
+        "reset must report the retired item: {body}"
+    );
+    let item = body_json(get!(
+        &app,
+        format!("/domains/{DOMAIN}/action-items/{item_id}")
+    ))
+    .await;
+    assert_eq!(
+        item["status"], "cancelled",
+        "the prior fictional item is cancelled, not erased"
+    );
+}
+
+#[actix_web::test]
+async fn broad_governance_write_retains_setup_review_and_confirm() {
+    // Operator-compatibility fallback (sub-capability doctrine): broad
+    // governance:write may drive the whole surface. Browser credentials
+    // never hold it — pinned by the icn-http-kit boundary tests.
+    let ctx = make_ctx(GovernanceContextBuildMode::Rehearsal);
+    let operator = fresh_did();
+    seed_domain(&ctx.manager, vec![operator.clone()]).await;
+    let app = gov_app!(ctx, &operator, format!("{READ} {BROAD}"));
+
+    let resp = post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK, "broad scope designates");
+    post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": operator.to_string()})
+    );
+    post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/pending-publish/{ROW_ACTION}/assign"),
+        &json!({"assignee_label": "Example member (fictional)"})
+    );
+    let preview = approve_and_preview!(&app);
+    let digest = preview["preview_digest"].as_str().unwrap().to_string();
+    let resp = post!(
+        &app,
+        confirm_uri(ROW_ACTION),
+        &json!({"preview_digest": digest})
+    );
+    assert_eq!(resp.status(), StatusCode::CREATED, "broad scope confirms");
 }

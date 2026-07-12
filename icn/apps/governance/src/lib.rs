@@ -40,9 +40,9 @@ pub mod init;
 pub mod institutional_effect;
 pub mod manager;
 pub mod mandate_gate;
-pub mod rehearsal_workspace;
 pub mod receipt_backend;
 pub mod registry;
+pub mod rehearsal_workspace;
 pub mod state_store;
 
 pub use actor::{GovernanceActor, GovernanceCommand, GovernanceConfigLite, GovernanceHandle};

@@ -30,16 +30,20 @@ this surface grants authority.
 
 | Scope | Grants |
 |---|---|
-| `governance:pending-publish:review` | review decisions, bounded edits, label assignment, label→fictional-DID binding, previews, workspace reset |
+| `governance:rehearsal:setup` | DESIGNATING a rehearsal domain (its first workspace initialization) and binding labels to fictional identities — internal setup credential only |
+| `governance:pending-publish:review` | review decisions, bounded edits, label assignment (labels only), previews, RE-resetting an already-designated workspace |
 | `governance:pending-publish:confirm` | executing an approved, digest-bound mutation |
 | `governance:read` | all read surfaces (list, detail, bindings, receipts, evidence) |
-| `governance:write` (broad, technical operators) | accepted-also fallback for both, per sub-capability doctrine |
+| `governance:write` (broad, technical operators) | accepted-also fallback for all three, per sub-capability doctrine (tested) |
 
-Review and confirm are non-implying siblings; neither implies the other and
-`governance:read` grants neither. Reset and binding are deliberately part of
-`review` (repeating the fictional rehearsal is an organizer act; a binding
-grants no authority, and rebinding invalidates outstanding previews).
-Every route additionally requires domain membership; the path domain is the
+All three rehearsal capabilities are non-implying siblings and
+`governance:read` grants none of them. The organizer browser credential
+carries review+confirm+read only: it can neither turn an arbitrary domain
+into a rehearsal workspace (designation needs setup) nor bind identities —
+and it never sees, stores, or submits a DID. A binding grants no authority,
+must reference an identity that already holds domain membership, and any
+rebinding invalidates outstanding previews. Every route additionally
+requires the caller's own domain membership; the path domain is the
 authority context.
 
 ## Routes
@@ -48,13 +52,13 @@ All under `/v1/gov` (gateway mount). `{d}` = domain id, `{r}` = row id.
 
 | Method + path | Scope | Behavior |
 |---|---|---|
-| `POST /domains/{d}/rehearsal/reset` | review | initialize/re-seed the deterministic workspace; bumps `generation` (invalidates all previews); recorded receipts and created items are NOT erased |
+| `POST /domains/{d}/rehearsal/reset` | setup (first) / review (re-reset) | start a new rehearsal generation with the deterministic seed and a fresh restart-safe `run_id`; invalidates all previews; the prior run's fictional action items are cancelled through the normal status machinery (completed items and all receipts remain) |
 | `GET /domains/{d}/rehearsal/pending-publish` | read | rows + review state (`404` until first reset) |
 | `GET /domains/{d}/rehearsal/pending-publish/{r}` | read | row detail (`assignee_bound`, `executed`, version) |
 | `POST .../{r}/review` `{decision, note?}` | review | decision ∈ {approve, reject, needs_edit, needs_more_info}; records a real `DecisionRecordedReceipt`; note ≤ 2000 bytes |
 | `PUT .../{r}` `{plain_summary}` | review | bounded edit (≤ 256 bytes; the ONLY editable field); resets status to pending_review and clears approval |
 | `POST .../{r}/assign` `{assignee_label?}` | review | assign by registered human label (≤ 120 bytes); unknown label → 422; resets status/approval; `null` clears |
-| `POST /domains/{d}/rehearsal/bindings` `{label, did}` | review | bind label → fictional DID; DID accepted on write, never echoed |
+| `POST /domains/{d}/rehearsal/bindings` `{label, did}` | setup | bind label → fictional DID (target must already hold domain membership, else 422); DID accepted on write, never echoed |
 | `GET /domains/{d}/rehearsal/bindings` | read | labels + `bound` flags only |
 | `GET .../{r}/preview` | review | pure read; requires current approval; returns the exact mutation fields + `preview_digest`; non-action-item kinds → 422 (reviewable, not executable) |
 | `POST .../{r}/confirm` `{preview_digest}` | confirm | digest-verified execution (below); duplicate identical confirm → 200 idempotent replay; different digest after execution → 409 |
@@ -81,6 +85,15 @@ digest, so the stale preview fails closed (409) and a fresh preview is
 required. The digest bytes are persisted as the plan `body_hash`, so the
 binding is auditable in the receipt chain.
 
+**Interrupted-confirm recovery:** the created action item is marked in the
+workspace the moment it exists, before the mutation-applied receipt. If that
+recording fails, review mutations on the row are blocked (409) and an
+identical retried confirm RESUMES the same item — a retry can never create a
+second one. Every persistent identifier (session, decision, activation,
+plan, application) carries the workspace `run_id`, so identifiers are never
+reused across resets or daemon restarts even though the seed content is
+deterministic.
+
 ## Confirm execution (real machinery)
 
 On a verified confirm the node records, in order, through the existing
@@ -102,22 +115,32 @@ in this slice (422).
 ## Summary origin
 
 `GET /v1/gov/me/pending-publish-summary` gains one origin value:
-`rehearsal_runtime` — served only in Rehearsal mode once a workspace exists
-(rows then reflect live review state). `committed_fixture` (Bootstrap/Test,
-and Rehearsal before any reset) and `live_runtime` (Production: no rows) are
+`rehearsal_runtime` — served only in Rehearsal mode, and only for workspaces
+in domains where the CALLER holds membership standing. A caller with no
+member-visible workspace receives the static `committed_fixture` response,
+exactly as if no workspace existed anywhere: one domain's rehearsal rows,
+review state, and workspace existence are never observable from another
+domain. `committed_fixture` (Bootstrap/Test, and Rehearsal before any
+member-visible reset) and `live_runtime` (Production: no rows) are
 unchanged.
 
 ## Evidence packet (`urn:icn:contract:rehearsal-workflow-evidence:v1`)
 
 Derived from actual workspace outcomes: per-row outcome
-(`executed | approved-not-executed | rejected | edit-and-resubmit |
-deferred`), versions, preview digests and plan/application record hashes for
-executed rows, the decision log (ids + record hashes + `note_present`
-flags), label binding states, non-claims, a privacy-review block, and a
-`packet_hash` — SHA-256 over the canonical packet content (excluding
-`packet_hash`/`generated_at`) so any tampering is detectable by
-recomputation, including in a browser via WebCrypto. The packet contains no
-DIDs, credentials, private-overlay values, paths, or topology.
+(`executed | interrupted-execution | approved-not-executed | rejected |
+edit-and-resubmit | deferred`), versions, preview digests and
+plan/application record hashes for executed rows, the decision log (ids +
+record hashes + `note_present` flags), label binding states, the `run_id`
+and generation, non-claims, a privacy-review result, and TWO hashes over the
+canonical packet content (the packet's JSON serialization with only the two
+hash fields removed — `generated_at` and every other exported field are
+bound): `packet_hash` (domain-separated BLAKE3, tag
+`icn:gov:rehearsal_workflow_evidence:v1`, the ICN receipt convention) and
+`packet_hash_sha256` (a mirror so a browser steward view can verify via
+WebCrypto). A reusable validator
+(`icn_governance_actor::rehearsal_workspace::validate_evidence_packet`)
+recomputes both; tampering with any field fails verification. The packet
+contains no DIDs, credentials, private-overlay values, paths, or topology.
 
 ## Non-claims
 

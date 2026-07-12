@@ -6278,15 +6278,34 @@ pub async fn get_my_pending_publish_summary<E: GovernanceEventEmitter + Clone + 
     // In Rehearsal mode, an initialized review workspace replaces the static
     // fixture: same fictional material, but reflecting live review state and
     // honestly labeled as such. Production continues to serve no rows.
-    let (origin, rows) = if ctx.build_mode.allows_rehearsal_mutation()
-        && ctx.manager.rehearsal_state().any_initialized()
-    {
-        (
-            PendingPublishOrigin::RehearsalRuntime,
-            ctx.manager.rehearsal_state().summary_rows(),
-        )
-    } else {
-        pending_publish_projection(ctx.build_mode)
+    //
+    // Isolation: only workspaces in domains where the CALLER holds membership
+    // standing are visible — a workspace's rows, labels, and very existence
+    // in one domain must never be observable from another (#2052
+    // object-context doctrine applied to this self-scoped summary). A caller
+    // with no member-visible workspace falls through to the static fixture,
+    // exactly as if no workspace existed anywhere.
+    let mut rehearsal_rows: Option<Vec<PendingPublishRow>> = None;
+    if ctx.build_mode.allows_rehearsal_mutation() {
+        let mut visible = Vec::new();
+        for domain_id in ctx.manager.rehearsal_state().initialized_domains() {
+            let domain = GovernanceDomainId(domain_id.clone());
+            if check_domain_membership(&ctx, &domain, &caller)
+                .await
+                .is_ok()
+            {
+                if let Some(rows) = ctx.manager.rehearsal_state().domain_rows(&domain_id) {
+                    visible.extend(rows);
+                }
+            }
+        }
+        if !visible.is_empty() {
+            rehearsal_rows = Some(visible);
+        }
+    }
+    let (origin, rows) = match rehearsal_rows {
+        Some(rows) => (PendingPublishOrigin::RehearsalRuntime, rows),
+        None => pending_publish_projection(ctx.build_mode),
     };
 
     Ok(HttpResponse::Ok().json(PendingPublishSummaryResponse {

@@ -10,7 +10,8 @@ use icn_rpc::auth::scopes::{
     GOVERNANCE_ACTION_ITEM_COMPLETE, GOVERNANCE_ACTIVITY_WRITE, GOVERNANCE_CHARTER_WRITE,
     GOVERNANCE_COMMENT_WRITE, GOVERNANCE_FEDERATION_WRITE, GOVERNANCE_MEETING_WRITE,
     GOVERNANCE_PENDING_PUBLISH_CONFIRM, GOVERNANCE_PENDING_PUBLISH_REVIEW,
-    GOVERNANCE_PROCESS_WRITE, GOVERNANCE_PROPOSAL_WRITE, GOVERNANCE_STEWARD_WRITE,
+    GOVERNANCE_PROCESS_WRITE, GOVERNANCE_PROPOSAL_WRITE, GOVERNANCE_REHEARSAL_SETUP,
+    GOVERNANCE_STEWARD_WRITE,
 };
 
 /// Maximum length for cooperative ID
@@ -88,6 +89,7 @@ pub const ALLOWED_SCOPES: &[&str] = &[
     // `test_allowed_scopes_contains_pending_publish_capabilities`.
     GOVERNANCE_PENDING_PUBLISH_REVIEW,
     GOVERNANCE_PENDING_PUBLISH_CONFIRM,
+    GOVERNANCE_REHEARSAL_SETUP,
     // Settlement operations
     "settlements:read",
     "settlements:write",
@@ -947,6 +949,7 @@ mod tests {
                 GOVERNANCE_PENDING_PUBLISH_CONFIRM,
                 "governance:pending-publish:confirm",
             ),
+            (GOVERNANCE_REHEARSAL_SETUP, "governance:rehearsal:setup"),
         ] {
             assert_eq!(scope, wire, "canonical wire string must not drift");
             assert!(
