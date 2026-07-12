@@ -198,7 +198,9 @@ summary:focus-visible {
 
 dl.kv { margin: 0.75rem 0; }
 dl.kv dt { font-weight: 600; margin-top: 0.5rem; }
-dl.kv dd { margin: 0; color: var(--ink-muted); }
+/* Long unbreakable values (ids, 64-hex digests/hashes) must wrap so a mobile
+   viewport never scrolls sideways — same treatment as inline <code>. */
+dl.kv dd { margin: 0; color: var(--ink-muted); overflow-wrap: anywhere; }
 
 /* Status chips: glyph + text, color reinforces only. */
 .chip {
@@ -245,6 +247,66 @@ code {
   background: var(--panel);
 }
 .confirm-panel .actions { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.75rem; }
+
+/* ---------------------------------------------------------------------------
+ * Organizer rehearsal workflow (#2386). Reuses the existing tokens/classes;
+ * adds only layout plus focus/sizing for native controls not used elsewhere
+ * (textarea, radio, select, fieldset). No new colors. Single-column always so
+ * the 375px reading order (list, then selected item) never scrolls sideways.
+ * ------------------------------------------------------------------------- */
+textarea {
+  width: 100%;
+  font-size: 1rem;
+  padding: 0.6rem;
+  min-height: 4rem;
+  border: 1px solid var(--ink-muted);
+  border-radius: 0.25rem;
+  color: var(--ink);
+  background: var(--bg);
+  font-family: inherit;
+  line-height: 1.5;
+}
+select.assign-select {
+  width: 100%;
+  font-size: 1rem;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--ink-muted);
+  border-radius: 0.25rem;
+  color: var(--ink);
+  background: var(--bg);
+}
+select:focus-visible,
+textarea:focus-visible,
+input[type="radio"]:focus-visible {
+  outline: 3px solid var(--ink);
+  outline-offset: 2px;
+}
+fieldset {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.5rem 1rem 0.75rem;
+  margin: 0.75rem 0;
+}
+fieldset legend { font-weight: 600; padding: 0 0.4rem; }
+.organizer-choice {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.5rem 0;
+  min-height: 2.75rem;
+}
+.organizer-choice input[type="radio"] { width: auto; min-height: 0; margin: 0; }
+.organizer-choice label { margin: 0; font-weight: 400; }
+.organizer-actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin: 0.5rem 0; }
+.organizer-panel {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 1rem;
+  margin-top: 0.75rem;
+  background: var(--bg);
+}
+.card-list > li.selected { border-color: var(--accent); border-width: 2px; }
 
 footer {
   margin-top: 3rem;

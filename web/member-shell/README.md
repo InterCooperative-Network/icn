@@ -48,6 +48,7 @@ A banner naming the active tier is permanently visible.
 |---|---|---|---|
 | **Demo** | `?mode=demo` | "Fixture-backed demo — no live node, nothing signed." | Fixture rendering rehearsal only. Consumes the committed pilot-ui fixture pack (`web/pilot-ui/fixtures/icn-organizer-demo/standing.json` + `action-cards.json`) by relative fetch — those files are CI-drift-guarded and are **not** duplicated here. Deadlines are read relative to the fixture's own `generated_at` snapshot (and the UI says so), because frozen data must not pretend to be current. |
 | **Live** | default (or `?mode=live`) | "Live-local node — dev rehearsal, not production." | Talks to a locally running gateway (default `http://localhost:8080`). Dev rehearsal against real endpoint shapes; no production, pilot, or live-federation claim. |
+| **Organizer rehearsal** | `?mode=live&surface=organizer` | "Rehearsal mode — fictional data on an isolated node…" | Interactive organizer review→confirm (#2386) against a **Rehearsal-mode** gateway (`ICN_GOVERNANCE_BUILD_MODE=rehearsal`). Fictional data; confirming creates real ADR-0026 receipts + one action item on that isolated node. Live-only; not a pilot, not production, not live federation. See the organizer section below. |
 
 ### Demo-mode receipt fixture
 
@@ -87,6 +88,62 @@ held in a closure variable for the life of the page only — never written to
 localStorage/sessionStorage/cookies/URL, never hardcoded, sent only as an
 `Authorization: Bearer` header to the gateway address you typed.
 
+## Organizer rehearsal surface (`?surface=organizer`)
+
+`?mode=live&surface=organizer` opens the interactive organizer review→confirm
+workflow (#2386). It is **live-only** — it needs a locally running gateway
+started in **Rehearsal mode** (`ICN_GOVERNANCE_BUILD_MODE=rehearsal`); demo mode
+deliberately hosts no mutation surface (a fixture that appeared to confirm work
+would be fake success). Design of record:
+[`docs/design/ORGANIZER_REHEARSAL_WORKFLOW_WIREFRAME.md`](../../docs/design/ORGANIZER_REHEARSAL_WORKFLOW_WIREFRAME.md);
+runtime contract:
+[`docs/contracts/rehearsal-review-workflow.md`](../../docs/contracts/rehearsal-review-workflow.md).
+
+The human loop: connect → select a domain (auto if one, explicit if several) →
+inspect proposed work → review (approve / reject / request an edit / ask for more
+information) → edit the one allowlisted summary field → assign by registered
+label → **preview the exact mutation** → **confirm the bound preview** → see the
+created action item + ADR-0026 process receipts → inspect the value-withheld
+evidence summary → continue as the assigned member (member surface) to complete
+the card.
+
+**Authority boundary — the organizer credential is the narrow middle band:**
+
+```text
+setup / steward (internal credential, NOT in the browser): initialize a
+    workspace; bind a label to a fictional identity (holds a DID)
+organizer (the browser credential): read · review · bounded edit · assign an
+    existing label · preview · confirm
+member (a separate credential): read · complete their assigned action item
+```
+
+The organizer credential carries only `governance:read`,
+`governance:pending-publish:review`, and `governance:pending-publish:confirm`.
+It never holds setup/write/completion/admin authority, never initializes a
+workspace, never binds a label, and **never handles or displays a DID** (the DID
+identity section is not rendered on this surface). Confirm sends only the
+node-computed `preview_digest`; any edit/review/assignment/reset makes a prior
+preview stale (409) and no enabled Confirm survives a stale state.
+
+Routes driven (all under the gateway `/v1/gov` mount, `{d}` = selected domain):
+
+| Screen / action | Method + route | Scope |
+|---|---|---|
+| Eligible domains | `GET /me/standing` | `governance:read` |
+| Proposed-work list / detail | `GET /domains/{d}/rehearsal/pending-publish[/{row}]` | `governance:read` |
+| Registered labels | `GET /domains/{d}/rehearsal/bindings` | `governance:read` |
+| Review / edit / assign | `POST …/review` · `PUT …/{row}` · `POST …/assign` | `governance:pending-publish:review` |
+| Preview | `GET …/{row}/preview` | `governance:pending-publish:review` |
+| Confirm (digest only) | `POST …/{row}/confirm` | `governance:pending-publish:confirm` |
+| Receipts / evidence | `GET …/rehearsal/receipts` · `…/evidence-export` | `governance:read` |
+
+The organizer surface never calls the setup routes (`POST …/rehearsal/bindings`,
+`POST …/rehearsal/reset`); those are the internal credential's. Credential
+handling is the same memory-only discipline as live mode. This is a rehearsal
+surface: not organizer-ready, not accessibility-validated (the human assistive-
+technology gate #2041 stays open), not a pilot, not production, not live
+federation; receipts record process facts and grant no authority.
+
 ## How to run
 
 Serve the **`web/` directory** as the root (the demo fixture fetch crosses
@@ -103,6 +160,8 @@ Then open:
 - Demo: <http://localhost:8000/member-shell/?mode=demo>
 - Live: <http://localhost:8000/member-shell/> (gateway at
   `http://localhost:8080`)
+- Organizer rehearsal: <http://localhost:8000/member-shell/?mode=live&surface=organizer>
+  (needs a gateway started with `ICN_GOVERNANCE_BUILD_MODE=rehearsal`)
 
 Live-mode note: the browser enforces CORS, and the shell's requests carry
 an `Authorization` header, which forces a CORS preflight. Start the node
@@ -250,10 +309,41 @@ compliance with the gap declared"):
 - [ ] Deadline-justice metadata rendering (cards do not carry it yet)
 - [ ] Captions/transcripts — no media in this client (floor not exercised)
 
+## Browser tests (dev tools — not shipped)
+
+Playwright-based, borrowing Playwright + axe from `web/pilot-ui`'s
+devDependencies (`#1735`); none are loaded by `index.html`. Serve the `web/`
+root first:
+
+```bash
+cd web/pilot-ui && npm ci && npx playwright install chromium
+( cd web && python3 -m http.server 8099 --bind 127.0.0.1 & )
+export NODE_PATH=web/pilot-ui/node_modules
+# member surface
+node web/member-shell/pending-publish.test.cjs http://127.0.0.1:8099
+node web/member-shell/a11y-walkthrough.cjs     http://127.0.0.1:8099 ./out
+# organizer rehearsal surface (#2386), route-intercepted against the runtime shapes
+node web/member-shell/organizer-workflow.test.cjs http://127.0.0.1:8099
+node web/member-shell/organizer-a11y.cjs          http://127.0.0.1:8099 ./out
+```
+
+`organizer-workflow.test.cjs` drives the full review→confirm loop plus the
+security/robustness boundaries (setup/bindings-write/reset unreachable, no DID in
+the DOM, stale-409 clears Confirm, one-request-per-confirm, abandoned-response
+guard, reconnect clears prior rows, memory-only credential); `organizer-a11y.cjs`
+runs axe (`wcag2a/2aa/21a/21aa/22aa`) + keyboard + 200% zoom + 375px + pseudo-
+locale + RTL across the surface's states; `organizer-mock.cjs` is the shared
+stateful runtime mock both use. **An automated pass is not the human
+assistive-technology gate (#2041).**
+
 ## What this does NOT claim
 
 - Not the production member shell; no platform decision (iOS/Android/PWA/
   native) is made or implied.
+- The organizer rehearsal surface (`?surface=organizer`) is not organizer-ready
+  or accessibility-validated; it is a Rehearsal-mode-only review→confirm rehearsal
+  over fictional data, the browser never handles a DID or setup/write/completion
+  authority, and the human assistive-technology gate (#2041) stays open.
 - Not the full member-shell-v0 information architecture — the spec's ten
   surfaces include Decisions/Governance, Records/Artifacts, Privacy/Access,
   and a scope switcher that this client does not implement.
