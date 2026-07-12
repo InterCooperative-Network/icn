@@ -1021,15 +1021,17 @@ pub mod scopes {
     /// Rehearsal pending-publish review capability (#1726/#2386).
     ///
     /// Authorizes review decisions (approve / reject / needs-edit /
-    /// needs-more-info), bounded edits, label assignment, label→fictional-DID
-    /// binding, previews, and workspace reset on the rehearsal
-    /// pending-publish surface — routes that exist ONLY on an isolated
-    /// Rehearsal Node (`ICN_GOVERNANCE_BUILD_MODE=rehearsal`). It authorizes
-    /// no mutation of real governance state: reviewing, editing, and
-    /// assigning change only the fictional rehearsal workspace. Reset and
-    /// binding are deliberately part of this capability (repeating the
-    /// fictional rehearsal is an organizer act; a binding grants no
-    /// authority and rebinding invalidates outstanding previews).
+    /// needs-more-info), bounded edits, label assignment (labels only),
+    /// previews, and **re-reset** of an already-designated workspace on the
+    /// rehearsal pending-publish surface — routes that exist ONLY on an
+    /// isolated Rehearsal Node (`ICN_GOVERNANCE_BUILD_MODE=rehearsal`). It
+    /// authorizes no mutation of real governance state: reviewing, editing,
+    /// and assigning change only the fictional rehearsal workspace.
+    ///
+    /// **Not** included here (held by [`GOVERNANCE_REHEARSAL_SETUP`]
+    /// instead): the first workspace designation for a domain and
+    /// label→fictional-DID binding. The organizer browser credential carries
+    /// review+confirm+read only and never binds identities.
     ///
     /// Sibling of the class-level write scopes: it neither implies nor is
     /// implied by `GOVERNANCE_WRITE`; the rehearsal routes accept the broad
