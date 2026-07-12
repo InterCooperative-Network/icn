@@ -2219,3 +2219,102 @@ async fn broad_governance_write_retains_setup_review_and_confirm() {
     );
     assert_eq!(resp.status(), StatusCode::CREATED, "broad scope confirms");
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 10. Fresh-review-round P2 fixes: reset scan run-scoping + summary
+//     single-domain (no ambiguous cross-domain aggregation)
+// ═══════════════════════════════════════════════════════════════════════════
+
+#[actix_web::test]
+async fn reset_scan_matches_only_the_structured_marker_not_a_look_alike() {
+    // The durable retirement scan must match ONLY the structured rehearsal
+    // session marker (`"rehearsal-review session rehearsal-…-gen…"`), never
+    // the loose human prefix a normal caller could put in `meeting_context`.
+    // A normal action item whose context merely starts with the human words
+    // must survive a rehearsal reset.
+    let ctx = make_ctx(GovernanceContextBuildMode::Rehearsal);
+    let organizer = fresh_did();
+    seed_domain(&ctx.manager, vec![organizer.clone()]).await;
+
+    // Create a normal (non-rehearsal) action item with a look-alike context
+    // via the ordinary create route (broad scope), directly in the domain.
+    let broad_app = gov_app!(ctx.clone(), &organizer, format!("{READ} {BROAD}"));
+    let resp = post!(
+        &broad_app,
+        format!("/domains/{DOMAIN}/action-items"),
+        &json!({
+            "title": "Ordinary item",
+            "priority": "medium",
+            "meeting_context": "rehearsal-review session notes (not a real marker)"
+        })
+    );
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let decoy_id = body_json(resp).await["id"].as_str().unwrap().to_string();
+
+    // Designate the rehearsal workspace (the first reset runs the durable
+    // retirement scan over the domain's action items).
+    let setup_app = gov_app!(ctx, &organizer, format!("{READ} {SETUP}"));
+    let resp = post!(
+        &setup_app,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // The look-alike item is NOT swept — its marker lacks the structured
+    // `rehearsal-…-gen…` session form.
+    let item = body_json(get!(
+        &broad_app,
+        format!("/domains/{DOMAIN}/action-items/{decoy_id}")
+    ))
+    .await;
+    assert_ne!(
+        item["status"], "cancelled",
+        "a look-alike meeting_context must never be swept by the rehearsal reset scan"
+    );
+}
+
+#[actix_web::test]
+async fn summary_serves_a_single_domain_never_ambiguous_cross_domain_rows() {
+    // A caller who is a member of TWO initialized rehearsal domains must not
+    // receive a concatenated rows array with duplicate seed ids. The summary
+    // falls through to the honest committed_fixture response; the per-domain
+    // routes remain the authoritative surface.
+    let ctx = make_ctx(GovernanceContextBuildMode::Rehearsal);
+    let member = fresh_did();
+    seed_domain(&ctx.manager, vec![member.clone()]).await;
+    seed_named_domain(
+        &ctx.manager,
+        vec![member.clone()],
+        "second-rehearsal-domain",
+    )
+    .await;
+
+    let app = gov_app!(ctx, &member, format!("{READ} {REVIEW} {SETUP}"));
+    // Designate + approve in BOTH domains.
+    for d in [DOMAIN, "second-rehearsal-domain"] {
+        let resp = post!(&app, format!("/domains/{d}/rehearsal/reset"), &json!({}));
+        assert_eq!(resp.status(), StatusCode::OK);
+        let resp = post!(
+            &app,
+            format!("/domains/{d}/rehearsal/pending-publish/{ROW_ACTION}/review"),
+            &json!({"decision": "approve"})
+        );
+        assert_eq!(resp.status(), StatusCode::OK);
+    }
+
+    // Member of two rehearsal domains → summary is NOT the ambiguous
+    // aggregate; it is the honest static fixture.
+    let body = body_json(get!(&app, "/me/pending-publish-summary")).await;
+    assert_eq!(
+        body["origin"], "committed_fixture",
+        "two member-visible workspaces must not aggregate into one rows array"
+    );
+    // No duplicate ids: the fixture set has unique row ids.
+    let rows = body["rows"].as_array().unwrap();
+    let mut ids: Vec<&str> = rows.iter().filter_map(|r| r["id"].as_str()).collect();
+    let n = ids.len();
+    ids.sort();
+    ids.dedup();
+    assert_eq!(ids.len(), n, "summary rows must have unique ids");
+}

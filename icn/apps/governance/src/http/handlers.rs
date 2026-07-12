@@ -6285,22 +6285,29 @@ pub async fn get_my_pending_publish_summary<E: GovernanceEventEmitter + Clone + 
     // object-context doctrine applied to this self-scoped summary). A caller
     // with no member-visible workspace falls through to the static fixture,
     // exactly as if no workspace existed anywhere.
+    // Serve live rehearsal rows only from a SINGLE member-visible workspace.
+    // Fixture rows carry no `domain_id` and every workspace seeds the same
+    // generic row ids, so concatenating two domains would yield duplicate,
+    // indistinguishable ids a client could act on against the wrong
+    // `/domains/{id}/rehearsal/...` route. The authoritative surface is
+    // per-domain; this self-scoped summary is a convenience mirror, so a
+    // caller who is a member of more than one initialized rehearsal domain
+    // falls through to the honest static `committed_fixture` response rather
+    // than an ambiguous aggregate.
     let mut rehearsal_rows: Option<Vec<PendingPublishRow>> = None;
     if ctx.build_mode.allows_rehearsal_mutation() {
-        let mut visible = Vec::new();
+        let mut member_visible: Vec<String> = Vec::new();
         for domain_id in ctx.manager.rehearsal_state().initialized_domains() {
             let domain = GovernanceDomainId(domain_id.clone());
             if check_domain_membership(&ctx, &domain, &caller)
                 .await
                 .is_ok()
             {
-                if let Some(rows) = ctx.manager.rehearsal_state().domain_rows(&domain_id) {
-                    visible.extend(rows);
-                }
+                member_visible.push(domain_id);
             }
         }
-        if !visible.is_empty() {
-            rehearsal_rows = Some(visible);
+        if let [only] = member_visible.as_slice() {
+            rehearsal_rows = ctx.manager.rehearsal_state().domain_rows(only);
         }
     }
     let (origin, rows) = match rehearsal_rows {

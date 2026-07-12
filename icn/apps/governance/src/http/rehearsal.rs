@@ -317,14 +317,26 @@ pub async fn rehearsal_reset<E: GovernanceEventEmitter + Clone + 'static>(
     };
     let (domain, caller) = gate(&ctx, &http_req, &domain_id, scopes).await?;
     let (generation, prior_items) = state.reset(&domain.0, demo_pending_publish_rows());
+    // The run id just minted for THIS (new) generation. Items whose marker
+    // names it belong to the new run — a confirm racing this reset could
+    // create one after `state.reset()` installed the new workspace — and
+    // must NOT be retired. `run_id` is a unique nanos-derived token, so a
+    // simple containment test is unambiguous.
+    let new_run_id = state
+        .with_workspace(&domain.0, |ws| ws.run_id.clone())
+        .unwrap_or_default();
 
     // The in-memory workspace only knows about items created THIS process
     // lifetime. Action items are durable (Sled in the gateway path) and
     // survive restarts, so also scan the durable store for this domain's
-    // rehearsal-created items (identified by the meeting_context marker
-    // this surface writes) that are still active. Without this, a daemon
-    // restart would orphan the prior run's fictional items in the member's
-    // active queue. Scan failures are reported, never silently swallowed.
+    // rehearsal-created items that are still active. Without this, a daemon
+    // restart would orphan the PRIOR run's fictional items in the member's
+    // active queue. The scan is confined to the path (designated fictional
+    // rehearsal) domain and matches only the STRUCTURED marker this surface
+    // writes (`"<prefix>rehearsal-…-gen…"`), never the loose human prefix, and
+    // it excludes the current run so a concurrent new-generation confirm is
+    // never swept. Scan failures are reported, never silently swallowed.
+    let structured_marker_prefix = format!("{REHEARSAL_ITEM_CONTEXT_PREFIX}rehearsal-");
     let mut retire: Vec<String> = prior_items;
     let mut scan_failed = false;
     match ctx
@@ -333,16 +345,15 @@ pub async fn rehearsal_reset<E: GovernanceEventEmitter + Clone + 'static>(
     {
         Ok(items) => {
             for item in items {
-                let is_rehearsal_item = item
-                    .meeting_context
-                    .as_deref()
-                    .is_some_and(|c| c.starts_with(REHEARSAL_ITEM_CONTEXT_PREFIX));
+                let marker = item.meeting_context.as_deref().unwrap_or("");
+                let is_prior_rehearsal_item = marker.starts_with(&structured_marker_prefix)
+                    && !(new_run_id.is_empty() || marker.contains(&new_run_id));
                 let is_active = !matches!(
                     item.status,
                     icn_governance::ActionItemStatus::Completed
                         | icn_governance::ActionItemStatus::Cancelled
                 );
-                if is_rehearsal_item && is_active {
+                if is_prior_rehearsal_item && is_active {
                     let id = item.id.to_string();
                     if !retire.contains(&id) {
                         retire.push(id);
