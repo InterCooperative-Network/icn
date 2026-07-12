@@ -2935,6 +2935,10 @@ pub struct GovernanceManager {
     domain_store: Option<Arc<dyn GovernanceStateStore>>,
     /// Optional receipt store for persisting GovernanceDecisionReceipts
     receipt_store: Option<Arc<dyn GovernanceReceiptBackend>>,
+    /// Isolated rehearsal review workspaces (#1726/#2386). Only the
+    /// Rehearsal-mode HTTP surface touches this; every other mode leaves it
+    /// empty. Kept on the manager so all gateway workers share one instance.
+    rehearsal_state: crate::rehearsal_workspace::RehearsalReviewState,
     /// Optional append-only log of milestone status transitions.
     ///
     /// `None` in tests and standalone mode (no log written, history falls back
@@ -2984,6 +2988,7 @@ impl GovernanceManager {
             governance_handle: None,
             domain_store: None,
             receipt_store: None,
+            rehearsal_state: Default::default(),
             milestone_event_log: None,
             program_event_log: None,
             domain_adoption_locks: Mutex::new(HashMap::new()),
@@ -3024,6 +3029,7 @@ impl GovernanceManager {
             governance_handle: Some(handle),
             domain_store: None,
             receipt_store: None,
+            rehearsal_state: Default::default(),
             milestone_event_log: None,
             program_event_log: None,
             domain_adoption_locks: Mutex::new(HashMap::new()),
@@ -3042,6 +3048,11 @@ impl GovernanceManager {
     ///
     /// When set, `close_proposal()` in standalone mode will automatically
     /// generate and store a `GovernanceDecisionReceipt` after closing.
+    /// The rehearsal review workspace container (Rehearsal build mode only).
+    pub fn rehearsal_state(&self) -> &crate::rehearsal_workspace::RehearsalReviewState {
+        &self.rehearsal_state
+    }
+
     pub fn with_receipt_store(mut self, store: Arc<dyn GovernanceReceiptBackend>) -> Self {
         self.receipt_store = Some(store);
         self
@@ -3182,6 +3193,7 @@ impl GovernanceManager {
             milestone_store: Arc::new(SledMilestoneStore::new(db.clone())),
             governance_handle: Some(handle),
             receipt_store: None,
+            rehearsal_state: Default::default(),
             // Actor-backed mode: the actor owns its own state store. Standalone-mode
             // domain persistence is intentionally not wired here.
             domain_store: None,
@@ -3245,6 +3257,7 @@ impl GovernanceManager {
             governance_handle: None,
             domain_store: Some(domain_store),
             receipt_store: None,
+            rehearsal_state: Default::default(),
             milestone_event_log: Some(Arc::new(SledMilestoneEventLog::new(db.clone()))),
             program_event_log: Some(Arc::new(SledProgramEventLog::new(db))),
             domain_adoption_locks: Mutex::new(HashMap::new()),

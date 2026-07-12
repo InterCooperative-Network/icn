@@ -1018,6 +1018,35 @@ pub mod scopes {
     /// full transition range during the migration.
     pub const GOVERNANCE_ACTION_ITEM_COMPLETE: &str = "governance:action-item:complete";
 
+    /// Rehearsal pending-publish review capability (#1726/#2386).
+    ///
+    /// Authorizes review decisions (approve / reject / needs-edit /
+    /// needs-more-info), bounded edits, label assignment, label→fictional-DID
+    /// binding, previews, and workspace reset on the rehearsal
+    /// pending-publish surface — routes that exist ONLY on an isolated
+    /// Rehearsal Node (`ICN_GOVERNANCE_BUILD_MODE=rehearsal`). It authorizes
+    /// no mutation of real governance state: reviewing, editing, and
+    /// assigning change only the fictional rehearsal workspace. Reset and
+    /// binding are deliberately part of this capability (repeating the
+    /// fictional rehearsal is an organizer act; a binding grants no
+    /// authority and rebinding invalidates outstanding previews).
+    ///
+    /// Sibling of the class-level write scopes: it neither implies nor is
+    /// implied by `GOVERNANCE_WRITE`; the rehearsal routes accept the broad
+    /// scope as a fallback consistent with the sub-capability doctrine.
+    pub const GOVERNANCE_PENDING_PUBLISH_REVIEW: &str = "governance:pending-publish:review";
+
+    /// Rehearsal pending-publish confirm capability (#1726/#2386).
+    ///
+    /// Authorizes executing an approved, digest-bound rehearsal mutation
+    /// (creating ONE real action item through the manager machinery plus the
+    /// ADR-0026 receipt ladder) on the Rehearsal-Node-only confirm route.
+    /// Held separately from `GOVERNANCE_PENDING_PUBLISH_REVIEW` so a
+    /// review-only credential can never mutate governance state and a
+    /// confirm-only credential can never manufacture the review state it
+    /// confirms.
+    pub const GOVERNANCE_PENDING_PUBLISH_CONFIRM: &str = "governance:pending-publish:confirm";
+
     // Admin scopes
     pub const ADMIN: &str = "admin";
 

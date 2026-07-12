@@ -407,13 +407,22 @@ async fn read_scope_cannot_review_edit_assign_confirm_or_reset() {
     let organizer = fresh_did();
     seed_domain(&ctx.manager, vec![organizer.clone()]).await;
     let app = gov_app!(ctx, &organizer, READ);
-    for uri in [
-        format!("/domains/{DOMAIN}/rehearsal/reset"),
-        review_uri(ROW_ACTION),
-        confirm_uri(ROW_ACTION),
-        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+    // Each request carries a schema-valid body for its route, so the
+    // rejection under test is the capability gate (403), not body parsing —
+    // actix extractors run before handler bodies by repo convention.
+    for (uri, body) in [
+        (format!("/domains/{DOMAIN}/rehearsal/reset"), json!({})),
+        (review_uri(ROW_ACTION), json!({"decision": "approve"})),
+        (
+            confirm_uri(ROW_ACTION),
+            json!({"preview_digest": "0".repeat(64)}),
+        ),
+        (
+            format!("/domains/{DOMAIN}/rehearsal/bindings"),
+            json!({"label": "Example member (fictional)", "did": "did:icn:example-not-live"}),
+        ),
     ] {
-        let resp = post!(&app, &uri, &json!({"decision": "approve"}));
+        let resp = post!(&app, &uri, &body);
         assert_eq!(
             resp.status(),
             StatusCode::FORBIDDEN,
@@ -1082,7 +1091,11 @@ async fn member_of_another_domain_cannot_touch_this_domains_workspace() {
         StatusCode::FORBIDDEN,
         "standing in another domain must not open this domain's workspace"
     );
-    let resp = post!(&app, review_uri(ROW_ACTION), &json!({"decision": "approve"}));
+    let resp = post!(
+        &app,
+        review_uri(ROW_ACTION),
+        &json!({"decision": "approve"})
+    );
     assert_eq!(resp.status(), StatusCode::FORBIDDEN);
 }
 

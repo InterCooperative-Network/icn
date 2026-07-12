@@ -4022,6 +4022,15 @@ domain_tags = ["contracts", "pilots", "review", "evidence", "accessibility"]
 recommended_action = "keep"
 last_reviewed = "2026-05-05"
 
+[docs."docs/contracts/rehearsal-review-workflow.md"]
+category = "reference"
+status = "living"
+title = "Rehearsal review workflow — runtime contract (v1)"
+description = "Runtime contract for the Rehearsal-Node-only organizer pending-publish review/confirm surface (#1726/#1728/#2386): mounted exclusively in the rehearsal governance build mode; narrow governance:pending-publish:review / :confirm capabilities; bounded review decisions/edits/label assignment; domain-separated BLAKE3 preview digest binding confirm to the previewed mutation; confirm walks the real ADR-0026 receipt ladder and creates one real action item; rehearsal_runtime summary origin; value-withheld SHA-256-hashed evidence packet (urn:icn:contract:rehearsal-workflow-evidence:v1). Deliberately absent from the public OpenAPI document. Fictional rehearsal surface; grants no authority."
+last_updated = "2026-07-11"
+owner = "matt"
+audiences = ["contributors", "architects", "organizers"]
+
 [docs."docs/contracts/pending-publish-summary.md"]
 category = "reference"
 status = "living"

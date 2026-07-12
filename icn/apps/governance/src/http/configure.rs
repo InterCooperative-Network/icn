@@ -605,6 +605,13 @@ where
 
     let data = web::Data::new(ctx);
 
+    // The rehearsal review/mutation surface exists ONLY in Rehearsal mode.
+    // In every other mode the routes are not mounted at all, so the surface
+    // fails closed as 404 (no handler-level check to get wrong).
+    if data.build_mode.allows_rehearsal_mutation() {
+        super::rehearsal::configure_rehearsal_routes::<E>(cfg);
+    }
+
     cfg.app_data(data.clone())
         // ── Domain endpoints ─────────────────────────────────────────────
         .service(

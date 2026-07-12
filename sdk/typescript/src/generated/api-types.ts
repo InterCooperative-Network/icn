@@ -890,7 +890,7 @@ export interface components {
          *     taxonomy so a client can never confuse fixture rehearsal data with live state.
          * @enum {string}
          */
-        PendingPublishOrigin: "live_runtime" | "committed_fixture";
+        PendingPublishOrigin: "live_runtime" | "committed_fixture" | "rehearsal_runtime";
         /**
          * @description Provenance category of a row's source material. Closed taxonomy mirroring the
          *     contract's `source_provenance_ref.category`.
@@ -1604,7 +1604,7 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description Pending-publish preview/review rows for the caller, wrapped in `PendingPublishSummaryResponse` (`{did, origin, rows, non_claims, generated_at}`). Runtime projection of `urn:icn:contract:pending-publish-summary:v1`. Read-only: there is no mutation API on this surface, no authority is granted, and no action card is created. `origin = live_runtime` (production) returns no rows; `origin = committed_fixture` (non-production) returns deterministic, fictional rehearsal rows. Row `kind`, `status`, `risk_level`, `source_provenance`, and `receipt_expected.category` use closed enums. */
+            /** @description Pending-publish preview/review rows for the caller, wrapped in `PendingPublishSummaryResponse` (`{did, origin, rows, non_claims, generated_at}`). Runtime projection of `urn:icn:contract:pending-publish-summary:v1`. Read-only: there is no mutation API on this surface, no authority is granted, and no action card is created. `origin = live_runtime` (production) returns no rows; `origin = committed_fixture` (non-production) returns deterministic, fictional rehearsal rows; `origin = rehearsal_runtime` (rehearsal build mode, after an explicit workspace reset) returns the live rehearsal review workspace rows — still fictional, never production state. Row `kind`, `status`, `risk_level`, `source_provenance`, and `receipt_expected.category` use closed enums. */
             200: {
                 headers: {
                     [name: string]: unknown;

@@ -513,6 +513,11 @@ pub enum PendingPublishOrigin {
     /// live participant state. Served only in non-production (bootstrap/test)
     /// build modes so the organizer rehearsal shell can exercise the endpoint.
     CommittedFixture,
+    /// `rows` come from the live rehearsal review workspace on an isolated
+    /// Rehearsal Node (`rehearsal` build mode, after an explicit workspace
+    /// reset): still fictional, but reflecting real organizer review state
+    /// rather than the static committed fixture. Never served in production.
+    RehearsalRuntime,
 }
 
 /// Closed taxonomy of pending-publish row kinds. Mirrors the `kind` enum of
