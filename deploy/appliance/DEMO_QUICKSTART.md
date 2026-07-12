@@ -4,6 +4,14 @@ One VM. One browser. The core ICN loop, honestly labeled:
 
 **standing → action card → discharge → receipt → evidence/audit**
 
+> **Rehearsal Node loop (#2386):** the one-command launcher now opens the
+> **organizer** surface (`?surface=organizer`). The assembled loop is *organizer
+> reviews → confirms one fictional item → the assigned member (a fresh
+> least-privilege session) completes it → steward verifies*
+> (`sudo icn-demo-verify --rehearsal`). See
+> [docs/demo/rehearsal-node-appliance-loop.md](../../docs/demo/rehearsal-node-appliance-loop.md).
+> The legacy member action-item loop below still works as the manual fallback.
+
 ## What this demonstrates
 
 - A real ICN node (`icnd`) booting on a disposable VM and serving its
@@ -136,11 +144,13 @@ ICN_DEMO_VM_IP=192.0.2.50 ICN_DEMO_JUMP=user@dev-host \
 ```
 
 It opens the SSH tunnels (gateway→18080, shell→18090, demo-session→18091),
-then opens your browser to `…/member-shell/?mode=live&demo=launcher`. In the
-page, the gateway is pre-filled and a **Start local demo** button appears —
-select it once and your standing + a sample action card load automatically.
-Nothing is copied or pasted; the credential lives only in the page's memory.
-Press Ctrl-C in the terminal to close the tunnel when you're done.
+then opens your browser to the **organizer** surface
+(`…/member-shell/?mode=live&surface=organizer&demo=launcher`). In the page, the
+gateway is pre-filled and a **Start organizer rehearsal** button appears — select
+it once to review and confirm one fictional item, then "Continue as the assigned
+member" (a fresh least-privilege session) to complete it. Nothing is copied or
+pasted; each credential lives only in the page's memory. Press Ctrl-C in the
+terminal to close the tunnel when you're done.
 
 This needs a demo-profile image (the `icn-demo-session` endpoint ships with
 `ICN_APPLIANCE_DEMO_PROFILE=1`). Everything below is the manual fallback.
