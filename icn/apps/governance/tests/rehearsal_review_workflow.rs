@@ -31,8 +31,9 @@ use std::sync::{Arc, Mutex};
 
 use actix_web::{dev::Service as _, http::StatusCode, test, App, HttpMessage};
 use icn_governance::{
-    GovernanceDecisionReceipt, GovernanceDomainId, GovernanceParams, MembershipConfig,
-    MembershipSource, StaticMembershipResolver,
+    ActionItem, ActionItemFilter, ActionItemId, GovernanceDecisionReceipt, GovernanceDomain,
+    GovernanceDomainId, GovernanceParams, InMemoryActionItemStore, MembershipConfig,
+    MembershipResolver, MembershipSource, StaticMembershipResolver,
 };
 use icn_governance_actor::{
     http::{self, GovernanceContext, GovernanceContextBuildMode},
@@ -83,6 +84,17 @@ impl OpaqueUniqueBackend {
     }
     fn clear_failures(&self) {
         self.fail_classes.lock().unwrap().clear();
+    }
+    /// Total persisted entries of one receipt class (append-only chains +
+    /// unique inserts both land in `chains`).
+    fn count_entries(&self, class: &str) -> usize {
+        self.chains
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|((c, _, _), _)| c == class)
+            .map(|(_, chain)| chain.len())
+            .sum()
     }
 }
 
@@ -197,6 +209,61 @@ fn make_ctx(mode: GovernanceContextBuildMode) -> GovernanceContext<NoopEventEmit
     make_ctx_with_backend(mode).0
 }
 
+/// Share one in-memory action-item store across "restarted" managers, the
+/// way the gateway's Sled store survives a daemon restart.
+struct SharedItemStore(Arc<InMemoryActionItemStore>);
+
+impl icn_governance::ActionItemStoreBackend for SharedItemStore {
+    fn save(&self, item: &ActionItem) -> icn_governance::Result<()> {
+        self.0.save(item)
+    }
+    fn get(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &ActionItemId,
+    ) -> icn_governance::Result<Option<ActionItem>> {
+        self.0.get(domain_id, id)
+    }
+    fn list(
+        &self,
+        domain_id: &GovernanceDomainId,
+        filter: &ActionItemFilter,
+    ) -> icn_governance::Result<Vec<ActionItem>> {
+        self.0.list(domain_id, filter)
+    }
+    fn delete(
+        &self,
+        domain_id: &GovernanceDomainId,
+        id: &ActionItemId,
+    ) -> icn_governance::Result<bool> {
+        self.0.delete(domain_id, id)
+    }
+    fn count(
+        &self,
+        domain_id: &GovernanceDomainId,
+        filter: &ActionItemFilter,
+    ) -> icn_governance::Result<usize> {
+        self.0.count(domain_id, filter)
+    }
+    fn delete_all(&self, domain_id: &GovernanceDomainId) -> icn_governance::Result<usize> {
+        self.0.delete_all(domain_id)
+    }
+}
+
+/// Like [`make_ctx_on_backend`], but with a durable (shared) action-item
+/// store, so a "restart" test can observe items persisted by a prior manager.
+fn make_ctx_on_backend_with_items(
+    mode: GovernanceContextBuildMode,
+    backend: Arc<OpaqueUniqueBackend>,
+    items: Arc<InMemoryActionItemStore>,
+) -> GovernanceContext<NoopEventEmitter> {
+    let mut ctx = make_ctx_on_backend(mode, backend.clone());
+    let mut manager = GovernanceManager::new().with_receipt_store(backend);
+    manager.set_action_item_store(Box::new(SharedItemStore(items)));
+    ctx.manager = Arc::new(manager);
+    ctx
+}
+
 fn make_ctx_on_backend(
     mode: GovernanceContextBuildMode,
     backend: Arc<OpaqueUniqueBackend>,
@@ -268,6 +335,49 @@ async fn seed_named_domain(
 
 async fn seed_domain(mgr: &GovernanceManager, members: Vec<Did>) -> GovernanceDomainId {
     seed_named_domain(mgr, members, DOMAIN).await
+}
+
+/// A `TrustThreshold` domain: membership is NOT enumerable from the source;
+/// standing exists only if a wired resolver affirms it.
+async fn seed_trust_domain(mgr: &GovernanceManager, name: &str) -> GovernanceDomainId {
+    let domain = GovernanceDomainId::new(name);
+    mgr.create_domain(
+        domain.clone(),
+        format!("Rehearsal Trust Coop ({name})"),
+        "default".to_string(),
+        GovernanceParams {
+            quorum_percentage: 1,
+            approval_threshold_percentage: 51,
+            voting_period_seconds: 86_400,
+            require_deliberation: false,
+            ..GovernanceParams::default()
+        },
+        MembershipConfig {
+            source: MembershipSource::TrustThreshold(0.5),
+        },
+    )
+    .await
+    .expect("create_domain");
+    domain
+}
+
+/// Test resolver with a fixed member set, optionally erroring for one DID
+/// (an INDETERMINATE standing, distinct from a provable non-member).
+struct FixedResolver {
+    members: Vec<Did>,
+    error_for: Option<Did>,
+}
+
+impl MembershipResolver for FixedResolver {
+    fn resolve_members(&self, _domain: &GovernanceDomain) -> anyhow::Result<Vec<Did>> {
+        Ok(self.members.clone())
+    }
+    fn is_member(&self, _domain: &GovernanceDomain, did: &Did) -> anyhow::Result<bool> {
+        if self.error_for.as_ref() == Some(did) {
+            anyhow::bail!("trust graph unavailable for this identity");
+        }
+        Ok(self.members.contains(did))
+    }
 }
 
 macro_rules! gov_app {
@@ -1683,6 +1793,340 @@ async fn confirm_retry_after_applied_failure_resumes_same_item_never_duplicates(
         listing.as_array().map(Vec::len),
         Some(1),
         "an interrupted-then-retried confirm must never duplicate the item"
+    );
+
+    // The retry REUSED the original gate receipt instead of appending a
+    // second observation. This is what keeps the retry working at all: gate
+    // record hashes include recorded_at, so a fresh gate in a later second
+    // would change the activation's gate basis and hard-conflict with the
+    // already-recorded activation (same activation_id, different basis).
+    assert_eq!(
+        backend.count_entries("process_gate_result"),
+        1,
+        "an identical retry must reuse the recorded gate receipt, not append a second"
+    );
+    assert_eq!(
+        backend.count_entries("activation_crossed"),
+        1,
+        "exactly one activation crossing exists after the retry"
+    );
+}
+
+#[actix_web::test]
+async fn rebinding_is_refused_while_an_interrupted_execution_references_the_label() {
+    // If the mutation-applied receipt fails after the item exists, the row
+    // holds pending_item_id and the ONLY forward path is the identical
+    // retry. Rebinding the assignee label now would change the recomputed
+    // digest, turn that retry into a stale-preview 409, and strand the
+    // created item without its applied receipt — so rebinding is refused
+    // (409) until the retry completes or the rehearsal is reset.
+    let (ctx, backend) = make_ctx_with_backend(GovernanceContextBuildMode::Rehearsal);
+    let organizer = fresh_did();
+    let other = fresh_did();
+    seed_domain(&ctx.manager, vec![organizer.clone(), other.clone()]).await;
+    let app = gov_app!(
+        ctx,
+        &organizer,
+        format!("{READ} {REVIEW} {CONFIRM} {SETUP}")
+    );
+    let resp = post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
+    post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": organizer.to_string()})
+    );
+    post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/pending-publish/{ROW_ACTION}/assign"),
+        &json!({"assignee_label": "Example member (fictional)"})
+    );
+    let preview = approve_and_preview!(&app);
+    let digest = preview["preview_digest"].as_str().unwrap().to_string();
+
+    backend.fail_class("mutation_applied");
+    let resp = post!(
+        &app,
+        confirm_uri(ROW_ACTION),
+        &json!({"preview_digest": digest})
+    );
+    assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+
+    // Rebinding the label referenced by the interrupted row: refused.
+    let resp = post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": other.to_string()})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::CONFLICT,
+        "rebinding must be refused while an interrupted execution references the label"
+    );
+
+    // An unrelated label may still be bound during the pending state.
+    let resp = post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Another member (fictional)", "did": other.to_string()})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "labels not referenced by the interrupted row stay bindable"
+    );
+
+    // The identical retry still resumes and completes.
+    backend.clear_failures();
+    let resp = post!(
+        &app,
+        confirm_uri(ROW_ACTION),
+        &json!({"preview_digest": digest})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::CREATED,
+        "the identical retry must still complete after the refused rebinding"
+    );
+}
+
+#[actix_web::test]
+async fn reset_after_restart_retires_the_prior_runs_persisted_items() {
+    // Action items are DURABLE (Sled in the gateway path) while the review
+    // workspace is node-lifetime memory. After a daemon restart the first
+    // reset has no in-memory record of the prior run — the durable
+    // meeting_context marker is what lets it retire the prior run's
+    // fictional items instead of leaving them active in the member's queue.
+    let backend = Arc::new(OpaqueUniqueBackend::default());
+    let items = Arc::new(InMemoryActionItemStore::new());
+    let organizer = fresh_did();
+
+    // Run 1: full confirm on manager A.
+    let ctx1 = make_ctx_on_backend_with_items(
+        GovernanceContextBuildMode::Rehearsal,
+        backend.clone(),
+        items.clone(),
+    );
+    seed_domain(&ctx1.manager, vec![organizer.clone()]).await;
+    let app1 = gov_app!(
+        ctx1,
+        &organizer,
+        format!("{READ} {REVIEW} {CONFIRM} {SETUP}")
+    );
+    let resp = post!(
+        &app1,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
+    post!(
+        &app1,
+        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": organizer.to_string()})
+    );
+    post!(
+        &app1,
+        format!("/domains/{DOMAIN}/rehearsal/pending-publish/{ROW_ACTION}/assign"),
+        &json!({"assignee_label": "Example member (fictional)"})
+    );
+    let preview = approve_and_preview!(&app1);
+    let digest = preview["preview_digest"].as_str().unwrap().to_string();
+    let resp = post!(
+        &app1,
+        confirm_uri(ROW_ACTION),
+        &json!({"preview_digest": digest})
+    );
+    assert_eq!(resp.status(), StatusCode::CREATED);
+    let item_id = body_json(resp).await["action_item_id"]
+        .as_str()
+        .unwrap()
+        .to_string();
+
+    // "Restart": manager B shares the durable stores but has NO in-memory
+    // workspace. The first reset (a fresh designation) must find and retire
+    // the prior run's persisted item through the durable marker.
+    let ctx2 =
+        make_ctx_on_backend_with_items(GovernanceContextBuildMode::Rehearsal, backend, items);
+    seed_domain(&ctx2.manager, vec![organizer.clone()]).await;
+    let app2 = gov_app!(ctx2, &organizer, format!("{READ} {SETUP}"));
+    let resp = post!(
+        &app2,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
+    let body = body_json(resp).await;
+    assert_eq!(body["prior_item_scan"], "complete");
+    assert!(
+        body["cancelled_action_items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|v| v == item_id.as_str()),
+        "post-restart reset must retire the prior run's persisted item: {body}"
+    );
+    let item = body_json(get!(
+        &app2,
+        format!("/domains/{DOMAIN}/action-items/{item_id}")
+    ))
+    .await;
+    assert_eq!(
+        item["status"], "cancelled",
+        "the orphaned fictional item is cancelled, not left active"
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// 9. Binding-target membership must be AFFIRMATIVE (fail-closed)
+// ═══════════════════════════════════════════════════════════════════════════
+
+const TRUST_DOMAIN: &str = "rehearsal-trust-domain";
+
+/// The standard deny body: identical for every deny cause, so the response
+/// never distinguishes "provable non-member" from "membership unknowable"
+/// and leaks nothing about hidden identities or foreign domains.
+fn assert_binding_denied_opaquely(status: StatusCode, body: &Value, did: &Did) {
+    assert_eq!(
+        status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "binding must be denied: {body}"
+    );
+    assert!(
+        !body.to_string().contains(&did.to_string()),
+        "the deny must not echo the DID: {body}"
+    );
+    assert_eq!(
+        body["error"]
+            .as_str()
+            .map(|s| s.contains("membership standing")),
+        Some(true),
+        "the deny carries only the generic standing message: {body}"
+    );
+}
+
+#[actix_web::test]
+async fn trust_threshold_binding_denies_when_no_resolver_is_wired() {
+    // Rehearsal keeps the permissive CALLER posture for TrustThreshold
+    // domains without a resolver (matching Bootstrap), so the setup caller
+    // reaches the handler — but the BINDING TARGET invariant must still
+    // fail closed: with no resolver, standing cannot be affirmatively
+    // established, so no DID whatsoever may be bound.
+    let ctx = make_ctx(GovernanceContextBuildMode::Rehearsal);
+    let operator = fresh_did();
+    let target = fresh_did();
+    seed_trust_domain(&ctx.manager, TRUST_DOMAIN).await;
+    let app = gov_app!(ctx, &operator, format!("{READ} {SETUP}"));
+    let resp = post!(
+        &app,
+        format!("/domains/{TRUST_DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "caller-side permissive posture still designates the workspace"
+    );
+    let resp = post!(
+        &app,
+        format!("/domains/{TRUST_DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": target.to_string()})
+    );
+    let status = resp.status();
+    let body = body_json(resp).await;
+    assert_binding_denied_opaquely(status, &body, &target);
+}
+
+#[actix_web::test]
+async fn trust_threshold_binding_requires_affirmative_resolver_confirmation() {
+    let mut ctx = make_ctx(GovernanceContextBuildMode::Rehearsal);
+    let operator = fresh_did();
+    let member_target = fresh_did();
+    let non_member = fresh_did();
+    let indeterminate = fresh_did();
+    ctx.membership_resolver = Some(Arc::new(FixedResolver {
+        members: vec![operator.clone(), member_target.clone()],
+        error_for: Some(indeterminate.clone()),
+    }));
+    seed_trust_domain(&ctx.manager, TRUST_DOMAIN).await;
+    let app = gov_app!(ctx, &operator, format!("{READ} {SETUP}"));
+    let resp = post!(
+        &app,
+        format!("/domains/{TRUST_DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Resolver AFFIRMS membership → binding proceeds.
+    let resp = post!(
+        &app,
+        format!("/domains/{TRUST_DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": member_target.to_string()})
+    );
+    assert_eq!(
+        resp.status(),
+        StatusCode::OK,
+        "resolver-confirmed membership must permit the binding"
+    );
+    assert_eq!(body_json(resp).await["bound"], true);
+
+    // Resolver PROVES non-membership → deny.
+    let resp = post!(
+        &app,
+        format!("/domains/{TRUST_DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Second member (fictional)", "did": non_member.to_string()})
+    );
+    let status = resp.status();
+    let deny_non_member = body_json(resp).await;
+    assert_binding_denied_opaquely(status, &deny_non_member, &non_member);
+
+    // Resolver CANNOT DETERMINE standing → deny, indistinguishable from the
+    // provable non-member deny (same status, same error text).
+    let resp = post!(
+        &app,
+        format!("/domains/{TRUST_DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Second member (fictional)", "did": indeterminate.to_string()})
+    );
+    let status = resp.status();
+    let deny_indeterminate = body_json(resp).await;
+    assert_binding_denied_opaquely(status, &deny_indeterminate, &indeterminate);
+    assert_eq!(
+        deny_non_member["error"], deny_indeterminate["error"],
+        "non-member and indeterminate denies must be indistinguishable"
+    );
+}
+
+#[actix_web::test]
+async fn membership_in_another_domain_does_not_permit_binding() {
+    // The target holds REAL standing — in a different domain. The binding
+    // domain's own membership is the only authority context, and the deny
+    // must not reveal that the target exists elsewhere.
+    let ctx = make_ctx(GovernanceContextBuildMode::Rehearsal);
+    let operator = fresh_did();
+    let foreigner = fresh_did();
+    seed_domain(&ctx.manager, vec![operator.clone()]).await;
+    seed_named_domain(&ctx.manager, vec![foreigner.clone()], "other-domain").await;
+    let app = gov_app!(ctx, &operator, format!("{READ} {SETUP}"));
+    let resp = post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/reset"),
+        &json!({})
+    );
+    assert_eq!(resp.status(), StatusCode::OK);
+    let resp = post!(
+        &app,
+        format!("/domains/{DOMAIN}/rehearsal/bindings"),
+        &json!({"label": "Example member (fictional)", "did": foreigner.to_string()})
+    );
+    let status = resp.status();
+    let body = body_json(resp).await;
+    assert_binding_denied_opaquely(status, &body, &foreigner);
+    assert!(
+        !body.to_string().contains("other-domain"),
+        "the deny must not reveal foreign-domain standing: {body}"
     );
 }
 

@@ -136,6 +136,15 @@ pub struct RehearsalRow {
     /// Set when the current version was approved; cleared by any edit,
     /// re-assignment, or non-approve decision.
     pub approve_ref: Option<ApproveRef>,
+    /// `(row_version, gate record_hash)` of the `ProcessGateResultReceipt`
+    /// recorded for a confirm of that row version. Gate receipts are
+    /// append-only observations whose `record_hash` includes `recorded_at`,
+    /// so a retried confirm MUST reuse the original receipt: recording a
+    /// fresh one in a later second would change the activation's gate basis
+    /// and conflict with the already-recorded `ActivationCrossedReceipt`,
+    /// wedging the retry. Reused only while the version matches; a new
+    /// version (edit/assign/re-review) records a fresh gate observation.
+    pub confirm_gate: Option<(u64, [u8; 32])>,
     /// Set the moment the real action item is created, BEFORE the
     /// mutation-applied receipt is recorded. If that recording fails, a
     /// retried confirm resumes with this item instead of creating a second
@@ -195,6 +204,7 @@ impl Workspace {
                     version: 0,
                     note: None,
                     approve_ref: None,
+                    confirm_gate: None,
                     pending_item_id: None,
                     execution: None,
                 })

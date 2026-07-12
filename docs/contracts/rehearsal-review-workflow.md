@@ -42,9 +42,23 @@ carries review+confirm+read only: it can neither turn an arbitrary domain
 into a rehearsal workspace (designation needs setup) nor bind identities —
 and it never sees, stores, or submits a DID. A binding grants no authority,
 must reference an identity that already holds domain membership, and any
-rebinding invalidates outstanding previews. Every route additionally
-requires the caller's own domain membership; the path domain is the
-authority context.
+rebinding invalidates outstanding previews (except while an interrupted
+execution references the label — see recovery below — when rebinding is
+refused with 409). Every route additionally requires the caller's own
+domain membership; the path domain is the authority context.
+
+**The binding-target membership check never falls open.** Membership must
+be affirmatively established: a `StaticList` domain resolves it from the
+source; a `TrustThreshold` domain requires a wired membership resolver that
+confirms standing. A missing resolver, a resolver failure, or any other
+indeterminate outcome DENIES the binding — this invariant is not deferred
+to appliance wiring. Every deny is the same 422 with the same message, so
+the response never distinguishes "provable non-member" from "membership
+unknowable" and reveals nothing about hidden identities or standing in
+other domains. (The CALLER-side gate keeps the permissive Bootstrap
+dependency posture in Rehearsal mode, like every non-production surface;
+only the binding target is held to the stricter affirmative rule, because
+a binding feeds the completion loop.)
 
 ## Routes
 
@@ -52,7 +66,7 @@ All under `/v1/gov` (gateway mount). `{d}` = domain id, `{r}` = row id.
 
 | Method + path | Scope | Behavior |
 |---|---|---|
-| `POST /domains/{d}/rehearsal/reset` | setup (first) / review (re-reset) | start a new rehearsal generation with the deterministic seed and a fresh restart-safe `run_id`; invalidates all previews; the prior run's fictional action items are cancelled through the normal status machinery (completed items and all receipts remain) |
+| `POST /domains/{d}/rehearsal/reset` | setup (first) / review (re-reset) | start a new rehearsal generation with the deterministic seed and a fresh restart-safe `run_id`; invalidates all previews; the prior run's fictional action items are cancelled through the normal status machinery (completed items and all receipts remain). Retirement scans the DURABLE item store for this surface's `meeting_context` marker in addition to the in-memory workspace, so items orphaned by a daemon restart are retired too (`prior_item_scan: complete\|failed` reports the scan outcome) |
 | `GET /domains/{d}/rehearsal/pending-publish` | read | rows + review state (`404` until first reset) |
 | `GET /domains/{d}/rehearsal/pending-publish/{r}` | read | row detail (`assignee_bound`, `executed`, version) |
 | `POST .../{r}/review` `{decision, note?}` | review | decision ∈ {approve, reject, needs_edit, needs_more_info}; records a real `DecisionRecordedReceipt`; note ≤ 2000 bytes |
@@ -85,14 +99,44 @@ digest, so the stale preview fails closed (409) and a fresh preview is
 required. The digest bytes are persisted as the plan `body_hash`, so the
 binding is auditable in the receipt chain.
 
-**Interrupted-confirm recovery:** the created action item is marked in the
-workspace the moment it exists, before the mutation-applied receipt. If that
-recording fails, review mutations on the row are blocked (409) and an
-identical retried confirm RESUMES the same item — a retry can never create a
-second one. Every persistent identifier (session, decision, activation,
-plan, application) carries the workspace `run_id`, so identifiers are never
-reused across resets or daemon restarts even though the seed content is
-deterministic.
+**Interrupted-confirm recovery (same process only):** the created action
+item is marked in the workspace the moment it exists, before the
+mutation-applied receipt. If any ladder step fails, an identical retried
+confirm — same preview digest, same facilitator identity, same running
+process — resumes exactly where the interruption happened:
+
+- failure BEFORE item creation (gate/activation/plan recording): no item
+  exists; the retry re-runs the remaining steps, reusing the gate receipt
+  already recorded for this row version (gate record hashes include their
+  timestamp, so recording a fresh observation in a later second would
+  change the activation's gate basis and hard-conflict with an
+  already-recorded activation);
+- failure AFTER item creation but before the applied receipt: the row
+  carries the pending item marker; review mutations on the row AND
+  rebinding of the row's assignee label are blocked (409) so the recomputed
+  digest still matches, and the retry resumes the SAME item — a retry can
+  never create a second one;
+- a retry by a DIFFERENT confirm-capable identity fails closed (409
+  activation conflict): recovery belongs to the facilitator who started it,
+  or to a reset.
+
+**This recovery state is in-memory and does NOT survive a daemon restart.**
+Cross-restart confirm idempotency is explicitly not claimed. After a
+restart the workspace is gone (routes answer 404 until a new designation
+reset); a partially confirmed row cannot be resumed, and its receipts stop
+at the last recorded rung (e.g. a plan without an applied record — an
+honest partial trail, readable by an operator from the receipt store). The
+created-but-unreceipted action item is durable; the recovery path is the
+next reset, which retires it (below). Every persistent identifier (session,
+decision, activation, plan, application) carries the workspace `run_id`, so
+identifiers are never reused across resets or daemon restarts even though
+the seed content is deterministic.
+
+**Concurrency:** the entire review surface is serialized under one lock
+with no awaits inside critical sections; confirm's verify-then-execute is a
+single critical section. Two simultaneous confirms of one row cannot both
+execute — the loser observes the winner's execution and replays
+idempotently (same digest) or conflicts (different digest).
 
 ## Confirm execution (real machinery)
 
@@ -123,6 +167,18 @@ review state, and workspace existence are never observable from another
 domain. `committed_fixture` (Bootstrap/Test, and Rehearsal before any
 member-visible reset) and `live_runtime` (Production: no rows) are
 unchanged.
+
+The isolation filter fails closed on any provably-non-member domain and
+never exports a DID. One posture caveat, symmetric with the caller gate on
+every read route: the CALLER-side membership check keeps the permissive
+Bootstrap posture, so on a `TrustThreshold` domain with **no** wired
+membership resolver it resolves every caller as a member — there, a domain's
+fictional (label-only, DID-free) review state is visible to any
+authenticated `governance:read` caller. This is the deliberate asymmetry
+noted under Capabilities: only the binding *target* is held to the
+affirmative rule. Run rehearsals on `StaticList` fictional domains (as the
+appliance profile does) or wire a resolver for strict cross-caller read
+isolation.
 
 ## Evidence packet (`urn:icn:contract:rehearsal-workflow-evidence:v1`)
 

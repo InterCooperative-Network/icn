@@ -76,6 +76,15 @@ const CONFIRM_SCOPES: &[&str] = &["governance:pending-publish:confirm", "governa
 /// bind identities — it only sees and assigns labels.
 const SETUP_SCOPES: &[&str] = &["governance:rehearsal:setup", "governance:write"];
 
+/// `meeting_context` marker prefix carried by every action item this surface
+/// creates (the full value appends the run-scoped session id). Reset scans
+/// the DURABLE item store for this marker in addition to the in-memory
+/// workspace: the workspace is node-lifetime, so after a daemon restart the
+/// prior run's created items are only findable through this persisted
+/// marker — without the scan they would stay active in the member's queue
+/// and accumulate across restarted rehearsals.
+const REHEARSAL_ITEM_CONTEXT_PREFIX: &str = "rehearsal-review session ";
+
 // ── Request models: contract enforced by rejection, not omission ───────────
 
 #[derive(Debug, Deserialize)]
@@ -196,12 +205,32 @@ fn ensure_session<E: GovernanceEventEmitter + Clone + 'static>(
     Ok(())
 }
 
-/// The ladder fails closed with descriptive conflicts (e.g. a session opened
-/// by a different actor). Map those to 409 and everything else to 500 with
-/// PLAIN client messages — backend detail goes to the log, never the client.
+/// The stable, message-leading error prefixes the `GovernanceManager` ladder
+/// uses for identity conflicts (same id re-recorded with different content).
+/// These — and only these — map to 409. Precondition failures
+/// (`*_not_opened`, `*_not_found`, `*_mismatch`, `*_gate_not_passed`, …) and
+/// storage failures stay 500: they signal state divergence or operational
+/// trouble, not a client-resolvable conflict.
+const LADDER_CONFLICT_PREFIXES: &[&str] = &[
+    "process_session_open_conflict",
+    "decision_recorded_conflict",
+    "activation_crossed_conflict",
+    "mutation_plan_recorded_conflict",
+    "mutation_applied_conflict",
+];
+
+/// The ladder fails closed with stable-prefix conflict errors (e.g. a session
+/// opened by a different actor). Map exactly those to 409 and everything else
+/// to 500 with PLAIN client messages — backend detail goes to the log, never
+/// the client. Matching is on the manager's stable prefixes at the START of
+/// the message, never on incidental substrings ("already", "conflict") that a
+/// storage-layer error could coincidentally contain.
 fn conflict_or_internal(e: anyhow::Error) -> ApiError {
     let detail = e.to_string();
-    if detail.contains("conflict") || detail.contains("already") {
+    if LADDER_CONFLICT_PREFIXES
+        .iter()
+        .any(|p| detail.starts_with(p))
+    {
         tracing::warn!(detail = %detail, "rehearsal receipt conflict");
         ApiError::Conflict(
             "A rehearsal process receipt for this step already exists with different \
@@ -289,12 +318,50 @@ pub async fn rehearsal_reset<E: GovernanceEventEmitter + Clone + 'static>(
     let (domain, caller) = gate(&ctx, &http_req, &domain_id, scopes).await?;
     let (generation, prior_items) = state.reset(&domain.0, demo_pending_publish_rows());
 
+    // The in-memory workspace only knows about items created THIS process
+    // lifetime. Action items are durable (Sled in the gateway path) and
+    // survive restarts, so also scan the durable store for this domain's
+    // rehearsal-created items (identified by the meeting_context marker
+    // this surface writes) that are still active. Without this, a daemon
+    // restart would orphan the prior run's fictional items in the member's
+    // active queue. Scan failures are reported, never silently swallowed.
+    let mut retire: Vec<String> = prior_items;
+    let mut scan_failed = false;
+    match ctx
+        .manager
+        .list_action_items(&domain, &icn_governance::ActionItemFilter::default())
+    {
+        Ok(items) => {
+            for item in items {
+                let is_rehearsal_item = item
+                    .meeting_context
+                    .as_deref()
+                    .is_some_and(|c| c.starts_with(REHEARSAL_ITEM_CONTEXT_PREFIX));
+                let is_active = !matches!(
+                    item.status,
+                    icn_governance::ActionItemStatus::Completed
+                        | icn_governance::ActionItemStatus::Cancelled
+                );
+                if is_rehearsal_item && is_active {
+                    let id = item.id.to_string();
+                    if !retire.contains(&id) {
+                        retire.push(id);
+                    }
+                }
+            }
+        }
+        Err(e) => {
+            tracing::warn!(detail = %e, "reset could not scan durable rehearsal items");
+            scan_failed = true;
+        }
+    }
+
     // Retire the prior run's fictional action items (skip anything already
     // completed — completion history is real and stays). Per-item failures
     // are reported, never silently swallowed.
     let mut cancelled = Vec::new();
     let mut not_cancelled = Vec::new();
-    for item_id in prior_items {
+    for item_id in retire {
         let Ok(uuid) = item_id.parse::<uuid::Uuid>() else {
             not_cancelled.push(item_id);
             continue;
@@ -339,6 +406,10 @@ pub async fn rehearsal_reset<E: GovernanceEventEmitter + Clone + 'static>(
         "rows": rows,
         "cancelled_action_items": cancelled,
         "not_cancelled_action_items": not_cancelled,
+        // "complete" = the durable store was scanned for prior rehearsal
+        // items (including runs before a daemon restart); "failed" = the
+        // scan errored and orphaned items may remain (re-run reset).
+        "prior_item_scan": if scan_failed { "failed" } else { "complete" },
         "non_claims": [
             "fictional rehearsal workspace — grants no authority",
             "reset starts a new rehearsal generation: recorded receipts are permanent process facts; the prior run's fictional action items are cancelled (not erased) unless already completed",
@@ -637,9 +708,65 @@ pub async fn rehearsal_assign<E: GovernanceEventEmitter + Clone + 'static>(
     }
 }
 
+/// Affirmative membership check for a BINDING TARGET — never falls open.
+///
+/// The caller gate ([`check_domain_membership`]) keeps the permissive
+/// Bootstrap dependency posture in Rehearsal mode (a `TrustThreshold`
+/// domain with no wired resolver lets the CALLER proceed, matching every
+/// other rehearsal/bootstrap surface). The binding-target invariant is
+/// stricter: the runtime contract says the bound DID must ALREADY hold
+/// membership standing in this domain, and that fact must be affirmatively
+/// established here — not deferred to future appliance wiring. So:
+///
+/// - `StaticList` — the DID is in the list, resolved from the source;
+/// - `TrustThreshold` + wired resolver — the resolver confirms membership;
+/// - `TrustThreshold` + missing resolver — DENY (standing cannot be
+///   established, so it is not established);
+/// - resolver error/indeterminate — DENY (logged; never surfaced).
+///
+/// Every deny is reported identically by the caller, so the response never
+/// distinguishes "not a member" from "membership unknowable" and leaks
+/// nothing about hidden identities or other domains' state.
+async fn binding_target_holds_membership<E: GovernanceEventEmitter + Clone + 'static>(
+    ctx: &GovernanceContext<E>,
+    domain: &GovernanceDomainId,
+    did: &Did,
+) -> bool {
+    let domain_obj = match ctx.manager.get_domain(domain).await {
+        Ok(Some(d)) => d,
+        Ok(None) => return false,
+        Err(e) => {
+            tracing::warn!(detail = %e, "rehearsal binding: domain lookup failed; denying");
+            return false;
+        }
+    };
+    match &domain_obj.config.membership.source {
+        icn_governance::MembershipSource::StaticList(members) => members.contains(did),
+        icn_governance::MembershipSource::TrustThreshold(_) => match &ctx.membership_resolver {
+            Some(resolver) => resolver.is_member(&domain_obj, did).unwrap_or_else(|e| {
+                tracing::warn!(
+                    detail = %e,
+                    "rehearsal binding: membership resolution failed; denying (fail closed)"
+                );
+                false
+            }),
+            None => {
+                tracing::warn!(
+                    domain = %domain.0,
+                    "rehearsal binding: no membership resolver for TrustThreshold domain; \
+                     denying (fail closed — binding targets must have affirmative standing)"
+                );
+                false
+            }
+        },
+    }
+}
+
 /// POST /domains/{domain_id}/rehearsal/bindings — bind a label to a fictional
 /// DID (registering the label if new). The DID is accepted on write and never
-/// echoed. Rebinding invalidates outstanding previews via the digest.
+/// echoed. Rebinding invalidates outstanding previews via the digest — except
+/// while an interrupted execution references the label, when rebinding is
+/// refused so the identical confirm retry can still resume.
 pub async fn rehearsal_bind_label<E: GovernanceEventEmitter + Clone + 'static>(
     ctx: web::Data<GovernanceContext<E>>,
     http_req: HttpRequest,
@@ -658,11 +785,10 @@ pub async fn rehearsal_bind_label<E: GovernanceEventEmitter + Clone + 'static>(
     let bound_did = parse_did(&req.did, "Invalid DID in binding")?;
     // A binding target must already hold standing in this domain: binding
     // grants no authority and cannot smuggle an outside identity into the
-    // rehearsal's completion loop.
-    if check_domain_membership(&ctx, &domain, &bound_did)
-        .await
-        .is_err()
-    {
+    // rehearsal's completion loop. This check NEVER falls open: absent or
+    // indeterminate standing denies, and the deny below is identical for
+    // every cause, so nothing about hidden identities leaks.
+    if !binding_target_holds_membership(&ctx, &domain, &bound_did).await {
         return Ok(HttpResponse::UnprocessableEntity().json(json!({
             "error": "The identity for this label does not hold membership standing in this domain; bindings must reference an existing fictional domain member.",
             "label": req.label,
@@ -671,13 +797,31 @@ pub async fn rehearsal_bind_label<E: GovernanceEventEmitter + Clone + 'static>(
 
     let state = ctx.manager.rehearsal_state();
     let body = state
-        .with_workspace(&domain.0, |workspace| {
+        .with_workspace(&domain.0, |workspace| -> Result<Value, ApiError> {
+            // An interrupted execution's retry recomputes the plan digest
+            // from CURRENT state, including this label's bound DID.
+            // Rebinding now would make the identical retry stale (409) and
+            // strand the already-created action item without its applied
+            // receipt — so rebinding is refused until the retry completes
+            // or the workspace is reset.
+            let referenced_by_interrupted = workspace.rows.iter().any(|r| {
+                r.pending_item_id.is_some()
+                    && r.base.assignee_label.as_deref() == Some(req.label.as_str())
+            });
+            if referenced_by_interrupted {
+                return Err(ApiError::Conflict(
+                    "An interrupted execution references this label; retry confirm with \
+                     the same preview digest to complete it (or reset the rehearsal) \
+                     before rebinding."
+                        .to_string(),
+                ));
+            }
             workspace
                 .bindings
                 .insert(req.label.clone(), bound_did.to_string());
-            json!({ "label": req.label, "bound": true })
+            Ok(json!({ "label": req.label, "bound": true }))
         })
-        .ok_or_else(workspace_not_initialized)?;
+        .ok_or_else(workspace_not_initialized)??;
     Ok(HttpResponse::Ok().json(body))
 }
 
@@ -852,16 +996,40 @@ pub async fn rehearsal_confirm<E: GovernanceEventEmitter + Clone + 'static>(
             // Real ADR-0026 ladder: gate → activation → plan → item → applied.
             ensure_session(&ctx, &domain, workspace, &caller)?;
             let row_version = workspace.row(&row_id).ok_or_else(row_not_found)?.version;
-            let gate_receipt = ctx
-                .manager
-                .record_process_gate_result(
-                    &domain,
-                    &session_id,
-                    ProcessGateKind::ScopeConfirmation,
-                    ProcessGateResult::Pass,
-                    &caller,
-                )
-                .map_err(conflict_or_internal)?;
+            // Gate receipts are append-only observations whose record_hash
+            // includes recorded_at, and the activation's gate basis is part
+            // of the activation's stable identity. A RETRY of an interrupted
+            // confirm must therefore reuse the gate receipt already recorded
+            // for this row version: recording a fresh one in a later second
+            // would change the basis and hard-conflict with the
+            // already-recorded activation, wedging the retry. One confirm of
+            // one row version = one gate observation.
+            let gate_record_hash = {
+                let prior = workspace
+                    .row(&row_id)
+                    .ok_or_else(row_not_found)?
+                    .confirm_gate
+                    .and_then(|(v, hash)| (v == row_version).then_some(hash));
+                match prior {
+                    Some(hash) => hash,
+                    None => {
+                        let receipt = ctx
+                            .manager
+                            .record_process_gate_result(
+                                &domain,
+                                &session_id,
+                                ProcessGateKind::ScopeConfirmation,
+                                ProcessGateResult::Pass,
+                                &caller,
+                            )
+                            .map_err(conflict_or_internal)?;
+                        if let Some(row) = workspace.row_mut(&row_id) {
+                            row.confirm_gate = Some((row_version, receipt.record_hash));
+                        }
+                        receipt.record_hash
+                    }
+                }
+            };
             let activation_id = format!("rehearsal-activation-{run_id}-{row_id}-v{row_version}");
             let activation = match ctx
                 .manager
@@ -871,7 +1039,7 @@ pub async fn rehearsal_confirm<E: GovernanceEventEmitter + Clone + 'static>(
                     &activation_id,
                     &approve_ref.decision_id,
                     approve_ref.record_hash,
-                    &[gate_receipt.record_hash],
+                    &[gate_record_hash],
                     &caller,
                 )
                 .map_err(conflict_or_internal)?
@@ -926,7 +1094,7 @@ pub async fn rehearsal_confirm<E: GovernanceEventEmitter + Clone + 'static>(
                             plan.due_date,
                             ActionItemPriority::Medium,
                             None,
-                            Some(format!("rehearsal-review session {session_id}")),
+                            Some(format!("{REHEARSAL_ITEM_CONTEXT_PREFIX}{session_id}")),
                             Vec::new(),
                         )
                         .map_err(|e| {
@@ -973,7 +1141,7 @@ pub async fn rehearsal_confirm<E: GovernanceEventEmitter + Clone + 'static>(
                 session_id: session_id.clone(),
                 decision_id: approve_ref.decision_id.clone(),
                 decision_record_hash: approve_ref.record_hash,
-                gate_record_hash: gate_receipt.record_hash,
+                gate_record_hash,
                 activation_id,
                 activation_record_hash: activation.record_hash,
                 plan_id,
@@ -1278,4 +1446,70 @@ pub fn configure_rehearsal_routes<E: GovernanceEventEmitter + Clone + 'static>(
         web::resource("/domains/{domain_id}/rehearsal/evidence-export")
             .route(web::get().to(rehearsal_evidence_export::<E>)),
     );
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn is_conflict(msg: &str) -> bool {
+        matches!(
+            conflict_or_internal(anyhow::anyhow!("{msg}")),
+            ApiError::Conflict(_)
+        )
+    }
+
+    /// Every stable manager conflict prefix maps to 409.
+    #[test]
+    fn ladder_conflict_prefixes_map_to_conflict() {
+        for prefix in LADDER_CONFLICT_PREFIXES {
+            assert!(
+                is_conflict(&format!("{prefix}: detail elided")),
+                "{prefix} must classify as a conflict"
+            );
+        }
+    }
+
+    /// Backend/storage errors that merely CONTAIN conflict-ish words must
+    /// stay 500 — the regression the old substring matching allowed.
+    #[test]
+    fn incidental_substrings_stay_internal() {
+        for msg in [
+            "Failed to persist decision receipt for decision d1: key already exists",
+            "storage error: tree 'receipts' already open in another process",
+            "I/O error while resolving lock conflict in sled segment",
+            "record_process_gate_result: session_id must be non-empty",
+        ] {
+            assert!(
+                !is_conflict(msg),
+                "'{msg}' must classify as internal, not conflict"
+            );
+        }
+    }
+
+    /// Precondition failures (state divergence) are not client conflicts.
+    #[test]
+    fn ladder_precondition_failures_stay_internal() {
+        for msg in [
+            "activation_crossed_session_not_opened: session s in domain d has no recorded opening",
+            "activation_crossed_decision_not_found: no decision d1 recorded in session s",
+            "activation_crossed_decision_mismatch: decision d1 in session s in domain d",
+            "activation_crossed_gate_not_passed: a declared gate-result in session s did not pass",
+            "mutation_plan_recorded_activation_not_found: no activation a1 recorded",
+        ] {
+            assert!(
+                !is_conflict(msg),
+                "'{msg}' is a precondition failure and must stay internal"
+            );
+        }
+    }
+
+    /// The prefix must lead the message: a conflict token buried mid-message
+    /// (e.g. quoted inside a storage error) is not a manager conflict.
+    #[test]
+    fn conflict_prefix_must_lead_the_message() {
+        assert!(!is_conflict(
+            "sled write failed while storing 'activation_crossed_conflict' payload"
+        ));
+    }
 }
