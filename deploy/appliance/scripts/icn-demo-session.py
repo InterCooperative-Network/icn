@@ -12,13 +12,17 @@
 # demo" button obtain a fresh DEV/DEMO session with one click — no copy/paste,
 # no JWT in any URL.
 #
-# What it does: on `POST /v1/dev/demo/session` it runs the existing
-# `icn-demo-seed --json` (the same safe, fictional, dev-gated seed an operator
-# could run by hand) and returns its JSON: a short-lived DEV/DEMO session
-# credential, the seeded item/domain/did, and the standing note. The shell
-# holds the credential in page memory only (it is never persisted, never put
-# in a URL). This service adds no privilege the tunnel-holding operator does
-# not already have (they have SSH + sudo on this throwaway VM).
+# What it does: on `POST /v1/dev/demo/session` it reads a CLOSED role intent
+# from the JSON body (`{"role":"organizer"|"member"}`, default member), maps it
+# to one of two FIXED `icn-demo-seed --session <role> --json` commands (the same
+# safe, fictional, dev-gated seed an operator could run by hand), and returns its
+# JSON: a short-lived least-privilege per-role session credential, the domain/did,
+# and the standing note. The role only SELECTS a constant command — no request
+# bytes are ever interpolated into it. The shell holds the credential in page
+# memory only (never persisted, never in a URL). A role transition (organizer ->
+# member) calls back here for a FRESH least-privilege session — it never upgrades
+# a token. This service adds no privilege the tunnel-holding operator does not
+# already have (they have SSH + sudo on this throwaway VM).
 #
 # Safety:
 #   * Binds 127.0.0.1 ONLY (loopback) — reachable solely through the operator's
@@ -48,7 +52,31 @@ _SEED_LOCK = threading.Lock()
 
 BIND_HOST = "127.0.0.1"
 BIND_PORT = int(os.environ.get("ICN_DEMO_SESSION_PORT", "8091"))
-SEED_CMD = ["/usr/local/sbin/icn-demo-seed", "--json"]
+# Two FIXED commands, one per role. The request selects one from this CLOSED set
+# (see resolve_seed_cmd); no request bytes are ever interpolated into a command,
+# so there is no injection surface. Each --session role mints a least-privilege
+# per-role browser JWT (organizer = read+review+confirm; member = read+complete)
+# for the Rehearsal Node loop (#2386). The role transition in the browser calls
+# back here for a FRESH least-privilege session — it never upgrades a token.
+SEED_CMD_ORGANIZER = ["/usr/local/sbin/icn-demo-seed", "--session", "organizer", "--json"]
+SEED_CMD_MEMBER = ["/usr/local/sbin/icn-demo-seed", "--session", "member", "--json"]
+
+
+def resolve_seed_cmd(body_bytes):
+    """Map a CLOSED role intent to one of the two FIXED commands above.
+    Returns (cmd, role) on success, or (None, error_message) on a bad body/role.
+    The role only SELECTS a constant list — it is never spliced into a command."""
+    role = "member"  # default: the member session
+    if body_bytes:
+        try:
+            role = (json.loads(body_bytes.decode("utf-8")).get("role") or "member")
+        except Exception:  # noqa: BLE001
+            return (None, "request body is not valid JSON")
+    if role == "organizer":
+        return (SEED_CMD_ORGANIZER, "organizer")
+    if role == "member":
+        return (SEED_CMD_MEMBER, "member")
+    return (None, "unknown role (allowed: organizer, member)")
 
 # The demo shell is served at 127.0.0.1:8090 in the VM and reached over the
 # operator's tunnel at localhost:18090 (a FIXED host port — open-proxmox-demo.sh
@@ -109,6 +137,14 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         origin = self.headers.get("Origin", "")
+        # Read and bound any request body up front so the socket is drained. The
+        # body may carry a role intent; it is validated against a CLOSED set
+        # (resolve_seed_cmd) and never interpolated into a command.
+        try:
+            length = int(self.headers.get("Content-Length", "0") or "0")
+        except ValueError:
+            length = 0
+        body_bytes = self.rfile.read(min(length, 4096)) if length > 0 else b""
         if self.path.rstrip("/") != "/v1/dev/demo/session":
             return self._json(404, {"error": "not found"}, origin)
         # SERVER-SIDE origin check, before any side effect. CORS response
@@ -122,16 +158,20 @@ class Handler(BaseHTTPRequestHandler):
         if not demo_gated():
             log("refused: dev gates off (ICN_ENABLE_ADMIN_ENDPOINTS / non-production)")
             return self._json(403, {"error": "demo session disabled (not a DEV/DEMO posture)"}, origin)
+        cmd, role = resolve_seed_cmd(body_bytes)
+        if cmd is None:
+            log("refused: %s" % role)  # `role` holds the error string here
+            return self._json(400, {"error": role}, origin)
         # Serialize: never run two seeds at once (see _SEED_LOCK).
         with _SEED_LOCK:
             try:
-                out = subprocess.run(SEED_CMD, capture_output=True, text=True, timeout=120)
+                out = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             except Exception as e:  # noqa: BLE001 - report any spawn failure plainly
                 log("seed spawn failed: %s" % e)
                 return self._json(500, {"error": "seed failed to start"}, origin)
             if out.returncode != 0:
                 # stderr may name the failure; it does not contain the credential.
-                log("seed exit %d: %s" % (out.returncode, (out.stderr or "").strip()[:200]))
+                log("seed exit %d (%s): %s" % (out.returncode, role, (out.stderr or "").strip()[:200]))
                 return self._json(500, {"error": "seed failed"}, origin)
             try:
                 session = json.loads(out.stdout)
@@ -142,8 +182,7 @@ class Handler(BaseHTTPRequestHandler):
             if note != "bootstrap-standing: ok":
                 log("seed standing degraded: %s" % note)
                 return self._json(500, {"error": "standing bootstrap degraded", "standing_note": note}, origin)
-            log("session seeded ok (item %s) — credential returned to caller, not logged"
-                % session.get("item_id", "?"))
+            log("%s session seeded ok — credential returned to caller, not logged" % role)
             # Return the seed JSON verbatim (it carries the short-lived
             # credential under "jwt"); the shell keeps it in page memory only.
             return self._json(200, session, origin)

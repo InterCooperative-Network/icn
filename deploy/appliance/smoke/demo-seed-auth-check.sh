@@ -95,6 +95,37 @@ else
     bad "BROWSER_SCOPES is not the expected completion-only set (got: '${browser_scopes:-<unset>}'); it must be governance:read,governance:action-item:complete — no governance:meeting:write, no coop:*, no broad governance:write"
 fi
 
+# 7b. Rehearsal Node (#2386) per-role session scopes are least-privilege.
+organizer_scopes="$(awk -F'"' '/^ORGANIZER_SCOPES=/{print $2; exit}' "$SEED")"
+if [ "$organizer_scopes" = "governance:read,governance:pending-publish:review,governance:pending-publish:confirm" ]; then
+    ok "organizer session is least-privilege: read + pending-publish:review + :confirm"
+else
+    bad "ORGANIZER_SCOPES must be governance:read,governance:pending-publish:review,governance:pending-publish:confirm — no rehearsal:setup, governance:write, meeting:write, action-item:complete, entity:write, or coop:admin (got: '${organizer_scopes:-<unset>}')"
+fi
+member_scopes="$(awk -F'"' '/^MEMBER_SCOPES=/{print $2; exit}' "$SEED")"
+if [ "$member_scopes" = '$BROWSER_SCOPES' ] || [ "$member_scopes" = "governance:read,governance:action-item:complete" ]; then
+    ok "member session is least-privilege: read + action-item:complete (= BROWSER_SCOPES)"
+else
+    bad "MEMBER_SCOPES must be governance:read,governance:action-item:complete (or \$BROWSER_SCOPES) — no organizer or setup authority (got: '${member_scopes:-<unset>}')"
+fi
+# 7c. The internal rehearsal-setup credential carries no write/admin class.
+setup_scopes="$(awk -F'"' '/^REHEARSAL_SETUP_SCOPES=/{print $2; exit}' "$SEED")"
+case "$setup_scopes" in
+  *governance:rehearsal:setup*)
+    case "$setup_scopes" in
+      *governance:write*|*coop:*|*entity:write*|*meeting:write*|*action-item:complete*)
+        bad "REHEARSAL_SETUP_SCOPES must not carry any write/admin/complete class (got: '$setup_scopes')" ;;
+      *) ok "rehearsal-setup credential is read + rehearsal:setup only (internal; never printed)" ;;
+    esac ;;
+  *) bad "REHEARSAL_SETUP_SCOPES must include governance:rehearsal:setup (got: '${setup_scopes:-<unset>}')" ;;
+esac
+# 7d. The per-role session JSON emits the role JWT + role (never the setup JWT).
+if grep -qE '"jwt": sys.argv\[2\]' "$SEED" && grep -qE '"role": sys.argv\[3\]' "$SEED"; then
+    ok "the per-role session JSON emits the role-scoped jwt + role (organizer/member)"
+else
+    bad "the per-role (--session) JSON does not emit a role-scoped jwt"
+fi
+
 # 8. SETUP JWT is internal — only the BROWSER JWT is emitted/printed.
 if grep -qE '"\$BROWSER_JWT"' "$SEED"; then
     ok "the emitted JSON carries the browser JWT (\$BROWSER_JWT)"
