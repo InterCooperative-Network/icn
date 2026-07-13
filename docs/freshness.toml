@@ -216,7 +216,7 @@ notes = "Auto-generated from Cargo.toml + kernel_surface.toml."
 
 [sections."18-institution-primitives"]
 title = "Institution Primitives"
-last_updated = "2026-07-13"
+last_updated = "2026-07-13T18:28:00"
 last_verified_by = "vision-doctrine-refresh"
 review_note = "Re-verified 2026-07-13 (PR docs/vision-current-doctrine): the four institution primitives still compose from the eight kernel primitives as described; section content re-read against the rewritten VISION.md dependency and remains consistent. Changes this pass: the section's starter-bundle heading no longer uses the retired 'Institution-in-a-Box' product name as current framing (historical name annotated, archived vision linked); no primitive/composition change. Prior 2026-06-21 verification (TOML→YAML charter correction) preserved in git history."
 staleness_threshold_days = 90
