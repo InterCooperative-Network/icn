@@ -2,12 +2,45 @@
 
 **Date**: 2026-03-21
 **Status**: accepted
-**Implementation status**: needs verification (see Implementation Status note below — 2026-04-26)
+**Implementation status**: auth enforcement verified (2026-07-13); one divergence pending decision — unauthorized callers receive uniform 401, not the literal 404 this ADR mandates (see Implementation Status below)
 **Tags**: gateway, api, security, service-discovery
 **Supersedes**: N/A
 **Note**: Originally filed as ADR-0009 in `ops/state/decisions/` (collided with another decision sharing that number). Renumbered to 0015 when ADRs were canonicalized under `docs/adr/`.
 
-## Implementation status (2026-04-26)
+## Implementation status (2026-07-13)
+
+**Auth enforcement: VERIFIED.** A full mounting-chain trace (issue #1642) proved all five
+`/v1/services/*` routes are wrapped by `HttpAuthentication::bearer(jwt_auth)` at the
+`web::scope("/services")` level in `server.rs`, with auth outermost (it runs before the
+trust rate-limit middleware and before any handler or resource lookup). The wrap is
+unconditional — it holds in default, dev (`ICN_DEV_MODE`), and loopback-only
+`--insecure-gateway-no-jwt` configurations (the latter only installs a well-known JWT
+secret; the bearer middleware still runs). The 2026-04-26 concern below is resolved: the
+gating lives in `server.rs` scope wiring, not in `api/services.rs`, which is why a
+handler-file read could not see it.
+
+**Anti-oracle property: HOLDS.** Because authentication precedes any lookup, the
+unauthenticated/invalid-token response is uniform (identical for existing and
+nonexistent `service_id`s) — no enumeration oracle exists.
+
+**Status-code divergence: PENDING DECISION.** Unauthorized callers receive **401**, not
+the **404** this ADR's decision point 3 literally mandates. Both are enumeration-safe;
+conforming to the literal 404 would require a custom auth-failure mapper for this scope.
+The choice — conform the code to literal-404, or amend point 3 to accept uniform-401 as
+satisfying its anti-oracle intent — is a maintainer decision tracked on issue #1642.
+Until it is resolved, the current (most restrictive, uniform-401) behavior is pinned by
+`icn/crates/icn-gateway/tests/services_auth_boundary.rs`, which asserts: no token → 401
+on all five routes (uniform across existence); invalid token → 401 (uniform); valid
+token + nonexistent → 404 for `GET/DELETE /{id}` and empty `/discover`; the list route
+returns 200 with an empty set (list semantics); valid token + existing → 200.
+
+**Note on the 2026-04-26 verification recipe below:** its test recipe was internally
+contradictory (it asked for both "401 without a JWT" and "404, not 401, for a
+nonexistent resource without a JWT" — impossible for the same request). The landed test
+pins the uniform-401 reality and must be updated in the same PR as any future
+semantics change.
+
+## Prior implementation-status note (2026-04-26, superseded)
 
 **`needs verification`.** A code read on 2026-04-26 found:
 
