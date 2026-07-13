@@ -3,14 +3,14 @@
   "theme": "TBD",
   "governing_rule": "A task is only done when repo state, board state, and narrative state agree.",
   "start_date": "2026-03-23",
-  "status": "active",
+  "status": "closed",
   "spine": [
     "#1406"
   ],
   "shipped": [
     "#1406 — refactor(compute): extract reservation helpers + idempotence tests (PR #1406)"
   ],
-  "notes": "Centralized release_commons_reservation / consume_commons_reservation into free async helpers (9 sites → 2 fns). Added cancel-path and double-cancel idempotence tests (17/17 pass). Renamed trigger_timeout_sweep → trigger_timeout_sweep_for_test per _for_test convention. Adversarial review confirmed semantic equivalence at all 11 call sites; None-branch in check_timeouts documented as theoretically unreachable under lock semantics. WasmRef no-registry failure-path test added (Issue #1407 closed); reservation-lifecycle proof surface now complete across all 6 termination paths (success, failure, timeout, cancel, double-cancel, WasmRef). 18/18 commons_integration tests pass. CI starvation root cause identified and fixed (benchmark.yml was missing concurrency group; required checks run on ubuntu-latest, not ci-runner); ADR-0010 corrected. Issue #1408 closed.",
+  "notes": "CLOSED RETROACTIVELY 2026-07-13 by the ecosystem truth audit: the sprint cadence lapsed after 2026-03; work from 2026-04 onward has been lane-based and is recorded in docs/STATE.md + docs/PHASE_PROGRESS.md (canonical). There is NO active sprint; if the cadence resumes, the next sprint starts at 27. Task statuses below are frozen as last recorded in March 2026 (several were since resolved outside the sprint plane). Original March notes: Centralized release_commons_reservation / consume_commons_reservation into free async helpers (9 sites → 2 fns). Added cancel-path and double-cancel idempotence tests (17/17 pass). Renamed trigger_timeout_sweep → trigger_timeout_sweep_for_test per _for_test convention. Adversarial review confirmed semantic equivalence at all 11 call sites; None-branch in check_timeouts documented as theoretically unreachable under lock semantics. WasmRef no-registry failure-path test added (Issue #1407 closed); reservation-lifecycle proof surface now complete across all 6 termination paths (success, failure, timeout, cancel, double-cancel, WasmRef). 18/18 commons_integration tests pass. CI starvation root cause identified and fixed (benchmark.yml was missing concurrency group; required checks run on ubuntu-latest, not ci-runner); ADR-0010 corrected. Issue #1408 closed.",
   "closed_sprint": {
     "sprint": 25,
     "theme": "Pre-Execution Commons Credit Reservation",
@@ -71,5 +71,6 @@
       "assignee": "matt",
       "epic": "arch-invariants"
     }
-  ]
+  ],
+  "closed_date": "2026-07-13"
 }

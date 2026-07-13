@@ -2688,7 +2688,7 @@ category = "reference"
 status = "living"
 title = "Current Truth Map"
 description = "One-screen routing for what is real now, what is not, what gates remain — pointing at STATE.md and PHASE_PROGRESS.md for the per-PR record."
-last_updated = "2026-04-29"
+last_updated = "2026-07-13"
 owner = "matt"
 audiences = ["all"]
 truth_class = "descriptive"
@@ -2697,7 +2697,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation", "phase"]
 recommended_action = "keep"
-last_reviewed = "2026-04-29"
+last_reviewed = "2026-07-13"
 
 [docs."docs/reference/project-index/source-tree-map.md"]
 category = "reference"
@@ -2784,7 +2784,7 @@ category = "reference"
 status = "living"
 title = "Show-Readiness Map"
 description = "What can be shown now, what should not be shown as finished, suggested first-demo narrative, and red lines for outside-facing material."
-last_updated = "2026-04-29"
+last_updated = "2026-07-13"
 owner = "matt"
 audiences = ["all", "team"]
 truth_class = "descriptive"
@@ -2793,7 +2793,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation", "show-readiness", "communications"]
 recommended_action = "keep"
-last_reviewed = "2026-04-29"
+last_reviewed = "2026-07-13"
 
 [docs."docs/reference/project-index/full-repo-record.md"]
 category = "reference"

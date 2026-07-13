@@ -2,7 +2,9 @@
 
 This document contains detailed history of all completed development phases. For current project status, see [CLAUDE.md](../CLAUDE.md).
 
-## Current Status
+## Current Status (historical — January 2026)
+
+> **Historical note (2026-07-13):** this section records the focus at the time of the January 2026 architecture reset and is preserved as history — it is NOT present truth. Current status lives in [docs/STATE.md](STATE.md) and [docs/PHASE_PROGRESS.md](PHASE_PROGRESS.md).
 
 **Current Focus**: Kernel/App Separation Architecture
 **Tracking Issue**: [#856](https://github.com/InterCooperative-Network/icn/issues/856)
