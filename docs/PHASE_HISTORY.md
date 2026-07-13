@@ -1,6 +1,6 @@
 # ICN Phase History
 
-This document contains detailed history of all completed development phases. For current project status, see [CLAUDE.md](../CLAUDE.md).
+This document contains detailed history of all completed development phases. For current project status, see [docs/STATE.md](STATE.md) and [docs/PHASE_PROGRESS.md](PHASE_PROGRESS.md) (canonical).
 
 ## Current Status (historical — January 2026)
 
