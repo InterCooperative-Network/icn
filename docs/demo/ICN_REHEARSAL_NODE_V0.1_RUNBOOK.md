@@ -65,6 +65,16 @@ as cryptographic verification.
 - No payment / wallet / balance / currency / token framing — the loop is
   governed coordination with provenance receipts.
 
+## Presenting this to organizers
+
+This runbook is the *operator* path. For the human presentation itself, use
+[CAPABILITY_HORIZON.md](CAPABILITY_HORIZON.md): the four-layer progression
+(do the loop → reveal what ICN enforced → show what else the same primitives
+can carry, with per-example status labels → name the long-term horizon), the
+organizer questions to ask afterward, and the truth-boundary rules for
+forward-looking claims. The rehearsal is one bounded process on a general
+substrate — present it as the first application, not as the product.
+
 ## Existing pieces reused
 
 | Piece | Role |
