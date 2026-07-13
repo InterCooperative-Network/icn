@@ -1,7 +1,11 @@
 # ICN Session Sync Log
 
+> **RETIRED (2026-07-13).** This log stopped being updated after 2026-03-18;
+> the practice it describes was superseded by the append-only truth-sync
+> blocks in `docs/STATE.md`. Preserved as a historical record — do not update
+> it on session end, and do not treat it as current session state.
+
 Track what each development session changed to prevent multi-agent conflicts.
-Agents: read this on session start. Update it on session end.
 
 ## 2026-03-18 Session A (icn-dev, Claude Code)
 - Created: GOLDEN_PROMPT.md, PHASE_PROGRESS.md, Dockerfile.fast

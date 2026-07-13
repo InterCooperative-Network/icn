@@ -1,10 +1,23 @@
 # ICN Demo: Start Here
 
-**Last Updated**: 2026-06-13
+**Last Updated**: 2026-07-13
 
 ---
 
-## July Demo Candidate 0.1 (current single-actor proof loop)
+## Rehearsal Node v0.1 (current headline: the two-role organizer→member loop)
+
+> **DEV/DEMO only — local, single-node, fictional institution data.** Not
+> production, not federation, not a formal pilot, no real member or funds
+> data. Since #2406–#2408 the headline surface is the **two-role rehearsal
+> loop**: an organizer reviews fictional proposed work in a browser, approves,
+> previews a digest-bound plan, and confirms (creating one real local action
+> item through the ADR-0026 receipt ladder); a fresh least-privilege member
+> session completes it and the completion receipt + value-withheld evidence
+> validate. Witnessed on a fresh assembled image at `8c0fe926` (2026-07-13).
+> Start with [rehearsal-node-appliance-loop.md](rehearsal-node-appliance-loop.md)
+> and [ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md](ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md).
+
+## July Demo Candidate 0.1 (single-actor proof loop — superseded as headline)
 
 > **DEV/DEMO only — local, single-node, single-actor, fictional institution
 > data.** Not production, not federation, not a formal pilot, no real member or

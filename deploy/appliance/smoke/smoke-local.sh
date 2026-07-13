@@ -20,6 +20,16 @@
 #                - drive the member loop from the HOST through the forwarded
 #                  gateway: standing -> action card -> complete -> receipt,
 #                  with the receipt binding check (32-byte record_hash)
+#                - drive the rehearsal organizer->member loop (#2406/#2407/
+#                  #2408) from the HOST through the same forwarded gateway:
+#                  organizer + member sessions via `icn-demo-seed --session`,
+#                  review approve -> preview digest -> WRONG-digest 409 ->
+#                  digest-bound confirm 201 -> member-only completion ->
+#                  completion-receipt binding check, plus the capability
+#                  negatives (member cannot review, organizer cannot bind or
+#                  complete); then run the in-VM steward verifier
+#                  (`sudo icn-demo-verify --rehearsal`) so the receipt ladder
+#                  and value-withheld evidence export are validated on the VM
 #                - block guest-initiated outbound networking by DEFAULT
 #                  (QEMU user-net restrict=on; explicitly set forwarding
 #                  rules are unaffected per the QEMU manual) and prove it
@@ -192,7 +202,12 @@ cat <<'EOF_PLAN'
        - no display; serial-on-stdout for diagnostics
        - with --demo: gateway + member-shell hostfwd, and guest outbound
          BLOCKED by default (user-net restrict=on; set
-         ICN_APPLIANCE_ALLOW_OUTBOUND=1 to permit outbound). A restricted
+         ICN_APPLIANCE_ALLOW_OUTBOUND=1 to permit outbound). After the
+         member loop, --demo also drives the rehearsal organizer->member
+         loop host-side (seed sessions over SSH; review -> preview digest
+         -> wrong-digest 409 -> confirm 201 -> member completion receipt;
+         member/organizer capability negatives) and runs the in-VM
+         steward verifier (icn-demo-verify --rehearsal). A restricted
          --demo run ends with an isolation canary: a host-loopback
          listener must be reachable from the host and unreachable from
          the guest.
@@ -610,6 +625,159 @@ if [ "$DEMO" = 1 ]; then
     fi
     log "[demo] least-privilege OK: browser JWT 403'd on the entity route (no entity:read)."
 
+    # ---------- rehearsal organizer->member loop (#2406/#2407/#2408) ----------
+    # The current-main walkthrough (#2398): the assembled image must complete
+    # the organizer review->confirm->action-item->member-completion loop over
+    # the SAME forwarded gateway port a browser would use, with the digest and
+    # capability negatives that make it evidence rather than a happy path.
+    # Role JWTs come from `icn-demo-seed --session` over SSH (the demo-session
+    # endpoint on 8091 is deliberately NOT host-forwarded by this smoke).
+    # Failures in this section exit 15. JWT-bearing seed JSON is NEVER echoed
+    # (same seed_incomplete_diag discipline as the member loop above).
+    log "[demo] rehearsal 1/8: organizer session (sudo icn-demo-seed --session organizer --json)..."
+    ORG_SEED_JSON="$(run_in_vm "sudo icn-demo-seed --session organizer --json" 2>/dev/null)" || {
+        err "[demo] rehearsal organizer seed failed."
+        run_in_vm "sudo journalctl -u icnd.service --no-pager -n 100" || true
+        exit 15
+    }
+    ORG_JWT="$(jq -r '.jwt // empty' <<<"$ORG_SEED_JSON")"
+    ORG_DOMAIN="$(jq -r '.domain // empty' <<<"$ORG_SEED_JSON")"
+    ORG_ROLE="$(jq -r '.role // empty' <<<"$ORG_SEED_JSON")"
+    if [ -z "$ORG_JWT" ] || [ -z "$ORG_DOMAIN" ] || [ "$ORG_ROLE" != "organizer" ]; then
+        _missing=""
+        [ -z "$ORG_JWT" ]    && _missing="$_missing jwt"
+        [ -z "$ORG_DOMAIN" ] && _missing="$_missing domain"
+        [ "$ORG_ROLE" != "organizer" ] && _missing="$_missing role=organizer"
+        err "[demo] $(seed_incomplete_diag "$ORG_SEED_JSON" "$_missing")"
+        exit 15
+    fi
+    ORG_STANDING_NOTE="$(jq -r '.standing_note // empty' <<<"$ORG_SEED_JSON")"
+    if [ "$ORG_STANDING_NOTE" != "bootstrap-standing: ok" ]; then
+        err "[demo] rehearsal organizer seed standing bootstrap did not succeed: $ORG_STANDING_NOTE"
+        exit 15
+    fi
+
+    log "[demo] rehearsal 2/8: member session (sudo icn-demo-seed --session member --json)..."
+    MEM_SEED_JSON="$(run_in_vm "sudo icn-demo-seed --session member --json" 2>/dev/null)" || {
+        err "[demo] rehearsal member seed failed."
+        run_in_vm "sudo journalctl -u icnd.service --no-pager -n 100" || true
+        exit 15
+    }
+    MEM_JWT="$(jq -r '.jwt // empty' <<<"$MEM_SEED_JSON")"
+    MEM_DID="$(jq -r '.did // empty' <<<"$MEM_SEED_JSON")"
+    MEM_ROLE="$(jq -r '.role // empty' <<<"$MEM_SEED_JSON")"
+    MEM_DOMAIN="$(jq -r '.domain // empty' <<<"$MEM_SEED_JSON")"
+    if [ -z "$MEM_JWT" ] || [ -z "$MEM_DID" ] || [ "$MEM_ROLE" != "member" ]; then
+        _missing=""
+        [ -z "$MEM_JWT" ] && _missing="$_missing jwt"
+        [ -z "$MEM_DID" ] && _missing="$_missing did"
+        [ "$MEM_ROLE" != "member" ] && _missing="$_missing role=member"
+        err "[demo] $(seed_incomplete_diag "$MEM_SEED_JSON" "$_missing")"
+        exit 15
+    fi
+    # Both role sessions must be scoped to the SAME rehearsal domain — fail
+    # closed before any gateway call rather than surfacing as a confusing
+    # 403/404 (or acting on a different domain's item) later.
+    if [ "$MEM_DOMAIN" != "$ORG_DOMAIN" ]; then
+        err "[demo] rehearsal seed domain mismatch: organizer=$ORG_DOMAIN member=$MEM_DOMAIN"
+        exit 15
+    fi
+    ORG_AUTH="Authorization: Bearer $ORG_JWT"
+    MEM_AUTH="Authorization: Bearer $MEM_JWT"
+    REH="$GWH/v1/gov/domains/$ORG_DOMAIN/rehearsal"
+
+    log "[demo] rehearsal 3/8: organizer lists pending-publish rows..."
+    REH_ROWS="$(curl -sf -m 10 -H "$ORG_AUTH" "$REH/pending-publish")" \
+        || { err "[demo] rehearsal pending-publish list failed (is the image's icnd running with ICN_GOVERNANCE_BUILD_MODE=rehearsal?)"; exit 15; }
+    REH_ROW="$(jq -r '[.rows[]? | select(.kind=="action_item")][0].id // empty' <<<"$REH_ROWS")"
+    [ -n "$REH_ROW" ] || { err "[demo] no action_item row in the rehearsal workspace"; exit 15; }
+    N_EXEC_ROWS="$(jq '[.rows[]? | select(.kind=="action_item")] | length' <<<"$REH_ROWS")"
+    [ "$N_EXEC_ROWS" = "1" ] || { err "[demo] expected exactly 1 action_item row, found $N_EXEC_ROWS"; exit 15; }
+
+    # Capability negatives BEFORE the positive path: the loop is evidence of
+    # separation only if the wrong role is denied on the same live surface.
+    log "[demo] rehearsal 4/8: capability negatives (member!=review, organizer!=bind)..."
+    NEG_CODE="$(curl -s -o /dev/null -w '%{http_code}' -m 10 -X POST -H "$MEM_AUTH" \
+        -H 'Content-Type: application/json' -d '{"decision":"approve"}' \
+        "$REH/pending-publish/$REH_ROW/review")"
+    [ "$NEG_CODE" = "403" ] \
+        || { err "[demo] SECURITY: member JWT got HTTP $NEG_CODE (expected 403) on organizer review"; exit 15; }
+    NEG_CODE="$(curl -s -o /dev/null -w '%{http_code}' -m 10 -X POST -H "$ORG_AUTH" \
+        -H 'Content-Type: application/json' \
+        -d '{"label":"Example member (fictional)","did":"did:icn:zSmokeNegativeProbe"}' \
+        "$REH/bindings")"
+    [ "$NEG_CODE" = "403" ] \
+        || { err "[demo] SECURITY: organizer JWT got HTTP $NEG_CODE (expected 403) on setup-only bindings route"; exit 15; }
+
+    log "[demo] rehearsal 5/8: organizer approves + fetches digest-bound preview..."
+    curl -sf -m 10 -X POST -H "$ORG_AUTH" -H 'Content-Type: application/json' \
+        -d '{"decision":"approve"}' "$REH/pending-publish/$REH_ROW/review" \
+        | jq -e '.decision_receipt.record_hash' >/dev/null \
+        || { err "[demo] organizer review approve failed"; exit 15; }
+    PREVIEW="$(curl -sf -m 10 -H "$ORG_AUTH" "$REH/pending-publish/$REH_ROW/preview")" \
+        || { err "[demo] preview fetch failed"; exit 15; }
+    PREVIEW_DIGEST="$(jq -r '.preview_digest // empty' <<<"$PREVIEW")"
+    jq -e '.confirmable == true' <<<"$PREVIEW" >/dev/null \
+        || { err "[demo] preview is not confirmable (approval or assignee binding missing)"; exit 15; }
+    grep -qE '^[0-9a-f]{64}$' <<<"$PREVIEW_DIGEST" \
+        || { err "[demo] preview_digest is not 64-hex"; exit 15; }
+
+    log "[demo] rehearsal 6/8: WRONG digest must be rejected, right digest must confirm..."
+    if [ "${PREVIEW_DIGEST%a}" != "$PREVIEW_DIGEST" ]; then
+        WRONG_DIGEST="${PREVIEW_DIGEST%a}b"
+    else
+        WRONG_DIGEST="${PREVIEW_DIGEST%?}a"
+    fi
+    NEG_CODE="$(curl -s -o /dev/null -w '%{http_code}' -m 10 -X POST -H "$ORG_AUTH" \
+        -H 'Content-Type: application/json' -d "{\"preview_digest\":\"$WRONG_DIGEST\"}" \
+        "$REH/pending-publish/$REH_ROW/confirm")"
+    [ "$NEG_CODE" = "409" ] \
+        || { err "[demo] SECURITY: wrong preview digest got HTTP $NEG_CODE (expected 409) on confirm"; exit 15; }
+    CONFIRM_BODY_FILE="$WORK_DIR/rehearsal-confirm.json"
+    CONFIRM_CODE="$(curl -s -o "$CONFIRM_BODY_FILE" -w '%{http_code}' -m 20 -X POST -H "$ORG_AUTH" \
+        -H 'Content-Type: application/json' -d "{\"preview_digest\":\"$PREVIEW_DIGEST\"}" \
+        "$REH/pending-publish/$REH_ROW/confirm")"
+    # Fresh overlay boot => first execution => 201 (200/idempotent would mean
+    # this "fresh" VM already ran a confirm, which a smoke must not excuse).
+    [ "$CONFIRM_CODE" = "201" ] \
+        || { err "[demo] digest-bound confirm got HTTP $CONFIRM_CODE (expected 201 on a fresh image)"; exit 15; }
+    REH_ITEM="$(jq -r '.action_item_id // empty' "$CONFIRM_BODY_FILE")"
+    [ -n "$REH_ITEM" ] || { err "[demo] confirm response carried no action_item_id"; exit 15; }
+    jq -e '(.plan_record_hash | test("^[0-9a-f]{64}$")) and (.application_record_hash | test("^[0-9a-f]{64}$"))' \
+        "$CONFIRM_BODY_FILE" >/dev/null \
+        || { err "[demo] confirm response missing ladder record hashes"; exit 15; }
+
+    log "[demo] rehearsal 7/8: organizer cannot complete; assigned member completes + receipt binds..."
+    NEG_CODE="$(curl -s -o /dev/null -w '%{http_code}' -m 10 -X PUT -H "$ORG_AUTH" \
+        -H 'Content-Type: application/json' -d '{"status":"completed"}' \
+        "$GWH/v1/gov/domains/$ORG_DOMAIN/action-items/$REH_ITEM/status")"
+    [ "$NEG_CODE" = "403" ] \
+        || { err "[demo] SECURITY: organizer JWT got HTTP $NEG_CODE (expected 403) on member completion"; exit 15; }
+    N_CARDS="$(curl -sf -m 10 -H "$MEM_AUTH" "$GWH/v1/gov/me/action-cards" \
+        | jq --arg id "$REH_ITEM" '[.cards[]? | select(.source_id==$id)] | length')"
+    [ "$N_CARDS" = "1" ] \
+        || { err "[demo] confirmed rehearsal item not visible as the member's action card (found $N_CARDS)"; exit 15; }
+    curl -sf -m 10 -X PUT -H "$MEM_AUTH" -H 'Content-Type: application/json' \
+        -d '{"status":"completed"}' \
+        "$GWH/v1/gov/domains/$ORG_DOMAIN/action-items/$REH_ITEM/status" >/dev/null \
+        || { err "[demo] member completion PUT failed"; exit 15; }
+    REH_RECEIPT="$(curl -sf -m 10 -H "$MEM_AUTH" \
+        "$GWH/v1/gov/domains/$ORG_DOMAIN/action-items/$REH_ITEM/completion-receipt")" \
+        || { err "[demo] rehearsal completion-receipt fetch failed"; exit 15; }
+    jq -e --arg id "$REH_ITEM" --arg dom "$ORG_DOMAIN" --arg did "$MEM_DID" \
+        '(.record_hash | type == "array" and length == 32 and all(.[]; type == "number" and . >= 0 and . <= 255))
+         and .item_id == $id and .domain_id == $dom and .actor_did == $did
+         and .transition == "completed"' <<<"$REH_RECEIPT" >/dev/null \
+        || { err "[demo] rehearsal completion receipt failed the binding check"; exit 15; }
+
+    log "[demo] rehearsal 8/8: in-VM steward verifier (sudo icn-demo-verify --rehearsal)..."
+    if ! run_in_vm "sudo icn-demo-verify --rehearsal" >/dev/null 2>&1; then
+        err "[demo] icn-demo-verify --rehearsal FAILED on the VM (receipt ladder / evidence export / negative matrix)."
+        run_in_vm "sudo icn-demo-verify --rehearsal" 2>&1 | tail -n 20 || true
+        exit 15
+    fi
+    log "[demo] rehearsal loop complete: review -> digest confirm -> action item -> member receipt (+ negatives, + steward verify)."
+
     # ---------- outbound-isolation canary (restricted runs only) ----------
     if [ "$ALLOW_OUTBOUND" != "1" ]; then
         log "[demo] outbound-isolation canary: guest must NOT reach a host listener..."
@@ -695,13 +863,17 @@ if [ "$DEMO" = 1 ]; then
   shell:    http://127.0.0.1:${SHELL_FWD_PORT}/member-shell/ (host-forwarded)
   gateway:  http://127.0.0.1:${GW_FWD_PORT} (host-forwarded, JWT-auth)
   loop:     standing -> action card -> discharge -> receipt (verified host-side)
+  rehearsal: review -> digest confirm -> action item -> member receipt
+            (+ wrong-digest 409, role negatives, in-VM steward verify)
   outbound: $( [ "$ALLOW_OUTBOUND" != "1" ] \
       && echo "BLOCKED (restrict=on; in-guest canary probe held)" \
       || echo "ALLOWED (ICN_APPLIANCE_ALLOW_OUTBOUND=1; canary skipped)" )
 
-NOTE: DEMO PASS means the member loop works end-to-end on this image from a
-clean boot, over the same forwarded ports a stranger's browser would use.
-Fictional fixture institution, dev gates, test posture — NOT production,
-NOT a pilot, NOT federation.
+NOTE: DEMO PASS means the member loop AND the rehearsal organizer->member
+loop work end-to-end on this image from a clean boot, over the same
+forwarded ports a stranger's browser would use. HTTP-contract coverage:
+the browser surface itself is rendered by a human or a Playwright witness,
+not by this smoke. Fictional fixture institution, dev gates, test posture —
+NOT production, NOT a pilot, NOT federation.
 EOF_DEMO
 fi
