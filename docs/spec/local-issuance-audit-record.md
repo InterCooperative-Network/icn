@@ -15,7 +15,7 @@ production trusted-issuance architecture (#2080) and does not change it.
 
 ## Decision
 
-**Yes — each `--local-mint` issuance SHOULD leave a minimal, secret-free,
+**Yes — each `--local-mint` issuance MUST leave a minimal, secret-free,
 append-only local record, written by `icnctl` itself, explicitly labeled as
 operational provenance (NOT cryptographic evidence).** A new record shape is
 justified; the existing daemon-side surfaces cannot represent the event
@@ -63,11 +63,11 @@ directory created `0750` on first write).
   "issued_at": 1789300000,
   "expires_at": 1789303600,
   "subject_did": "did:icn:…",
-  "coop_id": "nycn",
+  "coop_id": "rehearsal-coop",
   "scopes": ["governance:read", "governance:pending-publish:review"],
-  "scope_set_b3": "<64-hex BLAKE3 of the sorted, comma-joined scope list>",
-  "issuer_instance": "<64-hex BLAKE3 of the node's public instance identity: the operator DID string>",
-  "minted_by": "icnctl <version> (<subcommand: auth-token | institution-bootstrap>)"
+  "scope_set_b3": "<lowercase 64-hex BLAKE3 scope-set fingerprint>",
+  "issuer_instance": "<lowercase 64-hex BLAKE3 public-issuer fingerprint>",
+  "minted_by": "icnctl auth token"
 }
 ```
 
@@ -76,6 +76,27 @@ Field rules:
 - **MUST NOT** contain the JWT, the signing secret, any value derived from
   the secret, a passphrase, or any private overlay data. `issuer_instance`
   is derived from the node's PUBLIC operator DID only.
+- `scope_set_b3` MUST be computed from the exact validated scope strings
+  accepted for the minted token. Scope strings are case-sensitive UTF-8 and
+  are not trimmed, case-folded, comma-joined, or otherwise rewritten after CLI
+  validation. Duplicate scope strings MUST fail the mint rather than be
+  silently deduplicated. The canonical order is raw UTF-8 byte order ascending.
+  The BLAKE3 input is the raw domain-separation tag
+  `icn:local_issuance:scope_set_b3:v0`, followed by `u64` little-endian scope
+  count, followed by each scope as `u64` little-endian byte length plus raw
+  UTF-8 bytes. The stored value is the lowercase 64-character hex encoding of
+  the 32-byte digest.
+- `issuer_instance` MUST be computed from the public issuer identity that
+  `icnctl` uses for trusted-local issuance at this boundary: the node/operator
+  DID string, never a private key, JWT, signing secret, host-private overlay
+  label, or network address. The BLAKE3 input is the raw domain-separation tag
+  `icn:local_issuance:issuer_instance:v0`, followed by `u64` little-endian
+  byte length plus the DID's raw UTF-8 bytes. The stored value is the lowercase
+  64-character hex encoding of the 32-byte digest.
+- `minted_by` MUST be one of the actual CLI command paths that minted the
+  token today: `icnctl auth token` or `icnctl institution bootstrap apply`.
+  Implementations MUST NOT invent abbreviated names such as `auth-token` or
+  `institution-bootstrap`.
 - `cryptographic_evidence: false` is a REQUIRED literal. The record is an
   unsigned operator log; the label is what prevents it being mistaken for
   signed evidence (the #2399 MUST-NOT), the same honesty-by-labeling pattern
@@ -87,9 +108,9 @@ Field rules:
   identities. If `--local-mint` ever graduates beyond that boundary, this
   field MUST be re-reviewed (fingerprint-only is the likely production
   shape) — that review belongs to #2080's lane, not here.
-- Failures to write the record MUST fail the mint (fail-closed): an
-  operator who asked for auditability does not get a silent gap. A node
-  with an unwritable data dir is already unfit to seed.
+- Failures to write the record MUST fail the mint (fail-closed): a
+  trusted-local mint must not create a silent audit gap. A node with an
+  unwritable data dir is already unfit to seed.
 
 ## What this record is NOT
 
