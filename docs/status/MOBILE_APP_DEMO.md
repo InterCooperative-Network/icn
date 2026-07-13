@@ -1,6 +1,11 @@
 # ICN Mobile App Demo Setup
 
-## Status: Ready for Testing! 🎉
+> **HISTORICAL SNAPSHOT (2025-12-18).** This document describes the state at
+> that date and is preserved as a record. It is NOT current status — do not
+> read "Ready for Testing" as a claim about today's codebase. Current project
+> state: `docs/STATE.md`.
+
+## Status (as of 2025-12-18): Ready for Testing! 🎉
 
 ### What We Fixed Today
 We resolved all critical test failures in the ICN codebase:
