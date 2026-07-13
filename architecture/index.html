@@ -835,7 +835,7 @@ Federation ──→ Federation (nested federations)
 <!-- truth: descriptive -->
 
 <h2>17. Crate Map</h2>
-<p><strong>Workspace: 44 packages</strong> — 37 crates in <code>icn/crates/</code>, 4 apps in <code>icn/apps/</code>, 3 binaries in <code>icn/bins/</code> (icnd, icnctl, icn-console). <em>(Verified 2026-06-14 against <code>[workspace].members</code> in icn/Cargo.toml: 37 <code>crates/*</code> + 4 <code>apps/*</code> + 3 <code>bins/*</code> = 44. There are 38 crate directories on disk; <code>icn-baseline-lock-guest</code> is present but excluded from the workspace. The previous &quot;39 packages / 32 crates&quot; figure was stale.)</em></p>
+<p><strong>Workspace: 48 packages</strong> — 38 crates in <code>icn/crates/</code>, 7 apps in <code>icn/apps/</code> (charter, governance, membership, ledger, ledger-app, governance-app, trust-app), 3 binaries in <code>icn/bins/</code> (icnd, icnctl, icn-console). <em>(Verified 2026-07-13 against <code>[workspace].members</code> in icn/Cargo.toml: 38 <code>crates/*</code> + 7 <code>apps/*</code> + 3 <code>bins/*</code> = 48. There are 39 crate directories on disk; <code>icn-baseline-lock-guest</code> is present but excluded from the workspace. The previous &quot;44 packages / 37 crates + 4 apps&quot; figure, verified 2026-06-14, was stale.)</em></p>
 <p><strong>Kernel crates</strong> (domain-agnostic, enforce constraints):</p>
 <table>
 <thead>
@@ -1184,7 +1184,7 @@ Federation ──→ Federation (nested federations)
 </tr>
 </tbody></table>
 <p><strong>Infection status (recomputed 2026-06-14 from kernel_surface.toml per-crate entries — see §17):</strong> of 28 inventoried crates, <strong>13 clean / 14 infected / 1 needs-review</strong>, plus 1 extracted app. Highest priority: icn-trust and icn-ledger (cascade infections). GovernanceActor extraction to apps/ complete (Feb 2026); icn-core governance refs now 0; trust and ledger extractions next. The earlier <code>9/11/9</code> figure here came from the then-out-of-date kernel_surface.toml <code>[metadata]</code> summary; that summary was regenerated to match its per-crate entries in PR #2110 (2026-06-20).</p>
-<p><strong>Test coverage:</strong> NEEDS RE-DERIVATION. The previously asserted &quot;2,287 tests across 32 crates&quot; is stale: the workspace now has 37 crates + 4 apps + 3 binaries = 44 members (verified against icn/Cargo.toml), and a per-crate <code>#[test]</code>/<code>#[tokio::test]</code> grep of icn-governance alone exceeds 600. An exact, tool-derived total (<code>cargo test</code> summary) is owed before a precise number is re-asserted; the count was intentionally not date-stamped as verified here. CI runs on every commit.</p>
+<p><strong>Test coverage:</strong> NEEDS RE-DERIVATION. The previously asserted &quot;2,287 tests across 32 crates&quot; is stale: the workspace now has 38 crates + 7 apps + 3 binaries = 48 members (verified 2026-07-13 against icn/Cargo.toml), and a per-crate <code>#[test]</code>/<code>#[tokio::test]</code> grep of icn-governance alone exceeds 600. An exact, tool-derived total (<code>cargo test</code> summary) is owed before a precise number is re-asserted; the count was intentionally not date-stamped as verified here. CI runs on every commit.</p>
 <p><strong>Operational deployment (NEEDS OPS RE-CONFIRMATION):</strong> runtime liveness/uptime/no-data-loss are operational claims not verifiable from source in this docs pass; see the ops-owned network/deployment rows in <code>docs/status.toml</code>. Cluster and ports unchanged from the prior revision.</p>
 <!-- truth: operational -->
 

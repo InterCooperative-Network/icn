@@ -114,13 +114,23 @@ matrix, organizer confirm → item created, member complete, completion receipt 
 process receipts + value-withheld evidence). This validates the build-mode
 flip, the seed setup, the role scopes, and the verifier matrix against the
 actual runtime.</li>
-<li><strong>Full assembled-image (KVM) witness — NOT performed in the authoring session.</strong>
-It requires building a demo-profile <code>qcow2</code> from a base image
-(<code>build-image.sh --real</code>) and then <code>smoke-local.sh --real --demo</code>; the base
-image build is a heavy separate step. Per the honesty rule, the appliance
-tranche is <strong>not</strong> claimed &quot;assembled-image witnessed&quot; until that runs. The KVM
-smoke path is otherwise ready (qemu + <code>/dev/kvm</code> available; the <code>--demo</code> flow
-drives a real browser request path and a no-outbound canary).</li>
+<li><strong>Full assembled-image (KVM) witness — PERFORMED 2026-07-13</strong> (it was
+honestly NOT performed in the authoring session; the gap closed the day
+after merge). A demo-profile <code>qcow2</code> built from clean, unedited main
+<code>8c0fe926</code> (image sha256 <code>f2aa7d24d062…</code>, fail-closed manifest verified)
+completed the #2409 <code>smoke-local.sh --real --demo</code> driver from a clean
+restrict=on boot — including the full organizer→member loop on the image
+(role sessions,
+member/organizer capability 403s, wrong-digest 409, digest-bound confirm
+201, member completion receipt binding, in-VM <code>icn-demo-verify --rehearsal</code>)
+and the no-outbound canary. A browser-observed pass additionally drove the
+real <code>?mode=live&amp;surface=organizer&amp;demo=launcher</code> path and a
+restart-durability check (completion receipt survives reboot; re-seed
+restores the workspace). Walkthrough driver: PR #2409, merged as
+<code>7437e412</code>; evidence summary posted on #2386/#1746/#2398.
+The witness binds to <code>8c0fe926</code> — re-run <code>icn-rehearsal-node.sh smoke-image</code>
+for claims about any later commit (recurring automation is tracked in
+#2398).</li>
 </ul>
 <h2>Non-claims</h2>
 <p>Receipts do not create authority · rehearsal is not a pilot · fictional data is

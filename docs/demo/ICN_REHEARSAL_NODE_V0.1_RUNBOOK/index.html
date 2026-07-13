@@ -65,6 +65,14 @@ is <code>PUT /v1/gov/domains/{domain_id}/action-items/{item_id}/status</code> wi
 <code>GET .../completion-receipt</code>).</li>
 <li>The receipt can be re-fetched and consistency-checked
 (<code>sudo icn-demo-verify &lt;item-id&gt;</code>).</li>
+<li>Since #2406–#2408: the full rehearsal <strong>organizer→member</strong> loop runs on the
+node — an organizer session reviews fictional pending-publish rows,
+approves, previews a digest-bound plan, and confirms (creating one real
+local action item through the ADR-0026 receipt ladder); a fresh member
+session completes it; <code>sudo icn-demo-verify --rehearsal</code> validates the
+loop, the receipt-ladder classes, and the value-withheld evidence export.
+Witnessed on a fresh assembled image at <code>8c0fe926</code> on 2026-07-13 (see
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/rehearsal-node-appliance-loop">rehearsal-node-appliance-loop.md</a>).</li>
 <li>The deeper 13-of-13 governed receipt-chain rehearsal remains available
 through <code>sudo icn-demo-verify --chain</code>.</li>
 </ul>
@@ -107,7 +115,7 @@ governed coordination with provenance receipts.</li>
 </tr>
 <tr>
 <td><code>deploy/appliance/scripts/icn-demo-seed.sh</code></td>
-<td>In-VM: mints a short-lived DEV/DEMO session JWT via <strong>trusted local issuance</strong> (signs with this VM&#39;s own per-instance gateway secret — see the auth-boundary note below), bootstraps the fixture institution, creates one action item. Not idempotent — use reset for a clean slate.</td>
+<td>In-VM: mints a short-lived DEV/DEMO session JWT via <strong>trusted local issuance</strong> (signs with this VM&#39;s own per-instance gateway secret — see the auth-boundary note below), bootstraps the fixture institution. Legacy mode (no <code>--session</code>) additionally creates one action item and is not idempotent — use reset for a clean slate. Since #2408, <code>--session organizer|member</code> mints a least-privilege role session with an idempotent workspace ensure and NO pre-seeded item (the organizer&#39;s confirm creates it).</td>
 </tr>
 <tr>
 <td><code>deploy/appliance/scripts/icn-demo-verify.sh</code></td>
@@ -154,16 +162,26 @@ network. It makes no network call, adds no endpoint, and leaves <code>/auth/veri
 fail-closed. <code>institution bootstrap apply --local-mint</code> uses the same path. The
 secret never leaves the VM and is never baked into the image; a JWT minted with
 one VM&#39;s secret does not verify on any other node.</p>
-<p>The seed mints two least-privilege credentials: an internal <strong>setup</strong> token that
-provisions the demo (never printed), and the <strong>browser</strong> token it hands to the
-member shell — scoped to <code>governance:read</code> plus <code>governance:action-item:complete</code>,
-the completion-only capability (#2400). That capability authorizes only the
-<code>completed</code> transition of an action item the caller is assigned, so the browser
-token cannot create action items or meetings, drive other status transitions,
-administer a cooperative, read entities, touch treasury, or reach the broad /
-other governance write classes. The internal setup token retains
-<code>governance:meeting:write</code> because it creates the fixture action item; it is
-never emitted.</p>
+<p>Legacy seed mode mints two least-privilege credentials: an internal <strong>setup</strong>
+token that provisions the demo and creates the legacy fixture action item (never
+printed; scoped to <code>governance:meeting:write</code>), and the <strong>member browser</strong> token
+it hands to the member shell — scoped to <code>governance:read</code> plus
+<code>governance:action-item:complete</code>, the completion-only capability (#2400). That
+capability authorizes only the <code>completed</code> transition of an action item the
+caller is assigned, so the browser token cannot create action items or meetings,
+drive other status transitions, administer a cooperative, read entities, touch
+treasury, or reach the broad / other governance write classes.</p>
+<p>The rehearsal <code>--session organizer|member</code> path adds a separate internal
+<strong>rehearsal setup</strong> token (never printed; scoped to <code>governance:read</code> plus
+<code>governance:rehearsal:setup</code>) that idempotently initializes the rehearsal
+workspace and binds fictional labels. It then mints exactly one role browser
+token: <strong>organizer</strong> sessions carry <code>governance:read</code> plus
+<code>governance:pending-publish:review</code> and <code>governance:pending-publish:confirm</code>;
+<strong>member</strong> sessions carry the same completion-only member scope as the legacy
+browser token. The organizer token cannot bind, initialize, complete, or
+broad-write; the member token cannot review, confirm, bind, or initialize. The
+session path pre-seeds no action item — the organizer&#39;s digest-bound confirm
+creates it.</p>
 <h2>Fast path A — smoke an already-built demo image</h2>
 <pre><code class="language-bash">ICN_APPLIANCE_IMAGE=/path/to/icn-appliance-demo.qcow2 \
 ICN_APPLIANCE_SSH_KEY=/path/to/smoke_ed25519 \
@@ -198,15 +216,38 @@ bash deploy/appliance/scripts/icn-rehearsal-node.sh open-running-node
 </code></pre>
 <p>This tunnels the gateway (<code>18080</code>), member shell (<code>18090</code> — fixed: it is the
 browser Origin the gateway CORS and the session endpoint pin), and the
-loopback demo-session port (<code>18091</code>), then opens the shell with
-<code>?demo=launcher</code>. The &quot;Start local demo&quot; button mints a short-lived DEV/DEMO
-session via the in-VM loopback endpoint — the credential lives in page memory
-only, never in a URL, never pasted.</p>
+loopback demo-session port (<code>18091</code>), then opens the shell at
+<code>?mode=live&amp;surface=organizer&amp;demo=launcher</code> (since #2408). The &quot;Start
+organizer rehearsal&quot; button mints a short-lived, least-privilege DEV/DEMO
+<strong>organizer</strong> session via the in-VM loopback endpoint — the credential lives
+in page memory only, never in a URL, never pasted. The organizer reviews the
+fictional pending-publish rows, approves, previews the digest-bound plan, and
+confirms — creating one real local action item and its ADR-0026 process
+receipts. The &quot;Continue as the assigned member&quot; link opens a FRESH
+least-privilege <strong>member</strong> session (never a token upgrade) that completes the
+item and shows the completion receipt. Full loop description:
+<a href="https://github.com/InterCooperative-Network/icn/blob/main/rehearsal-node-appliance-loop">rehearsal-node-appliance-loop.md</a>.
+Note: the session endpoint becomes ready a few seconds after <code>icnd</code> health —
+if the Start button falls back to the manual connect form right after boot,
+wait a moment and reload.</p>
 <h2>Evidence path</h2>
 <ul>
 <li><code>sudo icn-demo-verify &lt;item-id&gt;</code> — re-fetches the completion receipt and
 checks its field binding (item, domain, transition, 32-byte <code>record_hash</code>
 present). A consistency check, not a client-side hash re-derivation.</li>
+<li><code>sudo icn-demo-verify --rehearsal [domain]</code> (since #2408) — the steward
+verifier for the organizer→member loop: negative capability matrix
+(organizer cannot bind/create; member cannot bind/review), drives or
+validates review → digest-bound confirm → member completion, checks the
+receipt-ladder classes and the value-withheld
+<code>urn:icn:contract:rehearsal-workflow-evidence:v1</code> export (no DIDs, no
+credentials). NOTE: when the browser has not already driven the loop, the
+verifier drives it itself — it consumes the seeded executable row;
+<code>sudo icn-demo-reset</code> + re-seed (<code>icn-demo-seed --session organizer</code>)
+restores a fresh workspace.</li>
+<li><code>sudo icn-demo-verify --pending-publish</code> (since #2394) — steward validation
+of the pending-publish evidence export
+(<code>urn:icn:contract:rehearsal-evidence-export:v1</code>).</li>
 <li><code>sudo icn-demo-verify --chain</code> — runs the deeper 13-of-13 governed
 receipt-chain rehearsal (<code>icnctl audit verify</code>) against an ephemeral in-VM
 gateway and emits a repo-safe evidence packet conforming to
