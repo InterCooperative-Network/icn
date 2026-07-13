@@ -660,17 +660,26 @@ if [ "$DEMO" = 1 ]; then
     log "[demo] rehearsal 2/8: member session (sudo icn-demo-seed --session member --json)..."
     MEM_SEED_JSON="$(run_in_vm "sudo icn-demo-seed --session member --json" 2>/dev/null)" || {
         err "[demo] rehearsal member seed failed."
+        run_in_vm "sudo journalctl -u icnd.service --no-pager -n 100" || true
         exit 15
     }
     MEM_JWT="$(jq -r '.jwt // empty' <<<"$MEM_SEED_JSON")"
     MEM_DID="$(jq -r '.did // empty' <<<"$MEM_SEED_JSON")"
     MEM_ROLE="$(jq -r '.role // empty' <<<"$MEM_SEED_JSON")"
+    MEM_DOMAIN="$(jq -r '.domain // empty' <<<"$MEM_SEED_JSON")"
     if [ -z "$MEM_JWT" ] || [ -z "$MEM_DID" ] || [ "$MEM_ROLE" != "member" ]; then
         _missing=""
         [ -z "$MEM_JWT" ] && _missing="$_missing jwt"
         [ -z "$MEM_DID" ] && _missing="$_missing did"
         [ "$MEM_ROLE" != "member" ] && _missing="$_missing role=member"
         err "[demo] $(seed_incomplete_diag "$MEM_SEED_JSON" "$_missing")"
+        exit 15
+    fi
+    # Both role sessions must be scoped to the SAME rehearsal domain — fail
+    # closed before any gateway call rather than surfacing as a confusing
+    # 403/404 (or acting on a different domain's item) later.
+    if [ "$MEM_DOMAIN" != "$ORG_DOMAIN" ]; then
+        err "[demo] rehearsal seed domain mismatch: organizer=$ORG_DOMAIN member=$MEM_DOMAIN"
         exit 15
     fi
     ORG_AUTH="Authorization: Bearer $ORG_JWT"
