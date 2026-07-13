@@ -7,26 +7,29 @@
 //! `HttpAuthentication::bearer(jwt_auth)` with auth outermost, so authentication
 //! runs BEFORE any handler or resource lookup:
 //!
-//! 1. **No token → 401**, uniformly — identical for existing and nonexistent
-//!    `service_id`s, so unauthenticated callers get NO enumeration oracle
-//!    (the security property ADR-0015 decision point 3 exists to protect).
-//! 2. **Invalid token → 401**, uniformly (same anti-oracle property).
+//! 1. **No token → 401**, with the SAME status code for existing and
+//!    nonexistent `service_id`s, so unauthenticated callers get NO enumeration
+//!    oracle. (Uniformity here is asserted at the status-code level; because
+//!    rejection happens before any lookup, no resource data can reach the
+//!    response body either.)
+//! 2. **Invalid token → 401**, likewise status-uniform across existence.
 //! 3. **Valid token + nonexistent resource → 404** for `GET /{service_id}`,
 //!    `DELETE /{service_id}`, and `/discover` with no matches; the list route
 //!    (`GET /v1/services`) returns 200 with an empty result set (list semantics).
 //! 4. **Valid token + existing resource → 200** (the 401s above are the auth
-//!    boundary, not a broken route).
+//!    boundary, not a broken route); withdraw by a non-owning provider → 403
+//!    (operation-specific authority boundary).
 //!
-//! ## What this deliberately does NOT decide (#1642 / ADR-0015 divergence)
+//! ## Decision context (ADR-0015 as amended 2026-07-13)
 //!
-//! ADR-0015's decision point 3 literally mandates **404** (not 401) for
-//! unauthorized callers; the implementation returns uniform **401**. Both are
-//! enumeration-safe because the response is independent of resource existence.
-//! Conforming to the literal 404 would require a custom auth-failure mapper for
-//! this scope — that is a pending maintainer decision recorded on #1642, and
-//! this test pins the CURRENT most-restrictive behavior without preempting it.
-//! If the decision later conforms the code to literal-404, update assertions
-//! here in the same PR as the semantics change.
+//! The amended ADR-0015 makes uniform pre-lookup **401** the accepted behavior
+//! for missing/invalid credentials: authentication, authorization, and resource
+//! absence are distinct outcomes, and the enumeration-safety invariant binds
+//! credential failures to response *uniformity*, not to a literal 404. This
+//! matrix is therefore the specified contract, not an interim snapshot. If
+//! service visibility later becomes scope-restricted, the ADR requires the
+//! authenticated existence-disclosure behavior (the 404/200 rows) to be
+//! re-reviewed — update these assertions in the same PR as any such change.
 //!
 //! The scope wiring below mirrors `server.rs` (`configure` + trust rate-limit
 //! wrap + bearer wrap) so the middleware ordering under test matches production.
@@ -182,7 +185,7 @@ async fn no_token_is_401_on_every_route_and_uniform_across_existence() {
     assert_eq!(existing, 401);
     assert_eq!(
         existing, missing,
-        "unauthenticated response must be identical for existing vs nonexistent ids"
+        "unauthenticated response status must not differ between existing and nonexistent ids"
     );
 }
 
@@ -215,7 +218,7 @@ async fn invalid_token_is_401_on_every_route_and_uniform_across_existence() {
     assert_eq!(existing, 401);
     assert_eq!(
         existing, missing,
-        "invalid-token response must be identical for existing vs nonexistent ids"
+        "invalid-token response status must not differ between existing and nonexistent ids"
     );
 }
 
