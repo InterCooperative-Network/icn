@@ -716,6 +716,79 @@ jobs:
           name: accessibility-report
           path: web/pilot-ui/test-results/
 
+  # Member Shell (web/member-shell) is the CURRENT member/organizer rehearsal
+  # surface; until this job existed its browser tests were dev-tools only, so
+  # the surface could drift or stop working while unrelated CI stayed green
+  # (2026-07-13 ecosystem audit finding). Runs the four fail-closed test
+  # drivers documented in web/member-shell/README.md against a static serve of
+  # web/ (no gateway, no outbound app traffic — the organizer flow is
+  # route-intercepted by organizer-mock.cjs), plus the fixture-pack content
+  # validator and the shell.js fixture-binding drift check.
+  # An automated pass here is NOT the human assistive-technology gate (#2041).
+  member-shell:
+    name: Member Shell Tests
+    needs: [changes]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      # Docs-only fast path — job always runs so it can satisfy branch
+      # protection if/when it is added to the required set.
+      - name: Docs-only fast path
+        if: needs.changes.outputs.docs_only == 'true' && needs.changes.outputs.has_rust != 'true'
+        run: echo "Confirmed docs-only (no frontend files); skipping member-shell tests."
+
+      - uses: actions/setup-node@v6
+        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/pilot-ui/package-lock.json
+
+      # The member-shell drivers deliberately borrow Playwright + axe from
+      # web/pilot-ui's devDependencies (#1735) — no second dependency tree.
+      - name: Install dependencies (borrowed from web/pilot-ui)
+        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
+        working-directory: ./web/pilot-ui
+        run: npm ci
+
+      - name: Install Playwright browsers
+        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
+        working-directory: ./web/pilot-ui
+        run: npx playwright install --with-deps chromium
+
+      - name: Fixture validation (content + consumer binding)
+        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
+        run: |
+          python3 docs/scripts/validate-rehearsal-shell-fixtures.py
+          python3 docs/scripts/check-member-shell-fixture-binding.py
+
+      - name: Run member-shell browser tests
+        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
+        run: |
+          # Serve the web/ root (the shell's relative fixture fetches require it).
+          (cd web && python3 -m http.server 8099 --bind 127.0.0.1 &)
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8099/member-shell/index.html > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8099/member-shell/index.html > /dev/null
+          export NODE_PATH="$GITHUB_WORKSPACE/web/pilot-ui/node_modules"
+          mkdir -p member-shell-a11y-out
+          node web/member-shell/pending-publish.test.cjs    http://127.0.0.1:8099
+          node web/member-shell/a11y-walkthrough.cjs        http://127.0.0.1:8099 ./member-shell-a11y-out
+          node web/member-shell/organizer-workflow.test.cjs http://127.0.0.1:8099
+          node web/member-shell/organizer-a11y.cjs          http://127.0.0.1:8099 ./member-shell-a11y-out
+
+      - name: Upload member-shell a11y reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: member-shell-a11y-report
+          path: member-shell-a11y-out/
+          if-no-files-found: ignore
+
   pilot-provenance:
     name: Pilot Provenance Invariant
     if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
