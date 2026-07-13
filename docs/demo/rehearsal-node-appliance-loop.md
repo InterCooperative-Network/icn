@@ -90,14 +90,16 @@ validate with **no DID and no credential**.
   honestly NOT performed in the authoring session; the gap closed the day
   after merge). A demo-profile `qcow2` built from clean, unedited main
   `8c0fe926` (image sha256 `f2aa7d24d062…`, fail-closed manifest verified)
-  completed `smoke-local.sh --real --demo` from a clean restrict=on boot —
-  including the full organizer→member loop on the image (role sessions,
+  completed the #2409 `smoke-local.sh --real --demo` driver from a clean
+  restrict=on boot — including the full organizer→member loop on the image
+  (role sessions,
   member/organizer capability 403s, wrong-digest 409, digest-bound confirm
   201, member completion receipt binding, in-VM `icn-demo-verify --rehearsal`)
   and the no-outbound canary. A browser-observed pass additionally drove the
-  real `?surface=organizer` launcher path and a restart-durability check
-  (completion receipt survives reboot; re-seed restores the workspace).
-  Walkthrough driver: PR #2409; evidence summary posted on #2386/#1746/#2398.
+  real `?mode=live&surface=organizer&demo=launcher` path and a
+  restart-durability check (completion receipt survives reboot; re-seed
+  restores the workspace). Walkthrough driver: PR #2409, merged as
+  `7437e412`; evidence summary posted on #2386/#1746/#2398.
   The witness binds to `8c0fe926` — re-run `icn-rehearsal-node.sh smoke-image`
   for claims about any later commit (recurring automation is tracked in
   #2398).
