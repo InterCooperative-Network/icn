@@ -270,7 +270,7 @@ total_subsystems = 10
 # is stale (workspace grew; icn-governance alone now greps to 600+ test attrs). Run `cargo test`
 # for an authoritative total before re-asserting a precise number.
 total_tests_note = "stale (2287, 2026-03-17) — needs cargo-test re-derivation"
-total_crates = "37 crates + 4 apps + 3 binaries = 44 workspace members"   # verified 2026-06-14 vs icn/Cargo.toml [workspace].members
+total_crates = "38 crates + 7 apps + 3 binaries = 48 workspace members"   # verified 2026-07-13 vs icn/Cargo.toml [workspace].members
 loc_approx = "414K"   # not re-measured this pass
 deployment = "3-node K3s cluster, running since Dec 2025 — NEEDS OPS RE-CONFIRMATION (runtime claim; node addresses documented in deployment guides/runbooks)"
 # last_full_verification deliberately NOT bumped to today: this #2047 pass re-verified the

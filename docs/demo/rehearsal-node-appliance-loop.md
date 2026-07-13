@@ -86,13 +86,23 @@ validate with **no DID and no credential**.
   process receipts + value-withheld evidence). This validates the build-mode
   flip, the seed setup, the role scopes, and the verifier matrix against the
   actual runtime.
-- **Full assembled-image (KVM) witness — NOT performed in the authoring session.**
-  It requires building a demo-profile `qcow2` from a base image
-  (`build-image.sh --real`) and then `smoke-local.sh --real --demo`; the base
-  image build is a heavy separate step. Per the honesty rule, the appliance
-  tranche is **not** claimed "assembled-image witnessed" until that runs. The KVM
-  smoke path is otherwise ready (qemu + `/dev/kvm` available; the `--demo` flow
-  drives a real browser request path and a no-outbound canary).
+- **Full assembled-image (KVM) witness — PERFORMED 2026-07-13** (it was
+  honestly NOT performed in the authoring session; the gap closed the day
+  after merge). A demo-profile `qcow2` built from clean, unedited main
+  `8c0fe926` (image sha256 `f2aa7d24d062…`, fail-closed manifest verified)
+  completed the #2409 `smoke-local.sh --real --demo` driver from a clean
+  restrict=on boot — including the full organizer→member loop on the image
+  (role sessions,
+  member/organizer capability 403s, wrong-digest 409, digest-bound confirm
+  201, member completion receipt binding, in-VM `icn-demo-verify --rehearsal`)
+  and the no-outbound canary. A browser-observed pass additionally drove the
+  real `?mode=live&surface=organizer&demo=launcher` path and a
+  restart-durability check (completion receipt survives reboot; re-seed
+  restores the workspace). Walkthrough driver: PR #2409, merged as
+  `7437e412`; evidence summary posted on #2386/#1746/#2398.
+  The witness binds to `8c0fe926` — re-run `icn-rehearsal-node.sh smoke-image`
+  for claims about any later commit (recurring automation is tracked in
+  #2398).
 
 ## Non-claims
 

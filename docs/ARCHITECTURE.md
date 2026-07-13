@@ -738,7 +738,7 @@ Configurable per cooperative. Trust graph change invalidates rate limit cache (r
 
 ## 17. Crate Map
 
-**Workspace: 44 packages** — 37 crates in `icn/crates/`, 4 apps in `icn/apps/`, 3 binaries in `icn/bins/` (icnd, icnctl, icn-console). *(Verified 2026-06-14 against `[workspace].members` in icn/Cargo.toml: 37 `crates/*` + 4 `apps/*` + 3 `bins/*` = 44. There are 38 crate directories on disk; `icn-baseline-lock-guest` is present but excluded from the workspace. The previous "39 packages / 32 crates" figure was stale.)*
+**Workspace: 48 packages** — 38 crates in `icn/crates/`, 7 apps in `icn/apps/` (charter, governance, membership, ledger, ledger-app, governance-app, trust-app), 3 binaries in `icn/bins/` (icnd, icnctl, icn-console). *(Verified 2026-07-13 against `[workspace].members` in icn/Cargo.toml: 38 `crates/*` + 7 `apps/*` + 3 `bins/*` = 48. There are 39 crate directories on disk; `icn-baseline-lock-guest` is present but excluded from the workspace. The previous "44 packages / 37 crates + 4 apps" figure, verified 2026-06-14, was stale.)*
 
 **Kernel crates** (domain-agnostic, enforce constraints):
 
@@ -884,7 +884,7 @@ This is the honest scorecard of what's complete, what's working, and what's know
 
 **Infection status (recomputed 2026-06-14 from kernel_surface.toml per-crate entries — see §17):** of 28 inventoried crates, **13 clean / 14 infected / 1 needs-review**, plus 1 extracted app. Highest priority: icn-trust and icn-ledger (cascade infections). GovernanceActor extraction to apps/ complete (Feb 2026); icn-core governance refs now 0; trust and ledger extractions next. The earlier `9/11/9` figure here came from the then-out-of-date kernel_surface.toml `[metadata]` summary; that summary was regenerated to match its per-crate entries in PR #2110 (2026-06-20).
 
-**Test coverage:** NEEDS RE-DERIVATION. The previously asserted "2,287 tests across 32 crates" is stale: the workspace now has 37 crates + 4 apps + 3 binaries = 44 members (verified against icn/Cargo.toml), and a per-crate `#[test]`/`#[tokio::test]` grep of icn-governance alone exceeds 600. An exact, tool-derived total (`cargo test` summary) is owed before a precise number is re-asserted; the count was intentionally not date-stamped as verified here. CI runs on every commit.
+**Test coverage:** NEEDS RE-DERIVATION. The previously asserted "2,287 tests across 32 crates" is stale: the workspace now has 38 crates + 7 apps + 3 binaries = 48 members (verified 2026-07-13 against icn/Cargo.toml), and a per-crate `#[test]`/`#[tokio::test]` grep of icn-governance alone exceeds 600. An exact, tool-derived total (`cargo test` summary) is owed before a precise number is re-asserted; the count was intentionally not date-stamped as verified here. CI runs on every commit.
 
 **Operational deployment (NEEDS OPS RE-CONFIRMATION):** runtime liveness/uptime/no-data-loss are operational claims not verifiable from source in this docs pass; see the ops-owned network/deployment rows in `docs/status.toml`. Cluster and ports unchanged from the prior revision.
 
