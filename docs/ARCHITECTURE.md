@@ -853,7 +853,7 @@ Cooperatives need to interoperate without surrendering autonomy. ICN provides:
 - Authorization: Trust attestations (federation vouches for other coop)
 - Coordination: Settle credits between ledgers
 
-**Cooperative starter bundle** *(historical working name: "Institution-in-a-Box" — retired as product framing; see [docs/archive/2026/VISION-institution-in-a-box.md](archive/2026/VISION-institution-in-a-box.md))*:
+**Cooperative starter bundle** *(historical working name: "Institution-in-a-Box" — retired as product framing; see [the archived vision](archive/2026/VISION-institution-in-a-box.md))*:
 
 A new cooperative needs:
 1. A charter (governance rules) — written in YAML (CCL schema; parsed by `CclDocument::from_yaml`, templates at `contracts/templates/*.yaml`)
