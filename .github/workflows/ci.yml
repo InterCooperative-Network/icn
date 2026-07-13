@@ -41,6 +41,7 @@ jobs:
     outputs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
       has_rust: ${{ steps.filter.outputs.has_rust }}
+      member_shell_relevant: ${{ steps.filter.outputs.member_shell_relevant }}
     steps:
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v4
@@ -58,6 +59,22 @@ jobs:
               - 'icn/**/*.rs'
               - 'icn/**/Cargo.toml'
               - 'icn/Cargo.lock'
+            # Member Shell relevance is a POSITIVE filter, deliberately not derived
+            # from docs_only: with paths-filter's default some-quantifier, docs_only
+            # is true whenever ANY changed file matches a docs pattern, so a mixed
+            # docs+frontend PR would read as "docs only" and skip the shell gate
+            # (this very workflow's own first PR skipped itself that way). Covers
+            # the surface, its drivers/fixtures, the borrowed pilot-ui organizer
+            # pack + the dependency tree the drivers borrow, both validators, and
+            # this workflow file.
+            member_shell_relevant:
+              - 'web/member-shell/**'
+              - 'web/pilot-ui/fixtures/icn-organizer-demo/**'
+              - 'web/pilot-ui/package.json'
+              - 'web/pilot-ui/package-lock.json'
+              - 'docs/scripts/validate-rehearsal-shell-fixtures.py'
+              - 'docs/scripts/check-member-shell-fixture-binding.py'
+              - '.github/workflows/ci.yml'
 
   secrets-check:
     name: Secrets Placeholder Check
@@ -733,14 +750,18 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      # Docs-only fast path — job always runs so it can satisfy branch
-      # protection if/when it is added to the required set.
-      - name: Docs-only fast path
-        if: needs.changes.outputs.docs_only == 'true' && needs.changes.outputs.has_rust != 'true'
-        run: echo "Confirmed docs-only (no frontend files); skipping member-shell tests."
+      # No-op fast path — the job itself always runs (so it can satisfy branch
+      # protection if/when it joins the required set) but only skips substance
+      # when NO member-shell-relevant path changed. Deliberately NOT keyed on
+      # docs_only: that filter is some-quantified and misreads mixed
+      # docs+frontend PRs as docs-only (this job's own first PR skipped itself
+      # that way — run 29291254970).
+      - name: No-op fast path (no member-shell-relevant changes)
+        if: needs.changes.outputs.member_shell_relevant != 'true'
+        run: echo "No member-shell-relevant paths changed; passing as a no-op."
 
       - uses: actions/setup-node@v6
-        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
+        if: needs.changes.outputs.member_shell_relevant == 'true'
         with:
           node-version: '20'
           cache: 'npm'
@@ -749,23 +770,23 @@ jobs:
       # The member-shell drivers deliberately borrow Playwright + axe from
       # web/pilot-ui's devDependencies (#1735) — no second dependency tree.
       - name: Install dependencies (borrowed from web/pilot-ui)
-        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
+        if: needs.changes.outputs.member_shell_relevant == 'true'
         working-directory: ./web/pilot-ui
         run: npm ci
 
       - name: Install Playwright browsers
-        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
+        if: needs.changes.outputs.member_shell_relevant == 'true'
         working-directory: ./web/pilot-ui
         run: npx playwright install --with-deps chromium
 
       - name: Fixture validation (content + consumer binding)
-        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
+        if: needs.changes.outputs.member_shell_relevant == 'true'
         run: |
           python3 docs/scripts/validate-rehearsal-shell-fixtures.py
           python3 docs/scripts/check-member-shell-fixture-binding.py
 
       - name: Run member-shell browser tests
-        if: needs.changes.outputs.docs_only != 'true' || needs.changes.outputs.has_rust == 'true'
+        if: needs.changes.outputs.member_shell_relevant == 'true'
         run: |
           # Serve the web/ root (the shell's relative fixture fetches require it).
           (cd web && python3 -m http.server 8099 --bind 127.0.0.1 &)

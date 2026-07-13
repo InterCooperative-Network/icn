@@ -10,11 +10,13 @@ stages `web/member-shell` + `web/pilot-ui/fixtures` side by side precisely so
 the shell's `../pilot-ui/fixtures/...` fetches keep working.
 
 This check makes that contract mechanical: it extracts every fixture path
-literal from shell.js, resolves each against the served layout (page base =
-`web/member-shell/`, serve root = `web/`), and fails when any referenced file
-is missing, escapes the serve root, or is not valid JSON. If the fixture pack
-is ever moved (e.g. when pilot-ui is demoted) without updating shell.js — or
-vice versa — this exits non-zero.
+literal from shell.js, requires the extracted set to EQUAL the contractual
+EXPECTED_BINDINGS set (a removed binding, an unreviewed new binding, and a
+stale extraction pattern all fail), then resolves each path against the served
+layout (page base = `web/member-shell/`, serve root = `web/`) and fails when
+any referenced file is missing, escapes the serve root, or is not valid JSON.
+If the fixture pack is ever moved (e.g. when pilot-ui is demoted) without
+updating shell.js — or vice versa — this exits non-zero.
 
 Offline, deterministic, <1s. Complements (does not replace)
 `validate-rehearsal-shell-fixtures.py`, which validates the pack's CONTENT;
@@ -43,11 +45,28 @@ FIXTURE_LITERAL = re.compile(
     r"""["']((?:\.\./pilot-ui/)?fixtures/[A-Za-z0-9._/-]+\.json)["']"""
 )
 
-# Fail-closed floor: shell.js currently binds 9 distinct fixture files (demo
-# pack standing/cards, local receipt + pending-publish, community set of 3,
-# process-evidence set). If a refactor drops the count below this floor the
-# regex (or the surface) changed shape and a human must re-verify the binding.
-MIN_DISTINCT_PATHS = 6
+# The CONTRACTUAL binding set. These nine paths are the shell's committed
+# fixture surface (demo pack standing/cards borrowed from pilot-ui, local
+# receipt + pending-publish, the community set of three, and the
+# process-evidence pair). An explicit set — rather than a count floor — is
+# deliberate: it fails when an expected binding disappears, when a NEW binding
+# is added without review, and when the extraction pattern silently stops
+# matching the surface (any of those makes the extracted set differ). The
+# tradeoff: intentional fixture changes must update this set in the same PR,
+# which is exactly the review moment the check exists to force.
+EXPECTED_BINDINGS = frozenset(
+    {
+        "../pilot-ui/fixtures/icn-organizer-demo/standing.json",
+        "../pilot-ui/fixtures/icn-organizer-demo/action-cards.json",
+        "fixtures/demo-completion-receipt.json",
+        "fixtures/pending-publish-summary.json",
+        "fixtures/community-standing.json",
+        "fixtures/community-action-cards.json",
+        "fixtures/community-completion-receipt.json",
+        "fixtures/process-evidence-receipts.json",
+        "fixtures/process-evidence-export.json",
+    }
+)
 
 
 def main() -> int:
@@ -61,16 +80,23 @@ def main() -> int:
         print(f"FAIL: {SHELL_JS} not found under {repo}", file=sys.stderr)
         return 1
 
-    literals = sorted(set(FIXTURE_LITERAL.findall(shell.read_text(encoding="utf-8"))))
-    if len(literals) < MIN_DISTINCT_PATHS:
+    extracted = set(FIXTURE_LITERAL.findall(shell.read_text(encoding="utf-8")))
+    missing = sorted(EXPECTED_BINDINGS - extracted)
+    unexpected = sorted(extracted - EXPECTED_BINDINGS)
+    if missing or unexpected:
         print(
-            f"FAIL: only {len(literals)} fixture path literal(s) extracted from "
-            f"{SHELL_JS} (floor: {MIN_DISTINCT_PATHS}). Either the surface's "
-            "fixture wiring changed shape or this check's pattern is stale — "
-            "re-verify the binding and update this script deliberately.",
+            f"FAIL: {SHELL_JS} fixture bindings diverge from the contractual set "
+            f"({len(EXPECTED_BINDINGS)} expected). If this change is intentional, "
+            "update EXPECTED_BINDINGS in this script in the same PR.",
             file=sys.stderr,
         )
+        for m in missing:
+            print(f"  - expected binding no longer referenced: {m}", file=sys.stderr)
+        for u in unexpected:
+            print(f"  - unreviewed new binding: {u}", file=sys.stderr)
         return 1
+
+    literals = sorted(extracted)
 
     serve_root = (repo / SERVE_ROOT).resolve()
     failures: list[str] = []
