@@ -99,16 +99,27 @@ fail-closed. `institution bootstrap apply --local-mint` uses the same path. The
 secret never leaves the VM and is never baked into the image; a JWT minted with
 one VM's secret does not verify on any other node.
 
-The seed mints two least-privilege credentials: an internal **setup** token that
-provisions the demo (never printed), and the **browser** token it hands to the
-member shell — scoped to `governance:read` plus `governance:action-item:complete`,
-the completion-only capability (#2400). That capability authorizes only the
-`completed` transition of an action item the caller is assigned, so the browser
-token cannot create action items or meetings, drive other status transitions,
-administer a cooperative, read entities, touch treasury, or reach the broad /
-other governance write classes. The internal setup token retains
-`governance:meeting:write` because it creates the fixture action item; it is
-never emitted.
+Legacy seed mode mints two least-privilege credentials: an internal **setup**
+token that provisions the demo and creates the legacy fixture action item (never
+printed; scoped to `governance:meeting:write`), and the **member browser** token
+it hands to the member shell — scoped to `governance:read` plus
+`governance:action-item:complete`, the completion-only capability (#2400). That
+capability authorizes only the `completed` transition of an action item the
+caller is assigned, so the browser token cannot create action items or meetings,
+drive other status transitions, administer a cooperative, read entities, touch
+treasury, or reach the broad / other governance write classes.
+
+The rehearsal `--session organizer|member` path adds a separate internal
+**rehearsal setup** token (never printed; scoped to `governance:read` plus
+`governance:rehearsal:setup`) that idempotently initializes the rehearsal
+workspace and binds fictional labels. It then mints exactly one role browser
+token: **organizer** sessions carry `governance:read` plus
+`governance:pending-publish:review` and `governance:pending-publish:confirm`;
+**member** sessions carry the same completion-only member scope as the legacy
+browser token. The organizer token cannot bind, initialize, complete, or
+broad-write; the member token cannot review, confirm, bind, or initialize. The
+session path pre-seeds no action item — the organizer's digest-bound confirm
+creates it.
 
 ## Fast path A — smoke an already-built demo image
 
