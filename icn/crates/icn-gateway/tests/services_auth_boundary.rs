@@ -33,6 +33,11 @@
 //!
 //! The scope wiring below mirrors `server.rs` (`configure` + trust rate-limit
 //! wrap + bearer wrap) so the middleware ordering under test matches production.
+//! Known limitation: this is a mirrored miniature app, not the real `server.rs`
+//! assembly — a regression that drops the bearer wrap from the REAL mount would
+//! not fail here (route shadowing at the real registration level is separately
+//! guarded by `route_ordering_regression.rs`). Exercising the real assembly
+//! needs an app-builder seam — tracked in #2421.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 

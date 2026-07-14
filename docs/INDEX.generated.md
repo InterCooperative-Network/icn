@@ -74,9 +74,9 @@ Semantic freeze for the four governance constitutional types. Decision: accepted
 
 ### 📝 **Living** [ADR-0015: Service Discovery Auth Semantics — Auth-gated with Enumeration-Safe 404](/docs/adr/ADR-0015-service-discovery-auth-semantics.md)
 
-Decision: all /v1/services/* require JWT; missing/unauthorized -> 404 (enumeration-safe). Implementation status (2026-04-26): needs verification — route-level auth gating not visible in api/services.rs; follow-up audit issue suggested.
+Decision (amended 2026-07-13): all /v1/services/* require JWT; missing/invalid credentials -> uniform pre-lookup 401 (enumeration-safe by response uniformity); authenticated + missing resource -> 404; operation-specific authority boundaries may 403. Implementation status: implemented — enforcement traced to the server.rs /services scope bearer wrap and pinned by icn-gateway/tests/services_auth_boundary.rs (PR #2417). OpenAPI listing of these routes remains outstanding under the repo-wide API-classification follow-up.
 
-**For:** `architects`, `developers` | **Updated:** 2026-04-26
+**For:** `architects`, `developers` | **Updated:** 2026-07-13
 
 ### 📝 **Living** [ADR-0017: Monorepo Consolidation with Explicit Internal Boundaries](/docs/adr/ADR-0017-monorepo-consolidation-with-explicit-internal-boundaries.md)
 
@@ -1536,6 +1536,12 @@ Companion notes for the substrate-level repo-safe rehearsal evidence export sche
 
 **For:** `contributors`, `organizers` | **Updated:** 2026-05-04
 
+### 📝 **Living** [Rehearsal review workflow — runtime contract (v1)](/docs/contracts/rehearsal-review-workflow.md)
+
+Runtime contract for the Rehearsal-Node-only organizer pending-publish review/confirm surface (#1726/#1728/#2386): mounted exclusively in the rehearsal governance build mode; narrow governance:pending-publish:review / :confirm capabilities; bounded review decisions/edits/label assignment; domain-separated BLAKE3 preview digest binding confirm to the previewed mutation; confirm walks the real ADR-0026 receipt ladder and creates one real action item; rehearsal_runtime summary origin; value-withheld SHA-256-hashed evidence packet (urn:icn:contract:rehearsal-workflow-evidence:v1). Deliberately absent from the public OpenAPI document. Fictional rehearsal surface; grants no authority.
+
+**For:** `contributors`, `architects`, `organizers` | **Updated:** 2026-07-11
+
 ### 📝 **Living** [Schema $id audit](/docs/contracts/schema-id-audit.md)
 
 Audit-only record of every JSON schema $id under docs/contracts/, classified DNS-backed vs non-DNS, with per-schema keep/migrate/investigate recommendations and migration safety rules. Performs no migration. First deliberate application of the architecture due-diligence checklist; deliverable for icn#1737.
@@ -1822,7 +1828,7 @@ Operational claim-boundary manual: disambiguates the architectural Meaning Firew
 
 One-screen routing for what is real now, what is not, what gates remain — pointing at STATE.md and PHASE_PROGRESS.md for the per-PR record.
 
-**For:** `all` | **Updated:** 2026-04-29
+**For:** `all` | **Updated:** 2026-07-13
 
 ### 📝 **Living** [Docs Control Map](/docs/reference/project-index/docs-control-map.md)
 
@@ -1870,7 +1876,7 @@ The icn/ Rust workspace grouped by rough layer (kernel, identity, networking, le
 
 What can be shown now, what should not be shown as finished, suggested first-demo narrative, and red lines for outside-facing material.
 
-**For:** `all`, `team` | **Updated:** 2026-04-29
+**For:** `all`, `team` | **Updated:** 2026-07-13
 
 ### 📝 **Living** [Source Tree Map](/docs/reference/project-index/source-tree-map.md)
 
@@ -1995,6 +2001,12 @@ Comprehensive threat model covering attack vectors, adversary capabilities, and 
 
 **For:** `security`, `architects` | **Updated:** 2026-03-15
 
+### 📋 **Draft** [Local Issuance Audit Record](/docs/spec/local-issuance-audit-record.md)
+
+Design decision for #2399: trusted-local `icnctl --local-mint` issuance at the rehearsal/appliance boundary must write a minimal, secret-free, append-only JSONL operator log labeled `cryptographic_evidence: false`. Explains why daemon-side evidence surfaces cannot be reused at mint time, defines the v0 record shape, fail-closed write semantics, actual command paths (`icnctl auth token`, `icnctl institution bootstrap apply`), and exact BLAKE3 canonicalization for `scope_set_b3` and `issuer_instance`. Explicit non-claims: no JWT or secret material, no bearer credential, no governance approval, no cryptographic evidence, no revocation infrastructure, no network surface, no daemon ingestion, and no #2080 production trusted-issuance implementation.
+
+**For:** `operators`, `developers`, `security-reviewers` | **Updated:** 2026-07-13
+
 
 ## Status
 
@@ -2002,7 +2014,7 @@ Comprehensive threat model covering attack vectors, adversary capabilities, and 
 
 Living snapshot of repo layout, decisions, constraints, and current engineering status
 
-**For:** `developers`, `agents` | **Updated:** 2026-06-26
+**For:** `developers`, `agents` | **Updated:** 2026-07-13
 
 
 ## Strategy
@@ -2162,10 +2174,10 @@ Assessment of pilot readiness and gaps
 
 ## Summary
 
-**Total documents:** 353
+**Total documents:** 355
 
 **By status:**
 - Active: 1
 - Canonical: 40
-- Draft: 99
-- Living: 213
+- Draft: 100
+- Living: 214
