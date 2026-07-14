@@ -853,7 +853,7 @@ Cooperatives need to interoperate without surrendering autonomy. ICN provides:
 - Authorization: Trust attestations (federation vouches for other coop)
 - Coordination: Settle credits between ledgers
 
-**"Institution-in-a-Box" starter kit:**
+**Cooperative starter bundle** *(historical working name: "Institution-in-a-Box" — retired as product framing; see [the archived vision](archive/2026/VISION-institution-in-a-box.md))*:
 
 A new cooperative needs:
 1. A charter (governance rules) — written in YAML (CCL schema; parsed by `CclDocument::from_yaml`, templates at `contracts/templates/*.yaml`)
@@ -871,7 +871,7 @@ This is the honest scorecard of what's complete, what's working, and what's know
 
 | Subsystem | Status | Evidence | Truth Class |
 |---|---|---|---|
-| **Identity** | EXCEEDS SPEC | SDIS + PQ crypto operational; DIDs live in production K3s | operational |
+| **Identity** | EXCEEDS SPEC | SDIS + PQ crypto operational; DID issuance/resolution proven in tests, demos, and the assembled-image witness (K3s deployment liveness: NEEDS OPS RE-CONFIRMATION — see below) | operational |
 | **Governance** | CONFIRMED | 9-state proposal lifecycle proven in demos (test count needs re-derivation — see status.toml note; 547 figure is stale) | operational |
 | **Economics (mutual credit)** | CONFIRMED | Ledger entries gossip, double-entry enforced, multi-unit works | operational |
 | **Federation** | PARTIALLY CONFIRMED | Registry works, bilateral settlement works; async proofs + netting unbuilt | operational |
