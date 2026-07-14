@@ -16,6 +16,10 @@
 > validate. Witnessed on a fresh assembled image at `8c0fe926` (2026-07-13).
 > Start with [rehearsal-node-appliance-loop.md](rehearsal-node-appliance-loop.md)
 > and [ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md](ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md).
+> **Presenting to organizers?** Use [CAPABILITY_HORIZON.md](CAPABILITY_HORIZON.md)
+> — the four-layer narrative (what you're doing → what ICN enforced → what else
+> the same primitives can carry → the long-term horizon), with an honest status
+> label on every forward-looking claim and the organizer questions to ask.
 
 ## July Demo Candidate 0.1 (single-actor proof loop — superseded as headline)
 
