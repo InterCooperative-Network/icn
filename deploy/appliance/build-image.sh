@@ -275,21 +275,34 @@ log "Running virt-customize on $OUT_IMAGE ..."
 VIRT_CUSTOMIZE_ARGS=(
     -a "$OUT_IMAGE"
 )
-# The libguestfs appliance's user-mode network often cannot forward DNS to a
-# host-local stub resolver (systemd-resolved on 127.0.0.53), which silently
-# breaks --update/--install for any package NOT already present in the base
-# ("Temporary failure resolving 'deb.debian.org'"). ICN_APPLIANCE_BUILD_DNS
-# points the guest at a resolver reachable from the host's network for the
-# duration of the customize; the systemd-resolved stub symlink is restored as
-# the last step so the produced image's runtime DNS behavior is unchanged.
+# The libguestfs appliance cannot resolve DNS names when the build host uses a
+# local stub resolver (systemd-resolved on 127.0.0.53): virt-customize installs
+# ITS OWN resolv.conf pointing at the user-net DNS (10.0.2.3) for the duration
+# of each apt operation, and that forwarder dies against the host stub — so
+# --install fails ("Temporary failure resolving 'deb.debian.org'") for any
+# package not already present in the base, and writing the guest's resolv.conf
+# cannot help. TCP through the user-net NAT works fine; only name resolution is
+# broken. ICN_APPLIANCE_BUILD_DNS therefore names a resolver the BUILD HOST
+# queries directly; the resolved mirror addresses are pinned into the guest's
+# /etc/hosts for the build (tagged lines), and the pins are removed as the last
+# customize step so the produced image is unchanged.
 if [ -n "${ICN_APPLIANCE_BUILD_DNS:-}" ]; then
     if ! [[ "$ICN_APPLIANCE_BUILD_DNS" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
         err "ICN_APPLIANCE_BUILD_DNS must be an IPv4 address (got: '$ICN_APPLIANCE_BUILD_DNS')"
         exit 7
     fi
-    VIRT_CUSTOMIZE_ARGS+=(
-        --run-command "rm -f /etc/resolv.conf && printf 'nameserver %s\n' '$ICN_APPLIANCE_BUILD_DNS' > /etc/resolv.conf"
-    )
+    BUILD_PIN_HOSTS="deb.debian.org security.debian.org"
+    for h in $BUILD_PIN_HOSTS; do
+        pin_ip="$(dig +short A "$h" "@$ICN_APPLIANCE_BUILD_DNS" 2>/dev/null | grep -E '^[0-9]{1,3}(\.[0-9]{1,3}){3}$' | head -1)"
+        if [ -z "$pin_ip" ]; then
+            err "ICN_APPLIANCE_BUILD_DNS: could not resolve $h via $ICN_APPLIANCE_BUILD_DNS"
+            exit 7
+        fi
+        log "Build DNS pin: $h -> $pin_ip (guest /etc/hosts, build-time only)"
+        VIRT_CUSTOMIZE_ARGS+=(
+            --run-command "printf '%s %s # icn-build-pin\n' '$pin_ip' '$h' >> /etc/hosts"
+        )
+    done
 fi
 VIRT_CUSTOMIZE_ARGS+=(
     --update
@@ -553,12 +566,11 @@ if [ "$LAN_PROFILE" = "1" ]; then
     fi
 fi
 
-# Restore the genericcloud resolv.conf stub symlink (see ICN_APPLIANCE_BUILD_DNS
-# above) so runtime DNS in the produced image is systemd-resolved's, not the
-# build host's resolver.
+# Remove the build-time mirror pins (see ICN_APPLIANCE_BUILD_DNS above) so the
+# produced image's /etc/hosts is unchanged.
 if [ -n "${ICN_APPLIANCE_BUILD_DNS:-}" ]; then
     VIRT_CUSTOMIZE_ARGS+=(
-        --run-command "ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf"
+        --run-command "sed -i '/# icn-build-pin\$/d' /etc/hosts"
     )
 fi
 
