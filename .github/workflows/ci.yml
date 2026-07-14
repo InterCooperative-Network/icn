@@ -69,6 +69,7 @@ jobs:
             # this workflow file.
             member_shell_relevant:
               - 'web/member-shell/**'
+              - 'web/rehearsal-landing/**'
               - 'web/pilot-ui/fixtures/icn-organizer-demo/**'
               - 'web/pilot-ui/package.json'
               - 'web/pilot-ui/package-lock.json'

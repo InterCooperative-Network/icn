@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ICN Rehearsal Node</title>
+  <link rel="stylesheet" href="landing.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header>
+    <h1>ICN Rehearsal Node</h1>
+    <p class="subtitle">
+      A local, non-production rehearsal of one governed loop: an organizer
+      reviews, edits, assigns, previews, and confirms a piece of proposed work;
+      a member completes it; every step leaves a receipt.
+    </p>
+  </header>
+
+  <div class="banner" role="note">
+    <strong>Non-production rehearsal.</strong> Everything here is fictional and
+    runs on local, operator-controlled infrastructure. This is not a pilot, not
+    a production system, and not a live federation.
+  </div>
+
+  <main id="main">
+    <section aria-labelledby="status-h">
+      <h2 id="status-h">Status</h2>
+      <div id="status-strip" aria-live="polite">
+        <p id="status-line" class="status-line">
+          <span class="chip neutral" id="health-chip">⏳ Checking services…</span>
+        </p>
+        <p id="workspace-line" class="muted"></p>
+        <p id="build-line" class="muted"></p>
+        <p id="status-error" class="error" hidden></p>
+        <button type="button" id="status-retry" hidden>Check again</button>
+      </div>
+    </section>
+
+    <section aria-labelledby="run-h">
+      <h2 id="run-h">Run the rehearsal</h2>
+      <ul class="actions">
+        <li>
+          <a class="action" href="/member-shell/?mode=live&amp;surface=organizer&amp;demo=launcher&amp;fresh=1">
+            <span class="action-title">Start a new rehearsal</span>
+            <span class="action-desc">Retires the previous run&rsquo;s unfinished
+            items and opens a fresh organizer session. Receipts from earlier
+            runs remain — they are permanent process facts.</span>
+          </a>
+        </li>
+        <li>
+          <a class="action" href="/member-shell/?mode=live&amp;surface=organizer&amp;demo=launcher">
+            <span class="action-title">Continue as organizer</span>
+            <span class="action-desc">Review the pending item, edit it, assign
+            it, preview the exact resulting action, and confirm — the
+            confirmation is bound to a digest of exactly what was previewed.</span>
+          </a>
+        </li>
+        <li>
+          <a class="action" href="/member-shell/?mode=live&amp;demo=launcher">
+            <span class="action-title">Continue as member</span>
+            <span class="action-desc">Opens a fresh, least-privilege member
+            session (the organizer session is never reused or upgraded), shows
+            the assigned action, and lets you complete it.</span>
+          </a>
+        </li>
+      </ul>
+      <p class="muted">
+        Sessions start with one click — no account, no credential to paste.
+        Each button asks this appliance for a short-lived, role-scoped session
+        that lives only in the page&rsquo;s memory.
+      </p>
+    </section>
+
+    <section aria-labelledby="evidence-h">
+      <h2 id="evidence-h">Receipts and evidence</h2>
+      <p>
+        Receipts appear inside the surfaces where they are produced: the
+        organizer surface lists the process receipts (plan recorded, action
+        applied) and an evidence summary; the member surface shows the
+        completion receipt after the action is completed.
+      </p>
+      <p>
+        The exportable evidence packet is <strong>value-withheld</strong>: it
+        proves the process happened without carrying identities or credentials.
+        Verifying an export is an operator step — see Diagnostics below.
+      </p>
+    </section>
+
+    <section aria-labelledby="demo-h">
+      <h2 id="demo-h">What this demonstrates</h2>
+      <ul class="fact-list">
+        <li>Role-scoped sessions: the organizer can review and confirm but not
+          complete; the member can complete but not review or confirm. Wrong-role
+          attempts are refused.</li>
+        <li>Digest-bound confirmation: confirming with a stale or wrong preview
+          digest is refused; only the exact previewed plan can be executed.</li>
+        <li>Exactly one real action item is created by a valid confirmation.</li>
+        <li>Durable receipts: completion and process receipts survive service
+          restarts and reboots.</li>
+        <li>Secret-free evidence: the export withholds identities and
+          credentials by construction.</li>
+      </ul>
+      <h3>What it does not demonstrate</h3>
+      <ul class="fact-list">
+        <li>No production readiness, no pilot, and no live federation — this is
+          a single local node with fictional data.</li>
+        <li>No real institution: the example domain and member are fictional.</li>
+        <li>No organizer approval and no completed accessibility certification —
+          those are open human gates, not software claims.</li>
+      </ul>
+    </section>
+
+    <section aria-labelledby="learn-h">
+      <h2 id="learn-h">Guides</h2>
+      <ul class="fact-list">
+        <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/testing/WORKSTATION_BROWSER_TEST_GUIDE.md">Workstation browser test guide</a> — the step-by-step walkthrough this page fronts.</li>
+        <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/demo/CAPABILITY_HORIZON.md">Capability horizon</a> — what is demonstrated today versus specified or on the horizon, with per-claim labels.</li>
+        <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/demo/ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md">Rehearsal Node runbook</a> — how this appliance is built and operated.</li>
+      </ul>
+    </section>
+
+    <details id="diagnostics">
+      <summary>Diagnostics (technical)</summary>
+      <div class="diag-body">
+        <h3>Endpoints on this origin</h3>
+        <ul class="fact-list">
+          <li><code>/member-shell/</code> — the member/organizer surface (static).</li>
+          <li><code>/v1/…</code> — the gateway API (authenticated; uniform 401 without a valid session).</li>
+          <li><code>/v1/dev/demo/session</code> — dev/demo-only session mint (fixed commands, origin-checked, non-production gate).</li>
+          <li><code>/v1/dev/demo/status</code> — read-only sanitized status (counts only).</li>
+        </ul>
+        <h3>Raw status</h3>
+        <pre id="diag-status">not loaded</pre>
+        <h3>Build</h3>
+        <pre id="diag-build">not loaded</pre>
+        <h3>If something fails</h3>
+        <ul class="fact-list">
+          <li><strong>Service unavailable</strong> — the appliance VM may be
+            starting; wait a minute and use &ldquo;Check again&rdquo;. If it
+            persists, the operator can check <code>systemctl status icnd
+            icn-member-shell icn-demo-session nginx</code> on the VM.</li>
+          <li><strong>Session expired / request refused (401)</strong> — return
+            here and start the role again; sessions are short-lived on purpose.</li>
+          <li><strong>Wrong role (403)</strong> — expected: organizer-only and
+            member-only actions refuse the other role. Switch roles from this
+            page.</li>
+          <li><strong>Stale preview (409)</strong> — expected: the item changed
+            after the preview; re-open the preview and confirm the current
+            digest.</li>
+          <li><strong>Already completed</strong> — the assigned action was
+            already completed (completion is idempotent); start a new rehearsal
+            to run the loop again.</li>
+          <li><strong>Full appliance reset</strong> (operator, destructive):
+            <code>sudo icn-demo-reset</code> on the VM wipes local state and
+            regenerates per-instance secrets. The browser
+            &ldquo;Start a new rehearsal&rdquo; action is the normal reset.</li>
+          <li><strong>Verify evidence</strong> (operator): <code>sudo
+            icn-demo-verify --rehearsal</code> on the VM re-checks the receipt
+            ladder and the no-identity/no-credential invariant of the export.</li>
+          <li><a href="/member-shell/?mode=demo">Fixture tour (no services)</a> —
+            a read-only, clearly-labeled fixture walkthrough that needs no
+            gateway; useful to separate UI problems from service problems.</li>
+        </ul>
+      </div>
+    </details>
+  </main>
+
+  <footer>
+    <p class="muted">
+      Served by the ICN Rehearsal Node appliance ·
+      <a href="https://github.com/InterCooperative-Network/icn">InterCooperative-Network/icn</a>
+    </p>
+  </footer>
+
+  <script src="landing.js"></script>
+</body>
+</html>
