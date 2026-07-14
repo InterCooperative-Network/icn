@@ -80,8 +80,8 @@ View source on GitHub →
 <p>Semantic freeze for the four governance constitutional types. Decision: accepted; implementation: partially landed (types + accepted-decision minting seam land at the governance app layer; kernel dispatch is not yet gated by mandates). See ADR-0019 for the minting/persistence seam decision.</p>
 <p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-04-26</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0015-service-discovery-auth-semantics.md">ADR-0015: Service Discovery Auth Semantics — Auth-gated with Enumeration-Safe 404</a></h3>
-<p>Decision: all /v1/services/* require JWT; missing/unauthorized -&gt; 404 (enumeration-safe). Implementation status (2026-04-26): needs verification — route-level auth gating not visible in api/services.rs; follow-up audit issue suggested.</p>
-<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-04-26</p>
+<p>Decision (amended 2026-07-13): all /v1/services/* require JWT; missing/invalid credentials -&gt; uniform pre-lookup 401 (enumeration-safe by response uniformity); authenticated + missing resource -&gt; 404; operation-specific authority boundaries may 403. Implementation status: implemented — enforcement traced to the server.rs /services scope bearer wrap and pinned by icn-gateway/tests/services_auth_boundary.rs (PR #2417). OpenAPI listing of these routes remains outstanding under the repo-wide API-classification follow-up.</p>
+<p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-07-13</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/adr/ADR-0017-monorepo-consolidation-with-explicit-internal-boundaries.md">ADR-0017: Monorepo Consolidation with Explicit Internal Boundaries</a></h3>
 <p>Canonical roots table for the consolidated monorepo: icn/, icn/apps/, apps/, website/, ops/mcp/, ops/state/, docs/, docs/adr/, deploy/, sdk/, web/. Decision supersedes ADR-0001 and ADR-0010; amends ADR-0002.</p>
 <p><strong>For:</strong> <code>architects</code>, <code>developers</code> | <strong>Updated:</strong> 2026-04-26</p>
@@ -809,6 +809,9 @@ View source on GitHub →
 <h3>📝 <strong>Living</strong> <a href="/docs/contracts/rehearsal-evidence-export.md">Rehearsal evidence export — contract notes</a></h3>
 <p>Companion notes for the substrate-level repo-safe rehearsal evidence export schema (urn:icn:contract:rehearsal-evidence-export:v1). Defines field shape, must-not-include list, validation guidance, stability, and the non-DNS contract-identity decision. JSON schema and fictional example live alongside; tiny validator at docs/scripts/validate-rehearsal-evidence.py.</p>
 <p><strong>For:</strong> <code>contributors</code>, <code>organizers</code> | <strong>Updated:</strong> 2026-05-04</p>
+<h3>📝 <strong>Living</strong> <a href="/docs/contracts/rehearsal-review-workflow.md">Rehearsal review workflow — runtime contract (v1)</a></h3>
+<p>Runtime contract for the Rehearsal-Node-only organizer pending-publish review/confirm surface (#1726/#1728/#2386): mounted exclusively in the rehearsal governance build mode; narrow governance:pending-publish:review / :confirm capabilities; bounded review decisions/edits/label assignment; domain-separated BLAKE3 preview digest binding confirm to the previewed mutation; confirm walks the real ADR-0026 receipt ladder and creates one real action item; rehearsal_runtime summary origin; value-withheld SHA-256-hashed evidence packet (urn:icn:contract:rehearsal-workflow-evidence:v1). Deliberately absent from the public OpenAPI document. Fictional rehearsal surface; grants no authority.</p>
+<p><strong>For:</strong> <code>contributors</code>, <code>architects</code>, <code>organizers</code> | <strong>Updated:</strong> 2026-07-11</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/contracts/schema-id-audit.md">Schema $id audit</a></h3>
 <p>Audit-only record of every JSON schema $id under docs/contracts/, classified DNS-backed vs non-DNS, with per-schema keep/migrate/investigate recommendations and migration safety rules. Performs no migration. First deliberate application of the architecture due-diligence checklist; deliverable for icn#1737.</p>
 <p><strong>For:</strong> <code>architects</code>, <code>contributors</code> | <strong>Updated:</strong> 2026-05-05</p>
@@ -952,7 +955,7 @@ View source on GitHub →
 <p><strong>For:</strong> <code>all</code>, <code>team</code> | <strong>Updated:</strong> 2026-06-26</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/reference/project-index/current-truth-map.md">Current Truth Map</a></h3>
 <p>One-screen routing for what is real now, what is not, what gates remain — pointing at STATE.md and PHASE_PROGRESS.md for the per-PR record.</p>
-<p><strong>For:</strong> <code>all</code> | <strong>Updated:</strong> 2026-04-29</p>
+<p><strong>For:</strong> <code>all</code> | <strong>Updated:</strong> 2026-07-13</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/reference/project-index/docs-control-map.md">Docs Control Map</a></h3>
 <p>How INDEX.md, registry.toml, DOCUMENT_REGISTRY.md, and doc_control_check.py relate; truth classes; how to add a doc.</p>
 <p><strong>For:</strong> <code>contributors</code>, <code>agents</code> | <strong>Updated:</strong> 2026-04-29</p>
@@ -976,7 +979,7 @@ View source on GitHub →
 <p><strong>For:</strong> <code>developers</code>, <code>contributors</code> | <strong>Updated:</strong> 2026-04-29</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/reference/project-index/show-readiness-map.md">Show-Readiness Map</a></h3>
 <p>What can be shown now, what should not be shown as finished, suggested first-demo narrative, and red lines for outside-facing material.</p>
-<p><strong>For:</strong> <code>all</code>, <code>team</code> | <strong>Updated:</strong> 2026-04-29</p>
+<p><strong>For:</strong> <code>all</code>, <code>team</code> | <strong>Updated:</strong> 2026-07-13</p>
 <h3>📝 <strong>Living</strong> <a href="/docs/reference/project-index/source-tree-map.md">Source Tree Map</a></h3>
 <p>Top-level repo surfaces and what each is for; monorepo root vs Rust workspace at icn/.</p>
 <p><strong>For:</strong> <code>contributors</code>, <code>developers</code> | <strong>Updated:</strong> 2026-04-29</p>
@@ -1038,10 +1041,13 @@ View source on GitHub →
 <h3>📝 <strong>Living</strong> <a href="/docs/security/threat-model.md">ICN Threat Model</a></h3>
 <p>Comprehensive threat model covering attack vectors, adversary capabilities, and mitigations</p>
 <p><strong>For:</strong> <code>security</code>, <code>architects</code> | <strong>Updated:</strong> 2026-03-15</p>
+<h3>📋 <strong>Draft</strong> <a href="/docs/spec/local-issuance-audit-record.md">Local Issuance Audit Record</a></h3>
+<p>Design decision for #2399: trusted-local <code>icnctl --local-mint</code> issuance at the rehearsal/appliance boundary must write a minimal, secret-free, append-only JSONL operator log labeled <code>cryptographic_evidence: false</code>. Explains why daemon-side evidence surfaces cannot be reused at mint time, defines the v0 record shape, fail-closed write semantics, actual command paths (<code>icnctl auth token</code>, <code>icnctl institution bootstrap apply</code>), and exact BLAKE3 canonicalization for <code>scope_set_b3</code> and <code>issuer_instance</code>. Explicit non-claims: no JWT or secret material, no bearer credential, no governance approval, no cryptographic evidence, no revocation infrastructure, no network surface, no daemon ingestion, and no #2080 production trusted-issuance implementation.</p>
+<p><strong>For:</strong> <code>operators</code>, <code>developers</code>, <code>security-reviewers</code> | <strong>Updated:</strong> 2026-07-13</p>
 <h2>Status</h2>
 <h3>📝 <strong>Living</strong> <a href="/docs/STATE.md">ICN State (living doc)</a></h3>
 <p>Living snapshot of repo layout, decisions, constraints, and current engineering status</p>
-<p><strong>For:</strong> <code>developers</code>, <code>agents</code> | <strong>Updated:</strong> 2026-06-26</p>
+<p><strong>For:</strong> <code>developers</code>, <code>agents</code> | <strong>Updated:</strong> 2026-07-13</p>
 <h2>Strategy</h2>
 <h3>📋 <strong>Draft</strong> <a href="/docs/planning/documentation-namespace-resolution.md">Documentation namespace resolution plan</a></h3>
 <p>Plans vs planning, ops vs operations; no moves executed here</p>
@@ -1120,13 +1126,13 @@ View source on GitHub →
 <p><strong>For:</strong> <code>team</code> | <strong>Updated:</strong> 2026-03-10</p>
 <hr>
 <h2>Summary</h2>
-<p><strong>Total documents:</strong> 353</p>
+<p><strong>Total documents:</strong> 355</p>
 <p><strong>By status:</strong></p>
 <ul>
 <li>Active: 1</li>
 <li>Canonical: 40</li>
-<li>Draft: 99</li>
-<li>Living: 213</li>
+<li>Draft: 100</li>
+<li>Living: 214</li>
 </ul>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
     const navToggle = document.getElementById('nav-toggle');

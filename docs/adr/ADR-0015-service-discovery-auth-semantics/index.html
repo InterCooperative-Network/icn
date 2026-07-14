@@ -40,12 +40,40 @@
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ADR-0015: Service Discovery Auth Semantics — Auth-gated with Enumeration-Safe 404</h1>
 <p><strong>Date</strong>: 2026-03-21
-<strong>Status</strong>: accepted
-<strong>Implementation status</strong>: needs verification (see Implementation Status note below — 2026-04-26)
+<strong>Status</strong>: accepted (amended 2026-07-13 — see Amendment section)
+<strong>Implementation status</strong>: implemented (verified 2026-07-13; enforcement <code>icn/crates/icn-gateway/src/server.rs</code> <code>/services</code> scope bearer wrap, behavior pinned by <code>icn/crates/icn-gateway/tests/services_auth_boundary.rs</code>, PR #2417)
 <strong>Tags</strong>: gateway, api, security, service-discovery
 <strong>Supersedes</strong>: N/A
 <strong>Note</strong>: Originally filed as ADR-0009 in <code>ops/state/decisions/</code> (collided with another decision sharing that number). Renumbered to 0015 when ADRs were canonicalized under <code>docs/adr/</code>.</p>
-<h2>Implementation status (2026-04-26)</h2>
+<h2>Implementation status (2026-07-13)</h2>
+<p><strong>Auth enforcement: VERIFIED.</strong> A full mounting-chain trace (issue #1642) proved all five
+<code>/v1/services/*</code> routes are wrapped by <code>HttpAuthentication::bearer(jwt_auth)</code> at the
+<code>web::scope(&quot;/services&quot;)</code> level in <code>server.rs</code>, with auth outermost (it runs before the
+trust rate-limit middleware and before any handler or resource lookup). The wrap is
+unconditional — it holds in default, dev (<code>ICN_DEV_MODE</code>), and loopback-only
+<code>--insecure-gateway-no-jwt</code> configurations (the latter only installs a well-known JWT
+secret; the bearer middleware still runs). The 2026-04-26 concern below is resolved: the
+gating lives in <code>server.rs</code> scope wiring, not in <code>api/services.rs</code>, which is why a
+handler-file read could not see it.</p>
+<p><strong>Anti-oracle property: HOLDS.</strong> Because authentication precedes any lookup, the
+unauthenticated/invalid-token response is uniform (identical for existing and
+nonexistent <code>service_id</code>s) — no enumeration oracle exists.</p>
+<p><strong>Status codes: RESOLVED by the 2026-07-13 amendment (uniform pre-lookup 401 retained).</strong>
+The implemented behavior matches the amended decision exactly and is pinned by
+<code>icn/crates/icn-gateway/tests/services_auth_boundary.rs</code>: no token → 401 on all five
+routes with the same status for existing and nonexistent ids; invalid token → 401,
+likewise uniform; valid token + nonexistent → 404 for <code>GET/DELETE /{id}</code> and for
+<code>/discover</code> with no matches; the list route returns 200 with an empty set (list
+semantics); valid token + existing → 200; withdraw by a non-owning provider → 403.
+(The uniformity assertions compare HTTP status codes — the pre-lookup gate makes
+body-level divergence structurally impossible for credential failures, since no
+resource data is loaded before rejection.) No custom 401→404 mapper exists and none is
+needed; runtime behavior was not changed by the verification or the amendment.</p>
+<p><strong>Note on the 2026-04-26 verification recipe below:</strong> its test recipe was internally
+contradictory (it asked for both &quot;401 without a JWT&quot; and &quot;404, not 401, for a
+nonexistent resource without a JWT&quot; — impossible for the same request). The amendment
+dissolves the contradiction; the landed test pins the amended semantics.</p>
+<h2>Prior implementation-status note (2026-04-26, superseded)</h2>
 <p><strong><code>needs verification</code>.</strong> A code read on 2026-04-26 found:</p>
 <ul>
 <li><code>icn/crates/icn-gateway/src/api/services.rs</code> registers the service-discovery
@@ -104,12 +132,37 @@ deliberate design.</p>
 <ol>
 <li>All <code>/v1/services/*</code> endpoints require a valid JWT (<code>Authorization: Bearer &lt;token&gt;</code>)</li>
 <li>For authorized callers, a missing resource returns <strong>404</strong> (not 401)</li>
-<li>For <strong>unauthorized callers</strong>, a missing OR existing resource returns <strong>404</strong> — not 401</li>
+<li>For <strong>unauthorized callers</strong>, a missing OR existing resource returns <strong>404</strong> — not 401
+<em>(superseded by the 2026-07-13 amendment below: uniform pre-lookup <strong>401</strong> is the
+accepted behavior; the enumeration-prevention goal this point encoded is preserved)</em></li>
 </ol>
-<p>Point 3 is the enumeration-prevention rule: returning 401 for &quot;exists but unauthorized&quot; vs 404
-for &quot;doesn&#39;t exist&quot; would allow unauthenticated callers to learn which service IDs are valid by
-probing the status code. Returning 404 uniformly prevents the endpoint from becoming an oracle.</p>
+<p>Point 3 was the enumeration-prevention rule: a response that differs between &quot;exists but
+unauthorized&quot; and &quot;doesn&#39;t exist&quot; would let unauthenticated callers learn which service IDs are
+valid by probing the status code. The amendment keeps that rule but binds it to response
+<em>uniformity</em> rather than to the literal 404.</p>
 <p>This is consistent with ICN&#39;s adversarial-by-default invariant applied to the HTTP API surface.</p>
+<h2>Amendment (2026-07-13): authentication, authorization, and absence are distinct; uniform pre-lookup 401 is compliant</h2>
+<p>Adopted maintainer decision (issue #1642). The three failure families are distinct outcomes,
+and the enumeration-safety invariant binds the first to <em>uniformity</em>, not to a specific code:</p>
+<ol>
+<li>Every <code>/v1/services/*</code> route requires a valid JWT.</li>
+<li>Missing or invalid credentials return a uniform <strong>401</strong> <em>before</em> any resource lookup.</li>
+<li>An authenticated request for a missing individual resource returns <strong>404</strong>.</li>
+<li>An authenticated request that reaches an operation-specific authority boundary may return
+<strong>403</strong> (e.g. <code>DELETE /{service_id}</code> by a non-owning provider).</li>
+<li><strong>No response to missing or invalid credentials may depend on whether the requested service
+ID exists.</strong> Because authentication precedes lookup, this holds by construction and is pinned
+by tests.</li>
+<li>If service visibility later becomes scoped by member, cooperative, community, or federation
+boundaries, authenticated existence-disclosure behavior must be reviewed again — a valid JWT
+must not become a license to enumerate services outside the caller&#39;s scope.</li>
+</ol>
+<p>The original point 3 (&quot;unauthorized → 404&quot;) is superseded: its stated goal was enumeration
+prevention, which uniform pre-lookup 401 satisfies with standard HTTP semantics (the
+<code>WWW-Authenticate</code> challenge is preserved and no custom 401→404 mapper is needed). Note on the
+rejected <strong>Option C</strong> below: the variant it rejected is an existence-<em>dependent</em> 401 (auth
+evaluated after lookup); that rejection stands and does not apply to the uniform pre-lookup 401
+this amendment accepts.</p>
 <h2>Consequences</h2>
 <p><strong>Easier</strong>:</p>
 <ul>
@@ -124,12 +177,17 @@ unnecessary)</li>
 some future use cases (public cooperative service catalogs)</li>
 <li>OpenAPI spec must be updated to document required auth on all <code>/v1/services/*</code> endpoints</li>
 </ul>
-<p><strong>Implementation required</strong> (separate PR from this decision):</p>
+<p><strong>Implementation required</strong> (as written 2026-03-21; status as of the 2026-07-13 amendment):</p>
 <ul>
-<li>Add JWT auth middleware to <code>POST /v1/services/announce</code> and <code>DELETE /v1/services/:id</code></li>
-<li>Change 401 → 404 logic for missing-resource paths behind auth</li>
-<li>Change 401 → 404 for unauthenticated requests to prevent enumeration</li>
-<li>Update OpenAPI spec</li>
+<li>Add JWT auth middleware to <code>POST /v1/services/announce</code> and <code>DELETE /v1/services/:id</code>
+— <em>done (the whole <code>/services</code> scope is bearer-wrapped in <code>server.rs</code>; predates this ADR)</em></li>
+<li>Change 401 → 404 logic for missing-resource paths behind auth — <em>already correct
+(authenticated + missing → 404)</em></li>
+<li>Change 401 → 404 for unauthenticated requests to prevent enumeration — <em>superseded by the
+amendment: uniform pre-lookup 401 is the accepted behavior; never implemented, no longer
+required</em></li>
+<li>Update OpenAPI spec — <em>outstanding; tracked by the API-classification follow-up (the
+services routes are among the ~380 routes absent from the generated spec)</em></li>
 </ul>
 <h2>Alternatives Considered</h2>
 <table>
