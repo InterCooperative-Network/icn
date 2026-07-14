@@ -274,6 +274,24 @@ done
 log "Running virt-customize on $OUT_IMAGE ..."
 VIRT_CUSTOMIZE_ARGS=(
     -a "$OUT_IMAGE"
+)
+# The libguestfs appliance's user-mode network often cannot forward DNS to a
+# host-local stub resolver (systemd-resolved on 127.0.0.53), which silently
+# breaks --update/--install for any package NOT already present in the base
+# ("Temporary failure resolving 'deb.debian.org'"). ICN_APPLIANCE_BUILD_DNS
+# points the guest at a resolver reachable from the host's network for the
+# duration of the customize; the systemd-resolved stub symlink is restored as
+# the last step so the produced image's runtime DNS behavior is unchanged.
+if [ -n "${ICN_APPLIANCE_BUILD_DNS:-}" ]; then
+    if ! [[ "$ICN_APPLIANCE_BUILD_DNS" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+        err "ICN_APPLIANCE_BUILD_DNS must be an IPv4 address (got: '$ICN_APPLIANCE_BUILD_DNS')"
+        exit 7
+    fi
+    VIRT_CUSTOMIZE_ARGS+=(
+        --run-command "rm -f /etc/resolv.conf && printf 'nameserver %s\n' '$ICN_APPLIANCE_BUILD_DNS' > /etc/resolv.conf"
+    )
+fi
+VIRT_CUSTOMIZE_ARGS+=(
     --update
     --install "ca-certificates,curl,openssl,python3,systemd,sudo"
 
@@ -533,6 +551,15 @@ if [ "$LAN_PROFILE" = "1" ]; then
             --run-command "chown root:root /etc/icn/tls/rehearsal.key && chmod 600 /etc/icn/tls/rehearsal.key"
         )
     fi
+fi
+
+# Restore the genericcloud resolv.conf stub symlink (see ICN_APPLIANCE_BUILD_DNS
+# above) so runtime DNS in the produced image is systemd-resolved's, not the
+# build host's resolver.
+if [ -n "${ICN_APPLIANCE_BUILD_DNS:-}" ]; then
+    VIRT_CUSTOMIZE_ARGS+=(
+        --run-command "ln -sf ../run/systemd/resolve/stub-resolv.conf /etc/resolv.conf"
+    )
 fi
 
 virt-customize "${VIRT_CUSTOMIZE_ARGS[@]}"
