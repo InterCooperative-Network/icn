@@ -39,8 +39,10 @@ In plain terms, you will:
    you, the confirmation fails and tells you so.
 5. **Complete the work** as the member it was assigned to.
 6. **Keep the receipts.** Every important step left a record. You can export the
-   evidence, hand it to someone else, and they can verify it without trusting you —
-   and without it containing anyone's identity or credentials.
+   evidence and hand it to someone else, who can run an independent check on it —
+   and it carries no sign-in secrets and no private personal details (technical
+   proof pointers like hashes may appear; the rehearsal export withholds
+   identities entirely).
 
 Everything runs on one small local machine. No cloud account, no vendor, no outside
 network connection. The fictional institution in the demo owns its process and its
@@ -58,11 +60,11 @@ general-purpose — the action-item workflow is just the first process wired to 
 
 | What happened | What ICN actually did |
 |---|---|
-| You signed in without typing a password into the page | Issued you a short-lived session credential scoped to your role — the browser never held broader authority than your seat required |
+| You opened your seat without creating an account or pasting a credential | Issued you a short-lived session credential scoped to your role — the browser never held broader authority than your seat required |
 | The member couldn't approve; the organizer couldn't complete | Enforced role capabilities on every request, on the server, not in the page — the buttons weren't just hidden, the authority genuinely doesn't exist in the session |
 | The preview you confirmed was the version that took effect | Bound your confirmation to a digest (a fingerprint) of the exact previewed content; a stale or tampered version fails closed |
 | Steps produced receipts | Recorded each authorized transition — who was authorized, what changed, in what order — as durable receipts that survive restart |
-| The evidence exported cleanly | Produced a portable evidence packet with identities and credentials withheld by construction; an independent verifier accepts it and rejects a tampered copy |
+| The evidence exported cleanly | Produced a portable evidence packet with credentials and private personal details withheld by construction (the rehearsal export withholds identities too); a steward-side check validates the packet independently — today that check confirms structure and leak-absence for the rehearsal packet, and for the pending-publish packet type it additionally rejects tampered copies |
 | It all worked offline | The institution's process ran entirely on infrastructure it controls — there is no platform landlord in the loop |
 
 This is why ICN is not a task-management app with extra steps: the *app* is
@@ -93,8 +95,10 @@ labeled honestly:
 | Creating a formal agreement between institutions (a federation treaty) | **[Specified]** — treaty and agreement structures are part of the contract-language design |
 
 The honest pattern to notice: **the mechanisms generalize; the interfaces do not exist
-yet.** Building each row above is interface-and-validation work on top of mechanisms
-that mostly already run — not a rewrite of the foundation.
+yet.** For the **[Primitive exists]** rows, building the workflow is
+interface-and-validation work on mechanisms that already run. The **[Specified]** rows
+are further out: their mechanisms still need to be implemented and validated before any
+interface question arises.
 
 ---
 
