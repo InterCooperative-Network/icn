@@ -1,0 +1,65 @@
+{
+  "sprint": 26,
+  "theme": "TBD",
+  "governing_rule": "A task is only done when repo state, board state, and narrative state agree.",
+  "start_date": "2026-03-23",
+  "status": "closed",
+  "spine": [
+    "#1406"
+  ],
+  "shipped": [
+    "#1406 — refactor(compute): extract reservation helpers + idempotence tests (PR #1406)"
+  ],
+  "notes": "Closed retroactively 2026-07-13 by the ecosystem truth audit: the sprint cadence lapsed after 2026-03; work from 2026-04 onward is lane-based and recorded in docs/STATE.md + docs/PHASE_PROGRESS.md. Task statuses frozen as last recorded in March 2026 (several were later resolved outside the sprint plane). Original March notes: Centralized release_commons_reservation / consume_commons_reservation into free async helpers (9 sites → 2 fns). Added cancel-path and double-cancel idempotence tests (17/17 pass). Renamed trigger_timeout_sweep → trigger_timeout_sweep_for_test per _for_test convention. Adversarial review confirmed semantic equivalence at all 11 call sites; None-branch in check_timeouts documented as theoretically unreachable under lock semantics. WasmRef no-registry failure-path test added (Issue #1407 closed); reservation-lifecycle proof surface now complete across all 6 termination paths (success, failure, timeout, cancel, double-cancel, WasmRef). 18/18 commons_integration tests pass. CI starvation root cause identified and fixed (benchmark.yml was missing concurrency group; required checks run on ubuntu-latest, not ci-runner); ADR-0010 corrected. Issue #1408 closed.",
+  "tasks": [
+    {
+      "id": "s26-t1",
+      "title": "Migrate CI coverage to llvm-cov on Zentith self-hosted runner",
+      "status": "in-progress",
+      "pr": null,
+      "assignee": "matt",
+      "epic": "devops"
+    },
+    {
+      "id": "s26-t2",
+      "title": "Review dependabot PR #1422: bump dtolnay/rust-toolchain from 1.88.0 to 1.100.0",
+      "status": "blocked",
+      "pr": 1422,
+      "assignee": null,
+      "epic": "deps"
+    },
+    {
+      "id": "s26-t3",
+      "title": "Resolve fix/demo-path-bugs branch: 7 dirty files from route rename (/payment+currency -> /settle+unit)",
+      "status": "done",
+      "pr": 1433,
+      "assignee": "matt",
+      "epic": "demo"
+    },
+    {
+      "id": "s26-t4",
+      "title": "Complete Claude agent definition rewrite (.claude/agents/icn-architect.md)",
+      "status": "in-progress",
+      "pr": null,
+      "assignee": "matt",
+      "epic": "workflow"
+    },
+    {
+      "id": "s26-t5",
+      "title": "Unblock CI: main branch CI run stuck in queued state",
+      "status": "done",
+      "pr": null,
+      "assignee": null,
+      "epic": "devops"
+    },
+    {
+      "id": "s26-t6",
+      "title": "Governance→economics provenance hardening (INV-2/5/6): chain endpoint, allocation receipts, /health/full, 4 regression tests",
+      "status": "in-review",
+      "pr": 1434,
+      "assignee": "matt",
+      "epic": "arch-invariants"
+    }
+  ],
+  "closed_date": "2026-07-13"
+}

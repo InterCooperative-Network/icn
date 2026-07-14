@@ -1,32 +1,11 @@
-# ICN TODO (ordered)
+# ICN TODO
 
-Last reviewed: 2026-04-10
+Last reviewed: 2026-07-13
 
-1) Main CI — stable as of 2026-04-10
-   - Security Audit gate (RUSTSEC-2026-0095, wasmtime 24.0.6) resolved via PR #1522
-   - Test gate (`test_treasury_nonce_survives_reopen` sled lock) resolved via PR #1522
-   - PR #1520 (website cleanup) merged 2026-04-10
-   - PR #1521 closed as superseded by #1522
+This file is deliberately thin: ordered work lists rot here. The durable sources are:
 
-2) Sprint: Pilot Vertical Slice Hardening (complete — all issues closed)
-   - #1214 ✅ closed
-   - #1221 ✅ closed
-   - #1220 ✅ closed
-   - #1222 ✅ closed
+- **Current state + phase gates**: [docs/PHASE_PROGRESS.md](PHASE_PROGRESS.md) and [docs/STATE.md](STATE.md) (canonical)
+- **Open actionable work**: the [GitHub issue tracker](https://github.com/InterCooperative-Network/icn/issues) (taxonomy in `.github/ISSUE_POLICY.md`)
+- **The present human gates** (not software): #2041 (member-shell human assistive-technology pass); #1703 / #1746 (organizer presentation → pilot formalization → first operator rehearsal; partner-side gates nycn #41/#52)
 
-3) Docs reality-sync (active, non-archive/session scope)
-   - Fix broken links and stale absolute paths under `docs/`
-   - Normalize present-tense status claims to dated snapshot language where not re-verified
-   - Keep canonical current pointers in `docs/INDEX.md`, `docs/README.md`, `docs/STATE.md`
-   Acceptance: `.codex/skills/icn-docs-reality-sync/scripts/doc_reality_scan.sh` reports no broken links in scanned docs.
-
-4) Verification routing discipline
-   - Rust changes: run `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, and targeted `cargo test` scopes
-   - Gateway API changes: run `cargo test -p icn-gateway --features sled-storage`
-   - If API schema changes: regenerate OpenAPI + TypeScript generated types
-   Acceptance: verification output recorded in PR and matches touched subsystems.
-
-5) Track remaining pilot-completion backlog separately
-   - Milestone `Pilot Completion` retains open items (for example #1099 epic and child issues)
-   - Keep this backlog distinct from active hardening sprint to avoid scope mixing
-   Acceptance: sprint PRs link explicitly to milestone scope.
+Do not maintain an ordered backlog in this file. Historical snapshots (e.g. the 2026-04-10 ordered list this file previously carried) live in git history; nothing here outranks the tracker.
