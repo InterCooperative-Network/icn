@@ -48,7 +48,7 @@ icn/
 │   │   ├── icn-ledger/    # Mutual credit accounting
 │   │   ├── icn-ccl/       # Contract language interpreter
 │   │   ├── icn-store/     # Persistent storage (Sled)
-│   │   ├── icn-rpc/       # gRPC API server
+│   │   ├── icn-rpc/       # JSON-RPC API server
 │   │   ├── icn-gateway/   # REST + WebSocket API
 │   │   ├── icn-governance/# Governance primitives
 │   │   ├── icn-compute/   # Distributed compute layer
@@ -81,7 +81,7 @@ icn/
 ## Current Working Context
 
 - See docs/STATE.md and docs/TODO.md for current status, known issues, and priorities.
-- Rust toolchain note: wasmtime/cranelift currently require rustc 1.89.0; upgrade toolchain or pin compatible versions before running cargo.
+- Rust toolchain note: the toolchain is pinned in `icn/rust-toolchain.toml` — do NOT upgrade it. If a dependency demands a newer rustc, pin a compatible dependency version instead (see CLAUDE.md non-negotiables).
 
 ## Development Workflow
 
@@ -420,9 +420,9 @@ The codebase includes extensive production hardening:
 
 ## Current Status
 
-**Status: PILOT-READY** ✅
+**Status: Phase 2 — Pilot Launch, in progress (partner-bound).** Do NOT describe ICN as pilot-ready, production-ready, or complete. Canonical current state lives in `docs/STATE.md` + `docs/PHASE_PROGRESS.md`; the retired "Phase 1–20" numbering is pre-reset history (`docs/PHASE_HISTORY.md`) and must not be cited as current. Never quote test/crate counts from this file — derive them (`cargo test`, `cargo metadata`) or cite `docs/status.toml`.
 
-All core infrastructure is complete (Phases 1-20, 1134+ tests passing). The system includes:
+The codebase includes substantial infrastructure across the following areas (existence, not completeness or readiness):
 
 **Core Infrastructure:**
 - Complete actor runtime with supervisor
