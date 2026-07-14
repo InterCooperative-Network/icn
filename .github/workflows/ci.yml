@@ -782,6 +782,10 @@ jobs:
       - name: Fixture validation (content + consumer binding)
         if: needs.changes.outputs.member_shell_relevant == 'true'
         run: |
+          # The pack validator imports jsonschema; install explicitly (as the
+          # docs-freshness fixture-bundle job does) rather than relying on the
+          # runner image happening to ship it.
+          python3 -m pip install jsonschema
           python3 docs/scripts/validate-rehearsal-shell-fixtures.py
           python3 docs/scripts/check-member-shell-fixture-binding.py
 
