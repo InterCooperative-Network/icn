@@ -231,13 +231,22 @@ ensure_rehearsal_workspace(){  # $1=SETUP_JWT
     # --fresh on an existing workspace: reset starts a NEW generation. The
     # daemon's reset semantics are retire-not-erase — prior un-completed
     # fictional items are cancelled, recorded receipts remain permanent
-    # process facts (see apps/governance rehearsal_reset).
+    # process facts. RE-resetting an already-designated workspace is an
+    # ORGANIZER act (governance:pending-publish:review) — the setup scope
+    # only authorizes first designation (apps/governance rehearsal.rs). Mint
+    # an INTERNAL organizer-scoped credential just for this call; like the
+    # setup JWT it is never printed.
     log "starting a fresh rehearsal for $DOMAIN (--fresh: new generation, prior items retired) ..."
+    local reset_jwt
+    reset_jwt="$(mint_local_jwt "$ORGANIZER_SCOPES")"
+    [ -n "$reset_jwt" ] || fatal "trusted local reset-JWT mint failed (icnctl --local-mint)."
+    status="$(rehearsal_status POST "/v1/gov/domains/$DOMAIN/rehearsal/reset" "$reset_jwt" '{}')"
+    [ "$status" = "200" ] || fatal "fresh rehearsal reset failed: HTTP $status (re-reset is an organizer act: governance:pending-publish:review)"
   else
     log "initializing the rehearsal workspace for $DOMAIN ..."
+    status="$(rehearsal_status POST "/v1/gov/domains/$DOMAIN/rehearsal/reset" "$setup" '{}')"
+    [ "$status" = "200" ] || fatal "rehearsal workspace init (reset) failed: HTTP $status (setup scope governance:rehearsal:setup)"
   fi
-  status="$(rehearsal_status POST "/v1/gov/domains/$DOMAIN/rehearsal/reset" "$setup" '{}')"
-  [ "$status" = "200" ] || fatal "rehearsal workspace init (reset) failed: HTTP $status (setup scope governance:rehearsal:setup)"
   body="$(python3 -c 'import json,sys; print(json.dumps({"label": sys.argv[1], "did": sys.argv[2]}))' "$REHEARSAL_LABEL" "$DID")"
   status="$(rehearsal_status POST "/v1/gov/domains/$DOMAIN/rehearsal/bindings" "$setup" "$body")"
   [ "$status" = "200" ] || fatal "rehearsal label binding failed: HTTP $status (label '$REHEARSAL_LABEL' -> operator DID; the operator must be a domain member — it is, via the package StaticList)"
