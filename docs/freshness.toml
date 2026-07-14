@@ -137,9 +137,9 @@ notes = "CCL runtime stable but ecosystem immature."
 
 [sections."12-governance"]
 title = "Governance"
-last_updated = "2026-06-14"
-last_verified_by = "freshness-2047"
-review_note = "Verified accurate: 9-state proposal lifecycle (incl. ForceClosed) vs enum ProposalState in icn-governance/src/proposal.rs. '547 tests' figure dropped as stale (icn-governance #[test] grep now 600+); exact count flagged for re-derivation."
+last_updated = "2026-07-14T22:05:00"
+last_verified_by = "lan-rehearsal-deployment"
+review_note = "Re-verified 2026-07-14: the 9-state proposal lifecycle (incl. ForceClosed) is unchanged vs enum ProposalState in icn-governance/src/proposal.rs (variants re-counted). Dependency changes since the 2026-06-14 verification: #2055 rand 0.8->0.9 (mechanical) in icn-governance, and the additive build-mode-gated rehearsal surface (#2406) in apps/governance, which mounts /rehearsal/* only under the exact-match Rehearsal build mode and does not alter the lifecycle this section describes. Exact test count still NEEDS RE-DERIVATION (unchanged from prior note)."
 staleness_threshold_days = 30
 truth_class = "operational"
 depends_on = [
@@ -166,9 +166,9 @@ notes = "Entity model fully implements spec. Stable."
 
 [sections."14-federation"]
 title = "Federation"
-last_updated = "2026-06-14"
-last_verified_by = "freshness-2047"
-review_note = "Updated: bilateral clearing now exists (clearing.rs CrossCoopTransfer, receipt_clearing.rs Epic 4 #941). Gaps re-verified: no multilateral netting, no dispute engine (only Option<String> label), no BFT/checkpointing. federation:write/treasury:write scopes now present in gateway ALLOWED_SCOPES."
+last_updated = "2026-07-14T22:05:00"
+last_verified_by = "lan-rehearsal-deployment"
+review_note = "Re-verified 2026-07-14: the ONLY icn-federation/src change since the 2026-06-14 verification is #2055 (rand 0.8->0.9 migration, mechanical; no federation semantics). Prior facts re-affirmed: bilateral clearing present (clearing.rs, receipt_clearing.rs); gaps unchanged - no multilateral netting, no dispute engine, no BFT/checkpointing."
 staleness_threshold_days = 30
 truth_class = "descriptive"
 depends_on = ["icn/crates/icn-federation/src/**"]
@@ -216,8 +216,8 @@ notes = "Auto-generated from Cargo.toml + kernel_surface.toml."
 
 [sections."18-institution-primitives"]
 title = "Institution Primitives"
-last_updated = "2026-07-13T18:28:00"
-last_verified_by = "vision-doctrine-refresh"
+last_updated = "2026-07-14T22:05:00"
+last_verified_by = "lan-rehearsal-deployment"
 review_note = "Re-verified 2026-07-13 (PR docs/vision-current-doctrine): the four institution primitives still compose from the eight kernel primitives as described; section content re-read against the rewritten VISION.md dependency and remains consistent. Changes this pass: the section's starter-bundle heading no longer uses the retired 'Institution-in-a-Box' product name as current framing (historical name annotated, archived vision linked); no primitive/composition change. Prior 2026-06-21 verification (TOML→YAML charter correction) preserved in git history."
 staleness_threshold_days = 90
 truth_class = "normative"
