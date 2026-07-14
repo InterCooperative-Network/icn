@@ -512,7 +512,11 @@ if [ "$LAN_PROFILE" = "1" ]; then
         "$LAN_DIR/icn-demo-session-30-lan-origin.conf.in" > "$LAN_STAGE/session-dropin/30-lan-origin.conf"
     log "LAN profile: single origin $LAN_ORIGIN (nginx in-VM; session endpoint stays loopback)"
     VIRT_CUSTOMIZE_ARGS+=(
-        --install nginx
+        # qemu-guest-agent: the LAN profile targets a long-lived VM on a real
+        # hypervisor (not a throwaway user-net QEMU), where clean host-initiated
+        # shutdown and agent-side diagnostics matter.
+        --install nginx,qemu-guest-agent
+        --run-command "systemctl enable qemu-guest-agent"
         --mkdir /etc/systemd/system/icn-demo-session.service.d
         --copy-in "$LAN_STAGE/nginx/icn-rehearsal.conf:/etc/nginx/sites-available"
         --run-command "ln -sf ../sites-available/icn-rehearsal.conf /etc/nginx/sites-enabled/icn-rehearsal.conf && rm -f /etc/nginx/sites-enabled/default"
