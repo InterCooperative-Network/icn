@@ -4368,8 +4368,8 @@ category = "architecture"
 status = "living"
 truth_class = "normative"
 title = "ADR-0015: Service Discovery Auth Semantics — Auth-gated with Enumeration-Safe 404"
-description = "Decision: all /v1/services/* require JWT; missing/unauthorized -> 404 (enumeration-safe). Implementation status (2026-04-26): needs verification — route-level auth gating not visible in api/services.rs; follow-up audit issue suggested."
-last_updated = "2026-04-26"
+description = "Decision (amended 2026-07-13): all /v1/services/* require JWT; missing/invalid credentials -> uniform pre-lookup 401 (enumeration-safe by response uniformity); authenticated + missing resource -> 404; operation-specific authority boundaries may 403. Implementation status: implemented — enforcement traced to the server.rs /services scope bearer wrap and pinned by icn-gateway/tests/services_auth_boundary.rs (PR #2417). OpenAPI listing of these routes remains outstanding under the repo-wide API-classification follow-up."
+last_updated = "2026-07-13"
 owner = "matt"
 audiences = ["architects", "developers"]
 
