@@ -14,19 +14,22 @@ import Layout from '../../layouts/Layout.astro';
       </nav>
 
       <div class="demo-header">
-        <span class="badge badge-green">Live on K3s</span>
+        <span class="badge badge-amber">Development demo — not production</span>
         <h1>ICN Demo: Five Cooperative Flows</h1>
         <p class="lead">
-          Five demonstration organizations on a live K3s cluster.
-          Five end-to-end flows covering governance, economics, federation, reporting, and compute.
-          Each flow produces cryptographic receipts — running against real infrastructure, not a sandbox.
+          Five fictional demonstration organizations, five scripted end-to-end flows covering
+          governance, economics, federation, reporting, and compute. Each flow produces real
+          cryptographic receipts — but it runs on a development deployment the project operates
+          for itself. This is a rehearsal of the mechanisms, not a production service and not a
+          live federation. For what is and isn't real today, see
+          <a href="/whats-real-now">What's Real Now</a>.
         </p>
       </div>
 
       <!-- Prerequisites -->
       <div class="prereq-box">
         <h4>Prerequisites</h4>
-        <p>kubectl access to the K3s cluster. Run <code>demo/scripts/reseed-federation-demo.sh</code> before any demo day to seed identity, trust, and state.</p>
+        <p>kubectl access to a development cluster (or the local devnet). Run <code>demo/scripts/reseed-federation-demo.sh</code> before any demo day to seed identity, trust, and state.</p>
         <p>Each flow accepts <code>--present</code> (minimal output, pause on key beats) or <code>--narrated</code> (full explanatory output) flags.</p>
       </div>
 
@@ -113,8 +116,8 @@ import Layout from '../../layouts/Layout.astro';
           <span class="badge badge-green">~8 min</span>
         </div>
         <p>
-          Harbor generates a signed compliance report over its transaction history.
-          The report is anchored to on-chain governance receipts, enabling third-party
+          Harbor generates a signed compliance report over its recorded activity.
+          The report is anchored to signed governance receipts, enabling third-party
           verification without exposing internal financials.
         </p>
         <div class="flow-proves">
@@ -143,9 +146,9 @@ import Layout from '../../layouts/Layout.astro';
           Both pass. The task enters the queue with a Blake3 content hash as its provenance anchor.
         </p>
         <div class="status-note">
-          <strong>Sprint 28 complete:</strong> Gossip fan-out fix enables task dispatch via
-          loopback. CCL executor is live. Tasks move Pending → Completed. Settlement receipts
-          with full provenance chain are generated on completion.
+          <strong>Works end-to-end in the development environment:</strong> task dispatch runs
+          via gossip loopback, the CCL executor completes tasks (Pending → Completed), and
+          settlement receipts with a full provenance chain are generated on completion.
         </div>
         <div class="flow-proves">
           <span class="flow-proves-label">Proves:</span>
@@ -163,7 +166,7 @@ import Layout from '../../layouts/Layout.astro';
         <div class="next-grid">
           <div class="next-item">
             <span class="next-label">Distributed Execution</span>
-            <p>Multi-executor node pool scaling across K3s cluster. Tasks already execute via gossip loopback; this expands to parallel execution across cooperative-contributed nodes.</p>
+            <p>Multi-executor node pool scaling across a multi-node development cluster. Tasks already execute via gossip loopback; this expands to parallel execution across cooperative-contributed nodes.</p>
           </div>
           <div class="next-item">
             <span class="next-label">Mobile UX</span>
