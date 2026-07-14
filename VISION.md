@@ -1,71 +1,48 @@
-# Vision: Institution-in-a-Box
-
-> **"Every human group can run its own institution. On their hardware. With verifiable identity, consent, and auditability."**
-
-You don’t “pivot” from what we have into the vision. You **route** it.
-
-We are keeping the *core invariant* (sovereign nodes + trust-gated coordination) and deliberately growing the *interfaces* that make it feel like “the internet finally grew up.”
-
-## The Promise
-
-> **"Spin up a community. Give it rules. Give it money flows. Give it governance. Make it interoperable. Make it accountable."**
-
-That’s the north star.
-
-## 1. Institution Primitives (The Kernel)
-
-We expose 4 “institution primitives” cleanly:
-
-1.  **Identity & Membership**: Who is in/out, what roles exist, verification, revocation.
-2.  **Rules & Governance**: Proposals, deliberation, voting, constitutional constraints.
-3.  **Economics**: Budgets, mutual credit, accounts, spending limits, audits.
-4.  **Interoperation**: Federation agreements for trade, sharing, and arbitration.
-
-## 2. The Product: Institution-in-a-Box
-
-The first real product is a boring, powerful bundle: a **municipal operating system starter kit.**
-
-*   **One-click “New Coop / New Community”**
-*   Default charter templates
-*   Membership onboarding
-*   Treasury ledger
-*   Proposal + vote loop
-*   Dashboard: “What decisions exist, what money moved, who authorized it”
-
-## 3. The Compute Commons (The Consequence)
-
-We don't pitch "a compute commons." We pitch **capability**. Compute is a paid-in-kind resource.
-
-*   Communities contribute compute/storage/bandwidth.
-*   They earn internal credit.
-*   They spend it on shared services (search, hosting) or federation-wide projects.
-
-Compute becomes the “mana meter” behind cooperation.
-
-## 4. Federation Agreements (The Bridge)
-
-The **Federation Agreement** defines trust thresholds, dispute resolution, cross-ledger clearing, and data sharing between groups. This turns isolated islands into a **civilizational mesh**.
-
-## Roadmap: From Vision to Inevitability
-
-1.  **Stage A: Institutions** (Institution-in-a-Box, Charters, Treasury)
-2.  **Stage B: Federation** (Agreements, Cross-group Trust, Clearing)
-3.  **Stage C: Commons** (Resource Contribution, Shared Services)
-4.  **Stage D: Civilization Tools** (Municipal Governance, Public Infrastructure)
-
-## The Adoption Wedge
-
-Our adoption wedge must deliver value *before* philosophy:
-*   **Group purchasing**
-*   **Mutual aid funds**
-*   **Community grants**
-*   **Shared services**
-
-## Governance Law: The Meaning Firewall
-
-*   **Kernel** enforces *mechanisms* (identity, trust, audit).
-*   **Apps** define *meaning* (what is a “member”, “vote”, “budget”).
-
+---
+Status: normative
+Canonical: yes
+Last Reviewed: 2026-07-13
 ---
 
-> **Turn what you have into the vision by productizing “institution primitives,” shipping Institution-in-a-Box, then scaling via Federation Agreements until the compute commons emerges as the resource layer behind cooperation.**
+# Vision
+
+> **Every human group can run its own institution — on hardware it controls, with verifiable identity, consent, auditability, and a real way to leave.**
+
+ICN is **Digital Public Infrastructure**: a coordination substrate for cooperatives, communities, and federations. It is not a product suite, and it is not a platform with a landlord.
+
+## The core bet: a meaning-blind substrate
+
+> **Apps translate institutional meaning into constraints; the kernel enforces constraints without understanding meaning.**
+
+This is the Meaning Firewall. The kernel provides mechanisms — identity, state, communication, authorization, audit. Apps define meaning — what a "member" is, what a "vote" does, how credit and settlement are governed, what standing means. Institutions stay sovereign over their own meaning; the substrate stays predictable, inspectable, and replaceable.
+
+## What ICN refuses to be
+
+- **Not a blockchain, token, or retail payment network.** Settlement and credit are constraint-governed institutional records, not financial instruments.
+- **Not a municipal operating system or a turnkey product bundle.** Institutions are rehearsed into existence, not installed.
+- **No speculative resource economy.** The old "Mana" concept is retired; compute metering is fuel — an enforcement detail, not an economy.
+- **No claims ahead of evidence.** Production, pilot, or organizer readiness are asserted only with current, witnessed evidence.
+
+## How adoption happens: rehearsal before belief
+
+The current wedge is the **Rehearsal Node**: an assembled appliance an institution can boot and use to rehearse a real organizational process end-to-end. An organizer reviews, edits, assigns, and digest-confirms a pending item; a member completes it; every step leaves receipts; the evidence exports and verifies without exposing identities or credentials.
+
+Institutions adopt ICN by watching their own work run on it — value before philosophy, evidence before claims.
+
+## The arc
+
+1. **Rehearsal** — one institution's organizers and members complete the loop on hardware they control. *(Where we are: the software loop is witnessed on an assembled image; the remaining gates are human — the organizer presentation and the assistive-technology pass.)*
+2. **Operation** — a first partner institution runs a real process on ICN with custody of its own data. *(NYCN is the intended first partner — an active track, not a committed pilot.)*
+3. **Federation** — institutions interoperate across trust boundaries without surrendering autonomy: agreements, settlement, dispute paths.
+4. **Commons** — shared services (compute, knowledge, infrastructure) governed by the member institutions that use them.
+
+Each stage is entered on evidence from the one before it, and reality is allowed to edit this document.
+
+## Where the truth lives
+
+- Present state: [docs/STATE.md](docs/STATE.md) and [docs/PHASE_PROGRESS.md](docs/PHASE_PROGRESS.md)
+- Doctrine: [docs/genesis.md](docs/genesis.md), [docs/ai/ICN_CONSTITUTIONAL_CORE.md](docs/ai/ICN_CONSTITUTIONAL_CORE.md), [docs/architecture/KERNEL_APP_SEPARATION.md](docs/architecture/KERNEL_APP_SEPARATION.md)
+
+## History
+
+The previous vision ("Institution-in-a-Box", 2025 – early 2026) is preserved unchanged at [docs/archive/2026/VISION-institution-in-a-box.md](docs/archive/2026/VISION-institution-in-a-box.md). Retired with it: the municipal-OS product framing, the "mana" resource economy, and a philosophy-first adoption wedge.
