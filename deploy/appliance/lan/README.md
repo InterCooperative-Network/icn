@@ -36,6 +36,28 @@ browser origin.
 | `ICN_APPLIANCE_LAN_TLS_CERT` | if origin is https | PEM certificate (full chain) path on the build host |
 | `ICN_APPLIANCE_LAN_TLS_KEY` | if origin is https | PEM private key path on the build host (never committed; never logged) |
 
+## Build-host networking (nginx / qemu-guest-agent installs)
+
+The LAN profile is the first profile that apt-installs packages **not already
+present** in the staged base image, which requires working networking inside
+the libguestfs appliance. Two independent failure modes exist:
+
+1. **DNS**: libguestfs (and passt/slirp generally) forwards guest DNS to the
+   build host's resolver; a host-local stub (systemd-resolved `127.0.0.53`)
+   breaks it. `ICN_APPLIANCE_BUILD_DNS=<resolver-ip>` makes build-image.sh
+   resolve the Debian mirror hostnames on the host and pin them into the
+   guest's `/etc/hosts` for the build (pins are removed as the last step).
+2. **No appliance network at all** (`connect (101: Network is unreachable)` or
+   `passt exited with status 1`): the host lacks a usable user-net backend —
+   on Ubuntu, `passt` may be missing or AppArmor-confined away from
+   libguestfs's runtime directory. If you choose not to change host security
+   policy, **pre-stage the packages into the base image** instead (the same
+   precedent as the base's `python3-jsonschema` staging): boot a copy of the
+   base under plain QEMU with user-net, fix the guest's `/etc/resolv.conf` to
+   a reachable resolver, `apt-get install -y nginx qemu-guest-agent`, remove
+   any staging SSH key, and power off. Point `ICN_APPLIANCE_BASE_IMAGE` at the
+   staged copy; the profile's `--install` then succeeds offline.
+
 ## What it does NOT change
 
 - No bind is widened: gateway was already `0.0.0.0:8080` in the demo profile,
