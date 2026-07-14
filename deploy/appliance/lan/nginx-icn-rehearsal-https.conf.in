@@ -1,0 +1,53 @@
+# icn-rehearsal — single-origin LAN serving (HTTPS variant).
+# Rendered by build-image.sh (LAN profile) from
+# deploy/appliance/lan/nginx-icn-rehearsal-https.conf.in; @LAN_HOST@ is the
+# origin host from ICN_APPLIANCE_LAN_ORIGIN. The certificate/key are
+# operator-supplied (internal CA) and installed by the build at
+# /etc/icn/tls/rehearsal.{crt,key}.
+
+server {
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name @LAN_HOST@;
+    return 301 https://@LAN_HOST@$request_uri;
+}
+
+server {
+    listen 443 ssl default_server;
+    listen [::]:443 ssl default_server;
+    server_name @LAN_HOST@;
+
+    ssl_certificate     /etc/icn/tls/rehearsal.crt;
+    ssl_certificate_key /etc/icn/tls/rehearsal.key;
+
+    add_header X-Content-Type-Options nosniff;
+
+    root /usr/share/icn/static/web;
+
+    # Landing page is the front door.
+    location = / {
+        return 302 /rehearsal-landing/;
+    }
+
+    # DEV/DEMO session + status endpoint: loopback-only service; this proxy is
+    # the single LAN path to it. Its own server-side origin allowlist and
+    # non-production dev gates still apply.
+    location /v1/dev/demo/ {
+        proxy_pass http://127.0.0.1:8091;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    # Gateway API (JWT-authenticated; uniform 401 pre-lookup without a valid
+    # credential — ADR-0015).
+    location /v1/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+    }
+
+    # Static: rehearsal landing + member shell + fixture pack.
+    location / {
+        try_files $uri $uri/ =404;
+    }
+}

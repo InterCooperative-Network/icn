@@ -1,0 +1,11 @@
+# LAN profile drop-in — rendered by build-image.sh from
+# deploy/appliance/lan/icnd-30-lan-origin.conf.in when
+# ICN_APPLIANCE_LAN_PROFILE=1.
+#
+# systemd's last-assignment-wins Environment= semantics mean this REPLACES the
+# demo drop-in's ICN_CORS_ORIGINS: the value below is the demo profile's exact
+# loopback set PLUS the single LAN origin the in-VM reverse proxy serves.
+# Exact scheme://host[:port] matches only — the gateway's CORS matcher does no
+# wildcarding (crates/icn-gateway/src/security.rs).
+[Service]
+Environment=ICN_CORS_ORIGINS=http://localhost:8090,http://127.0.0.1:8090,http://localhost:18090,http://127.0.0.1:18090,@LAN_ORIGIN@
