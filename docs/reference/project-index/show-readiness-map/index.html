@@ -49,34 +49,38 @@ View source on GitHub →
 <ul>
 <li><strong>The project thesis.</strong> ICN is digital public infrastructure for cooperatives, communities, and federations. It is a constraint engine: apps translate meaning into constraints; the kernel enforces constraints without understanding meaning. (See <a href="/docs/architecture/THE_COMMONS">`docs/architecture/THE_COMMONS.md`</a> and <a href="/docs/genesis">`docs/genesis.md`</a>.)</li>
 <li><strong>The public site.</strong> <a href="https://intercooperative.network" target="_blank" rel="noopener">`intercooperative.network`</a> — including <a href="https://intercooperative.network/what-is-icn" target="_blank" rel="noopener">What is ICN</a>, <a href="https://intercooperative.network/whats-real-now" target="_blank" rel="noopener">What's Real Now</a>, <a href="https://intercooperative.network/for-cooperatives" target="_blank" rel="noopener">For Cooperatives</a>, and <a href="https://intercooperative.network/get-involved" target="_blank" rel="noopener">Get Involved</a>.</li>
-<li><strong>The current proof-loop story.</strong> Decision → action → receipt is real, end-to-end, for the three currently emitted action-card source paths (proposal/vote, action_item/complete, meeting/attend). Both locally and on K3s.</li>
-<li><strong>Roadmap truth.</strong> Phase 0 done, Phase 1 done, Phase 2 in progress. Phase 2 machinery in place; remaining work is human procedure. (<a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>, <a href="/docs/STATE">`docs/STATE.md`</a>, <a href="/docs/strategy/ICN-Roadmap-Live">`docs/strategy/ICN-Roadmap-Live.md`</a>.)</li>
-<li><strong>NYCN as the intended first cooperative partner.</strong> Active partnership track. Drive-ingest operator ladder is merged end-to-end on the NYCN side; ICN-side proof paths are documented. The next step is presenting the merged ladder + proof-loop machinery to NYCN organizers.</li>
-<li><strong>Member-facing standing / action-card / receipt concept.</strong> The shapes are real and exercised. Show the surfaces (<a href="https://github.com/InterCooperative-Network/icn/blob/main/runtime-surface-map">`runtime-surface-map.md`</a>) and the proof-path docs.</li>
-<li><strong>Documentation control plane.</strong> Honest, auditable, versioned: hand-maintained <code>INDEX.md</code>, machine-readable <code>registry.toml</code>, generated <code>DOCUMENT_REGISTRY.md</code>, validator in CI, regulatory-compliance linter on the avoid list. (<a href="https://github.com/InterCooperative-Network/icn/blob/main/docs-control-map">`docs-control-map.md`</a>.)</li>
-<li><strong>Substrate maturity claims.</strong> ~75% implementation, current test counts as reported in <a href="/docs/STATE">`docs/STATE.md`</a>, 35 library crates + 4 runtime apps + 3 binaries, K3s deployment running since 2025-12-03. State these as written; do not extrapolate.</li>
+<li><strong>The Rehearsal Node organizer→member loop.</strong> The current show story. On an appliance built from clean <code>main</code>: an organizer opens a no-paste browser session, reviews a pending item, edits, assigns, sees an exact preview, and confirms — the confirm is digest-bound (a stale or tampered preview fails closed) and executes the real governance ladder, creating one real action item; a member (fresh least-privilege session) completes it and a durable completion receipt binds the act. Evidence exports without identities or credentials and a steward verifier accepts it (and rejects a tampered packet). Witnessed end-to-end on a fresh assembled image 2026-07-13 (<code>docs/STATE.md</code> newest sync block; runbook: <a href="/docs/demo/ICN_REHEARSAL_NODE_V0.1_RUNBOOK">`docs/demo/ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md`</a>).</li>
+<li><strong>The proof-loop story.</strong> Decision → action → receipt is real end-to-end for the three currently emitted action-card source paths (proposal/vote, action_item/complete, meeting/attend), locally and on the assembled appliance image.</li>
+<li><strong>Roadmap truth.</strong> Phase 0 done, Phase 1 done, Phase 2 in progress. The software side of the rehearsal wedge is witnessed; the remaining gates are human (organizer presentation, assistive-technology pass). (<a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>, <a href="/docs/STATE">`docs/STATE.md`</a>.)</li>
+<li><strong>NYCN as the intended first cooperative partner.</strong> Active partnership track. The organizer-gate package on the NYCN side is independently steward-operable (facilitator guide, fail-closed validator, closed human-outcome vocabulary). The next step is the presentation itself.</li>
+<li><strong>Member-facing standing / action-card / receipt surfaces.</strong> Real and exercised; show the member shell and the receipt loop.</li>
+<li><strong>Documentation control plane.</strong> Honest, auditable, versioned: <code>registry.toml</code> + validators in CI, regulatory-compliance linter, readiness-overclaim linter, truth-spine and drift checks.</li>
+<li><strong>Substrate scale, stated from generated sources only.</strong> Workspace composition and test counts change; quote them from <a href="https://github.com/InterCooperative-Network/icn/blob/main/status.toml">`docs/status.toml`</a> / <a href="/docs/STATE">`docs/STATE.md`</a> at the time of the conversation (as of 2026-07-13: 48 workspace members — 38 crates + 7 apps + 3 binaries). Do not quote deployment-age or uptime figures at all: current K3s liveness is an ops claim flagged <code>NEEDS OPS RE-CONFIRMATION</code> in <code>status.toml</code>.</li>
 </ul>
 <h2>What should not be shown as finished</h2>
 <p>These are real things that exist in the repo but are not in a finished state. <strong>Do not present them as production capabilities.</strong></p>
 <ul>
-<li><strong>A live production cooperative network.</strong> ICN runs on a homelab K3s cluster. There is no live multi-cooperative production deployment. Members do not currently log in to a hosted cooperative on ICN.</li>
-<li><strong>A formal NYCN pilot.</strong> NYCN is the <em>intended</em> first cooperative partner. There is no signed partnership, no committed launch date, no formal pilot agreement. The relationship is in good faith and active, not formal.</li>
-<li><strong>Live federation integration.</strong> No two cooperatives currently federate over ICN in production. The federation primitives exist as code; the cross-org coordination story is Phase 3 in <a href="/docs/PHASE_PROGRESS">`docs/PHASE_PROGRESS.md`</a>, not Phase 2.</li>
-<li><strong>One-click / non-technical deployment.</strong> Phase 2 deliverables for one-command per-coop deployment, charter customization workflow, and pilot onboarding guide are not yet shipped.</li>
-<li><strong>A complete mobile app.</strong> The React Native SDK and mobile member-app work exist. The mobile UX spec is at <a href="/docs/mobile/icn-mobile-ux-spec-v1">`docs/mobile/icn-mobile-ux-spec-v1.md`</a>. Treat it as a build-facing spec, not a shipped product.</li>
-<li><strong>Action-card runtime as fully expanded.</strong> Two RFC-gated source paths (<code>signal_rule</code>, <code>obligation_lifecycle</code>) are pending under <a href="https://github.com/InterCooperative-Network/icn/issues/1646" target="_blank" rel="noopener">#1646</a>. Show three of five, not five of five.</li>
-<li><strong>K3s teardown semantics as designed.</strong> Smoke artifacts persist on the cluster; namespaced teardown is not yet specified (<a href="https://github.com/InterCooperative-Network/icn/issues/1679" target="_blank" rel="noopener">#1679</a>).</li>
+<li><strong>A live production cooperative network.</strong> There is no live multi-cooperative production deployment. Members do not currently log in to a hosted cooperative on ICN. The homelab K3s deployment&#39;s current liveness needs ops re-confirmation — do not claim &quot;running since <date>&quot;.</li>
+<li><strong>A formal NYCN pilot.</strong> NYCN is the <em>intended</em> first cooperative partner. No signed partnership, no committed launch date, no formal pilot agreement.</li>
+<li><strong>Human validation.</strong> The assembled-image witness is automated evidence; <strong>no real organizer has run the loop</strong> (#1703/#1746) and <strong>no human assistive-technology pass has occurred</strong> (#2041). Never imply organizer acceptance or accessibility sign-off.</li>
+<li><strong>Live federation integration.</strong> No two cooperatives federate over ICN in production. Federation primitives exist as code; two-node rehearsal is v0.2 territory.</li>
+<li><strong>Production trusted issuance.</strong> The appliance&#39;s trusted-local mint is operator bootstrap on the local node. How institutions issue real positive authority is an open architecture decision (#2080).</li>
+<li><strong>One-click / non-technical deployment.</strong> Per-coop one-command deployment, charter customization workflow, and pilot onboarding guides are not shipped.</li>
+<li><strong>A complete mobile app.</strong> React Native SDK and mobile examples are parked until the browser interaction model is organizer-validated.</li>
+<li><strong>Action-card runtime as fully expanded.</strong> Two source paths remain RFC-gated (<code>signal_rule</code> under #1631/#1711, <code>obligation_lifecycle</code> under #1634/#1712). Show three of five, not five of five.</li>
+<li><strong>Recurring assembled-image CI.</strong> The appliance walkthrough is protected by a committed harness plus manual witnesses, not yet by a standing scheduled lane (#2398).</li>
 </ul>
 <h2>Suggested first-demo narrative</h2>
 <p>A short, honest, non-pitch-shaped narrative for first conversations:</p>
 <ol>
-<li><strong>ICN is institutional infrastructure</strong> for democratic organizations — cooperatives, communities, federations. It is not a platform, not a marketplace, not a token economy.</li>
-<li><strong>It helps democratic organizations turn decisions into auditable action.</strong> A decision generates an action card; completing the action generates an append-only receipt; that receipt can be retrieved over HTTP and is portable.</li>
-<li><strong>A member sees their standing, their scope, their action cards, and their receipts</strong> through real endpoints. The proof loop is end-to-end on three currently emitted source paths, both locally and on K3s.</li>
-<li><strong>NYCN is the intended first real-world rehearsal track.</strong> Active partnership track. The drive-ingest operator ladder walks an organizer&#39;s drive content into ICN action-item proofs without requiring a live federation step.</li>
-<li><strong>The next step is organizer presentation and pilot formalization.</strong> Phase 2 machinery is in place; the remaining gate is human procedure, not engineering.</li>
+<li><strong>ICN is institutional infrastructure</strong> for democratic organizations — cooperatives, communities, federations. Not a platform, not a marketplace, not a token economy.</li>
+<li><strong>Boot the Rehearsal Node.</strong> A single appliance image, offline-capable, built from public <code>main</code>. No credentials are pasted; sessions are least-privilege by construction.</li>
+<li><strong>An organizer turns a pending item into assigned work.</strong> Review → edit → assign → exact preview → digest-bound confirm. The confirm executes the real governance ladder — what was previewed is exactly what happens, or it fails closed.</li>
+<li><strong>A member completes the work and the institution gets a receipt.</strong> Standing → action card → completion → durable receipt. Receipts record facts and grant no authority.</li>
+<li><strong>The evidence leaves with the institution.</strong> Export the packet (no identities, no credentials), verify it independently, tamper with it and watch verification fail.</li>
+<li><strong>The next step is the organizer presentation and pilot formalization.</strong> The remaining gate is human procedure, not engineering.</li>
 </ol>
-<p>Lean toward &quot;show, then explain&quot; rather than &quot;explain, then show&quot;: real surfaces beat slide decks for outside readers.</p>
+<p>Lean toward &quot;show, then explain&quot;: real surfaces beat slide decks.</p>
 <h2>Red lines</h2>
 <p>These are language or framing choices that should never appear in any external-facing material — slides, write-ups, posts, demos.</p>
 <table>
@@ -100,18 +104,26 @@ View source on GitHub →
 </tr>
 <tr>
 <td><strong>No live-federation claim.</strong> No two cooperatives are federating in production.</td>
-<td>Truthfulness; this is Phase 3, not Phase 2.</td>
+<td>Truthfulness.</td>
 </tr>
 <tr>
-<td><strong>No &quot;platform landlord&quot; aesthetics.</strong> ICN is not a SaaS, not a hosted product, not &quot;let us run it for you.&quot; It is infrastructure cooperatives stand up themselves or with a cooperative developer.</td>
+<td><strong>No deployment-age / uptime claim.</strong> Current K3s liveness is flagged <code>NEEDS OPS RE-CONFIRMATION</code>; a stale &quot;running since <date>&quot; is an overclaim even if it was once true.</td>
+<td>Truthfulness; <code>docs/status.toml</code> is the owner of this claim.</td>
+</tr>
+<tr>
+<td><strong>No human-validation claim.</strong> No organizer has accepted the loop; no assistive-technology pass has been performed. Automated a11y checks are not the human gate.</td>
+<td>Truthfulness; #2041/#1703/#1746 are open.</td>
+</tr>
+<tr>
+<td><strong>No &quot;platform landlord&quot; aesthetics.</strong> ICN is not a SaaS, not a hosted product, not &quot;let us run it for you.&quot;</td>
 <td>Doctrine (<a href="/docs/architecture/THE_COMMONS">`THE_COMMONS.md`</a> §Non-Goals).</td>
 </tr>
 <tr>
-<td><strong>No production-readiness claim across the substrate.</strong> Some surfaces are mature; many are uneven; the pilot machinery is in place but unrehearsed at scale.</td>
+<td><strong>No production-readiness claim across the substrate.</strong> Some surfaces are mature; many are uneven; the appliance ships <code>non_production=true, signed=false</code>.</td>
 <td>Truthfulness; do not generalize from the strongest parts.</td>
 </tr>
 <tr>
-<td><strong>No &quot;this replaces governance / legal / financial professionals&quot; claim.</strong> ICN provides infrastructure for what those people and institutions choose to do; it does not replace them.</td>
+<td><strong>No &quot;this replaces governance / legal / financial professionals&quot; claim.</strong></td>
 <td>Truthfulness, dignity.</td>
 </tr>
 </tbody></table>
@@ -119,11 +131,11 @@ View source on GitHub →
 <ul>
 <li><input disabled="" type="checkbox"> Does the deck / page / talk represent Phase 2 as in progress (not complete)?</li>
 <li><input disabled="" type="checkbox"> Does it represent NYCN as the intended first cooperative partner (not a committed pilot)?</li>
-<li><input disabled="" type="checkbox"> Does it avoid the vocabulary in the avoid list?</li>
-<li><input disabled="" type="checkbox"> Does it avoid token / web3 / financial-product framing?</li>
-<li><input disabled="" type="checkbox"> Does it represent action-card runtime as three of five currently emitted source paths (not five of five)?</li>
-<li><input disabled="" type="checkbox"> Does it represent the K3s deployment as homelab-class (not production multi-tenant)?</li>
-<li><input disabled="" type="checkbox"> If it claims a number (LOC, tests, crates, phases), does that number come from <code>STATE.md</code> / <code>PHASE_PROGRESS.md</code>?</li>
+<li><input disabled="" type="checkbox"> Does it avoid the vocabulary in the avoid list, and token / web3 / financial-product framing?</li>
+<li><input disabled="" type="checkbox"> Does it distinguish the automated assembled-image witness from human validation (organizer + assistive technology), which has not occurred?</li>
+<li><input disabled="" type="checkbox"> Does it represent action-card runtime as three of five currently emitted source paths?</li>
+<li><input disabled="" type="checkbox"> Does it avoid any deployment-age / uptime / &quot;running since&quot; figure?</li>
+<li><input disabled="" type="checkbox"> If it claims a number (LOC, tests, crates, members), does that number come from <code>status.toml</code> / <code>STATE.md</code> at conversation time?</li>
 </ul>
 <h2>Where to read deeper</h2>
 <table>
@@ -140,6 +152,10 @@ View source on GitHub →
 <tr>
 <td>Doctrine — what is immutable in the substrate</td>
 <td><a href="/docs/genesis">`docs/genesis.md`</a></td>
+</tr>
+<tr>
+<td>The rehearsal runbook (the demo script)</td>
+<td><a href="/docs/demo/ICN_REHEARSAL_NODE_V0.1_RUNBOOK">`docs/demo/ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md`</a></td>
 </tr>
 <tr>
 <td>Public site copy as canonical &quot;what we say&quot;</td>
