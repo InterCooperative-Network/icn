@@ -138,6 +138,12 @@ async function driveToApproved(page) {
       await page.check('#org-domain-1');
       await page.click('#organizer-domain-open');
       await page.waitForSelector('#organizer-workspace-section:not([hidden])', { timeout: 8000 });
+      // Rows render from an async fetch after the section unhides — wait on the
+      // row count itself, not just section visibility (races on slow CI runners).
+      await page.waitForFunction(
+        () => document.querySelectorAll('#organizer-rows-list > li').length === 2,
+        { timeout: 8000 }
+      ).catch(() => {});
       check('after an explicit choice, workspace opens', (await page.locator('#organizer-rows-list > li').count()) === 2);
       await ctx.close();
     }

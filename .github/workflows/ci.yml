@@ -41,6 +41,7 @@ jobs:
     outputs:
       docs_only: ${{ steps.filter.outputs.docs_only }}
       has_rust: ${{ steps.filter.outputs.has_rust }}
+      member_shell_relevant: ${{ steps.filter.outputs.member_shell_relevant }}
     steps:
       - uses: actions/checkout@v6
       - uses: dorny/paths-filter@v4
@@ -58,6 +59,22 @@ jobs:
               - 'icn/**/*.rs'
               - 'icn/**/Cargo.toml'
               - 'icn/Cargo.lock'
+            # Member Shell relevance is a POSITIVE filter, deliberately not derived
+            # from docs_only: with paths-filter's default some-quantifier, docs_only
+            # is true whenever ANY changed file matches a docs pattern, so a mixed
+            # docs+frontend PR would read as "docs only" and skip the shell gate
+            # (this very workflow's own first PR skipped itself that way). Covers
+            # the surface, its drivers/fixtures, the borrowed pilot-ui organizer
+            # pack + the dependency tree the drivers borrow, both validators, and
+            # this workflow file.
+            member_shell_relevant:
+              - 'web/member-shell/**'
+              - 'web/pilot-ui/fixtures/icn-organizer-demo/**'
+              - 'web/pilot-ui/package.json'
+              - 'web/pilot-ui/package-lock.json'
+              - 'docs/scripts/validate-rehearsal-shell-fixtures.py'
+              - 'docs/scripts/check-member-shell-fixture-binding.py'
+              - '.github/workflows/ci.yml'
 
   secrets-check:
     name: Secrets Placeholder Check
@@ -715,6 +732,87 @@ jobs:
         with:
           name: accessibility-report
           path: web/pilot-ui/test-results/
+
+  # Member Shell (web/member-shell) is the CURRENT member/organizer rehearsal
+  # surface; until this job existed its browser tests were dev-tools only, so
+  # the surface could drift or stop working while unrelated CI stayed green
+  # (2026-07-13 ecosystem audit finding). Runs the four fail-closed test
+  # drivers documented in web/member-shell/README.md against a static serve of
+  # web/ (no gateway, no outbound app traffic — the organizer flow is
+  # route-intercepted by organizer-mock.cjs), plus the fixture-pack content
+  # validator and the shell.js fixture-binding drift check.
+  # An automated pass here is NOT the human assistive-technology gate (#2041).
+  member-shell:
+    name: Member Shell Tests
+    needs: [changes]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+
+      # No-op fast path — the job itself always runs (so it can satisfy branch
+      # protection if/when it joins the required set) but only skips substance
+      # when NO member-shell-relevant path changed. Deliberately NOT keyed on
+      # docs_only: that filter is some-quantified and misreads mixed
+      # docs+frontend PRs as docs-only (this job's own first PR skipped itself
+      # that way — run 29291254970).
+      - name: No-op fast path (no member-shell-relevant changes)
+        if: needs.changes.outputs.member_shell_relevant != 'true'
+        run: echo "No member-shell-relevant paths changed; passing as a no-op."
+
+      - uses: actions/setup-node@v6
+        if: needs.changes.outputs.member_shell_relevant == 'true'
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: web/pilot-ui/package-lock.json
+
+      # The member-shell drivers deliberately borrow Playwright + axe from
+      # web/pilot-ui's devDependencies (#1735) — no second dependency tree.
+      - name: Install dependencies (borrowed from web/pilot-ui)
+        if: needs.changes.outputs.member_shell_relevant == 'true'
+        working-directory: ./web/pilot-ui
+        run: npm ci
+
+      - name: Install Playwright browsers
+        if: needs.changes.outputs.member_shell_relevant == 'true'
+        working-directory: ./web/pilot-ui
+        run: npx playwright install --with-deps chromium
+
+      - name: Fixture validation (content + consumer binding)
+        if: needs.changes.outputs.member_shell_relevant == 'true'
+        run: |
+          # The pack validator imports jsonschema; install explicitly (as the
+          # docs-freshness fixture-bundle job does) rather than relying on the
+          # runner image happening to ship it.
+          python3 -m pip install jsonschema
+          python3 docs/scripts/validate-rehearsal-shell-fixtures.py
+          python3 docs/scripts/check-member-shell-fixture-binding.py
+
+      - name: Run member-shell browser tests
+        if: needs.changes.outputs.member_shell_relevant == 'true'
+        run: |
+          # Serve the web/ root (the shell's relative fixture fetches require it).
+          (cd web && python3 -m http.server 8099 --bind 127.0.0.1 &)
+          for i in $(seq 1 30); do
+            curl -sf http://127.0.0.1:8099/member-shell/index.html > /dev/null && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:8099/member-shell/index.html > /dev/null
+          export NODE_PATH="$GITHUB_WORKSPACE/web/pilot-ui/node_modules"
+          mkdir -p member-shell-a11y-out
+          node web/member-shell/pending-publish.test.cjs    http://127.0.0.1:8099
+          node web/member-shell/a11y-walkthrough.cjs        http://127.0.0.1:8099 ./member-shell-a11y-out
+          node web/member-shell/organizer-workflow.test.cjs http://127.0.0.1:8099
+          node web/member-shell/organizer-a11y.cjs          http://127.0.0.1:8099 ./member-shell-a11y-out
+
+      - name: Upload member-shell a11y reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: member-shell-a11y-report
+          path: member-shell-a11y-out/
+          if-no-files-found: ignore
 
   pilot-provenance:
     name: Pilot Provenance Invariant
