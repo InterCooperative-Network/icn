@@ -188,16 +188,32 @@ View source on GitHub →
 <li>accommodation or access needs tied to an identifiable person</li>
 <li>raw attendee or member rolls</li>
 <li>API tokens, secrets, signed URLs, or session credentials</li>
+<li>JWT / bearer-shaped credentials (e.g. <code>eyJ…</code> tokens)</li>
+<li>PEM private keys</li>
 <li>private Drive / Groups / Sheets paths or content</li>
+<li>private filesystem paths (e.g. <code>/home</code>, <code>/root</code>, <code>/Users</code>, Windows user profiles)</li>
 <li>private overlay contents</li>
+<li>private-network or loopback IP addresses / internal topology</li>
 <li>live partner operational details</li>
 <li>any field that implies formal pilot approval or production deployment</li>
 <li>DIDs of unconsented participants</li>
 </ul>
-<p>This list is also captured in the schema&#39;s <code>x-icn-must-not-include</code> extension so machine consumers (linters, partner CI) can read it without parsing this prose.</p>
+<p>This list is also captured in the schema&#39;s <code>x-icn-must-not-include</code> extension so machine consumers (linters, partner CI) can read it without parsing this prose. The last six of these (DIDs, JWT/bearer credentials, PEM keys, private paths, private/loopback IPs) are the ones the bundled validator&#39;s privacy scan (§&quot;Validation is two distinct layers&quot;) enforces at the value level, since JSON Schema structure cannot see them.</p>
+<h2>Validation is two distinct layers (not four)</h2>
+<p>The bundled validator (<code>docs/scripts/validate-rehearsal-evidence.py</code>) enforces <strong>two</strong> of the four concerns; keep them distinct when reasoning about what a &quot;valid&quot; packet proves:</p>
+<ul>
+<li><strong>(a) Structural</strong> — draft-2020-12 JSON Schema: shape, required fields, enums, <code>additionalProperties:false</code>. Structure alone cannot see a leaked identifier hidden inside an otherwise-valid free-text field.</li>
+<li><strong>(b) Privacy / redaction</strong> — a deterministic value scan (added for <a href="https://github.com/InterCooperative-Network/icn/issues/2422" target="_blank" rel="noopener">#2422</a>) for the identifier classes §&quot;What this schema MUST NOT carry&quot; forbids but that structure cannot catch: <code>did:icn:</code> DIDs, JWT/bearer-shaped credentials, PEM private keys, private filesystem paths, and private-network / loopback IPs (topology). This asserts the packet&#39;s <em>content</em> is repo-safe; it does <strong>not</strong> prove redaction is complete. Diagnostics name the field and class only — never the offending value.</li>
+</ul>
+<p>Not performed by this validator, and not implied by a passing result:</p>
+<ul>
+<li><strong>(c) Cryptographic verification</strong> (digest / signature / <code>packet_hash</code>) — a separate concern.</li>
+<li><strong>(d) Institutional truth</strong> (approval, pilot status, authority) — a valid, repo-safe packet still grants zero authority.</li>
+</ul>
+<p>A passing validation means <em>structurally valid AND free of the scanned identifier classes</em> — nothing more.</p>
 <h2>Validation guidance for package repos</h2>
 <ol>
-<li>Validate every example or evidence packet that will live in a <strong>public repository</strong> against <code>rehearsal-evidence-export.schema.json</code> before committing. Use the bundled validator (<code>docs/scripts/validate-rehearsal-evidence.py</code>) or any draft-2020-12 JSON Schema validator. Pin to the URN.</li>
+<li>Validate every example or evidence packet that will live in a <strong>public repository</strong> against <code>rehearsal-evidence-export.schema.json</code> <strong>and</strong> the privacy scan before committing. Use the bundled validator (<code>docs/scripts/validate-rehearsal-evidence.py</code>, which runs both layers) — a bare draft-2020-12 JSON Schema validator only covers layer (a). Pin to the URN. Adversarial coverage lives at <code>docs/scripts/tests/test_rehearsal_evidence_leak_scan.py</code> (offline, CI-run).</li>
 <li>Do <strong>not</strong> add partner-specific nouns to this schema. Bind local meaning in package docs.</li>
 <li><strong>Partner-internal overlays do not validate against this schema and must not be committed.</strong> This schema is for the repo-safe export path only.</li>
 <li>Prefer regulatory-safe vocabulary in human-language fields: <strong>obligation</strong>, <strong>allocation</strong>, <strong>settlement</strong>, <strong>unit</strong>, <strong>position</strong>, <strong>receipt</strong>, <strong>provenance</strong>, <strong>evidence</strong> — not payment / wallet / balance / currency framing for substrate flows.</li>
