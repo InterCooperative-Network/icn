@@ -257,6 +257,11 @@ jobs:
           # output (deterministic apart from recorded_at), so a fixture edit cannot
           # silently drift the committed packet. Offline, fail-closed.
           python3 scripts/rehearsal_pending_publish_evidence.py --check
+          # #2422: the evidence packet validator now runs a privacy/redaction
+          # value scan (did:icn / JWT / PEM / private-path / private-IP) on top
+          # of structural schema validation. Adversarial suite must stay green
+          # so a structurally-valid-but-leaky packet can never pass. Offline.
+          python3 docs/scripts/tests/test_rehearsal_evidence_leak_scan.py
         continue-on-error: false
 
   bridge_conformance:
