@@ -274,6 +274,44 @@ done
 log "Running virt-customize on $OUT_IMAGE ..."
 VIRT_CUSTOMIZE_ARGS=(
     -a "$OUT_IMAGE"
+)
+# The libguestfs appliance cannot resolve DNS names when the build host uses a
+# local stub resolver (systemd-resolved on 127.0.0.53): virt-customize installs
+# ITS OWN resolv.conf pointing at the user-net DNS (10.0.2.3) for the duration
+# of each apt operation, and that forwarder dies against the host stub — so
+# --install fails ("Temporary failure resolving 'deb.debian.org'") for any
+# package not already present in the base, and writing the guest's resolv.conf
+# cannot help. TCP through the user-net NAT works fine; only name resolution is
+# broken. ICN_APPLIANCE_BUILD_DNS therefore names a resolver the BUILD HOST
+# queries directly; the resolved mirror addresses are pinned into the guest's
+# /etc/hosts for the build (tagged lines), and the pins are removed as the last
+# customize step so the produced image is unchanged.
+if [ -n "${ICN_APPLIANCE_BUILD_DNS:-}" ]; then
+    if ! [[ "$ICN_APPLIANCE_BUILD_DNS" =~ ^[0-9]{1,3}(\.[0-9]{1,3}){3}$ ]]; then
+        err "ICN_APPLIANCE_BUILD_DNS must be an IPv4 address (got: '$ICN_APPLIANCE_BUILD_DNS')"
+        exit 7
+    fi
+    # `dig` does the host-side mirror resolution; without it the pin loop would
+    # produce empty results and misreport a resolver failure. Fail early with a
+    # clear dependency message instead.
+    if ! command -v dig >/dev/null 2>&1; then
+        err "ICN_APPLIANCE_BUILD_DNS is set but 'dig' is not installed on the build host (install dnsutils/bind-utils, or unset the knob and pre-stage packages into the base image)."
+        exit 7
+    fi
+    BUILD_PIN_HOSTS="deb.debian.org security.debian.org"
+    for h in $BUILD_PIN_HOSTS; do
+        pin_ip="$(dig +short A "$h" "@$ICN_APPLIANCE_BUILD_DNS" 2>/dev/null | grep -E '^[0-9]{1,3}(\.[0-9]{1,3}){3}$' | head -1)"
+        if [ -z "$pin_ip" ]; then
+            err "ICN_APPLIANCE_BUILD_DNS: could not resolve $h via $ICN_APPLIANCE_BUILD_DNS"
+            exit 7
+        fi
+        log "Build DNS pin: $h -> $pin_ip (guest /etc/hosts, build-time only)"
+        VIRT_CUSTOMIZE_ARGS+=(
+            --run-command "printf '%s %s # icn-build-pin\n' '$pin_ip' '$h' >> /etc/hosts"
+        )
+    done
+fi
+VIRT_CUSTOMIZE_ARGS+=(
     --update
     --install "ca-certificates,curl,openssl,python3,systemd,sudo"
 
@@ -337,17 +375,20 @@ if [ "$DEMO_PROFILE" = "1" ]; then
     DEMO_VERIFY_SCRIPT="$APPLIANCE_DIR/scripts/icn-demo-verify.sh"
     DEMO_RESET_SCRIPT="$APPLIANCE_DIR/scripts/icn-demo-reset.sh"
     DEMO_SESSION_SCRIPT="$APPLIANCE_DIR/scripts/icn-demo-session.py"
+    DEMO_STATUS_SCRIPT="$APPLIANCE_DIR/scripts/icn-demo-status.sh"
     MEMBER_SHELL_UNIT="$APPLIANCE_DIR/systemd/icn-member-shell.service"
     DEMO_SESSION_UNIT="$APPLIANCE_DIR/systemd/icn-demo-session.service"
     DEMO_DROPIN="$APPLIANCE_DIR/systemd/icnd.service.d/20-demo-profile.conf"
     for f in "$DEMO_SEED_SCRIPT" "$DEMO_VERIFY_SCRIPT" "$DEMO_RESET_SCRIPT" \
-             "$DEMO_SESSION_SCRIPT" "$MEMBER_SHELL_UNIT" "$DEMO_SESSION_UNIT" "$DEMO_DROPIN"; do
+             "$DEMO_SESSION_SCRIPT" "$DEMO_STATUS_SCRIPT" \
+             "$MEMBER_SHELL_UNIT" "$DEMO_SESSION_UNIT" "$DEMO_DROPIN"; do
         if [ ! -f "$f" ]; then
             err "Demo profile source file missing: $f"
             exit 7
         fi
     done
     for d in "$REPO_ROOT/web/member-shell" "$REPO_ROOT/web/pilot-ui/fixtures" \
+             "$REPO_ROOT/web/rehearsal-landing" \
              "$REPO_ROOT/institutions/nycn" "$REPO_ROOT/demo/nycn-dogfood"; do
         if [ ! -d "$d" ]; then
             err "Demo profile payload directory missing: $d"
@@ -385,6 +426,24 @@ if [ "$DEMO_PROFILE" = "1" ]; then
         "$DEMO_STAGE/demo/repo/demo"
     cp -r "$REPO_ROOT/web/member-shell"            "$DEMO_STAGE/static/web/"
     cp -r "$REPO_ROOT/web/pilot-ui/fixtures"       "$DEMO_STAGE/static/web/pilot-ui/"
+    cp -r "$REPO_ROOT/web/rehearsal-landing"       "$DEMO_STAGE/static/web/"
+    # Non-secret build provenance for the landing page's status strip
+    # (GET /build-info.json). The typed appliance manifest stays the artifact
+    # of record; this is a display convenience staged next to the static tree.
+    DEMO_GIT_COMMIT="$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo unknown)"
+    python3 - "$DEMO_STAGE/static/web/build-info.json" "$DEMO_GIT_COMMIT" \
+        "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$ICN_APPLIANCE_VERSION" <<'PYEOF'
+import json, sys
+path, commit, ts, version = sys.argv[1:5]
+with open(path, "w", encoding="utf-8") as f:
+    json.dump({
+        "git_commit": commit,
+        "build_timestamp": ts,
+        "image_version": version,
+        "demo_profile": True,
+        "non_production": True,
+    }, f, indent=2)
+PYEOF
     cp -r "$REPO_ROOT/institutions/nycn"           "$DEMO_STAGE/demo/institutions/"
     cp -r "$REPO_ROOT/demo/nycn-dogfood"           "$DEMO_STAGE/demo/repo/demo/"
     cp "$REPO_ROOT/scripts/local_receipt_chain_13of13_rehearsal.sh" \
@@ -414,8 +473,9 @@ if [ "$DEMO_PROFILE" = "1" ]; then
         --copy-in "$DEMO_VERIFY_SCRIPT:/usr/local/sbin"
         --copy-in "$DEMO_RESET_SCRIPT:/usr/local/sbin"
         --copy-in "$DEMO_SESSION_SCRIPT:/usr/local/sbin"
-        --run-command "chmod +x /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-session.py"
-        --run-command "ln -sf /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-seed && ln -sf /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-verify && ln -sf /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-reset"
+        --copy-in "$DEMO_STATUS_SCRIPT:/usr/local/sbin"
+        --run-command "chmod +x /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-session.py /usr/local/sbin/icn-demo-status.sh"
+        --run-command "ln -sf /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-seed && ln -sf /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-verify && ln -sf /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-reset && ln -sf /usr/local/sbin/icn-demo-status.sh /usr/local/sbin/icn-demo-status"
         --run-command "systemctl enable icn-member-shell.service"
         --run-command "systemctl enable icn-demo-session.service"
         # The bundled 13/13 evidence validator (icn-demo-verify --chain)
@@ -429,10 +489,142 @@ if [ "$DEMO_PROFILE" = "1" ]; then
     )
 fi
 
+# ---------- LAN profile (ICN_APPLIANCE_LAN_PROFILE=1; DEMO profile required) ----
+# Single-origin LAN serving: nginx inside the VM terminates ONE browser origin
+# (ICN_APPLIANCE_LAN_ORIGIN) and forwards /v1/dev/demo/* to the loopback-only
+# session endpoint (:8091, bind unchanged) and /v1/* to the gateway (:8080),
+# while serving the landing page + member shell as static files — so every
+# browser fetch is same-origin. The gateway CORS allowlist and the session
+# endpoint's origin allowlist each gain EXACTLY this one origin via rendered
+# drop-ins. Off by default; with the flag unset the image is byte-identical to
+# a plain demo build. See deploy/appliance/lan/README.md.
+LAN_PROFILE="${ICN_APPLIANCE_LAN_PROFILE:-0}"
+LAN_STAGE=""
+if [ "$LAN_PROFILE" = "1" ]; then
+    if [ "$DEMO_PROFILE" != "1" ]; then
+        err "LAN profile requires the demo profile (ICN_APPLIANCE_DEMO_PROFILE=1)"
+        exit 7
+    fi
+    LAN_ORIGIN="${ICN_APPLIANCE_LAN_ORIGIN:-}"
+    # Exact origin only: scheme://host[:port] — no path, no wildcard. The host
+    # charset restriction also keeps the sed render below injection-free.
+    if ! [[ "$LAN_ORIGIN" =~ ^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]]; then
+        err "ICN_APPLIANCE_LAN_ORIGIN must be http(s)://host[:port] (got: '${LAN_ORIGIN:-unset}')"
+        exit 7
+    fi
+    LAN_DIR="$APPLIANCE_DIR/lan"
+    LAN_SCHEME="${LAN_ORIGIN%%://*}"
+    LAN_HOST="${LAN_ORIGIN#*://}"; LAN_HOST="${LAN_HOST%%:*}"
+    # Port handling. The rendered nginx templates listen ONLY on the scheme
+    # default (80 for http, 443 for https) and the redirect uses only the host,
+    # so an origin with a non-default explicit port would be baked into the
+    # gateway/session allowlists yet unreachable on that port — the browser
+    # would fail the session endpoint's exact-Origin check. Reject a non-default
+    # port up front rather than emit a config that fails at browse time. Also
+    # reject a port > 65535 (the 1–5 digit regex above admits e.g. 99999).
+    LAN_PORT=""
+    case "$LAN_ORIGIN" in
+        *:*://*) : ;;  # unreachable — scheme handled above
+    esac
+    LAN_AFTER_SCHEME="${LAN_ORIGIN#*://}"
+    if [[ "$LAN_AFTER_SCHEME" == *:* ]]; then
+        LAN_PORT="${LAN_AFTER_SCHEME##*:}"
+        if [ "$LAN_PORT" -gt 65535 ] 2>/dev/null || [ "$LAN_PORT" -lt 1 ] 2>/dev/null; then
+            err "ICN_APPLIANCE_LAN_ORIGIN port out of range (1–65535): '$LAN_PORT'"
+            exit 7
+        fi
+        if { [ "$LAN_SCHEME" = "http" ] && [ "$LAN_PORT" != "80" ]; } ||
+           { [ "$LAN_SCHEME" = "https" ] && [ "$LAN_PORT" != "443" ]; }; then
+            err "ICN_APPLIANCE_LAN_ORIGIN uses a non-default port ($LAN_PORT). The in-VM nginx serves only the scheme default (80/443); a non-default port would be baked into the allowlists but unreachable. Use a default-port origin, or front this VM with an external proxy that terminates the non-default port."
+            exit 7
+        fi
+        # Canonicalize an EXPLICIT default port away: a browser serializes the
+        # Origin header without the default port (https://host, not
+        # https://host:443), and the session endpoint / gateway do exact Origin
+        # matching. If we baked "https://host:443" into the allowlists, the
+        # one-click launcher's request (Origin: https://host) would 403. Strip
+        # the port so the stored origin matches what the browser sends.
+        LAN_ORIGIN="$LAN_SCHEME://$LAN_HOST"
+        log "LAN origin canonicalized (explicit default port removed): $LAN_ORIGIN"
+    fi
+    for f in "$LAN_DIR/nginx-icn-rehearsal-http.conf.in" \
+             "$LAN_DIR/nginx-icn-rehearsal-https.conf.in" \
+             "$LAN_DIR/icnd-30-lan-origin.conf.in" \
+             "$LAN_DIR/icn-member-shell-30-lan-origin.conf.in" \
+             "$LAN_DIR/icn-demo-session-30-lan-origin.conf.in"; do
+        if [ ! -f "$f" ]; then
+            err "LAN profile template missing: $f"
+            exit 7
+        fi
+    done
+    LAN_STAGE="$ICN_APPLIANCE_OUTPUT_DIR/.lan-stage.$$"
+    rm -rf "$LAN_STAGE"
+    mkdir -p "$LAN_STAGE/nginx" "$LAN_STAGE/icnd-dropin" "$LAN_STAGE/shell-dropin" "$LAN_STAGE/session-dropin" "$LAN_STAGE/tls"
+    if [ "$LAN_SCHEME" = "https" ]; then
+        NGINX_TEMPLATE="$LAN_DIR/nginx-icn-rehearsal-https.conf.in"
+        LAN_TLS_CERT="${ICN_APPLIANCE_LAN_TLS_CERT:-}"
+        LAN_TLS_KEY="${ICN_APPLIANCE_LAN_TLS_KEY:-}"
+        if [ ! -f "$LAN_TLS_CERT" ] || [ ! -f "$LAN_TLS_KEY" ]; then
+            err "https LAN origin requires ICN_APPLIANCE_LAN_TLS_CERT and ICN_APPLIANCE_LAN_TLS_KEY (operator-supplied, e.g. from an internal CA)"
+            exit 7
+        fi
+        cp "$LAN_TLS_CERT" "$LAN_STAGE/tls/rehearsal.crt"
+        cp "$LAN_TLS_KEY"  "$LAN_STAGE/tls/rehearsal.key"
+        chmod 600 "$LAN_STAGE/tls/rehearsal.key"
+    else
+        NGINX_TEMPLATE="$LAN_DIR/nginx-icn-rehearsal-http.conf.in"
+        warn "LAN origin is plain http — the bearer session travels unencrypted on the LAN; prefer an https origin with an internal-CA certificate."
+    fi
+    sed -e "s|@LAN_HOST@|$LAN_HOST|g" -e "s|@LAN_ORIGIN@|$LAN_ORIGIN|g" \
+        "$NGINX_TEMPLATE" > "$LAN_STAGE/nginx/icn-rehearsal.conf"
+    sed -e "s|@LAN_ORIGIN@|$LAN_ORIGIN|g" \
+        "$LAN_DIR/icnd-30-lan-origin.conf.in" > "$LAN_STAGE/icnd-dropin/30-lan-origin.conf"
+    # No @…@ tokens in the shell drop-in, but stage it uniformly.
+    cp "$LAN_DIR/icn-member-shell-30-lan-origin.conf.in" "$LAN_STAGE/shell-dropin/30-lan-origin.conf"
+    sed -e "s|@LAN_ORIGIN@|$LAN_ORIGIN|g" \
+        "$LAN_DIR/icn-demo-session-30-lan-origin.conf.in" > "$LAN_STAGE/session-dropin/30-lan-origin.conf"
+    log "LAN profile: single origin $LAN_ORIGIN (nginx in-VM; gateway + shell + session endpoint all loopback-bound)"
+    VIRT_CUSTOMIZE_ARGS+=(
+        # qemu-guest-agent: the LAN profile targets a long-lived VM on a real
+        # hypervisor (not a throwaway user-net QEMU), where clean host-initiated
+        # shutdown and agent-side diagnostics matter.
+        --install nginx,qemu-guest-agent
+        --run-command "systemctl enable qemu-guest-agent"
+        --mkdir /etc/systemd/system/icn-demo-session.service.d
+        --mkdir /etc/systemd/system/icn-member-shell.service.d
+        --copy-in "$LAN_STAGE/nginx/icn-rehearsal.conf:/etc/nginx/sites-available"
+        --run-command "ln -sf ../sites-available/icn-rehearsal.conf /etc/nginx/sites-enabled/icn-rehearsal.conf && rm -f /etc/nginx/sites-enabled/default"
+        --copy-in "$LAN_STAGE/icnd-dropin/30-lan-origin.conf:/etc/systemd/system/icnd.service.d"
+        --copy-in "$LAN_STAGE/shell-dropin/30-lan-origin.conf:/etc/systemd/system/icn-member-shell.service.d"
+        --copy-in "$LAN_STAGE/session-dropin/30-lan-origin.conf:/etc/systemd/system/icn-demo-session.service.d"
+        --write "/etc/icn/lan-profile.env:ICN_LAN_ORIGIN=$LAN_ORIGIN"
+        --run-command "systemctl enable nginx"
+    )
+    if [ "$LAN_SCHEME" = "https" ]; then
+        VIRT_CUSTOMIZE_ARGS+=(
+            --mkdir /etc/icn/tls
+            --copy-in "$LAN_STAGE/tls/rehearsal.crt:/etc/icn/tls"
+            --copy-in "$LAN_STAGE/tls/rehearsal.key:/etc/icn/tls"
+            --run-command "chown root:root /etc/icn/tls/rehearsal.key && chmod 600 /etc/icn/tls/rehearsal.key"
+        )
+    fi
+fi
+
+# Remove the build-time mirror pins (see ICN_APPLIANCE_BUILD_DNS above) so the
+# produced image's /etc/hosts is unchanged.
+if [ -n "${ICN_APPLIANCE_BUILD_DNS:-}" ]; then
+    VIRT_CUSTOMIZE_ARGS+=(
+        --run-command "sed -i '/# icn-build-pin\$/d' /etc/hosts"
+    )
+fi
+
 virt-customize "${VIRT_CUSTOMIZE_ARGS[@]}"
 
 if [ -n "$DEMO_STAGE" ]; then
     rm -rf "$DEMO_STAGE"
+fi
+if [ -n "$LAN_STAGE" ]; then
+    rm -rf "$LAN_STAGE"
 fi
 
 # virt-sysprep to scrub instance-specific state. --operations chosen

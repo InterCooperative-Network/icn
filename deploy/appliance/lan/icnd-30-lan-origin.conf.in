@@ -1,0 +1,29 @@
+# LAN profile drop-in — rendered by build-image.sh from
+# deploy/appliance/lan/icnd-30-lan-origin.conf.in when
+# ICN_APPLIANCE_LAN_PROFILE=1. Sorts AFTER 20-demo-profile.conf, so its
+# last-assignment-wins directives override the demo profile's.
+#
+# Two overrides, both load-bearing for the single-origin security posture:
+#
+# 1. Gateway bind 127.0.0.1:8080 (the demo drop-in binds 0.0.0.0:8080).
+#    On a bridged LAN VM, 0.0.0.0 makes the dev gateway — which runs with
+#    ICN_ENABLE_ADMIN_ENDPOINTS=true — directly reachable at http://<vm>:8080,
+#    bypassing the in-VM TLS reverse proxy and the single-origin CORS/Origin
+#    controls, and exposing dev/admin routes to the LAN. nginx proxies to
+#    127.0.0.1:8080, so rebinding to loopback keeps the browser path working
+#    while making nginx the ONLY LAN path to the gateway. This is the
+#    CLAUDE.md "never enable a dev posture on a routable bind" rule applied to
+#    the LAN profile. (The user-net QEMU smoke path is unaffected: smoke-local
+#    reaches the gateway over an SSH/hostfwd tunnel to the guest, and this
+#    profile is not applied to smoke images.)
+#    ExecStart is reset (empty) then re-set — systemd requires the reset to
+#    replace an inherited ExecStart.
+#
+# 2. ICN_CORS_ORIGINS REPLACES the demo drop-in's value with the demo
+#    loopback set PLUS the single LAN origin the reverse proxy serves. Exact
+#    scheme://host[:port] matches only — the gateway's CORS matcher does no
+#    wildcarding (crates/icn-gateway/src/security.rs).
+[Service]
+ExecStart=
+ExecStart=/usr/local/bin/icnd --data-dir /var/lib/icn --gateway-enable --gateway-bind 127.0.0.1:8080
+Environment=ICN_CORS_ORIGINS=http://localhost:8090,http://127.0.0.1:8090,http://localhost:18090,http://127.0.0.1:18090,@LAN_ORIGIN@

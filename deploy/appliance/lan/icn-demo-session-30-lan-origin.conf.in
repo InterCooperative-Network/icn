@@ -1,0 +1,9 @@
+# LAN profile drop-in — rendered by build-image.sh from
+# deploy/appliance/lan/icn-demo-session-30-lan-origin.conf.in when
+# ICN_APPLIANCE_LAN_PROFILE=1.
+#
+# Adds the single reverse-proxied LAN origin to the demo-session endpoint's
+# server-side origin allowlist (icn-demo-session.py ALLOWED_ORIGINS). The
+# endpoint's 127.0.0.1 bind and double dev-gate are unchanged.
+[Service]
+Environment=ICN_DEMO_SESSION_EXTRA_ORIGINS=@LAN_ORIGIN@

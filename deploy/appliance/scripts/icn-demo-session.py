@@ -40,10 +40,18 @@
 # ============================================================================
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+
+def log(msg):
+    # stdout -> journald via the unit. Never include the credential here.
+    # Defined up front so module-level origin validation below can warn.
+    print("[demo-session] %s" % msg, flush=True)
+
 
 # Serialize seeding: ThreadingHTTPServer can dispatch concurrent POSTs, and
 # overlapping icn-demo-seed runs would race on node state. Only one seed runs
@@ -60,21 +68,40 @@ BIND_PORT = int(os.environ.get("ICN_DEMO_SESSION_PORT", "8091"))
 # back here for a FRESH least-privilege session — it never upgrades a token.
 SEED_CMD_ORGANIZER = ["/usr/local/sbin/icn-demo-seed", "--session", "organizer", "--json"]
 SEED_CMD_MEMBER = ["/usr/local/sbin/icn-demo-seed", "--session", "member", "--json"]
+# "Start a NEW rehearsal": same fixed organizer seed plus --fresh, which makes
+# the seed reset the workspace (an organizer act: prior un-completed fictional
+# items are retired, recorded receipts remain permanent process facts) before
+# minting the organizer session. Still a constant list — the flag only SELECTS
+# this third command.
+SEED_CMD_ORGANIZER_FRESH = [
+    "/usr/local/sbin/icn-demo-seed", "--session", "organizer", "--fresh", "--json",
+]
+# Read-only sanitized status summary for the landing page (GET
+# /v1/dev/demo/status): gateway health + workspace/receipt COUNTS only. The
+# script mints an internal governance:read credential and never returns it.
+STATUS_CMD = ["/usr/local/sbin/icn-demo-status", "--json"]
 
 
 def resolve_seed_cmd(body_bytes):
-    """Map a CLOSED role intent to one of the two FIXED commands above.
-    Returns (cmd, role) on success, or (None, error_message) on a bad body/role.
-    The role only SELECTS a constant list — it is never spliced into a command."""
+    """Map a CLOSED role intent (plus the organizer-only `fresh` flag) to one
+    of the FIXED commands above. Returns (cmd, role) on success, or
+    (None, error_message) on a bad body/role. The role only SELECTS a constant
+    list — it is never spliced into a command."""
     role = "member"  # default: the member session
+    fresh = False
     if body_bytes:
         try:
-            role = (json.loads(body_bytes.decode("utf-8")).get("role") or "member")
+            body = json.loads(body_bytes.decode("utf-8"))
+            role = body.get("role") or "member"
+            fresh = body.get("fresh") is True
         except Exception:  # noqa: BLE001
             return (None, "request body is not valid JSON")
     if role == "organizer":
-        return (SEED_CMD_ORGANIZER, "organizer")
+        return (SEED_CMD_ORGANIZER_FRESH if fresh else SEED_CMD_ORGANIZER, "organizer")
     if role == "member":
+        if fresh:
+            # Reset is an organizer act; a member session must not trigger it.
+            return (None, "fresh requires the organizer role")
         return (SEED_CMD_MEMBER, "member")
     return (None, "unknown role (allowed: organizer, member)")
 
@@ -85,10 +112,44 @@ def resolve_seed_cmd(body_bytes):
 # unrelated http://localhost:3000 dev server, which could otherwise obtain a
 # JWT). The allow-list below is therefore the exact, fixed set, identical to the
 # gateway's ICN_CORS_ORIGINS. Non-listed origins are refused.
+#
+# LAN single-origin posture (appliance LAN profile): this endpoint STAYS bound
+# to loopback; an in-VM reverse proxy serves the shell and forwards
+# /v1/dev/demo/session here, so the browser's Origin header carries the
+# deployment's public origin. That exact origin is added — at build/deploy
+# time, by the operator, via ICN_DEMO_SESSION_EXTRA_ORIGINS (comma-separated,
+# exact `scheme://host[:port]` values; no wildcards) — never from request
+# bytes. An empty/unset variable changes nothing.
+#
+# Each configured value is validated to a strict origin shape before it can
+# join the allowlist. safe_origin() reflects an allowlist member verbatim into
+# Access-Control-Allow-Origin, so a value containing whitespace, control
+# characters, or CR/LF could otherwise become a header-injection / response-
+# splitting vector. A malformed entry is dropped with a startup warning rather
+# than trusted.
+_ORIGIN_RE = re.compile(r"^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$")
+
+
+def _valid_configured_origins(raw):
+    out = []
+    for o in raw.split(","):
+        o = o.strip()
+        if not o:
+            continue
+        if _ORIGIN_RE.match(o):
+            out.append(o)
+        else:
+            log("ignoring malformed ICN_DEMO_SESSION_EXTRA_ORIGINS entry: %r" % o[:80])
+    return tuple(out)
+
+
+_EXTRA_ORIGINS = _valid_configured_origins(
+    os.environ.get("ICN_DEMO_SESSION_EXTRA_ORIGINS", "")
+)
 ALLOWED_ORIGINS = (
     "http://localhost:8090", "http://127.0.0.1:8090",
     "http://localhost:18090", "http://127.0.0.1:18090",
-)
+) + _EXTRA_ORIGINS
 
 
 def safe_origin(origin):
@@ -109,24 +170,20 @@ def demo_gated():
     return admin and not production
 
 
-def log(msg):
-    # stdout -> journald via the unit. Never include the credential here.
-    print("[demo-session] %s" % msg, flush=True)
-
-
 class Handler(BaseHTTPRequestHandler):
     server_version = "icn-demo-session/0"
 
     def _cors(self, origin):
-        # Echo only a server-reconstructed loopback origin (literals + an
-        # int-parsed port), never the raw request value — so a tainted Origin
-        # header can never be reflected into a response (avoids HTTP
-        # response-splitting). Non-loopback origins get no CORS headers.
+        # Echo only an exact allowlist member (a stored constant), never the raw
+        # request value — so a tainted Origin header can never be reflected into
+        # a response (avoids HTTP response-splitting). Non-listed origins get no
+        # CORS headers. GET is advertised alongside POST because the status
+        # route (GET /v1/dev/demo/status) is served from this same handler.
         safe = safe_origin(origin)
         if safe is not None:
             self.send_header("Access-Control-Allow-Origin", safe)
             self.send_header("Vary", "Origin")
-            self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def do_OPTIONS(self):
@@ -134,6 +191,31 @@ class Handler(BaseHTTPRequestHandler):
         self._cors(self.headers.get("Origin", ""))
         self.send_header("Content-Length", "0")
         self.end_headers()
+
+    def do_GET(self):
+        # Read-only sanitized status for the landing page. No credential is
+        # minted INTO the response (icn-demo-status returns counts only), so
+        # unlike the POST path this does not demand an Origin header — a
+        # same-origin GET may legitimately omit one. The dev gates still apply.
+        origin = self.headers.get("Origin", "")
+        if self.path.rstrip("/") != "/v1/dev/demo/status":
+            return self._json(404, {"error": "not found"}, origin)
+        if not demo_gated():
+            return self._json(403, {"error": "demo status disabled (not a DEV/DEMO posture)"}, origin)
+        try:
+            out = subprocess.run(STATUS_CMD, capture_output=True, text=True, timeout=60)
+        except Exception as e:  # noqa: BLE001
+            log("status spawn failed: %s" % e)
+            return self._json(500, {"error": "status failed to start"}, origin)
+        if out.returncode != 0:
+            log("status exit %d: %s" % (out.returncode, (out.stderr or "").strip()[:200]))
+            return self._json(500, {"error": "status failed"}, origin)
+        try:
+            summary = json.loads(out.stdout)
+        except Exception:  # noqa: BLE001
+            log("status produced non-JSON output")
+            return self._json(500, {"error": "status output not JSON"}, origin)
+        return self._json(200, summary, origin)
 
     def do_POST(self):
         origin = self.headers.get("Origin", "")

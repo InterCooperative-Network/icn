@@ -212,18 +212,43 @@
   // credential is held in page memory exactly like the manual flow (never
   // persisted). The flag is a UI hint only and carries no secret.
   var DEMO_LAUNCHER = MODE === "live" && params.get("demo") === "launcher";
+  // The shell is served from one of two very different origins, and the
+  // launcher targets must follow the origin — a loopback literal is only
+  // correct when the PAGE itself is on loopback:
+  //   * loopback (assembled-appliance tunnels / smoke-local.sh): the gateway
+  //     and session endpoint are SSH/hostfwd-forwarded to host ports
+  //     (defaults 18080/18091, overridable via ?gw / ?session), and
+  //   * a LAN single-origin deployment (appliance LAN profile): one reverse
+  //     proxy serves this page AND forwards /v1/* to the gateway and
+  //     /v1/dev/demo/session to the VM-loopback session endpoint. There the
+  //     only correct target is the page's own origin — "localhost" would
+  //     point the browser at the VIEWER'S machine, not the appliance.
+  var PAGE_ON_LOOPBACK = window.location.hostname === "127.0.0.1" ||
+    window.location.hostname === "localhost";
   var DEMO_LOOPBACK = window.location.hostname === "127.0.0.1" ? "127.0.0.1" : "localhost";
   // The launcher forwards the gateway and session endpoint to host ports and
   // passes them as ?gw / ?session so operator port overrides
   // (ICN_DEMO_GW_PORT / ICN_DEMO_SESSION_PORT) are honored. Digits only — a
   // non-numeric value falls back to the default and can never inject into the
-  // URL we build.
+  // URL we build. Port overrides are loopback-tunnel concepts; on a LAN
+  // origin both targets are same-origin paths behind the reverse proxy.
   function demoPort(name, fallback) {
     var v = params.get(name);
     return v && /^[0-9]{1,5}$/.test(v) ? v : fallback;
   }
-  var DEMO_GATEWAY = "http://" + DEMO_LOOPBACK + ":" + demoPort("gw", "18080");
-  var DEMO_SESSION_URL = "http://" + DEMO_LOOPBACK + ":" + demoPort("session", "18091") + "/v1/dev/demo/session";
+  var DEMO_GATEWAY = PAGE_ON_LOOPBACK
+    ? "http://" + DEMO_LOOPBACK + ":" + demoPort("gw", "18080")
+    : window.location.origin;
+  var DEMO_SESSION_URL = (PAGE_ON_LOOPBACK
+    ? "http://" + DEMO_LOOPBACK + ":" + demoPort("session", "18091")
+    : window.location.origin) + "/v1/dev/demo/session";
+  // ?fresh=1 (organizer launcher only): ask the session endpoint to start a
+  // NEW rehearsal generation before minting the organizer session. Reset is
+  // an organizer act with retire-not-erase semantics (prior fictional items
+  // are cancelled unless already completed; recorded receipts remain
+  // permanent process facts). The flag is a UI intent only — the endpoint
+  // maps it to a fixed command; nothing here carries a secret.
+  var DEMO_FRESH = DEMO_LAUNCHER && SURFACE === "organizer" && params.get("fresh") === "1";
 
   var state = {
     gateway: null,     // live mode only; validated http(s) origin string
@@ -2444,8 +2469,12 @@
         setOrganizerLaunchCopy();
         show("demo-launch-section");
         setSyncChip(t(SYNC.DELAYED), "neutral", t("launcher.ready"));
-        wireDemoLaunch("organizer", loadOrganizer);
+        wireDemoLaunch("organizer", loadOrganizer, DEMO_FRESH);
       } else {
+        // Manual connect on a non-loopback origin: the HTML default
+        // (http://localhost:8080) would point at the viewer's machine, so
+        // prefill the page's own origin (the LAN deployment proxies /v1/*).
+        if (!PAGE_ON_LOOPBACK) { byId("gateway-url").value = window.location.origin; }
         show("connect-section");
         setSyncChip(t(SYNC.DELAYED), "neutral", t("launcher.notConnected"));
       }
@@ -2463,6 +2492,8 @@
         setSyncChip(t(SYNC.DELAYED), "neutral", t("launcher.ready"));
         wireDemoLaunch("member", loadLive);
       } else {
+        // Same non-loopback prefill as the organizer manual path above.
+        if (!PAGE_ON_LOOPBACK) { byId("gateway-url").value = window.location.origin; }
         show("connect-section");
         setSyncChip(t(SYNC.DELAYED), "neutral", t("launcher.notConnected"));
       }
@@ -2526,7 +2557,7 @@
   // role is the CLOSED session intent ("member" | "organizer"); loader is the
   // surface loader to run once the session is minted. The manual-connect fallback
   // uses the connect form already wired for this surface in init().
-  function wireDemoLaunch(role, loader) {
+  function wireDemoLaunch(role, loader, fresh) {
     loader = loader || loadLive;
     var btn = byId("demo-launch-button");
     var adv = byId("demo-advanced-button");
@@ -2540,14 +2571,16 @@
     btn.addEventListener("click", function () {
       btn.disabled = true;
       st.textContent = t("launcher.starting");
-      // JSON body carries the CLOSED role intent; the loopback session endpoint
-      // maps it to a fixed command and mints a least-privilege per-role session.
-      // This triggers a CORS preflight, which the endpoint answers for the
-      // demo-shell origin. The credential lives only in page memory.
+      // JSON body carries the CLOSED role intent (plus the organizer-only
+      // fresh flag); the loopback session endpoint maps it to a fixed command
+      // and mints a least-privilege per-role session. On a cross-origin
+      // (tunnel) posture this triggers a CORS preflight, which the endpoint
+      // answers for the demo-shell origin; on the LAN single-origin posture
+      // the request is same-origin. The credential lives only in page memory.
       fetch(DEMO_SESSION_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ role: role })
+        body: JSON.stringify(fresh ? { role: role, fresh: true } : { role: role })
       }).then(function (resp) {
         if (!resp.ok) { throw new Error("HTTP " + resp.status); }
         return resp.json();
@@ -2558,6 +2591,16 @@
         // the endpoint reports. Credential lives only in page memory.
         state.gateway = DEMO_GATEWAY;
         state.credential = cred;
+        // Drop ?fresh from the address bar once the new generation exists, so
+        // a reload continues the rehearsal instead of silently resetting it
+        // again (reset retires un-completed items).
+        if (fresh) {
+          var cleaned = new URLSearchParams(window.location.search);
+          cleaned.delete("fresh");
+          var qs = cleaned.toString();
+          window.history.replaceState(null, "",
+            window.location.pathname + (qs ? "?" + qs : ""));
+        }
         hide("demo-launch-section");
         show("connect-section");
         loader();

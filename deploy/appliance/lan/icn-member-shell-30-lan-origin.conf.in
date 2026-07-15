@@ -1,0 +1,14 @@
+# LAN profile drop-in — rendered by build-image.sh from
+# deploy/appliance/lan/icn-member-shell-30-lan-origin.conf.in when
+# ICN_APPLIANCE_LAN_PROFILE=1.
+#
+# Rebinds the static member-shell server to 127.0.0.1:8090 (the demo unit
+# binds 0.0.0.0:8090). In the LAN profile nginx serves the SAME static tree
+# (/usr/share/icn/static/web) directly, so this server is not on the LAN
+# browser path at all — it exists only for smoke-local parity. Keeping it on
+# 0.0.0.0 would needlessly expose a second HTTP listener on the LAN, so the
+# single-origin posture rebinds it to loopback. ExecStart is reset then
+# re-set (systemd requires the reset to replace the inherited ExecStart).
+[Service]
+ExecStart=
+ExecStart=/usr/bin/python3 -m http.server 8090 --bind 127.0.0.1 --directory /usr/share/icn/static/web

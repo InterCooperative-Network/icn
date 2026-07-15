@@ -99,6 +99,7 @@ REHEARSAL_LABEL="Example member (fictional)"
 
 JSON_OUT=0
 SESSION_ROLE=""   # "" = legacy pre-seeded member loop; "organizer"|"member" = Rehearsal Node role session
+FRESH=0           # --fresh (organizer only): reset the workspace to a NEW rehearsal generation before minting
 
 log(){ [ "$JSON_OUT" = 1 ] || echo "[demo-seed] $*"; }
 fatal(){ echo "[demo-seed] FATAL: $*" >&2; exit 1; }
@@ -109,15 +110,22 @@ fatal(){ echo "[demo-seed] FATAL: $*" >&2; exit 1; }
 while [ $# -gt 0 ]; do
   case "$1" in
     --json) JSON_OUT=1; shift ;;
+    --fresh) FRESH=1; shift ;;
     --session) shift; SESSION_ROLE="${1:-__missing__}"; [ $# -gt 0 ] && shift ;;
     --session=*) SESSION_ROLE="${1#--session=}"; shift ;;
-    *) fatal "unknown argument: $1 (usage: icn-demo-seed [--json] [--session organizer|member])" ;;
+    *) fatal "unknown argument: $1 (usage: icn-demo-seed [--json] [--session organizer|member] [--fresh])" ;;
   esac
 done
 case "$SESSION_ROLE" in
   ""|organizer|member) : ;;
   *) fatal "unknown --session role '$SESSION_ROLE' (allowed: organizer, member)" ;;
 esac
+# Reset (a new rehearsal generation) is an organizer act — refuse it for the
+# member role and the legacy loop, so --fresh can never silently retire an
+# organizer's in-progress items from a non-organizer path.
+if [ "$FRESH" = 1 ] && [ "$SESSION_ROLE" != "organizer" ]; then
+  fatal "--fresh requires --session organizer (reset is an organizer act)"
+fi
 
 [ "$(id -u)" -eq 0 ] || fatal "run as root: sudo icn-demo-seed"
 [ -f "$ENV_FILE" ]   || fatal "$ENV_FILE missing — has icn-appliance-firstboot run?"
@@ -212,14 +220,33 @@ rehearsal_status(){  # $1=METHOD $2=PATH $3=JWT [$4=BODY]
 ensure_rehearsal_workspace(){  # $1=SETUP_JWT
   local setup="$1" status body
   status="$(rehearsal_status GET "/v1/gov/domains/$DOMAIN/rehearsal/pending-publish" "$setup")"
-  if [ "$status" = "200" ]; then
+  if [ "$status" = "200" ] && [ "$FRESH" != 1 ]; then
     log "rehearsal workspace already initialized (generation preserved)."
     return 0
   fi
-  [ "$status" = "404" ] || fatal "unexpected HTTP $status probing the rehearsal workspace — is icnd in ICN_GOVERNANCE_BUILD_MODE=rehearsal? (rehearsal routes 404 otherwise)"
-  log "initializing the rehearsal workspace for $DOMAIN ..."
-  status="$(rehearsal_status POST "/v1/gov/domains/$DOMAIN/rehearsal/reset" "$setup" '{}')"
-  [ "$status" = "200" ] || fatal "rehearsal workspace init (reset) failed: HTTP $status (setup scope governance:rehearsal:setup)"
+  if [ "$status" != "200" ] && [ "$status" != "404" ]; then
+    fatal "unexpected HTTP $status probing the rehearsal workspace — is icnd in ICN_GOVERNANCE_BUILD_MODE=rehearsal? (rehearsal routes 404 otherwise)"
+  fi
+  if [ "$FRESH" = 1 ] && [ "$status" = "200" ]; then
+    # --fresh on an existing workspace: reset starts a NEW generation. The
+    # daemon's reset semantics are retire-not-erase — prior un-completed
+    # fictional items are cancelled, recorded receipts remain permanent
+    # process facts. RE-resetting an already-designated workspace is an
+    # ORGANIZER act (governance:pending-publish:review) — the setup scope
+    # only authorizes first designation (apps/governance rehearsal.rs). Mint
+    # an INTERNAL organizer-scoped credential just for this call; like the
+    # setup JWT it is never printed.
+    log "starting a fresh rehearsal for $DOMAIN (--fresh: new generation, prior items retired) ..."
+    local reset_jwt
+    reset_jwt="$(mint_local_jwt "$ORGANIZER_SCOPES")"
+    [ -n "$reset_jwt" ] || fatal "trusted local reset-JWT mint failed (icnctl --local-mint)."
+    status="$(rehearsal_status POST "/v1/gov/domains/$DOMAIN/rehearsal/reset" "$reset_jwt" '{}')"
+    [ "$status" = "200" ] || fatal "fresh rehearsal reset failed: HTTP $status (re-reset is an organizer act: governance:pending-publish:review)"
+  else
+    log "initializing the rehearsal workspace for $DOMAIN ..."
+    status="$(rehearsal_status POST "/v1/gov/domains/$DOMAIN/rehearsal/reset" "$setup" '{}')"
+    [ "$status" = "200" ] || fatal "rehearsal workspace init (reset) failed: HTTP $status (setup scope governance:rehearsal:setup)"
+  fi
   body="$(python3 -c 'import json,sys; print(json.dumps({"label": sys.argv[1], "did": sys.argv[2]}))' "$REHEARSAL_LABEL" "$DID")"
   status="$(rehearsal_status POST "/v1/gov/domains/$DOMAIN/rehearsal/bindings" "$setup" "$body")"
   [ "$status" = "200" ] || fatal "rehearsal label binding failed: HTTP $status (label '$REHEARSAL_LABEL' -> operator DID; the operator must be a domain member — it is, via the package StaticList)"

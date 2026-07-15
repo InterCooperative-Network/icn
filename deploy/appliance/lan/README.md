@@ -1,0 +1,95 @@
+# Appliance LAN profile (`ICN_APPLIANCE_LAN_PROFILE=1`)
+
+Single-origin LAN serving for the **demo-profile** rehearsal appliance. Off by
+default; requires `ICN_APPLIANCE_DEMO_PROFILE=1`. Never appropriate for
+production or partner deployments — this is the same non-production rehearsal
+posture, made reachable from an operator-controlled LAN through exactly one
+browser origin.
+
+## What it installs (at image build time)
+
+- **nginx** inside the VM, terminating one origin (`ICN_APPLIANCE_LAN_ORIGIN`,
+  e.g. `https://rehearsal.example.internal`) and forwarding:
+  - `/v1/dev/demo/*` → `127.0.0.1:8091` — the demo-session endpoint **keeps its
+    deliberate loopback-only bind**; the proxy is the only LAN path to it
+  - `/v1/*` → `127.0.0.1:8080` — the gateway (JWT auth unchanged)
+  - everything else → `/usr/share/icn/static/web` served as static files
+    (the rehearsal landing page and the member shell), so every browser fetch
+    is **same-origin**
+- a rendered icnd drop-in (`30-lan-origin.conf`) whose `ICN_CORS_ORIGINS` is
+  the demo profile's loopback set **plus exactly this one origin**
+- a rendered demo-session drop-in setting
+  `ICN_DEMO_SESSION_EXTRA_ORIGINS=<origin>` (exact-match, no wildcard)
+- with an `https` origin: the operator-supplied certificate/key at
+  `/etc/icn/tls/rehearsal.{crt,key}` (key mode 600) plus an HTTP→HTTPS
+  redirect. Supplying a certificate is the operator's job (internal CA);
+  the build never fabricates or disables TLS validation.
+- `/etc/icn/lan-profile.env` recording the baked origin (non-secret marker;
+  the typed appliance manifest schema is deliberately unchanged).
+
+## Environment contract
+
+| Variable | Required | Meaning |
+|---|---|---|
+| `ICN_APPLIANCE_LAN_PROFILE` | `1` to enable | opt-in; anything else = profile absent, image byte-identical to plain demo build |
+| `ICN_APPLIANCE_LAN_ORIGIN` | yes | exact browser origin, `http(s)://host[:port]` — no path, no wildcard |
+| `ICN_APPLIANCE_LAN_TLS_CERT` | if origin is https | PEM certificate (full chain) path on the build host |
+| `ICN_APPLIANCE_LAN_TLS_KEY` | if origin is https | PEM private key path on the build host (never committed; never logged) |
+
+## Build-host networking (nginx / qemu-guest-agent installs)
+
+The LAN profile is the first profile that apt-installs packages **not already
+present** in the staged base image, which requires working networking inside
+the libguestfs appliance. Two independent failure modes exist:
+
+1. **DNS**: libguestfs (and passt/slirp generally) forwards guest DNS to the
+   build host's resolver; a host-local stub (systemd-resolved `127.0.0.53`)
+   breaks it. `ICN_APPLIANCE_BUILD_DNS=<resolver-ip>` makes build-image.sh
+   resolve the Debian mirror hostnames on the host and pin them into the
+   guest's `/etc/hosts` for the build (pins are removed as the last step).
+2. **No appliance network at all** (`connect (101: Network is unreachable)` or
+   `passt exited with status 1`): the host lacks a usable user-net backend —
+   on Ubuntu, `passt` may be missing or AppArmor-confined away from
+   libguestfs's runtime directory. If you choose not to change host security
+   policy, **pre-stage the packages into the base image** instead (the same
+   precedent as the base's `python3-jsonschema` staging): boot a copy of the
+   base under plain QEMU with user-net, fix the guest's `/etc/resolv.conf` to
+   a reachable resolver, `apt-get install -y nginx qemu-guest-agent`, remove
+   any staging SSH key, and power off. Point `ICN_APPLIANCE_BASE_IMAGE` at the
+   staged copy; the profile's `--install` then succeeds offline.
+
+## Single-origin bind posture (nginx is the only LAN path)
+
+The LAN profile **narrows** the demo profile's binds so that nginx is the sole
+LAN-reachable HTTP surface:
+
+- **Gateway → `127.0.0.1:8080`** (the demo drop-in binds `0.0.0.0:8080`). The
+  dev gateway runs with `ICN_ENABLE_ADMIN_ENDPOINTS=true`; on a bridged LAN VM
+  a `0.0.0.0` bind would make it directly reachable at `http://<vm>:8080`,
+  bypassing the TLS single-origin proxy and its CORS/Origin controls and
+  exposing dev/admin routes to the LAN. The `30-lan-origin.conf` icnd drop-in
+  re-binds it to loopback; nginx proxies to `127.0.0.1:8080`, so the browser
+  path is unchanged.
+- **Member-shell static server → `127.0.0.1:8090`** (demo unit binds
+  `0.0.0.0:8090`). nginx serves the same static tree directly, so this server
+  is not on the LAN browser path at all — it stays for smoke parity only, and
+  is rebound to loopback so it is not a second LAN listener.
+- **Session endpoint stays `127.0.0.1:8091`** — unchanged; nginx is the only
+  LAN path to it, and its server-side origin allowlist gains exactly the one
+  configured origin (validated to a strict `scheme://host[:port]` shape;
+  malformed values are dropped).
+
+This is the CLAUDE.md "never enable a dev posture on a routable bind" rule
+applied to the LAN profile.
+
+## What it does NOT change
+
+- No auth or dev-gate semantics change; the session endpoint's server-side
+  origin check and double dev-gate are unchanged — its allowlist simply gains
+  the one configured origin.
+- No public exposure: reachability beyond the VM's own LAN segment remains
+  whatever the operator's network policy says. Do not port-forward or tunnel
+  this origin to the public internet.
+- The origin must use the scheme default port (80/443) — nginx serves only
+  those, so the build rejects a non-default explicit port rather than bake an
+  unreachable origin into the allowlists.
