@@ -86,13 +86,17 @@ The schema declares `additionalProperties: false` so unknown fields are rejected
 - accommodation or access needs tied to an identifiable person
 - raw attendee or member rolls
 - API tokens, secrets, signed URLs, or session credentials
+- JWT / bearer-shaped credentials (e.g. `eyJ…` tokens)
+- PEM private keys
 - private Drive / Groups / Sheets paths or content
+- private filesystem paths (e.g. `/home`, `/root`, `/Users`, Windows user profiles)
 - private overlay contents
+- private-network or loopback IP addresses / internal topology
 - live partner operational details
 - any field that implies formal pilot approval or production deployment
 - DIDs of unconsented participants
 
-This list is also captured in the schema's `x-icn-must-not-include` extension so machine consumers (linters, partner CI) can read it without parsing this prose.
+This list is also captured in the schema's `x-icn-must-not-include` extension so machine consumers (linters, partner CI) can read it without parsing this prose. The last six of these (DIDs, JWT/bearer credentials, PEM keys, private paths, private/loopback IPs) are the ones the bundled validator's privacy scan (§"Validation is two distinct layers") enforces at the value level, since JSON Schema structure cannot see them.
 
 ## Validation is two distinct layers (not four)
 

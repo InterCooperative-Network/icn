@@ -172,14 +172,17 @@ def main() -> int:
     args = parser.parse_args()
 
     try:
-        from jsonschema import Draft202012Validator
+        from jsonschema import Draft202012Validator, FormatChecker
     except ImportError:
         print("ERROR: the `jsonschema` Python package is required (pip install jsonschema).", file=sys.stderr)
         return 1
 
     schema = load_json(args.schema, "schema")
     Draft202012Validator.check_schema(schema)
-    validator = Draft202012Validator(schema)
+    # Register a format checker so `format: date-time` / `format: uri`
+    # annotations are actually enforced (stdlib-only checks), matching the
+    # sibling contract validators (validate-preview-review.py / -action-card.py).
+    validator = Draft202012Validator(schema, format_checker=FormatChecker())
     packet = load_json(args.packet, "packet")
 
     rel = args.packet.relative_to(REPO_ROOT) if args.packet.is_relative_to(REPO_ROOT) else args.packet
