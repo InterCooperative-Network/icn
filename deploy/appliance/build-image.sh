@@ -538,6 +538,14 @@ if [ "$LAN_PROFILE" = "1" ]; then
             err "ICN_APPLIANCE_LAN_ORIGIN uses a non-default port ($LAN_PORT). The in-VM nginx serves only the scheme default (80/443); a non-default port would be baked into the allowlists but unreachable. Use a default-port origin, or front this VM with an external proxy that terminates the non-default port."
             exit 7
         fi
+        # Canonicalize an EXPLICIT default port away: a browser serializes the
+        # Origin header without the default port (https://host, not
+        # https://host:443), and the session endpoint / gateway do exact Origin
+        # matching. If we baked "https://host:443" into the allowlists, the
+        # one-click launcher's request (Origin: https://host) would 403. Strip
+        # the port so the stored origin matches what the browser sends.
+        LAN_ORIGIN="$LAN_SCHEME://$LAN_HOST"
+        log "LAN origin canonicalized (explicit default port removed): $LAN_ORIGIN"
     fi
     for f in "$LAN_DIR/nginx-icn-rehearsal-http.conf.in" \
              "$LAN_DIR/nginx-icn-rehearsal-https.conf.in" \
