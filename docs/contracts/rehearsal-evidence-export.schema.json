@@ -28,8 +28,12 @@
     "accommodation or access needs tied to an identifiable person",
     "raw attendee or member rolls",
     "API tokens, secrets, signed URLs, or session credentials",
+    "JWT / bearer-shaped credentials (e.g. eyJ… tokens)",
+    "PEM private keys",
     "private Drive / Groups / Sheets paths or content",
+    "private filesystem paths (e.g. /home, /root, /Users, Windows user profiles)",
     "private overlay contents",
+    "private-network or loopback IP addresses / internal topology",
     "live partner operational details",
     "any field that implies formal pilot approval or production deployment",
     "DIDs of unconsented participants"

@@ -86,17 +86,35 @@ The schema declares `additionalProperties: false` so unknown fields are rejected
 - accommodation or access needs tied to an identifiable person
 - raw attendee or member rolls
 - API tokens, secrets, signed URLs, or session credentials
+- JWT / bearer-shaped credentials (e.g. `eyJ…` tokens)
+- PEM private keys
 - private Drive / Groups / Sheets paths or content
+- private filesystem paths (e.g. `/home`, `/root`, `/Users`, Windows user profiles)
 - private overlay contents
+- private-network or loopback IP addresses / internal topology
 - live partner operational details
 - any field that implies formal pilot approval or production deployment
 - DIDs of unconsented participants
 
-This list is also captured in the schema's `x-icn-must-not-include` extension so machine consumers (linters, partner CI) can read it without parsing this prose.
+This list is also captured in the schema's `x-icn-must-not-include` extension so machine consumers (linters, partner CI) can read it without parsing this prose. The last six of these (DIDs, JWT/bearer credentials, PEM keys, private paths, private/loopback IPs) are the ones the bundled validator's privacy scan (§"Validation is two distinct layers") enforces at the value level, since JSON Schema structure cannot see them.
+
+## Validation is two distinct layers (not four)
+
+The bundled validator (`docs/scripts/validate-rehearsal-evidence.py`) enforces **two** of the four concerns; keep them distinct when reasoning about what a "valid" packet proves:
+
+- **(a) Structural** — draft-2020-12 JSON Schema: shape, required fields, enums, `additionalProperties:false`. Structure alone cannot see a leaked identifier hidden inside an otherwise-valid free-text field.
+- **(b) Privacy / redaction** — a deterministic value scan (added for [#2422](https://github.com/InterCooperative-Network/icn/issues/2422)) for the identifier classes §"What this schema MUST NOT carry" forbids but that structure cannot catch: `did:icn:` DIDs, JWT/bearer-shaped credentials, PEM private keys, private filesystem paths, and private-network / loopback IPs (topology). This asserts the packet's *content* is repo-safe; it does **not** prove redaction is complete. Diagnostics name the field and class only — never the offending value.
+
+Not performed by this validator, and not implied by a passing result:
+
+- **(c) Cryptographic verification** (digest / signature / `packet_hash`) — a separate concern.
+- **(d) Institutional truth** (approval, pilot status, authority) — a valid, repo-safe packet still grants zero authority.
+
+A passing validation means *structurally valid AND free of the scanned identifier classes* — nothing more.
 
 ## Validation guidance for package repos
 
-1. Validate every example or evidence packet that will live in a **public repository** against `rehearsal-evidence-export.schema.json` before committing. Use the bundled validator (`docs/scripts/validate-rehearsal-evidence.py`) or any draft-2020-12 JSON Schema validator. Pin to the URN.
+1. Validate every example or evidence packet that will live in a **public repository** against `rehearsal-evidence-export.schema.json` **and** the privacy scan before committing. Use the bundled validator (`docs/scripts/validate-rehearsal-evidence.py`, which runs both layers) — a bare draft-2020-12 JSON Schema validator only covers layer (a). Pin to the URN. Adversarial coverage lives at `docs/scripts/tests/test_rehearsal_evidence_leak_scan.py` (offline, CI-run).
 2. Do **not** add partner-specific nouns to this schema. Bind local meaning in package docs.
 3. **Partner-internal overlays do not validate against this schema and must not be committed.** This schema is for the repo-safe export path only.
 4. Prefer regulatory-safe vocabulary in human-language fields: **obligation**, **allocation**, **settlement**, **unit**, **position**, **receipt**, **provenance**, **evidence** — not payment / wallet / balance / currency framing for substrate flows.
