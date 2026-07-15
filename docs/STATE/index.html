@@ -38,6 +38,60 @@
 </script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a>  <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>STATE</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/STATE.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
 View source on GitHub →
 </a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ICN State (living doc)</h1>
+<!-- [sync edit] 2026-07-15 (LAN rehearsal MERGED-MAIN witness + hardening;
+     branch `docs/state-mainmerge-witness`; docs/ops-state-only).
+     Records that the LAN Rehearsal Node work MERGED to main and was
+     re-witnessed from merged-main provenance (superseding the 2026-07-14
+     branch-image note below).
+
+     MERGE TIMELINE (explicit, to avoid provenance ambiguity):
+       - main was c4364f93.
+       - PR #2424 (LAN single-origin appliance + landing + operator ctl +
+         testing docs) merged first -> main = e74a8915.
+       - The appliance image and the workstation witness were built/run against
+         main-AT-e74a8915 (i.e. after #2424, the appliance-bearing PR). The
+         image's typed manifest records git_commit e74a8915.
+       - PR #2425 (public website truth pass) merged AFTER -> main = 0030e730.
+         #2425 touches only website/ and does not change the appliance image,
+         so the deployment provenance is e74a8915 while current main is 0030e730.
+
+     SECURITY FIX CAUGHT PRE-MERGE (#2424 review): the LAN profile had left the
+     dev gateway (ICN_ENABLE_ADMIN_ENDPOINTS=true) bound 0.0.0.0:8080 — directly
+     LAN-reachable and bypassing the TLS single-origin proxy. The merged profile
+     rebinds gateway + member-shell + session endpoint all to loopback so nginx
+     is the ONLY LAN HTTP surface (verified: :8080/:8090 refuse LAN connections,
+     nginx serves).
+
+     DEPLOY + WITNESS: the e74a8915 image (non_production=true, signed=false) was
+     deployed to the dedicated hypervisor VM via the documented reversible disk
+     swap (old branch image retained as rollback). The full organizer->member
+     loop was driven from a real Windows workstation browser against the
+     merged-main deployment: one-click role-scoped sessions (no terminal, no
+     paste, no credential in any URL), review->edit->assign->digest-bound
+     preview/confirm, WRONG-digest confirm -> 409 (fail-closed, server-verified),
+     exactly one action item per confirm, fresh least-privilege member session,
+     completion, idempotent retry; in-VM `icn-demo-verify --rehearsal` PASS incl.
+     the negative capability matrix and the value-withheld (no-DID/no-credential)
+     evidence check; service restart + full VM reboot recovered unattended with
+     node IDENTITY durable (stable DID, firstboot not re-run) and sled stores
+     intact — the rehearsal WORKSPACE VIEW is intentionally ephemeral (rebuilt
+     per process; a clean reseed follows).
+
+     WEBSITE: #2425's changes are LIVE on intercooperative.network (Deploy
+     Website workflow success on 0030e730; verified: no 'Live on K3s' /
+     'Institution-in-a-box' / 'every step leaves a durable receipt'; dev-demo
+     framing + Rehearsal-Node wedge + capability-horizon link present; no private
+     LAN address/hostname leaked).
+
+     NO CLAIM CHANGE: still a LAN development rehearsal on operator-controlled
+     infrastructure — not production, not a pilot, not federation, not organizer
+     acceptance, and NOT the #2041 human AT pass. One blocked action remains
+     (needs firewall admin, not agent-executable): an internal DNS domain-override
+     forwarding the internal zone to its authoritative resolver so the canonical
+     hostname resolves from the workstation; the IP origin works meanwhile.
+     Human gates unchanged: #2041, #1703/#1746, nycn#41/#52. #2422 (evidence
+     packet validator privacy leak scan) implemented in PR #2426 (open, awaiting
+     Matt). Refs #2398 #2415 #2421. No close keywords. -->
 <!-- [sync edit] 2026-07-14 (LAN rehearsal deployment; branch `feat/lan-rehearsal-deployment`). WHAT THIS EDIT DOES: adds one bullet to the current-status snapshot recording the first LAN workstation witness of the Rehearsal Node. Facts: a demo+LAN-profile appliance image was built from THIS BRANCH at commit 916629d7 (the typed manifest is the provenance record; branch = main c4364f93 + the LAN single-origin feature itself) and deployed as a dedicated hypervisor VM on the operator's LAN behind one TLS origin (internal CA). The complete organizer→member loop was then driven TWICE from a real Windows workstation browser (Chrome) with no terminal, no credential paste, and no credential in any URL: one-click role-scoped sessions → review/edit/assign → digest-bound preview/confirm (post-preview edit invalidates the stale preview, fail-closed) → exactly one action item per confirm → fresh least-privilege member session → completion → durable receipt; in-VM steward verify (`icn-demo-verify --rehearsal`) PASSED against the browser-created state including the negative capability matrix; service restart and full VM reboot recovered unattended with durable receipts intact; run 2 executed cleanly after reboot + browser-initiated fresh reset. NO claim change: this is a LAN development rehearsal on operator-controlled infrastructure — not production, not a pilot, not federation, not organizer acceptance, and NOT the #2041 human AT pass (automated a11y floor only; NVDA/zoom/forced-colors remain human-owed). Human gates unchanged: #2041, #1703/#1746, nycn#41/#52. New follow-up: #2422 (evidence packet validator leak-scan gap found by tamper testing). Refs #2398 #2415 #2421. No close keywords. -->
 <!-- [sync edit] 2026-07-13b (orientation truth refresh; branch `docs/orientation-truth-refresh`; docs/ops-state-only — no code/schema/route/auth-decision change lands with it). Append-only/newest-first; the 2026-07-13 witness block immediately below remains accurate and is the current truth root. WHAT THIS EDIT DOES: (1) replaces this file's stale rendered `## Current status (2026-05-15 snapshot)` section with a fresh 2026-07-13 snapshot and relabels the old section as historical (content preserved verbatim); (2) closes the frozen `ops/state/sprint/current.json` (Sprint 26, stale since 2026-03; the full frozen record — spine, shipped, task list — is archived in-tree at `ops/state/sprint/sprint-26-closed.json` per the existing sprint-N-closed convention, and `current.json` carries no active work items; `what-matters-now.sh` now reports it closed); (3) reduces `docs/TODO.md` to a thin dated pointer at the tracker + canonical state docs; (4) rewrites `docs/reference/project-index/current-truth-map.md` and `show-readiness-map.md` from the pre-Rehearsal-Node wedge (drive-ingest ladder, image `91a63eec`, "K3s running since 2025-12-03" as-written guidance) to the witnessed rehearsal reality, removing deployment-age claims per `docs/status.toml` NEEDS-OPS-RE-CONFIRMATION; (5) annotates `docs/PHASE_HISTORY.md`'s January-2026 "Current Status" block as historical. NO new capability, NO route/enforcement change, NO phase-status change, NO production/pilot/organizer-ready/live-federation/human-accessibility claim. Human gates unchanged and still owed: #2041, #1703/#1746, nycn#41/#52. Refs #2398 #2393 #2080. No close keywords. -->
 
@@ -1383,7 +1437,7 @@ View source on GitHub →
 
 <h2>Current status (2026-07-13 snapshot)</h2>
 <p><strong>Current phase:</strong> Phase 2 — Pilot Launch (in progress, partner-bound). The <strong>Rehearsal Node organizer→member loop</strong> is merged (#2406 runtime, #2407 browser surface, #2408 appliance wiring, #2409 smoke driver) and was witnessed end-to-end on a fresh assembled image built from clean <code>main</code> <code>8c0fe926</code> on 2026-07-13: restrict=on boot → organizer no-paste session → review/edit/assign → digest-bound confirm (wrong digest → 409, fail-closed) → real ADR-0026 ladder → member completion → durable receipt → evidence export (<code>dids_exported=false</code>) → in-VM steward verify → outbound canary held. Per-PR detail: the newest-first <code>[sync edit]</code> blocks above (this file is append-only; the comment blocks ARE the per-PR record).</p>
-<p><strong>LAN workstation witness (2026-07-14):</strong> the appliance&#39;s new LAN single-origin profile (this branch, image commit <code>916629d7</code>) was deployed as a dedicated hypervisor VM on operator-controlled LAN infrastructure and the full organizer→member loop was driven twice from a real Windows workstation browser — one-click role-scoped sessions (no terminal, no credential paste, no credential in any URL), digest-bound confirm with fail-closed stale-preview handling, fresh member session, durable completion receipt, in-VM steward verify PASS, unattended recovery across service restart and VM reboot. A LAN development rehearsal, not production and not any human gate — see the 2026-07-14 sync block above.</p>
+<p><strong>LAN workstation witness (2026-07-15, merged-main):</strong> the appliance&#39;s LAN single-origin profile is <strong>merged to main</strong> (#2424, #2425) and deployed as a dedicated hypervisor VM on operator-controlled LAN infrastructure from the <strong>merged-main image <code>icn-appliance-0.0.3-lan-e74a8915</code></strong> (git_commit <code>e74a8915</code>, non-production, unsigned; supersedes the earlier <code>916629d7</code> branch image). A review-caught authority-boundary defect was fixed before merge: the LAN profile&#39;s gateway/member-shell/session are now all loopback-bound so the in-VM nginx is the only LAN HTTP surface. The full organizer→member loop was driven from a real Windows workstation browser against the merged-main deployment — one-click role-scoped sessions (no terminal, no credential paste, no credential in any URL), digest-bound confirm with server-verified wrong-digest 409, exactly one action item per confirm, fresh member session, completion, idempotent retry, in-VM steward verify PASS (negative capability matrix + value-withheld evidence), unattended recovery across service restart and VM reboot (node identity + sled durable; the rehearsal workspace view is intentionally ephemeral). A LAN development rehearsal, not production and not any human gate — see the 2026-07-15 sync block above.</p>
 <p><strong>NYCN adoption state:</strong> partner repo pinned to <code>8c0fe926</code>; facilitator gate package independently steward-operable (nycn#100/#101); <code>human_review: pending</code>. NYCN remains the intended first partner — an active track, not a committed pilot.</p>
 <p><strong>Open human gates (the project&#39;s primary gates):</strong> the real organizer presentation → pilot formalization → first operator rehearsal (#1703/#1746; partner-side nycn#41/#52), and the member-shell human assistive-technology pass (#2041). The assembled-image witness is automated evidence and closes none of these.</p>
 <p><strong>Open software lanes (selected):</strong> production trusted issuance architecture (#2080 — the appliance&#39;s <code>--local-mint</code> is operator bootstrap, not enrollment); recurring assembled-image smoke lane (#2398 — the harness is committed, a KVM-capable runner is owed); provider-boundary slice 3 (#2393); local-issuance audit-record implementation (spec merged <code>1ac5fd58</code>).</p>
