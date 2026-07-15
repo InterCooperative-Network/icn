@@ -1,12 +1,65 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-07-13
+Last Reviewed: 2026-07-15
 ---
 
 # ICN State (living doc)
 
-<!-- [sync edit] 2026-07-15 (LAN rehearsal MERGED-MAIN witness + hardening; branch `docs/state-mainmerge-witness`; docs/ops-state-only). WHAT THIS EDIT DOES: records that the LAN Rehearsal Node work MERGED to main and was re-witnessed from merged-main provenance (superseding the 2026-07-14 branch-image note below). Facts: PR #2424 (LAN single-origin appliance + landing + operator ctl + testing docs) and #2425 (public website truth pass) MERGED — main advanced c4364f93 → e74a8915 (#2424) → 0030e730 (#2425). During #2424 review a real authority-boundary defect was caught and fixed BEFORE merge: the LAN profile had left the dev gateway (ICN_ENABLE_ADMIN_ENDPOINTS=true) bound 0.0.0.0:8080, directly LAN-reachable and bypassing the TLS single-origin proxy; the merged profile rebinds gateway + member-shell + session endpoint all to loopback so nginx is the ONLY LAN HTTP surface (verified: :8080/:8090 refuse LAN connections, nginx serves). A fresh appliance image was then built from merged main (git_commit e74a8915, non_production=true, signed=false) and deployed to the dedicated hypervisor VM via the documented reversible disk swap (old branch image retained as rollback). The full organizer→member loop was driven from a real Windows workstation browser against the merged-main deployment: one-click role-scoped sessions (no terminal, no paste, no credential in any URL), review→edit→assign→digest-bound preview/confirm, WRONG-digest confirm → 409 (fail-closed, server-verified), exactly one action item per confirm, fresh least-privilege member session, completion, idempotent retry; in-VM `icn-demo-verify --rehearsal` PASS incl. the negative capability matrix and the value-withheld (no-DID/no-credential) evidence check; service restart + full VM reboot recovered unattended with node IDENTITY durable (stable DID, firstboot not re-run) and sled stores intact — the rehearsal WORKSPACE VIEW is intentionally ephemeral (rebuilt per process; a clean reseed follows). The public website changes are LIVE on intercooperative.network (Deploy Website workflow success on 0030e730; verified: no 'Live on K3s'/'Institution-in-a-box'/'every step leaves a durable receipt', dev-demo framing + Rehearsal-Node wedge + capability-horizon link present; no private LAN address/hostname leaked). NO claim change: still a LAN development rehearsal on operator-controlled infrastructure — not production, not a pilot, not federation, not organizer acceptance, and NOT the #2041 human AT pass. One blocked action remains (needs firewall admin, not agent-executable): an internal DNS domain-override forwarding the internal zone to its authoritative resolver so the canonical hostname resolves from the workstation; the IP origin works meanwhile. Human gates unchanged: #2041, #1703/#1746, nycn#41/#52. #2422 (evidence packet validator privacy leak scan) implemented in PR #2426 (open, awaiting Matt). Refs #2398 #2415 #2421. No close keywords. -->
+<!-- [sync edit] 2026-07-15 (LAN rehearsal MERGED-MAIN witness + hardening;
+     branch `docs/state-mainmerge-witness`; docs/ops-state-only).
+     Records that the LAN Rehearsal Node work MERGED to main and was
+     re-witnessed from merged-main provenance (superseding the 2026-07-14
+     branch-image note below).
+
+     MERGE TIMELINE (explicit, to avoid provenance ambiguity):
+       - main was c4364f93.
+       - PR #2424 (LAN single-origin appliance + landing + operator ctl +
+         testing docs) merged first -> main = e74a8915.
+       - The appliance image and the workstation witness were built/run against
+         main-AT-e74a8915 (i.e. after #2424, the appliance-bearing PR). The
+         image's typed manifest records git_commit e74a8915.
+       - PR #2425 (public website truth pass) merged AFTER -> main = 0030e730.
+         #2425 touches only website/ and does not change the appliance image,
+         so the deployment provenance is e74a8915 while current main is 0030e730.
+
+     SECURITY FIX CAUGHT PRE-MERGE (#2424 review): the LAN profile had left the
+     dev gateway (ICN_ENABLE_ADMIN_ENDPOINTS=true) bound 0.0.0.0:8080 — directly
+     LAN-reachable and bypassing the TLS single-origin proxy. The merged profile
+     rebinds gateway + member-shell + session endpoint all to loopback so nginx
+     is the ONLY LAN HTTP surface (verified: :8080/:8090 refuse LAN connections,
+     nginx serves).
+
+     DEPLOY + WITNESS: the e74a8915 image (non_production=true, signed=false) was
+     deployed to the dedicated hypervisor VM via the documented reversible disk
+     swap (old branch image retained as rollback). The full organizer->member
+     loop was driven from a real Windows workstation browser against the
+     merged-main deployment: one-click role-scoped sessions (no terminal, no
+     paste, no credential in any URL), review->edit->assign->digest-bound
+     preview/confirm, WRONG-digest confirm -> 409 (fail-closed, server-verified),
+     exactly one action item per confirm, fresh least-privilege member session,
+     completion, idempotent retry; in-VM `icn-demo-verify --rehearsal` PASS incl.
+     the negative capability matrix and the value-withheld (no-DID/no-credential)
+     evidence check; service restart + full VM reboot recovered unattended with
+     node IDENTITY durable (stable DID, firstboot not re-run) and sled stores
+     intact — the rehearsal WORKSPACE VIEW is intentionally ephemeral (rebuilt
+     per process; a clean reseed follows).
+
+     WEBSITE: #2425's changes are LIVE on intercooperative.network (Deploy
+     Website workflow success on 0030e730; verified: no 'Live on K3s' /
+     'Institution-in-a-box' / 'every step leaves a durable receipt'; dev-demo
+     framing + Rehearsal-Node wedge + capability-horizon link present; no private
+     LAN address/hostname leaked).
+
+     NO CLAIM CHANGE: still a LAN development rehearsal on operator-controlled
+     infrastructure — not production, not a pilot, not federation, not organizer
+     acceptance, and NOT the #2041 human AT pass. One blocked action remains
+     (needs firewall admin, not agent-executable): an internal DNS domain-override
+     forwarding the internal zone to its authoritative resolver so the canonical
+     hostname resolves from the workstation; the IP origin works meanwhile.
+     Human gates unchanged: #2041, #1703/#1746, nycn#41/#52. #2422 (evidence
+     packet validator privacy leak scan) implemented in PR #2426 (open, awaiting
+     Matt). Refs #2398 #2415 #2421. No close keywords. -->
 <!-- [sync edit] 2026-07-14 (LAN rehearsal deployment; branch `feat/lan-rehearsal-deployment`). WHAT THIS EDIT DOES: adds one bullet to the current-status snapshot recording the first LAN workstation witness of the Rehearsal Node. Facts: a demo+LAN-profile appliance image was built from THIS BRANCH at commit 916629d7 (the typed manifest is the provenance record; branch = main c4364f93 + the LAN single-origin feature itself) and deployed as a dedicated hypervisor VM on the operator's LAN behind one TLS origin (internal CA). The complete organizer→member loop was then driven TWICE from a real Windows workstation browser (Chrome) with no terminal, no credential paste, and no credential in any URL: one-click role-scoped sessions → review/edit/assign → digest-bound preview/confirm (post-preview edit invalidates the stale preview, fail-closed) → exactly one action item per confirm → fresh least-privilege member session → completion → durable receipt; in-VM steward verify (`icn-demo-verify --rehearsal`) PASSED against the browser-created state including the negative capability matrix; service restart and full VM reboot recovered unattended with durable receipts intact; run 2 executed cleanly after reboot + browser-initiated fresh reset. NO claim change: this is a LAN development rehearsal on operator-controlled infrastructure — not production, not a pilot, not federation, not organizer acceptance, and NOT the #2041 human AT pass (automated a11y floor only; NVDA/zoom/forced-colors remain human-owed). Human gates unchanged: #2041, #1703/#1746, nycn#41/#52. New follow-up: #2422 (evidence packet validator leak-scan gap found by tamper testing). Refs #2398 #2415 #2421. No close keywords. -->
 <!-- [sync edit] 2026-07-13b (orientation truth refresh; branch `docs/orientation-truth-refresh`; docs/ops-state-only — no code/schema/route/auth-decision change lands with it). Append-only/newest-first; the 2026-07-13 witness block immediately below remains accurate and is the current truth root. WHAT THIS EDIT DOES: (1) replaces this file's stale rendered `## Current status (2026-05-15 snapshot)` section with a fresh 2026-07-13 snapshot and relabels the old section as historical (content preserved verbatim); (2) closes the frozen `ops/state/sprint/current.json` (Sprint 26, stale since 2026-03; the full frozen record — spine, shipped, task list — is archived in-tree at `ops/state/sprint/sprint-26-closed.json` per the existing sprint-N-closed convention, and `current.json` carries no active work items; `what-matters-now.sh` now reports it closed); (3) reduces `docs/TODO.md` to a thin dated pointer at the tracker + canonical state docs; (4) rewrites `docs/reference/project-index/current-truth-map.md` and `show-readiness-map.md` from the pre-Rehearsal-Node wedge (drive-ingest ladder, image `91a63eec`, "K3s running since 2025-12-03" as-written guidance) to the witnessed rehearsal reality, removing deployment-age claims per `docs/status.toml` NEEDS-OPS-RE-CONFIRMATION; (5) annotates `docs/PHASE_HISTORY.md`'s January-2026 "Current Status" block as historical. NO new capability, NO route/enforcement change, NO phase-status change, NO production/pilot/organizer-ready/live-federation/human-accessibility claim. Human gates unchanged and still owed: #2041, #1703/#1746, nycn#41/#52. Refs #2398 #2393 #2080. No close keywords. -->
 
