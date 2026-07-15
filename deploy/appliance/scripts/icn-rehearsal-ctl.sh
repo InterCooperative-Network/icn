@@ -56,6 +56,13 @@ case "$cmd" in
     ;;
   logs)
     unit="${2:-icnd}"
+    # Restrict to the known unit set — the value is forwarded into a remote
+    # sudo command, so an unconstrained argument would be a command-injection
+    # vector on the VM. Reject anything not in the allowlist.
+    case "$unit" in
+      icnd|icn-member-shell|icn-demo-session|nginx|qemu-guest-agent|icn-appliance-firstboot) : ;;
+      *) echo "unknown unit '$unit' (allowed: $UNITS icn-appliance-firstboot)" >&2; exit 2 ;;
+    esac
     run "sudo journalctl -u $unit -n 100 --no-pager"
     ;;
   reset)

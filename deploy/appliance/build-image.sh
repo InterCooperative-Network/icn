@@ -291,6 +291,13 @@ if [ -n "${ICN_APPLIANCE_BUILD_DNS:-}" ]; then
         err "ICN_APPLIANCE_BUILD_DNS must be an IPv4 address (got: '$ICN_APPLIANCE_BUILD_DNS')"
         exit 7
     fi
+    # `dig` does the host-side mirror resolution; without it the pin loop would
+    # produce empty results and misreport a resolver failure. Fail early with a
+    # clear dependency message instead.
+    if ! command -v dig >/dev/null 2>&1; then
+        err "ICN_APPLIANCE_BUILD_DNS is set but 'dig' is not installed on the build host (install dnsutils/bind-utils, or unset the knob and pre-stage packages into the base image)."
+        exit 7
+    fi
     BUILD_PIN_HOSTS="deb.debian.org security.debian.org"
     for h in $BUILD_PIN_HOSTS; do
         pin_ip="$(dig +short A "$h" "@$ICN_APPLIANCE_BUILD_DNS" 2>/dev/null | grep -E '^[0-9]{1,3}(\.[0-9]{1,3}){3}$' | head -1)"
@@ -508,9 +515,34 @@ if [ "$LAN_PROFILE" = "1" ]; then
     LAN_DIR="$APPLIANCE_DIR/lan"
     LAN_SCHEME="${LAN_ORIGIN%%://*}"
     LAN_HOST="${LAN_ORIGIN#*://}"; LAN_HOST="${LAN_HOST%%:*}"
+    # Port handling. The rendered nginx templates listen ONLY on the scheme
+    # default (80 for http, 443 for https) and the redirect uses only the host,
+    # so an origin with a non-default explicit port would be baked into the
+    # gateway/session allowlists yet unreachable on that port — the browser
+    # would fail the session endpoint's exact-Origin check. Reject a non-default
+    # port up front rather than emit a config that fails at browse time. Also
+    # reject a port > 65535 (the 1–5 digit regex above admits e.g. 99999).
+    LAN_PORT=""
+    case "$LAN_ORIGIN" in
+        *:*://*) : ;;  # unreachable — scheme handled above
+    esac
+    LAN_AFTER_SCHEME="${LAN_ORIGIN#*://}"
+    if [[ "$LAN_AFTER_SCHEME" == *:* ]]; then
+        LAN_PORT="${LAN_AFTER_SCHEME##*:}"
+        if [ "$LAN_PORT" -gt 65535 ] 2>/dev/null || [ "$LAN_PORT" -lt 1 ] 2>/dev/null; then
+            err "ICN_APPLIANCE_LAN_ORIGIN port out of range (1–65535): '$LAN_PORT'"
+            exit 7
+        fi
+        if { [ "$LAN_SCHEME" = "http" ] && [ "$LAN_PORT" != "80" ]; } ||
+           { [ "$LAN_SCHEME" = "https" ] && [ "$LAN_PORT" != "443" ]; }; then
+            err "ICN_APPLIANCE_LAN_ORIGIN uses a non-default port ($LAN_PORT). The in-VM nginx serves only the scheme default (80/443); a non-default port would be baked into the allowlists but unreachable. Use a default-port origin, or front this VM with an external proxy that terminates the non-default port."
+            exit 7
+        fi
+    fi
     for f in "$LAN_DIR/nginx-icn-rehearsal-http.conf.in" \
              "$LAN_DIR/nginx-icn-rehearsal-https.conf.in" \
              "$LAN_DIR/icnd-30-lan-origin.conf.in" \
+             "$LAN_DIR/icn-member-shell-30-lan-origin.conf.in" \
              "$LAN_DIR/icn-demo-session-30-lan-origin.conf.in"; do
         if [ ! -f "$f" ]; then
             err "LAN profile template missing: $f"
@@ -519,7 +551,7 @@ if [ "$LAN_PROFILE" = "1" ]; then
     done
     LAN_STAGE="$ICN_APPLIANCE_OUTPUT_DIR/.lan-stage.$$"
     rm -rf "$LAN_STAGE"
-    mkdir -p "$LAN_STAGE/nginx" "$LAN_STAGE/icnd-dropin" "$LAN_STAGE/session-dropin" "$LAN_STAGE/tls"
+    mkdir -p "$LAN_STAGE/nginx" "$LAN_STAGE/icnd-dropin" "$LAN_STAGE/shell-dropin" "$LAN_STAGE/session-dropin" "$LAN_STAGE/tls"
     if [ "$LAN_SCHEME" = "https" ]; then
         NGINX_TEMPLATE="$LAN_DIR/nginx-icn-rehearsal-https.conf.in"
         LAN_TLS_CERT="${ICN_APPLIANCE_LAN_TLS_CERT:-}"
@@ -539,9 +571,11 @@ if [ "$LAN_PROFILE" = "1" ]; then
         "$NGINX_TEMPLATE" > "$LAN_STAGE/nginx/icn-rehearsal.conf"
     sed -e "s|@LAN_ORIGIN@|$LAN_ORIGIN|g" \
         "$LAN_DIR/icnd-30-lan-origin.conf.in" > "$LAN_STAGE/icnd-dropin/30-lan-origin.conf"
+    # No @…@ tokens in the shell drop-in, but stage it uniformly.
+    cp "$LAN_DIR/icn-member-shell-30-lan-origin.conf.in" "$LAN_STAGE/shell-dropin/30-lan-origin.conf"
     sed -e "s|@LAN_ORIGIN@|$LAN_ORIGIN|g" \
         "$LAN_DIR/icn-demo-session-30-lan-origin.conf.in" > "$LAN_STAGE/session-dropin/30-lan-origin.conf"
-    log "LAN profile: single origin $LAN_ORIGIN (nginx in-VM; session endpoint stays loopback)"
+    log "LAN profile: single origin $LAN_ORIGIN (nginx in-VM; gateway + shell + session endpoint all loopback-bound)"
     VIRT_CUSTOMIZE_ARGS+=(
         # qemu-guest-agent: the LAN profile targets a long-lived VM on a real
         # hypervisor (not a throwaway user-net QEMU), where clean host-initiated
@@ -549,9 +583,11 @@ if [ "$LAN_PROFILE" = "1" ]; then
         --install nginx,qemu-guest-agent
         --run-command "systemctl enable qemu-guest-agent"
         --mkdir /etc/systemd/system/icn-demo-session.service.d
+        --mkdir /etc/systemd/system/icn-member-shell.service.d
         --copy-in "$LAN_STAGE/nginx/icn-rehearsal.conf:/etc/nginx/sites-available"
         --run-command "ln -sf ../sites-available/icn-rehearsal.conf /etc/nginx/sites-enabled/icn-rehearsal.conf && rm -f /etc/nginx/sites-enabled/default"
         --copy-in "$LAN_STAGE/icnd-dropin/30-lan-origin.conf:/etc/systemd/system/icnd.service.d"
+        --copy-in "$LAN_STAGE/shell-dropin/30-lan-origin.conf:/etc/systemd/system/icn-member-shell.service.d"
         --copy-in "$LAN_STAGE/session-dropin/30-lan-origin.conf:/etc/systemd/system/icn-demo-session.service.d"
         --write "/etc/icn/lan-profile.env:ICN_LAN_ORIGIN=$LAN_ORIGIN"
         --run-command "systemctl enable nginx"

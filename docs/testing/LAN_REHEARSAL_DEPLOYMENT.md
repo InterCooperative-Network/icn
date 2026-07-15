@@ -135,9 +135,10 @@ deliberately not offered.
 - The bearer session credential transits the LAN inside TLS when the origin is
   `https`; with a plain-`http` origin it is unencrypted on the LAN — the build
   warns, and `https` with an internal CA is the intended posture.
-- Port 8090 (static-only member-shell server) remains open on the VM for smoke
-  parity; the launcher on that origin is refused by the session endpoint's
-  allowlist. Nothing secret is served there.
+- The gateway (8080), the member-shell static server (8090), and the session
+  endpoint (8091) are all **loopback-bound** in the LAN profile; nginx is the
+  only LAN-reachable HTTP surface. (This narrows the demo profile, which binds
+  the gateway/shell to `0.0.0.0`.)
 - nginx serves no CSP header yet (the static pages set none) — candidate
   follow-up, not a regression versus the witnessed loopback posture.
 - The status endpoint (`GET /v1/dev/demo/status`) is unauthenticated by design

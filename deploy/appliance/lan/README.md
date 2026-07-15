@@ -58,14 +58,38 @@ the libguestfs appliance. Two independent failure modes exist:
    any staging SSH key, and power off. Point `ICN_APPLIANCE_BASE_IMAGE` at the
    staged copy; the profile's `--install` then succeeds offline.
 
+## Single-origin bind posture (nginx is the only LAN path)
+
+The LAN profile **narrows** the demo profile's binds so that nginx is the sole
+LAN-reachable HTTP surface:
+
+- **Gateway → `127.0.0.1:8080`** (the demo drop-in binds `0.0.0.0:8080`). The
+  dev gateway runs with `ICN_ENABLE_ADMIN_ENDPOINTS=true`; on a bridged LAN VM
+  a `0.0.0.0` bind would make it directly reachable at `http://<vm>:8080`,
+  bypassing the TLS single-origin proxy and its CORS/Origin controls and
+  exposing dev/admin routes to the LAN. The `30-lan-origin.conf` icnd drop-in
+  re-binds it to loopback; nginx proxies to `127.0.0.1:8080`, so the browser
+  path is unchanged.
+- **Member-shell static server → `127.0.0.1:8090`** (demo unit binds
+  `0.0.0.0:8090`). nginx serves the same static tree directly, so this server
+  is not on the LAN browser path at all — it stays for smoke parity only, and
+  is rebound to loopback so it is not a second LAN listener.
+- **Session endpoint stays `127.0.0.1:8091`** — unchanged; nginx is the only
+  LAN path to it, and its server-side origin allowlist gains exactly the one
+  configured origin (validated to a strict `scheme://host[:port]` shape;
+  malformed values are dropped).
+
+This is the CLAUDE.md "never enable a dev posture on a routable bind" rule
+applied to the LAN profile.
+
 ## What it does NOT change
 
-- No bind is widened: gateway was already `0.0.0.0:8080` in the demo profile,
-  the session endpoint stays `127.0.0.1:8091`, the member-shell static server
-  stays as-is (nginx serves the same tree directly).
 - No auth or dev-gate semantics change; the session endpoint's server-side
   origin check and double dev-gate are unchanged — its allowlist simply gains
   the one configured origin.
 - No public exposure: reachability beyond the VM's own LAN segment remains
   whatever the operator's network policy says. Do not port-forward or tunnel
   this origin to the public internet.
+- The origin must use the scheme default port (80/443) — nginx serves only
+  those, so the build rejects a non-default explicit port rather than bake an
+  unreachable origin into the allowlists.

@@ -40,10 +40,18 @@
 # ============================================================================
 import json
 import os
+import re
 import subprocess
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+
+def log(msg):
+    # stdout -> journald via the unit. Never include the credential here.
+    # Defined up front so module-level origin validation below can warn.
+    print("[demo-session] %s" % msg, flush=True)
+
 
 # Serialize seeding: ThreadingHTTPServer can dispatch concurrent POSTs, and
 # overlapping icn-demo-seed runs would race on node state. Only one seed runs
@@ -112,10 +120,31 @@ def resolve_seed_cmd(body_bytes):
 # time, by the operator, via ICN_DEMO_SESSION_EXTRA_ORIGINS (comma-separated,
 # exact `scheme://host[:port]` values; no wildcards) — never from request
 # bytes. An empty/unset variable changes nothing.
-_EXTRA_ORIGINS = tuple(
-    o.strip()
-    for o in os.environ.get("ICN_DEMO_SESSION_EXTRA_ORIGINS", "").split(",")
-    if o.strip()
+#
+# Each configured value is validated to a strict origin shape before it can
+# join the allowlist. safe_origin() reflects an allowlist member verbatim into
+# Access-Control-Allow-Origin, so a value containing whitespace, control
+# characters, or CR/LF could otherwise become a header-injection / response-
+# splitting vector. A malformed entry is dropped with a startup warning rather
+# than trusted.
+_ORIGIN_RE = re.compile(r"^https?://[A-Za-z0-9.-]+(:[0-9]{1,5})?$")
+
+
+def _valid_configured_origins(raw):
+    out = []
+    for o in raw.split(","):
+        o = o.strip()
+        if not o:
+            continue
+        if _ORIGIN_RE.match(o):
+            out.append(o)
+        else:
+            log("ignoring malformed ICN_DEMO_SESSION_EXTRA_ORIGINS entry: %r" % o[:80])
+    return tuple(out)
+
+
+_EXTRA_ORIGINS = _valid_configured_origins(
+    os.environ.get("ICN_DEMO_SESSION_EXTRA_ORIGINS", "")
 )
 ALLOWED_ORIGINS = (
     "http://localhost:8090", "http://127.0.0.1:8090",
@@ -141,24 +170,20 @@ def demo_gated():
     return admin and not production
 
 
-def log(msg):
-    # stdout -> journald via the unit. Never include the credential here.
-    print("[demo-session] %s" % msg, flush=True)
-
-
 class Handler(BaseHTTPRequestHandler):
     server_version = "icn-demo-session/0"
 
     def _cors(self, origin):
-        # Echo only a server-reconstructed loopback origin (literals + an
-        # int-parsed port), never the raw request value — so a tainted Origin
-        # header can never be reflected into a response (avoids HTTP
-        # response-splitting). Non-loopback origins get no CORS headers.
+        # Echo only an exact allowlist member (a stored constant), never the raw
+        # request value — so a tainted Origin header can never be reflected into
+        # a response (avoids HTTP response-splitting). Non-listed origins get no
+        # CORS headers. GET is advertised alongside POST because the status
+        # route (GET /v1/dev/demo/status) is served from this same handler.
         safe = safe_origin(origin)
         if safe is not None:
             self.send_header("Access-Control-Allow-Origin", safe)
             self.send_header("Vary", "Origin")
-            self.send_header("Access-Control-Allow-Methods", "POST, OPTIONS")
+            self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def do_OPTIONS(self):
