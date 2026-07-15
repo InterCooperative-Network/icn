@@ -9,8 +9,8 @@
       "label": "Current emphasis",
       "badge": "badge-green",
       "markerColor": "var(--accent-green)",
-      "title": "Institution-in-a-box",
-      "description": "The core loop of cooperative life — identity, membership, proposals, decisions, and durable receipts — is the most mature part of the system. Governance-backed provenance and auditable coordination are load-bearing today. This is the part of ICN we are most willing to stand behind in public.",
+      "title": "The institutional core loop",
+      "description": "The core loop of cooperative life — identity, membership, proposals, decisions, and durable receipts — is the most mature part of the system. Governance-backed provenance and auditable coordination are load-bearing today. The Rehearsal Node packages one bounded slice of this loop — an organizer reviewing, editing, assigning, and digest-bound-confirming a piece of proposed work, and a member completing it — as a witnessable, non-production rehearsal; proposal and vote surfaces are not part of that rehearsal yet. This is the part of ICN we are most willing to stand behind in public.",
       "band": "strong"
     },
     {

@@ -1,9 +1,17 @@
 ---
-title: "Institution-in-a-Box: A Live Demo"
-description: "What it looks like when a cooperative actually runs on ICN. A walk-through of the four governance flows that make up our demo."
+title: "The Core Loop, Demonstrated: A Local Devnet Walk-through"
+description: "What the cooperative core loop looks like running on ICN — four flows you can run yourself on a local devnet."
 pubDate: 2026-03-21
 tags: ["demo", "governance", "cooperative"]
 ---
+
+> **Update (July 2026):** this March post described a local devnet
+> walk-through, and its original title oversold that as a "live demo."
+> Everything below runs on your laptop against fictional organizations —
+> it demonstrates real mechanisms, not a deployed network. The current
+> honest map of what is and isn't real is
+> [What's Real Now](/whats-real-now); the current human-facing wedge is
+> the Rehearsal Node.
 
 The most common question we get is: "What does it actually do?"
 
@@ -37,9 +45,9 @@ If your cooperative operates in New York and is required to distribute surplus b
 
 Cooperative A has compute capacity. Cooperative C needs compute. They have a federation agreement.
 
-Cooperative C submits a compute task. The federation protocol routes it to Cooperative A's available nodes. The task executes. An `ExecutionReceipt` comes back. The receipt is linked to the federation agreement that authorized the allocation. Commons credits move between the two cooperatives' accounts, recorded on both sides as signed journal entries.
+Cooperative C submits a compute task. The federation protocol routes it to Cooperative A's available nodes. The task executes. An `ExecutionReceipt` comes back. The receipt is linked to the federation agreement that authorized the allocation, and the allocation is settled between the two cooperatives — recorded on both sides as signed journal entries.
 
-No platform in the middle. No third-party routing compute marketplace. Two organizations that agreed to work together, doing so directly, with a verifiable record on both sides.
+No platform in the middle. No third-party routing compute marketplace. Two fictional organizations on a local devnet, coordinating directly, with a verifiable record on both sides. (No two real cooperatives are federating in production — that distinction matters, and [What's Real Now](/whats-real-now) keeps it explicit.)
 
 ## Flow 4: Audit Report
 
@@ -62,4 +70,4 @@ The demo runs on your laptop. No cloud required. No account required. The crypto
 
 If you want to be part of building what it demonstrates, the issues are labeled, the codebase is open, and we have a Matrix room.
 
-The infrastructure is not theoretical anymore.
+The core loop is real code you can run. What remains between "runs on a laptop" and "carries a real institution" is exactly the part we refuse to hand-wave — [What's Real Now](/whats-real-now) is the running answer.

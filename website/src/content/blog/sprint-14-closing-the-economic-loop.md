@@ -5,6 +5,11 @@ pubDate: 2026-03-21
 tags: ["development", "sprint", "economics", "governance"]
 ---
 
+> **Update (July 2026):** sprint-number tracking was retired in March 2026 in
+> favor of the sequential Phase 0/1/2 model. This post is kept as a historical
+> record of the work; for current status see
+> [What's Real Now](/whats-real-now).
+
 Every sprint has a theme. Sprint 14's theme was: prove that decisions and their consequences are actually connected.
 
 This sounds obvious. In practice, it is one of the hardest things to build correctly. Most software systems treat governance and execution as separate layers that communicate by convention. Someone decides something. Someone else executes it. The link between the two is a handshake agreement, not a verifiable chain.
