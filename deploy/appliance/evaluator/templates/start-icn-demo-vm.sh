@@ -27,7 +27,13 @@ else
 fi
 SSH_PORT="${ICN_DEMO_SSH_PORT:-22222}"
 GW_PORT="${ICN_DEMO_GW_PORT:-18080}"
-SHELL_PORT="${ICN_DEMO_SHELL_PORT:-18090}"
+# The member-shell host-forward port is FIXED at 18090 and intentionally not
+# overridable: the demo image's CORS/origin allowlist only permits the fixed
+# localhost:8090/18090 origins, so the browser must load the shell from
+# localhost:18090 for the session mint + authenticated gateway calls to pass.
+# (Gateway/session forward ports are the request TARGETS, not the browser Origin,
+# so those remain overridable.)
+SHELL_PORT=18090
 SESSION_PORT="${ICN_DEMO_SESSION_PORT:-18091}"
 SSH_USER="${ICN_DEMO_SSH_USER:-debian}"
 VM_MEMORY="${ICN_DEMO_VM_MEMORY:-2048}"

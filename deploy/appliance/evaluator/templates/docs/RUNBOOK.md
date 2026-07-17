@@ -196,21 +196,20 @@ Default ports:
 - `18090` member shell
 - `18091` session service
 
-Alternative ports:
+Alternative ports (SSH, gateway, session only):
 
 ```bash
 ICN_DEMO_SSH_PORT=32222 \
 ICN_DEMO_GW_PORT=28080 \
-ICN_DEMO_SHELL_PORT=28090 \
 ICN_DEMO_SESSION_PORT=28091 \
 ./setup-and-run.sh
 ```
 
-Then open:
-
-```text
-http://localhost:28090/member-shell/?mode=live&demo=launcher&gw=28080&session=28091
-```
+The member-shell port is **fixed at 18090** and cannot be changed: the demo image
+only allowlists the `localhost:18090` browser origin, so the shell must load from
+there or the session/gateway calls fail their origin checks. If `18090` is in use,
+free it (see Troubleshooting) rather than remapping it. The launcher prints the
+exact URL to open; it always uses `localhost:18090`.
 
 ## Troubleshooting
 
