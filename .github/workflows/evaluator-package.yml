@@ -1,0 +1,76 @@
+name: Evaluator Package (static)
+
+# Fast, KVM-free static validation of the portable evaluator package lane.
+# This does NOT boot the appliance or assemble the ~1GB image — it validates the
+# repo-owned templates, scripts, spec, generator, and the static validator itself
+# (layout, syntax, ShellCheck, manifest metadata, privacy/forbidden scan,
+# loopback-default binds, archive safety). Assembled-image RUNTIME proof is a
+# separate, KVM-capable concern and is deliberately not claimed here.
+
+on:
+  push:
+    paths:
+      - 'deploy/appliance/evaluator/**'
+      - '.github/workflows/evaluator-package.yml'
+  pull_request:
+    paths:
+      - 'deploy/appliance/evaluator/**'
+      - '.github/workflows/evaluator-package.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  static:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Syntax check (bash -n)
+        run: |
+          for s in $(find deploy/appliance/evaluator -type f -name '*.sh'); do
+            bash -n "$s"
+          done
+
+      - name: ShellCheck
+        run: |
+          shellcheck -S warning \
+            deploy/appliance/evaluator/build-evaluator-package.sh \
+            deploy/appliance/evaluator/validate-evaluator-package.sh \
+            deploy/appliance/evaluator/tests/test-evaluator-package.sh \
+            deploy/appliance/evaluator/templates/setup-and-run.sh \
+            deploy/appliance/evaluator/templates/start-icn-demo-vm.sh \
+            deploy/appliance/evaluator/templates/scripts/*.sh
+
+      - name: Validator unit tests (synthetic packages, no image)
+        run: deploy/appliance/evaluator/tests/test-evaluator-package.sh
+
+      - name: Validate template set (no-image, template-derived package)
+        run: |
+          # Assemble a template-only package (no qcow2) and run the full static
+          # validator in --no-image mode, so template/privacy/bind regressions are
+          # caught even without building an image.
+          set -euo pipefail
+          . deploy/appliance/evaluator/package-spec.env
+          PKG_NAME="${PKG_STEM}-${PKG_VERSION}-${PKG_ARCH}"
+          ROOT="$RUNNER_TEMP/$PKG_NAME"; mkdir -p "$ROOT/scripts" "$ROOT/docs"
+          commit=0123456789abcdef0123456789abcdef01234567
+          ish=$(printf 'ci-template-check' | sha256sum | awk '{print $1}')
+          subst() { sed -e "s/@IMAGE_BASENAME@/$IMAGE_BASENAME/g" -e "s/@MANIFEST_BASENAME@/$MANIFEST_BASENAME/g" \
+              -e "s/@PKG_NAME@/$PKG_NAME/g" -e "s/@IMAGE_VERSION@/${PKG_VERSION}-demo/g" \
+              -e "s/@SOURCE_COMMIT@/$commit/g" -e "s/@IMAGE_SHA256@/$ish/g"; }
+          T=deploy/appliance/evaluator/templates
+          for f in README.md setup-and-run.sh start-icn-demo-vm.sh scripts/run-demo.sh scripts/verify.sh \
+                   docs/START-HERE.md docs/RUNBOOK.md docs/WALKTHROUGH.md; do subst < "$T/$f" > "$ROOT/$f"; done
+          chmod 0755 "$ROOT"/setup-and-run.sh "$ROOT"/start-icn-demo-vm.sh "$ROOT"/scripts/*.sh
+          cat > "$ROOT/$MANIFEST_BASENAME" <<EOF
+          { "manifest_version":1, "version":"${PKG_VERSION}-demo", "arch":"$PKG_ARCH",
+            "image_sha256":"$ish", "git_commit":"$commit",
+            "image_path":"$IMAGE_BASENAME", "base_image_path":"base.qcow2",
+            "non_production":true, "signed":false, "demo_profile":true }
+          EOF
+          ( cd "$ROOT" && find . -type f ! -name SHA256SUMS -printf '%P\0' | sort -z | xargs -0 sha256sum > SHA256SUMS )
+          deploy/appliance/evaluator/validate-evaluator-package.sh "$ROOT" --no-image
