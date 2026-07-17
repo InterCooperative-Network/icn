@@ -168,6 +168,11 @@ wait_in_vm() {
 }
 
 [ -f "$IMAGE" ] || { err "Image not found: $IMAGE"; exit 2; }
+# Canonicalize to an absolute path: the overlay is created under RUN_DIR with this
+# image as its qcow2 backing file, and QEMU resolves a relative backing path from
+# the overlay's own directory — so a relative ICN_DEMO_IMAGE (e.g. ./image.qcow2)
+# would pass the check above yet be unfindable at boot.
+IMAGE="$(cd "$(dirname -- "$IMAGE")" && pwd)/$(basename -- "$IMAGE")"
 
 require_tool qemu-system-x86_64
 require_tool qemu-img
