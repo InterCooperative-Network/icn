@@ -40,10 +40,10 @@ EOF
   ( cd "$root" && find . -type f ! -name SHA256SUMS -printf '%P\0' | sort -z | xargs -0 sha256sum > SHA256SUMS )
   echo "$root"
 }
-run() { "$VALIDATE" "$1" --no-image >/tmp/v.log 2>&1; }
+run() { "$VALIDATE" "$1" --no-image >"$TMP/v.log" 2>&1; }
 
 # 1. clean package PASSES
-R="$(mkpkg "$TMP/clean")"; if run "$R"; then ok "clean package validates"; else no "clean package should validate"; cat /tmp/v.log; fi
+R="$(mkpkg "$TMP/clean")"; if run "$R"; then ok "clean package validates"; else no "clean package should validate"; cat "$TMP/v.log"; fi
 
 # 2. absolute /home path leak FAILS
 R="$(mkpkg "$TMP/homeleak")"; echo '# see /home/ubuntu/secret/path' >> "$R/docs/RUNBOOK.md"

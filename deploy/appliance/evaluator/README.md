@@ -52,10 +52,13 @@ assert provenance against a specific commit (defaults to the manifest's
   `@IMAGE_VERSION@`, `@SOURCE_COMMIT@`, `@IMAGE_SHA256@`) are stamped at generation
   from the actual manifest, so the RUNBOOK's recorded commit/sha are always the
   real ones for the packaged image.
-- **Non-deterministic surface**, documented: the qcow2 bytes (built upstream), the
-  manifest `build_timestamp_utc`, and optional PDFs (generated only when `pandoc`
-  is present — the Markdown doc set is always shipped; PDFs are best-effort).
-  Everything else is a pure function of (templates, spec, image, manifest).
+- **Determinism**: given identical declared inputs (templates, spec, image,
+  manifest), the ZIP is byte-reproducible — entry order is sorted and every
+  entry's mtime is pinned to the manifest `build_timestamp_utc` (fixed-epoch
+  fallback) under `TZ=UTC` with `zip -X`. The only inputs outside that function
+  are the qcow2 bytes (built upstream) and the optional PDFs (generated only when
+  `pandoc` is present; the Markdown doc set always ships, PDFs are best-effort and
+  therefore the one non-reproducible surface if pandoc availability differs).
 
 ## Fail-closed guarantees
 

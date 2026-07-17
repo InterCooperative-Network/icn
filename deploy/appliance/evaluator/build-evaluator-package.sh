@@ -158,7 +158,21 @@ if [ "$DO_ZIP" -eq 1 ]; then
   command -v zip >/dev/null 2>&1 || die "missing tool: zip"
   ZIP="$OUTDIR/${PKG_NAME}.zip"
   rm -f "$ZIP"
-  ( cd "$OUTDIR" && zip -q -r -X "${PKG_NAME}.zip" "$PKG_NAME" )
+  # Deterministic archive: identical declared inputs → identical ZIP bytes. Pin
+  # every entry's mtime to the manifest build timestamp (fixed epoch fallback),
+  # feed a sorted entry list, use -X (drop uid/gid/extra fields) under TZ=UTC.
+  # (mtime touch is after SHA256SUMS — those hashes are content-only, unaffected.)
+  REF_EPOCH="$(python3 - "$STAGE/$MANIFEST_BASENAME" <<'PY'
+import json,sys,datetime
+try:
+    ts=json.load(open(sys.argv[1])).get("build_timestamp_utc","")
+    print(int(datetime.datetime.fromisoformat(ts.replace("Z","+00:00")).timestamp()))
+except Exception:
+    print(1577836800)  # 2020-01-01T00:00:00Z fixed fallback
+PY
+)"
+  find "$STAGE" -exec touch -h -d "@$REF_EPOCH" {} +
+  ( cd "$OUTDIR" && find "$PKG_NAME" -print | LC_ALL=C sort | TZ=UTC zip -q -X -@ "${PKG_NAME}.zip" >/dev/null )
   ( cd "$OUTDIR" && sha256sum "${PKG_NAME}.zip" > "${PKG_NAME}.zip.sha256" )
   log "wrote $ZIP"
   log "outer sha256: $(awk '{print $1}' "$OUTDIR/${PKG_NAME}.zip.sha256")"

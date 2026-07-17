@@ -11,7 +11,20 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 IMAGE="${ICN_DEMO_IMAGE:-$SCRIPT_DIR/@IMAGE_BASENAME@}"
-WORK_ROOT="${ICN_DEMO_WORK_ROOT:-/tmp/icn-demo-vm}"
+# Per-run private work dir (holds the disposable SSH key + cloud-init seed). When
+# ICN_DEMO_WORK_ROOT is not set we mktemp a fresh 0700 dir per run and delete it on
+# exit — never a fixed /tmp path that another local user on a shared host could
+# pre-create (predictable-path / pre-seeded-key attack). An explicit override is
+# honored as-is (its lifecycle is the caller's).
+if [ -n "${ICN_DEMO_WORK_ROOT:-}" ]; then
+  WORK_ROOT="$ICN_DEMO_WORK_ROOT"
+  WORK_ROOT_EPHEMERAL=0
+  mkdir -p "$WORK_ROOT"
+  chmod 700 "$WORK_ROOT" 2>/dev/null || true
+else
+  WORK_ROOT="$(mktemp -d -t icn-demo-work.XXXXXX)"
+  WORK_ROOT_EPHEMERAL=1
+fi
 SSH_PORT="${ICN_DEMO_SSH_PORT:-22222}"
 GW_PORT="${ICN_DEMO_GW_PORT:-18080}"
 SHELL_PORT="${ICN_DEMO_SHELL_PORT:-18090}"
@@ -44,6 +57,9 @@ cleanup() {
   fi
   if [ -n "${RUN_DIR:-}" ] && [ -d "$RUN_DIR" ]; then
     rm -rf "$RUN_DIR"
+  fi
+  if [ "${WORK_ROOT_EPHEMERAL:-0}" = "1" ] && [ -n "${WORK_ROOT:-}" ] && [ -d "$WORK_ROOT" ]; then
+    rm -rf "$WORK_ROOT"
   fi
   exit "$rc"
 }

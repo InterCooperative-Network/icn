@@ -87,7 +87,7 @@ if [ -f "$PKG_ROOT/SHA256SUMS" ]; then
       [ -f "$PKG_ROOT/$rel" ] || { fail "SHA256SUMS lists missing file: $rel"; miss=1; }
     done < "$PKG_ROOT/SHA256SUMS"
     if [ "$miss" -eq 0 ]; then
-      ( cd "$PKG_ROOT" && grep -v " \*\?$IMAGE_BASENAME\$" SHA256SUMS | sha256sum -c --quiet - ) \
+      ( cd "$PKG_ROOT" && grep -vF "$IMAGE_BASENAME" SHA256SUMS | sha256sum -c --quiet - ) \
         && pass "SHA256SUMS verify (non-image entries)" || fail "SHA256SUMS verify failed (non-image entries)"
     fi
   else
@@ -101,7 +101,9 @@ fi
 # ---- 5. Manifest metadata + honest posture --------------------------------
 MANIFEST="$PKG_ROOT/$MANIFEST_BASENAME"
 if [ -f "$MANIFEST" ]; then
-  python3 - "$MANIFEST" "$PKG_ROOT" "$NO_IMAGE" "$EXPECT_COMMIT" \
+  # Run inside `if` so a non-zero exit is captured (not aborted by `set -e`),
+  # letting the remaining privacy/bind/non-claim checks still run + accumulate.
+  if python3 - "$MANIFEST" "$PKG_ROOT" "$NO_IMAGE" "$EXPECT_COMMIT" \
     "$PKG_VERSION" "$PKG_ARCH" "$REQUIRE_NON_PRODUCTION" "$REQUIRE_SIGNED" \
     "$REQUIRE_DEMO_PROFILE" "$IMAGE_BASENAME" <<'PY'
 import json, sys, re, os
@@ -172,7 +174,7 @@ if not no_image:
 print("\n".join(out))
 sys.exit(0 if ok else 1)
 PY
-  if [ "$?" -eq 0 ]; then pass "manifest checks"; else fail "manifest checks (see above)"; fi
+  then pass "manifest checks"; else fail "manifest checks (see above)"; fi
 else
   fail "manifest missing: $MANIFEST_BASENAME"
 fi
@@ -204,7 +206,7 @@ done
 # DIDs are prohibited in SCRIPTS (a shipped script must never embed an identity);
 # docs may name the did: scheme conceptually, so restrict this one to scripts.
 did_hits="$(printf '%s\0' "${SCRIPTS[@]}" | xargs -0 grep -lE 'did:(icn|key|web):[A-Za-z0-9]' 2>/dev/null || true)"
-if [ -z "$did_hits" ]; then pass "no DID literal in scripts"; else fail "DID literal in scripts: $did_hits"; fi
+if [ -z "$did_hits" ]; then pass "no DID literal in scripts"; else fail "DID literal in scripts: $(echo "$did_hits" | sed "s#$PKG_ROOT/##g" | tr '\n' ' ')"; fi
 
 # ---- 7. Archive safety (tree) ---------------------------------------------
 if find "$PKG_ROOT" -type l | grep -q .; then fail "symlink present in package tree"; else pass "no symlinks in tree"; fi
