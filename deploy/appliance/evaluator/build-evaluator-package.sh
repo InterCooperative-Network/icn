@@ -90,6 +90,18 @@ fi
 echo "$M_COMMIT" | grep -qE '^[0-9a-f]{40}$' || die "manifest git_commit is not a 40-hex sha"
 log "source commit: $M_COMMIT"
 
+# Injection guard: every value interpolated into the sed substitution below MUST
+# be free of sed metacharacters, so a crafted manifest cannot inject a sed command
+# (e.g. GNU sed's `e`, which executes a shell command) to run code on the builder
+# host. The manifest version is only prefix-checked above, so validate the whole
+# string here; git_commit/image_sha are already hex-validated; the spec-derived
+# basenames are checked defensively too. Legit values are [0-9A-Za-z._-] only.
+echo "$M_VER"  | grep -qE '^[0-9A-Za-z._-]+$' || die "manifest version contains unsafe characters — refusing"
+echo "$IMG_SHA" | grep -qE '^[0-9a-f]{64}$'   || die "image sha256 is malformed"
+for _v in "$IMAGE_BASENAME" "$MANIFEST_BASENAME" "$PKG_NAME"; do
+  echo "$_v" | grep -qE '^[0-9A-Za-z._-]+$' || die "spec-derived value has unsafe characters: $_v"
+done
+
 # ---- assemble staging tree -------------------------------------------------
 STAGE="$OUTDIR/$PKG_NAME"
 rm -rf "$STAGE"

@@ -89,5 +89,25 @@ R="$(mkpkg "$TMP/jwt")"; printf 'token eyJTWVNURVNU.ZmFrZVRFU1Rml4dHVyZQ\n' >> "
 ( cd "$R" && find . -type f ! -name SHA256SUMS -printf '%P\0' | sort -z | xargs -0 sha256sum > SHA256SUMS )
 if run "$R"; then no "should reject JWT-shaped value"; else ok "rejects JWT-shaped credential"; fi
 
+# 11. GENERATOR command-injection defense: a crafted manifest version that would
+#     inject a GNU sed `e` command must be refused, and the injected command must
+#     NOT run on the builder host. Uses a tiny fake image (no KVM, CI-runnable).
+GEN="$EV/build-evaluator-package.sh"
+FAKEIMG="$TMP/fake.qcow2"; printf 'not-a-real-image' > "$FAKEIMG"
+FSHA="$(sha256sum "$FAKEIMG" | awk '{print $1}')"
+MARKER="$TMP/EVIL_MARKER"; rm -f "$MARKER"
+python3 - "$TMP/craft.json" "$PKG_VERSION" "$PKG_ARCH" "$FSHA" "$IMAGE_BASENAME" "$MARKER" <<'PY'
+import json,sys
+craft,ver,arch,sha,imgbase,marker=sys.argv[1:7]
+# version passes the prefix check (ver-...) but injects a sed `e` command
+d={"manifest_version":1,"version":f"{ver}-x/;e${{IFS}}touch${{IFS}}{marker};#","arch":arch,
+   "image_sha256":sha,"git_commit":"0123456789abcdef0123456789abcdef01234567",
+   "image_path":imgbase,"base_image_path":"b.qcow2","image_format":"qcow2",
+   "non_production":True,"signed":False,"demo_profile":True}
+json.dump(d,open(craft,"w"))
+PY
+"$GEN" --image "$FAKEIMG" --manifest "$TMP/craft.json" --out "$TMP/geninj" --no-zip >/dev/null 2>&1 || true
+if [ -e "$MARKER" ]; then no "generator executed an injected manifest-version command (RCE)"; else ok "generator refuses injected manifest version (no code execution)"; fi
+
 echo "== $PASS passed, $FAILN failed =="
 [ "$FAILN" -eq 0 ]
