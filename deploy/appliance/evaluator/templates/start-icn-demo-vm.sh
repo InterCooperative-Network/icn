@@ -219,20 +219,35 @@ ssh -N \
   -o UserKnownHostsFile=/dev/null \
   -o StrictHostKeyChecking=no \
   -o ServerAliveInterval=30 \
-  -L "${GW_PORT}:127.0.0.1:8080" \
-  -L "${SHELL_PORT}:127.0.0.1:8090" \
-  -L "${SESSION_PORT}:127.0.0.1:8091" \
+  -o GatewayPorts=no \
+  -L "127.0.0.1:${GW_PORT}:127.0.0.1:8080" \
+  -L "127.0.0.1:${SHELL_PORT}:127.0.0.1:8090" \
+  -L "127.0.0.1:${SESSION_PORT}:127.0.0.1:8091" \
   -i "$KEY" \
   -p "$SSH_PORT" \
   "${SSH_USER}@127.0.0.1" &
 TUNNEL_PID=$!
 
+# The forwards MUST stay loopback-only. Explicit 127.0.0.1 bind addresses plus
+# GatewayPorts=no defeat a host ssh_config that sets `GatewayPorts yes` (which
+# would otherwise bind these on wildcard interfaces and expose the demo to the LAN).
+
+TUNNEL_UP=0
 for _ in $(seq 1 30); do
+  if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then
+    err "The browser tunnel exited before it became reachable (a local process may have won the port bind race). Free the ports and rerun."
+    exit 8
+  fi
   if curl -sf -m 3 "http://127.0.0.1:${SHELL_PORT}/member-shell/index.html" >/dev/null 2>&1; then
+    TUNNEL_UP=1
     break
   fi
   sleep 1
 done
+if [ "$TUNNEL_UP" -ne 1 ]; then
+  err "The browser surface did not become reachable at http://127.0.0.1:${SHELL_PORT}; not printing a dead URL."
+  exit 8
+fi
 
 URL="http://localhost:${SHELL_PORT}/member-shell/?mode=live&demo=launcher&gw=${GW_PORT}&session=${SESSION_PORT}"
 

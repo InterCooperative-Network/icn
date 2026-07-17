@@ -158,10 +158,17 @@ if [ "$DO_ZIP" -eq 1 ]; then
   command -v zip >/dev/null 2>&1 || die "missing tool: zip"
   ZIP="$OUTDIR/${PKG_NAME}.zip"
   rm -f "$ZIP"
-  # Deterministic archive: identical declared inputs → identical ZIP bytes. Pin
-  # every entry's mtime to the manifest build timestamp (fixed epoch fallback),
-  # feed a sorted entry list, use -X (drop uid/gid/extra fields) under TZ=UTC.
-  # (mtime touch is after SHA256SUMS — those hashes are content-only, unaffected.)
+  # Deterministic archive: identical declared inputs → identical ZIP bytes.
+  # (1) Canonical modes independent of the caller umask (zip -X still records Unix
+  #     mode bits, so umask 022 vs 077 would otherwise diverge): dirs + executables
+  #     0755, every other file 0644.
+  find "$STAGE" -type d -exec chmod 0755 {} +
+  find "$STAGE" -type f -exec chmod 0644 {} +
+  for ex in "${EXECUTABLE_FILES[@]}"; do chmod 0755 "$STAGE/$ex"; done
+  # (2) Pin every entry's mtime to the manifest build timestamp (fixed epoch
+  #     fallback), feed a sorted entry list, use -X (drop uid/gid/extra fields)
+  #     under TZ=UTC. (mtime/mode changes are after SHA256SUMS — those hashes are
+  #     content-only, unaffected.)
   REF_EPOCH="$(python3 - "$STAGE/$MANIFEST_BASENAME" <<'PY'
 import json,sys,datetime
 try:

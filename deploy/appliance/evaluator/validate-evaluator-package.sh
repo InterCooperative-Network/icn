@@ -219,9 +219,15 @@ if [ -f "$LAUNCHER" ]; then
     fail "launcher hostfwd defaults to a non-loopback bind"
   else pass "launcher hostfwd bind is loopback-scoped"; fi
   if grep -qE 'hostfwd=tcp:127\.0\.0\.1:' "$LAUNCHER"; then pass "launcher hostfwd explicitly 127.0.0.1"; else fail "launcher has no explicit 127.0.0.1 hostfwd"; fi
-  # ssh -L forwards must not bind all interfaces; GatewayPorts must not be enabled
-  if grep -qE 'GatewayPorts +yes' "$LAUNCHER"; then fail "launcher enables GatewayPorts (exposes tunnels)"; else pass "launcher does not enable GatewayPorts"; fi
-  if grep -qE -- '-L +(\*|0\.0\.0\.0):' "$LAUNCHER"; then fail "launcher ssh -L binds all interfaces"; else pass "launcher ssh -L is localhost-bound"; fi
+  # ssh -L forwards must stay loopback-only even when the host ssh_config sets
+  # GatewayPorts on: require an explicit GatewayPorts=no on the tunnel + explicit
+  # 127.0.0.1 -L bind addresses; forbid wildcard binds / enabling GatewayPorts.
+  # Scan code only (strip comment lines) so prose examples don't trip the checks.
+  LCODE="$(grep -vE '^[[:space:]]*#' "$LAUNCHER")"
+  if printf '%s\n' "$LCODE" | grep -qE 'GatewayPorts[ =]+yes'; then fail "launcher enables GatewayPorts (exposes tunnels)"; else pass "launcher does not enable GatewayPorts"; fi
+  if printf '%s\n' "$LCODE" | grep -qE -- '-o +GatewayPorts=no'; then pass "launcher forces GatewayPorts=no on the tunnel"; else fail "launcher does not force GatewayPorts=no (host config could wildcard-bind -L)"; fi
+  if printf '%s\n' "$LCODE" | grep -qE -- '-L +["'\'']?(\*|0\.0\.0\.0):'; then fail "launcher ssh -L binds all interfaces"; else pass "launcher ssh -L is localhost-bound"; fi
+  if printf '%s\n' "$LCODE" | grep -qE -- '-L +["'\'']?127\.0\.0\.1:'; then pass "launcher ssh -L uses explicit 127.0.0.1 bind"; else fail "launcher ssh -L lacks explicit 127.0.0.1 bind address"; fi
 else
   fail "launcher template missing from package"
 fi
