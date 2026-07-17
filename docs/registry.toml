@@ -682,7 +682,7 @@ category = "status"
 status = "living"
 title = "ICN State (living doc)"
 description = "Living snapshot of repo layout, decisions, constraints, and current engineering status"
-last_updated = "2026-07-15"
+last_updated = "2026-07-17"
 owner = "matt"
 audiences = ["developers", "agents"]
 truth_class = "descriptive"
@@ -691,7 +691,7 @@ canonical = "yes"
 freshness = "current"
 domain_tags = ["status", "project"]
 recommended_action = "keep"
-last_reviewed = "2026-07-15"
+last_reviewed = "2026-07-17"
 
 [docs."docs/DOCUMENTATION_CONTROL_SYSTEM.md"]
 category = "reference"
@@ -714,7 +714,7 @@ category = "reference"
 status = "living"
 title = "ICN Document Registry (human summary)"
 description = "Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh"
-last_updated = "2026-06-22"
+last_updated = "2026-07-17"
 owner = "matt"
 audiences = ["contributors", "agents"]
 truth_class = "descriptive"
@@ -723,7 +723,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["registry", "documentation-control"]
 recommended_action = "keep"
-last_reviewed = "2026-06-22"
+last_reviewed = "2026-07-17"
 
 [docs."docs/planning/documentation-namespace-resolution.md"]
 category = "strategy"
