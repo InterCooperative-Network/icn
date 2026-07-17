@@ -1439,7 +1439,7 @@ Last Reviewed: 2026-07-17
      Aligned crate list, merged PRs, and metrics to verified repo state.
      Phase model unchanged — phase classification is governance territory (PR C). -->
 
-## Current status (2026-07-13 snapshot)
+## Current status (2026-07-17 snapshot)
 
 **Current phase:** Phase 2 — Pilot Launch (in progress, partner-bound). The **Rehearsal Node organizer→member loop** is merged (#2406 runtime, #2407 browser surface, #2408 appliance wiring, #2409 smoke driver) and was witnessed end-to-end on a fresh assembled image built from clean `main` `8c0fe926` on 2026-07-13: restrict=on boot → organizer no-paste session → review/edit/assign → digest-bound confirm (wrong digest → 409, fail-closed) → real ADR-0026 ladder → member completion → durable receipt → evidence export (`dids_exported=false`) → in-VM steward verify → outbound canary held. Per-PR detail: the newest-first `[sync edit]` blocks above (this file is append-only; the comment blocks ARE the per-PR record).
 
