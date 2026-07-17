@@ -55,14 +55,20 @@ log "package: $PKG_NAME (profile=$PKG_PROFILE)"
 log "hashing image (streaming)…"
 IMG_SHA="$(sha256sum "$IMAGE" | awk '{print $1}')"
 
-read -r M_SHA M_COMMIT M_VER M_ARCH M_NP M_SIGNED M_DEMO < <(python3 - "$MANIFEST_IN" <<'PY'
+read -r M_SHA M_COMMIT M_VER M_ARCH M_NP M_SIGNED M_DEMO M_FMT < <(python3 - "$MANIFEST_IN" <<'PY'
 import json,sys
 d=json.load(open(sys.argv[1]))
 def b(x): return "true" if x is True else "false"
 print(d.get("image_sha256",""), d.get("git_commit",""), d.get("version",""),
-      d.get("arch",""), b(d.get("non_production")), b(d.get("signed")), b(d.get("demo_profile")))
+      d.get("arch",""), b(d.get("non_production")), b(d.get("signed")), b(d.get("demo_profile")),
+      d.get("image_format","") or "-")
 PY
 )
+
+# The lane packages a qcow2 (the launcher + IMAGE_BASENAME assume it). Reject any
+# other source format so a raw/other image is never shipped under a .qcow2 name.
+[ "$M_FMT" = "qcow2" ] || die "manifest image_format=$M_FMT (this lane only packages qcow2)"
+case "$IMAGE_BASENAME" in *.qcow2) ;; *) die "IMAGE_BASENAME $IMAGE_BASENAME is not a .qcow2 name" ;; esac
 
 [ "$M_SHA" = "$IMG_SHA" ] || die "manifest image_sha256 ($M_SHA) != actual image sha ($IMG_SHA)"
 log "image sha matches manifest: OK"

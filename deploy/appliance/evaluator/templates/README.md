@@ -7,10 +7,9 @@ member shell working against services inside that VM.
 
 ## Start Here
 
-Open these first:
+Open this first:
 
 - `docs/START-HERE.md`
-- `docs/START-HERE.pdf`
 
 Then run:
 
@@ -29,10 +28,13 @@ and starts the local VM.
 - `setup-and-run.sh` - one-command Debian/Ubuntu setup, verify, and run path.
 - `scripts/verify.sh` - verifies every packaged file.
 - `scripts/run-demo.sh` - starts the demo from the package root.
-- `docs/START-HERE.md` and `docs/START-HERE.pdf` - visual setup guide.
-- `docs/RUNBOOK.md` and `docs/RUNBOOK.pdf` - detailed operations runbook.
-- `docs/WALKTHROUGH.md` and `docs/WALKTHROUGH.pdf` - browser click-through.
+- `docs/START-HERE.md` - visual setup guide.
+- `docs/RUNBOOK.md` - detailed operations runbook.
+- `docs/WALKTHROUGH.md` - browser click-through.
 - `SHA256SUMS` - checksums for the package contents.
+
+The docs are Markdown. A matching `.pdf` for each is included **only when the build
+environment can render one** (best-effort); it is never required to run the demo.
 
 ## What This Shows
 

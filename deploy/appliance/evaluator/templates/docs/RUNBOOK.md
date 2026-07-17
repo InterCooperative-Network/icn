@@ -32,11 +32,9 @@ Minimum practical resources:
     verify.sh
   docs/
     START-HERE.md
-    START-HERE.pdf
     RUNBOOK.md
-    RUNBOOK.pdf
     WALKTHROUGH.md
-    WALKTHROUGH.pdf
+    (a matching .pdf for each may be present if the build rendered one)
   setup-and-run.sh
 ```
 
@@ -99,14 +97,14 @@ Expected shape:
 ```text
 README.md: OK
 docs/START-HERE.md: OK
-docs/START-HERE.pdf: OK
 docs/RUNBOOK.md: OK
-docs/RUNBOOK.pdf: OK
 docs/WALKTHROUGH.md: OK
-docs/WALKTHROUGH.pdf: OK
 @IMAGE_BASENAME@: OK
 ...
 ```
+
+Every line must end in `OK`. If the package includes `.pdf` docs, they appear as
+additional `OK` lines; if it ships Markdown only, they are simply absent.
 
 If any line does not end in `OK`, stop and re-download.
 
