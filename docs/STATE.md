@@ -1,10 +1,46 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-07-15
+Last Reviewed: 2026-07-17
 ---
 
 # ICN State (living doc)
+
+<!-- [sync edit] 2026-07-17 (repository-owned portable evaluator lane MERGED + canonical
+     release; branch `docs/evaluator-lane-state-sync`; docs/ops-state-only — no
+     code/schema/route/auth-decision change lands with it). Append-only/newest-first;
+     the 2026-07-15 LAN-witness block below remains accurate.
+     WHAT MERGED: PR #2428 (`f34f9f29`) adds `deploy/appliance/evaluator/` — a
+     declared-input, fail-closed, repository-owned lane that GENERATES the external
+     "Common Sense bootable vertical slice" evaluator package (was previously assembled
+     ad hoc). It takes a `build-image.sh` demo-profile image + typed manifest and emits
+     the distributable ZIP: sanitizes the manifest paths to basenames (no build-host
+     `/home` leak), deterministic archive, `SHA256SUMS`, static validator + 11-case
+     defect suite (privacy/bind/checksum/manifest/injection), and a KVM-free CI lane.
+     PORTABLE vs LAN: this packages the DEMO profile (QEMU user-net, localhost-only host
+     forwards, disposable overlay, one-command setup for a reviewer's own machine) — a
+     DIFFERENT threat model + audience from the LAN Rehearsal Node (operator-controlled,
+     nginx single TLS origin, internal DNS/CA; `deploy/appliance/lan/`). The profiles are
+     deliberately not collapsed.
+     CANONICAL RELEASE: `common-sense-vertical-slice-0.0.3-amd64` — built from a
+     current-main demo image (git_commit `f34f9f29`, image sha256 `097b2b2a…`, archive
+     sha256 `5df053e5…`, `non_production=true, signed=false, demo_profile=true`),
+     GENERATED THROUGH THE MERGED LANE. Static-validated AND runtime-witnessed on a real
+     KVM boot of the exact published bytes: loopback-only forwards (LAN address refused),
+     one-click role sessions (no credential in any URL), organizer review/assign/preview/
+     digest-bound confirm (wrong digest → 409; correct → one action item + ADR-0026
+     ladder), member completion + idempotent retry, source qcow2 unchanged, clean
+     teardown, repeat run; the downloaded release bytes match the witnessed bytes. The
+     four ad-hoc 0.0.2 pre-releases are reconciled: two recipient-name-contaminated demo
+     releases DELETED, the two 0.0.2 vertical-slice releases marked SUPERSEDED.
+     WHAT STATIC CI PROVES vs RUNTIME: the CI lane is fast static validation only
+     (layout/syntax/ShellCheck/checksum/manifest/privacy/bind); it is NOT assembled-image
+     runtime proof — that is the separate KVM witness recorded here. NON-CLAIMS: an
+     unsigned, non-production evaluator artifact; NOT production, NOT a pilot, NOT
+     organizer acceptance, NOT accessibility-completion, NOT live federation, NOT general
+     cooperative storage/compute hosting. Human gates unchanged and still owed: #2041,
+     #1703/#1746, nycn#41/#52. #2422 CLOSED (fulfilled by merged #2426). Follow-up #2429
+     (bounded blob publish/fetch). Refs #2428 #2426 #2429 #2421 #2398. No close keywords. -->
 
 <!-- [sync edit] 2026-07-15 (LAN rehearsal MERGED-MAIN witness + hardening;
      branch `docs/state-mainmerge-witness`; docs/ops-state-only).
@@ -1408,6 +1444,8 @@ Last Reviewed: 2026-07-15
 **Current phase:** Phase 2 — Pilot Launch (in progress, partner-bound). The **Rehearsal Node organizer→member loop** is merged (#2406 runtime, #2407 browser surface, #2408 appliance wiring, #2409 smoke driver) and was witnessed end-to-end on a fresh assembled image built from clean `main` `8c0fe926` on 2026-07-13: restrict=on boot → organizer no-paste session → review/edit/assign → digest-bound confirm (wrong digest → 409, fail-closed) → real ADR-0026 ladder → member completion → durable receipt → evidence export (`dids_exported=false`) → in-VM steward verify → outbound canary held. Per-PR detail: the newest-first `[sync edit]` blocks above (this file is append-only; the comment blocks ARE the per-PR record).
 
 **LAN workstation witness (2026-07-15, merged-main):** the appliance's LAN single-origin profile is **merged to main** (#2424, #2425) and deployed as a dedicated hypervisor VM on operator-controlled LAN infrastructure from the **merged-main image `icn-appliance-0.0.3-lan-e74a8915`** (git_commit `e74a8915`, non-production, unsigned; supersedes the earlier `916629d7` branch image). A review-caught authority-boundary defect was fixed before merge: the LAN profile's gateway/member-shell/session are now all loopback-bound so the in-VM nginx is the only LAN HTTP surface. The full organizer→member loop was driven from a real Windows workstation browser against the merged-main deployment — one-click role-scoped sessions (no terminal, no credential paste, no credential in any URL), digest-bound confirm with server-verified wrong-digest 409, exactly one action item per confirm, fresh member session, completion, idempotent retry, in-VM steward verify PASS (negative capability matrix + value-withheld evidence), unattended recovery across service restart and VM reboot (node identity + sled durable; the rehearsal workspace view is intentionally ephemeral). A LAN development rehearsal, not production and not any human gate — see the 2026-07-15 sync block above.
+
+**Portable evaluator release (2026-07-17, current-main):** distinct from the LAN Rehearsal Node, the **portable "Common Sense bootable vertical slice"** is now produced by a repository-owned, fail-closed generation lane (`deploy/appliance/evaluator/`, merged `f34f9f29`, PR #2428) rather than assembled ad hoc. The canonical release **`common-sense-vertical-slice-0.0.3-amd64`** was built from a current-main demo-profile image (git_commit `f34f9f29`, `non_production=true, signed=false, demo_profile=true`), generated through the merged lane, and **runtime-witnessed on a real KVM boot of the exact published bytes**: QEMU user-net with localhost-only host forwards (LAN address refused), disposable overlay (source image unchanged), one-command `setup-and-run.sh`, one-click role sessions with no credential in any URL, organizer review/assign/preview/digest-bound confirm (wrong digest → 409; correct → one action item + ADR-0026 ladder), member completion + idempotent retry, clean teardown, repeat run; the downloaded release bytes match the witnessed bytes. This is the reviewer-on-their-own-machine profile — a different threat model and audience from the operator-controlled LAN node, and the two profiles are deliberately not collapsed. The four ad-hoc 0.0.2 pre-releases were reconciled (two recipient-name-contaminated demo releases deleted; the two 0.0.2 vertical-slice releases marked superseded). Unsigned, non-production; not a pilot, not organizer acceptance, not accessibility completion, not federation.
 
 **NYCN adoption state:** partner repo pinned to `8c0fe926`; facilitator gate package independently steward-operable (nycn#100/#101); `human_review: pending`. NYCN remains the intended first partner — an active track, not a committed pilot.
 
