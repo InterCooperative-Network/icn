@@ -2272,6 +2272,19 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/spec/receipt-chain-verification.md"]
+category = "architecture"
+status = "draft"
+title = "Receipt-Chain Verification Contract"
+description = "Normative contract for a mechanical, offline re-verifier of ICN receipt chains (ADR-0026 re-verifiability made enforceable). Defines what verifying a receipt chain must check: content-hash recompute for GovernanceDecisionReceipt/GovernanceProof, fail-closed Pass/Fail/Unresolved/NotApplicable folding (NotApplicable least-severe), generic chain-link and hash-collision checks. Implemented as icn-governance::verify and consumed by a rewritten icnctl audit verify that recomputes the decision hash from content instead of comparing hash strings. Proves integrity/authenticity only, never authorization or legitimacy. A concrete supersedes-linked domain-policy-adoption receipt class is a deferred consumer (needs a crash-atomic cross-store transition; see close_journal.rs WAL pattern)."
+last_updated = "2026-07-18"
+last_reviewed = "2026-07-18"
+owner = "matt"
+audiences = ["architects", "developers", "contributors"]
+domain_tags = ["governance", "receipts", "verification", "audit", "kernel-app-boundary", "spec"]
+depends_on = ["docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md"]
+recommended_action = "keep"
+
 [docs."docs/spec/institutional-powers.md"]
 category = "architecture"
 status = "draft"

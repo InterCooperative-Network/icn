@@ -78,6 +78,7 @@ pub mod steward;
 pub mod steward_store;
 pub mod store;
 pub mod tally;
+pub mod verify;
 pub mod vote;
 
 // Action items for meeting/task tracking

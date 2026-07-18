@@ -11613,9 +11613,98 @@ struct AuditCheck {
     detail: String,
 }
 
-/// Verify receipt chain integrity. Returns a list of checks with pass/fail.
-///
-/// Extracted from the handler so it can be unit-tested without a live gateway.
+/// Recompute a chain's governance `decision_hash` from the receipt's own
+/// canonical fields and compare to the claimed value. Returns `(matches,
+/// detail)`. Fail-closed: a missing governance receipt, an unknown outcome
+/// string, or a malformed `vote_hash` all return `false` (unverifiable, treated
+/// as failure) rather than silently passing. Reuses the canonical hashing in
+/// `icn_governance` — it does not define a second hash function. Extracted from
+/// the handler so it can be unit-tested without a live gateway.
+fn recompute_decision_hash_matches(
+    chain: &icn_gateway::api::receipts::ReceiptChainResponse,
+) -> (bool, String) {
+    use icn_governance::{GovernanceDecisionReceipt, ProofOutcome, VoteTally};
+
+    // Char-safe display truncation (never panics on non-ASCII/short input).
+    fn short(s: &str) -> String {
+        s.chars().take(16).collect()
+    }
+
+    let gov = match &chain.governance {
+        Some(g) => g,
+        None => return (false, "No governance receipt to recompute".to_string()),
+    };
+    // Hex hashes are case-insensitive; `hex::encode` (used for the recomputed
+    // value) emits lowercase, so normalize the response's hashes to lowercase
+    // before any comparison. Otherwise an uppercase-hex decision hash supplied by
+    // the caller and echoed by the gateway would spuriously mismatch a valid
+    // receipt.
+    let chain_decision_hash = chain.decision_hash.to_ascii_lowercase();
+    let gov_decision_hash = gov.decision_hash.to_ascii_lowercase();
+    // Fail closed if the response is internally inconsistent: the governance
+    // receipt's own `decision_hash` must equal the chain's top-level one.
+    if gov_decision_hash != chain_decision_hash {
+        return (
+            false,
+            format!(
+                "inconsistent response: governance.decision_hash {}... != chain.decision_hash {}...",
+                short(&gov_decision_hash),
+                short(&chain_decision_hash)
+            ),
+        );
+    }
+    let outcome = match gov.outcome.as_str() {
+        "Accepted" => ProofOutcome::Accepted,
+        "Rejected" => ProofOutcome::Rejected,
+        "NoQuorum" => ProofOutcome::NoQuorum,
+        other => {
+            return (
+                false,
+                format!("Unknown outcome '{other}'; cannot recompute (fail-closed)"),
+            )
+        }
+    };
+    let vote_hash = match hex::decode(&gov.vote_hash) {
+        Ok(b) if b.len() == 32 => {
+            let mut h = [0u8; 32];
+            h.copy_from_slice(&b);
+            h
+        }
+        _ => return (false, "Malformed vote_hash; cannot recompute".to_string()),
+    };
+    let tally = VoteTally {
+        for_votes: gov.vote_tally.for_votes,
+        against_votes: gov.vote_tally.against_votes,
+        abstain_votes: gov.vote_tally.abstain_votes,
+    };
+    let recomputed = GovernanceDecisionReceipt::compute_decision_hash(
+        &gov.proposal_id,
+        &gov.domain_id,
+        outcome,
+        &tally,
+        &vote_hash,
+    );
+    let recomputed_hex = hex::encode(recomputed);
+    if recomputed_hex == chain_decision_hash {
+        (
+            true,
+            format!(
+                "recomputed decision_hash matches claimed {}...",
+                short(&chain_decision_hash)
+            ),
+        )
+    } else {
+        (
+            false,
+            format!(
+                "recomputed {}... != claimed {}... (tampered or corrupt)",
+                short(&recomputed_hex),
+                short(&chain_decision_hash)
+            ),
+        )
+    }
+}
+
 fn verify_receipt_chain(
     chain: &icn_gateway::api::receipts::ReceiptChainResponse,
     decision_hash: &str,
@@ -11636,20 +11725,41 @@ fn verify_receipt_chain(
         },
     });
 
-    // Check 2: Decision hash consistency
-    let hash_consistent = chain.decision_hash == decision_hash;
+    // Check 2a: the returned chain corresponds to the requested decision.
+    // (Requested-vs-returned identity only — NOT an integrity check.)
+    // Char-safe truncation avoids a panic on non-ASCII CLI input.
+    let short = |s: &str| -> String { s.chars().take(16).collect() };
+    // Hex is case-insensitive: compare hashes ignoring ASCII case so an
+    // uppercase-hex request does not spuriously mismatch the gateway's echo.
+    let requested_matches = chain.decision_hash.eq_ignore_ascii_case(decision_hash);
     checks.push(AuditCheck {
-        name: "Decision hash consistent".to_string(),
-        passed: hash_consistent,
-        detail: if hash_consistent {
-            format!("Hash: {}...", &decision_hash[..16])
+        name: "Returned chain matches requested decision".to_string(),
+        passed: requested_matches,
+        detail: if requested_matches {
+            format!("Hash: {}...", short(decision_hash))
         } else {
             format!(
                 "Mismatch: requested {}... got {}...",
-                &decision_hash[..16],
-                &chain.decision_hash[..chain.decision_hash.len().min(16)]
+                short(decision_hash),
+                short(&chain.decision_hash)
             )
         },
+    });
+
+    // Check 2b: Decision hash INTEGRITY (recomputed). Recompute the decision
+    // hash from the governance receipt's own canonical fields via the shared
+    // `GovernanceDecisionReceipt::compute_decision_hash` and compare to the
+    // claimed value. This replaces the prior tautological string compare
+    // (`chain.decision_hash == requested`, which the gateway trivially echoes)
+    // with a real cryptographic re-verification: a chain whose governance
+    // fields were altered while keeping the old decision_hash now FAILS here.
+    // NOTE: proves integrity only — not that the decision was authorized or
+    // institutionally legitimate.
+    let (integrity_ok, integrity_detail) = recompute_decision_hash_matches(chain);
+    checks.push(AuditCheck {
+        name: "Decision hash integrity (recomputed)".to_string(),
+        passed: integrity_ok,
+        detail: integrity_detail,
     });
 
     // Check 3: Allocation receipts present
@@ -11664,7 +11774,7 @@ fn verify_receipt_chain(
     let all_alloc_linked = chain
         .allocations
         .iter()
-        .all(|a| a.decision_hash == decision_hash);
+        .all(|a| a.decision_hash.eq_ignore_ascii_case(decision_hash));
     checks.push(AuditCheck {
         name: "Allocation provenance linked".to_string(),
         passed: !has_allocations || all_alloc_linked,
@@ -11689,7 +11799,7 @@ fn verify_receipt_chain(
     let all_intents_linked = chain
         .intents
         .iter()
-        .all(|i| i.decision_hash == decision_hash);
+        .all(|i| i.decision_hash.eq_ignore_ascii_case(decision_hash));
     checks.push(AuditCheck {
         name: "Intent provenance linked".to_string(),
         passed: !has_intents || all_intents_linked,
@@ -11808,7 +11918,7 @@ fn verify_receipt_chain(
     let all_journal_linked = chain
         .journal_entries
         .iter()
-        .all(|j| j.decision_hash == decision_hash);
+        .all(|j| j.decision_hash.eq_ignore_ascii_case(decision_hash));
     checks.push(AuditCheck {
         name: "Journal provenance matches decision".to_string(),
         passed: !has_journal || all_journal_linked,
@@ -12359,6 +12469,87 @@ mod audit_verify_tests {
                 execution_complete,
             },
         }
+    }
+
+    /// A chain whose governance `decision_hash` is the *real* canonical hash of
+    /// its own fields (so the recomputed-integrity check passes).
+    fn valid_governance_chain() -> ReceiptChainResponse {
+        use icn_governance::{GovernanceDecisionReceipt, ProofOutcome, VoteTally};
+        let tally = VoteTally {
+            for_votes: 3,
+            against_votes: 0,
+            abstain_votes: 0,
+        };
+        let vote_hash = [0u8; 32];
+        let dh = GovernanceDecisionReceipt::compute_decision_hash(
+            "prop-1",
+            "domain-1",
+            ProofOutcome::Accepted,
+            &tally,
+            &vote_hash,
+        );
+        let dh_hex = hex::encode(dh);
+        ReceiptChainResponse {
+            decision_hash: dh_hex.clone(),
+            governance: Some(GovernanceReceiptResponse {
+                decision_hash: dh_hex,
+                proposal_id: "prop-1".to_string(),
+                domain_id: "domain-1".to_string(),
+                outcome: "Accepted".to_string(),
+                vote_tally: GovernanceVoteTallyResponse {
+                    for_votes: 3,
+                    against_votes: 0,
+                    abstain_votes: 0,
+                },
+                vote_hash: hex::encode(vote_hash),
+            }),
+            allocations: vec![],
+            intents: vec![],
+            journal_entries: vec![],
+            structural_complete: true,
+            execution_complete: true,
+            chain_complete: true,
+            execution: DecisionExecutionTruthResponse {
+                execution_record_present: true,
+                status: None,
+                total_effects: 1,
+                executed_effects: 1,
+                not_executed_effects: 0,
+                hard_failed_effects: 0,
+                execution_complete: true,
+            },
+        }
+    }
+
+    #[test]
+    fn recomputed_integrity_passes_for_valid_chain() {
+        let chain = valid_governance_chain();
+        let requested = chain.decision_hash.clone();
+        let checks = verify_receipt_chain(&chain, &requested);
+        assert!(
+            checks
+                .iter()
+                .any(|c| c.name == "Decision hash integrity (recomputed)" && c.passed),
+            "a chain with a canonical decision_hash must pass recomputed integrity"
+        );
+    }
+
+    #[test]
+    fn recomputed_integrity_fails_for_tampered_outcome() {
+        // The exact attack the old tautological string compare missed: alter a
+        // governance field but keep the (now stale) decision_hash.
+        let mut chain = valid_governance_chain();
+        if let Some(ref mut g) = chain.governance {
+            g.outcome = "Rejected".to_string();
+        }
+        let requested = chain.decision_hash.clone();
+        let checks = verify_receipt_chain(&chain, &requested);
+        assert!(
+            checks
+                .iter()
+                .any(|c| c.name == "Decision hash integrity (recomputed)" && !c.passed),
+            "tampered outcome with a stale decision_hash must FAIL recomputed integrity"
+        );
     }
 
     #[test]
