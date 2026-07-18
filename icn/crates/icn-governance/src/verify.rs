@@ -157,7 +157,8 @@ pub fn verify_governance_proof(
 ) -> Vec<CheckVerdict> {
     let mut checks = Vec::new();
 
-    if proof.verify_binding() {
+    let binding_ok = proof.verify_binding();
+    if binding_ok {
         checks.push(CheckVerdict::pass(
             "proof_hash_binding",
             "recomputed proof_hash matches claimed value",
@@ -170,11 +171,21 @@ pub fn verify_governance_proof(
     }
 
     match verifying_key {
+        // The signature covers the stored `proof_hash`, which binds the content
+        // only when `verify_binding()` holds. If the binding failed, a
+        // signature that still verifies over the stale hash authenticates
+        // nothing about the (tampered) content — report it as a failure, never a
+        // pass, so the per-check verdict cannot be read as "authentic".
+        Some(_) if !binding_ok => checks.push(CheckVerdict::fail(
+            "signature",
+            "proof_hash does not bind the content, so a signature over it \
+             authenticates nothing (tampered or corrupt)",
+        )),
         Some(vk) => {
             if proof.verify_signature(vk) {
                 checks.push(CheckVerdict::pass(
                     "signature",
-                    "signature verifies under supplied key",
+                    "signature verifies under supplied key (and proof_hash binds the content)",
                 ));
             } else {
                 checks.push(CheckVerdict::fail(
@@ -445,13 +456,21 @@ mod tests {
     #[test]
     fn tampered_proof_binding_fails() {
         let (mut p, vk) = signed_proof();
-        p.proposal_id = "prop-EVIL".to_string(); // change content, keep proof_hash
+        p.proposal_id = "prop-EVIL".to_string(); // change content, keep proof_hash + signature
         let checks = verify_governance_proof(&p, Some(&vk));
         let binding = checks
             .iter()
             .find(|c| c.check == "proof_hash_binding")
             .expect("binding check present");
         assert_eq!(binding.status, VerificationStatus::Fail);
+        // The signature still verifies over the (unchanged) stored proof_hash, but
+        // that hash no longer binds the tampered content — so the signature verdict
+        // must be Fail, never a Pass that reads as "authentic".
+        let sig = checks
+            .iter()
+            .find(|c| c.check == "signature")
+            .expect("signature check present");
+        assert_eq!(sig.status, VerificationStatus::Fail);
         assert_eq!(overall_status(&checks), VerificationStatus::Fail);
     }
 
