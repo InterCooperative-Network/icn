@@ -148,7 +148,7 @@ Inside the persisted adoption seam `adopt_domain_policy_persisted_with_body`,
 **after** the mandate gate passes, the receipt chain is resolved and validated
 (below), and `save_institutional_domain` durably commits the new
 `current_policy`, emit the receipt through the `put_opaque_if_absent` cascade the
-other Layer-2 classes use, keyed `(class=DomainPolicyAdopted, key1=domain_id,
+other Layer-2 classes use, keyed `(class=domain_policy_adopted, key1=domain_id,
 key2=<occurrence key>)`. The **occurrence key** is the predecessor's `record_hash`
 (`hex(supersedes)`), or the literal `genesis` for the first adoption — not the
 policy id, which collides when a policy version is re-adopted later (A → B → A).
@@ -176,15 +176,20 @@ identical record hash is an idempotent replay (or a completed backfill); a
 *different* record hash is a conflict — two transitions from the same predecessor
 — and fails closed rather than forking the chain.
 
-On a **non-empty** chain the validated head must record the policy that
-currently governs the domain (the loaded `current_policy`). If it does not, an
-earlier adoption durably saved `current_policy` but lost its receipt; in that
-partial-failure state only a **backfill of that same policy** is accepted —
-adopting a *different* policy fails closed, because appending it would skip the
-unreceipted rung and record a lineage that disagrees with the durable current
-policy. (An empty chain legitimately starts at genesis: a pre-feature
-`current_policy` is simply not in the receipt lineage, and is indistinguishable
-from a lost genesis receipt, so genesis is not blocked there.)
+Whenever the domain already has a `current_policy`, the validated chain must
+record it (the head policy equals the current policy; a domain with no current
+policy has an empty chain). If that does not hold, an earlier adoption durably
+saved `current_policy` but its receipt is missing — a lost genesis, a lost
+mid-chain rung, or a `current_policy` that predates this feature. Only a
+**backfill of that same policy** is then accepted; adopting a *different* policy
+fails closed, because it would record a lineage that disagrees with the durable
+current policy. This includes the **empty-chain** case: a divergent adoption on a
+domain whose only genesis receipt was lost would otherwise emit itself as a false
+genesis and permanently omit the current policy's interval. Recovery/migration is
+uniform — re-adopt the current policy to seed/backfill its receipt, then a
+different adoption is accepted. A genuine first adoption (no `current_policy`,
+empty chain) is *not* blocked, since the head policy and the current policy are
+both absent.
 
 Emission is skipped only when the validated chain head already records the
 adopted policy id — strictly stronger than `prior == new`. So a retry after a
