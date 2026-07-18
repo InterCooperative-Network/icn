@@ -259,8 +259,9 @@ Per [`ICN_OPERATING_MODEL.md`](../architecture/ICN_OPERATING_MODEL.md) §Feature
   is out of scope here and tracked as separate gaps: adopted-policy evaluation
   (the CCL evaluator-selection seam, parked under #2141), act-time mandate
   enforcement (ADR-0019 "kernel dispatch gated by mandates — NOT IMPLEMENTED"),
-  and the DomainPolicy adoption receipt (a spine transition that currently emits
-  no receipt — see `docs/spec/domain-policy-adoption-receipt.md`, companion
-  scaffold).
+  and adopted-policy *legitimacy* (a passing adoption-receipt chain proves the
+  adoption was recorded, not that the policy body was evaluated or the mandate
+  enforced — see `docs/spec/domain-policy-adoption-receipt.md`, whose receipt +
+  supersession chain this verifier walks).
 - Logging redaction: the verifier must not reintroduce DID/body leakage into
   operational logs (a known observability gap).

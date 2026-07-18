@@ -10,16 +10,35 @@ Last Reviewed: 2026-07-17
 > **Implementation status.** Implemented and integration-tested in this
 > repository: the `DomainPolicyAdoptedReceipt` type (`icn-governance::proof`) and
 > its emission at the persisted adoption boundary
-> (`adopt_domain_policy_persisted_with_body`). The receipt is emitted **after**
-> the durable `save_institutional_domain`, so a receipt always corresponds to an
-> adoption that durably happened; `supersedes` is resolved deterministically from
-> the domain's prior `current_policy` (a keyed `get_latest_opaque` lookup, with
-> read/decode failures propagated fail-closed), and the write is an idempotent
-> `put_opaque_if_absent` keyed `(class, domain_id, hex(policy_id))`. A no-op
-> re-adoption of the already-current policy emits nothing. An integration test
-> adopts v1 then v2 and verifies the resulting supersession chain through the
-> verifier contract above. The receipt records a process fact and grants **zero
-> authority**.
+> (`adopt_domain_policy_persisted_with_body`).
+>
+> `supersedes` is resolved **structurally** from the validated chain head — the
+> single stored receipt no other receipt supersedes — not from a policy id or a
+> timestamp-ordered "latest" lookup. The full receipt history is read and
+> **validated before any durable domain write**: every receipt must decode, pass
+> its own `record_hash` integrity check, embed the matching `domain_id`, and form
+> exactly one connected acyclic chain with one genesis and one head. Any
+> unreadable, tampered, dangling, cyclic, disconnected, or multi-head history
+> fails closed **before** `save_institutional_domain`, leaving `current_policy`
+> unchanged.
+>
+> Each adoption is keyed by **occurrence**, not policy version: the opaque `key2`
+> is the predecessor's `record_hash` (`hex(supersedes)`), or the literal
+> `genesis` for the first adoption. This makes a cycle such as A → B → A record
+> three distinct receipts (a policy-id key collided the second A with the first).
+> The receipt is emitted **after** the durable save via an idempotent, atomic
+> `put_opaque_if_absent`: an identical record hash already present is an
+> idempotent replay; a *different* record hash already at the occurrence key is a
+> loud conflict (two transitions from the same predecessor) and fails closed.
+>
+> Emission is skipped only when the validated chain head already records the
+> current policy id. Because that check reads the chain (not just `prior == new`),
+> a retry after a save that succeeded but whose receipt write failed **backfills**
+> the missing receipt rather than skipping it. The domain store and the opaque
+> receipt store are not one transaction, so a save-then-emit-failure returns
+> `Err` with the receipt momentarily missing; a later retry backfills it (a
+> cross-process atomic save+emit is future work). The receipt records a process
+> fact and grants **zero authority**.
 
 > **What this document is.** The normative design contract for a receipt on the
 > domain-policy adoption transition — a domain adopting (or replacing) its
@@ -126,30 +145,47 @@ an institution-ceremony word.
 ## Emission point
 
 Inside the persisted adoption seam `adopt_domain_policy_persisted_with_body`,
-**after** the mandate gate passes and `save_institutional_domain` durably commits
-the new `current_policy`, emit the receipt through the `put_opaque_if_absent`
-cascade the other Layer-2 classes use, keyed `(class=DomainPolicyAdopted,
-key1=domain_id, key2=hex(policy_id))`.
+**after** the mandate gate passes, the receipt chain is resolved and validated
+(below), and `save_institutional_domain` durably commits the new
+`current_policy`, emit the receipt through the `put_opaque_if_absent` cascade the
+other Layer-2 classes use, keyed `(class=DomainPolicyAdopted, key1=domain_id,
+key2=<occurrence key>)`. The **occurrence key** is the predecessor's `record_hash`
+(`hex(supersedes)`), or the literal `genesis` for the first adoption — not the
+policy id, which collides when a policy version is re-adopted later (A → B → A).
 
-Ordering is **gate → commit → receipt** (emit *after* the durable save). This
-guarantees a receipt always corresponds to an adoption that durably happened — a
-receipt never over-claims. The weaker alternative (emit-before-save) can leave a
-durable receipt for an adoption that failed to persist, which is a lying receipt
-and worse for an evidence system.
+Ordering is **gate → validate chain → commit → receipt**. Chain resolution and
+validation run against a read-only view **before** the durable save, so a corrupt
+history aborts with `current_policy` unchanged (never mutate durable state and
+then fail head resolution). Emitting the receipt *after* the durable save
+guarantees a receipt never over-claims an adoption that did not persist; the
+weaker emit-before-save alternative can leave a durable receipt for an adoption
+that failed to persist (a lying receipt).
 
-`supersedes` is resolved deterministically from the domain's **prior
-`current_policy`** (captured before adoption overwrites it): a keyed
-`get_latest_opaque(class, domain_id, hex(prior_policy_id))` lookup. Read and
-decode failures are **propagated (fail-closed)**, never silently degraded to a
-genesis link (which would corrupt the chain). A prior policy that predates this
-feature has no receipt → the chain legitimately starts there. Re-adopting the
-already-current policy (`prior == new`) is a no-op and emits nothing.
+`supersedes` is the **structural chain head** — the single stored receipt no
+other receipt supersedes — resolved by `resolve_validated_chain_head`, which
+fails closed unless the receipts form exactly one connected acyclic chain (each
+decodes, passes its own `record_hash` integrity check, embeds the matching
+`domain_id`, has one genesis and one head, no dangling pointer, no cycle). A
+domain that predates this feature has no receipts → the chain legitimately starts
+at genesis. Read/decode/validation failures are **propagated (fail-closed)**,
+never degraded to a false genesis link.
+
+The write is idempotent and conflict-detecting: `put_opaque_if_absent` returns
+the existing winner's `record_hash` when the occurrence key is already taken. An
+identical record hash is an idempotent replay (or a completed backfill); a
+*different* record hash is a conflict — two transitions from the same predecessor
+— and fails closed rather than forking the chain.
+
+Emission is skipped only when the validated chain head already records the
+current policy id — strictly stronger than `prior == new`. So a retry after a
+save that committed but whose receipt write failed re-runs head resolution, finds
+the head still records the predecessor, and **backfills** the missing receipt.
 
 Known, bounded limitation: because the domain store and the receipt (opaque)
 store are not a single transaction, an emission failure *after* a successful save
 returns an error with a durable adoption whose receipt is momentarily missing.
-This missing-receipt failure mode is deliberately chosen over the lying-receipt
-mode; automatic re-emission/backfill is future work.
+That state is recoverable — a later retry backfills the receipt as above. A
+cross-process atomic save+emit remains future work.
 
 ## Authorization, receipts, surfaces, custody (feature-placement checklist)
 

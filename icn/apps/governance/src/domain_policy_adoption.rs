@@ -52,27 +52,44 @@ pub const DOMAIN_POLICY_ADOPTED_CLASS: &str = "DomainPolicyAdopted";
 /// Opaque-store `key2` for the first (genesis) adoption in a domain's chain.
 const ADOPTION_GENESIS_KEY: &str = "genesis";
 
-/// Resolve the **head** of a domain's adoption-receipt chain *structurally* — the
-/// unique receipt that no other receipt supersedes — rather than by policy id or
-/// by timestamp ordering.
+/// Resolve **and fully validate** a domain's adoption-receipt chain, returning
+/// the head receipt (the one no other receipt supersedes) or `None` for an empty
+/// chain.
 ///
-/// - Empty chain → `Ok(None)` (the next adoption is genesis).
-/// - Exactly one head → `Ok(Some(head_record_hash))`.
-/// - **Fails closed** on a read error, any decode error, or an ambiguous chain
-///   (a non-empty set with zero or more than one head — i.e. corruption or a
-///   fork). It never silently degrades to a genesis link, which would splice a
-///   false new root into the supersession chain.
-fn resolve_adoption_chain_head(
+/// Every check runs against a read-only view of the receipt store, so a caller
+/// can invoke this **before** any durable domain mutation and abort cleanly on a
+/// corrupt history. The chain is accepted only when the stored receipts form
+/// exactly one connected acyclic supersession chain:
+///
+/// - each receipt decodes, and passes **its own** `record_hash` integrity check
+///   ([`DomainPolicyAdoptedReceipt::verify`]);
+/// - each receipt's embedded `domain_id` matches the storage domain;
+/// - `record_hash`es are unique within the chain;
+/// - exactly one **head** (a receipt no other supersedes);
+/// - walking head → genesis via `supersedes` reaches every stored receipt
+///   (connected), visits none twice (acyclic), and every pointer resolves to a
+///   known receipt (no dangling), terminating at a single genesis (`None`).
+///
+/// **Fails closed** on any read/decode error, integrity failure, domain
+/// mismatch, duplicate, dangling pointer, cycle, disconnection, or an ambiguous
+/// (multi-head / multi-genesis) chain — it never silently degrades to a genesis
+/// link, which would splice a false new root into the supersession chain.
+fn resolve_validated_chain_head(
     backend: &dyn GovernanceReceiptBackend,
     domain_id: &str,
-) -> Result<Option<[u8; 32]>, InstitutionalDomainStoreError> {
+) -> Result<Option<icn_governance::DomainPolicyAdoptedReceipt>, InstitutionalDomainStoreError> {
+    use std::collections::{HashMap, HashSet};
+
     let rows = backend
         .list_opaque_for(DOMAIN_POLICY_ADOPTED_CLASS, domain_id)
         .map_err(InstitutionalDomainStoreError::Store)?;
     if rows.is_empty() {
         return Ok(None);
     }
-    let mut receipts = Vec::with_capacity(rows.len());
+
+    // Decode + integrity-verify every stored receipt, indexed by record_hash.
+    let mut by_hash: HashMap<[u8; 32], icn_governance::DomainPolicyAdoptedReceipt> =
+        HashMap::with_capacity(rows.len());
     for bytes in &rows {
         let r: icn_governance::DomainPolicyAdoptedReceipt =
             serde_json::from_slice(bytes).map_err(|e| {
@@ -80,23 +97,96 @@ fn resolve_adoption_chain_head(
                     "domain-policy adoption receipt unreadable during head resolution: {e}"
                 ))
             })?;
-        receipts.push(r);
+        if !r.verify() {
+            return Err(InstitutionalDomainStoreError::Store(format!(
+                "domain-policy adoption receipt for domain {domain_id} fails its own integrity \
+                 check (record_hash does not bind its fields); refusing to resolve chain head \
+                 (fail-closed)"
+            )));
+        }
+        if r.domain_id != domain_id {
+            return Err(InstitutionalDomainStoreError::Store(format!(
+                "domain-policy adoption receipt embeds domain_id {:?} but is stored under \
+                 {domain_id:?}; refusing to resolve chain head (fail-closed)",
+                r.domain_id
+            )));
+        }
+        if by_hash.insert(r.record_hash, r).is_some() {
+            return Err(InstitutionalDomainStoreError::Store(format!(
+                "duplicate domain-policy adoption record_hash in chain for domain {domain_id}; \
+                 refusing to resolve chain head (fail-closed)"
+            )));
+        }
     }
-    let superseded: std::collections::HashSet<[u8; 32]> =
-        receipts.iter().filter_map(|r| r.supersedes).collect();
-    let heads: Vec<[u8; 32]> = receipts
-        .iter()
-        .map(|r| r.record_hash)
+    let n = by_hash.len();
+
+    // Head = the single receipt that nothing supersedes.
+    let superseded: HashSet<[u8; 32]> = by_hash.values().filter_map(|r| r.supersedes).collect();
+    let heads: Vec<[u8; 32]> = by_hash
+        .keys()
+        .copied()
         .filter(|h| !superseded.contains(h))
         .collect();
-    match heads.as_slice() {
-        [h] => Ok(Some(*h)),
-        _ => Err(InstitutionalDomainStoreError::Store(format!(
-            "domain-policy adoption chain for domain {domain_id} has {} heads \
-             (expected exactly 1); refusing to append a receipt (fail-closed)",
-            heads.len()
+    let head_hash = match heads.as_slice() {
+        [h] => *h,
+        _ => {
+            return Err(InstitutionalDomainStoreError::Store(format!(
+                "domain-policy adoption chain for domain {domain_id} has {} heads (expected \
+                 exactly 1); refusing to append a receipt (fail-closed)",
+                heads.len()
+            )));
+        }
+    };
+
+    // Walk head → genesis via `supersedes`: every pointer must resolve to a known
+    // receipt (no dangling), no receipt is visited twice (acyclic), and every
+    // stored receipt is reached (single connected chain terminating at one
+    // genesis, where `supersedes == None`).
+    let mut seen: HashSet<[u8; 32]> = HashSet::with_capacity(n);
+    let mut cursor = Some(head_hash);
+    while let Some(h) = cursor {
+        if !seen.insert(h) {
+            return Err(InstitutionalDomainStoreError::Store(format!(
+                "domain-policy adoption chain for domain {domain_id} contains a cycle; refusing \
+                 to resolve chain head (fail-closed)"
+            )));
+        }
+        let r = by_hash.get(&h).ok_or_else(|| {
+            InstitutionalDomainStoreError::Store(format!(
+                "domain-policy adoption chain for domain {domain_id} has a dangling supersedes \
+                 pointer to an unknown receipt; refusing to resolve chain head (fail-closed)"
+            ))
+        })?;
+        cursor = r.supersedes;
+    }
+    if seen.len() != n {
+        return Err(InstitutionalDomainStoreError::Store(format!(
+            "domain-policy adoption chain for domain {domain_id} is disconnected: {} receipts \
+             reachable from the head but {n} stored; refusing to resolve chain head (fail-closed)",
+            seen.len()
+        )));
+    }
+
+    // `head_hash` came from `by_hash.keys()`, so it is present; use a fail-closed
+    // lookup rather than `expect` (no panics in this path).
+    match by_hash.remove(&head_hash) {
+        Some(head) => Ok(Some(head)),
+        None => Err(InstitutionalDomainStoreError::Store(format!(
+            "internal invariant: validated chain head for domain {domain_id} vanished from the \
+             receipt index (fail-closed)"
         ))),
     }
+}
+
+/// A fully-formed, pre-validated plan to emit one adoption receipt, computed
+/// **before** the durable domain save so that head resolution / chain validation
+/// can fail closed without having mutated state. Emitting is then a single
+/// idempotent, conflict-detecting `put_opaque_if_absent`.
+struct AdoptionEmitPlan {
+    backend: Arc<dyn GovernanceReceiptBackend>,
+    receipt: icn_governance::DomainPolicyAdoptedReceipt,
+    payload: Vec<u8>,
+    occurrence_key: String,
 }
 
 /// Error from a gate-wired domain-policy adoption. Every variant leaves the
@@ -531,18 +621,70 @@ impl crate::manager::GovernanceManager {
             .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?
             .ok_or(InstitutionalDomainStoreError::NotDeclared)?;
 
-        // Capture the domain's current policy BEFORE adoption overwrites it —
-        // used only for the no-op guard below (skip emission when re-adopting the
-        // already-current policy). The receipt's `supersedes` is NOT derived from
-        // this; it is resolved from the structural chain head at emit time.
-        let prior_policy_id: Option<[u8; 32]> = domain.current_policy().map(|r| r.id.0);
-
         // Real gate resolution + pure-core structural commit. On rejection the
         // in-memory `domain` is left unchanged and nothing is persisted, so a
         // gate failure never reaches the body write below.
         let policy_ref = self
             .adopt_domain_policy(&mut domain, policy, actor, now)
             .map_err(InstitutionalDomainStoreError::Adopt)?;
+
+        // Resolve AND fully validate the adoption-receipt chain, then decide what
+        // to emit — all BEFORE any durable write. This is the recoverable-
+        // transition ordering: an unreadable, tampered, disconnected, cyclic, or
+        // multi-head history aborts here with the domain state untouched, instead
+        // of durably changing `current_policy` and only then failing head
+        // resolution (which would leave a durable adoption with no receipt).
+        //
+        // OCCURRENCE-SAFE LINEAGE. Each adoption is recorded by its position in
+        // the chain, NOT by the adopted policy version: `supersedes` is the
+        // validated structural head (the one receipt no other supersedes), and the
+        // storage `key2` is that predecessor's `record_hash` (`hex(head)`, or the
+        // literal `genesis`). A sequence A → B → A therefore records THREE distinct
+        // receipts (the earlier policy-id keying collided the second A with the
+        // first and dropped it).
+        //
+        // NO-OP vs BACKFILL. Emission is skipped only when the validated chain
+        // head *already records the current policy id* — i.e. this exact adoption
+        // is already evidenced. This is strictly stronger than the old
+        // `prior == new` check: if an earlier attempt durably saved the domain but
+        // its receipt write failed, the head still records the predecessor, so a
+        // retry re-enters this block and backfills the missing receipt rather than
+        // being silently skipped.
+        let emit_plan: Option<AdoptionEmitPlan> = match self.receipt_backend() {
+            Some(backend) => {
+                let head = resolve_validated_chain_head(backend.as_ref(), &domain_id.0)?;
+                let head_records_current =
+                    head.as_ref().map(|h| h.policy_id) == Some(policy_ref.id.0);
+                if head_records_current {
+                    None
+                } else {
+                    let supersedes = head.as_ref().map(|h| h.record_hash);
+                    let receipt = icn_governance::DomainPolicyAdoptedReceipt::new(
+                        domain_id.0.clone(),
+                        policy_ref.id.0,
+                        actor.to_string(),
+                        now,
+                        supersedes,
+                    );
+                    let payload = serde_json::to_vec(&receipt).map_err(|e| {
+                        InstitutionalDomainStoreError::Store(format!(
+                            "serialize domain-policy adoption receipt: {e}"
+                        ))
+                    })?;
+                    let occurrence_key = match supersedes {
+                        Some(h) => hex::encode(h),
+                        None => ADOPTION_GENESIS_KEY.to_string(),
+                    };
+                    Some(AdoptionEmitPlan {
+                        backend,
+                        receipt,
+                        payload,
+                        occurrence_key,
+                    })
+                }
+            }
+            None => None,
+        };
 
         // Persist the body BEFORE the current_policy update: a body-store
         // failure (including a fail-closed content/id hash mismatch) returns
@@ -553,70 +695,60 @@ impl crate::manager::GovernanceManager {
                 .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?;
         }
 
-        // Durable commit of the adoption FIRST.
+        // Durable commit of the adoption.
         store
             .save_institutional_domain(&domain)
             .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?;
 
-        // THEN emit the domain-policy adoption receipt — AFTER the durable
-        // save, so that **every adoption receipt corresponds to an adoption that
-        // durably happened** (a receipt never over-claims). The weaker
-        // alternative (emit-before-save) can leave a durable receipt for an
-        // adoption that failed to persist — a lying receipt, which is worse for
-        // an evidence system than a temporarily-missing one.
+        // THEN emit the adoption receipt — AFTER the durable save, so a receipt
+        // never over-claims an adoption that did not persist (the emit plan was
+        // fully validated pre-save, so this cannot fail on chain corruption). The
+        // write is idempotent and conflict-detecting via the store's atomic
+        // uniqueness on `(class, domain_id, occurrence_key)`:
         //
-        // OCCURRENCE-SAFE LINEAGE. Each adoption is recorded by its position in
-        // the chain, NOT by the adopted policy version. `supersedes` is the
-        // current *structural* chain head (`resolve_adoption_chain_head`: the one
-        // receipt no other supersedes), and the storage `key2` is that
-        // predecessor (`hex(head)`, or `genesis`). This makes a sequence such as
-        // A → B → A record THREE distinct receipts (the earlier bug keyed by
-        // policy id, so the second A collided with the first A's key and was
-        // silently dropped). The key is occurrence-unique and idempotent: a retry
-        // of the *same* transition sees the same head → same key → first-writer-
-        // wins. Head resolution fails closed on read/decode errors and on an
-        // ambiguous (multi-head / forked) chain — it never fabricates a genesis
-        // link.
+        // - `Ok(None)`      → this call won the insert (fresh receipt).
+        // - `Ok(Some(h))`   with `h == record_hash` → an identical receipt is
+        //                     already present: an idempotent replay / successful
+        //                     backfill; nothing more to do.
+        // - `Ok(Some(h))`   with `h != record_hash` → a *different* transition
+        //                     already occupies this occurrence key (two adoptions
+        //                     from the same predecessor). Fail loudly rather than
+        //                     let the recorded lineage disagree with the persisted
+        //                     current policy.
         //
-        // Only a real change emits: re-adopting the already-current policy
-        // (`prior == new`) is a no-op and writes nothing.
-        //
-        // KNOWN LIMITATION (documented, bounded): the domain store and the
-        // receipt (opaque) store are not one transaction, so if the save succeeds
-        // but this emission fails the call returns `Err` with a durable adoption
-        // whose receipt is momentarily missing. That missing-receipt mode is
-        // deliberately chosen over the lying-receipt mode above; automatic
-        // re-emission/backfill is future work.
-        let is_real_change = prior_policy_id != Some(policy_ref.id.0);
-        if is_real_change {
-            if let Some(backend) = self.receipt_backend() {
-                let supersedes = resolve_adoption_chain_head(backend.as_ref(), &domain_id.0)?;
-                let receipt = icn_governance::DomainPolicyAdoptedReceipt::new(
-                    domain_id.0.clone(),
-                    policy_ref.id.0,
-                    actor.to_string(),
-                    now,
-                    supersedes,
-                );
-                let payload = serde_json::to_vec(&receipt).map_err(|e| {
-                    InstitutionalDomainStoreError::Store(format!(
-                        "serialize domain-policy adoption receipt: {e}"
-                    ))
-                })?;
-                let occurrence_key = match supersedes {
-                    Some(h) => hex::encode(h),
-                    None => ADOPTION_GENESIS_KEY.to_string(),
-                };
-                backend
-                    .put_opaque_if_absent(
-                        DOMAIN_POLICY_ADOPTED_CLASS,
-                        &domain_id.0,
-                        Some(&occurrence_key),
-                        receipt.recorded_at,
-                        receipt.record_hash,
-                        &payload,
-                    )
-                    .map_err(InstitutionalDomainStoreError::Store)?;
+        // KNOWN LIMITATION (documented, bounded): the domain store and the opaque
+        // receipt store are not one transaction, so if the save succeeds but this
+        // write fails, the call returns `Err` with the domain durably saved and its
+        // receipt momentarily missing. That is recoverable: a later retry re-runs
+        // the validated head resolution above, sees the head still records the
+        // predecessor, and backfills the same receipt. A cross-process atomic
+        // save+emit remains future work.
+        if let Some(plan) = emit_plan {
+            match plan
+                .backend
+                .put_opaque_if_absent(
+                    DOMAIN_POLICY_ADOPTED_CLASS,
+                    &domain_id.0,
+                    Some(&plan.occurrence_key),
+                    plan.receipt.recorded_at,
+                    plan.receipt.record_hash,
+                    &plan.payload,
+                )
+                .map_err(InstitutionalDomainStoreError::Store)?
+            {
+                None => {}
+                Some(existing) if existing == plan.receipt.record_hash => {}
+                Some(existing) => {
+                    return Err(InstitutionalDomainStoreError::Store(format!(
+                        "conflicting domain-policy adoption receipt for domain {}: occurrence \
+                         key {} already records a different transition (existing record_hash {}, \
+                         attempted {}); refusing to fork the supersession chain (fail-closed)",
+                        domain_id.0,
+                        plan.occurrence_key,
+                        hex::encode(existing),
+                        hex::encode(plan.receipt.record_hash),
+                    )));
+                }
             }
         }
 
@@ -677,6 +809,15 @@ mod tests {
         mandates: Vec<Mandate>,
         grants: Vec<AuthorityGrant>,
         opaque: std::sync::Mutex<Vec<OpaqueEntry>>,
+        /// Number of upcoming `put_opaque_if_absent` calls to fail with a store
+        /// error before behaving normally — simulates a transient receipt-write
+        /// failure after a durable domain save (retry/backfill test).
+        fail_next_opaque_puts: std::sync::atomic::AtomicUsize,
+        /// When set, `put_opaque_if_absent` reports this record hash as the
+        /// existing winner for the `DomainPolicyAdopted` class without writing —
+        /// simulates a concurrent, un-serialized adoption from the same
+        /// predecessor (conflict test).
+        force_put_conflict: std::sync::Mutex<Option<[u8; 32]>>,
     }
 
     impl TestBackend {
@@ -685,6 +826,8 @@ mod tests {
                 mandates,
                 grants,
                 opaque: std::sync::Mutex::new(Vec::new()),
+                fail_next_opaque_puts: std::sync::atomic::AtomicUsize::new(0),
+                force_put_conflict: std::sync::Mutex::new(None),
             })
         }
     }
@@ -746,6 +889,25 @@ mod tests {
             record_hash: [u8; 32],
             payload: &[u8],
         ) -> Result<Option<[u8; 32]>, String> {
+            // Simulate a transient write failure (retry/backfill test).
+            if self
+                .fail_next_opaque_puts
+                .load(std::sync::atomic::Ordering::SeqCst)
+                > 0
+            {
+                self.fail_next_opaque_puts
+                    .fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+                return Err("injected transient opaque write failure".to_string());
+            }
+            // Simulate a concurrent adoption winning this occurrence key with a
+            // different transition (conflict test).
+            if class == DOMAIN_POLICY_ADOPTED_CLASS {
+                if let Some(other) = *self.force_put_conflict.lock().unwrap() {
+                    if other != record_hash {
+                        return Ok(Some(other));
+                    }
+                }
+            }
             let mut store = self.opaque.lock().unwrap();
             if let Some(existing) = store
                 .iter()
@@ -1399,6 +1561,15 @@ mod tests {
         heads[0].clone()
     }
 
+    /// Read back the persisted domain's current policy id (None if unset/absent).
+    fn current_policy_id(mgr: &GovernanceManager, dom: &str) -> Option<[u8; 32]> {
+        mgr.domain_state_store()
+            .expect("domain store wired")
+            .get_institutional_domain(&domain_id(dom))
+            .expect("domain read")
+            .and_then(|d| d.current_policy().map(|r| r.id.0))
+    }
+
     #[test]
     fn adoption_a_b_a_records_three_distinct_receipts() {
         // The occurrence-key regression: keying by policy id dropped the final A.
@@ -1526,6 +1697,67 @@ mod tests {
             matches!(err, InstitutionalDomainStoreError::Store(ref m) if m.contains("heads")),
             "expected a fail-closed multi-head error, got {err:?}"
         );
+        // Invariant: multi-head history leaves current_policy unchanged.
+        assert_eq!(
+            current_policy_id(&mgr, "coop-alpha"),
+            None,
+            "a fail-closed adoption must not durably change current_policy"
+        );
+    }
+
+    #[test]
+    fn dangling_supersedes_pointer_fails_closed() {
+        // A receipt superseding a record_hash that is not present in the chain is
+        // corruption: adoption must fail closed, leaving current_policy unchanged.
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = manager_with_stores(backend.clone());
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        // Single receipt that supersedes an unknown predecessor → it is the only
+        // head, but the walk to genesis hits a dangling pointer.
+        let pid = DomainPolicy::new(domain_id("coop-alpha"), b"ghost")
+            .policy_ref()
+            .id
+            .0;
+        let dangling = icn_governance::DomainPolicyAdoptedReceipt::new(
+            "coop-alpha".to_string(),
+            pid,
+            actor.to_string(),
+            50,
+            Some([0xEE; 32]), // predecessor not in the store
+        );
+        backend
+            .put_opaque_if_absent(
+                DOMAIN_POLICY_ADOPTED_CLASS,
+                "coop-alpha",
+                Some("dangling"),
+                dangling.recorded_at,
+                dangling.record_hash,
+                &serde_json::to_vec(&dangling).unwrap(),
+            )
+            .unwrap();
+
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"real policy");
+        let err = mgr
+            .adopt_domain_policy_persisted_with_body(
+                &domain_id("coop-alpha"),
+                &policy,
+                Some(b"real policy"),
+                &actor,
+                100,
+            )
+            .expect_err("adoption must fail closed on a dangling supersedes pointer");
+        assert!(
+            matches!(err, InstitutionalDomainStoreError::Store(ref m) if m.contains("dangling")),
+            "expected a fail-closed dangling-pointer error, got {err:?}"
+        );
+        assert_eq!(current_policy_id(&mgr, "coop-alpha"), None);
     }
 
     #[test]
@@ -1566,6 +1798,247 @@ mod tests {
         assert!(
             matches!(err, InstitutionalDomainStoreError::Store(ref m) if m.contains("unreadable")),
             "expected a fail-closed decode error, got {err:?}"
+        );
+        // Invariant: unreadable predecessor history leaves current_policy unchanged.
+        assert_eq!(
+            current_policy_id(&mgr, "coop-alpha"),
+            None,
+            "a fail-closed adoption must not durably change current_policy"
+        );
+    }
+
+    #[test]
+    fn tampered_receipt_hash_fails_before_mutation() {
+        // A stored receipt whose record_hash does not bind its fields must abort
+        // the next adoption during pre-save validation, leaving current_policy
+        // unchanged (detected before any durable mutation).
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = manager_with_stores(backend.clone());
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        // A genesis receipt with a deliberately wrong record_hash (does not match
+        // compute_record_hash of its fields).
+        let pid = DomainPolicy::new(domain_id("coop-alpha"), b"ghost")
+            .policy_ref()
+            .id
+            .0;
+        let mut tampered = icn_governance::DomainPolicyAdoptedReceipt::new(
+            "coop-alpha".to_string(),
+            pid,
+            actor.to_string(),
+            50,
+            None,
+        );
+        tampered.record_hash = [0xAB; 32]; // break integrity
+        assert!(!tampered.verify());
+        backend
+            .put_opaque_if_absent(
+                DOMAIN_POLICY_ADOPTED_CLASS,
+                "coop-alpha",
+                Some("tampered"),
+                tampered.recorded_at,
+                tampered.record_hash,
+                &serde_json::to_vec(&tampered).unwrap(),
+            )
+            .unwrap();
+
+        let policy = DomainPolicy::new(domain_id("coop-alpha"), b"real policy");
+        let err = mgr
+            .adopt_domain_policy_persisted_with_body(
+                &domain_id("coop-alpha"),
+                &policy,
+                Some(b"real policy"),
+                &actor,
+                100,
+            )
+            .expect_err("adoption must fail closed on a tampered predecessor receipt");
+        assert!(
+            matches!(err, InstitutionalDomainStoreError::Store(ref m) if m.contains("integrity")),
+            "expected a fail-closed integrity error, got {err:?}"
+        );
+        assert_eq!(
+            current_policy_id(&mgr, "coop-alpha"),
+            None,
+            "a tampered-history adoption must not durably change current_policy"
+        );
+    }
+
+    #[test]
+    fn receipt_write_failure_after_save_is_recovered_by_retry() {
+        // If the receipt write fails AFTER the durable domain save, a retry must
+        // backfill the missing receipt (the no-op guard checks the chain head, not
+        // just prior==new). First adoption A succeeds (genesis). Then adopt B with
+        // the next opaque write forced to fail: the domain durably moves to B but
+        // the B receipt is missing. Re-adopting B (same now) backfills it.
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = manager_with_stores(backend.clone());
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        let a = adopt(&mgr, "coop-alpha", &actor, b"policy A");
+        assert_eq!(read_receipts(&backend, "coop-alpha").len(), 1);
+
+        // Force the next put to fail, then attempt A -> B.
+        backend
+            .fail_next_opaque_puts
+            .store(1, std::sync::atomic::Ordering::SeqCst);
+        let b_policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy B");
+        let err = mgr
+            .adopt_domain_policy_persisted_with_body(
+                &domain_id("coop-alpha"),
+                &b_policy,
+                Some(b"policy B"),
+                &actor,
+                100,
+            )
+            .expect_err("the injected receipt-write failure surfaces as Err");
+        assert!(matches!(err, InstitutionalDomainStoreError::Store(_)));
+
+        // Domain durably moved to B, but the B receipt is missing (still 1 receipt,
+        // whose head records A).
+        let b_id = b_policy.policy_ref().id.0;
+        assert_eq!(current_policy_id(&mgr, "coop-alpha"), Some(b_id));
+        let receipts = read_receipts(&backend, "coop-alpha");
+        assert_eq!(receipts.len(), 1, "B receipt was not written");
+        assert_eq!(chain_head(&receipts).policy_id, a, "head still records A");
+
+        // Retry A -> B (now succeeds): backfills the B receipt.
+        let ref_again = mgr
+            .adopt_domain_policy_persisted_with_body(
+                &domain_id("coop-alpha"),
+                &b_policy,
+                Some(b"policy B"),
+                &actor,
+                100,
+            )
+            .expect("retry backfills the missing receipt");
+        assert_eq!(ref_again.id.0, b_id);
+        let receipts = read_receipts(&backend, "coop-alpha");
+        assert_eq!(receipts.len(), 2, "retry backfilled the B receipt");
+        let head = chain_head(&receipts);
+        assert_eq!(head.policy_id, b_id, "head now records B");
+        assert!(receipts.iter().all(|r| r.verify()));
+        // Invariant 9: persisted current policy == final chain head policy.
+        assert_eq!(current_policy_id(&mgr, "coop-alpha"), Some(head.policy_id));
+    }
+
+    #[test]
+    fn same_transition_replay_is_idempotent() {
+        // Replaying the exact same adoption (same predecessor, policy, actor, now)
+        // produces the same record_hash and writes no second receipt.
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = manager_with_stores(backend.clone());
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        adopt(&mgr, "coop-alpha", &actor, b"policy A");
+        let b_policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy B");
+        // First B adoption.
+        mgr.adopt_domain_policy_persisted_with_body(
+            &domain_id("coop-alpha"),
+            &b_policy,
+            Some(b"policy B"),
+            &actor,
+            100,
+        )
+        .unwrap();
+        let before = read_receipts(&backend, "coop-alpha");
+        assert_eq!(before.len(), 2);
+
+        // Replay the identical B adoption: head already records B → no-op, no new
+        // receipt. Idempotent.
+        mgr.adopt_domain_policy_persisted_with_body(
+            &domain_id("coop-alpha"),
+            &b_policy,
+            Some(b"policy B"),
+            &actor,
+            100,
+        )
+        .unwrap();
+        let after = read_receipts(&backend, "coop-alpha");
+        assert_eq!(after.len(), 2, "identical replay writes no new receipt");
+    }
+
+    #[test]
+    fn competing_transitions_from_same_predecessor_conflict() {
+        // Two different transitions from the same predecessor must not both be
+        // recorded. In-process the per-domain lock serializes adoptions, so this
+        // exercises the store-level conflict guard directly: the opaque store
+        // reports a DIFFERENT winner already at the resolved occurrence key (a
+        // concurrent/un-serialized writer), and adoption fails loudly rather than
+        // forking the chain.
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = manager_with_stores(backend.clone());
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        adopt(&mgr, "coop-alpha", &actor, b"policy A"); // head records A
+
+        // A concurrent adoption already claimed this predecessor's occurrence key
+        // with some other transition's record hash.
+        *backend.force_put_conflict.lock().unwrap() = Some([0xC0; 32]);
+
+        let b_policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy B");
+        let err = mgr
+            .adopt_domain_policy_persisted_with_body(
+                &domain_id("coop-alpha"),
+                &b_policy,
+                Some(b"policy B"),
+                &actor,
+                100,
+            )
+            .expect_err("a competing transition on the same predecessor must conflict");
+        assert!(
+            matches!(err, InstitutionalDomainStoreError::Store(ref m) if m.contains("conflicting")),
+            "expected a loud conflict error, got {err:?}"
+        );
+    }
+
+    #[test]
+    fn persisted_current_policy_and_chain_head_agree() {
+        // Across a multi-step history, the persisted current_policy and the final
+        // chain head always name the same policy id.
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = manager_with_stores(backend.clone());
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        adopt(&mgr, "coop-alpha", &actor, b"policy A");
+        adopt(&mgr, "coop-alpha", &actor, b"policy B");
+        let c = adopt(&mgr, "coop-alpha", &actor, b"policy C");
+
+        let head = chain_head(&read_receipts(&backend, "coop-alpha"));
+        assert_eq!(head.policy_id, c);
+        assert_eq!(
+            current_policy_id(&mgr, "coop-alpha"),
+            Some(head.policy_id),
+            "persisted current policy must equal the final chain head policy"
         );
     }
 

@@ -279,6 +279,12 @@ pub struct HashClaim {
 pub fn detect_hash_conflicts(entries: &[HashClaim]) -> Vec<CheckVerdict> {
     let mut checks = Vec::new();
 
+    // Single pass: per-entry integrity plus collision detection against the
+    // first entry seen for each claimed identity. Replaces the previous O(n²)
+    // all-pairs scan; a `claimed` hash maps to `(first_index, recomputed)`.
+    let mut first_by_claimed: std::collections::HashMap<[u8; 32], (usize, [u8; 32])> =
+        std::collections::HashMap::with_capacity(entries.len());
+
     for (i, e) in entries.iter().enumerate() {
         if e.claimed != e.recomputed {
             checks.push(CheckVerdict::fail(
@@ -286,21 +292,22 @@ pub fn detect_hash_conflicts(entries: &[HashClaim]) -> Vec<CheckVerdict> {
                 format!("entry {i}: recomputed content hash does not match claimed identity"),
             ));
         }
-    }
 
-    // Collision: same claimed identity, differing recomputed content.
-    for i in 0..entries.len() {
-        for j in (i + 1)..entries.len() {
-            if entries[i].claimed == entries[j].claimed
-                && entries[i].recomputed != entries[j].recomputed
-            {
+        // Collision: an earlier entry asserted the same claimed identity but
+        // bound different recomputed content.
+        match first_by_claimed.get(&e.claimed) {
+            Some(&(j, prev_recomputed)) if prev_recomputed != e.recomputed => {
                 checks.push(CheckVerdict::fail(
                     "hash_collision",
                     format!(
-                        "entries {i} and {j} assert the same record_hash but differ in content"
+                        "entries {j} and {i} assert the same record_hash but differ in content"
                     ),
                 ));
             }
+            None => {
+                first_by_claimed.insert(e.claimed, (i, e.recomputed));
+            }
+            _ => {}
         }
     }
 
