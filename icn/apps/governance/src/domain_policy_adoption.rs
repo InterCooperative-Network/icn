@@ -478,6 +478,12 @@ impl crate::manager::GovernanceManager {
             .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?
             .ok_or(InstitutionalDomainStoreError::NotDeclared)?;
 
+        // Capture the domain's current policy BEFORE adoption overwrites it: this
+        // is definitionally the predecessor of the adoption about to happen, and
+        // it is what the new adoption receipt's `supersedes` must point at. (A
+        // fresh domain with no current policy → `None` → the receipt is genesis.)
+        let prior_policy_id: Option<[u8; 32]> = domain.current_policy().map(|r| r.id.0);
+
         // Real gate resolution + pure-core structural commit. On rejection the
         // in-memory `domain` is left unchanged and nothing is persisted, so a
         // gate failure never reaches the body write below.
@@ -494,57 +500,92 @@ impl crate::manager::GovernanceManager {
                 .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?;
         }
 
-        // Emit the domain-policy adoption receipt BEFORE the durable
-        // current_policy save, with a `supersedes` back-pointer to the domain's
-        // most-recent prior adoption receipt. Emitting first makes it
-        // fail-closed: if the receipt cannot be written the call returns here
-        // and no adoption is durably committed without its receipt.
-        //
-        // The predecessor is the last entry of `list_opaque_for` (documented
-        // oldest-first by recorded_at) — NOT `get_latest_opaque(.., None)`,
-        // which returns the lexicographically-last key2, not the chronological
-        // latest. Storage is insert-if-absent per `(class, domain_id,
-        // policy_id)`, so a retry after a later failure re-derives the same
-        // receipt idempotently (the first write wins; a recomputed duplicate is
-        // discarded). Re-adopting an already-recorded policy version is a no-op
-        // by the same key — the chain records distinct versions in order.
-        if let Some(backend) = self.receipt_backend() {
-            let supersedes = backend
-                .list_opaque_for(DOMAIN_POLICY_ADOPTED_CLASS, &domain_id.0)
-                .ok()
-                .and_then(|entries| entries.last().cloned())
-                .and_then(|bytes| {
-                    serde_json::from_slice::<icn_governance::DomainPolicyAdoptedReceipt>(&bytes)
-                        .ok()
-                })
-                .map(|prior| prior.record_hash);
-            let receipt = icn_governance::DomainPolicyAdoptedReceipt::new(
-                domain_id.0.clone(),
-                policy_ref.id.0,
-                actor.to_string(),
-                now,
-                supersedes,
-            );
-            let payload = serde_json::to_vec(&receipt).map_err(|e| {
-                InstitutionalDomainStoreError::Store(format!(
-                    "serialize domain-policy adoption receipt: {e}"
-                ))
-            })?;
-            backend
-                .put_opaque_if_absent(
-                    DOMAIN_POLICY_ADOPTED_CLASS,
-                    &domain_id.0,
-                    Some(&hex::encode(receipt.policy_id)),
-                    receipt.recorded_at,
-                    receipt.record_hash,
-                    &payload,
-                )
-                .map_err(InstitutionalDomainStoreError::Store)?;
-        }
-
+        // Durable commit of the adoption FIRST.
         store
             .save_institutional_domain(&domain)
             .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?;
+
+        // THEN emit the domain-policy adoption receipt — AFTER the durable
+        // save, so that **every adoption receipt corresponds to an adoption that
+        // durably happened** (a receipt never over-claims). The weaker
+        // alternative (emit-before-save) can leave a durable receipt for an
+        // adoption that failed to persist — a lying receipt, which is worse for
+        // an evidence system than a temporarily-missing one.
+        //
+        // `supersedes` is resolved deterministically from the prior
+        // `current_policy`'s own adoption receipt (keyed lookup), not from a
+        // "latest by timestamp" scan. Read and decode failures are propagated
+        // (fail-closed) rather than silently degraded to a genesis link, which
+        // would corrupt the supersession chain. A prior policy that predates
+        // this feature has no receipt (`Ok(None)`) → the chain legitimately
+        // starts here.
+        //
+        // Only a real change emits: re-adopting the already-current policy
+        // (`prior == new`) is a no-op and writes nothing (this also avoids a
+        // self-referential `supersedes`). Storage is insert-if-absent per
+        // `(class, domain_id, policy_id)`.
+        //
+        // KNOWN LIMITATION (documented, bounded): if the domain save succeeds
+        // but this emission fails, the call returns `Err` with a durable
+        // adoption whose receipt is missing. There is no automatic
+        // reconciliation sweep in this slice; re-emission/backfill is future
+        // work. This is the accepted (missing-receipt) failure mode, chosen over
+        // the lying-receipt failure mode above.
+        let is_real_change = prior_policy_id != Some(policy_ref.id.0);
+        if is_real_change {
+            if let Some(backend) = self.receipt_backend() {
+                let supersedes: Option<[u8; 32]> =
+                    match prior_policy_id {
+                        None => None,
+                        Some(pid) => {
+                            match backend
+                                .get_latest_opaque(
+                                    DOMAIN_POLICY_ADOPTED_CLASS,
+                                    &domain_id.0,
+                                    Some(&hex::encode(pid)),
+                                )
+                                .map_err(InstitutionalDomainStoreError::Store)?
+                            {
+                                None => None, // prior policy predates this feature
+                                Some(bytes) => Some(
+                                    serde_json::from_slice::<
+                                        icn_governance::DomainPolicyAdoptedReceipt,
+                                    >(&bytes)
+                                    .map_err(|e| {
+                                        InstitutionalDomainStoreError::Store(format!(
+                                            "prior domain-policy adoption receipt unreadable: {e}"
+                                        ))
+                                    })?
+                                    .record_hash,
+                                ),
+                            }
+                        }
+                    };
+                let receipt = icn_governance::DomainPolicyAdoptedReceipt::new(
+                    domain_id.0.clone(),
+                    policy_ref.id.0,
+                    actor.to_string(),
+                    now,
+                    supersedes,
+                );
+                let payload = serde_json::to_vec(&receipt).map_err(|e| {
+                    InstitutionalDomainStoreError::Store(format!(
+                        "serialize domain-policy adoption receipt: {e}"
+                    ))
+                })?;
+                backend
+                    .put_opaque_if_absent(
+                        DOMAIN_POLICY_ADOPTED_CLASS,
+                        &domain_id.0,
+                        Some(&hex::encode(receipt.policy_id)),
+                        receipt.recorded_at,
+                        receipt.record_hash,
+                        &payload,
+                    )
+                    .map_err(InstitutionalDomainStoreError::Store)?;
+            }
+        }
+
         Ok(policy_ref)
     }
 

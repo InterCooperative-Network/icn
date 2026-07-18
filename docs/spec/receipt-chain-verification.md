@@ -1,5 +1,5 @@
 ---
-Status: normative (design contract; implemented + locally tested on branch task/gap-atlas-20260717, NOT merged)
+Status: normative (design contract; implemented + tested in this repository)
 Canonical: no
 Current-state source: docs/STATE.md + docs/PHASE_PROGRESS.md
 Last Reviewed: 2026-07-17
@@ -7,28 +7,28 @@ Last Reviewed: 2026-07-17
 
 # Receipt-chain verification contract (ADR-0026 re-verifiability, made enforceable)
 
-> **Implementation status (2026-07-17).** The core of this contract is
-> **implemented and unit/integration-tested** on branch `task/gap-atlas-20260717`
-> (uncommitted, not merged): `icn-governance::verify` (integrity/authenticity
-> recompute over `GovernanceDecisionReceipt`/`GovernanceProof`, fail-closed
-> `Pass`/`Fail`/`Unresolved`/`NotApplicable` folding, chain-link and collision
-> checks), consumed by a rewritten `icnctl audit verify` that recomputes the
-> decision hash from content instead of comparing hash strings. Per-ladder-class
-> field recompute (activation → mutation-plan → mutation-applied) and read-path
-> re-verification inside the gateway store remain follow-on. This proves
-> **integrity**, not authorization or legitimacy.
+> **Implementation status.** The core of this contract is **implemented and
+> unit/integration-tested** in this repository: `icn-governance::verify`
+> (integrity/authenticity recompute over `GovernanceDecisionReceipt` /
+> `GovernanceProof`, fail-closed `Pass`/`Fail`/`Unresolved`/`NotApplicable`
+> folding where `NotApplicable` is the least-severe status, chain-link and
+> collision checks), consumed by a rewritten `icnctl audit verify` that
+> recomputes the decision hash from content instead of comparing hash strings.
+> Per-ladder-class field recompute (activation → mutation-plan →
+> mutation-applied) and read-path re-verification inside the gateway store remain
+> follow-on. This proves **integrity** (and authenticity where a key is
+> supplied), not authorization or legitimacy.
 
-> **What this document is.** A design contract for a *mechanical, offline
-> re-verifier* of ICN receipt chains. It writes down what "verify a receipt
-> chain" must actually check, so that the **re-verifiability invariant already
+> **What this document is.** The normative design contract for a *mechanical,
+> offline re-verifier* of ICN receipt chains. It writes down what "verify a
+> receipt chain" must check, making the **re-verifiability invariant already
 > asserted by [ADR-0026](../adr/ADR-0026-receipt-and-provenance-proof-envelope.md)
-> becomes falsifiable** rather than merely stated.
+> falsifiable** rather than merely stated.
 >
-> **What this document is NOT.** It is not an implementation, not a claim that
-> re-verification is implemented today, and it changes no runtime behavior. It
-> lands no code. It does not modify the receipt schema, the receipt store, or
-> any auth/write path. Current implementation status lives only in
-> [`../STATE.md`](../STATE.md).
+> **What this document is NOT.** It does not modify the receipt schema, the
+> receipt store's on-disk format, or any auth/write path; and a passing verdict
+> proves integrity/authenticity only — never authorization or institutional
+> legitimacy. Canonical current state lives in [`../STATE.md`](../STATE.md).
 
 ## Problem (evidence, not assertion)
 

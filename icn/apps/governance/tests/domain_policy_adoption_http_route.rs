@@ -173,6 +173,30 @@ impl GovernanceReceiptBackend for TestBackend {
         });
         Ok(rows.into_iter().map(|e| e.payload.clone()).collect())
     }
+    fn get_latest_opaque(
+        &self,
+        class: &str,
+        key1: &str,
+        key2: Option<&str>,
+    ) -> Result<Option<Vec<u8>>, String> {
+        let store = self.opaque.lock().unwrap();
+        Ok(store
+            .iter()
+            .filter(|e| {
+                e.class == class
+                    && e.key1 == key1
+                    && match key2 {
+                        Some(k) => e.key2.as_deref() == Some(k),
+                        None => true,
+                    }
+            })
+            .max_by(|a, b| {
+                a.recorded_at
+                    .cmp(&b.recorded_at)
+                    .then(a.record_hash.cmp(&b.record_hash))
+            })
+            .map(|e| e.payload.clone()))
+    }
 }
 
 // ============================================================================

@@ -11627,10 +11627,27 @@ fn recompute_decision_hash_matches(
 ) -> (bool, String) {
     use icn_governance::{GovernanceDecisionReceipt, ProofOutcome, VoteTally};
 
+    // Char-safe display truncation (never panics on non-ASCII/short input).
+    fn short(s: &str) -> String {
+        s.chars().take(16).collect()
+    }
+
     let gov = match &chain.governance {
         Some(g) => g,
         None => return (false, "No governance receipt to recompute".to_string()),
     };
+    // Fail closed if the response is internally inconsistent: the governance
+    // receipt's own `decision_hash` must equal the chain's top-level one.
+    if gov.decision_hash != chain.decision_hash {
+        return (
+            false,
+            format!(
+                "inconsistent response: governance.decision_hash {}... != chain.decision_hash {}...",
+                short(&gov.decision_hash),
+                short(&chain.decision_hash)
+            ),
+        );
+    }
     let outcome = match gov.outcome.as_str() {
         "Accepted" => ProofOutcome::Accepted,
         "Rejected" => ProofOutcome::Rejected,
@@ -11668,7 +11685,7 @@ fn recompute_decision_hash_matches(
             true,
             format!(
                 "recomputed decision_hash matches claimed {}...",
-                &chain.decision_hash[..chain.decision_hash.len().min(16)]
+                short(&chain.decision_hash)
             ),
         )
     } else {
@@ -11676,8 +11693,8 @@ fn recompute_decision_hash_matches(
             false,
             format!(
                 "recomputed {}... != claimed {}... (tampered or corrupt)",
-                &recomputed_hex[..16],
-                &chain.decision_hash[..chain.decision_hash.len().min(16)]
+                short(&recomputed_hex),
+                short(&chain.decision_hash)
             ),
         )
     }
@@ -11705,17 +11722,19 @@ fn verify_receipt_chain(
 
     // Check 2a: the returned chain corresponds to the requested decision.
     // (Requested-vs-returned identity only — NOT an integrity check.)
+    // Char-safe truncation avoids a panic on non-ASCII CLI input.
+    let short = |s: &str| -> String { s.chars().take(16).collect() };
     let requested_matches = chain.decision_hash == decision_hash;
     checks.push(AuditCheck {
         name: "Returned chain matches requested decision".to_string(),
         passed: requested_matches,
         detail: if requested_matches {
-            format!("Hash: {}...", &decision_hash[..decision_hash.len().min(16)])
+            format!("Hash: {}...", short(decision_hash))
         } else {
             format!(
                 "Mismatch: requested {}... got {}...",
-                &decision_hash[..decision_hash.len().min(16)],
-                &chain.decision_hash[..chain.decision_hash.len().min(16)]
+                short(decision_hash),
+                short(&chain.decision_hash)
             )
         },
     });

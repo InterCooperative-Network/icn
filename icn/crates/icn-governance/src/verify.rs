@@ -58,16 +58,21 @@ pub enum VerificationStatus {
 }
 
 impl VerificationStatus {
-    /// Fail-closed severity ordering: `Fail` is worst, then `Unresolved`, then
-    /// `NotApplicable`, then `Pass`. Used to fold a set of checks into one
-    /// overall status where any failure dominates and any unproven check keeps
-    /// the whole set from reading as proven.
+    /// Fail-closed severity ordering used to fold a set of checks into one
+    /// overall status: `Fail` (worst) > `Unresolved` > `Pass` >
+    /// `NotApplicable` (least). Any failure dominates; any *unproven*
+    /// (`Unresolved`) check keeps the whole set from reading as proven; but a
+    /// `NotApplicable` check — one that genuinely does not apply, e.g. a
+    /// signature check on an unsigned deterministic receipt — must **not** drag
+    /// an otherwise-passing set below `Pass`. So a set of `{Pass, NotApplicable}`
+    /// folds to `Pass`, while a set that is entirely `NotApplicable` folds to
+    /// `NotApplicable` (nothing applicable was checked).
     fn severity(self) -> u8 {
         match self {
             VerificationStatus::Fail => 3,
             VerificationStatus::Unresolved => 2,
-            VerificationStatus::NotApplicable => 1,
-            VerificationStatus::Pass => 0,
+            VerificationStatus::Pass => 1,
+            VerificationStatus::NotApplicable => 0,
         }
     }
 }
@@ -341,13 +346,32 @@ mod tests {
     fn valid_decision_receipt_passes() {
         let r = valid_decision_receipt();
         let checks = verify_decision_receipt(&r);
-        assert_eq!(overall_status(&checks), VerificationStatus::NotApplicable);
+        // A valid unsigned decision receipt has integrity=Pass and signature=N/A;
+        // N/A must not drag the overall verdict below Pass.
+        assert_eq!(overall_status(&checks), VerificationStatus::Pass);
         // The integrity check specifically must PASS.
         let integrity = checks
             .iter()
             .find(|c| c.check == "decision_hash_integrity")
             .expect("integrity check present");
         assert_eq!(integrity.status, VerificationStatus::Pass);
+        // The signature check is genuinely N/A for this unsigned type.
+        let sig = checks
+            .iter()
+            .find(|c| c.check == "signature")
+            .expect("signature check present");
+        assert_eq!(sig.status, VerificationStatus::NotApplicable);
+    }
+
+    #[test]
+    fn all_not_applicable_folds_to_not_applicable() {
+        // A set with nothing applicable folds to NotApplicable, not Pass.
+        let checks = vec![CheckVerdict::new(
+            "x",
+            VerificationStatus::NotApplicable,
+            "n/a",
+        )];
+        assert_eq!(overall_status(&checks), VerificationStatus::NotApplicable);
     }
 
     #[test]

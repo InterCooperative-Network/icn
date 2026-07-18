@@ -1,5 +1,5 @@
 ---
-Status: normative (design contract; implemented + locally tested on branch task/gap-atlas-20260717, NOT merged)
+Status: normative (design contract; implemented + tested in this repository)
 Canonical: no
 Current-state source: docs/STATE.md + docs/PHASE_PROGRESS.md
 Last Reviewed: 2026-07-17
@@ -7,28 +7,32 @@ Last Reviewed: 2026-07-17
 
 # DomainPolicy adoption receipt + supersession pointer
 
-> **Implementation status (2026-07-17).** Implemented and integration-tested on
-> branch `task/gap-atlas-20260717` (uncommitted, not merged): the
-> `DomainPolicyAdoptedReceipt` type (`icn-governance::proof`) and its fail-closed
-> emission at the persisted adoption boundary
-> (`adopt_domain_policy_persisted_with_body`), with `supersedes` resolved from the
-> domain's prior adoption receipt via `list_opaque_for(...).last()` and an
-> idempotent `put_opaque_if_absent` keyed `(class, domain_id, hex(policy_id))`.
-> An integration test adopts v1 then v2 and verifies the resulting supersession
-> chain through the verifier above. The receipt records a process fact and grants
-> **zero authority**.
+> **Implementation status.** Implemented and integration-tested in this
+> repository: the `DomainPolicyAdoptedReceipt` type (`icn-governance::proof`) and
+> its emission at the persisted adoption boundary
+> (`adopt_domain_policy_persisted_with_body`). The receipt is emitted **after**
+> the durable `save_institutional_domain`, so a receipt always corresponds to an
+> adoption that durably happened; `supersedes` is resolved deterministically from
+> the domain's prior `current_policy` (a keyed `get_latest_opaque` lookup, with
+> read/decode failures propagated fail-closed), and the write is an idempotent
+> `put_opaque_if_absent` keyed `(class, domain_id, hex(policy_id))`. A no-op
+> re-adoption of the already-current policy emits nothing. An integration test
+> adopts v1 then v2 and verifies the resulting supersession chain through the
+> verifier contract above. The receipt records a process fact and grants **zero
+> authority**.
 
-> **What this document is.** A design contract for the **one spine transition
-> that currently emits no receipt**: a domain adopting (or replacing) its
-> `current_policy`. It specifies a new ADR-0026 Layer-2 receipt class,
-> `DomainPolicyAdoptedReceipt`, and a `supersedes` back-pointer so "what rules
-> governed this domain on date X" becomes mechanically answerable.
+> **What this document is.** The normative design contract for a receipt on the
+> domain-policy adoption transition — a domain adopting (or replacing) its
+> `current_policy` — via an ADR-0026 Layer-2 `DomainPolicyAdoptedReceipt` with a
+> `supersedes` back-pointer, so "what rules governed this domain on date X"
+> becomes mechanically answerable.
 >
-> **What this document is NOT.** Not an implementation, not a claim that
-> adoption receipts exist today, and it lands no code. It does not change the
-> authorization model (the adoption gate is unchanged), the CCL evaluation
-> question (adopted bodies are still inert — separate gap), or any auth/write
-> path beyond adding a receipt emission at an already-authorized transition.
+> **What this document is NOT.** It does not change the authorization model (the
+> adoption gate is unchanged and still runs before the receipt), the CCL
+> evaluation question (adopted bodies are still inert — separate gap), or any
+> auth/write path beyond adding the receipt emission at an already-authorized,
+> already-persisted transition. A valid receipt proves the adoption was recorded,
+> not that it was legitimate.
 
 ## Problem (evidence, not assertion)
 
@@ -97,37 +101,55 @@ Out of scope (explicitly, to keep the scaffold bounded and honest):
 ## The receipt class
 
 `DomainPolicyAdoptedReceipt` (ADR-0026 Layer 2, domain-tagged BLAKE3 like its
-siblings), canonical fields:
+siblings), as implemented in `icn-governance::proof`:
 
-- `domain_id: GovernanceDomainId` — the adopting domain.
-- `policy_ref: DomainPolicyRef` — the now-current policy (id + version +
-  body content-hash, reusing the existing ref shape).
+- `domain_id: String` — the adopting domain (`GovernanceDomainId.0`).
+- `policy_id: Hash` — the content-addressed id of the now-current policy version
+  (`DomainPolicyId.0`, raw 32 bytes; the content hash of the adopted policy).
+- `adopted_by: String` — the actor DID that recorded the adoption. This is
+  **recorder evidence**, consistent with the sibling ladder classes'
+  `recorded_by` field; it is not an authority grant and confers none.
+- `recorded_at: u64` — wall-clock seconds the adoption was recorded (hashed into
+  `record_hash`).
 - `supersedes: Option<Hash>` — the `record_hash` of the prior
-  `DomainPolicyAdoptedReceipt` for this domain, or `None` for first adoption.
+  `DomainPolicyAdoptedReceipt` for this domain, or `None` for the first adoption.
   This forms a per-domain adoption chain the verifier
   ([`receipt-chain-verification.md`](receipt-chain-verification.md)) can walk.
-- `adopted_by: <authority reference>` — the mandate/grant record hash the gate
-  resolved (value-withheld: the *authority basis*, not the raw DID, consistent
-  with existing value-withheld bindings).
-- `adopted_at: Timestamp`.
-- `record_hash: Hash` — computed over the above via a `compute_record_hash`
-  method mirroring the sibling classes.
+- `record_hash: Hash` — `compute_record_hash` over the fields above
+  (domain-separation tag `icn:gov:domain-policy-adopted:v1`; a 1-byte
+  discriminant distinguishes `supersedes: None` from `Some(all-zero)`).
 
-No policy *body* is embedded — only the content-addressed `policy_ref`. No
-package vocabulary. No DID echoed. Firewall-clean: this is a generic core noun
-(`Policy` adoption), not an institution-ceremony word.
+No policy *body* is embedded — only the content-addressed `policy_id`. No package
+vocabulary. Firewall-clean: this is a generic core noun (`Policy` adoption), not
+an institution-ceremony word.
 
 ## Emission point
 
 Inside the persisted adoption seam `adopt_domain_policy_persisted_with_body`,
-**after** the mandate gate passes and `save_institutional_domain` commits the new
-`current_policy`, emit the receipt through the same `put_opaque` cascade the
-other Layer-2 classes use. The `supersedes` value is the current domain's
-most-recent adoption-receipt hash (looked up from the opaque store by
-`(class=DomainPolicyAdopted, key1=domain_id)`), or `None`.
+**after** the mandate gate passes and `save_institutional_domain` durably commits
+the new `current_policy`, emit the receipt through the `put_opaque_if_absent`
+cascade the other Layer-2 classes use, keyed `(class=DomainPolicyAdopted,
+key1=domain_id, key2=hex(policy_id))`.
 
-Fail-closed ordering: gate → commit → receipt. If the receipt write fails, the
-adoption must not be reported as complete (same posture as the other rungs).
+Ordering is **gate → commit → receipt** (emit *after* the durable save). This
+guarantees a receipt always corresponds to an adoption that durably happened — a
+receipt never over-claims. The weaker alternative (emit-before-save) can leave a
+durable receipt for an adoption that failed to persist, which is a lying receipt
+and worse for an evidence system.
+
+`supersedes` is resolved deterministically from the domain's **prior
+`current_policy`** (captured before adoption overwrites it): a keyed
+`get_latest_opaque(class, domain_id, hex(prior_policy_id))` lookup. Read and
+decode failures are **propagated (fail-closed)**, never silently degraded to a
+genesis link (which would corrupt the chain). A prior policy that predates this
+feature has no receipt → the chain legitimately starts there. Re-adopting the
+already-current policy (`prior == new`) is a no-op and emits nothing.
+
+Known, bounded limitation: because the domain store and the receipt (opaque)
+store are not a single transaction, an emission failure *after* a successful save
+returns an error with a durable adoption whose receipt is momentarily missing.
+This missing-receipt failure mode is deliberately chosen over the lying-receipt
+mode; automatic re-emission/backfill is future work.
 
 ## Authorization, receipts, surfaces, custody (feature-placement checklist)
 
@@ -152,7 +174,7 @@ adoption must not be reported as complete (same posture as the other rungs).
 
 1. **Adoption is provable.** After a domain adopts policy v1, an ADR-0026
    `DomainPolicyAdoptedReceipt` exists, keyed by `domain_id`, with
-   `supersedes: None`. *Today, no such receipt exists.*
+   `supersedes: None`. *Previously, no such receipt existed.*
 2. **Supersession is a chain, not an erasure.** Adopting v2 emits a second
    receipt whose `supersedes` equals the v1 receipt's `record_hash`; the v1
    receipt is unchanged and still retrievable. "What governed us before v2?" is
