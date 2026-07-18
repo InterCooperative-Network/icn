@@ -2,7 +2,7 @@
 Status: normative (design contract; implemented + tested in this repository)
 Canonical: no
 Current-state source: docs/STATE.md + docs/PHASE_PROGRESS.md
-Last Reviewed: 2026-07-17
+Last Reviewed: 2026-07-18
 ---
 
 # Receipt-chain verification contract (ADR-0026 re-verifiability, made enforceable)
@@ -257,11 +257,14 @@ Per [`ICN_OPERATING_MODEL.md`](../architecture/ICN_OPERATING_MODEL.md) §Feature
   re-verifier), but new work should reuse its recompute conventions.
 - The **legitimacy** half — that a recorded decision was actually authorized —
   is out of scope here and tracked as separate gaps: adopted-policy evaluation
-  (the CCL evaluator-selection seam, parked under #2141), act-time mandate
-  enforcement (ADR-0019 "kernel dispatch gated by mandates — NOT IMPLEMENTED"),
-  and adopted-policy *legitimacy* (a passing adoption-receipt chain proves the
-  adoption was recorded, not that the policy body was evaluated or the mandate
-  enforced — see `docs/spec/domain-policy-adoption-receipt.md`, whose receipt +
-  supersession chain this verifier walks).
+  (the CCL evaluator-selection seam, parked under #2141) and act-time mandate
+  enforcement (ADR-0019 "kernel dispatch gated by mandates — NOT IMPLEMENTED").
+- A concrete `supersedes`-linked receipt class for **domain-policy adoption**
+  (one consumer of the generic chain-link verifier above) is **not** part of
+  this change. Its emission requires a crash-atomic cross-store transition
+  (domain-state store and receipt store are separate `sled::Db` instances) and is
+  deferred — see the tracking issue and the `apps/governance/close_journal.rs`
+  write-ahead-log pattern it should follow. This verifier defines only the
+  generic re-verification primitive.
 - Logging redaction: the verifier must not reintroduce DID/body leakage into
   operational logs (a known observability gap).

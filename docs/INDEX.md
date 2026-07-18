@@ -182,6 +182,7 @@ Feature designs, proposals, and evolution plans:
 Formal protocol and contract specifications:
 
 - [KERNEL_CONTRACTS.md](spec/KERNEL_CONTRACTS.md) - Kernel contract specifications
+- [receipt-chain-verification.md](spec/receipt-chain-verification.md) - Normative contract for a mechanical, offline re-verifier of ICN receipt chains (ADR-0026 re-verifiability made enforceable): content-hash recompute, fail-closed Pass/Fail/Unresolved/NotApplicable folding, generic chain-link + collision checks. Implemented as `icn-governance::verify` and consumed by a rewritten `icnctl audit verify`; proves integrity/authenticity only. A concrete supersedes-linked domain-policy-adoption receipt class is a deferred consumer (needs a crash-atomic cross-store transition)
 - [effect-dispatch-contract.md](spec/effect-dispatch-contract.md) - Accepted-proposal effect dispatch contract (governance decision → mandate → effect plan → dispatch → application + evidence)
 - [institutional-domain.md](spec/institutional-domain.md) - `InstitutionalDomain` and `DomainPolicy` primitive (the governed operating jurisdiction)
 - [ccl-policy-registry.md](spec/ccl-policy-registry.md) - CCL policy registry, versioning, adoption contract, and governance-effect hook contract
