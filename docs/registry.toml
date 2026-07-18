@@ -1766,6 +1766,22 @@ domain_tags = ["strategy", "introduction", "outreach", "handbill"]
 recommended_action = "keep"
 last_reviewed = "2026-06-09"
 
+[docs."docs/strategy/ICN_SECOND_PASS_STRATEGY_BRIEF_2026-07-17.md"]
+category = "strategy"
+status = "living"
+title = "ICN Second-Pass Strategy Brief (2026-07-17)"
+description = "Dated, explicitly non-canonical analysis snapshot from a second-pass multi-lane audit: the software-vs-institutional axis reframe, the built-but-sidelined pattern with composition-root evidence, minimum-cut sets, a horizon map, re-ranked wedges, recommended ADRs, a human-acquisition table, and a human-validation map. Carries the rule that the institutional axis advances only on a human-signed act — never on a document. Publishes no private-repository detail."
+last_updated = "2026-07-17"
+owner = "matt"
+audiences = ["maintainers", "contributors", "reviewers"]
+truth_class = "descriptive"
+role = "strategy"
+canonical = "no"
+freshness = "current"
+domain_tags = ["strategy", "audit-snapshot", "anti-overclaim"]
+recommended_action = "keep"
+last_reviewed = "2026-07-17"
+
 [docs."docs/strategy/ICN_HARD_QUESTIONS.md"]
 category = "strategy"
 status = "living"
