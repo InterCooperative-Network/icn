@@ -11613,15 +11613,13 @@ struct AuditCheck {
     detail: String,
 }
 
-/// Verify receipt chain integrity. Returns a list of checks with pass/fail.
-///
-/// Extracted from the handler so it can be unit-tested without a live gateway.
 /// Recompute a chain's governance `decision_hash` from the receipt's own
 /// canonical fields and compare to the claimed value. Returns `(matches,
 /// detail)`. Fail-closed: a missing governance receipt, an unknown outcome
 /// string, or a malformed `vote_hash` all return `false` (unverifiable, treated
 /// as failure) rather than silently passing. Reuses the canonical hashing in
-/// `icn_governance` — it does not define a second hash function.
+/// `icn_governance` — it does not define a second hash function. Extracted from
+/// the handler so it can be unit-tested without a live gateway.
 fn recompute_decision_hash_matches(
     chain: &icn_gateway::api::receipts::ReceiptChainResponse,
 ) -> (bool, String) {
