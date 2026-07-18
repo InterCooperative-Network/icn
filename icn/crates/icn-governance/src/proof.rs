@@ -4311,8 +4311,25 @@ fn target_kind_ordinal(target: &MandateGrantRefTarget) -> u8 {
 /// - `supersedes` is the `record_hash` of the domain's immediately-prior
 ///   adoption receipt, or `None` for the first adoption. Verified as a chain by
 ///   [`crate::verify::verify_chain_links`].
-/// - `recorded_at` is hashed into `record_hash` (a retry never restamps because
-///   the storage layer is insert-if-absent per `(domain_id, policy_id)`).
+/// - `recorded_at` is hashed into `record_hash`. Adoption receipts are stored
+///   **occurrence-keyed** by predecessor (`key2 = hex(supersedes)`, or `genesis`
+///   for the first adoption) via an insert-if-absent write, so a re-adopted
+///   policy version (e.g. `A → B → A`) records a distinct receipt rather than
+///   colliding on the policy id. Replaying the *same* transition (same
+///   predecessor, policy, actor, `recorded_at`) yields the same `record_hash` and
+///   is idempotent; a different transition at the same occurrence key is a
+///   conflict and is rejected.
+/// - `recorded_at` and `adopted_by` are **recording** metadata — when, and by
+///   whom, the adoption was *recorded* — not proof of the exact adoption-commit
+///   instant. Normally recording is immediate (same call as the durable adoption
+///   save), so they coincide. In the rare partial-failure case (the domain save
+///   committed but the receipt write failed), a later **backfill** records the
+///   retry's `recorded_at`/`adopted_by`, which may trail the original commit.
+///   Supersession *ordering* is unaffected (it follows `supersedes`, not
+///   timestamps); only the recording instant/recorder may differ. Consumers must
+///   not read `recorded_at` as the precise adoption-commit time. A durable
+///   pending-receipt outbox that makes the two always coincide across a crash is
+///   deliberately-deferred larger work.
 ///
 /// Equality/identity is anchored to `record_hash`.
 #[derive(Clone, Debug, Serialize, Deserialize)]

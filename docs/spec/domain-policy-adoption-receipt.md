@@ -197,6 +197,17 @@ returns an error with a durable adoption whose receipt is momentarily missing.
 That state is recoverable — a later retry backfills the receipt as above. A
 cross-process atomic save+emit remains future work.
 
+Backfill metadata: `recorded_at` and `adopted_by` are **recording** metadata (when
+/ by whom the adoption was *recorded*), not the exact adoption-commit instant.
+Normally they coincide (recording is immediate). If a retry backfills a receipt
+whose original write failed, the backfilled receipt carries the *retry's*
+`recorded_at`/`adopted_by`, which may trail the original commit — so `recorded_at`
+must not be read as the precise adoption-commit time. Supersession **ordering** is
+unaffected (it follows `supersedes`, not timestamps). Making the two always
+coincide across a crash would require a durable pending-receipt outbox (persist
+the intended receipt in the same transaction as the domain save, then emit) —
+deliberately-deferred larger work, not a bounded change here.
+
 ## Authorization, receipts, surfaces, custody (feature-placement checklist)
 
 1. **What kind of thing is this?** A generic core noun's transition receipt
