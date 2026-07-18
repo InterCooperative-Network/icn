@@ -11918,7 +11918,7 @@ fn verify_receipt_chain(
     let all_journal_linked = chain
         .journal_entries
         .iter()
-        .all(|j| j.decision_hash == decision_hash);
+        .all(|j| j.decision_hash.eq_ignore_ascii_case(decision_hash));
     checks.push(AuditCheck {
         name: "Journal provenance matches decision".to_string(),
         passed: !has_journal || all_journal_linked,

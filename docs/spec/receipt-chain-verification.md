@@ -235,7 +235,12 @@ Per [`ICN_OPERATING_MODEL.md`](../architecture/ICN_OPERATING_MODEL.md) §Feature
 
 ## Non-claims
 
-- This is a design contract. Nothing here is implemented.
+- The verifier core (`icn-governance::verify`) and its `icnctl audit verify`
+  consumer are implemented and tested (see the Implementation-status note at the
+  top); the *remaining follow-on* pieces are not: per-ladder-class field
+  recompute (activation → mutation-plan → mutation-applied), gateway store-side
+  read-path re-verification, and the concrete `supersedes`-linked domain-policy
+  adoption receipt class (deferred to #2434).
 - A green verifier proves *integrity and authenticity of recorded facts*, not
   their *legitimacy*: it does not check that a decision was authorized, that a
   quorum was real, or that a mandate stood behind an act. Those are separate
