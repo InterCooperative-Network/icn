@@ -621,6 +621,12 @@ impl crate::manager::GovernanceManager {
             .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?
             .ok_or(InstitutionalDomainStoreError::NotDeclared)?;
 
+        // The policy that durably governs the domain *before* this adoption. Used
+        // below to require the validated chain head to record it — so we never
+        // append a divergent adoption on top of a partial-failure state where a
+        // prior adoption saved `current_policy` but lost its receipt.
+        let prior_policy_id: Option<[u8; 32]> = domain.current_policy().map(|r| r.id.0);
+
         // Real gate resolution + pure-core structural commit. On rejection the
         // in-memory `domain` is left unchanged and nothing is persisted, so a
         // gate failure never reaches the body write below.
@@ -643,19 +649,42 @@ impl crate::manager::GovernanceManager {
         // receipts (the earlier policy-id keying collided the second A with the
         // first and dropped it).
         //
-        // NO-OP vs BACKFILL. Emission is skipped only when the validated chain
-        // head *already records the current policy id* — i.e. this exact adoption
-        // is already evidenced. This is strictly stronger than the old
-        // `prior == new` check: if an earlier attempt durably saved the domain but
-        // its receipt write failed, the head still records the predecessor, so a
-        // retry re-enters this block and backfills the missing receipt rather than
-        // being silently skipped.
+        // HEAD MUST RECORD THE CURRENT POLICY. On a non-empty chain the head must
+        // record the policy that currently governs the domain (`prior_policy_id`).
+        // If it does not, an earlier adoption durably saved `current_policy` but
+        // lost its receipt. In that partial-failure state we allow only a
+        // **backfill of that same policy** (`new == prior`); appending a
+        // *different* adoption would skip the unreceipted rung and record a
+        // lineage that disagrees with the durable current policy. An empty chain
+        // legitimately starts at genesis (a pre-feature `current_policy`, if any,
+        // is simply not in the receipt lineage — indistinguishable from a lost
+        // genesis receipt, so we cannot fail closed there).
+        //
+        // NO-OP vs BACKFILL. Emission is then skipped only when the validated
+        // chain head *already records the adopted policy id* — this exact adoption
+        // is already evidenced. Otherwise emit, superseding the head. A retry after
+        // a save whose receipt write failed re-enters here (head still records the
+        // predecessor) and backfills the missing receipt.
         let emit_plan: Option<AdoptionEmitPlan> = match self.receipt_backend() {
             Some(backend) => {
                 let head = resolve_validated_chain_head(backend.as_ref(), &domain_id.0)?;
-                let head_records_current =
-                    head.as_ref().map(|h| h.policy_id) == Some(policy_ref.id.0);
-                if head_records_current {
+                let head_policy = head.as_ref().map(|h| h.policy_id);
+                let new_policy = policy_ref.id.0;
+
+                if head.is_some()
+                    && head_policy != prior_policy_id
+                    && Some(new_policy) != prior_policy_id
+                {
+                    return Err(InstitutionalDomainStoreError::Store(format!(
+                        "domain-policy adoption chain head for domain {} does not record the \
+                         current policy (a prior adoption's receipt is missing); refusing to \
+                         append a divergent adoption — retry the current policy to backfill the \
+                         missing receipt first (fail-closed)",
+                        domain_id.0
+                    )));
+                }
+
+                if head_policy == Some(new_policy) {
                     None
                 } else {
                     let supersedes = head.as_ref().map(|h| h.record_hash);
@@ -1931,6 +1960,77 @@ mod tests {
         assert!(receipts.iter().all(|r| r.verify()));
         // Invariant 9: persisted current policy == final chain head policy.
         assert_eq!(current_policy_id(&mgr, "coop-alpha"), Some(head.policy_id));
+    }
+
+    #[test]
+    fn divergent_adoption_over_missing_receipt_fails_closed() {
+        // Partial-failure state: A adopted (genesis), then B adopted but its
+        // receipt write fails → durable B, head still records A. A *different*
+        // adoption C (not retrying B) must fail closed, so the lineage never
+        // records A -> C while B actually governed the domain. The backfill path
+        // (retry B) stays open.
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = manager_with_stores(backend.clone());
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        let a = adopt(&mgr, "coop-alpha", &actor, b"policy A");
+
+        // A -> B with the receipt write forced to fail.
+        backend
+            .fail_next_opaque_puts
+            .store(1, std::sync::atomic::Ordering::SeqCst);
+        let b_policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy B");
+        mgr.adopt_domain_policy_persisted_with_body(
+            &domain_id("coop-alpha"),
+            &b_policy,
+            Some(b"policy B"),
+            &actor,
+            100,
+        )
+        .expect_err("injected receipt-write failure");
+        let b_id = b_policy.policy_ref().id.0;
+        assert_eq!(current_policy_id(&mgr, "coop-alpha"), Some(b_id)); // durable B
+        assert_eq!(read_receipts(&backend, "coop-alpha").len(), 1); // head still A
+
+        // A DIFFERENT adoption C must fail closed (would skip the unreceipted B).
+        let c_policy = DomainPolicy::new(domain_id("coop-alpha"), b"policy C");
+        let err = mgr
+            .adopt_domain_policy_persisted_with_body(
+                &domain_id("coop-alpha"),
+                &c_policy,
+                Some(b"policy C"),
+                &actor,
+                100,
+            )
+            .expect_err("divergent adoption over a missing-receipt rung must fail closed");
+        assert!(
+            matches!(err, InstitutionalDomainStoreError::Store(ref m)
+                if m.contains("does not record the current policy")),
+            "expected a fail-closed divergent-adoption error, got {err:?}"
+        );
+        // current_policy unchanged (still B), still just the A receipt.
+        assert_eq!(current_policy_id(&mgr, "coop-alpha"), Some(b_id));
+        let receipts = read_receipts(&backend, "coop-alpha");
+        assert_eq!(receipts.len(), 1);
+        assert_eq!(chain_head(&receipts).policy_id, a);
+
+        // Recovery stays open: retrying the current policy B backfills its receipt.
+        mgr.adopt_domain_policy_persisted_with_body(
+            &domain_id("coop-alpha"),
+            &b_policy,
+            Some(b"policy B"),
+            &actor,
+            100,
+        )
+        .expect("retry of the current policy backfills the missing receipt");
+        assert_eq!(read_receipts(&backend, "coop-alpha").len(), 2);
+        assert_eq!(current_policy_id(&mgr, "coop-alpha"), Some(b_id));
     }
 
     #[test]

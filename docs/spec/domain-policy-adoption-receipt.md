@@ -176,8 +176,18 @@ identical record hash is an idempotent replay (or a completed backfill); a
 *different* record hash is a conflict — two transitions from the same predecessor
 — and fails closed rather than forking the chain.
 
+On a **non-empty** chain the validated head must record the policy that
+currently governs the domain (the loaded `current_policy`). If it does not, an
+earlier adoption durably saved `current_policy` but lost its receipt; in that
+partial-failure state only a **backfill of that same policy** is accepted —
+adopting a *different* policy fails closed, because appending it would skip the
+unreceipted rung and record a lineage that disagrees with the durable current
+policy. (An empty chain legitimately starts at genesis: a pre-feature
+`current_policy` is simply not in the receipt lineage, and is indistinguishable
+from a lost genesis receipt, so genesis is not blocked there.)
+
 Emission is skipped only when the validated chain head already records the
-current policy id — strictly stronger than `prior == new`. So a retry after a
+adopted policy id — strictly stronger than `prior == new`. So a retry after a
 save that committed but whose receipt write failed re-runs head resolution, finds
 the head still records the predecessor, and **backfills** the missing receipt.
 
