@@ -42,6 +42,10 @@ use crate::mandate_gate::{
 };
 use crate::receipt_backend::GovernanceReceiptBackend;
 
+/// Opaque-store class tag for [`icn_governance::DomainPolicyAdoptedReceipt`]
+/// records. Keyed `(class, domain_id, hex(policy_id))` in the opaque cascade.
+pub const DOMAIN_POLICY_ADOPTED_CLASS: &str = "DomainPolicyAdopted";
+
 /// Error from a gate-wired domain-policy adoption. Every variant leaves the
 /// domain's policy state **unchanged** — adoption is fail-closed.
 #[derive(Debug)]
@@ -490,6 +494,54 @@ impl crate::manager::GovernanceManager {
                 .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?;
         }
 
+        // Emit the domain-policy adoption receipt BEFORE the durable
+        // current_policy save, with a `supersedes` back-pointer to the domain's
+        // most-recent prior adoption receipt. Emitting first makes it
+        // fail-closed: if the receipt cannot be written the call returns here
+        // and no adoption is durably committed without its receipt.
+        //
+        // The predecessor is the last entry of `list_opaque_for` (documented
+        // oldest-first by recorded_at) — NOT `get_latest_opaque(.., None)`,
+        // which returns the lexicographically-last key2, not the chronological
+        // latest. Storage is insert-if-absent per `(class, domain_id,
+        // policy_id)`, so a retry after a later failure re-derives the same
+        // receipt idempotently (the first write wins; a recomputed duplicate is
+        // discarded). Re-adopting an already-recorded policy version is a no-op
+        // by the same key — the chain records distinct versions in order.
+        if let Some(backend) = self.receipt_backend() {
+            let supersedes = backend
+                .list_opaque_for(DOMAIN_POLICY_ADOPTED_CLASS, &domain_id.0)
+                .ok()
+                .and_then(|entries| entries.last().cloned())
+                .and_then(|bytes| {
+                    serde_json::from_slice::<icn_governance::DomainPolicyAdoptedReceipt>(&bytes)
+                        .ok()
+                })
+                .map(|prior| prior.record_hash);
+            let receipt = icn_governance::DomainPolicyAdoptedReceipt::new(
+                domain_id.0.clone(),
+                policy_ref.id.0,
+                actor.to_string(),
+                now,
+                supersedes,
+            );
+            let payload = serde_json::to_vec(&receipt).map_err(|e| {
+                InstitutionalDomainStoreError::Store(format!(
+                    "serialize domain-policy adoption receipt: {e}"
+                ))
+            })?;
+            backend
+                .put_opaque_if_absent(
+                    DOMAIN_POLICY_ADOPTED_CLASS,
+                    &domain_id.0,
+                    Some(&hex::encode(receipt.policy_id)),
+                    receipt.recorded_at,
+                    receipt.record_hash,
+                    &payload,
+                )
+                .map_err(InstitutionalDomainStoreError::Store)?;
+        }
+
         store
             .save_institutional_domain(&domain)
             .map_err(|e| InstitutionalDomainStoreError::Store(e.to_string()))?;
@@ -530,17 +582,35 @@ mod tests {
 
     // ----- fixtures ---------------------------------------------------------
 
+    /// One stored opaque row for the in-memory test backend.
+    struct OpaqueEntry {
+        class: String,
+        key1: String,
+        key2: Option<String>,
+        recorded_at: u64,
+        record_hash: [u8; 32],
+        payload: Vec<u8>,
+    }
+
     /// Minimal in-memory backend seeded with pre-built mandates and grants.
-    /// Implements only the methods the gate + adopter read; the rest are
-    /// trivial stubs (mirrors `mandate_gate::tests::FixtureBackend`).
+    /// Implements the gate + adopter reads plus a faithful in-memory opaque
+    /// store (insert-if-absent per `(class, key1, key2)`; `list_opaque_for`
+    /// returns payloads oldest-first by `recorded_at`) so the domain-policy
+    /// adoption-receipt emission path is exercised exactly as against a real
+    /// `ReceiptStore`.
     struct TestBackend {
         mandates: Vec<Mandate>,
         grants: Vec<AuthorityGrant>,
+        opaque: std::sync::Mutex<Vec<OpaqueEntry>>,
     }
 
     impl TestBackend {
         fn new(mandates: Vec<Mandate>, grants: Vec<AuthorityGrant>) -> Arc<Self> {
-            Arc::new(Self { mandates, grants })
+            Arc::new(Self {
+                mandates,
+                grants,
+                opaque: std::sync::Mutex::new(Vec::new()),
+            })
         }
     }
 
@@ -591,6 +661,70 @@ mod tests {
                 .filter(|g| &g.grantee == grantee && g.is_active_at(now))
                 .cloned()
                 .collect())
+        }
+        fn put_opaque_if_absent(
+            &self,
+            class: &str,
+            key1: &str,
+            key2: Option<&str>,
+            recorded_at: u64,
+            record_hash: [u8; 32],
+            payload: &[u8],
+        ) -> Result<Option<[u8; 32]>, String> {
+            let mut store = self.opaque.lock().unwrap();
+            if let Some(existing) = store
+                .iter()
+                .find(|e| e.class == class && e.key1 == key1 && e.key2.as_deref() == key2)
+            {
+                // First-writer-wins: triple already present; write nothing.
+                return Ok(Some(existing.record_hash));
+            }
+            store.push(OpaqueEntry {
+                class: class.to_string(),
+                key1: key1.to_string(),
+                key2: key2.map(|s| s.to_string()),
+                recorded_at,
+                record_hash,
+                payload: payload.to_vec(),
+            });
+            Ok(None)
+        }
+        fn list_opaque_for(&self, class: &str, key1: &str) -> Result<Vec<Vec<u8>>, String> {
+            let store = self.opaque.lock().unwrap();
+            let mut rows: Vec<&OpaqueEntry> = store
+                .iter()
+                .filter(|e| e.class == class && e.key1 == key1)
+                .collect();
+            rows.sort_by(|a, b| {
+                a.recorded_at
+                    .cmp(&b.recorded_at)
+                    .then(a.record_hash.cmp(&b.record_hash))
+            });
+            Ok(rows.into_iter().map(|e| e.payload.clone()).collect())
+        }
+        fn get_latest_opaque(
+            &self,
+            class: &str,
+            key1: &str,
+            key2: Option<&str>,
+        ) -> Result<Option<Vec<u8>>, String> {
+            let store = self.opaque.lock().unwrap();
+            Ok(store
+                .iter()
+                .filter(|e| {
+                    e.class == class
+                        && e.key1 == key1
+                        && match key2 {
+                            Some(k) => e.key2.as_deref() == Some(k),
+                            None => true,
+                        }
+                })
+                .max_by(|a, b| {
+                    a.recorded_at
+                        .cmp(&b.recorded_at)
+                        .then(a.record_hash.cmp(&b.record_hash))
+                })
+                .map(|e| e.payload.clone()))
         }
     }
 
@@ -1059,6 +1193,92 @@ mod tests {
             mgr.get_domain_policy_body(&policy.id).unwrap(),
             Some(b"policy body v1".to_vec()),
             "the adopted body resolves by DomainPolicyId"
+        );
+    }
+
+    #[test]
+    fn adoption_emits_receipt_chain_with_supersession() {
+        // Slice B acceptance: adopting v1 then v2 emits two DomainPolicyAdopted
+        // receipts; v2 supersedes v1; each receipt re-verifies; and the chain
+        // passes the Slice A mechanical verifier.
+        use icn_governance::verify::{
+            overall_status, verify_chain_links, ChainLink, VerificationStatus,
+        };
+        use icn_governance::DomainPolicyAdoptedReceipt;
+
+        let actor = did(1);
+        let (backend,) = live_adopt_fixture(&actor, "coop-alpha");
+        let mgr = manager_with_stores(backend.clone());
+        mgr.declare_institutional_domain(
+            domain_id("coop-alpha"),
+            BootstrapEntityType::Cooperative,
+            None,
+        )
+        .unwrap();
+
+        // ---- Adopt v1 -------------------------------------------------------
+        let policy_v1 = DomainPolicy::new(domain_id("coop-alpha"), b"policy body v1");
+        mgr.adopt_domain_policy_persisted_with_body(
+            &domain_id("coop-alpha"),
+            &policy_v1,
+            Some(b"policy body v1"),
+            &actor,
+            100,
+        )
+        .expect("v1 adoption succeeds");
+
+        let rows1 = backend
+            .list_opaque_for(DOMAIN_POLICY_ADOPTED_CLASS, "coop-alpha")
+            .unwrap();
+        assert_eq!(rows1.len(), 1, "exactly one adoption receipt after v1");
+        let r1: DomainPolicyAdoptedReceipt = serde_json::from_slice(&rows1[0]).unwrap();
+        assert!(r1.verify(), "v1 receipt re-verifies");
+        assert_eq!(
+            r1.supersedes, None,
+            "v1 adoption is genesis (no predecessor)"
+        );
+        assert_eq!(r1.policy_id, policy_v1.policy_ref().id.0);
+
+        // ---- Adopt v2 (distinct content) -----------------------------------
+        let policy_v2 = DomainPolicy::new(domain_id("coop-alpha"), b"policy body v2");
+        mgr.adopt_domain_policy_persisted_with_body(
+            &domain_id("coop-alpha"),
+            &policy_v2,
+            Some(b"policy body v2"),
+            &actor,
+            200,
+        )
+        .expect("v2 adoption succeeds");
+
+        let rows2 = backend
+            .list_opaque_for(DOMAIN_POLICY_ADOPTED_CLASS, "coop-alpha")
+            .unwrap();
+        assert_eq!(rows2.len(), 2, "two adoption receipts after v2");
+        let r1b: DomainPolicyAdoptedReceipt = serde_json::from_slice(&rows2[0]).unwrap();
+        let r2: DomainPolicyAdoptedReceipt = serde_json::from_slice(&rows2[1]).unwrap();
+        assert!(r2.verify(), "v2 receipt re-verifies");
+        assert_eq!(
+            r2.supersedes,
+            Some(r1b.record_hash),
+            "v2 receipt supersedes the v1 receipt"
+        );
+        assert_ne!(r1b.record_hash, r2.record_hash);
+
+        // ---- The chain verifies via the Slice A mechanical verifier ---------
+        let links = vec![
+            ChainLink {
+                record_hash: r1b.record_hash,
+                prior: r1b.supersedes,
+            },
+            ChainLink {
+                record_hash: r2.record_hash,
+                prior: r2.supersedes,
+            },
+        ];
+        assert_eq!(
+            overall_status(&verify_chain_links(&links)),
+            VerificationStatus::Pass,
+            "the adoption receipt chain must verify as a valid supersession chain"
         );
     }
 

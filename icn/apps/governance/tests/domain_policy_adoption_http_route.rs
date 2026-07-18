@@ -58,14 +58,28 @@ use icn_kernel_api::{AllocationReceipt, Hash};
 // DefaultMandateGate reads. Mirrors `domain_policy_adoption::tests::TestBackend`.
 // ============================================================================
 
+struct OpaqueEntry {
+    class: String,
+    key1: String,
+    key2: Option<String>,
+    recorded_at: u64,
+    record_hash: [u8; 32],
+    payload: Vec<u8>,
+}
+
 struct TestBackend {
     mandates: Vec<Mandate>,
     grants: Vec<AuthorityGrant>,
+    opaque: std::sync::Mutex<Vec<OpaqueEntry>>,
 }
 
 impl TestBackend {
     fn new(mandates: Vec<Mandate>, grants: Vec<AuthorityGrant>) -> Arc<Self> {
-        Arc::new(Self { mandates, grants })
+        Arc::new(Self {
+            mandates,
+            grants,
+            opaque: std::sync::Mutex::new(Vec::new()),
+        })
     }
 }
 
@@ -116,6 +130,48 @@ impl GovernanceReceiptBackend for TestBackend {
             .filter(|g| &g.grantee == grantee && g.is_active_at(now))
             .cloned()
             .collect())
+    }
+    // Opaque-capable (mirrors the sibling ladder HTTP-route tests + production
+    // ReceiptStore) so the domain-policy adoption-receipt emission persists
+    // rather than hitting the fail-closed default.
+    fn put_opaque_if_absent(
+        &self,
+        class: &str,
+        key1: &str,
+        key2: Option<&str>,
+        recorded_at: u64,
+        record_hash: [u8; 32],
+        payload: &[u8],
+    ) -> Result<Option<[u8; 32]>, String> {
+        let mut store = self.opaque.lock().unwrap();
+        if let Some(existing) = store
+            .iter()
+            .find(|e| e.class == class && e.key1 == key1 && e.key2.as_deref() == key2)
+        {
+            return Ok(Some(existing.record_hash));
+        }
+        store.push(OpaqueEntry {
+            class: class.to_string(),
+            key1: key1.to_string(),
+            key2: key2.map(|s| s.to_string()),
+            recorded_at,
+            record_hash,
+            payload: payload.to_vec(),
+        });
+        Ok(None)
+    }
+    fn list_opaque_for(&self, class: &str, key1: &str) -> Result<Vec<Vec<u8>>, String> {
+        let store = self.opaque.lock().unwrap();
+        let mut rows: Vec<&OpaqueEntry> = store
+            .iter()
+            .filter(|e| e.class == class && e.key1 == key1)
+            .collect();
+        rows.sort_by(|a, b| {
+            a.recorded_at
+                .cmp(&b.recorded_at)
+                .then(a.record_hash.cmp(&b.record_hash))
+        });
+        Ok(rows.into_iter().map(|e| e.payload.clone()).collect())
     }
 }
 

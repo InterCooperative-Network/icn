@@ -4285,6 +4285,130 @@ fn target_kind_ordinal(target: &MandateGrantRefTarget) -> u8 {
     }
 }
 
+/// Cross-node deterministic receipt recording that a **domain policy version
+/// was adopted** into an [`crate::institutional_domain::InstitutionalDomain`],
+/// with an explicit `supersedes` back-pointer to the domain's previous adoption
+/// receipt.
+///
+/// This closes a specific evidence gap named in
+/// `docs/spec/domain-policy-adoption-receipt.md`: adoption is durably persisted
+/// (the domain's `current_policy` is overwritten and saved), but before this
+/// class **no receipt recorded that the transition happened, and no lineage
+/// linked one adopted version to the version it replaced** — so "which policy
+/// governed this domain on date X" was mechanically unanswerable and the prior
+/// policy ref was simply overwritten.
+///
+/// **This receipt records a process fact; it grants zero authority.** A valid
+/// `DomainPolicyAdoptedReceipt` proves only that *this domain recorded the
+/// adoption of this content-addressed policy version, superseding that prior
+/// one*. It does **not** prove the adoption was authorized (the act-time
+/// mandate gate is a separate, upstream check), that the policy is legitimate,
+/// or that the policy's rules are being evaluated at runtime (evaluator
+/// selection is separate, parked work). Do not read authority into it.
+///
+/// - `policy_id` is the content-addressed [`crate::institutional_domain::DomainPolicyId`]
+///   of the adopted version (raw 32 bytes; fixed-size, no length prefix).
+/// - `supersedes` is the `record_hash` of the domain's immediately-prior
+///   adoption receipt, or `None` for the first adoption. Verified as a chain by
+///   [`crate::verify::verify_chain_links`].
+/// - `recorded_at` is hashed into `record_hash` (a retry never restamps because
+///   the storage layer is insert-if-absent per `(domain_id, policy_id)`).
+///
+/// Equality/identity is anchored to `record_hash`.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct DomainPolicyAdoptedReceipt {
+    /// The governance domain that adopted the policy (`GovernanceDomainId.0`).
+    pub domain_id: String,
+    /// Content-addressed id of the adopted policy version.
+    pub policy_id: Hash,
+    /// Actor DID that recorded the adoption (recorder evidence, not authority).
+    pub adopted_by: String,
+    /// Wall-clock seconds the adoption was recorded.
+    pub recorded_at: u64,
+    /// `record_hash` of the prior adoption receipt for this domain, if any.
+    pub supersedes: Option<Hash>,
+    /// Canonical content hash binding every field above.
+    pub record_hash: Hash,
+}
+
+impl DomainPolicyAdoptedReceipt {
+    /// Domain-separation tag for the v1 wire format of this receipt class.
+    pub const DOMAIN_TAG: &[u8] = b"icn:gov:domain-policy-adopted:v1";
+
+    /// Compute the canonical record hash.
+    ///
+    /// Layout: [`Self::DOMAIN_TAG`]; then `domain_id` and `adopted_by`
+    /// length-prefixed (u64 LE); then `policy_id` raw as a fixed 32-byte field;
+    /// then `recorded_at` LE; then a 1-byte `supersedes` discriminant
+    /// (`0`=None, `1`=Some) followed by the 32 predecessor bytes when present.
+    /// The discriminant makes a genesis receipt (`None`) unambiguously distinct
+    /// from one superseding the all-zero hash.
+    pub fn compute_record_hash(
+        domain_id: &str,
+        policy_id: &Hash,
+        adopted_by: &str,
+        recorded_at: u64,
+        supersedes: &Option<Hash>,
+    ) -> Hash {
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(Self::DOMAIN_TAG);
+        for field in [domain_id, adopted_by] {
+            hasher.update(&(field.len() as u64).to_le_bytes());
+            hasher.update(field.as_bytes());
+        }
+        hasher.update(policy_id);
+        hasher.update(&recorded_at.to_le_bytes());
+        match supersedes {
+            None => hasher.update(&[0u8]),
+            Some(prior) => {
+                hasher.update(&[1u8]);
+                hasher.update(prior)
+            }
+        };
+        let mut out = [0u8; 32];
+        out.copy_from_slice(hasher.finalize().as_bytes());
+        out
+    }
+
+    /// Construct a receipt, computing its `record_hash` from the inputs.
+    pub fn new(
+        domain_id: String,
+        policy_id: Hash,
+        adopted_by: String,
+        recorded_at: u64,
+        supersedes: Option<Hash>,
+    ) -> Self {
+        let record_hash = Self::compute_record_hash(
+            &domain_id,
+            &policy_id,
+            &adopted_by,
+            recorded_at,
+            &supersedes,
+        );
+        Self {
+            domain_id,
+            policy_id,
+            adopted_by,
+            recorded_at,
+            supersedes,
+            record_hash,
+        }
+    }
+
+    /// Recompute the canonical hash and compare to the stored `record_hash`.
+    /// Returns `true` iff the receipt is internally consistent (integrity).
+    pub fn verify(&self) -> bool {
+        let recomputed = Self::compute_record_hash(
+            &self.domain_id,
+            &self.policy_id,
+            &self.adopted_by,
+            self.recorded_at,
+            &self.supersedes,
+        );
+        self.record_hash == recomputed
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
