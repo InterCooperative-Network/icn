@@ -323,10 +323,19 @@ pub fn detect_hash_conflicts(entries: &[HashClaim]) -> Vec<CheckVerdict> {
     }
 
     if checks.is_empty() {
-        checks.push(CheckVerdict::pass(
-            "record_integrity",
-            "all entries: claimed identity matches recomputed content; no collisions",
-        ));
+        if entries.is_empty() {
+            // Nothing was verified — an empty claim set must never read as a
+            // pass (fail-closed, consistent with `overall_status(&[])`).
+            checks.push(CheckVerdict::unresolved(
+                "record_integrity",
+                "no hash claims to verify; integrity unproven (fail-closed, not a pass)",
+            ));
+        } else {
+            checks.push(CheckVerdict::pass(
+                "record_integrity",
+                "all entries: claimed identity matches recomputed content; no collisions",
+            ));
+        }
     }
 
     checks
@@ -596,5 +605,12 @@ mod tests {
     fn empty_checks_are_fail_closed() {
         // A verifier that evaluated nothing must never read as proven.
         assert_eq!(overall_status(&[]), VerificationStatus::Unresolved);
+    }
+
+    #[test]
+    fn empty_hash_claims_is_unresolved_not_pass() {
+        // detect_hash_conflicts over zero claims verified nothing -> must not pass.
+        let checks = detect_hash_conflicts(&[]);
+        assert_eq!(overall_status(&checks), VerificationStatus::Unresolved);
     }
 }

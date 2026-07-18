@@ -11636,15 +11636,22 @@ fn recompute_decision_hash_matches(
         Some(g) => g,
         None => return (false, "No governance receipt to recompute".to_string()),
     };
+    // Hex hashes are case-insensitive; `hex::encode` (used for the recomputed
+    // value) emits lowercase, so normalize the response's hashes to lowercase
+    // before any comparison. Otherwise an uppercase-hex decision hash supplied by
+    // the caller and echoed by the gateway would spuriously mismatch a valid
+    // receipt.
+    let chain_decision_hash = chain.decision_hash.to_ascii_lowercase();
+    let gov_decision_hash = gov.decision_hash.to_ascii_lowercase();
     // Fail closed if the response is internally inconsistent: the governance
     // receipt's own `decision_hash` must equal the chain's top-level one.
-    if gov.decision_hash != chain.decision_hash {
+    if gov_decision_hash != chain_decision_hash {
         return (
             false,
             format!(
                 "inconsistent response: governance.decision_hash {}... != chain.decision_hash {}...",
-                short(&gov.decision_hash),
-                short(&chain.decision_hash)
+                short(&gov_decision_hash),
+                short(&chain_decision_hash)
             ),
         );
     }
@@ -11680,12 +11687,12 @@ fn recompute_decision_hash_matches(
         &vote_hash,
     );
     let recomputed_hex = hex::encode(recomputed);
-    if recomputed_hex == chain.decision_hash {
+    if recomputed_hex == chain_decision_hash {
         (
             true,
             format!(
                 "recomputed decision_hash matches claimed {}...",
-                short(&chain.decision_hash)
+                short(&chain_decision_hash)
             ),
         )
     } else {
@@ -11694,7 +11701,7 @@ fn recompute_decision_hash_matches(
             format!(
                 "recomputed {}... != claimed {}... (tampered or corrupt)",
                 short(&recomputed_hex),
-                short(&chain.decision_hash)
+                short(&chain_decision_hash)
             ),
         )
     }
@@ -11724,7 +11731,9 @@ fn verify_receipt_chain(
     // (Requested-vs-returned identity only — NOT an integrity check.)
     // Char-safe truncation avoids a panic on non-ASCII CLI input.
     let short = |s: &str| -> String { s.chars().take(16).collect() };
-    let requested_matches = chain.decision_hash == decision_hash;
+    // Hex is case-insensitive: compare hashes ignoring ASCII case so an
+    // uppercase-hex request does not spuriously mismatch the gateway's echo.
+    let requested_matches = chain.decision_hash.eq_ignore_ascii_case(decision_hash);
     checks.push(AuditCheck {
         name: "Returned chain matches requested decision".to_string(),
         passed: requested_matches,
@@ -11767,7 +11776,7 @@ fn verify_receipt_chain(
     let all_alloc_linked = chain
         .allocations
         .iter()
-        .all(|a| a.decision_hash == decision_hash);
+        .all(|a| a.decision_hash.eq_ignore_ascii_case(decision_hash));
     checks.push(AuditCheck {
         name: "Allocation provenance linked".to_string(),
         passed: !has_allocations || all_alloc_linked,
@@ -11792,7 +11801,7 @@ fn verify_receipt_chain(
     let all_intents_linked = chain
         .intents
         .iter()
-        .all(|i| i.decision_hash == decision_hash);
+        .all(|i| i.decision_hash.eq_ignore_ascii_case(decision_hash));
     checks.push(AuditCheck {
         name: "Intent provenance linked".to_string(),
         passed: !has_intents || all_intents_linked,
