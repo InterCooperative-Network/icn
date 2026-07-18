@@ -263,7 +263,7 @@ Per [`ICN_OPERATING_MODEL.md`](../architecture/ICN_OPERATING_MODEL.md) §Feature
   (one consumer of the generic chain-link verifier above) is **not** part of
   this change. Its emission requires a crash-atomic cross-store transition
   (domain-state store and receipt store are separate `sled::Db` instances) and is
-  deferred — see the tracking issue and the `apps/governance/close_journal.rs`
+  deferred — see issue #2434 and the `apps/governance/close_journal.rs`
   write-ahead-log pattern it should follow. This verifier defines only the
   generic re-verification primitive.
 - Logging redaction: the verifier must not reintroduce DID/body leakage into
