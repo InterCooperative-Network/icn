@@ -35,6 +35,7 @@ fn create_test_claims(did: &str, scopes: Vec<&str>) -> TokenClaims {
         coop_id: "test-coop".to_string(),
         scopes: scopes.iter().map(|s| s.to_string()).collect(),
         exp: 9999999999,
+        jti: None,
     }
 }
 

@@ -391,6 +391,7 @@ mod tests {
             coop_id: coop.to_string(),
             // Validly scoped, so the coop binding is the only thing under test.
             scopes: vec!["settlements:write".to_string()],
+            jti: None,
         }
     }
 

@@ -89,6 +89,12 @@ async fn test_governance_proposal_full_lifecycle_with_real_auth() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(auth_manager.clone()))
+            // Authority composition boundary (issues #2436/#2437): this test
+            // builds its own router, so it must install the same authority the
+            // production composition installs — `jwt_auth` fails closed without it.
+            .app_data(web::Data::new(std::sync::Arc::new(
+                icn_gateway::session_authority::SessionAuthority::evaluator(auth_manager.clone()),
+            )))
             .app_data(web::Data::new(ip_limiter.clone()))
             .service(
                 web::scope("/v1")
@@ -343,6 +349,12 @@ async fn test_auth_rejects_invalid_signature() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(auth_manager.clone()))
+            // Authority composition boundary (issues #2436/#2437): this test builds
+            // its own router, so it installs the same authority production installs —
+            // `jwt_auth` fails closed without it.
+            .app_data(web::Data::new(std::sync::Arc::new(
+                icn_gateway::session_authority::SessionAuthority::evaluator(auth_manager.clone()),
+            )))
             .app_data(web::Data::new(ip_limiter))
             .service(
                 web::scope("/v1")
@@ -406,6 +418,12 @@ async fn test_governance_endpoints_require_auth() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(auth_manager.clone()))
+            // Authority composition boundary (issues #2436/#2437): this test builds
+            // its own router, so it installs the same authority production installs —
+            // `jwt_auth` fails closed without it.
+            .app_data(web::Data::new(std::sync::Arc::new(
+                icn_gateway::session_authority::SessionAuthority::evaluator(auth_manager.clone()),
+            )))
             .app_data(web::Data::new(ip_limiter))
             .service(
                 web::scope("/v1")

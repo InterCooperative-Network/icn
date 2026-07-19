@@ -136,6 +136,23 @@ pub struct TokenClaims {
     /// back-compatible contract as `entity_id`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entity_type: Option<String>,
+
+    /// Unique credential id, enabling individual revocation (issue #2437).
+    ///
+    /// Minted by [`AuthManager::issue_entity_token`] — the one function every
+    /// gateway mint path bottoms out in — so all issuance paths (sessions,
+    /// invites, enrollment, `icnctl --local-mint`) produce revocable
+    /// credentials without call-site changes.
+    ///
+    /// `Option` for wire compatibility: credentials minted before this claim
+    /// existed still decode. A missing `jti` means *not individually
+    /// revocable*, which
+    /// [`SessionAuthority::verify`](crate::session_authority::SessionAuthority::verify)
+    /// refuses under profiles that require durable revocation. Because every
+    /// mint path now sets it, that population drains within one token lifetime
+    /// of an upgrade.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jti: Option<String>,
 }
 
 /// Authentication manager
@@ -214,6 +231,24 @@ impl AuthManager {
     pub fn with_self_asserted_coop(mut self, enabled: bool) -> Self {
         self.allow_self_asserted_coop = enabled;
         self
+    }
+
+    /// Apply a deployment-configured session lifetime to issued credentials.
+    ///
+    /// Before this existed, `GatewayConfig::token_expiry_hours` was parsed and
+    /// tested but never reached the issuer, so every credential lived exactly
+    /// one hour regardless of configuration (issue #2437). A configuration field
+    /// that does not change behavior is worse than no field at all: it creates
+    /// false operational confidence. The bound itself is validated by
+    /// [`TokenLifetimePolicy`](crate::session_authority::TokenLifetimePolicy).
+    pub fn with_token_ttl(mut self, ttl: Duration) -> Self {
+        self.token_ttl = ttl;
+        self
+    }
+
+    /// The lifetime applied to credentials this manager issues.
+    pub fn token_ttl(&self) -> Duration {
+        self.token_ttl
     }
 
     /// Generate a challenge for a DID
@@ -374,6 +409,7 @@ impl AuthManager {
             scopes,
             entity_id: entity_id.map(|id| id.to_string()),
             entity_type,
+            jti: Some(Self::generate_jti()),
         };
 
         let token = encode(
@@ -398,6 +434,18 @@ impl AuthManager {
         .map_err(|e| GatewayError::AuthenticationFailed(format!("Invalid token: {e}")))?;
 
         Ok(token_data.claims)
+    }
+
+    /// Generate a unique credential id (`jti`, 16 random bytes hex-encoded).
+    ///
+    /// Randomness — not a counter or a hash of the claims — so two credentials
+    /// minted for the same subject in the same second are still independently
+    /// revocable, and so an id reveals nothing about issuance order or volume.
+    fn generate_jti() -> String {
+        use rand::Rng;
+        let mut rng = rand::rng();
+        let bytes: [u8; 16] = rng.random();
+        hex::encode(bytes)
     }
 
     /// Generate cryptographically random nonce (32 bytes, hex-encoded)

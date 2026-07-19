@@ -406,6 +406,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["coop:write".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -426,6 +427,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["coop:read".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::get()
@@ -484,6 +486,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["coop:admin".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -551,6 +554,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["coop:read".to_string()], // Wrong scope!
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -577,6 +581,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["coop:read".to_string()], // Wrong scope!
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::put()
@@ -615,6 +620,7 @@ mod tests {
             coop_id: "alice-coop".to_string(),
             scopes: vec!["coop:write".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -699,6 +705,7 @@ mod tests {
             coop_id: "coop-food".to_string(),
             scopes: vec!["coop:read".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::get()
@@ -724,6 +731,7 @@ mod tests {
             coop_id: "coop-food".to_string(), // Alice's token is for coop-food
             scopes: vec!["coop:admin".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::put()

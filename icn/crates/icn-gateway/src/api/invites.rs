@@ -214,6 +214,7 @@ mod tests {
             exp: 9_999_999_999,
             coop_id: coop.to_string(),
             scopes: vec!["coop:admin".to_string(), "coop:read".to_string()],
+            jti: None,
         }
     }
 
