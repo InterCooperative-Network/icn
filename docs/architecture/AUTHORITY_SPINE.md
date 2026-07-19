@@ -61,6 +61,18 @@ capability report. `Institutional` requires durable revocation and **refuses to
 assemble** without it, naming the capability, the reason, the refused fallback,
 and the fix.
 
+**Which deployments actually get which profile today**, since a profile
+document that does not say this is exactly the kind of unbacked capability claim
+this note argues against: the profile is *inferred from whether a revocation
+store was supplied*, not declared by operator configuration. The daemon always
+supplies one, so **every daemon deployment — including the portable evaluator
+appliance — runs `Institutional`**. `PortableEvaluator` is reached only by
+embedded/test callers that construct a `GatewayServer` without a store. Two
+consequences worth naming: the evaluator appliance does get durable revocation
+(it has a real store), and a deployment whose keystore fails to unlock takes a
+path that supplies no store, silently *downgrading* the authority guarantee.
+Making the profile an operator-declared configuration value is a follow-up.
+
 Precisely what "refuses" means today: the gateway does not come up, and the
 daemon logs the error and continues running without a gateway. It is fail-closed
 — no request is ever served under an unmet guarantee — but it is *not* a process
