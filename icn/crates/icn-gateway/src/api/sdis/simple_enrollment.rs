@@ -57,6 +57,7 @@ use uuid::Uuid;
 use crate::api::sessions::get_gateway_url;
 use crate::auth::AuthManager;
 use crate::error::{GatewayError, Result};
+use crate::session_authority::SessionAuthority;
 use crate::steward_mgr::StewardManager;
 use crate::trust_mgr::TrustManager;
 
@@ -407,7 +408,7 @@ const STEWARD_MIN_TRUST_SCORE: f64 = 0.4;
 pub async fn verify_level2(
     http_req: HttpRequest,
     store: web::Data<Arc<EnrollmentStore>>,
-    auth: web::Data<Arc<AuthManager>>,
+    authority: web::Data<Arc<SessionAuthority>>,
     trust_mgr: web::Data<Arc<TrustManager>>,
     req: web::Json<VerifyLevel2Request>,
 ) -> Result<HttpResponse> {
@@ -424,7 +425,11 @@ pub async fn verify_level2(
         GatewayError::AuthenticationFailed("Invalid Authorization format".to_string())
     })?;
 
-    let claims = auth.verify_token(token)?;
+    // Verify through the session authority: this scope is mounted WITHOUT the
+    // `jwt_auth` middleware and authenticates by hand, so using the bare
+    // AuthManager here would honor revoked credentials that every wrapped route
+    // rejects (issue #2437).
+    let claims = authority.verify(token)?;
     let steward_did: Did = claims
         .sub
         .parse()
@@ -969,7 +974,7 @@ pub struct RejectRequest {
 pub async fn get_steward_stats(
     http_req: HttpRequest,
     store: web::Data<Arc<EnrollmentStore>>,
-    auth: web::Data<Arc<AuthManager>>,
+    authority: web::Data<Arc<SessionAuthority>>,
     trust_mgr: web::Data<Arc<TrustManager>>,
 ) -> Result<HttpResponse> {
     // Extract steward DID from Bearer token
@@ -985,7 +990,11 @@ pub async fn get_steward_stats(
         GatewayError::AuthenticationFailed("Invalid Authorization format".to_string())
     })?;
 
-    let claims = auth.verify_token(token)?;
+    // Verify through the session authority: this scope is mounted WITHOUT the
+    // `jwt_auth` middleware and authenticates by hand, so using the bare
+    // AuthManager here would honor revoked credentials that every wrapped route
+    // rejects (issue #2437).
+    let claims = authority.verify(token)?;
     let steward_did: Did = claims
         .sub
         .parse()

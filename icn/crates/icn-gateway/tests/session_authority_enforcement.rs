@@ -439,9 +439,20 @@ async fn capability_report_matches_the_assembled_dependencies() {
     assert_eq!(caps.revocation_durability, "durable");
     assert_eq!(caps.revocation_backend, "store");
     assert_eq!(caps.token_ttl_secs, 86_400);
+    // Revocation is fully satisfied here, so no revocation-degradation note —
+    // but attenuation is still partial and must say so even under the strongest
+    // profile. A capability report that goes quiet when the profile is strong is
+    // exactly the overclaim this subsystem exists to prevent.
     assert!(
-        caps.notes.is_empty(),
-        "a fully-satisfied institutional profile should carry no degradation notes: {:?}",
+        !caps.notes.iter().any(|n| n.contains("valid again after")),
+        "durable revocation must not carry a volatility note: {:?}",
+        caps.notes
+    );
+    assert!(
+        caps.notes
+            .iter()
+            .any(|n| n.contains("enforced only for delegated session approval")),
+        "partial attenuation must be reported even on the institutional profile: {:?}",
         caps.notes
     );
 
@@ -453,6 +464,96 @@ async fn capability_report_matches_the_assembled_dependencies() {
     let caps = volatile.capabilities();
     assert_eq!(caps.revocation_backend, "memory");
     assert!(!caps.notes.is_empty(), "degradation must be reported");
+}
+
+// ---------------------------------------------------------------------------
+// 15. One surface cannot be used to bypass the other
+// ---------------------------------------------------------------------------
+
+/// The gateway and the RPC server are signed with the same secret and share one
+/// revocation store, so a credential revoked on either surface must be rejected
+/// on both. This pins the shared key format: writing the entry the way `icn-rpc`
+/// writes it, and reading revocation state from the store rather than only from
+/// this process's cache.
+///
+/// Both directions are asserted because they fail differently: gateway→RPC
+/// depends on the key prefix and value shape, RPC→gateway depends on the
+/// cache-miss fallthrough to the store.
+#[actix_web::test]
+async fn revocation_is_visible_across_both_authenticated_surfaces() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let store: Arc<dyn icn_store::Store> =
+        Arc::new(icn_store::SledStore::open(dir.path()).expect("open store"));
+
+    let authority = authority(
+        Arc::new(StoreRevocationAuthority::new(store.clone()).unwrap()),
+        AuthorityProfile::Institutional,
+        1,
+    );
+    let app = protected_app!(authority.clone());
+
+    // -- direction 1: gateway revoke must be written where RPC looks for it --
+    let token = authority
+        .auth_manager()
+        .issue_token(&did(), "test-coop", scopes(&["coop:read"]))
+        .expect("mint");
+    let claims = authority.auth_manager().verify_token(&token).unwrap();
+    let jti = claims.jti.clone().expect("minted credential carries a jti");
+    authority.revoke(&claims).expect("revoke");
+
+    let rpc_key = format!("auth:revoked:{jti}").into_bytes();
+    let entry = store
+        .get(&rpc_key)
+        .expect("store read")
+        .expect("gateway revocation must be written under the shared RPC key prefix");
+    let decoded: serde_json::Value =
+        serde_json::from_slice(&entry).expect("entry must be JSON the RPC loader can parse");
+    assert_eq!(decoded["jti"], jti);
+    assert!(
+        decoded["original_expiry"].as_u64().is_some(),
+        "RPC's loader drops entries without a usable original_expiry"
+    );
+
+    // -- direction 2: an RPC-style revoke must be honored by the gateway ------
+    let other = authority
+        .auth_manager()
+        .issue_token(&did(), "test-coop", scopes(&["coop:read"]))
+        .expect("mint");
+    let other_jti = authority
+        .auth_manager()
+        .verify_token(&other)
+        .unwrap()
+        .jti
+        .expect("jti");
+
+    assert_eq!(
+        get_protected(&app, &other).await,
+        200,
+        "precondition: valid before the out-of-process revoke"
+    );
+
+    // Written directly to the store, as the RPC surface would — this process's
+    // cache knows nothing about it.
+    store
+        .put(
+            format!("auth:revoked:{other_jti}").as_bytes(),
+            serde_json::to_vec(&serde_json::json!({
+                "jti": other_jti,
+                "subject": "",
+                "revoked_at": 1,
+                "original_expiry": u64::MAX,
+                "reason": "revoked via RPC",
+            }))
+            .unwrap()
+            .as_slice(),
+        )
+        .expect("store write");
+
+    assert_eq!(
+        get_protected(&app, &other).await,
+        401,
+        "a credential revoked on the other surface must not remain valid here"
+    );
 }
 
 // ---------------------------------------------------------------------------

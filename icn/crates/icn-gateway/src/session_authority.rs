@@ -21,7 +21,7 @@
 //! 3. **Revocation** — an issued credential can be individually withdrawn and is
 //!    rejected thereafter ([`RevocationAuthority`]).
 //! 4. **Truth** — what is installed is reportable, and a profile that requires a
-//!    guarantee refuses to start without it ([`AuthorityCapabilities`],
+//!    guarantee refuses to assemble without it ([`AuthorityCapabilities`],
 //!    [`AuthorityProfile::validate`]).
 //!
 //! # What this module deliberately does NOT decide
@@ -42,7 +42,15 @@ use crate::auth::{AuthManager, TokenClaims};
 use crate::error::{GatewayError, Result};
 
 /// Key prefix for persisted revocation entries.
-const REVOKED_JTI_PREFIX: &[u8] = b"gateway:revoked_jti:";
+///
+/// **Deliberately identical to `icn-rpc`'s `TokenRevocationList` prefix.** The
+/// gateway and the RPC server are signed with the same secret and their claim
+/// shapes are mutually decodable, so a credential presented to one surface can
+/// be presented to the other. Namespacing the two revocation lists separately
+/// would mean "revoked" on the gateway and "valid" on RPC for the same
+/// credential — the exact divergence sharing a store is meant to prevent. The
+/// key IS the revocation fact; the value is advisory metadata.
+const REVOKED_JTI_PREFIX: &[u8] = b"auth:revoked:";
 
 /// Upper bound on any configured session lifetime.
 ///
@@ -211,10 +219,19 @@ pub trait RevocationAuthority: Send + Sync {
 
 /// Durable revocation backed by a persistent [`icn_store::Store`].
 ///
-/// Reads are served from an in-memory set so the request hot path stays a
-/// hash lookup; writes go to the store first and are only cached after the
-/// durable write succeeds, so a cached "revoked" always implies a persisted
-/// "revoked" (never the reverse).
+/// # Read semantics: cache is a fast YES, the store is the authority
+///
+/// A cache hit answers "revoked" immediately. A cache *miss* falls through to
+/// the store rather than answering "not revoked", because the cache only knows
+/// about revocations this process performed or loaded at startup — a credential
+/// revoked through the RPC `auth.revoke` surface (which shares this store) would
+/// otherwise stay valid on the gateway until a restart. The one-sided fallthrough
+/// keeps the dangerous answer authoritative while leaving the common path a
+/// single hash lookup plus one point read.
+///
+/// Writes go to the store first and are cached only after the durable write
+/// succeeds, so a cached "revoked" always implies a persisted "revoked" — never
+/// the reverse.
 pub struct StoreRevocationAuthority {
     store: Arc<dyn icn_store::Store>,
     cache: RwLock<HashSet<String>>,
@@ -255,18 +272,51 @@ impl StoreRevocationAuthority {
 
 impl RevocationAuthority for StoreRevocationAuthority {
     fn is_revoked(&self, jti: &str) -> Result<bool> {
-        let cache = self.cache.read().map_err(|_| {
-            GatewayError::InternalError("gateway revocation cache lock poisoned".to_string())
+        {
+            let cache = self.cache.read().map_err(|_| {
+                GatewayError::InternalError("gateway revocation cache lock poisoned".to_string())
+            })?;
+            if cache.contains(jti) {
+                return Ok(true);
+            }
+        }
+
+        // Cache miss is not proof of validity: the RPC surface shares this store
+        // and revokes without touching this process's cache. Consult the store,
+        // and propagate read failures so the caller fails closed.
+        let present = self.store.get(&Self::key(jti)).map_err(|e| {
+            GatewayError::InternalError(format!("failed to read revocation state: {e}"))
         })?;
-        Ok(cache.contains(jti))
+
+        if present.is_some() {
+            if let Ok(mut cache) = self.cache.write() {
+                cache.insert(jti.to_string());
+            }
+            return Ok(true);
+        }
+        Ok(false)
     }
 
     fn revoke(&self, jti: &str, expires_at: u64) -> Result<()> {
-        self.store
-            .put(&Self::key(jti), &expires_at.to_be_bytes())
-            .map_err(|e| {
-                GatewayError::InternalError(format!("failed to persist gateway revocation: {e}"))
-            })?;
+        // Value shape mirrors `icn-rpc`'s `RevokedToken` so the RPC server's
+        // startup cache load (which deserializes values and skips entries it
+        // cannot parse) honors revocations written here. The KEY is the
+        // authoritative revocation fact for this side; the value carries the
+        // expiry that both sides use to reclaim entries after the credential
+        // would have expired anyway.
+        let value = serde_json::json!({
+            "jti": jti,
+            "subject": "",
+            "revoked_at": icn_time::current_timestamp_secs(),
+            "original_expiry": expires_at,
+            "reason": "revoked via gateway session authority",
+        });
+        let encoded = serde_json::to_vec(&value).map_err(|e| {
+            GatewayError::InternalError(format!("failed to encode revocation entry: {e}"))
+        })?;
+        self.store.put(&Self::key(jti), &encoded).map_err(|e| {
+            GatewayError::InternalError(format!("failed to persist gateway revocation: {e}"))
+        })?;
         let mut cache = self.cache.write().map_err(|_| {
             GatewayError::InternalError("gateway revocation cache lock poisoned".to_string())
         })?;
@@ -538,8 +588,14 @@ impl SessionAuthority {
             // A credential minted before revocable ids existed cannot be
             // individually withdrawn. Institutions must not accept an
             // unrevocable credential; disposable evaluators may (they have no
-            // durable revocation to contradict anyway). Every mint path now sets
-            // `jti`, so this drains within one token lifetime of an upgrade.
+            // durable revocation to contradict anyway).
+            //
+            // MIGRATION (breaking): because the daemon declares the
+            // institutional profile whenever it has a revocation store, every
+            // credential outstanding at upgrade time is rejected *immediately*,
+            // not gradually — holders must re-authenticate. The appliance
+            // re-mints during seeding; browser sessions held elsewhere die at
+            // upgrade.
             if self.profile.requires_durable_revocation() {
                 return Err(GatewayError::AuthenticationFailed(
                     "credential predates revocable session ids and cannot be withdrawn; \
@@ -600,10 +656,24 @@ impl SessionAuthority {
             ));
         }
 
+        // Attenuation is DEGRADED, not enforced, and saying so is the whole
+        // point of this report. `issue_delegated` is the only attenuating mint
+        // path; the invite, SDIS-enrollment and trusted-local (`icnctl
+        // --local-mint`) paths still issue fixed scope sets chosen by the flow
+        // rather than bounded by the issuer's own authority. Reporting
+        // `Enforced` here would be precisely the failure this subsystem exists
+        // to make impossible: a capability claim the assembled runtime does not
+        // back on every path.
+        notes.push(
+            "scope attenuation is enforced only for delegated session approval; the invite, \
+             SDIS-enrollment and trusted-local mint paths still issue flow-chosen scope sets"
+                .to_string(),
+        );
+
         AuthorityCapabilities {
             profile: self.profile.as_str(),
             session_issuance: CapabilityState::Enforced,
-            scope_attenuation: CapabilityState::Enforced,
+            scope_attenuation: CapabilityState::Degraded,
             revocation,
             revocation_durability: durability.as_str(),
             revocation_backend: self.revocation.backend(),
@@ -814,7 +884,17 @@ mod tests {
         assert_eq!(caps.revocation_durability, "volatile");
         assert_eq!(caps.revocation_backend, "memory");
         assert_eq!(caps.token_ttl_secs, 7200);
-        assert_eq!(caps.scope_attenuation, CapabilityState::Enforced);
+        // Attenuation is Degraded, not Enforced: only delegated session approval
+        // attenuates today. Pinning the honest value here so a future change that
+        // upgrades the claim has to also upgrade the reality.
+        assert_eq!(caps.scope_attenuation, CapabilityState::Degraded);
+        assert!(
+            caps.notes
+                .iter()
+                .any(|n| n.contains("enforced only for delegated session approval")),
+            "partial attenuation must be reported honestly: {:?}",
+            caps.notes
+        );
         assert!(
             caps.notes.iter().any(|n| n.contains("valid again after")),
             "degraded revocation must be reported honestly: {:?}",

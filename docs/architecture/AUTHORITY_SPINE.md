@@ -41,7 +41,7 @@ authority rather than a bearer secret.
 | **Attenuation** | `issued ⊆ issuer ∩ flow_allowed ∩ requested` — every term a ceiling, never a grant | `session_authority::attenuate_scopes` |
 | **Expiration** | The *configured* lifetime bounds the credentials actually issued; misconfiguration is refused, not clamped | `TokenLifetimePolicy`, `AuthManager::with_token_ttl` |
 | **Revocation** | An issued credential can be individually withdrawn and is rejected thereafter on every surface that accepted it | `RevocationAuthority`, consulted in `jwt_auth` |
-| **Truth** | The runtime reports which of the above it actually installed, and a profile that *requires* a guarantee refuses to start without it | `AuthorityCapabilities`, `AuthorityProfile::validate` |
+| **Truth** | The runtime reports which of the above it actually installed, and a profile that *requires* a guarantee refuses to **serve** without it | `AuthorityCapabilities`, `AuthorityProfile::validate` |
 
 Two design rules make these hold under failure:
 
@@ -57,9 +57,16 @@ Two design rules make these hold under failure:
 
 A profile is a **requirement**, not a description. `PortableEvaluator` may run
 volatile revocation because the deployment is disposable — and says so in its
-capability report. `Institutional` requires durable revocation and **aborts
-startup** when it is missing, naming the capability, the reason, the refused
-fallback, and the fix. An institution that cannot make a withdrawal survive a
+capability report. `Institutional` requires durable revocation and **refuses to
+assemble** without it, naming the capability, the reason, the refused fallback,
+and the fix.
+
+Precisely what "refuses" means today: the gateway does not come up, and the
+daemon logs the error and continues running without a gateway. It is fail-closed
+— no request is ever served under an unmet guarantee — but it is *not* a process
+abort, and an operator watching only for a crash would miss it. Making an unmet
+authority profile fail the whole daemon is a deliberate follow-up decision, not
+an oversight. An institution that cannot make a withdrawal survive a
 restart does not have revocation, and the software should not claim otherwise on
 its behalf.
 

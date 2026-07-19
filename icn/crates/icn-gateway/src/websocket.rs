@@ -8,8 +8,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
-use crate::auth::AuthManager;
 use crate::events::{EventBroadcaster, SequencedEvent};
+use crate::session_authority::SessionAuthority;
 use icn_identity::Did;
 use icn_obs::metrics::gateway;
 
@@ -68,7 +68,7 @@ pub struct WsSession {
     /// Last heartbeat timestamp
     last_heartbeat: Instant,
     /// Authentication manager
-    auth_manager: Arc<AuthManager>,
+    authority: Arc<SessionAuthority>,
     /// Event broadcaster
     event_broadcaster: Arc<EventBroadcaster>,
     /// Event receiver (subscribed after authentication)
@@ -83,14 +83,14 @@ impl WsSession {
     /// Create a new WebSocket session
     pub fn new(
         coop_id: String,
-        auth_manager: Arc<AuthManager>,
+        authority: Arc<SessionAuthority>,
         event_broadcaster: Arc<EventBroadcaster>,
     ) -> Self {
         Self {
             coop_id,
             did: None,
             last_heartbeat: Instant::now(),
-            auth_manager,
+            authority,
             event_broadcaster,
             event_rx: None,
             connection_tracked: false,
@@ -111,7 +111,11 @@ impl WsSession {
 
     /// Authenticate user with JWT token
     fn authenticate(&mut self, token: &str, ctx: &mut <Self as Actor>::Context) {
-        match self.auth_manager.verify_token(token) {
+        // Verify through the session authority, NOT the bare AuthManager: this
+        // surface is mounted outside `jwt_auth` and authenticates in-band, so
+        // without this it would honor revoked and jti-less credentials that
+        // every wrapped HTTP route rejects (issue #2437).
+        match self.authority.verify(token) {
             Ok(claims) => {
                 // Verify token is for this cooperative
                 if claims.coop_id != self.coop_id {
@@ -421,10 +425,11 @@ mod tests {
 
     #[test]
     fn test_create_session() {
-        let auth = Arc::new(AuthManager::new(b"test_secret".to_vec()));
+        let auth = Arc::new(crate::auth::AuthManager::new(b"test_secret".to_vec()));
+        let authority = Arc::new(SessionAuthority::evaluator(auth));
         let broadcaster = Arc::new(EventBroadcaster::new());
 
-        let session = WsSession::new("test-coop".to_string(), auth, broadcaster);
+        let session = WsSession::new("test-coop".to_string(), authority, broadcaster);
         assert_eq!(session.coop_id, "test-coop");
         assert!(session.did.is_none());
     }
