@@ -24,8 +24,9 @@ The package stem is **`icn-portable-evaluator`**. Earlier packages in this line
 (the ad-hoc 0.0.2 pre-releases and the first lane-built 0.0.3 release) were
 published under an externally introduced **"common sense"** name that arrived
 with an externally assembled distribution and was never an ICN-ratified
-identity; it belongs to an unrelated project and does not describe anything in
-this repository. The *payloads* of those releases are genuine ICN appliance
+identity: it was never proposed, defined, or ratified anywhere in this
+repository, the project owner attests it names a separate unrelated project,
+and its external origin is otherwise undetermined. The *payloads* of those releases are genuine ICN appliance
 images (manifest `git_commit` values are real commits of this repository, and
 0.0.3 was runtime-witnessed on the exact published bytes) — only the name was
 foreign. Release tags and asset filenames for ≤0.0.3 are retained unchanged so
