@@ -1,7 +1,7 @@
 ---
 Status: descriptive
 Canonical: no
-Last Reviewed: 2026-07-18
+Last Reviewed: 2026-07-19
 ---
 
 # ICN Document Registry (human summary)
@@ -41,9 +41,9 @@ python3 docs/scripts/doc_control_check.py --repo . --registry docs/registry.toml
 
 ## Corpus coverage
 
-- **Markdown files under docs/**: 952
+- **Markdown files under docs/**: 953
 - **By truth_class (merged):**
-  - `descriptive`: 555
+  - `descriptive`: 556
   - `draft`: 44
   - `historical`: 80
   - `normative`: 89
@@ -76,5 +76,5 @@ What fails in CI, what warns, what `--strict` adds, and when to promote strict t
 
 ## Registry coverage (this snapshot)
 
-- **Files scanned:** 952 Markdown files under `docs/`
-- **Explicit `[docs."…"]` rows under `docs/`:** 350 (remaining files rely on `[[doc_path_defaults]]` only)
+- **Files scanned:** 953 Markdown files under `docs/`
+- **Explicit `[docs."…"]` rows under `docs/`:** 351 (remaining files rely on `[[doc_path_defaults]]` only)
