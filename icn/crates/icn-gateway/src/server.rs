@@ -37,6 +37,10 @@ use crate::rate_limit::{
     IpRateLimiter, RateLimitConfig, RateLimiter, VelocityLimitConfig, VelocityLimiter,
 };
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
+use crate::session_authority::{
+    AuthorityProfile, InMemoryRevocationAuthority, RevocationAuthority, SessionAuthority,
+    StoreRevocationAuthority, TokenLifetimePolicy,
+};
 use crate::treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
 use crate::trust_mgr::TrustManager;
 use anyhow::Context;
@@ -82,6 +86,16 @@ impl Default for AuditPruneConfig {
 pub struct GatewayServer {
     bind_addr: SocketAddr,
     jwt_secret: Vec<u8>,
+    /// Deployment profile governing which authority guarantees are REQUIRED.
+    /// Defaults to the disposable-evaluator posture; the daemon sets the
+    /// institutional profile when a persistent deployment is configured.
+    authority_profile: AuthorityProfile,
+    /// Persistent store backing session revocation. `None` yields volatile
+    /// revocation, which only the evaluator profile may run (see
+    /// [`AuthorityProfile::validate`]).
+    revocation_store: Option<Arc<dyn icn_store::Store>>,
+    /// Configured session lifetime; `None` uses the default.
+    token_lifetime: Option<TokenLifetimePolicy>,
     data_dir: Option<std::path::PathBuf>,
     event_broadcaster: Option<Arc<EventBroadcaster>>,
     security_config: SecurityConfig,
@@ -190,6 +204,13 @@ impl GatewayServer {
         GatewayServer {
             bind_addr,
             jwt_secret,
+            // Safe-by-default: assume the disposable posture until a deployment
+            // declares itself institutional. Declaring the stronger profile
+            // without the machinery to back it fails at startup rather than
+            // shipping an authority claim the runtime cannot honor.
+            authority_profile: AuthorityProfile::PortableEvaluator,
+            revocation_store: None,
+            token_lifetime: None,
             data_dir: None,
             event_broadcaster: None,
             security_config: SecurityConfig::development(), // Permissive for tests
@@ -242,6 +263,9 @@ impl GatewayServer {
         GatewayServer {
             bind_addr,
             jwt_secret,
+            authority_profile: AuthorityProfile::PortableEvaluator,
+            revocation_store: None,
+            token_lifetime: None,
             data_dir: Some(data_dir),
             event_broadcaster: None,
             security_config,
@@ -295,6 +319,9 @@ impl GatewayServer {
         GatewayServer {
             bind_addr,
             jwt_secret,
+            authority_profile: AuthorityProfile::PortableEvaluator,
+            revocation_store: None,
+            token_lifetime: None,
             data_dir,
             event_broadcaster: Some(event_broadcaster),
             security_config,
@@ -614,6 +641,32 @@ impl GatewayServer {
     /// real records (keyed `exec:<decision_hash>`). Standalone/test gateways
     /// that have no runtime store leave this `None` and keep the path-open
     /// fallback (Gap C).
+    /// Install a persistent store for session revocation.
+    ///
+    /// Without this, revocation is in-memory and is lost on restart — a posture
+    /// only [`AuthorityProfile::PortableEvaluator`] may run. Supplying the store
+    /// is what makes [`AuthorityProfile::Institutional`] assemblable.
+    pub fn with_revocation_store(mut self, store: Arc<dyn icn_store::Store>) -> Self {
+        self.revocation_store = Some(store);
+        self
+    }
+
+    /// Declare the deployment profile whose authority guarantees must hold.
+    ///
+    /// A profile is a *requirement*, not a description: declaring
+    /// [`AuthorityProfile::Institutional`] without durable revocation aborts
+    /// startup with an actionable error rather than degrading silently.
+    pub fn with_authority_profile(mut self, profile: AuthorityProfile) -> Self {
+        self.authority_profile = profile;
+        self
+    }
+
+    /// Apply the deployment-configured session lifetime (`token_expiry_hours`).
+    pub fn with_token_lifetime(mut self, lifetime: TokenLifetimePolicy) -> Self {
+        self.token_lifetime = Some(lifetime);
+        self
+    }
+
     pub fn with_execution_query_store(mut self, store: Arc<dyn icn_store::Store>) -> Self {
         self.execution_query_store = Some(store);
         self
@@ -697,9 +750,48 @@ impl GatewayServer {
                 self.bind_addr
             );
         }
+        // ---- Session authority composition (issues #2436, #2437) ----------
+        //
+        // The authority subsystem is assembled as ONE explicit value rather than
+        // an implicit set of defaults, so what this deployment guarantees is
+        // constructible, inspectable, and testable through the same path
+        // production uses. `SessionAuthority::new` runs the profile's startup
+        // invariants and refuses to assemble a deployment whose required
+        // guarantees are missing.
+        let lifetime = self.token_lifetime.unwrap_or_default();
         let auth_manager = Arc::new(
-            AuthManager::new(self.jwt_secret).with_self_asserted_coop(allow_self_asserted_coop),
+            AuthManager::new(self.jwt_secret)
+                .with_self_asserted_coop(allow_self_asserted_coop)
+                .with_token_ttl(lifetime.ttl()),
         );
+
+        // Durable when the daemon supplied a revocation store; volatile
+        // otherwise. The profile decides whether volatile is acceptable — it is
+        // never silently upgraded to "revocation supported".
+        let revocation: Arc<dyn RevocationAuthority> = match self.revocation_store.clone() {
+            Some(store) => Arc::new(StoreRevocationAuthority::new(store)?),
+            None => Arc::new(InMemoryRevocationAuthority::new()),
+        };
+
+        let session_authority = Arc::new(SessionAuthority::new(
+            auth_manager.clone(),
+            revocation,
+            lifetime,
+            self.authority_profile,
+        )?);
+
+        let authority_caps = session_authority.capabilities();
+        info!(
+            profile = authority_caps.profile,
+            revocation = ?authority_caps.revocation,
+            revocation_durability = authority_caps.revocation_durability,
+            revocation_backend = authority_caps.revocation_backend,
+            token_ttl_secs = authority_caps.token_ttl_secs,
+            "Session authority assembled"
+        );
+        for note in &authority_caps.notes {
+            warn!("Session authority: {}", note);
+        }
 
         // Create cooperative manager (uses actor if handle available, otherwise in-memory)
         let coop_manager: Arc<CoopManager> = if let Some(handle) = self.coop_handle {
@@ -1928,6 +2020,10 @@ impl GatewayServer {
                 )
                 // Shared state
                 .app_data(web::Data::new(auth_manager.clone()))
+                // Authority composition boundary: every authenticated request
+                // verifies through this (see `middleware::jwt_auth`), so
+                // revocation cannot be bypassed by a route that forgets it.
+                .app_data(web::Data::new(session_authority.clone()))
                 .app_data(web::Data::new(coop_manager.clone()))
                 .app_data(web::Data::new(community_manager.clone()))
                 .app_data(web::Data::new(steward_manager.clone()))

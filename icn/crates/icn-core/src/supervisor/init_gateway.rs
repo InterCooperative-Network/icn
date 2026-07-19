@@ -79,6 +79,12 @@ pub struct GatewayHandles {
     /// Shared into the gateway receipt-chain read API so audit reads see real
     /// execution records instead of an empty temp-store fallback (Gap C).
     pub execution_query_store: Option<Arc<dyn icn_store::Store>>,
+    /// Persistent store backing session revocation (issue #2437).
+    ///
+    /// Shared with the RPC auth manager so a credential revoked on one
+    /// authenticated surface is rejected on the other. Its presence is what
+    /// lets the gateway assemble the institutional authority profile.
+    pub revocation_store: Option<Arc<dyn icn_store::Store>>,
     /// Execution-record retention cleanup deferred to run after the gateway's
     /// dispatch-evidence backfill (Issue #1987 follow-up), so pruning cannot
     /// delete a terminal record whose evidence the backfill still needs to heal.
@@ -157,8 +163,13 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let settlement_engine_handle = handles.settlement_engine;
     let dispatch_evidence_sink_installer = handles.dispatch_evidence_sink_installer;
     let execution_query_store = handles.execution_query_store;
+    let revocation_store = handles.revocation_store;
     let post_backfill_cleanup = handles.post_backfill_cleanup;
     let default_trust_score = config.default_trust_score;
+    // The configured session lifetime now reaches the issuer (issue #2437):
+    // before this, `token_expiry_hours` was parsed and tested but never applied,
+    // so every credential lived one hour regardless of configuration.
+    let token_expiry_hours = config.token_expiry_hours;
     // Dev/demo posture (issue #2075): carried by config (set for the loopback
     // `--insecure-gateway-no-jwt` hatch) instead of an env var, so it does not
     // race threads reading the environment after the runtime has started.
@@ -271,6 +282,34 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
 
             if let Some(store) = execution_query_store {
                 gateway_server = gateway_server.with_execution_query_store(store);
+            }
+
+            // Session authority (issues #2436, #2437). A daemon deployment is an
+            // operator-run node, so it declares the institutional profile: the
+            // gateway then refuses to start unless durable revocation is
+            // actually installed, rather than serving requests whose credentials
+            // cannot be withdrawn across a restart.
+            if let Some(store) = revocation_store {
+                gateway_server = gateway_server
+                    .with_revocation_store(store)
+                    .with_authority_profile(
+                        icn_gateway::session_authority::AuthorityProfile::Institutional,
+                    );
+            }
+            match icn_gateway::session_authority::TokenLifetimePolicy::from_hours(
+                token_expiry_hours,
+            ) {
+                Ok(lifetime) => {
+                    gateway_server = gateway_server.with_token_lifetime(lifetime);
+                }
+                Err(e) => {
+                    // Misconfigured lifetime is an operator error: refuse to
+                    // start rather than silently fall back to a different
+                    // lifetime than the one configured.
+                    warn!("Gateway not started: invalid token_expiry_hours — {}", e);
+                    icn_obs::metrics::supervisor::error_inc("gateway_server");
+                    return;
+                }
             }
 
             if let Some(cleanup) = post_backfill_cleanup {

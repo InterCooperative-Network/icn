@@ -49,6 +49,13 @@ pub struct RpcConfig {
     pub jwt_secret: Option<Vec<u8>>,
     /// Enable trust-based rate limiting
     pub enable_trust_rate_limiting: bool,
+    /// Persistent store backing RPC token revocation (issue #2437).
+    ///
+    /// Supplied by the daemon; `None` leaves revocation uninstalled, which is
+    /// logged explicitly rather than presented as revocation support. Opened by
+    /// the caller (not derived here) so the store path stays with the rest of
+    /// the daemon's store layout in `lifecycle`.
+    pub revocation_store: Option<Arc<icn_store::SledStore>>,
 }
 
 impl RpcConfig {
@@ -70,7 +77,14 @@ impl RpcConfig {
             addr: rpc_addr,
             jwt_secret,
             enable_trust_rate_limiting: true,
+            revocation_store: None,
         }
+    }
+
+    /// Attach the persistent store that backs RPC token revocation.
+    pub fn with_revocation_store(mut self, store: Arc<icn_store::SledStore>) -> Self {
+        self.revocation_store = Some(store);
+        self
     }
 }
 
@@ -81,14 +95,45 @@ pub fn spawn_rpc_server(
     config: RpcConfig,
     deps: RpcDeps,
     background_tasks: &mut tokio::task::JoinSet<()>,
-) -> ComputeHandle {
+) -> anyhow::Result<ComputeHandle> {
     // Create RPC server with optional auth
     let mut rpc_server = if let Some(ref jwt_secret) = config.jwt_secret {
-        info!("RPC server auth enabled (using gateway JWT secret)");
         RpcServer::new_with_auth(config.addr, jwt_secret.clone())
     } else {
         RpcServer::new(config.addr)
     };
+
+    // Install the store-backed auth manager so token revocation actually exists
+    // in the assembled daemon (issue #2437).
+    //
+    // `new_with_auth` alone constructs `revocation_list: None`, which made the
+    // `auth.revoke` RPC method answer "Token revocation not available" at
+    // runtime even though the full `TokenRevocationList` machinery was
+    // implemented and tested — the library had the capability, the daemon did
+    // not install it. Wiring is fail-closed: if the revocation store cannot be
+    // opened we refuse to start rather than serve RPC with silently
+    // unrevocable credentials.
+    if let Some(ref jwt_secret) = config.jwt_secret {
+        match config.revocation_store.clone() {
+            Some(store) => {
+                rpc_server
+                    .set_auth_manager_with_store(jwt_secret.clone(), store)
+                    .map_err(|e| {
+                        anyhow::anyhow!("failed to install RPC token revocation store: {e}")
+                    })?;
+                info!("RPC server auth enabled with durable token revocation");
+            }
+            None => {
+                // Only reachable for callers that build an RpcConfig without a
+                // store (tests, embedded uses). Say so plainly rather than
+                // implying revocation exists.
+                warn!(
+                    "RPC server auth enabled WITHOUT a revocation store: issued credentials \
+                     cannot be revoked (auth.revoke will report revocation unavailable)"
+                );
+            }
+        }
+    }
 
     // Wire up all handles
     rpc_server.set_network_handle(deps.network_handle);
@@ -151,7 +196,7 @@ pub fn spawn_rpc_server(
     icn_obs::metrics::supervisor::actor_active_set("rpc_server", true);
     info!("RPC server spawned on {}", rpc_addr);
 
-    compute_handle_for_gateway
+    Ok(compute_handle_for_gateway)
 }
 
 /// Configuration for Gateway server
