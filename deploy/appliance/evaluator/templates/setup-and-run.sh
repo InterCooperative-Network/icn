@@ -5,7 +5,7 @@ PACKAGE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 usage() {
   cat <<'EOF'
-ICN Common Sense setup-and-run
+ICN Portable Evaluator setup-and-run
 
 Usage:
   ./setup-and-run.sh

@@ -1,10 +1,37 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-07-17
+Last Reviewed: 2026-07-19
 ---
 
 # ICN State (living doc)
+
+<!-- [sync edit] 2026-07-19 (evaluator package IDENTITY CORRECTION; branch
+     `fix/evaluator-identity-correction`; docs + deploy-lane naming only — no
+     code/schema/route/auth-decision change lands with it).
+     WHAT THIS CORRECTS: the portable evaluator package has until now carried the
+     name "Common Sense (bootable) vertical slice". That name arrived with an
+     externally assembled distribution (the ad-hoc 0.0.2 packages) and belongs to
+     an unrelated project; it was never proposed, defined, or ratified anywhere in
+     this repository (repo-wide search: the only occurrences were the package
+     lane's own titles/stem, this file, and one incidental English use of the
+     phrase in a 2026-05-15 handoff doc). The 2026-07-17 lane work verified the
+     PAYLOAD provenance rigorously (manifest git_commit = real main commits;
+     0.0.3 runtime-witnessed on exact published bytes) but never audited the NAME
+     provenance — the foreign identity was carried through into the repo-owned
+     spec, the release titles, and this file.
+     WHAT CHANGES: `deploy/appliance/evaluator/` PKG_STEM is now
+     `icn-portable-evaluator` (next lane artifact = 0.0.4); template/package
+     titles renamed; a naming-and-provenance section added to the lane README.
+     WHAT DOES NOT CHANGE: published release tags and asset filenames for ≤0.0.3
+     are retained (checksum continuity — renaming assets would break published
+     `.sha256` verification); their release pages are retitled with a correction
+     note. The 0.0.3 KVM runtime witness remains valid — it witnessed ICN bytes;
+     only the display name was wrong. Older sync blocks below record the name as
+     it stood then and are historical record, not current naming.
+     NON-CLAIMS unchanged: unsigned, non-production; NOT a pilot, NOT organizer
+     acceptance, NOT accessibility completion, NOT federation. Human gates
+     unchanged: #2041, #1703/#1746, nycn#41/#52. Refs #2428. No close keywords. -->
 
 <!-- [sync edit] 2026-07-17 (repository-owned portable evaluator lane MERGED + canonical
      release; branch `docs/evaluator-lane-state-sync`; docs/ops-state-only — no
@@ -1445,7 +1472,7 @@ Last Reviewed: 2026-07-17
 
 **LAN workstation witness (2026-07-15, merged-main):** the appliance's LAN single-origin profile is **merged to main** (#2424, #2425) and deployed as a dedicated hypervisor VM on operator-controlled LAN infrastructure from the **merged-main image `icn-appliance-0.0.3-lan-e74a8915`** (git_commit `e74a8915`, non-production, unsigned; supersedes the earlier `916629d7` branch image). A review-caught authority-boundary defect was fixed before merge: the LAN profile's gateway/member-shell/session are now all loopback-bound so the in-VM nginx is the only LAN HTTP surface. The full organizer→member loop was driven from a real Windows workstation browser against the merged-main deployment — one-click role-scoped sessions (no terminal, no credential paste, no credential in any URL), digest-bound confirm with server-verified wrong-digest 409, exactly one action item per confirm, fresh member session, completion, idempotent retry, in-VM steward verify PASS (negative capability matrix + value-withheld evidence), unattended recovery across service restart and VM reboot (node identity + sled durable; the rehearsal workspace view is intentionally ephemeral). A LAN development rehearsal, not production and not any human gate — see the 2026-07-15 sync block above.
 
-**Portable evaluator release (2026-07-17, current-main):** distinct from the LAN Rehearsal Node, the **portable "Common Sense bootable vertical slice"** is now produced by a repository-owned, fail-closed generation lane (`deploy/appliance/evaluator/`, merged `f34f9f29`, PR #2428) rather than assembled ad hoc. The canonical release **`common-sense-vertical-slice-0.0.3-amd64`** was built from a current-main demo-profile image (git_commit `f34f9f29`, `non_production=true, signed=false, demo_profile=true`), generated through the merged lane, and **runtime-witnessed on a real KVM boot of the exact published bytes**: QEMU user-net with localhost-only host forwards (LAN address refused), disposable overlay (source image unchanged), one-command `setup-and-run.sh`, one-click role sessions with no credential in any URL, organizer review/assign/preview/digest-bound confirm (wrong digest → 409; correct → one action item + ADR-0026 ladder), member completion + idempotent retry, clean teardown, repeat run; the downloaded release bytes match the witnessed bytes. This is the reviewer-on-their-own-machine profile — a different threat model and audience from the operator-controlled LAN node, and the two profiles are deliberately not collapsed. The four ad-hoc 0.0.2 pre-releases were reconciled (two recipient-name-contaminated demo releases deleted; the two 0.0.2 vertical-slice releases marked superseded). Unsigned, non-production; not a pilot, not organizer acceptance, not accessibility completion, not federation.
+**Portable evaluator release (2026-07-17, current-main; identity corrected 2026-07-19):** distinct from the LAN Rehearsal Node, the **ICN portable evaluator** (bootable vertical slice) is produced by a repository-owned, fail-closed generation lane (`deploy/appliance/evaluator/`, merged `f34f9f29`, PR #2428) rather than assembled ad hoc. Package stem: `icn-portable-evaluator` (from 0.0.4). The canonical release (tag `common-sense-vertical-slice-0.0.3-amd64` — the tag retains a foreign, since-corrected name that was never an ICN identity; see the 2026-07-19 sync block) was built from a current-main demo-profile image (git_commit `f34f9f29`, `non_production=true, signed=false, demo_profile=true`), generated through the merged lane, and **runtime-witnessed on a real KVM boot of the exact published bytes**: QEMU user-net with localhost-only host forwards (LAN address refused), disposable overlay (source image unchanged), one-command `setup-and-run.sh`, one-click role sessions with no credential in any URL, organizer review/assign/preview/digest-bound confirm (wrong digest → 409; correct → one action item + ADR-0026 ladder), member completion + idempotent retry, clean teardown, repeat run; the downloaded release bytes match the witnessed bytes. This is the reviewer-on-their-own-machine profile — a different threat model and audience from the operator-controlled LAN node, and the two profiles are deliberately not collapsed. The four ad-hoc 0.0.2 pre-releases were reconciled (two recipient-name-contaminated demo releases deleted; the two 0.0.2 vertical-slice releases marked superseded). Unsigned, non-production; not a pilot, not organizer acceptance, not accessibility completion, not federation.
 
 **NYCN adoption state:** partner repo pinned to `8c0fe926`; facilitator gate package independently steward-operable (nycn#100/#101); `human_review: pending`. NYCN remains the intended first partner — an active track, not a committed pilot.
 

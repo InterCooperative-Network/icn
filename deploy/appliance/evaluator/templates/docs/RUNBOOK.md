@@ -1,9 +1,9 @@
-# ICN Common Sense Vertical Slice Runbook
+# ICN Portable Evaluator Runbook
 
 ## Purpose
 
 This runbook explains how to verify, boot, run, inspect, and stop the ICN
-Common Sense bootable vertical slice.
+portable evaluator (bootable vertical slice).
 
 The package is local after download. It does not require access to the sender's
 LAN or node.
