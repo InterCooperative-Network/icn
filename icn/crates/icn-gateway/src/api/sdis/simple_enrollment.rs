@@ -55,7 +55,6 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::api::sessions::get_gateway_url;
-use crate::auth::AuthManager;
 use crate::error::{GatewayError, Result};
 use crate::session_authority::SessionAuthority;
 use crate::steward_mgr::StewardManager;
@@ -506,7 +505,7 @@ pub async fn verify_level2(
 #[post("/enrollment/complete")]
 pub async fn complete_enrollment(
     store: web::Data<Arc<EnrollmentStore>>,
-    auth: web::Data<Arc<AuthManager>>,
+    authority: web::Data<Arc<SessionAuthority>>,
     trust_mgr: web::Data<Arc<TrustManager>>,
     commons_mgr: web::Data<Arc<crate::commons_mgr::CommonsManager>>,
     steward_mgr: web::Data<Option<Arc<StewardManager>>>,
@@ -734,7 +733,7 @@ pub async fn complete_enrollment(
     // This eliminates the race condition identified in Issue #397.
 
     // Issue auth token for the new identity
-    let auth_token = auth.issue_token(
+    let auth_token = authority.auth_manager().issue_token(
         &ephemeral_did,
         &coop_id,
         vec!["ledger:read".to_string(), "ledger:write".to_string()],

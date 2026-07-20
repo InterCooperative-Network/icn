@@ -1743,7 +1743,7 @@ mod tests {
         use actix_web_httpauth::middleware::HttpAuthentication;
         use icn_gateway::{
             api, auth::AuthManager, entity_audit::EntityAuditManager, entity_mgr::EntityManager,
-            middleware::jwt_auth, rate_limit::IpRateLimiter,
+            middleware::jwt_auth, rate_limit::IpRateLimiter, session_authority::SessionAuthority,
         };
         use icn_governance_actor::{
             events::NoopEventEmitter,
@@ -1759,6 +1759,7 @@ mod tests {
         {
             let jwt_secret = b"bootstrap-apply-integration-test!".to_vec();
             let auth_mgr = Arc::new(AuthManager::new(jwt_secret).with_self_asserted_coop(true));
+            let authority = Arc::new(SessionAuthority::evaluator(auth_mgr));
             let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
             let entity_mgr = Arc::new(EntityManager::new());
             let store = Arc::new(SledStore::temporary().expect("temp sled store"));
@@ -1780,7 +1781,7 @@ mod tests {
                 build_mode: icn_governance_actor::http::GovernanceContextBuildMode::Test,
             };
 
-            let auth_mgr2 = auth_mgr.clone();
+            let authority2 = authority.clone();
             let ip2 = ip_limiter.clone();
             let entity2 = entity_mgr.clone();
             let audit2 = audit_mgr.clone();
@@ -1792,7 +1793,7 @@ mod tests {
             let server = HttpServer::new(move || {
                 let auth_mw = HttpAuthentication::bearer(jwt_auth);
                 App::new()
-                    .app_data(web::Data::new(auth_mgr2.clone()))
+                    .app_data(web::Data::new(authority2.clone()))
                     .app_data(web::Data::new(ip2.clone()))
                     .app_data(web::Data::new(entity2.clone()))
                     .app_data(web::Data::new(audit2.clone()))

@@ -39,16 +39,17 @@ authority rather than a bearer secret.
 | Invariant | Statement | Where enforced |
 |---|---|---|
 | **Attenuation** | `issued ⊆ issuer ∩ flow_allowed ∩ requested` — every term a ceiling, never a grant | `session_authority::attenuate_scopes` |
-| **Expiration** | The *configured* lifetime bounds the credentials actually issued; misconfiguration is refused, not clamped | `TokenLifetimePolicy`, `AuthManager::with_token_ttl` |
-| **Revocation** | An issued credential can be individually withdrawn and is rejected thereafter on every surface that accepted it | `RevocationAuthority`, consulted in `jwt_auth` |
+| **Expiration** | The *configured* lifetime bounds the credentials actually issued and accepted; client responses report that same lifetime, without hidden verification leeway | `TokenLifetimePolicy`, `AuthManager::with_token_ttl`, auth/invite/session responses |
+| **Revocation** | An issued credential can be individually withdrawn and is revalidated before each protected operation on every surface that accepted it | `RevocationAuthority`, HTTP middleware, WebSocket operations, RPC verification |
 | **Truth** | The runtime reports which of the above it actually installed, and a profile that *requires* a guarantee refuses to **serve** without it | `AuthorityCapabilities`, `AuthorityProfile::validate` |
 
 Two design rules make these hold under failure:
 
-- **Fail closed at the boundary, not per-caller.** `jwt_auth` resolves the
-  authority from `app_data` and refuses to authenticate if it is absent. A route
-  cannot opt out by forgetting to check, and a misassembly cannot silently
-  restore signature-only verification.
+- **Fail closed at the boundary, not per-caller.** Issuance handlers and
+  `jwt_auth` resolve the same `SessionAuthority` from `app_data`; the runtime no
+  longer registers a separate bare issuer. A route cannot opt out by forgetting
+  to check, and a misassembly cannot silently restore signature-only
+  verification.
 - **Unreadable state is not authorization.** A revocation lookup that errors
   denies the request. "We could not determine whether this was revoked" must
   never resolve to "not revoked".
@@ -74,13 +75,36 @@ path that supplies no store, silently *downgrading* the authority guarantee.
 Making the profile an operator-declared configuration value is a follow-up.
 
 Precisely what "refuses" means today: the gateway does not come up, and the
-daemon logs the error and continues running without a gateway. It is fail-closed
-— no request is ever served under an unmet guarantee — but it is *not* a process
-abort, and an operator watching only for a crash would miss it. Making an unmet
-authority profile fail the whole daemon is a deliberate follow-up decision, not
-an oversight. An institution that cannot make a withdrawal survive a
-restart does not have revocation, and the software should not claim otherwise on
-its behalf.
+daemon logs the error and continues running without a gateway. The supervisor
+waits for the gateway's initialization-and-bind acknowledgement and marks the
+gateway actor active only after that acknowledgement; failed startup is reported
+inactive. This is fail-closed — no request is ever served under an unmet
+guarantee — but it is *not* a process abort. Making an unmet authority profile
+fail the whole daemon is a deliberate follow-up decision. An institution that
+cannot make a withdrawal survive a restart does not have revocation, and the
+software should not claim otherwise on its behalf.
+
+### Current lifetime and continuing-authorization semantics
+
+- The canonical unconfigured session lifetime is 24 hours across
+  `AuthManager`, `TokenLifetimePolicy`, embedded gateways, and daemon
+  `GatewayConfig`. Explicit configuration replaces that value; authority
+  assembly rejects a mismatch between the issuer and the reported policy.
+- `/auth/verify`, invite join, and QR-session responses derive their reported
+  lifetime from the installed authority. Verification uses the credential's
+  exact `exp` boundary; the JWT library's default expiry leeway is disabled.
+- HTTP bearer routes revalidate on every request. WebSockets retain the
+  credential, revalidate after asynchronous subscription setup, and revalidate
+  before every protected event and every backfill operation/event. A revoked or
+  expired socket is stopped before protected delivery. An idle socket may remain
+  connected until its next protected operation; it retains no protected access
+  during that idle period.
+- Gateway and RPC revocation caches are positive-only. A miss consults the
+  shared durable store, so a revocation written by either surface is visible to
+  the other without restart. Store and cache errors deny verification.
+- This means verification of a non-revoked credential performs one point read
+  from the revocation store. No negative cache is installed: no demonstrated
+  bottleneck currently justifies a stale-revocation window.
 
 ## 4. Extending the pattern (analysis — not implemented)
 

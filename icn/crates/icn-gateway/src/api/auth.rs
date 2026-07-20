@@ -4,10 +4,10 @@ use actix_web::{post, web, HttpRequest, HttpResponse};
 use std::sync::Arc;
 
 use crate::audit::AuditLogger;
-use crate::auth::AuthManager;
 use crate::error::Result;
 use crate::models::{ChallengeRequest, ChallengeResponse, TokenResponse, VerifyRequest};
 use crate::rate_limit::IpRateLimiter;
+use crate::session_authority::SessionAuthority;
 use crate::validation;
 use icn_obs::metrics::gateway;
 
@@ -38,7 +38,7 @@ fn get_client_ip(req: &HttpRequest) -> String {
 #[post("/auth/challenge")]
 pub async fn challenge(
     http_req: HttpRequest,
-    auth: web::Data<Arc<AuthManager>>,
+    authority: web::Data<Arc<SessionAuthority>>,
     ip_limiter: web::Data<Arc<IpRateLimiter>>,
     req: web::Json<ChallengeRequest>,
 ) -> Result<HttpResponse> {
@@ -51,7 +51,7 @@ pub async fn challenge(
         .parse()
         .map_err(|e| crate::error::GatewayError::BadRequest(format!("Invalid DID: {e}")))?;
 
-    let nonce = auth.create_challenge(&did)?;
+    let nonce = authority.auth_manager().create_challenge(&did)?;
 
     // Increment challenge metric
     gateway::auth_challenges_inc();
@@ -68,7 +68,7 @@ pub async fn challenge(
 #[post("/auth/verify")]
 pub async fn verify(
     http_req: HttpRequest,
-    auth: web::Data<Arc<AuthManager>>,
+    authority: web::Data<Arc<SessionAuthority>>,
     ip_limiter: web::Data<Arc<IpRateLimiter>>,
     req: web::Json<VerifyRequest>,
 ) -> Result<HttpResponse> {
@@ -113,7 +113,8 @@ pub async fn verify(
         )));
     }
 
-    let token = auth
+    let token = authority
+        .auth_manager()
         .verify_challenge(&did, &signature, &req.coop_id, req.scopes.clone())
         .inspect_err(|e| {
             gateway::auth_failures_inc("verification_failed");
@@ -129,7 +130,7 @@ pub async fn verify(
 
     let response = TokenResponse {
         token,
-        expires_in: 3600, // 1 hour
+        expires_in: authority.lifetime().ttl().as_secs(),
     };
 
     Ok(HttpResponse::Ok().json(response))
@@ -138,8 +139,13 @@ pub async fn verify(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::AuthManager;
     use actix_web::{test, App};
     use icn_identity::IdentityBundle;
+
+    fn evaluator(auth: Arc<AuthManager>) -> Arc<SessionAuthority> {
+        Arc::new(SessionAuthority::evaluator(auth))
+    }
 
     #[actix_web::test]
     async fn test_challenge_endpoint() {
@@ -147,7 +153,7 @@ mod tests {
         let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
         let app = test::init_service(
             App::new()
-                .app_data(web::Data::new(auth))
+                .app_data(web::Data::new(evaluator(auth)))
                 .app_data(web::Data::new(ip_limiter))
                 .service(challenge),
         )
@@ -169,10 +175,13 @@ mod tests {
     }
 
     #[actix_web::test]
-    async fn test_verify_endpoint_success() {
+    async fn test_verify_endpoint_reports_issued_non_default_lifetime() {
         // Dev/demo self-service issuance: caller supplies its own coop_id (#2075).
-        let auth =
-            Arc::new(AuthManager::new(b"test_secret".to_vec()).with_self_asserted_coop(true));
+        let auth = Arc::new(
+            AuthManager::new(b"test_secret".to_vec())
+                .with_self_asserted_coop(true)
+                .with_token_ttl(std::time::Duration::from_secs(2 * 3600)),
+        );
         let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
         let bundle = IdentityBundle::generate().unwrap();
 
@@ -188,7 +197,7 @@ mod tests {
 
         let app = test::init_service(
             App::new()
-                .app_data(web::Data::new(auth))
+                .app_data(web::Data::new(evaluator(auth.clone())))
                 .app_data(web::Data::new(ip_limiter))
                 .service(verify),
         )
@@ -208,7 +217,13 @@ mod tests {
 
         let resp: TokenResponse = test::call_and_read_body_json(&app, req).await;
         assert!(!resp.token.is_empty());
-        assert_eq!(resp.expires_in, 3600);
+        assert_eq!(resp.expires_in, 2 * 3600);
+        let claims = auth.verify_token(&resp.token).unwrap();
+        assert_eq!(
+            claims.exp - claims.iat,
+            resp.expires_in,
+            "client-visible lifetime must equal the issued credential claims"
+        );
     }
 
     #[actix_web::test]
@@ -222,7 +237,7 @@ mod tests {
 
         let app = test::init_service(
             App::new()
-                .app_data(web::Data::new(auth))
+                .app_data(web::Data::new(evaluator(auth)))
                 .app_data(web::Data::new(ip_limiter))
                 .service(verify),
         )
@@ -254,7 +269,7 @@ mod tests {
 
         let app = test::init_service(
             App::new()
-                .app_data(web::Data::new(auth))
+                .app_data(web::Data::new(evaluator(auth)))
                 .app_data(web::Data::new(ip_limiter))
                 .service(verify),
         )
@@ -287,7 +302,7 @@ mod tests {
 
         let app = test::init_service(
             App::new()
-                .app_data(web::Data::new(auth))
+                .app_data(web::Data::new(evaluator(auth)))
                 .app_data(web::Data::new(ip_limiter))
                 .service(verify),
         )
@@ -316,7 +331,7 @@ mod tests {
         let ip_limiter = Arc::new(IpRateLimiter::new_for_auth());
         let app = test::init_service(
             App::new()
-                .app_data(web::Data::new(auth))
+                .app_data(web::Data::new(evaluator(auth)))
                 .app_data(web::Data::new(ip_limiter))
                 .service(challenge),
         )
@@ -378,7 +393,7 @@ mod tests {
 
         let app = test::init_service(
             App::new()
-                .app_data(web::Data::new(auth.clone()))
+                .app_data(web::Data::new(evaluator(auth.clone())))
                 .app_data(web::Data::new(ip_limiter))
                 .service(verify),
         )

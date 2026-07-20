@@ -682,8 +682,31 @@ impl GatewayServer {
         self
     }
 
-    /// Run the gateway server
+    /// Run the gateway server.
     pub async fn run(self) -> Result<()> {
+        self.run_inner(None).await
+    }
+
+    /// Run the gateway and acknowledge only after initialization and socket bind.
+    ///
+    /// The supervisor uses this handshake so it cannot report the gateway actor
+    /// active while authority assembly, storage initialization, or binding has
+    /// already failed.
+    pub async fn run_with_startup_signal(
+        self,
+        startup: tokio::sync::oneshot::Sender<()>,
+        supervisor_ack: tokio::sync::oneshot::Receiver<()>,
+    ) -> Result<()> {
+        self.run_inner(Some((startup, supervisor_ack))).await
+    }
+
+    async fn run_inner(
+        self,
+        startup: Option<(
+            tokio::sync::oneshot::Sender<()>,
+            tokio::sync::oneshot::Receiver<()>,
+        )>,
+    ) -> Result<()> {
         info!("Starting ICN Gateway on {}", self.bind_addr);
 
         // Initialize server start time for health check uptime reporting
@@ -2019,10 +2042,9 @@ impl GatewayServer {
                         .url("/api-docs/openapi.json", openapi.clone()),
                 )
                 // Shared state
-                .app_data(web::Data::new(auth_manager.clone()))
-                // Authority composition boundary: every authenticated request
-                // verifies through this (see `middleware::jwt_auth`), so
-                // revocation cannot be bypassed by a route that forgets it.
+                // Authority composition boundary: issuance handlers and every
+                // authenticated request resolve this one object, so a router
+                // cannot install a bare issuer without revocation enforcement.
                 .app_data(web::Data::new(session_authority.clone()))
                 .app_data(web::Data::new(coop_manager.clone()))
                 .app_data(web::Data::new(community_manager.clone()))
@@ -2513,6 +2535,19 @@ impl GatewayServer {
         .bind(self.bind_addr)?
         .run();
 
+        if let Some((startup, supervisor_ack)) = startup {
+            startup.send(()).map_err(|_| {
+                GatewayError::InternalError(
+                    "gateway supervisor dropped startup acknowledgement channel".to_string(),
+                )
+            })?;
+            supervisor_ack.await.map_err(|_| {
+                GatewayError::InternalError(
+                    "gateway supervisor did not acknowledge actor activation".to_string(),
+                )
+            })?;
+        }
+
         // Wait for server to complete and then signal cleanup task to shutdown
         let result = server.await;
 
@@ -2597,6 +2632,24 @@ mod tests {
         assert!(
             err_msg.contains("empty JWT secret"),
             "Expected empty JWT secret error, got: {err_msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn startup_signal_reports_failure_before_readiness() {
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let server = GatewayServer::new(addr, vec![]);
+        let (startup_tx, startup_rx) = tokio::sync::oneshot::channel();
+        let (_supervisor_ack_tx, supervisor_ack_rx) = tokio::sync::oneshot::channel();
+
+        let result = server
+            .run_with_startup_signal(startup_tx, supervisor_ack_rx)
+            .await;
+
+        assert!(result.is_err());
+        assert!(
+            startup_rx.await.is_err(),
+            "a failed server must never acknowledge readiness"
         );
     }
 

@@ -196,30 +196,44 @@ impl<S: Store> TokenRevocationList<S> {
         Ok(())
     }
 
-    /// Check if a token ID has been revoked
+    /// Check if a token ID has been revoked.
     ///
-    /// Returns `false` on cache lock errors (fail-open). This is intentional:
-    /// - Lock poisoning is extremely rare (requires a panic while holding the lock)
-    /// - Failing closed (rejecting all tokens) creates a DoS vector
-    /// - The persistent storage is the source of truth; cache is only a performance optimization
-    /// - Better to allow one potentially-revoked token through than reject all valid tokens
-    pub fn is_revoked(&self, jti: &str) -> bool {
+    /// A cache hit is sufficient, but a miss is not proof of validity: the
+    /// gateway shares this store and may have written the revocation after this
+    /// RPC process loaded its cache. Store and lock errors are returned so token
+    /// verification fails closed.
+    pub fn is_revoked(&self, jti: &str) -> Result<bool, AuthError> {
         counter!("icn_rpc_revocation_checks_total").increment(1);
 
-        let is_revoked = self
+        let cached = self
             .cache
             .read()
             .map(|cache| cache.contains(jti))
-            .unwrap_or_else(|e| {
-                tracing::warn!(error = %e, jti = %jti, "Cache lock poisoned in is_revoked, failing open");
-                false
-            });
+            .map_err(|e| {
+                AuthError::InternalError(format!("Revocation cache lock poisoned: {e}"))
+            })?;
 
-        if is_revoked {
+        if cached {
             counter!("icn_rpc_revocation_hits_total").increment(1);
+            return Ok(true);
         }
 
-        is_revoked
+        let present = self.store.get(&Self::make_key(jti)).map_err(|e| {
+            counter!("icn_rpc_revocation_errors_total").increment(1);
+            AuthError::InternalError(format!("Failed to read token revocation state: {e}"))
+        })?;
+
+        if present.is_some() {
+            let mut cache = self.cache.write().map_err(|e| {
+                AuthError::InternalError(format!("Revocation cache lock poisoned: {e}"))
+            })?;
+            cache.insert(jti.to_string());
+            counter!("icn_rpc_revocation_hits_total").increment(1);
+            gauge!("icn_rpc_revoked_tokens_total").set(cache.len() as f64);
+            return Ok(true);
+        }
+
+        Ok(false)
     }
 
     /// Revoke a token
@@ -704,7 +718,11 @@ impl<S: Store + 'static> RpcAuthManager<S> {
     /// 2. Token has not expired
     /// 3. Token has not been revoked (if revocation list is enabled)
     pub fn verify_token(&self, token: &str) -> Result<RpcTokenClaims, AuthError> {
-        let validation = Validation::default();
+        let mut validation = Validation::default();
+        // Credential expiry is an authority bound. Do not inherit
+        // jsonwebtoken's default 60-second leeway and silently extend access
+        // beyond the token's reported `exp`.
+        validation.leeway = 0;
 
         let token_data = decode::<RpcTokenClaims>(
             token,
@@ -715,7 +733,7 @@ impl<S: Store + 'static> RpcAuthManager<S> {
 
         // Check if token has been revoked
         if let Some(ref trl) = self.revocation_list {
-            if trl.is_revoked(&token_data.claims.jti) {
+            if trl.is_revoked(&token_data.claims.jti)? {
                 return Err(AuthError::TokenRevoked);
             }
         }
@@ -797,11 +815,12 @@ impl<S: Store + 'static> RpcAuthManager<S> {
 
     /// Check if a specific token (by JTI) has been revoked
     ///
-    /// Returns `false` if revocation is not enabled or on cache errors (fail-open).
-    pub fn is_token_revoked(&self, jti: &str) -> bool {
+    /// Returns `Ok(false)` if revocation is not enabled. Store and cache errors
+    /// are surfaced so callers can fail closed.
+    pub fn is_token_revoked(&self, jti: &str) -> Result<bool, AuthError> {
         match &self.revocation_list {
             Some(trl) => trl.is_revoked(jti),
-            None => false,
+            None => Ok(false),
         }
     }
 
@@ -1626,7 +1645,7 @@ mod tests {
             ));
 
             // Check by JTI directly
-            assert!(auth2.is_token_revoked(&jti));
+            assert!(auth2.is_token_revoked(&jti).unwrap());
         }
     }
 
@@ -1682,8 +1701,27 @@ mod tests {
         trl.revoke("new-jti", "did:icn:test", future_expiry, None)
             .unwrap();
         assert_eq!(trl.count(), 1);
-        assert!(trl.is_revoked("new-jti"));
-        assert!(!trl.is_revoked("old-jti"));
+        assert!(trl.is_revoked("new-jti").unwrap());
+        assert!(!trl.is_revoked("old-jti").unwrap());
+    }
+
+    #[test]
+    fn cache_miss_observes_revocation_written_by_another_surface() {
+        let store = Arc::new(icn_store::SledStore::temporary().unwrap());
+        let trl = TokenRevocationList::new(Arc::clone(&store)).unwrap();
+        let jti = "gateway-written-jti";
+
+        store
+            .put(
+                &TokenRevocationList::<icn_store::SledStore>::make_key(jti),
+                b"{}",
+            )
+            .unwrap();
+
+        assert!(
+            trl.is_revoked(jti).unwrap(),
+            "a live RPC verifier must consult shared storage after a cache miss"
+        );
     }
 
     /// Test concurrent token revocation from multiple threads.
@@ -1741,14 +1779,17 @@ mod tests {
 
         // Token should be revoked exactly once in the cache
         assert_eq!(trl.count(), 1, "Token should be in cache exactly once");
-        assert!(trl.is_revoked(jti), "Token should be marked as revoked");
+        assert!(
+            trl.is_revoked(jti).unwrap(),
+            "Token should be marked as revoked"
+        );
 
         // Verify concurrent reads don't cause issues
         let read_handles: Vec<_> = (0..num_threads)
             .map(|_| {
                 let trl = Arc::clone(&trl);
                 let jti = jti.to_string();
-                thread::spawn(move || trl.is_revoked(&jti))
+                thread::spawn(move || trl.is_revoked(&jti).unwrap())
             })
             .collect();
 

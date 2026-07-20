@@ -202,7 +202,7 @@ impl AuthManager {
             challenges: Arc::new(RwLock::new(HashMap::new())),
             jwt_secret,
             challenge_ttl: Duration::from_secs(300), // 5 minutes
-            token_ttl: Duration::from_secs(3600),    // 1 hour
+            token_ttl: crate::session_authority::DEFAULT_TOKEN_TTL,
             allow_self_asserted_coop: false,
         }
     }
@@ -424,7 +424,11 @@ impl AuthManager {
 
     /// Verify a JWT token and extract claims
     pub fn verify_token(&self, token: &str) -> Result<TokenClaims> {
-        let validation = Validation::default();
+        let mut validation = Validation::default();
+        // The configured lifetime is an authorization bound, not a hint. The
+        // jsonwebtoken default permits a 60-second expiry leeway, which would
+        // silently extend every issued credential beyond its reported `exp`.
+        validation.leeway = 0;
 
         let token_data = decode::<TokenClaims>(
             token,
@@ -442,18 +446,29 @@ impl AuthManager {
     /// minted for the same subject in the same second are still independently
     /// revocable, and so an id reveals nothing about issuance order or volume.
     fn generate_jti() -> String {
-        use rand::Rng;
-        let mut rng = rand::rng();
-        let bytes: [u8; 16] = rng.random();
-        hex::encode(bytes)
+        hex::encode(Self::cryptographic_random_bytes::<16>())
     }
 
     /// Generate cryptographically random nonce (32 bytes, hex-encoded)
     fn generate_nonce(&self) -> ChallengeNonce {
-        use rand::Rng;
+        hex::encode(Self::cryptographic_random_bytes::<32>())
+    }
+
+    /// Generate bytes from rand's cryptographic thread-local generator.
+    ///
+    /// Under the pinned rand 0.9 contract, `rand::rng()` is ChaCha12,
+    /// automatically seeded and periodically reseeded from `OsRng`. The
+    /// compile-time `CryptoRng` bound prevents a future API substitution with a
+    /// non-cryptographic generator from silently weakening credential IDs or
+    /// challenge nonces.
+    fn cryptographic_random_bytes<const N: usize>() -> [u8; N] {
+        use rand::{CryptoRng, Rng};
+
+        fn require_crypto_rng<R: CryptoRng + ?Sized>(_rng: &R) {}
+
         let mut rng = rand::rng();
-        let nonce_bytes: [u8; 32] = rng.random();
-        hex::encode(nonce_bytes)
+        require_crypto_rng(&rng);
+        rng.random()
     }
 
     /// Get current Unix timestamp

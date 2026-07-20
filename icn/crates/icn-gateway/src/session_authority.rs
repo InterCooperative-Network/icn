@@ -59,8 +59,12 @@ const REVOKED_JTI_PREFIX: &[u8] = b"auth:revoked:";
 /// a new credential rather than extending an old one.
 pub const MAX_TOKEN_TTL: Duration = Duration::from_secs(30 * 24 * 3600);
 
-/// Fallback lifetime when a deployment supplies no configuration.
-pub const DEFAULT_TOKEN_TTL: Duration = Duration::from_secs(3600);
+/// Canonical session-credential lifetime when no explicit configuration is supplied.
+///
+/// The daemon's `GatewayConfig`, embedded gateways, and direct [`AuthManager`]
+/// construction all use this value. Keeping one default prevents an embedded
+/// router from silently issuing shorter-lived credentials than the daemon.
+pub const DEFAULT_TOKEN_TTL: Duration = Duration::from_secs(24 * 3600);
 
 // ---------------------------------------------------------------------------
 // Scope attenuation
@@ -508,6 +512,13 @@ impl SessionAuthority {
         profile: AuthorityProfile,
     ) -> Result<Self> {
         profile.validate(revocation.durability())?;
+        if auth.token_ttl() != lifetime.ttl() {
+            return Err(GatewayError::InternalError(format!(
+                "session authority lifetime mismatch: issuer uses {} seconds but policy reports {} seconds",
+                auth.token_ttl().as_secs(),
+                lifetime.ttl().as_secs()
+            )));
+        }
         Ok(Self {
             auth,
             revocation,
@@ -812,6 +823,13 @@ mod tests {
     }
 
     #[test]
+    fn unconfigured_issuer_and_policy_share_the_canonical_default() {
+        let auth = AuthManager::new(vec![7u8; 32]);
+        assert_eq!(auth.token_ttl(), DEFAULT_TOKEN_TTL);
+        assert_eq!(TokenLifetimePolicy::default().ttl(), DEFAULT_TOKEN_TTL);
+    }
+
+    #[test]
     fn zero_and_excessive_lifetimes_are_rejected() {
         assert!(TokenLifetimePolicy::from_hours(0).is_err());
         assert!(TokenLifetimePolicy::from_hours(24 * 31).is_err());
@@ -855,6 +873,22 @@ mod tests {
         );
     }
 
+    #[test]
+    fn assembly_rejects_an_issuer_policy_lifetime_mismatch() {
+        let auth = Arc::new(AuthManager::new(vec![7u8; 32]));
+        let result = SessionAuthority::new(
+            auth,
+            Arc::new(InMemoryRevocationAuthority::new()),
+            TokenLifetimePolicy::from_hours(2).unwrap(),
+            AuthorityProfile::PortableEvaluator,
+        );
+        let error = match result {
+            Ok(_) => panic!("mismatched lifetime truth must fail assembly"),
+            Err(error) => error,
+        };
+        assert!(error.to_string().contains("lifetime mismatch"));
+    }
+
     // -- revocation --------------------------------------------------------
 
     #[test]
@@ -869,11 +903,12 @@ mod tests {
 
     #[test]
     fn capability_report_reflects_actual_assembly() {
-        let auth = Arc::new(AuthManager::new(vec![7u8; 32]));
+        let lifetime = TokenLifetimePolicy::from_hours(2).unwrap();
+        let auth = Arc::new(AuthManager::new(vec![7u8; 32]).with_token_ttl(lifetime.ttl()));
         let authority = SessionAuthority::new(
             auth,
             Arc::new(InMemoryRevocationAuthority::new()),
-            TokenLifetimePolicy::from_hours(2).unwrap(),
+            lifetime,
             AuthorityProfile::PortableEvaluator,
         )
         .unwrap();

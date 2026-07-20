@@ -181,7 +181,8 @@ pub async fn run_supervisor(
             revocation_store: gateway_handles.revocation_store,
             post_backfill_cleanup: gateway_handles.post_backfill_cleanup,
         },
-    );
+    )
+    .await;
 
     // Set supervisor state to running
     icn_obs::metrics::supervisor::state_set(2);

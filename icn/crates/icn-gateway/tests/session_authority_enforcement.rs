@@ -31,6 +31,7 @@ use icn_gateway::session_authority::{
     SessionAuthority, StoreRevocationAuthority, TokenLifetimePolicy,
 };
 use icn_identity::Did;
+use icn_store::Store;
 
 const SECRET: &[u8] = b"session-authority-enforcement-test-secret-32b";
 
@@ -273,10 +274,8 @@ async fn expired_credentials_are_rejected_at_the_boundary() {
 
     // Comfortably in the future: accepted.
     assert_eq!(get_protected(&app, &mint(now + 3600)).await, 200);
-    // Already past: rejected. (jsonwebtoken applies a small default leeway, so
-    // the "expired" case is placed clearly outside it rather than at exp-1,
-    // which would assert against library leeway rather than our behavior.)
-    assert_eq!(get_protected(&app, &mint(now - 3600)).await, 401);
+    // One second past the claim boundary: rejected without hidden leeway.
+    assert_eq!(get_protected(&app, &mint(now - 1)).await, 401);
 }
 
 // ---------------------------------------------------------------------------
@@ -482,14 +481,20 @@ async fn capability_report_matches_the_assembled_dependencies() {
 #[actix_web::test]
 async fn revocation_is_visible_across_both_authenticated_surfaces() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let store: Arc<dyn icn_store::Store> =
-        Arc::new(icn_store::SledStore::open(dir.path()).expect("open store"));
+    let store = Arc::new(icn_store::SledStore::open(dir.path()).expect("open store"));
+    let gateway_store: Arc<dyn icn_store::Store> = store.clone();
 
     let authority = authority(
-        Arc::new(StoreRevocationAuthority::new(store.clone()).unwrap()),
+        Arc::new(StoreRevocationAuthority::new(gateway_store).unwrap()),
         AuthorityProfile::Institutional,
         1,
     );
+    // Construct RPC before either revocation so its startup cache is empty. The
+    // assertions below therefore require live cache-miss store reads, not a
+    // reconstruction that happens to reload the persisted entry.
+    let rpc_auth =
+        icn_rpc::auth::RpcAuthManager::new_with_store(SECRET.to_vec(), true, store.clone())
+            .expect("RPC auth manager");
     let app = protected_app!(authority.clone());
 
     // -- direction 1: gateway revoke must be written where RPC looks for it --
@@ -513,18 +518,19 @@ async fn revocation_is_visible_across_both_authenticated_surfaces() {
         decoded["original_expiry"].as_u64().is_some(),
         "RPC's loader drops entries without a usable original_expiry"
     );
+    assert!(
+        matches!(
+            rpc_auth.verify_token(&token),
+            Err(icn_rpc::auth::AuthError::TokenRevoked)
+        ),
+        "a live RPC verifier must reject a gateway-revoked credential without restart"
+    );
 
-    // -- direction 2: an RPC-style revoke must be honored by the gateway ------
+    // -- direction 2: an RPC revoke must be honored by the gateway ------------
     let other = authority
         .auth_manager()
         .issue_token(&did(), "test-coop", scopes(&["coop:read"]))
         .expect("mint");
-    let other_jti = authority
-        .auth_manager()
-        .verify_token(&other)
-        .unwrap()
-        .jti
-        .expect("jti");
 
     assert_eq!(
         get_protected(&app, &other).await,
@@ -532,22 +538,9 @@ async fn revocation_is_visible_across_both_authenticated_surfaces() {
         "precondition: valid before the out-of-process revoke"
     );
 
-    // Written directly to the store, as the RPC surface would — this process's
-    // cache knows nothing about it.
-    store
-        .put(
-            format!("auth:revoked:{other_jti}").as_bytes(),
-            serde_json::to_vec(&serde_json::json!({
-                "jti": other_jti,
-                "subject": "",
-                "revoked_at": 1,
-                "original_expiry": u64::MAX,
-                "reason": "revoked via RPC",
-            }))
-            .unwrap()
-            .as_slice(),
-        )
-        .expect("store write");
+    rpc_auth
+        .revoke_token_string(&other, Some("revoked via RPC".to_string()))
+        .expect("RPC revoke");
 
     assert_eq!(
         get_protected(&app, &other).await,
