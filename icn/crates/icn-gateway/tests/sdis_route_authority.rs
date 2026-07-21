@@ -563,13 +563,15 @@ async fn public_enrollment_initiation_remains_anonymous() {
         .to_request();
     let status = test::call_service(&app, req).await.status().as_u16();
 
-    assert_ne!(
-        status, 401,
-        "enrollment initiation must not require a credential the applicant cannot have"
-    );
-    assert_ne!(
-        status, 403,
-        "enrollment initiation must not require authority"
+    // Pinned to 200, not merely "not 401/403". This test exists to prove the
+    // scope split did not break enrollment for people who have no credential
+    // yet — if it accepted any non-auth status, initiation could be failing
+    // outright and this case would still pass, proving nothing about the one
+    // thing it guards.
+    assert_eq!(
+        status, 200,
+        "enrollment initiation must remain anonymous AND working: an applicant \
+         has no credential to present"
     );
 }
 
