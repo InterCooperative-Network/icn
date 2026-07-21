@@ -39,7 +39,7 @@ authority rather than a bearer secret.
 | Invariant | Statement | Where enforced |
 |---|---|---|
 | **Attenuation** | `issued ⊆ issuer ∩ flow_allowed ∩ requested` — every term a ceiling, never a grant | `session_authority::attenuate_scopes` |
-| **Expiration** | The *configured* lifetime bounds the credentials actually issued and accepted; client responses report that same lifetime, without hidden verification leeway | `TokenLifetimePolicy`, `AuthManager::with_token_ttl`, `SessionAuthority::verify` (acceptance bound), auth/invite/session responses |
+| **Expiration** | The *configured* lifetime bounds the **gateway session** credentials actually issued and accepted; client responses report that same lifetime, without hidden verification leeway. The RPC surface is **not** bounded — see below | `TokenLifetimePolicy`, `AuthManager::with_token_ttl`, `SessionAuthority::verify` (acceptance bound), auth/invite/session responses |
 | **Revocation** | An issued credential can be individually withdrawn and is revalidated before each protected operation on every surface that accepted it | `RevocationAuthority`, HTTP middleware, WebSocket operations, RPC verification |
 | **Truth** | The runtime reports which of the above it actually installed, and a profile that *requires* a guarantee refuses to **serve** without it | `AuthorityCapabilities`, `AuthorityProfile::validate` |
 
@@ -105,6 +105,23 @@ software should not claim otherwise on its behalf.
   mint takes `--expiry-hours`, validated through the same
   `TokenLifetimePolicy` the gateway applies to its own configuration, for
   deployments configured shorter than the canonical default.
+- **The acceptance bound covers the gateway surface only.** The daemon derives
+  the RPC signing key from the same `gateway.jwt_secret`
+  (`supervisor/init_rpc.rs`), and `RpcTokenClaims` does not reject unknown
+  fields, so a gateway-issued credential is structurally verifiable on the RPC
+  surface. `icn-rpc`'s `verify_token` checks signature, `exp`, and revocation —
+  it applies no configured-lifetime bound, and its own issuance lifetime is a
+  hardcoded 24 hours that never reads `token_expiry_hours`. Verified by direct
+  test on this branch: on a deployment configured for one-hour sessions, a
+  24-hour co-issued credential is refused by `SessionAuthority::verify` and
+  **accepted** by `RpcAuthManager::verify_token`. Consequence an operator must
+  know: lowering `token_expiry_hours` shortens gateway sessions immediately but
+  does not shorten already-issued credentials on the RPC surface; revocation,
+  which *is* shared, remains the instrument that reaches both. Closing this
+  requires bounding RPC acceptance **and** issuance together — bounding
+  acceptance alone would refuse the RPC manager's own freshly-minted tokens —
+  which is a separate change with its own credential-invalidation migration,
+  tracked in #2445.
 - HTTP bearer routes revalidate on every request. WebSockets retain the
   credential, revalidate after asynchronous subscription setup, and revalidate
   before every protected event and every backfill operation/event. A revoked or
