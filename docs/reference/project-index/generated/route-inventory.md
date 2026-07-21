@@ -1,7 +1,7 @@
 ---
 Status: generated
 Canonical: no
-Generated: 2026-07-20T01:33:38+00:00
+Generated: 2026-07-21T13:04:39+00:00
 ---
 
 # Gateway Route Inventory (generated)
@@ -18,7 +18,7 @@ Generated: 2026-07-20T01:33:38+00:00
 
 ## Snapshot
 
-- Source commit: `708cb0004402dc298abd448ab84604d4d2f9933d`
+- Source commit: `b34cd3f670334a2313dc65363fa22e97c6297bc1`
 - Gateway source scanned: `icn/crates/icn-gateway/src/**`
 - OpenAPI spec: `docs/api/openapi.generated.yaml`
 
@@ -386,13 +386,13 @@ Status vocabulary is the existing set from `source-of-truth-map.md`; no new labe
 | POST | `/enrollment/verify/level2` | `/v1/sdis/enrollment/verify/level2` | `icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs`:406 | `verify_level2` | no | L1 | unknown / needs local verification | needs review |
 | POST | `/ephemeral/generate` | `/v1/sdis/ephemeral/generate` | `icn/crates/icn-gateway/src/api/sdis/mod.rs`:301 | `generate_ephemeral` | no | L1 | unknown / needs local verification | needs review |
 | GET | `/health` | `/v1/sdis/health` | `icn/crates/icn-gateway/src/api/sdis/mod.rs`:175 | `sdis_health` | no | L1 | unknown / needs local verification | needs review |
-| POST | `/reject/{enrollment_id}` | `/v1/sdis/reject/{enrollment_id}` | `icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs`:917 | `reject_enrollment` | no | L1 | unknown / needs local verification | needs review |
+| POST | `/reject/{enrollment_id}` | `/v1/sdis/reject/{enrollment_id}` | `icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs`:949 | `reject_enrollment` | no | L1 | unknown / needs local verification | needs review |
 | POST | `/rotate-keys` | `/v1/sdis/rotate-keys` | `icn/crates/icn-gateway/src/api/sdis/anchor.rs`:271 | `rotate_keys` | no | L1 | unknown / needs local verification | needs review |
 | POST | `/start` | `/v1/sdis/start` | `icn/crates/icn-gateway/src/api/sdis/enrollment.rs`:258 | `start_enrollment` | no | L1 | unknown / needs local verification | needs review |
 | POST | `/start` | `/v1/sdis/start` | `icn/crates/icn-gateway/src/api/sdis/recovery.rs`:216 | `start_recovery` | no | L1 | unknown / needs local verification | needs review |
 | POST | `/verify/level1` | `/v1/sdis/verify/level1` | `icn/crates/icn-gateway/src/api/sdis/mod.rs`:189 | `verify_level1` | no | L1 | unknown / needs local verification | needs review |
 | POST | `/verify/level2` | `/v1/sdis/verify/level2` | `icn/crates/icn-gateway/src/api/sdis/mod.rs`:209 | `verify_level2` | no | L1 | unknown / needs local verification | needs review |
-| POST | `/vouch/{enrollment_id}` | `/v1/sdis/vouch/{enrollment_id}` | `icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs`:828 | `steward_vouch` | no | L1 | unknown / needs local verification | needs review |
+| POST | `/vouch/{enrollment_id}` | `/v1/sdis/vouch/{enrollment_id}` | `icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs`:834 | `steward_vouch` | no | L1 | unknown / needs local verification | needs review |
 | GET | `/{anchor_id}` | `/v1/sdis/{anchor_id}` | `icn/crates/icn-gateway/src/api/sdis/anchor.rs`:246 | `get_anchor` | no | L1 | unknown / needs local verification | needs review |
 | GET | `/{anchor_id}/devices` | `/v1/sdis/{anchor_id}/devices` | `icn/crates/icn-gateway/src/api/sdis/anchor.rs`:368 | `list_devices` | no | L1 | unknown / needs local verification | needs review |
 | GET | `/{anchor_id}/history` | `/v1/sdis/{anchor_id}/history` | `icn/crates/icn-gateway/src/api/sdis/anchor.rs`:311 | `get_rotation_history` | no | L1 | unknown / needs local verification | needs review |

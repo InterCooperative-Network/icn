@@ -2152,7 +2152,13 @@ impl GatewayServer {
                         )
                         // Public cooperative statistics (no auth required)
                         .service(api::coops::get_coop_stats)
-                        // Public SDIS endpoints (verification + enrollment)
+                        // SDIS endpoints. The scope is deliberately split by
+                        // authority (issue #2443): public verification and
+                        // enrollment initiation stay reachable without a
+                        // credential, while steward and moderation routes are
+                        // mounted behind `jwt_auth` so they inherit signature
+                        // validation, the configured lifetime ceiling, durable
+                        // revocation, and fail-closed authority construction.
                         .service(
                             web::scope("/sdis")
                                 .service(api::sdis::sdis_health)
@@ -2163,7 +2169,16 @@ impl GatewayServer {
                                 // Note: enrollment::configure disabled - using simple_enrollment as primary API
                                 // .configure(api::sdis::enrollment::configure)
                                 .configure(api::sdis::recovery::configure)
-                                .configure(api::sdis::anchor::configure),
+                                .configure(api::sdis::anchor::configure)
+                                // Steward/moderation surface: same `/sdis`
+                                // prefix, authenticated. Nested last so the
+                                // public routes above keep their unwrapped
+                                // behavior.
+                                .service(
+                                    web::scope("").wrap(auth.clone()).configure(
+                                        api::sdis::simple_enrollment::configure_protected,
+                                    ),
+                                ),
                         )
                         // Protected coop endpoints (auth + rate limiting)
                         .service(
