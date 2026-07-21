@@ -153,6 +153,27 @@ surface, however, is explicitly `coop_id`-shaped and creates
 `coop:{session.coop_id}` jurisdiction standing. Generalizing the flow must not
 universalize today's cooperative-specific shortcut.
 
+## Dependency posture
+
+ADR-0085 uses the existing architecture as vocabulary and boundary evidence. It
+does not promote proposed or partial machinery to implemented status.
+
+| Dependency | Current status | How ADR-0085 uses it | Acceptance prerequisite? |
+|---|---|---|---|
+| ADR-0014 constitutional object model | `accepted`; `implementation_status` partially implemented; kernel dispatch is not gated by mandates or authority grants | Normative vocabulary for `AuthorityGrant`, `TypedScope`, `Mandate`, and separation of authority classes | No new prerequisite; ADR-0085 relies only on the accepted vocabulary and must not imply kernel enforcement exists |
+| ADR-0020 bootstrap activation and standing | `accepted`; partially implemented activation / standing / action-card slice | Boundary pattern for package activation, standing, private overlays, and explicit bootstrap | No; ADR-0085 does not claim SDIS enrollment bootstrap is implemented |
+| ADR-0025 effect-record schema | `proposed`; `implementation_status` proposed | Forward direction for a future institutional outcome record such as admission, denial, reversal, or revocation | No; accepting ADR-0085 does not accept or implement ADR-0025 |
+| ADR-0026 receipt and provenance envelope | `accepted`; partial implementation; generic provenance query remains future work | Normative envelope and immutability / counter-record pattern for enrollment decision receipts | No additional prerequisite; ADR-0085 must not claim SDIS enrollment receipts or holder-wide receipt indexes exist today |
+| ADR-0035 entity-aware request authorization | `accepted`; partial implementation and observe-mode migration | Target-entity authorization posture and the warning that a token or broad capability is not a mandate | No; ADR-0085 does not require the full entity-aware enforcement cutover to have landed |
+| ADR-0083 institutional domain and policy root | `proposed`; frontmatter says not-started, while the institutional-domain spec records later #2142 runtime work | Compatible direction for adopted policy references and domain-held authority | No; ADR-0085 may align with the direction without accepting ADR-0083 or asserting every runtime piece is complete |
+| `docs/spec/institutional-domain.md` | normative spec; canonical no; work-in-progress with forward-direction clauses | Domain/policy concepts: domains hold authority; unadopted policies are inert; policy adoption is an authority-bearing act | No; ADR-0085 does not introduce the spec's full schema, lifecycle, or CCL evaluator |
+| `docs/spec/effect-dispatch-contract.md` | normative spec; canonical no; work-in-progress with current and forward-direction clauses | Decision to mandate to effect to receipt chain, plus challenge, reversal, and counter-receipt language | No; ADR-0085 does not authorize new effect dispatch behavior or kernel mandate gating |
+
+Therefore, accepting ADR-0085 would accept only the SDIS enrollment-authority
+invariant recorded here. It would not accept ADR-0025 or ADR-0083, complete
+ADR-0026, ratify any institution's enrollment policy, or assert that the current
+SDIS routes already emit the required records.
+
 ## Decision
 
 Propose the following generic ICN architecture:
@@ -196,6 +217,44 @@ The same effect must not have two authority models. All paths that produce the
 same standing transition must pass through the same authority decision and
 receipt contract.
 
+## Authority separation
+
+Policy adoption and policy execution are distinct authority-bearing acts. A
+steward role, broad governance capability, institution-package role,
+administrator credential, or trusted operator identity must never silently imply
+all enrollment powers at once.
+
+An enrollment architecture must be able to distinguish at least these powers:
+
+1. authority to adopt, amend, suspend, or retire an enrollment policy;
+2. authority to evaluate evidence under the adopted policy;
+3. authority to decide an individual enrollment case;
+4. authority to apply the resulting standing effect;
+5. authority to revoke, reverse, reconsider, or correct the effect.
+
+One actor or ceremony may validly hold more than one of these powers, but only
+when the target institution's adopted policy and the actor's grant say so. The
+receipt for a standing-affecting transition must identify which power was
+exercised, not merely that the caller had a generic governance credential.
+
+### Authority scope requirements
+
+A capability, mandate, authority grant, federation delegation, or equivalent
+institutional grant used for enrollment must be bounded by:
+
+- target `EntityId` or jurisdiction;
+- effect type, such as provisional standing, admission, denial, reversal, or
+  revocation;
+- policy, ceremony, or package rule being exercised;
+- permitted action;
+- time, expiry, or validity window;
+- delegation chain or treaty reference, if authority is delegated;
+- current revocation status.
+
+A generic `governance:*` capability is not universal admission power. It may
+authorize an enrollment act only when a target-scoped policy or mandate maps that
+credential to the specific enrollment power being exercised.
+
 ## Allowed policy shapes
 
 This decision does not require every institution to use the same admissions
@@ -211,6 +270,18 @@ model. A target institution may adopt:
 The constraint is that the institution adopts the rule. A generic trust score
 must not grant authority by itself. Capability plus trust is valid only when the
 target institution's policy says both are required.
+
+Automatic admission is valid only as policy-authorized automation. An
+institution may adopt a rule that says "grant provisional standing when these
+verifiable conditions and this trust threshold are satisfied." In that case, the
+trust threshold remains evidence or a policy condition. The institution's
+adopted policy authorizes the transition; trust itself does not become the
+authority.
+
+The automated receipt must not pretend that a human steward personally made the
+decision. It should identify the target institution, policy and version, policy
+engine or executor, evidence evaluated, result, resulting standing effect,
+causal correlation, and appeal or correction route.
 
 ## Bootstrap
 
@@ -234,6 +305,12 @@ distinguishable from normal operation. ADR-0020 already distinguishes
 institution-package activation from package-local meaning, and ADR-0083 treats
 domain-policy adoption as an authority-bearing act rather than an inert config
 write. Enrollment bootstrap should follow the same posture.
+
+Founding authority must either expire, transform into ordinary authority through
+a receipted governance act, or be revoked. If the founding ceremony creates an
+initial enrollment policy, initial stewards, or an automatic provisional
+admission rule, those acts must be recorded separately enough that members can
+later challenge the bootstrap basis without rewriting history.
 
 ## External sponsorship and federation
 
@@ -266,6 +343,12 @@ Preserve the invariant:
 A federation may create reciprocity and delegated authority by agreement. It
 does not silently absorb the admission authority of its member institutions.
 
+Federation-delegated enrollment authority must name the treaty or agreement,
+target institutions that opted in, delegated body, permitted enrollment effects,
+policy version or ceremony, expiry, revocation mechanism, exit behavior, dispute
+route, and receipt attribution. Absent those bounds, federation output is
+sponsorship evidence, not admission authority.
+
 ## Canonical transition
 
 ICN should ultimately expose one canonical level-2 enrollment-standing
@@ -288,6 +371,13 @@ is narrower and stronger:
 > All paths that produce the same standing transition must pass through the same
 > authority decision and receipt contract.
 
+This applies to HTTP routes, admin tools, migration scripts, background jobs,
+institution-package executors, local development utilities, and future
+composition roots. A routable path or operator-only tool must not write the
+standing effect directly and later backfill authority as an audit note. The
+authority decision and receipt contract are part of the transition, not optional
+metadata around it.
+
 ## Receipt contract
 
 The minimum durable record for a standing-affecting enrollment decision should
@@ -307,6 +397,7 @@ include:
 - decision result;
 - resulting membership or standing;
 - timestamp;
+- credential, mandate, grant, or delegation status at decision time;
 - appeal deadline or route;
 - revocation or reconsideration reference;
 - causal correlation ID.
@@ -333,6 +424,28 @@ Remaining gaps:
 - no appeal/revocation/reconsideration link is written by current SDIS
   enrollment handlers.
 
+## Versioning, conflicts, and compatibility
+
+Enrollment decisions must pin the governing policy version at the time the
+decision is made. If an enrollment begins under policy version 4 and completes
+after version 5 is adopted, the adopted policy must say whether in-flight cases
+are grandfathered, migrated, re-evaluated, or rejected. Retroactive application
+of new conditions is not assumed. If the governing version cannot be determined,
+a standing-affecting write must fail closed rather than guess.
+
+Contradictory decisions must not resolve by last writer wins. The architecture
+must use the target institution's policy precedence, authority precedence,
+policy version, causal ordering, idempotency key, and dispute route to decide
+whether a later record is a duplicate, a valid supersession, a challenge, or an
+invalid attempt. Any reversal or correction produces a counter-record rather
+than editing the original record.
+
+Mixed-version nodes may read or preserve unfamiliar enrollment receipts as
+opaque evidence, but they must not perform a standing-affecting enrollment write
+when they cannot evaluate the authority contract or produce the required
+receipt. Compatibility shims may downgrade a request to sponsorship or pending
+review; they must not silently apply standing under an unrecognized contract.
+
 ## Appeal, revocation, and correction
 
 Admission denial, provisional standing, and approval must be explainable. The
@@ -340,6 +453,7 @@ architecture must support:
 
 - reason codes;
 - evidence disclosure boundaries;
+- selective disclosure when evidence is private or safety-sensitive;
 - an appeal route;
 - correction of erroneous evidence;
 - revocation or reconsideration;
@@ -348,6 +462,13 @@ architecture must support:
 Reversal is a fresh institutional transition, not deletion. This follows the
 ADR-0026 immutability rule and the effect-dispatch contract's challenge /
 reversal / counter-receipt direction.
+
+When a steward credential, mandate, or delegated authority is later found to have
+been compromised, expired, revoked, or out of scope, this ADR requires an
+auditable correction path. It does not by itself solve credential compromise or
+revocation propagation. The required architectural response is to preserve the
+original evidence, record the status discovered later, decide whether standing
+must be reversed or reconsidered, and emit the resulting counter-records.
 
 ## Security and anti-domination properties
 
@@ -366,6 +487,14 @@ This ADR prevents:
   expiring, and revocable;
 - stale-trust shortcuts: if trust is a policy condition, the policy must define
   freshness and revocation behavior;
+- generic-governance escalation: a broad governance credential cannot become
+  admission authority without a target-scoped policy or mandate;
+- automation laundering: an automated policy executor is identified as the
+  executor and does not masquerade as a human steward;
+- mixed-version bypass: nodes that cannot evaluate the authority and receipt
+  contract fail closed for standing writes;
+- composition-root bypass: scripts, packages, background jobs, and new routes
+  cannot skip the canonical authority service for the same effect;
 - receipt gaps: standing-affecting decisions must leave durable evidence.
 
 This ADR does not by itself solve:
@@ -383,6 +512,25 @@ This ADR does not by itself solve:
 
 Institution packages must still design accessible ceremonies. A policy that is
 formally adopted but practically inaccessible remains an institutional defect.
+
+## Pre-ratification adversarial review
+
+The pre-ratification review tested the proposed invariant against the following
+scenarios. This section records the architectural result; it is not an
+implementation plan.
+
+| Scenario | Review result | ADR response |
+|---|---|---|
+| A. Founding institution with no stewards, trust graph, ordinary grants, or established policy body | Partially handled by the original bootstrap section; amended to require expiry or transformation of genesis authority, separate records, and challengeability | Bootstrap text now makes founding authority explicit, bounded, receipted, terminable, and challengeable |
+| B. Trusted outsider from Cooperative A sponsors an applicant to Cooperative B | Handled | External sponsorship remains evidence; B-scoped authority or B-adopted policy decides admission |
+| C. Federation treaty delegates bounded admission authority | Partially handled; amended for treaty detail | Federation delegation must name agreement, opt-in, scope, expiry, revocation, exit, dispute handling, and receipt attribution |
+| D. Automatic provisional admission based on verifiable conditions and trust threshold | Partially handled; amended | Automation is policy-authorized execution; trust remains evidence or a condition, not authority |
+| E. Compromised steward credential before revocation propagates | Partially handled; amended and partly deferred | ADR requires status capture, reversal/correction path, and counter-records; credential security itself remains outside this ADR |
+| F. Conflicting authorized decisions | Missing; amended | Versioning/conflicts section rejects last-writer-wins and requires precedence, causal ordering, idempotency, disputes, and counter-records |
+| G. Policy changes mid-enrollment | Missing; amended | Decisions pin policy version; migration or retroactivity must be explicit; otherwise fail closed |
+| H. Denial and appeal with private evidence | Partially handled; amended | Appeal/correction now names selective disclosure and reason-code constraints |
+| I. Mixed-version nodes | Missing; amended | Unknown authority/receipt contracts fail closed for standing-affecting writes |
+| J. Alternate weaker path through script, admin tool, new route, package, or background job | Partially handled; amended | Canonical transition now binds every composition root that produces the same standing effect |
 
 ## Consequences
 
