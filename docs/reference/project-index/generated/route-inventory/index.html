@@ -54,20 +54,20 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 </ul>
 <h2>Snapshot</h2>
 <ul>
-<li>Source commit: <code>6a1f00aed433a8c80862f6742f081129ceeb323e</code></li>
+<li>Source commit: <code>708cb0004402dc298abd448ab84604d4d2f9933d</code></li>
 <li>Gateway source scanned: <code>icn/crates/icn-gateway/src/**</code></li>
 <li>OpenAPI spec: <code>docs/api/openapi.generated.yaml</code></li>
 </ul>
 <h2>Coverage summary</h2>
 <ul>
-<li><strong>Discovered gateway route macros: 287</strong> (DELETE 17 · GET 131 · POST 125 · PUT 14)</li>
-<li><strong>OpenAPI documented paths: 5</strong></li>
+<li><strong>Discovered gateway route macros: 286</strong> (DELETE 17 · GET 131 · POST 124 · PUT 14)</li>
+<li><strong>OpenAPI documented paths: 6</strong></li>
 <li>Matched as documented (best-effort method+path match): 2</li>
-<li>Not matched to OpenAPI (best-effort): 285 (~99% of discovered)</li>
+<li>Not matched to OpenAPI (best-effort): 284 (~99% of discovered)</li>
 <li>Documented share of discovered routes: ~0.7%</li>
-<li><strong>OpenAPI operations (method + path) not matched to a discovered gateway route: 3</strong> (see section below)</li>
-<li><strong>Governance app route-registration candidates (separate surface, not gateway macros): 86</strong> (see section below)</li>
-<li><strong>Proof level: every tabulated route row is recorded at <code>L1</code></strong> (287 gateway macros + 86 governance candidates + 3 OpenAPI-unmatched operations) — a declaration/contract/registration exists in source; the static scan asserts no level above L1. The 4 unparsed <code>web::resource</code>/<code>.route</code> candidates are flagged leads (not parsed into routes) and carry no proof level.</li>
+<li><strong>OpenAPI operations (method + path) not matched to a discovered gateway route: 4</strong> (see section below)</li>
+<li><strong>Governance app route-registration candidates (separate surface, not gateway macros): 87</strong> (see section below)</li>
+<li><strong>Proof level: every tabulated route row is recorded at <code>L1</code></strong> (286 gateway macros + 87 governance candidates + 4 OpenAPI-unmatched operations) — a declaration/contract/registration exists in source; the static scan asserts no level above L1. The 4 unparsed <code>web::resource</code>/<code>.route</code> candidates are flagged leads (not parsed into routes) and carry no proof level.</li>
 </ul>
 <blockquote>
 <p>The gap is structural: only handlers hand-annotated for utoipa reach the OpenAPI spec. Of the OpenAPI paths, several belong to <code>icn-governance-actor</code> HTTP handlers that live outside the gateway crate and are not captured by this macro scan — so the documented/undocumented counts here are a best-effort comparison, while the two headline counts (discovered macros, OpenAPI paths) are the robust measured facts.</p>
@@ -90,7 +90,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/gov/domains/{domain_id}/action-items/{item_id}/completion-receipt</code></td>
 <td>no</td>
-<td><code>get_action_item_completion_receipt</code> @ <code>icn/apps/governance/src/http/configure.rs</code>:682</td>
+<td><code>get_action_item_completion_receipt</code> @ <code>icn/apps/governance/src/http/configure.rs</code>:726</td>
 <td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
@@ -99,7 +99,16 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/gov/me/action-cards</code></td>
 <td>no</td>
-<td><code>get_my_action_cards</code> @ <code>icn/apps/governance/src/http/configure.rs</code>:871</td>
+<td><code>get_my_action_cards</code> @ <code>icn/apps/governance/src/http/configure.rs</code>:915</td>
+<td>L1</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/gov/me/pending-publish-summary</code></td>
+<td>no</td>
+<td><code>get_my_pending_publish_summary</code> @ <code>icn/apps/governance/src/http/configure.rs</code>:919</td>
 <td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
@@ -108,14 +117,14 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/gov/me/standing</code></td>
 <td>no</td>
-<td><code>get_my_standing</code> @ <code>icn/apps/governance/src/http/configure.rs</code>:867</td>
+<td><code>get_my_standing</code> @ <code>icn/apps/governance/src/http/configure.rs</code>:911</td>
 <td>L1</td>
 <td>unknown / needs local verification</td>
 <td>needs review</td>
 </tr>
 </tbody></table>
 <h2>Governance app route-registration candidates</h2>
-<p>The governance app (<code>icn-governance-actor</code> = <code>icn/apps/governance</code>) registers its HTTP routes via <code>web::resource(&quot;…&quot;).route(web::&lt;verb&gt;().to(handlers::…))</code> in <code>apps/governance/src/http/configure.rs</code>, mounted under the gateway&#39;s <code>web::scope(&quot;/gov&quot;)</code> (the served path is <code>/gov</code> + the relative path below). It uses <strong>no route attribute macros</strong>, so the gateway macro scan above never sees these: they are a <strong>separate registration surface</strong>, listed here as candidates and <strong>not</strong> counted among the 287 gateway macros. This is why the unmatched <code>/gov/*</code> OpenAPI operations have no gateway-macro match — their handlers are registered here. The scan is mechanical (one <code>configure.rs</code>, one pattern); a registration site does <strong>not</strong> prove correctness, auth, mounting health, tests, or production readiness, so candidates stay <code>unknown / needs local verification</code>. <code>OpenAPI documented</code> = this candidate&#39;s <code>(verb, /gov + path)</code> matches a generated OpenAPI operation.</p>
+<p>The governance app (<code>icn-governance-actor</code> = <code>icn/apps/governance</code>) registers its HTTP routes via <code>web::resource(&quot;…&quot;).route(web::&lt;verb&gt;().to(handlers::…))</code> in <code>apps/governance/src/http/configure.rs</code>, mounted under the gateway&#39;s <code>web::scope(&quot;/gov&quot;)</code> (the served path is <code>/gov</code> + the relative path below). It uses <strong>no route attribute macros</strong>, so the gateway macro scan above never sees these: they are a <strong>separate registration surface</strong>, listed here as candidates and <strong>not</strong> counted among the 286 gateway macros. This is why the unmatched <code>/gov/*</code> OpenAPI operations have no gateway-macro match — their handlers are registered here. The scan is mechanical (one <code>configure.rs</code>, one pattern); a registration site does <strong>not</strong> prove correctness, auth, mounting health, tests, or production readiness, so candidates stay <code>unknown / needs local verification</code>. <code>OpenAPI documented</code> = this candidate&#39;s <code>(verb, /gov + path)</code> matches a generated OpenAPI operation.</p>
 <table>
 <thead>
 <tr>
@@ -132,7 +141,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tbody><tr>
 <td>GET</td>
 <td><code>/activities/{activity_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:744</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:788</td>
 <td><code>get_activity</code></td>
 <td>no</td>
 <td>L1</td>
@@ -142,7 +151,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/charters</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:587</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:631</td>
 <td><code>activate_charter</code></td>
 <td>no</td>
 <td>L1</td>
@@ -152,7 +161,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/delegations</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:654</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:698</td>
 <td><code>list_delegations</code></td>
 <td>no</td>
 <td>L1</td>
@@ -162,7 +171,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/delegations</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:653</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:697</td>
 <td><code>create_delegation</code></td>
 <td>no</td>
 <td>L1</td>
@@ -172,7 +181,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>DELETE</td>
 <td><code>/delegations/{delegation_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:658</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:702</td>
 <td><code>revoke_delegation</code></td>
 <td>no</td>
 <td>L1</td>
@@ -182,7 +191,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/digest</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:864</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:908</td>
 <td><code>get_digest</code></td>
 <td>no</td>
 <td>L1</td>
@@ -192,7 +201,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/domains</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:576</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:620</td>
 <td><code>list_domains</code></td>
 <td>no</td>
 <td>L1</td>
@@ -202,7 +211,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/domains</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:575</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:619</td>
 <td><code>create_domain</code></td>
 <td>no</td>
 <td>L1</td>
@@ -212,7 +221,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/domains/{domain_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:579</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:623</td>
 <td><code>get_domain</code></td>
 <td>no</td>
 <td>L1</td>
@@ -222,7 +231,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/domains/{domain_id}/action-items</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:664</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:708</td>
 <td><code>list_action_items</code></td>
 <td>no</td>
 <td>L1</td>
@@ -232,7 +241,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/domains/{domain_id}/action-items</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:663</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:707</td>
 <td><code>create_action_item</code></td>
 <td>no</td>
 <td>L1</td>
@@ -242,7 +251,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>DELETE</td>
 <td><code>/domains/{domain_id}/action-items/{item_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:670</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:714</td>
 <td><code>delete_action_item</code></td>
 <td>no</td>
 <td>L1</td>
@@ -252,7 +261,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/domains/{domain_id}/action-items/{item_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:668</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:712</td>
 <td><code>get_action_item</code></td>
 <td>no</td>
 <td>L1</td>
@@ -262,7 +271,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>PUT</td>
 <td><code>/domains/{domain_id}/action-items/{item_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:669</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:713</td>
 <td><code>update_action_item</code></td>
 <td>no</td>
 <td>L1</td>
@@ -272,7 +281,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/domains/{domain_id}/action-items/{item_id}/completion-receipt</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:682</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:726</td>
 <td><code>get_action_item_completion_receipt</code></td>
 <td>yes</td>
 <td>L1</td>
@@ -282,7 +291,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/domains/{domain_id}/action-items/{item_id}/notes</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:678</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:722</td>
 <td><code>add_action_item_note</code></td>
 <td>no</td>
 <td>L1</td>
@@ -292,7 +301,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>PUT</td>
 <td><code>/domains/{domain_id}/action-items/{item_id}/status</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:674</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:718</td>
 <td><code>update_action_item_status</code></td>
 <td>no</td>
 <td>L1</td>
@@ -302,7 +311,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/domains/{domain_id}/domain-policy/adopt</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:714</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:758</td>
 <td><code>adopt_domain_policy</code></td>
 <td>no</td>
 <td>L1</td>
@@ -312,7 +321,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/domains/{domain_id}/institutional-domain/declare</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:719</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:763</td>
 <td><code>declare_institutional_domain</code></td>
 <td>no</td>
 <td>L1</td>
@@ -322,7 +331,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/domains/{domain_id}/meetings</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:795</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:839</td>
 <td><code>list_meetings</code></td>
 <td>no</td>
 <td>L1</td>
@@ -332,7 +341,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/domains/{domain_id}/meetings</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:794</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:838</td>
 <td><code>create_meeting</code></td>
 <td>no</td>
 <td>L1</td>
@@ -342,7 +351,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>DELETE</td>
 <td><code>/domains/{domain_id}/members</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:584</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:628</td>
 <td><code>remove_domain_member</code></td>
 <td>no</td>
 <td>L1</td>
@@ -352,7 +361,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/domains/{domain_id}/members</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:583</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:627</td>
 <td><code>add_domain_member</code></td>
 <td>no</td>
 <td>L1</td>
@@ -362,7 +371,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/domains/{domain_id}/process-sessions/{session_id}/decisions/{decision_id}/record</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:709</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:753</td>
 <td><code>record_decision</code></td>
 <td>no</td>
 <td>L1</td>
@@ -372,7 +381,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/domains/{domain_id}/process-sessions/{session_id}/deliberation-entries/{entry_id}/record</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:701</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:745</td>
 <td><code>record_deliberation_entry</code></td>
 <td>no</td>
 <td>L1</td>
@@ -382,7 +391,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/domains/{domain_id}/process-sessions/{session_id}/gate-results</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:687</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:731</td>
 <td><code>record_process_gate_result</code></td>
 <td>no</td>
 <td>L1</td>
@@ -392,7 +401,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/domains/{domain_id}/process-sessions/{session_id}/open</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:693</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:737</td>
 <td><code>open_process_session</code></td>
 <td>no</td>
 <td>L1</td>
@@ -402,7 +411,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/domains/{domain_id}/programs</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:750</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:794</td>
 <td><code>list_programs_by_domain</code></td>
 <td>no</td>
 <td>L1</td>
@@ -412,7 +421,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/domains/{domain_id}/programs</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:749</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:793</td>
 <td><code>create_program</code></td>
 <td>no</td>
 <td>L1</td>
@@ -422,7 +431,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/entities/{entity_id}/activities</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:740</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:784</td>
 <td><code>list_activities</code></td>
 <td>no</td>
 <td>L1</td>
@@ -432,7 +441,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/entities/{entity_id}/activities</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:739</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:783</td>
 <td><code>create_activity</code></td>
 <td>no</td>
 <td>L1</td>
@@ -442,7 +451,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/entities/{entity_id}/structures</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:725</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:769</td>
 <td><code>list_structures</code></td>
 <td>no</td>
 <td>L1</td>
@@ -452,7 +461,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/entities/{entity_id}/structures</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:724</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:768</td>
 <td><code>create_structure</code></td>
 <td>no</td>
 <td>L1</td>
@@ -462,7 +471,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/me/action-cards</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:871</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:915</td>
 <td><code>get_my_action_cards</code></td>
 <td>yes</td>
 <td>L1</td>
@@ -471,8 +480,18 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 </tr>
 <tr>
 <td>GET</td>
+<td><code>/me/pending-publish-summary</code></td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:919</td>
+<td><code>get_my_pending_publish_summary</code></td>
+<td>yes</td>
+<td>L1</td>
+<td>unknown / needs local verification</td>
+<td>needs review</td>
+</tr>
+<tr>
+<td>GET</td>
 <td><code>/me/scopes</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:866</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:910</td>
 <td><code>get_my_scopes</code></td>
 <td>no</td>
 <td>L1</td>
@@ -482,7 +501,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/me/standing</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:867</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:911</td>
 <td><code>get_my_standing</code></td>
 <td>yes</td>
 <td>L1</td>
@@ -492,7 +511,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/me/work</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:868</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:912</td>
 <td><code>get_my_work</code></td>
 <td>no</td>
 <td>L1</td>
@@ -502,7 +521,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/meetings/{meeting_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:799</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:843</td>
 <td><code>get_meeting</code></td>
 <td>no</td>
 <td>L1</td>
@@ -512,7 +531,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/meetings/{meeting_id}/agenda</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:819</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:863</td>
 <td><code>add_agenda_item</code></td>
 <td>no</td>
 <td>L1</td>
@@ -522,7 +541,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>PUT</td>
 <td><code>/meetings/{meeting_id}/agenda/{item_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:823</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:867</td>
 <td><code>update_agenda_item</code></td>
 <td>no</td>
 <td>L1</td>
@@ -532,7 +551,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>PUT</td>
 <td><code>/meetings/{meeting_id}/attendance</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:815</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:859</td>
 <td><code>mark_attendance</code></td>
 <td>no</td>
 <td>L1</td>
@@ -542,7 +561,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/meetings/{meeting_id}/attendees</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:811</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:855</td>
 <td><code>add_attendee</code></td>
 <td>no</td>
 <td>L1</td>
@@ -552,7 +571,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/meetings/{meeting_id}/end</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:807</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:851</td>
 <td><code>end_meeting</code></td>
 <td>no</td>
 <td>L1</td>
@@ -562,7 +581,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/meetings/{meeting_id}/start</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:803</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:847</td>
 <td><code>start_meeting</code></td>
 <td>no</td>
 <td>L1</td>
@@ -572,7 +591,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/milestones/{milestone_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:780</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:824</td>
 <td><code>get_milestone</code></td>
 <td>no</td>
 <td>L1</td>
@@ -582,7 +601,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>PATCH</td>
 <td><code>/milestones/{milestone_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:781</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:825</td>
 <td><code>update_milestone_status</code></td>
 <td>no</td>
 <td>L1</td>
@@ -592,7 +611,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/milestones/{milestone_id}/history</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:789</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:833</td>
 <td><code>get_milestone_history</code></td>
 <td>no</td>
 <td>L1</td>
@@ -602,7 +621,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/milestones/{milestone_id}/preview</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:785</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:829</td>
 <td><code>preview_milestone</code></td>
 <td>no</td>
 <td>L1</td>
@@ -612,7 +631,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/programs/{program_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:754</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:798</td>
 <td><code>get_program</code></td>
 <td>no</td>
 <td>L1</td>
@@ -622,7 +641,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>DELETE</td>
 <td><code>/programs/{program_id}/activities/{activity_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:776</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:820</td>
 <td><code>unlink_activity_from_program</code></td>
 <td>no</td>
 <td>L1</td>
@@ -632,7 +651,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>PUT</td>
 <td><code>/programs/{program_id}/activities/{activity_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:775</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:819</td>
 <td><code>link_activity_to_program</code></td>
 <td>no</td>
 <td>L1</td>
@@ -642,7 +661,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/programs/{program_id}/dashboard</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:762</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:806</td>
 <td><code>get_program_dashboard</code></td>
 <td>no</td>
 <td>L1</td>
@@ -652,7 +671,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/programs/{program_id}/milestones</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:771</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:815</td>
 <td><code>list_milestones_by_program</code></td>
 <td>no</td>
 <td>L1</td>
@@ -662,7 +681,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/programs/{program_id}/milestones</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:770</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:814</td>
 <td><code>create_milestone</code></td>
 <td>no</td>
 <td>L1</td>
@@ -672,7 +691,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>PATCH</td>
 <td><code>/programs/{program_id}/status</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:758</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:802</td>
 <td><code>update_program_status</code></td>
 <td>no</td>
 <td>L1</td>
@@ -682,7 +701,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/programs/{program_id}/summary</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:766</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:810</td>
 <td><code>get_program_summary</code></td>
 <td>no</td>
 <td>L1</td>
@@ -692,7 +711,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/proposals</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:592</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:636</td>
 <td><code>list_proposals</code></td>
 <td>no</td>
 <td>L1</td>
@@ -702,7 +721,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:591</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:635</td>
 <td><code>create_proposal</code></td>
 <td>no</td>
 <td>L1</td>
@@ -712,7 +731,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals/federation/clearing/establish</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:836</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:880</td>
 <td><code>create_establish_clearing_proposal</code></td>
 <td>no</td>
 <td>L1</td>
@@ -722,7 +741,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals/federation/clearing/terminate</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:840</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:884</td>
 <td><code>create_terminate_clearing_proposal</code></td>
 <td>no</td>
 <td>L1</td>
@@ -732,7 +751,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals/federation/join</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:828</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:872</td>
 <td><code>create_join_federation_proposal</code></td>
 <td>no</td>
 <td>L1</td>
@@ -742,7 +761,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals/federation/leave</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:832</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:876</td>
 <td><code>create_leave_federation_proposal</code></td>
 <td>no</td>
 <td>L1</td>
@@ -752,7 +771,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals/federation/policy</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:852</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:896</td>
 <td><code>create_update_federation_policy_proposal</code></td>
 <td>no</td>
 <td>L1</td>
@@ -762,7 +781,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals/federation/vouch</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:844</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:888</td>
 <td><code>create_vouch_proposal</code></td>
 <td>no</td>
 <td>L1</td>
@@ -772,7 +791,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals/federation/vouch/revoke</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:848</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:892</td>
 <td><code>create_revoke_vouch_proposal</code></td>
 <td>no</td>
 <td>L1</td>
@@ -782,7 +801,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals/sdis/appoint-steward</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:857</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:901</td>
 <td><code>create_appoint_steward_proposal</code></td>
 <td>no</td>
 <td>L1</td>
@@ -792,7 +811,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals/sdis/remove-steward</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:861</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:905</td>
 <td><code>create_remove_steward_proposal</code></td>
 <td>no</td>
 <td>L1</td>
@@ -802,7 +821,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/proposals/{proposal_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:596</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:640</td>
 <td><code>get_proposal</code></td>
 <td>no</td>
 <td>L1</td>
@@ -812,7 +831,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/proposals/{proposal_id}/chain</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:620</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:664</td>
 <td><code>get_chain</code></td>
 <td>no</td>
 <td>L1</td>
@@ -822,7 +841,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals/{proposal_id}/close</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:604</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:648</td>
 <td><code>close_proposal</code></td>
 <td>no</td>
 <td>L1</td>
@@ -832,7 +851,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/proposals/{proposal_id}/deliberation</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:624</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:668</td>
 <td><code>get_proposal_deliberation</code></td>
 <td>no</td>
 <td>L1</td>
@@ -842,7 +861,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/proposals/{proposal_id}/discussion</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:633</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:677</td>
 <td><code>get_discussion</code></td>
 <td>no</td>
 <td>L1</td>
@@ -852,7 +871,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/proposals/{proposal_id}/discussion/comments</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:638</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:682</td>
 <td><code>list_comments</code></td>
 <td>no</td>
 <td>L1</td>
@@ -862,7 +881,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals/{proposal_id}/discussion/comments</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:637</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:681</td>
 <td><code>add_comment</code></td>
 <td>no</td>
 <td>L1</td>
@@ -872,7 +891,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>DELETE</td>
 <td><code>/proposals/{proposal_id}/discussion/comments/{comment_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:643</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:687</td>
 <td><code>delete_comment</code></td>
 <td>no</td>
 <td>L1</td>
@@ -882,7 +901,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>PUT</td>
 <td><code>/proposals/{proposal_id}/discussion/comments/{comment_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:642</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:686</td>
 <td><code>edit_comment</code></td>
 <td>no</td>
 <td>L1</td>
@@ -892,7 +911,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>DELETE</td>
 <td><code>/proposals/{proposal_id}/discussion/comments/{comment_id}/reactions</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:648</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:692</td>
 <td><code>remove_reaction</code></td>
 <td>no</td>
 <td>L1</td>
@@ -902,7 +921,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals/{proposal_id}/discussion/comments/{comment_id}/reactions</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:647</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:691</td>
 <td><code>add_reaction</code></td>
 <td>no</td>
 <td>L1</td>
@@ -912,7 +931,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/proposals/{proposal_id}/effects</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:628</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:672</td>
 <td><code>list_proposal_effects</code></td>
 <td>no</td>
 <td>L1</td>
@@ -922,7 +941,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals/{proposal_id}/open</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:600</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:644</td>
 <td><code>open_proposal</code></td>
 <td>no</td>
 <td>L1</td>
@@ -932,7 +951,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/proposals/{proposal_id}/proof</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:616</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:660</td>
 <td><code>get_proof</code></td>
 <td>no</td>
 <td>L1</td>
@@ -942,7 +961,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/proposals/{proposal_id}/tally</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:612</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:656</td>
 <td><code>get_vote_tally</code></td>
 <td>no</td>
 <td>L1</td>
@@ -952,7 +971,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/proposals/{proposal_id}/vote</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:608</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:652</td>
 <td><code>cast_vote</code></td>
 <td>no</td>
 <td>L1</td>
@@ -962,7 +981,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/structures/{structure_id}</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:729</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:773</td>
 <td><code>get_structure</code></td>
 <td>no</td>
 <td>L1</td>
@@ -972,7 +991,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>GET</td>
 <td><code>/structures/{structure_id}/roles</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:734</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:778</td>
 <td><code>list_roles</code></td>
 <td>no</td>
 <td>L1</td>
@@ -982,7 +1001,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td>POST</td>
 <td><code>/structures/{structure_id}/roles</code></td>
-<td><code>icn/apps/governance/src/http/configure.rs</code>:733</td>
+<td><code>icn/apps/governance/src/http/configure.rs</code>:777</td>
 <td><code>assign_role</code></td>
 <td>no</td>
 <td>L1</td>
@@ -3524,7 +3543,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>POST</td>
 <td><code>/enrollment/complete</code></td>
 <td><code>/v1/sdis/enrollment/complete</code></td>
-<td><code>icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs</code>:501</td>
+<td><code>icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs</code>:505</td>
 <td><code>complete_enrollment</code></td>
 <td>no</td>
 <td>L1</td>
@@ -3590,7 +3609,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>POST</td>
 <td><code>/reject/{enrollment_id}</code></td>
 <td><code>/v1/sdis/reject/{enrollment_id}</code></td>
-<td><code>icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs</code>:913</td>
+<td><code>icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs</code>:917</td>
 <td><code>reject_enrollment</code></td>
 <td>no</td>
 <td>L1</td>
@@ -3656,7 +3675,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>POST</td>
 <td><code>/vouch/{enrollment_id}</code></td>
 <td><code>/v1/sdis/vouch/{enrollment_id}</code></td>
-<td><code>icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs</code>:824</td>
+<td><code>icn/crates/icn-gateway/src/api/sdis/simple_enrollment.rs</code>:828</td>
 <td><code>steward_vouch</code></td>
 <td>no</td>
 <td>L1</td>
@@ -3821,7 +3840,7 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>POST</td>
 <td><code>(empty)</code></td>
 <td><code>/v1/sessions</code></td>
-<td><code>icn/crates/icn-gateway/src/api/sessions.rs</code>:137</td>
+<td><code>icn/crates/icn-gateway/src/api/sessions.rs</code>:158</td>
 <td><code>create_session</code></td>
 <td>no</td>
 <td>L1</td>
@@ -3832,19 +3851,8 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <td>GET</td>
 <td><code>/{session_id}</code></td>
 <td><code>/v1/sessions/{session_id}</code></td>
-<td><code>icn/crates/icn-gateway/src/api/sessions.rs</code>:184</td>
+<td><code>icn/crates/icn-gateway/src/api/sessions.rs</code>:205</td>
 <td><code>get_session_status</code></td>
-<td>no</td>
-<td>L1</td>
-<td>unknown / needs local verification</td>
-<td>needs review</td>
-</tr>
-<tr>
-<td>POST</td>
-<td><code>/{session_id}/approve</code></td>
-<td><code>/v1/sessions/{session_id}/approve</code></td>
-<td><code>icn/crates/icn-gateway/src/api/sessions.rs</code>:251</td>
-<td><code>approve_session</code></td>
 <td>no</td>
 <td>L1</td>
 <td>unknown / needs local verification</td>
@@ -4196,12 +4204,12 @@ Regenerate: <code>python3 docs/scripts/route_inventory.py --write</code>  ·  Ch
 <tr>
 <td><code>web::resource</code></td>
 <td><code>/{session_id}/approve</code></td>
-<td><code>icn/crates/icn-gateway/src/server.rs</code>:2011</td>
+<td><code>icn/crates/icn-gateway/src/server.rs</code>:2129</td>
 </tr>
 <tr>
 <td><code>.route</code></td>
 <td>—</td>
-<td><code>icn/crates/icn-gateway/src/server.rs</code>:2012</td>
+<td><code>icn/crates/icn-gateway/src/server.rs</code>:2130</td>
 </tr>
 </tbody></table>
 </article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
