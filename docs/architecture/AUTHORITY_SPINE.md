@@ -65,14 +65,24 @@ and the fix.
 **Which deployments actually get which profile today**, since a profile
 document that does not say this is exactly the kind of unbacked capability claim
 this note argues against: the profile is *inferred from whether a revocation
-store was supplied*, not declared by operator configuration. The daemon always
-supplies one, so **every daemon deployment — including the portable evaluator
-appliance — runs `Institutional`**. `PortableEvaluator` is reached only by
-embedded/test callers that construct a `GatewayServer` without a store. Two
-consequences worth naming: the evaluator appliance does get durable revocation
-(it has a real store), and a deployment whose keystore fails to unlock takes a
-path that supplies no store, silently *downgrading* the authority guarantee.
-Making the profile an operator-declared configuration value is a follow-up.
+store was supplied*, not declared by operator configuration. The supply is
+conditional, not guaranteed — `revocation_store` is an `Option` on the gateway
+handles (`supervisor/lifecycle.rs`) that `init_gateway` consumes with `if let
+Some(..)`. A daemon startup that completes the component set opens
+`<store_path>/auth-revocation` and supplies it, so **a fully started daemon —
+including the portable evaluator appliance — runs `Institutional` with durable
+revocation**.
+
+The consequence to state plainly, because the inference is silent: `Institutional`
+is not a property of *being* a daemon. Any path that does not reach that
+assignment leaves the handle `None` and yields `PortableEvaluator` — embedded and
+test callers that construct a `GatewayServer` without a store, and equally a
+daemon run that never gets that far, such as one whose keystore does not unlock.
+In that case a daemon *downgrades* its own authority guarantee without an
+operator asking for it, and the only thing that says so is the capability report.
+Making the profile an operator-declared configuration value — so that a
+deployment which asked for `Institutional` fails instead of quietly becoming
+disposable — is a follow-up.
 
 Precisely what "refuses" means today: the gateway does not come up, and the
 daemon logs the error and continues running without a gateway. The supervisor
