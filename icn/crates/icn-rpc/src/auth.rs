@@ -210,6 +210,11 @@ impl<S: Store> TokenRevocationList<S> {
             .read()
             .map(|cache| cache.contains(jti))
             .map_err(|e| {
+                // Counted, not just returned: `icn_rpc_revocation_errors_total`
+                // is described as covering lock errors, and a fail-closed denial
+                // that never reaches a metric is invisible exactly when an
+                // operator is trying to explain a wave of 401s.
+                counter!("icn_rpc_revocation_errors_total").increment(1);
                 AuthError::InternalError(format!("Revocation cache lock poisoned: {e}"))
             })?;
 
@@ -225,6 +230,7 @@ impl<S: Store> TokenRevocationList<S> {
 
         if present.is_some() {
             let mut cache = self.cache.write().map_err(|e| {
+                counter!("icn_rpc_revocation_errors_total").increment(1);
                 AuthError::InternalError(format!("Revocation cache lock poisoned: {e}"))
             })?;
             cache.insert(jti.to_string());
