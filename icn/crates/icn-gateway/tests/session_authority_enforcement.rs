@@ -437,16 +437,27 @@ async fn authenticated_routes_refuse_to_serve_without_the_authority_installed() 
     // The misassembly guard: if `SessionAuthority` is not registered, the
     // middleware must fail closed rather than fall back to signature-only
     // verification (which is exactly the pre-#2437 behavior).
+    //
+    // A usable `AuthManager` is deliberately registered here, in both shapes a
+    // reintroduction would plausibly take. Omitting it would only prove the
+    // middleware fails when nothing can verify; the regression worth guarding
+    // is the one where something *can* — a refactor adding an `.or_else(..)`
+    // fallback to a bare issuer would restore "valid signature ⇒ authorized"
+    // while every route still looked wrapped. Production registers no
+    // `AuthManager` in `app_data` at all; these entries must stay inert.
     let auth_mw = HttpAuthentication::bearer(jwt_auth);
     let app = test::init_service(
-        App::new().service(
-            web::scope("/v1")
-                .route(
-                    "/protected",
-                    web::get().to(|| async { HttpResponse::Ok().body("ok") }),
-                )
-                .wrap(auth_mw),
-        ),
+        App::new()
+            .app_data(web::Data::new(AuthManager::new(SECRET.to_vec())))
+            .app_data(web::Data::new(Arc::new(AuthManager::new(SECRET.to_vec()))))
+            .service(
+                web::scope("/v1")
+                    .route(
+                        "/protected",
+                        web::get().to(|| async { HttpResponse::Ok().body("ok") }),
+                    )
+                    .wrap(auth_mw),
+            ),
     )
     .await;
 
