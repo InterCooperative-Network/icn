@@ -1236,9 +1236,14 @@ pub fn configure_protected(cfg: &mut web::ServiceConfig) {
 /// accepted alongside it during the #1868 capability decomposition — the same
 /// pair `assign_role` uses in `apps/governance`, so the enrollment surface does
 /// not invent a second, divergent notion of steward authority.
+/// Both are referenced through `icn_rpc::auth::scopes` rather than spelled as
+/// literals: the broad scope is slated for retirement "once no production code
+/// references it", and a string literal is invisible to the constant-reference
+/// search that decision will be made from — this call site would be missed and
+/// the accepted-also fallback would silently survive its own retirement.
 const STEWARD_ACT_SCOPES: &[&str] = &[
     icn_rpc::auth::scopes::GOVERNANCE_STEWARD_WRITE,
-    "governance:write",
+    icn_rpc::auth::scopes::GOVERNANCE_WRITE,
 ];
 
 /// Authorize a steward/moderation act and return the DID to RECORD as its actor.
