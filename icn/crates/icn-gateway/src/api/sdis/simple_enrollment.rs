@@ -55,8 +55,8 @@ use utoipa::ToSchema;
 use uuid::Uuid;
 
 use crate::api::sessions::get_gateway_url;
-use crate::auth::AuthManager;
 use crate::error::{GatewayError, Result};
+use crate::session_authority::SessionAuthority;
 use crate::steward_mgr::StewardManager;
 use crate::trust_mgr::TrustManager;
 
@@ -407,7 +407,7 @@ const STEWARD_MIN_TRUST_SCORE: f64 = 0.4;
 pub async fn verify_level2(
     http_req: HttpRequest,
     store: web::Data<Arc<EnrollmentStore>>,
-    auth: web::Data<Arc<AuthManager>>,
+    authority: web::Data<Arc<SessionAuthority>>,
     trust_mgr: web::Data<Arc<TrustManager>>,
     req: web::Json<VerifyLevel2Request>,
 ) -> Result<HttpResponse> {
@@ -424,7 +424,11 @@ pub async fn verify_level2(
         GatewayError::AuthenticationFailed("Invalid Authorization format".to_string())
     })?;
 
-    let claims = auth.verify_token(token)?;
+    // Verify through the session authority: this scope is mounted WITHOUT the
+    // `jwt_auth` middleware and authenticates by hand, so using the bare
+    // AuthManager here would honor revoked credentials that every wrapped route
+    // rejects (issue #2437).
+    let claims = authority.verify(token)?;
     let steward_did: Did = claims
         .sub
         .parse()
@@ -501,7 +505,7 @@ pub async fn verify_level2(
 #[post("/enrollment/complete")]
 pub async fn complete_enrollment(
     store: web::Data<Arc<EnrollmentStore>>,
-    auth: web::Data<Arc<AuthManager>>,
+    authority: web::Data<Arc<SessionAuthority>>,
     trust_mgr: web::Data<Arc<TrustManager>>,
     commons_mgr: web::Data<Arc<crate::commons_mgr::CommonsManager>>,
     steward_mgr: web::Data<Option<Arc<StewardManager>>>,
@@ -729,7 +733,7 @@ pub async fn complete_enrollment(
     // This eliminates the race condition identified in Issue #397.
 
     // Issue auth token for the new identity
-    let auth_token = auth.issue_token(
+    let auth_token = authority.auth_manager().issue_token(
         &ephemeral_did,
         &coop_id,
         vec!["ledger:read".to_string(), "ledger:write".to_string()],
@@ -969,7 +973,7 @@ pub struct RejectRequest {
 pub async fn get_steward_stats(
     http_req: HttpRequest,
     store: web::Data<Arc<EnrollmentStore>>,
-    auth: web::Data<Arc<AuthManager>>,
+    authority: web::Data<Arc<SessionAuthority>>,
     trust_mgr: web::Data<Arc<TrustManager>>,
 ) -> Result<HttpResponse> {
     // Extract steward DID from Bearer token
@@ -985,7 +989,11 @@ pub async fn get_steward_stats(
         GatewayError::AuthenticationFailed("Invalid Authorization format".to_string())
     })?;
 
-    let claims = auth.verify_token(token)?;
+    // Verify through the session authority: this scope is mounted WITHOUT the
+    // `jwt_auth` middleware and authenticates by hand, so using the bare
+    // AuthManager here would honor revoked credentials that every wrapped route
+    // rejects (issue #2437).
+    let claims = authority.verify(token)?;
     let steward_did: Did = claims
         .sub
         .parse()

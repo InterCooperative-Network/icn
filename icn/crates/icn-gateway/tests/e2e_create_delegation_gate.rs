@@ -297,6 +297,12 @@ async fn test_suspended_member_cannot_create_delegation() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(auth_manager.clone()))
+            // Authority composition boundary (issues #2436/#2437): this test
+            // builds its own router, so it must install the same authority the
+            // production composition installs — `jwt_auth` fails closed without it.
+            .app_data(web::Data::new(std::sync::Arc::new(
+                icn_gateway::session_authority::SessionAuthority::evaluator(auth_manager.clone()),
+            )))
             .app_data(web::Data::new(ip_limiter.clone()))
             .service(
                 web::scope("/v1")
@@ -532,6 +538,12 @@ async fn test_suspended_member_cannot_create_blanket_delegation() {
     let app = test::init_service(
         App::new()
             .app_data(web::Data::new(auth_manager.clone()))
+            // Authority composition boundary (issues #2436/#2437): this test builds
+            // its own router, so it installs the same authority production installs —
+            // `jwt_auth` fails closed without it.
+            .app_data(web::Data::new(std::sync::Arc::new(
+                icn_gateway::session_authority::SessionAuthority::evaluator(auth_manager.clone()),
+            )))
             .app_data(web::Data::new(ip_limiter.clone()))
             .service(
                 web::scope("/v1")

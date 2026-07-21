@@ -5,7 +5,6 @@
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use std::sync::Arc;
 
-use crate::auth::AuthManager;
 use crate::commons_mgr::CommonsManager;
 use crate::error::Result;
 use crate::invite::InviteManager;
@@ -13,6 +12,7 @@ use crate::middleware::{get_claims, require_coop_access, require_scope};
 use crate::models::{
     CreateInviteRequest, InviteInfo, InviteListResponse, InviteResponse, JoinRequest, JoinResponse,
 };
+use crate::session_authority::SessionAuthority;
 use crate::validation;
 use icn_identity::Did;
 use icn_obs::metrics::gateway;
@@ -146,7 +146,7 @@ pub async fn list_invites(
 #[post("/join")]
 pub async fn join_via_invite(
     invite_mgr: web::Data<Arc<InviteManager>>,
-    auth_mgr: web::Data<Arc<AuthManager>>,
+    authority: web::Data<Arc<SessionAuthority>>,
     req: web::Json<JoinRequest>,
 ) -> Result<HttpResponse> {
     // Validate invite code
@@ -177,7 +177,8 @@ pub async fn join_via_invite(
         "ledger:transact".to_string(),
     ];
 
-    let token = auth_mgr
+    let token = authority
+        .auth_manager()
         .issue_token(&did, &invite.coop_id, scopes)
         .map_err(|e| {
             crate::error::GatewayError::InternalError(format!("Failed to generate token: {e}"))
@@ -189,7 +190,7 @@ pub async fn join_via_invite(
     Ok(HttpResponse::Ok().json(JoinResponse {
         did: did.to_string(),
         token,
-        token_expires_in: 86400, // 24 hours
+        token_expires_in: authority.lifetime().ttl().as_secs(),
         coop_id: invite.coop_id,
         role: invite.role,
         private_key: String::new(), // Client generates their own keypair
@@ -199,7 +200,7 @@ pub async fn join_via_invite(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::auth::TokenClaims;
+    use crate::auth::{AuthManager, TokenClaims};
     use crate::commons_mgr::CommonsManager;
     use crate::invite::InviteManager;
     use actix_web::http::StatusCode;
@@ -214,6 +215,7 @@ mod tests {
             exp: 9_999_999_999,
             coop_id: coop.to_string(),
             scopes: vec!["coop:admin".to_string(), "coop:read".to_string()],
+            jti: None,
         }
     }
 
@@ -289,5 +291,43 @@ mod tests {
 
         assert_eq!(run("coopA", "coopA").await, StatusCode::OK);
         assert_eq!(run("coopA", "coopB").await, StatusCode::FORBIDDEN);
+    }
+
+    #[actix_web::test]
+    async fn join_reports_the_installed_non_default_token_lifetime() {
+        let invite_mgr = Arc::new(InviteManager::new());
+        let creator = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let invite = invite_mgr
+            .create_invite("coopA".to_string(), "member".to_string(), creator, 3600)
+            .await
+            .unwrap();
+        let auth = Arc::new(
+            AuthManager::new(b"invite-lifetime-test-secret-32b".to_vec())
+                .with_token_ttl(std::time::Duration::from_secs(2 * 3600)),
+        );
+        let authority = Arc::new(SessionAuthority::evaluator(auth.clone()));
+        let app = actix_test::init_service(
+            App::new()
+                .app_data(web::Data::new(invite_mgr))
+                .app_data(web::Data::new(authority))
+                .service(join_via_invite),
+        )
+        .await;
+        let member = icn_identity::KeyPair::generate().unwrap().did().clone();
+        let request = actix_test::TestRequest::post()
+            .uri("/join")
+            .set_json(JoinRequest {
+                invite_code: invite.code,
+                did: member.to_string(),
+            })
+            .to_request();
+
+        let response = actix_test::call_service(&app, request).await;
+        assert_eq!(response.status(), StatusCode::OK);
+        let response: JoinResponse = actix_test::read_body_json(response).await;
+
+        assert_eq!(response.token_expires_in, 2 * 3600);
+        let claims = auth.verify_token(&response.token).unwrap();
+        assert_eq!(claims.exp - claims.iat, response.token_expires_in);
     }
 }

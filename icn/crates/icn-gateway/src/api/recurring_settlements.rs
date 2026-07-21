@@ -436,6 +436,7 @@ mod tests {
             exp: 9_999_999_999,
             coop_id: coop.to_string(),
             scopes: vec!["settlements:write".to_string()],
+            jti: None,
         }
     }
 
@@ -545,6 +546,7 @@ mod tests {
             exp: 9_999_999_999,
             coop_id: "coopA".to_string(),
             scopes: vec!["settlements:read".to_string()],
+            jti: None,
         };
         let req = actix_test::TestRequest::get()
             .uri("/settlements/recurring")

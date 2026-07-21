@@ -61,6 +61,10 @@ pub struct GatewayActorHandles {
     /// execution records instead of re-opening the (exclusively locked) sled
     /// path and falling back to an empty temporary store.
     pub execution_query_store: Option<Arc<dyn icn_store::Store>>,
+    /// Runtime-owned session-revocation store, shared with the RPC auth manager
+    /// so a revoked credential is rejected on both authenticated surfaces
+    /// (issue #2437).
+    pub revocation_store: Option<Arc<dyn icn_store::Store>>,
     /// Best-effort execution-record retention cleanup, deferred to run *after*
     /// the gateway's dispatch-evidence backfill (Issue #1987 follow-up). Pruning
     /// terminal execution records before the backfill could delete a record

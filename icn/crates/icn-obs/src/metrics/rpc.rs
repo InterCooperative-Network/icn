@@ -13,7 +13,7 @@ pub fn init_descriptions() {
     );
     describe_counter!(
         "icn_rpc_revocation_hits_total",
-        "Total number of revocation checks that found a revoked token (cache hits)"
+        "Total number of revocation checks that found a revoked token"
     );
     describe_gauge!(
         "icn_rpc_revoked_tokens_total",

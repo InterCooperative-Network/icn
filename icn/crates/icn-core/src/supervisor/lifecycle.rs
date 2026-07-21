@@ -178,9 +178,11 @@ pub async fn run_supervisor(
             settlement_engine: gateway_handles.settlement_engine,
             dispatch_evidence_sink_installer: gateway_handles.dispatch_evidence_sink_installer,
             execution_query_store: gateway_handles.execution_query_store,
+            revocation_store: gateway_handles.revocation_store,
             post_backfill_cleanup: gateway_handles.post_backfill_cleanup,
         },
-    );
+    )
+    .await;
 
     // Set supervisor state to running
     icn_obs::metrics::supervisor::state_set(2);
@@ -1044,8 +1046,19 @@ async fn spawn_actors_with_identity(
     // SchedulingPolicy proposals will be handled by ProtocolService when implemented.
     info!("✓ Compute integration active");
 
+    // Session-authority revocation store (issue #2437).
+    //
+    // One store backs both authenticated surfaces: the RPC `auth.revoke` path
+    // and the gateway's session revocation. Sharing it is deliberate — a
+    // credential revoked through one API must not remain valid on the other,
+    // which two independent stores would allow.
+    let revocation_store_path = config.store_path().join("auth-revocation");
+    let revocation_store: Arc<icn_store::SledStore> =
+        Arc::new(icn_store::SledStore::open(&revocation_store_path)?);
+
     // Spawn RPC server with OracleRegistry-backed trust-based rate limiting
-    let rpc_config = super::init_rpc::RpcConfig::from_daemon_config(config);
+    let rpc_config = super::init_rpc::RpcConfig::from_daemon_config(config)
+        .with_revocation_store(revocation_store.clone());
     let rpc_compute_handle = super::init_rpc::spawn_rpc_server(
         rpc_config,
         super::init_rpc::RpcDeps {
@@ -1062,9 +1075,10 @@ async fn spawn_actors_with_identity(
             policy_oracle: Some(oracle_for_components.clone()),
         },
         background_tasks,
-    );
+    )?;
     gateway_handles.compute = Some(rpc_compute_handle);
     gateway_handles.settlement_engine = Some(compute_services.settlement_engine.clone());
+    gateway_handles.revocation_store = Some(revocation_store);
 
     // Extract LedgerService for background tasks (resource enforcer)
     let ledger_service_for_bg: Option<Arc<dyn icn_kernel_api::services::LedgerService>> =

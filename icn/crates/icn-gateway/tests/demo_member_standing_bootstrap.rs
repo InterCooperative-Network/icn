@@ -179,6 +179,12 @@ async fn build_app(
     test::init_service(
         App::new()
             .app_data(web::Data::new(auth_manager.clone()))
+            // Authority composition boundary (issues #2436/#2437): this test
+            // builds its own router, so it must install the same authority the
+            // production composition installs — `jwt_auth` fails closed without it.
+            .app_data(web::Data::new(std::sync::Arc::new(
+                icn_gateway::session_authority::SessionAuthority::evaluator(auth_manager.clone()),
+            )))
             .app_data(web::Data::new(ip_limiter))
             .service(
                 web::scope("/v1")

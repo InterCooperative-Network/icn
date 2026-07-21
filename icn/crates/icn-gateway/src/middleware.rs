@@ -10,8 +10,9 @@ use std::future::{ready, Ready};
 use std::sync::Arc;
 use std::time::Instant;
 
-use crate::auth::{AuthManager, TokenClaims};
+use crate::auth::TokenClaims;
 use crate::error::GatewayError;
+use crate::session_authority::SessionAuthority;
 use icn_obs::metrics::gateway;
 
 /// Extract and verify JWT token from Authorization header
@@ -19,11 +20,22 @@ pub async fn jwt_auth(
     req: ServiceRequest,
     credentials: BearerAuth,
 ) -> Result<ServiceRequest, (Error, ServiceRequest)> {
-    // Get auth manager
-    let auth_manager = match req.app_data::<actix_web::web::Data<Arc<AuthManager>>>() {
-        Some(mgr) => mgr.clone(),
+    // Verify through the session authority — the composition boundary that owns
+    // signature, expiry AND revocation (issue #2437). Resolving it here, at the
+    // single middleware every authenticated route is wrapped with, is what makes
+    // revocation unavoidable: a route cannot opt out by forgetting to check.
+    //
+    // Fail closed when it is absent. Falling back to a bare `AuthManager` would
+    // silently restore the pre-#2437 behavior (valid signature ⇒ authorized) in
+    // exactly the misassembly this work exists to prevent.
+    let authority = match req.app_data::<actix_web::web::Data<Arc<SessionAuthority>>>() {
+        Some(authority) => authority.clone(),
         None => {
-            let err = GatewayError::InternalError("AuthManager not found".to_string());
+            let err = GatewayError::InternalError(
+                "SessionAuthority not installed: refusing to authenticate without \
+                 revocation enforcement"
+                    .to_string(),
+            );
             return Err((Error::from(err), req));
         }
     };
@@ -42,7 +54,7 @@ pub async fn jwt_auth(
         }
     }
 
-    match auth_manager.verify_token(token) {
+    match authority.verify(token) {
         Ok(claims) => {
             // Insert BasicClaims first so apps/governance handlers can extract them
             // without depending on gateway-internal TokenClaims type.
@@ -264,6 +276,7 @@ mod tests {
             scopes: scopes.iter().map(|s| s.to_string()).collect(),
             entity_id: None,
             entity_type: None,
+            jti: None,
         });
         req
     }
@@ -486,6 +499,7 @@ mod tests {
             scopes: vec!["ledger:write".to_string()],
             entity_id: None,
             entity_type: None,
+            jti: None,
         });
 
         assert!(matches!(
@@ -510,6 +524,7 @@ mod tests {
             scopes: vec!["ledger:write".to_string()],
             entity_id: Some("entity:icn:cooperative:coop-b".to_string()),
             entity_type: Some("cooperative".to_string()),
+            jti: None,
         });
 
         // Decision follows coop_id, not the (mismatched) entity_id.

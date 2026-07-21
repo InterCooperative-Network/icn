@@ -314,14 +314,25 @@ pub async fn handle_auth_revoke(
     };
 
     // Check if token was already revoked (idempotent operation)
-    if auth_manager.is_token_revoked(&claims.jti) {
-        return RpcResponse::success(
-            id,
-            serde_json::json!({
-                "revoked": true,
-                "message": "Token was already revoked"
-            }),
-        );
+    match auth_manager.is_token_revoked(&claims.jti) {
+        Ok(true) => {
+            return RpcResponse::success(
+                id,
+                serde_json::json!({
+                    "revoked": true,
+                    "message": "Token was already revoked"
+                }),
+            );
+        }
+        Ok(false) => {}
+        Err(error) => {
+            tracing::error!(error = %error, "Unable to verify existing revocation; refusing revoke request");
+            return RpcResponse::error(
+                id,
+                -32603,
+                "Unable to verify token revocation state".to_string(),
+            );
+        }
     }
 
     // Authorization check: only the token owner or an admin can revoke
