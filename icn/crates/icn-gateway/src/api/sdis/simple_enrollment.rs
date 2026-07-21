@@ -797,8 +797,14 @@ fn format_timestamp(ts: u64) -> String {
 /// GET /pending - List pending enrollments for stewards
 #[actix_web::get("/pending")]
 pub async fn list_pending_enrollments(
+    http_req: HttpRequest,
     store: web::Data<Arc<EnrollmentStore>>,
 ) -> Result<HttpResponse> {
+    // The pending queue lists applicant names and cooperatives for people who
+    // have not been admitted to anything yet. It is steward working state, not
+    // public information (issue #2443).
+    authorize_steward_act(&http_req, None)?;
+
     let enrollments = store.enrollments.read().await;
     let now = icn_time::current_timestamp_secs();
 
@@ -827,14 +833,39 @@ pub async fn list_pending_enrollments(
 /// POST /vouch/{enrollment_id} - Steward vouches for an enrollment
 #[post("/vouch/{enrollment_id}")]
 pub async fn steward_vouch(
+    http_req: HttpRequest,
     store: web::Data<Arc<EnrollmentStore>>,
     enrollment_id: web::Path<String>,
     req: web::Json<StewardVouchRequest>,
 ) -> Result<HttpResponse> {
+    // Vouching is an institutional act of standing. Authorize BEFORE touching
+    // enrollment state, and take the actor from the credential rather than the
+    // body (issue #2443).
+    let steward_did = authorize_steward_act(&http_req, req.steward_did.as_deref())?;
+
     let mut enrollments = store.enrollments.write().await;
     let session = enrollments
         .get_mut(enrollment_id.as_str())
         .ok_or_else(|| GatewayError::NotFound("Enrollment not found".to_string()))?;
+
+    // Steward authority is scoped to an organization, not global: a steward of
+    // one must not vouch someone into another's membership. Checked before any
+    // state validation so a cross-organization caller is refused outright
+    // rather than told about the enrollment's progress.
+    //
+    // SCOPE NOTE: this surface is **cooperative-only by construction**, not
+    // organization-generic. `complete_enrollment` builds the membership
+    // jurisdiction as `format!("coop:{}", session.coop_id)`, and the `coop_id`
+    // claim is the cooperative namespace. Communities are a distinct entity
+    // type (`icn_entity::EntityType::Community`) addressed by a separate
+    // `community:*` scope family in `api/communities.rs` — which does not use
+    // this check, and whose scopes are not in `validation::ALLOWED_SCOPES`, so
+    // no gateway credential can carry them today. Enrolling into a community
+    // therefore is not a supported flow here; generalizing it belongs with the
+    // flat-`coop_id` → `EntityId` migration (#2082/#2080), not with this
+    // authorization fix. Until then, binding on `coop_id` matches exactly what
+    // the surface actually creates.
+    crate::middleware::require_coop_access(&http_req, &session.coop_id)?;
 
     // Must be level 1 first
     if session.level < 1 {
@@ -849,10 +880,11 @@ pub async fn steward_vouch(
         return Err(GatewayError::BadRequest("Enrollment expired".to_string()));
     }
 
-    // Record the vouch
+    // Record the vouch. `steward_did` is the VERIFIED credential subject, never
+    // the request body's assertion.
     session.level = 2;
     session.steward_vouch = Some(req.vouch_statement.clone());
-    session.steward_did = req.steward_did.clone();
+    session.steward_did = Some(steward_did);
     session.vouched_at = Some(now);
 
     // Release lock and persist
@@ -916,14 +948,23 @@ pub async fn get_enrollment_status(
 /// POST /reject/{enrollment_id} - Steward rejects an enrollment
 #[post("/reject/{enrollment_id}")]
 pub async fn reject_enrollment(
+    http_req: HttpRequest,
     store: web::Data<Arc<EnrollmentStore>>,
     enrollment_id: web::Path<String>,
     req: web::Json<RejectRequest>,
 ) -> Result<HttpResponse> {
+    // Rejection is an institutional moderation decision; same binding as
+    // vouching (issue #2443).
+    let rejected_by = authorize_steward_act(&http_req, req.steward_did.as_deref())?;
+
     let mut enrollments = store.enrollments.write().await;
     let session = enrollments
         .get_mut(enrollment_id.as_str())
         .ok_or_else(|| GatewayError::NotFound("Enrollment not found".to_string()))?;
+
+    // Same cooperative binding as vouching: moderation authority does not cross
+    // cooperative boundaries.
+    crate::middleware::require_coop_access(&http_req, &session.coop_id)?;
 
     // Check not already rejected
     if session.rejected {
@@ -945,7 +986,8 @@ pub async fn reject_enrollment(
     session.rejected = true;
     session.rejection_reason = Some(req.reason.clone());
     session.rejected_at = Some(now);
-    session.rejected_by = req.steward_did.clone();
+    // The VERIFIED subject, never the body's assertion.
+    session.rejected_by = Some(rejected_by);
 
     // Release lock and persist
     let id = enrollment_id.clone();
@@ -1069,9 +1111,15 @@ pub async fn get_steward_stats(
 /// GET /steward/history - Get vouch history
 #[actix_web::get("/steward/history")]
 pub async fn get_vouch_history(
+    http_req: HttpRequest,
     store: web::Data<Arc<EnrollmentStore>>,
     query: web::Query<HistoryQuery>,
 ) -> Result<HttpResponse> {
+    // Unlike `/steward/stats`, this history is NOT self-scoped: it discloses
+    // applicant identities together with which steward vouched for each of
+    // them, across every enrollment. Steward authority required (issue #2443).
+    authorize_steward_act(&http_req, None)?;
+
     let limit = query.limit.unwrap_or(50).min(100);
     let offset = query.offset.unwrap_or(0);
 
@@ -1124,17 +1172,109 @@ pub struct HistoryQuery {
 // Configuration
 // ============================================================================
 
+/// Public and self-authenticating enrollment routes.
+///
+/// Mounted WITHOUT `jwt_auth`. Two different reasons live here, and conflating
+/// them is how the #2443 defect happened:
+///
+/// - **Public initiation** (`/enrollment/start`, `/enrollment/verify/level1`,
+///   `/status/{id}`): a person beginning enrollment does not yet hold an ICN
+///   credential, so requiring one would make enrollment impossible.
+/// - **Bearer-authenticating by hand** (`/enrollment/verify/level2`,
+///   `/steward/stats`): these verify a bearer credential through
+///   [`SessionAuthority`], so they already honor revocation and the configured
+///   lifetime (#2437). They stay here rather than moving under the middleware,
+///   which would double-verify the same credential.
+/// - **Applicant-signature authenticating** (`/enrollment/complete`): this one
+///   takes no `Authorization` header at all. It authenticates the *applicant's*
+///   device signature over `complete:{enrollment_id}` and then **mints** a
+///   credential. It is a credential-issuing endpoint, not a credential-gated
+///   one — do not read its `SessionAuthority` parameter as an access check.
+///
+/// CAVEAT worth stating explicitly, because it bounds what this split fixes:
+/// `/enrollment/verify/level2` performs the *same* state transition as the
+/// protected `/vouch/{id}` — it sets `level = 2`, `steward_vouch`,
+/// `steward_did`, and `vouched_at` — but authorizes it with a trust-graph gate
+/// (`effective_trust >= STEWARD_MIN_TRUST_SCORE`) rather than a steward
+/// capability, and applies no cooperative binding. Moving `/vouch/{id}` behind
+/// a capability therefore does not make vouching capability-gated in general.
+/// Reconciling the two authority models is an institutional decision (does
+/// vouching authority derive from the trust graph or from a governance
+/// capability?), deliberately not made here — see the PR discussion for #2443.
+///
+/// Institutional acts do NOT belong in this set — see [`configure_protected`].
 pub fn configure(cfg: &mut web::ServiceConfig) {
     cfg.service(start_enrollment)
         .service(verify_level1)
         .service(verify_level2)
         .service(complete_enrollment)
-        .service(list_pending_enrollments)
-        .service(steward_vouch)
         .service(get_enrollment_status)
+        .service(get_steward_stats);
+}
+
+/// Steward and moderation routes, which record institutional acts or disclose
+/// applicant state.
+///
+/// Mounted BEHIND `jwt_auth` (issue #2443). Registering a route here is what
+/// gives it signature validation, the configured lifetime ceiling, durable
+/// revocation, and fail-closed authority construction — a handler cannot opt
+/// out of them by forgetting a check, which is precisely how `steward_vouch`
+/// came to accept an anonymous POST that named its own actor.
+///
+/// Authentication alone is not sufficient for these routes: each handler
+/// additionally requires steward authority through [`authorize_steward_act`].
+pub fn configure_protected(cfg: &mut web::ServiceConfig) {
+    cfg.service(list_pending_enrollments)
+        .service(steward_vouch)
         .service(reject_enrollment)
-        .service(get_steward_stats)
         .service(get_vouch_history);
+}
+
+/// Capabilities that authorize an institutional act on the enrollment surface.
+///
+/// The narrowed steward class scope first, with the broad `governance:write`
+/// accepted alongside it during the #1868 capability decomposition — the same
+/// pair `assign_role` uses in `apps/governance`, so the enrollment surface does
+/// not invent a second, divergent notion of steward authority.
+/// Both are referenced through `icn_rpc::auth::scopes` rather than spelled as
+/// literals: the broad scope is slated for retirement "once no production code
+/// references it", and a string literal is invisible to the constant-reference
+/// search that decision will be made from — this call site would be missed and
+/// the accepted-also fallback would silently survive its own retirement.
+const STEWARD_ACT_SCOPES: &[&str] = &[
+    icn_rpc::auth::scopes::GOVERNANCE_STEWARD_WRITE,
+    icn_rpc::auth::scopes::GOVERNANCE_WRITE,
+];
+
+/// Authorize a steward/moderation act and return the DID to RECORD as its actor.
+///
+/// The recorded actor is always the verified credential subject. A request body
+/// may still carry a steward DID (the field predates this check and remains in
+/// the wire format), but it may only *agree* with the verified subject — it can
+/// never determine the actor. Disagreement is refused rather than silently
+/// overridden, so a client that believes it is acting as someone else is told
+/// so instead of having its claim quietly rewritten.
+fn authorize_steward_act(http_req: &HttpRequest, body_did: Option<&str>) -> Result<String> {
+    crate::middleware::require_any_scope(http_req, STEWARD_ACT_SCOPES)?;
+
+    let claims = crate::middleware::get_claims(http_req).ok_or_else(|| {
+        // Unreachable while these routes are mounted behind `jwt_auth`; if a
+        // future composition drops the middleware, deny rather than proceed
+        // with an unauthenticated actor.
+        GatewayError::AuthenticationFailed(
+            "no verified credential on an institutional route".to_string(),
+        )
+    })?;
+
+    if let Some(supplied) = body_did {
+        if supplied != claims.sub {
+            return Err(GatewayError::AuthorizationFailed(
+                "steward_did does not match the authenticated credential subject".to_string(),
+            ));
+        }
+    }
+
+    Ok(claims.sub)
 }
 
 #[cfg(test)]
