@@ -1325,6 +1325,10 @@ async fn get_bootstrap_gateway_token(
                 "governance:read".to_string(),
                 "governance:write".to_string(),
             ],
+            // Canonical default lifetime. The bootstrap token is consumed
+            // immediately; a deployment configured shorter than the default
+            // refuses it at acceptance with a message naming the bound.
+            None,
         )?;
         return Ok(BootstrapAuthContext {
             token,

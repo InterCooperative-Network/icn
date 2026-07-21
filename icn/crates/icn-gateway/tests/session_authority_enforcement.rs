@@ -272,10 +272,54 @@ async fn expired_credentials_are_rejected_at_the_boundary() {
         .expect("encode")
     };
 
-    // Comfortably in the future: accepted.
-    assert_eq!(get_protected(&app, &mint(now + 3600)).await, 200);
+    // Comfortably in the future, and carrying EXACTLY the configured lifetime
+    // (iat is 10s in the past, so exp - iat == 3600): accepted. This also pins
+    // the acceptance-bound equality case through the real middleware — one
+    // second longer and the lifetime bound would refuse it.
+    assert_eq!(get_protected(&app, &mint(now + 3590)).await, 200);
     // One second past the claim boundary: rejected without hidden leeway.
     assert_eq!(get_protected(&app, &mint(now - 1)).await, 401);
+}
+
+// ---------------------------------------------------------------------------
+// 6b. The configured lifetime bounds ACCEPTANCE, not just issuance
+// ---------------------------------------------------------------------------
+
+/// `icnctl auth token --local-mint` holds the gateway's signing secret but not
+/// its configuration. If it mints with the canonical 24-hour default against a
+/// deployment configured for one-hour sessions, the middleware must refuse the
+/// credential: deployment policy is a ceiling on what is ACCEPTED, not advice
+/// to well-behaved issuers.
+#[actix_web::test]
+async fn co_issued_credential_exceeding_the_configured_lifetime_is_rejected() {
+    let authority = authority(
+        Arc::new(InMemoryRevocationAuthority::new()),
+        AuthorityProfile::PortableEvaluator,
+        1,
+    );
+    let app = protected_app!(authority.clone());
+
+    // The local-mint shape: same secret, canonical default (24h) lifetime.
+    let over_long = AuthManager::new(SECRET.to_vec())
+        .issue_token(&did(), "test-coop", scopes(&["coop:read"]))
+        .expect("mint");
+    assert_eq!(
+        get_protected(&app, &over_long).await,
+        401,
+        "a credential outliving the deployment's configured session lifetime \
+         must be refused at the enforcing boundary"
+    );
+
+    // The same co-issuer, minting within the configured bound, is accepted.
+    let bounded = AuthManager::new(SECRET.to_vec())
+        .with_token_ttl(TokenLifetimePolicy::from_hours(1).unwrap().ttl())
+        .issue_token(&did(), "test-coop", scopes(&["coop:read"]))
+        .expect("mint");
+    assert_eq!(
+        get_protected(&app, &bounded).await,
+        200,
+        "a co-issued credential within the configured bound is accepted"
+    );
 }
 
 // ---------------------------------------------------------------------------

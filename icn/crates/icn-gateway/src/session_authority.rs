@@ -584,7 +584,8 @@ impl SessionAuthority {
         Ok((token, granted))
     }
 
-    /// Verify a presented credential: signature and expiry, then revocation.
+    /// Verify a presented credential: signature and expiry, then the configured
+    /// lifetime bound, then revocation.
     ///
     /// Ordering is deliberate — revocation state is only consulted for a
     /// credential that is otherwise valid, so an attacker cannot use this path to
@@ -594,6 +595,42 @@ impl SessionAuthority {
     /// revocation state denies rather than admits.
     pub fn verify(&self, token: &str) -> Result<TokenClaims> {
         let claims = self.auth.verify_token(token)?;
+
+        // The configured lifetime bounds ACCEPTANCE, not just issuance. Every
+        // gateway mint already carries exactly the configured lifetime, but a
+        // co-issuer holding the signing secret — `icnctl auth token
+        // --local-mint` is the supported one — signs whatever expiry it
+        // chooses, and a signature check alone would honor it. Two checks,
+        // guarding different failures:
+        //
+        // 1. `exp - iat` beyond the bound: an issuer that never learned this
+        //    deployment's configured lifetime. Refused loudly and immediately
+        //    (not clamped, not accepted-later), so the operator re-mints
+        //    within policy instead of discovering a silently shortened
+        //    session.
+        // 2. `exp` further than one lifetime from now: independent of what
+        //    `iat` claims, no accepted credential can have more than one
+        //    configured lifetime of validity remaining. This holds even for a
+        //    fabricated or forward-dated `iat`, which check 1 alone would
+        //    trust.
+        //
+        // No leeway on either check, matching the zero-leeway expiry stance:
+        // the trusted-local co-issuer runs on this same host and clock.
+        let bound = self.lifetime.ttl().as_secs();
+        if claims.exp.saturating_sub(claims.iat) > bound {
+            return Err(GatewayError::AuthenticationFailed(format!(
+                "credential lifetime exceeds this deployment's configured session \
+                 lifetime ({bound} seconds); re-mint within the configured bound"
+            )));
+        }
+        let now = icn_time::current_timestamp_secs();
+        if claims.exp > now.saturating_add(bound) {
+            return Err(GatewayError::AuthenticationFailed(
+                "credential expiry lies further away than the configured session \
+                 lifetime permits"
+                    .to_string(),
+            ));
+        }
 
         let Some(jti) = claims.jti.as_deref() else {
             // A credential minted before revocable ids existed cannot be
@@ -935,5 +972,81 @@ mod tests {
             "degraded revocation must be reported honestly: {:?}",
             caps.notes
         );
+    }
+
+    // -- lifetime acceptance bound (#2442 review: trusted-local co-issuer) --
+
+    fn hour_authority() -> SessionAuthority {
+        let lifetime = TokenLifetimePolicy::from_hours(1).unwrap();
+        let auth = Arc::new(AuthManager::new(vec![7u8; 32]).with_token_ttl(lifetime.ttl()));
+        SessionAuthority::new(
+            auth,
+            Arc::new(InMemoryRevocationAuthority::new()),
+            lifetime,
+            AuthorityProfile::PortableEvaluator,
+        )
+        .unwrap()
+    }
+
+    fn test_did() -> icn_identity::Did {
+        icn_identity::IdentityBundle::generate()
+            .expect("generate test identity")
+            .did()
+            .clone()
+    }
+
+    /// A co-issuer holding the signing secret but not the deployment's
+    /// configuration (the `icnctl auth token --local-mint` shape) mints with
+    /// the canonical 24-hour default. A one-hour deployment must refuse that
+    /// credential at acceptance: the configured lifetime is an authorization
+    /// bound on what is ACCEPTED, not advice applied only at issuance.
+    #[test]
+    fn acceptance_rejects_a_lifetime_beyond_the_configured_bound() {
+        let authority = hour_authority();
+        let co_issuer = AuthManager::new(vec![7u8; 32]); // canonical 24h default
+        let token = co_issuer
+            .issue_token(&test_did(), "test-coop", scopes(&["coop:read"]))
+            .unwrap();
+        let err = authority.verify(&token).unwrap_err();
+        assert!(matches!(err, GatewayError::AuthenticationFailed(_)));
+    }
+
+    /// The bound is exact, not fuzzy: a credential carrying precisely the
+    /// configured lifetime — what every gateway mint produces — is accepted.
+    #[test]
+    fn acceptance_admits_exactly_the_configured_lifetime() {
+        let authority = hour_authority();
+        let token = authority
+            .auth_manager()
+            .issue_token(&test_did(), "test-coop", scopes(&["coop:read"]))
+            .unwrap();
+        assert!(authority.verify(&token).is_ok());
+    }
+
+    /// A forward-dated `iat` cannot smuggle extra validity: even when
+    /// `exp - iat` respects the configured lifetime, a credential whose expiry
+    /// lies further than one configured lifetime from now is refused.
+    #[test]
+    fn forward_dated_credentials_cannot_outlive_the_configured_bound() {
+        let authority = hour_authority();
+        let now = icn_time::current_timestamp_secs();
+        let claims = crate::auth::TokenClaims {
+            sub: test_did().to_string(),
+            iat: now + 7200,
+            exp: now + 7200 + 3600, // exp - iat == configured ttl, but 3h out
+            coop_id: "test-coop".to_string(),
+            scopes: scopes(&["coop:read"]),
+            entity_id: None,
+            entity_type: None,
+            jti: Some("forward-dated-test".to_string()),
+        };
+        let token = jsonwebtoken::encode(
+            &jsonwebtoken::Header::default(),
+            &claims,
+            &jsonwebtoken::EncodingKey::from_secret(&[7u8; 32]),
+        )
+        .unwrap();
+        let err = authority.verify(&token).unwrap_err();
+        assert!(matches!(err, GatewayError::AuthenticationFailed(_)));
     }
 }

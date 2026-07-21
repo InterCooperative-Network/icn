@@ -1,7 +1,7 @@
 ---
 Status: descriptive
 Canonical: no
-Last Reviewed: 2026-07-19
+Last Reviewed: 2026-07-21
 ---
 
 # The Authority Spine
@@ -39,7 +39,7 @@ authority rather than a bearer secret.
 | Invariant | Statement | Where enforced |
 |---|---|---|
 | **Attenuation** | `issued ⊆ issuer ∩ flow_allowed ∩ requested` — every term a ceiling, never a grant | `session_authority::attenuate_scopes` |
-| **Expiration** | The *configured* lifetime bounds the credentials actually issued and accepted; client responses report that same lifetime, without hidden verification leeway | `TokenLifetimePolicy`, `AuthManager::with_token_ttl`, auth/invite/session responses |
+| **Expiration** | The *configured* lifetime bounds the credentials actually issued and accepted; client responses report that same lifetime, without hidden verification leeway | `TokenLifetimePolicy`, `AuthManager::with_token_ttl`, `SessionAuthority::verify` (acceptance bound), auth/invite/session responses |
 | **Revocation** | An issued credential can be individually withdrawn and is revalidated before each protected operation on every surface that accepted it | `RevocationAuthority`, HTTP middleware, WebSocket operations, RPC verification |
 | **Truth** | The runtime reports which of the above it actually installed, and a profile that *requires* a guarantee refuses to **serve** without it | `AuthorityCapabilities`, `AuthorityProfile::validate` |
 
@@ -93,6 +93,18 @@ software should not claim otherwise on its behalf.
 - `/auth/verify`, invite join, and QR-session responses derive their reported
   lifetime from the installed authority. Verification uses the credential's
   exact `exp` boundary; the JWT library's default expiry leeway is disabled.
+- The configured lifetime bounds **acceptance**, not just issuance. Every
+  gateway mint already carries exactly the configured lifetime, but a co-issuer
+  holding the signing secret — `icnctl auth token --local-mint` is the
+  supported one — signs whatever expiry it chooses. `SessionAuthority::verify`
+  therefore refuses a credential whose `exp - iat` exceeds the configured
+  lifetime (loudly, naming the bound — not clamped, which would silently
+  shorten a session the holder was told was longer), and independently refuses
+  any credential whose expiry lies more than one configured lifetime from now,
+  so a fabricated or forward-dated `iat` cannot buy extra validity. The local
+  mint takes `--expiry-hours`, validated through the same
+  `TokenLifetimePolicy` the gateway applies to its own configuration, for
+  deployments configured shorter than the canonical default.
 - HTTP bearer routes revalidate on every request. WebSockets retain the
   credential, revalidate after asynchronous subscription setup, and revalidate
   before every protected event and every backfill operation/event. A revoked or

@@ -584,6 +584,14 @@ enum AuthCommands {
         /// (issue #2075), which stays fail-closed on routable binds.
         #[arg(long, default_value_t = false)]
         local_mint: bool,
+
+        /// Session lifetime in hours for --local-mint. Defaults to the
+        /// canonical 24-hour lifetime. The gateway ACCEPTS only credentials
+        /// whose lifetime is within its configured `token_expiry_hours`; on a
+        /// deployment configured shorter than 24 hours, pass a matching (or
+        /// shorter) value or the minted credential will be refused.
+        #[arg(long, requires = "local_mint")]
+        expiry_hours: Option<u64>,
     },
 }
 
@@ -7647,6 +7655,7 @@ pub(crate) fn mint_trusted_token_with_secret(
     did: &icn_identity::Did,
     coop_id: &str,
     scopes: Vec<String>,
+    expiry_hours: Option<u64>,
 ) -> Result<String> {
     if secret.is_empty() {
         bail!("gateway JWT secret is empty");
@@ -7664,7 +7673,22 @@ pub(crate) fn mint_trusted_token_with_secret(
     // bytes, verbatim, never hex/base64-decoded. This is what makes a token minted
     // here verify on this VM's live gateway (the divergence bug caught in review
     // of #2396 is now structurally impossible — one function, both call sites).
-    icn_gateway::auth::AuthManager::from_secret_string(secret)
+    let manager = icn_gateway::auth::AuthManager::from_secret_string(secret);
+    // An explicit lifetime goes through the SAME validation the gateway applies
+    // to its own configured `token_expiry_hours` (`TokenLifetimePolicy`), so the
+    // co-issuer and the gateway cannot drift in what a legal lifetime is. The
+    // gateway ACCEPTS only credentials within its configured lifetime, so on a
+    // deployment configured shorter than the canonical default this knob is how
+    // a trusted-local mint stays acceptable.
+    let manager = match expiry_hours {
+        Some(hours) => {
+            let policy = icn_gateway::session_authority::TokenLifetimePolicy::from_hours(hours)
+                .map_err(|e| anyhow::anyhow!("invalid --expiry-hours: {e}"))?;
+            manager.with_token_ttl(policy.ttl())
+        }
+        None => manager,
+    };
+    manager
         .issue_token(did, coop_id, scopes)
         .context("trusted local token mint failed")
 }
@@ -7677,6 +7701,7 @@ pub(crate) fn mint_local_trusted_token(
     did: &icn_identity::Did,
     coop_id: &str,
     scopes: Vec<String>,
+    expiry_hours: Option<u64>,
 ) -> Result<String> {
     let secret = std::env::var("ICN_GATEWAY_JWT_SECRET").map_err(|_| {
         anyhow::anyhow!(
@@ -7692,7 +7717,7 @@ pub(crate) fn mint_local_trusted_token(
     // daemon does (see `icn_gateway::auth::signing_key_bytes`). icnd stores
     // ICN_GATEWAY_JWT_SECRET verbatim, so the minted JWT verifies on the live
     // gateway.
-    mint_trusted_token_with_secret(&secret, did, coop_id, scopes)
+    mint_trusted_token_with_secret(&secret, did, coop_id, scopes, expiry_hours)
 }
 
 #[cfg(test)]
@@ -7712,6 +7737,7 @@ mod trusted_local_mint_tests {
             bundle.did(),
             "nycn",
             vec!["governance:read".to_string(), "coop:admin".to_string()],
+            None,
         )
         .unwrap();
         let claims = icn_gateway::auth::AuthManager::from_secret_string(secret)
@@ -7737,6 +7763,7 @@ mod trusted_local_mint_tests {
             bundle.did(),
             "nycn",
             vec!["governance:read".to_string()],
+            None,
         )
         .unwrap();
         assert!(
@@ -7751,7 +7778,7 @@ mod trusted_local_mint_tests {
     #[test]
     fn local_mint_rejects_empty_secret() {
         let bundle = icn_identity::IdentityBundle::generate().unwrap();
-        assert!(mint_trusted_token_with_secret("", bundle.did(), "nycn", vec![]).is_err());
+        assert!(mint_trusted_token_with_secret("", bundle.did(), "nycn", vec![], None).is_err());
     }
 
     /// The gateway builds its signing key as `config.jwt_secret.into_bytes()`
@@ -7768,6 +7795,7 @@ mod trusted_local_mint_tests {
             bundle.did(),
             "nycn",
             vec!["governance:read".to_string()],
+            None,
         )
         .unwrap();
         // The gateway (raw string-byte key, via the shared `from_secret_string`)
@@ -7785,6 +7813,78 @@ mod trusted_local_mint_tests {
         );
     }
 
+    /// The local mint applies a requested session lifetime, so an operator on a
+    /// deployment configured for shorter sessions can mint within that bound —
+    /// the gateway REFUSES any credential whose lifetime exceeds its configured
+    /// `token_expiry_hours` (#2442 acceptance bound).
+    #[test]
+    fn local_mint_applies_a_requested_expiry() {
+        let secret = "instance-local-gateway-secret";
+        let bundle = icn_identity::IdentityBundle::generate().unwrap();
+        let token = mint_trusted_token_with_secret(
+            secret,
+            bundle.did(),
+            "nycn",
+            vec!["governance:read".to_string()],
+            Some(1),
+        )
+        .unwrap();
+        let claims = icn_gateway::auth::AuthManager::from_secret_string(secret)
+            .verify_token(&token)
+            .unwrap();
+        assert_eq!(
+            claims.exp - claims.iat,
+            3600,
+            "an explicit --expiry-hours must be the lifetime actually minted"
+        );
+    }
+
+    /// Without an explicit lifetime the mint carries the canonical default —
+    /// the same lifetime an unconfigured gateway both issues and accepts.
+    #[test]
+    fn local_mint_defaults_to_the_canonical_lifetime() {
+        let secret = "instance-local-gateway-secret";
+        let bundle = icn_identity::IdentityBundle::generate().unwrap();
+        let token = mint_trusted_token_with_secret(
+            secret,
+            bundle.did(),
+            "nycn",
+            vec!["governance:read".to_string()],
+            None,
+        )
+        .unwrap();
+        let claims = icn_gateway::auth::AuthManager::from_secret_string(secret)
+            .verify_token(&token)
+            .unwrap();
+        assert_eq!(
+            claims.exp - claims.iat,
+            icn_gateway::session_authority::DEFAULT_TOKEN_TTL.as_secs(),
+            "the unconfigured mint and the unconfigured gateway must share one canonical lifetime"
+        );
+    }
+
+    /// A zero or absurd lifetime is rejected through the SAME validation the
+    /// gateway applies to its own configured lifetime (`TokenLifetimePolicy`),
+    /// so the two surfaces cannot drift in what they consider a legal lifetime.
+    #[test]
+    fn local_mint_rejects_zero_and_excessive_expiry() {
+        let secret = "instance-local-gateway-secret";
+        let bundle = icn_identity::IdentityBundle::generate().unwrap();
+        for hours in [0u64, 100_000] {
+            assert!(
+                mint_trusted_token_with_secret(
+                    secret,
+                    bundle.did(),
+                    "nycn",
+                    vec!["governance:read".to_string()],
+                    Some(hours),
+                )
+                .is_err(),
+                "lifetime of {hours} hours must be rejected up front"
+            );
+        }
+    }
+
     /// The local mint runs the same input validation as /auth/verify: a malformed
     /// coop_id or an unknown scope is rejected up front, not minted into a token
     /// that only 403s later at the endpoint.
@@ -7793,7 +7893,8 @@ mod trusted_local_mint_tests {
         let secret = "instance-local-gateway-secret";
         let bundle = icn_identity::IdentityBundle::generate().unwrap();
         assert!(
-            mint_trusted_token_with_secret(secret, bundle.did(), "bad@coop#id!", vec![]).is_err(),
+            mint_trusted_token_with_secret(secret, bundle.did(), "bad@coop#id!", vec![], None)
+                .is_err(),
             "malformed coop_id must be rejected up front"
         );
         assert!(
@@ -7802,6 +7903,7 @@ mod trusted_local_mint_tests {
                 bundle.did(),
                 "nycn",
                 vec!["governance:read".to_string(), "totally:bogus".to_string()],
+                None,
             )
             .is_err(),
             "an unknown scope must be rejected up front"
@@ -7817,6 +7919,7 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
             coop_id,
             scopes,
             local_mint,
+            expiry_hours,
         } => {
             // Get keystore path and unlock
             let keystore_path = get_keystore_path(data_dir);
@@ -7848,7 +7951,8 @@ async fn handle_auth_command(cmd: AuthCommands, data_dir: &Path) -> Result<()> {
                 // secret in-process — no network call, no /auth/verify. Print
                 // ONLY the token (callers / the demo seed capture it from
                 // stdout); the signing secret is never printed.
-                let token = mint_local_trusted_token(keypair.did(), &coop_id, scope_list)?;
+                let token =
+                    mint_local_trusted_token(keypair.did(), &coop_id, scope_list, expiry_hours)?;
                 println!("{token}");
                 return Ok(());
             }
