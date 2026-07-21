@@ -240,11 +240,14 @@ async fn revoked_credential_is_refused() {
     let token = mint(&authority, &did, &[STEWARD_SCOPE]);
     let body = serde_json::json!({ "vouch_statement": "x" });
 
-    // Sanity: accepted before revocation (not a 401).
+    // Sanity before revoking: the credential authenticates and authorizes, so
+    // the only thing left to refuse it is the nonexistent enrollment. Pinning
+    // 404 exactly (rather than "not 401") keeps this precondition from passing
+    // on a 500 and making the revocation assertion below vacuous.
     let before = post_vouch(&app, Some(&token), body.clone()).await;
-    assert_ne!(
-        before, 401,
-        "credential should authenticate before revocation"
+    assert_eq!(
+        before, 404,
+        "credential should authenticate and authorize before revocation"
     );
 
     let claims = authority.auth_manager().verify_token(&token).unwrap();
@@ -299,10 +302,15 @@ async fn steward_capability_and_broad_governance_scope_are_both_accepted() {
             serde_json::json!({ "vouch_statement": "I vouch", "steward_did": did.to_string() }),
         )
         .await;
-        assert_ne!(status, 401, "scope {scope} must authenticate");
-        assert_ne!(
-            status, 403,
-            "scope {scope} must carry steward authority (got {status})"
+        // 404 is the precise success signal: the enrollment id is deliberately
+        // nonexistent, so reaching the handler's own NotFound proves
+        // authentication AND authorization both passed. Asserting merely
+        // "not 401/403" would also pass on a 500 and mask an unrelated
+        // regression.
+        assert_eq!(
+            status, 404,
+            "scope {scope} must authenticate and carry steward authority, \
+             leaving only the missing enrollment to refuse it (got {status})"
         );
     }
 }
@@ -487,11 +495,14 @@ async fn matching_body_did_is_accepted_and_records_the_same_subject() {
         }),
     )
     .await;
-    assert_ne!(
-        status, 403,
-        "a body DID equal to the subject must be accepted"
+    // As above, 404 is the exact expected outcome: authorization passed and only
+    // the nonexistent enrollment remains. A bare "not 403" would also accept a
+    // 500 and hide an unrelated failure.
+    assert_eq!(
+        status, 404,
+        "a body DID equal to the verified subject must be accepted, leaving \
+         only the missing enrollment to refuse it (got {status})"
     );
-    assert_ne!(status, 401, "the credential is valid");
 }
 
 // ---------------------------------------------------------------------------
