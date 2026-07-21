@@ -272,7 +272,7 @@ pub async fn get_anchor(
 ///
 /// POST /v1/sdis/anchor/rotate-keys
 #[post("/rotate-keys")]
-pub async fn rotate_keys(_req: web::Json<RotateKeysRequest>) -> Result<HttpResponse> {
+pub async fn rotate_keys() -> Result<HttpResponse> {
     Err(GatewayError::Forbidden(
         "Anchor key rotation requires a signed current-key transition; this route is disabled until that authority path is wired".to_string(),
     ))
@@ -307,7 +307,7 @@ pub async fn get_rotation_history(
 ///
 /// POST /v1/sdis/anchor/devices/add
 #[post("/devices/add")]
-pub async fn add_device(_req: web::Json<AddDeviceRequest>) -> Result<HttpResponse> {
+pub async fn add_device() -> Result<HttpResponse> {
     Err(GatewayError::Forbidden(
         "Adding anchor devices requires a signed current-key transition; this route is disabled until that authority path is wired".to_string(),
     ))
