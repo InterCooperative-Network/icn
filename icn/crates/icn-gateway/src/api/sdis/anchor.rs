@@ -6,16 +6,15 @@
 //! # Endpoints
 //!
 //! - GET /v1/sdis/anchor/:anchor_id - Get anchor details
-//! - POST /v1/sdis/anchor/rotate-keys - Rotate keys while keeping anchor
+//! - POST /v1/sdis/anchor/rotate-keys - Disabled until signed current-key rotation is wired
 //! - GET /v1/sdis/anchor/:anchor_id/history - Get key rotation history
-//! - POST /v1/sdis/anchor/devices/add - Add a trusted device
+//! - POST /v1/sdis/anchor/devices/add - Disabled until signed current-key device enrollment is wired
 //! - GET /v1/sdis/anchor/:anchor_id/devices - List trusted devices
 
 use actix_web::{get, post, web, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
-use uuid::Uuid;
 
 use super::enrollment::{AnchorDto, EnrollmentPathwayDto, KeyBundleDto};
 use crate::error::{GatewayError, Result};
@@ -265,44 +264,18 @@ pub async fn get_anchor(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Rotate keys while keeping the same anchor
+/// Rotate keys while keeping the same anchor.
+///
+/// Disabled until this route can verify a signed current-key transition bound to
+/// the exact anchor and replacement key material. Public anchor data is not
+/// authority to mutate an identity root.
 ///
 /// POST /v1/sdis/anchor/rotate-keys
 #[post("/rotate-keys")]
-pub async fn rotate_keys(
-    store: web::Data<Arc<AnchorStore>>,
-    req: web::Json<RotateKeysRequest>,
-) -> Result<HttpResponse> {
-    // Get anchor record
-    let mut record = store
-        .get_anchor(&req.anchor_id)?
-        .ok_or_else(|| GatewayError::NotFound("Anchor not found".to_string()))?;
-
-    // Verify current DID matches
-    if record.current_did != req.current_did {
-        return Err(GatewayError::BadRequest(
-            "Current DID does not match".to_string(),
-        ));
-    }
-
-    // Generate new DID
-    let new_did = format!("did:icn:{}", Uuid::new_v4().to_string().replace("-", ""));
-
-    // Perform rotation
-    let old_did = record.current_did.clone();
-    record.rotate_keys(new_did.clone(), req.reason.clone());
-
-    // Save updated record
-    store.update_anchor(&req.anchor_id, record.clone())?;
-
-    let response = RotateKeysResponse {
-        anchor_id: req.anchor_id.clone(),
-        new_did,
-        keybundle_version: record.keybundle_version,
-        revoked_did: old_did,
-    };
-
-    Ok(HttpResponse::Ok().json(response))
+pub async fn rotate_keys() -> Result<HttpResponse> {
+    Err(GatewayError::Forbidden(
+        "Anchor key rotation requires a signed current-key transition; this route is disabled until that authority path is wired".to_string(),
+    ))
 }
 
 /// Get key rotation history
@@ -326,40 +299,18 @@ pub async fn get_rotation_history(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Add a trusted device to an anchor
+/// Add a trusted device to an anchor.
+///
+/// Disabled until this route can verify a signed current-key transition bound to
+/// the exact anchor and device key. Public anchor data is not authority to
+/// mutate identity authenticators.
 ///
 /// POST /v1/sdis/anchor/devices/add
 #[post("/devices/add")]
-pub async fn add_device(
-    store: web::Data<Arc<AnchorStore>>,
-    req: web::Json<AddDeviceRequest>,
-) -> Result<HttpResponse> {
-    // Get anchor record
-    let mut record = store
-        .get_anchor(&req.anchor_id)?
-        .ok_or_else(|| GatewayError::NotFound("Anchor not found".to_string()))?;
-
-    let now = icn_time::current_timestamp_secs();
-
-    // Create device info
-    let device_id = Uuid::new_v4().to_string();
-    let device = DeviceInfo {
-        device_id: device_id.clone(),
-        device_name: req.device_name.clone(),
-        added_at: now,
-        last_seen: now,
-        device_pubkey: req.device_pubkey.clone(),
-    };
-
-    // Add device
-    record.add_device(device.clone());
-
-    // Save updated record
-    store.update_anchor(&req.anchor_id, record)?;
-
-    let response = AddDeviceResponse { device_id, device };
-
-    Ok(HttpResponse::Ok().json(response))
+pub async fn add_device() -> Result<HttpResponse> {
+    Err(GatewayError::Forbidden(
+        "Adding anchor devices requires a signed current-key transition; this route is disabled until that authority path is wired".to_string(),
+    ))
 }
 
 /// List devices for an anchor
