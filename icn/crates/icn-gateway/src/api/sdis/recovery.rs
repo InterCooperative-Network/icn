@@ -11,7 +11,7 @@
 //! 4. Once threshold reached, new KeyBundle is authorized
 //! 5. Client receives new DID (same Anchor, new keys)
 
-use actix_web::{get, post, web, HttpResponse};
+use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
@@ -213,7 +213,7 @@ impl RecoveryCeremony {
 /// Start a new recovery ceremony
 ///
 /// POST /v1/sdis/recovery/start
-#[post("/start")]
+#[post("/recovery/start")]
 pub async fn start_recovery(
     store: web::Data<Arc<RecoveryStore>>,
     req: web::Json<StartRecoveryRequest>,
@@ -249,7 +249,7 @@ pub async fn start_recovery(
 /// Get recovery ceremony status
 ///
 /// GET /v1/sdis/recovery/{recovery_id}
-#[get("/{recovery_id}")]
+#[get("/recovery/{recovery_id}")]
 pub async fn get_recovery_status(
     store: web::Data<Arc<RecoveryStore>>,
     recovery_id: web::Path<String>,
@@ -272,7 +272,7 @@ pub async fn get_recovery_status(
 /// Complete recovery and receive new DID
 ///
 /// POST /v1/sdis/recovery/{recovery_id}/complete
-#[post("/{recovery_id}/complete")]
+#[post("/recovery/{recovery_id}/complete")]
 pub async fn complete_recovery(
     store: web::Data<Arc<RecoveryStore>>,
     recovery_id: web::Path<String>,
@@ -320,22 +320,42 @@ pub async fn complete_recovery(
     Ok(HttpResponse::Ok().json(response))
 }
 
-/// Simulate steward approval (for testing/development only)
+/// Record a steward approval on a recovery ceremony.
 ///
 /// POST /v1/sdis/recovery/{recovery_id}/approve
 ///
-/// **WARNING**: This endpoint should NOT be enabled in production.
-/// Set environment variable `ICN_ENABLE_ADMIN_ENDPOINTS=false` to disable.
-#[post("/{recovery_id}/approve")]
+/// A recovery approval is a steward institutional act: advancing it toward the
+/// approval threshold authorizes rotating an Anchor's keys (see the
+/// start -> approve -> complete chain). It is therefore mounted behind `jwt_auth`
+/// via [`configure_protected`] and requires steward authority — the approving
+/// steward is the VERIFIED credential subject, never a request-body field.
+///
+/// This endpoint SIMULATES a single steward approval (it advances the counter
+/// without the steward-network identity-proof ceremony), so it additionally stays
+/// an explicit, fail-closed dev/test escape hatch behind `ICN_ENABLE_ADMIN_ENDPOINTS`.
+/// It is NOT the production recovery-authority path: it has no cooperative binding
+/// (the ceremony carries no `coop_id`) and does not enforce distinct approvers.
+/// Production recovery authority is an owed institutional decision (see #2447 /
+/// ADR-0085), not established here.
+#[post("/recovery/{recovery_id}/approve")]
 pub async fn approve_recovery(
+    http_req: HttpRequest,
     store: web::Data<Arc<RecoveryStore>>,
     recovery_id: web::Path<String>,
 ) -> Result<HttpResponse> {
-    // Production guard: check environment variable
+    // Authority first: require verified steward authority (fail-closed if the
+    // `jwt_auth` middleware is ever dropped from this route). There is no body on
+    // this endpoint, so the actor is unambiguously the verified credential subject.
+    // Checked before the admin gate so the gate cannot be probed unauthenticated.
+    let steward_did = super::authorize_steward_act(&http_req, None)?;
+
+    // Defense in depth: this is a dev/test simulation of steward approval, so it
+    // stays fail-closed unless admin endpoints are explicitly enabled. Parsed the
+    // same way as the construction-time mount gate (`admin_endpoints_allowed` in
+    // server.rs) so the two never disagree on a padded/mixed-case value.
     let admin_enabled = std::env::var("ICN_ENABLE_ADMIN_ENDPOINTS")
-        .unwrap_or_else(|_| "false".to_string())
-        .to_lowercase()
-        == "true";
+        .map(|v| v.trim().eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
 
     if !admin_enabled {
         return Err(GatewayError::Forbidden(
@@ -352,6 +372,8 @@ pub async fn approve_recovery(
 
     Ok(HttpResponse::Ok().json(serde_json::json!({
         "status": "approved",
+        // Attribution comes from the verified credential subject, not the body.
+        "approved_by": steward_did,
         "approvals": ceremony.steward_approvals,
         "required": ceremony.required_stewards
     })))
@@ -386,14 +408,27 @@ fn validate_recovery_request(req: &StartRecoveryRequest) -> Result<()> {
 // Configuration Function
 // ============================================================================
 
+/// Public recovery routes (holder-side flow). Non-institutional: ceremony intake,
+/// status read, and holder-side completion (which is gated by prior steward
+/// approval). Steward approval itself is NOT here — see [`configure_protected`].
+///
+/// Registered as FLAT full-path services (not a `web::scope("/recovery")`), the
+/// same shape as `simple_enrollment::configure`: a prefix scope here would
+/// greedily match `/recovery/{id}/approve` and shadow the sibling protected
+/// scope, 404-ing the authenticated route before its middleware ran.
 pub fn configure(cfg: &mut web::ServiceConfig) {
-    cfg.service(
-        web::scope("/recovery")
-            .service(start_recovery)
-            .service(get_recovery_status)
-            .service(complete_recovery)
-            .service(approve_recovery), // Guarded by ICN_ENABLE_ADMIN_ENDPOINTS env var
-    );
+    cfg.service(start_recovery)
+        .service(get_recovery_status)
+        .service(complete_recovery);
+}
+
+/// Institutional (steward) recovery routes. The caller mounts this INSIDE the
+/// `jwt_auth`-wrapped scope (see `server.rs`), so `approve_recovery` always runs
+/// with a verified credential and cannot be reached unauthenticated. Registered
+/// flat (full-path macro) for the same reason as [`configure`]; the path is
+/// identical to the pre-existing mount (`/v1/sdis/recovery/{id}/approve`).
+pub fn configure_protected(cfg: &mut web::ServiceConfig) {
+    cfg.service(approve_recovery);
 }
 
 #[cfg(test)]
