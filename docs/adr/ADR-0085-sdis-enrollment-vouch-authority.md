@@ -532,6 +532,47 @@ implementation plan.
 | I. Mixed-version nodes | Missing; amended | Unknown authority/receipt contracts fail closed for standing-affecting writes |
 | J. Alternate weaker path through script, admin tool, new route, package, or background job | Partially handled; amended | Canonical transition now binds every composition root that produces the same standing effect |
 
+## Scope exclusion: identity-anchor control is not governed here
+
+This ADR governs authority over **institutional standing** — enrollment level,
+admission, membership, role, and capability inside a target institution. It does
+**not** govern authority over control of a personhood **identity anchor**:
+
+- SDIS **recovery approval** (advancing a recovery ceremony toward key rotation), and
+- SDIS **anchor key transition** (`/v1/sdis/anchor/rotate-keys`, `.../devices/add`).
+
+These mutate control of a person's identity keys. Their authority source is current-key
+possession plus a recovery quorum, not a target institution's adopted membership policy.
+Governing them under "the target institution's adopted enrollment policy" would let one
+cooperative govern a person's identity keys — a category error. Identity-anchor control
+authority is owed to a **separate ADR** that inherits this ADR's generic invariants
+(trust is not authority; one authority-and-receipt contract per effect; fail-closed
+composition) but defines its own authority source: a signed current-key transition,
+distinct recovery approvers, and a recovery quorum.
+
+The generic standing invariant here still applies to enrollment, suspension,
+reinstatement, role, and capability changes inside a target institution. It does not
+apply to identity-anchor control.
+
+### Issue-state and containment note (post-dates original drafting)
+
+Since this ADR was first drafted, two SDIS containment PRs merged to `main`: recovery
+steward-approval is now authenticated and loopback-gated (PR #2451), and the anchor
+mutation routes are fail-closed disabled pending a signed current-key transition
+(PR #2449; issue #2448 remains open for that transition). The forward-reference to
+"#2447 / ADR-0085" in `icn/crates/icn-gateway/src/api/sdis/recovery.rs` should be
+repointed to the separate identity-control ADR named above, because this ADR does not
+govern recovery.
+
+Issue **#2447** (reconcile the two vouching-authority models on `/v1/sdis`) was
+**closed as completed by accident** when PR #2449 merged: #2449's body contained the
+phrase "does not resolve #2447", and GitHub's closing-keyword parser matched
+"resolve #2447" without the negation. The duality this ADR addresses is **not**
+resolved on current `main` — `/vouch/{id}` (capability + cooperative binding) and
+`/enrollment/verify/level2` (trust threshold, no binding) still perform the same
+level-2 standing transition through different authority models. #2447 should be reopened
+or replaced with a narrower implementation issue as part of adopting this direction.
+
 ## Consequences
 
 Positive consequences:
