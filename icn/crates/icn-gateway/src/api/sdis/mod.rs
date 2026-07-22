@@ -16,9 +16,9 @@
 //!
 //! ## Anchor Management
 //! - `GET /v1/sdis/anchor/{id}` - Get anchor details
-//! - `POST /v1/sdis/anchor/rotate-keys` - Rotate keys
+//! - `POST /v1/sdis/anchor/rotate-keys` - Disabled until signed current-key rotation is wired
 //! - `GET /v1/sdis/anchor/{id}/history` - Get rotation history
-//! - `POST /v1/sdis/anchor/devices/add` - Add device
+//! - `POST /v1/sdis/anchor/devices/add` - Disabled until signed current-key device enrollment is wired
 //! - `GET /v1/sdis/anchor/{id}/devices` - List devices
 //!
 //! ## Ephemeral Proofs
