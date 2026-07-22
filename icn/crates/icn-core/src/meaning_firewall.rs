@@ -23,25 +23,51 @@
 
 use std::path::PathBuf;
 
-/// Core kernel crates that must not depend on domain crates.
-const KERNEL_CRATES: &[&str] = &["icn-net", "icn-gateway", "icn-gossip", "icn-ledger"];
+// Crate classes below MIRROR scripts/firewall-taxonomy.toml (the single source
+// of truth). .github/scripts/test_firewall_taxonomy.py fails CI if these
+// constants drift from the taxonomy — edit the taxonomy first.
 
-/// Domain-specific crates that kernel must not depend on directly.
-const DOMAIN_CRATES: &[&str] = &["icn-trust", "icn-governance"];
+/// Kernel-class crates that must not depend on domain crates.
+const KERNEL_CRATES: &[&str] = &[
+    "icn-core",
+    "icn-net",
+    "icn-gossip",
+    "icn-store",
+    "icn-kernel-api",
+];
 
-/// Forbidden import patterns in kernel crates.
-/// Used as reference for what constitutes a Meaning Firewall violation.
-/// The strict_*_import_violations tests use `use icn_*::` patterns directly;
-/// bare type names here are too broad for automated scanning (appear in docs).
+/// Domain-class crates that kernel crates must not depend on directly.
+const DOMAIN_CRATES: &[&str] = &[
+    "icn-trust",
+    "icn-governance",
+    "icn-ledger",
+    "icn-ccl",
+    "icn-compute",
+    "icn-entity",
+    "icn-community",
+    "icn-federation",
+    "icn-steward",
+    "icn-coop",
+    "icn-commons",
+    "icn-zkp",
+];
+
+/// API-shell crates: HTTP/RPC hosting layers. Their domain coupling is
+/// EXPECTED during the kernel/app migration and is pinned exactly (Cargo pins
+/// in the taxonomy `[shells]`; import pins in the shell ratchets below).
 #[allow(dead_code)]
-const FORBIDDEN_IMPORTS: &[&str] = &[
-    "use icn_trust::",
-    "icn_trust::",
-    "TrustGraph",
-    "TrustClass",
-    "TrustScore",
-    "GovernanceRules",
-    "MembershipCriteria",
+const API_SHELL_CRATES: &[&str] = &["icn-gateway", "icn-rpc", "icn-api"];
+
+/// App crates (apps/): the kernel must not depend on applications. Current
+/// violations are pinned in `strict_core_app_crate_deps` (migration B10).
+const APP_CRATES: &[&str] = &[
+    "icn-charter-app",
+    "icn-governance-actor",
+    "icn-governance-app",
+    "icn-ledger-actor",
+    "icn-ledger-app",
+    "icn-membership-app",
+    "icn-trust-app",
 ];
 
 /// Allowed kernel-api types that kernel crates CAN use.
@@ -160,18 +186,26 @@ mod tests {
     /// Update these when violations are removed. Adding new violations
     /// will cause this test to fail.
     ///
-    /// Current state (2026-02-15):
-    /// - icn-gossip: CLEAN
-    /// - icn-net: CLEAN
-    /// - icn-gateway: 2 (icn-trust + icn-governance in prod deps)
-    /// - icn-ledger: CLEAN (icn-trust + icn-governance are dev-deps only)
+    /// Current state (2026-07-22, taxonomy reconciliation):
+    /// - icn-net / icn-gossip / icn-store / icn-kernel-api: CLEAN against all
+    ///   12 domain crates.
+    /// - icn-core: carries pinned domain deps — covered by
+    ///   `strict_core_cargo_domain_deps` (finer-grained), excluded here.
+    /// - icn-gateway/icn-rpc/icn-api are API-SHELL class, not kernel: their
+    ///   Cargo domain deps are pinned in scripts/firewall-taxonomy.toml
+    ///   `[shells]` and enforced by firewall_denylist.py.
+    /// - icn-ledger is DOMAIN class (2026-07-22 reclassification) — no longer
+    ///   scanned as kernel. Public evidence: both CI dependency gates already
+    ///   denylisted it; its own trust/governance deps are dev-only; its public
+    ///   surface is settlement/credit/treasury semantics (see the taxonomy
+    ///   header's rules-of-change note).
     #[test]
     fn strict_cargo_dependency_violations() {
         let expected: &[(&str, usize)] = &[
-            ("icn-gossip", 0),  // CLEAN ✅
-            ("icn-net", 0),     // CLEAN ✅
-            ("icn-gateway", 2), // icn-trust + icn-governance
-            ("icn-ledger", 0),  // CLEAN ✅ (domain crates are dev-deps only)
+            ("icn-gossip", 0),     // CLEAN ✅
+            ("icn-net", 0),        // CLEAN ✅
+            ("icn-store", 0),      // CLEAN ✅
+            ("icn-kernel-api", 0), // CLEAN ✅
         ];
 
         for &(crate_name, expected_count) in expected {
@@ -207,18 +241,19 @@ mod tests {
     /// Update these when imports are removed. Adding new imports
     /// will cause this test to fail.
     ///
-    /// Current state (2026-01-30):
-    /// - icn-gossip: CLEAN
-    /// - icn-net: CLEAN (no source imports, only had Cargo.toml dev-dep)
-    /// - icn-gateway: 3 (trust_mgr.rs:2, api/trust.rs:1)
-    /// - icn-ledger: 3 (credit_policy.rs:1, ledger.rs:1, fork_resolution.rs:1)
+    /// Current state (2026-07-22, taxonomy reconciliation): ALL kernel-class
+    /// crates are at ZERO trust imports (icn-core's remaining trust coupling is
+    /// dev-dependency/test-only; `count_imports_in_crate` scans src/).
+    /// icn-gateway's 3 imports moved to `strict_shell_import_violations`
+    /// (api-shell class); icn-ledger is domain class and no longer scanned.
     #[test]
     fn strict_trust_import_violations() {
         let expected: &[(&str, usize)] = &[
+            ("icn-core", 0), // CLEAN ✅ in src/ (trust is a dev-dep; its uses live in tests/, outside the scan)
             ("icn-gossip", 0), // CLEAN ✅
-            ("icn-net", 0),    // CLEAN ✅
-            ("icn-gateway", 3),
-            ("icn-ledger", 0), // CLEAN ✅ (imports removed by #970)
+            ("icn-net", 0),  // CLEAN ✅
+            ("icn-store", 0), // CLEAN ✅
+            ("icn-kernel-api", 0), // CLEAN ✅
         ];
 
         for &(crate_name, expected_count) in expected {
@@ -266,13 +301,20 @@ mod tests {
     /// - receipt_store.rs: +5 `use icn_governance::{Mandate, MandateId, AuthorityGrant,
     ///   AuthorityGrantId, ...}` for sled-backed ADR-0014 authorization-side storage (#1575)
     /// - icn-gateway: 17
+    ///
+    /// Current state (2026-07-22, taxonomy reconciliation): kernel class is at
+    /// ZERO governance imports across the board (icn-core reached 0 earlier —
+    /// see `strict_core_governance_reference_ratchet`). icn-gateway's 17 moved
+    /// to `strict_shell_import_violations` (api-shell class); icn-ledger is
+    /// domain class and no longer scanned here.
     #[test]
     fn strict_governance_import_violations() {
         let expected: &[(&str, usize)] = &[
-            ("icn-net", 0),      // CLEAN ✅
-            ("icn-gossip", 0),   // CLEAN ✅
-            ("icn-ledger", 0),   // CLEAN ✅
-            ("icn-gateway", 17), // +5 ADR-0014 Mandate/AuthorityGrant storage in receipt_store.rs (#1575)
+            ("icn-core", 0),       // CLEAN ✅
+            ("icn-net", 0),        // CLEAN ✅
+            ("icn-gossip", 0),     // CLEAN ✅
+            ("icn-store", 0),      // CLEAN ✅
+            ("icn-kernel-api", 0), // CLEAN ✅
         ];
 
         for &(crate_name, expected_count) in expected {
@@ -372,7 +414,10 @@ mod tests {
 
     /// Domain crates that icn-core should eventually stop depending on.
     /// These are crates whose types leak into the supervisor/wiring layer.
-    const CORE_DOMAIN_DEPS: &[&str] = &["icn-ledger", "icn-ccl", "icn-governance"];
+    /// (Full DOMAIN_CRATES class since 2026-07-22 — previously only 3 of the
+    /// 8 live edges were tracked; compute/federation/coop/steward/entity/
+    /// community/commons had NO ratchet coverage.)
+    const CORE_DOMAIN_DEPS: &[&str] = DOMAIN_CRATES;
 
     /// Pinned count of ALL `icn_ledger::` references in icn-core source.
     ///
@@ -508,10 +553,14 @@ mod tests {
 
     /// Pinned Cargo.toml domain dependency count for icn-core.
     ///
-    /// icn-core currently depends on 3 domain crates (icn-ledger, icn-ccl,
-    /// icn-governance). As extraction proceeds, these should be removed.
+    /// Now measured against the FULL domain class (12 crates). icn-core's
+    /// production deps as of 2026-07-22: icn-ledger, icn-ccl, icn-compute,
+    /// icn-entity, icn-community, icn-federation, icn-steward, icn-coop,
+    /// icn-commons (9). icn-trust/icn-governance are dev-deps only; icn-zkp
+    /// is transitive-only. Each edge has an [[exception]] in
+    /// scripts/firewall-taxonomy.toml with an edge-absent expiry.
     ///
-    /// Target state: 0 after all domain crate extraction completes.
+    /// Target state: 0 after all domain crate extraction completes (Phases B0–B9).
     #[test]
     fn strict_core_cargo_domain_deps() {
         let cargo_toml = read_cargo_toml("icn-core").expect("Could not read icn-core/Cargo.toml");
@@ -523,7 +572,7 @@ mod tests {
             }
         }
 
-        let expected: usize = 2; // icn-ledger + icn-ccl (icn-governance moved to dev-deps only)
+        let expected: usize = 9; // ledger,ccl,compute,entity,community,federation,steward,coop,commons
 
         assert!(
             actual <= expected,
@@ -539,6 +588,170 @@ mod tests {
                  (was pinned at {expected}). Update the pinned count in \
                  meaning_firewall.rs::strict_core_cargo_domain_deps()."
             );
+        }
+    }
+
+    /// Pinned count of ALL references for the icn-core domain edges that had
+    /// NO ratchet coverage before 2026-07-22 (214 references could grow
+    /// silently). Same semantics as the ledger/ccl/governance ratchets:
+    /// counts `use` statements AND inline qualified paths, src/ only,
+    /// excluding this file.
+    ///
+    /// Baselines measured 2026-07-22 at 767ece63. Target: 0 per edge as the
+    /// corresponding migration tranche (B0–B9) lands.
+    #[test]
+    fn strict_core_remaining_domain_reference_ratchets() {
+        let expected: &[(&str, usize)] = &[
+            ("icn_compute::", 86),    // migration B8
+            ("icn_federation::", 48), // migration B6
+            ("icn_coop::", 34),       // migration B5
+            ("icn_steward::", 32),    // migration B4
+            ("icn_entity::", 14),     // migration B3
+            ("icn_commons::", 10),    // migration B9
+            ("icn_community::", 7),   // migration B0
+        ];
+
+        for &(pattern, expected_count) in expected {
+            let actual = count_imports_in_crate("icn-core", pattern);
+
+            assert!(
+                actual <= expected_count,
+                "REGRESSION: icn-core has {actual} `{pattern}` references \
+                 (expected at most {expected_count}). \
+                 Do not add new domain references to icn-core — \
+                 use kernel-api traits or BootstrapHandles instead. \
+                 See docs/architecture/KERNEL_APP_SEPARATION.md for extraction guidance."
+            );
+
+            if actual < expected_count {
+                panic!(
+                    "✅ PROGRESS: icn-core now has only {actual} `{pattern}` references \
+                     (was pinned at {expected_count}). Update the pinned count in \
+                     meaning_firewall.rs::strict_core_remaining_domain_reference_ratchets()."
+                );
+            }
+        }
+    }
+
+    /// Pinned Cargo.toml APP-crate dependency count for icn-core.
+    ///
+    /// The kernel must not depend on applications; these edges were on NO
+    /// denylist before 2026-07-22 (undetectable bypass, now closed). Each has
+    /// an [[exception]] in scripts/firewall-taxonomy.toml.
+    ///
+    /// Current: icn-trust-app, icn-governance-actor, icn-ledger-actor (3).
+    /// Target: 0 after migration B10 (composition moves to bins/icnd).
+    #[test]
+    fn strict_core_app_crate_deps() {
+        let cargo_toml = read_cargo_toml("icn-core").expect("Could not read icn-core/Cargo.toml");
+
+        let mut actual = 0;
+        for app_crate in APP_CRATES {
+            if has_dependency(&cargo_toml, app_crate) {
+                actual += 1;
+            }
+        }
+
+        let expected: usize = 3; // icn-trust-app + icn-governance-actor + icn-ledger-actor
+
+        assert!(
+            actual <= expected,
+            "REGRESSION: icn-core has {actual} app-crate Cargo.toml deps \
+             (expected at most {expected}). \
+             The kernel must not gain new dependencies on apps/ crates — \
+             register apps from the composition root (bins/icnd) instead."
+        );
+
+        if actual < expected {
+            panic!(
+                "✅ PROGRESS: icn-core now has only {actual} app-crate deps \
+                 (was pinned at {expected}). Update the pinned count in \
+                 meaning_firewall.rs::strict_core_app_crate_deps()."
+            );
+        }
+    }
+
+    /// Pinned domain-import counts for API-SHELL crates (icn-gateway, icn-rpc,
+    /// icn-api). Shells host domain routes during the transition, so their
+    /// coupling is EXPECTED — but pinned exactly so it can only shrink.
+    /// Compensates for the edit hook no longer treating icn-gateway as kernel
+    /// (2026-07-22 taxonomy reconciliation).
+    ///
+    /// Baselines measured 2026-07-22 at 767ece63.
+    #[test]
+    fn strict_shell_import_violations() {
+        let expected: &[(&str, &str, usize)] = &[
+            ("icn-gateway", "use icn_trust::", 3), // trust_mgr.rs:2, api/trust.rs:1
+            ("icn-gateway", "use icn_governance::", 17), // see strict_governance history above
+            ("icn-rpc", "use icn_trust::", 0),
+            ("icn-rpc", "use icn_governance::", 2),
+            ("icn-api", "use icn_trust::", 0),
+            ("icn-api", "use icn_governance::", 1),
+        ];
+
+        for &(crate_name, pattern, expected_count) in expected {
+            let actual = count_imports_in_crate(crate_name, pattern);
+
+            assert!(
+                actual <= expected_count,
+                "REGRESSION: {crate_name} has {actual} `{pattern}` imports \
+                 (expected at most {expected_count}). \
+                 API-shell domain coupling may only shrink — new handlers belong \
+                 in apps/ crates mounted as route plugins."
+            );
+
+            if actual < expected_count {
+                panic!(
+                    "✅ PROGRESS: {crate_name} now has only {actual} `{pattern}` \
+                     imports (was pinned at {expected_count}). Update the pinned count in \
+                     meaning_firewall.rs::strict_shell_import_violations()."
+                );
+            }
+        }
+    }
+
+    /// Pinned DOMAIN-TOKEN counts inside icn-kernel-api (the boundary contract
+    /// crate itself). icn-kernel-api was scanned by NOTHING before 2026-07-22,
+    /// while natively defining a domain service layer (services.rs) — domain
+    /// meaning that no Cargo-dependency check can see.
+    ///
+    /// These pins are the honest baseline for the kernel-api purification
+    /// (migration Phase A2/F; layer-contract ADR pending — HD-9). Counts are
+    /// raw token occurrences in icn-kernel-api/src, measured 2026-07-22.
+    /// They may only DECREASE; new domain vocabulary in kernel-api fails here.
+    #[test]
+    fn kernel_api_domain_surface_ratchet() {
+        let expected: &[(&str, usize)] = &[
+            ("TrustClass", 18),              // native enum + thresholds (services.rs)
+            ("MembershipService", 2),        // domain service trait
+            ("FederationService", 6),        // domain service trait
+            ("SdisService", 3),              // domain service trait
+            ("GovernanceService", 5),        // domain service trait
+            ("LedgerService", 8),            // domain service trait
+            ("ControlService", 2),           // domain service trait
+            ("TreasuryOperationType", 28),   // operation enum driving match logic
+            ("FederationOperationType", 10), // operation enum
+            ("AssetType", 65),               // operation enum
+        ];
+
+        for &(token, expected_count) in expected {
+            let actual = count_imports_in_crate("icn-kernel-api", token);
+
+            assert!(
+                actual <= expected_count,
+                "REGRESSION: icn-kernel-api has {actual} `{token}` occurrences \
+                 (expected at most {expected_count}). \
+                 The kernel contract crate must not GROW domain vocabulary — \
+                 domain service contracts belong in per-app api crates."
+            );
+
+            if actual < expected_count {
+                panic!(
+                    "✅ PROGRESS: icn-kernel-api now has only {actual} `{token}` \
+                     occurrences (was pinned at {expected_count}). Update the pinned \
+                     count in meaning_firewall.rs::kernel_api_domain_surface_ratchet()."
+                );
+            }
         }
     }
 
@@ -595,13 +808,15 @@ mod tests {
     /// Verify kernel-api does NOT expose domain-specific types.
     #[test]
     fn kernel_api_no_domain_types() {
+        // NOTE (2026-07-22): this test previously scanned for the literal
+        // "pub struct TrustClass" — a FALSE NEGATIVE, because the real
+        // definition is `pub enum TrustClass` (services.rs). TrustClass and
+        // the rest of kernel-api's existing domain surface are now honestly
+        // pinned (shrink-only) in `kernel_api_domain_surface_ratchet`; this
+        // test keeps only the absolute never-present assertions.
         for file in list_rust_files("icn-kernel-api") {
             if let Ok(content) = std::fs::read_to_string(&file) {
-                for pattern in &[
-                    "struct TrustGraph",
-                    "pub struct TrustClass",
-                    "GovernanceRules",
-                ] {
+                for pattern in &["struct TrustGraph", "enum TrustGraph", "GovernanceRules"] {
                     assert!(
                         !content.contains(pattern),
                         "icn-kernel-api should not define domain type: {pattern}"
