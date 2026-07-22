@@ -16,9 +16,9 @@
 //!
 //! ## Anchor Management
 //! - `GET /v1/sdis/anchor/{id}` - Get anchor details
-//! - `POST /v1/sdis/anchor/rotate-keys` - Rotate keys
+//! - `POST /v1/sdis/anchor/rotate-keys` - Disabled until signed current-key rotation is wired
 //! - `GET /v1/sdis/anchor/{id}/history` - Get rotation history
-//! - `POST /v1/sdis/anchor/devices/add` - Add device
+//! - `POST /v1/sdis/anchor/devices/add` - Disabled until signed current-key device enrollment is wired
 //! - `GET /v1/sdis/anchor/{id}/devices` - List devices
 //!
 //! ## Ephemeral Proofs
@@ -53,6 +53,9 @@ use crate::error::{GatewayError, Result};
 pub use ephemeral::{Channel, EphemeralBinding, EphemeralProof, VerifyResult};
 pub use qr::{decode_from_qr, encode_for_qr, QrEstimate};
 pub use verify::EphemeralVerifier;
+// Shared steward-authority check for SDIS institutional acts. Recovery reuses the
+// exact helper enrollment uses (one notion of steward authority, not a parallel one).
+pub(crate) use simple_enrollment::authorize_steward_act;
 
 // ============================================================================
 // Request/Response Models
