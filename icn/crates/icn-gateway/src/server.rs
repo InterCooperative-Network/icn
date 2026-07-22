@@ -198,6 +198,19 @@ fn self_serve_coop_allowed(dev_opt_in: bool, bind_addr: &SocketAddr) -> bool {
     dev_opt_in && bind_addr.ip().is_loopback()
 }
 
+/// Decide whether the admin/dev SDIS endpoints (currently the recovery-approval
+/// simulation) may be mounted (issue #2075).
+///
+/// Same safe-by-construction rule as [`self_serve_coop_allowed`]: BOTH an explicit
+/// opt-in (`ICN_ENABLE_ADMIN_ENDPOINTS`) AND a loopback bind. The loopback
+/// condition is the invariant — a dev/test escape hatch can never be reached from
+/// a routable interface even if the opt-in is mistakenly set on an all-interfaces
+/// listener. Off-loopback the route is simply not registered. Kept as a free
+/// function so the invariant is unit-tested directly.
+fn admin_endpoints_allowed(opt_in: bool, bind_addr: &SocketAddr) -> bool {
+    opt_in && bind_addr.ip().is_loopback()
+}
+
 impl GatewayServer {
     /// Create a new gateway server (uses temporary storage for testing)
     pub fn new(bind_addr: SocketAddr, jwt_secret: Vec<u8>) -> Self {
@@ -756,6 +769,23 @@ impl GatewayServer {
             .unwrap_or(false);
         let dev_opt_in = self.dev_self_serve_auth || dev_mode_env;
         let allow_self_asserted_coop = self_serve_coop_allowed(dev_opt_in, &self.bind_addr);
+
+        // Admin/dev SDIS endpoints (recovery-approval simulation) require an
+        // explicit opt-in AND a loopback bind. Computed once here (bind-address
+        // based, not a per-request IP heuristic) and used to decide whether the
+        // protected recovery route is mounted at all (#2075).
+        let admin_opt_in = std::env::var("ICN_ENABLE_ADMIN_ENDPOINTS")
+            .map(|v| v.trim().eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+        let mount_admin_recovery = admin_endpoints_allowed(admin_opt_in, &self.bind_addr);
+        if admin_opt_in && !mount_admin_recovery {
+            warn!(
+                "ICN_ENABLE_ADMIN_ENDPOINTS is set but the gateway is bound to \
+                 non-loopback {} — the SDIS recovery-approval simulation stays \
+                 UNMOUNTED (fail-closed). Bind to loopback for local dev (#2075).",
+                self.bind_addr
+            );
+        }
         if allow_self_asserted_coop {
             warn!(
                 "⚠️  self-asserted cooperative authority is ENABLED at /auth/verify on loopback \
@@ -2173,11 +2203,23 @@ impl GatewayServer {
                                 // Steward/moderation surface: same `/sdis`
                                 // prefix, authenticated. Nested last so the
                                 // public routes above keep their unwrapped
-                                // behavior.
+                                // behavior. Recovery steward-approval joins the
+                                // enrollment steward acts behind `jwt_auth`.
                                 .service(
-                                    web::scope("").wrap(auth.clone()).configure(
-                                        api::sdis::simple_enrollment::configure_protected,
-                                    ),
+                                    web::scope("")
+                                        .wrap(auth.clone())
+                                        .configure(
+                                            api::sdis::simple_enrollment::configure_protected,
+                                        )
+                                        // Recovery steward-approval is a dev/test
+                                        // escape hatch: mounted only on an
+                                        // explicit opt-in AND loopback bind
+                                        // (#2075). Off-loopback it is absent.
+                                        .configure(move |cfg| {
+                                            if mount_admin_recovery {
+                                                api::sdis::recovery::configure_protected(cfg);
+                                            }
+                                        }),
                                 ),
                         )
                         // Protected coop endpoints (auth + rate limiting)
@@ -2633,6 +2675,29 @@ mod tests {
         // no dev opt-in => disabled regardless of bind
         assert!(!self_serve_coop_allowed(false, &loopback_v4));
         assert!(!self_serve_coop_allowed(false, &all_ifaces));
+    }
+
+    /// SECURITY (#2075): the admin/dev SDIS recovery-approval simulation may be
+    /// mounted only with BOTH an explicit opt-in AND a loopback bind — never on a
+    /// routable/all-interfaces listener, and never without the opt-in.
+    #[test]
+    fn admin_endpoints_require_optin_and_loopback() {
+        let loopback_v4: SocketAddr = "127.0.0.1:8080".parse().unwrap();
+        let loopback_v6: SocketAddr = "[::1]:8080".parse().unwrap();
+        let all_ifaces: SocketAddr = "0.0.0.0:8080".parse().unwrap();
+        let routable: SocketAddr = "10.0.0.5:8080".parse().unwrap();
+
+        // opt-in + loopback => mountable
+        assert!(admin_endpoints_allowed(true, &loopback_v4));
+        assert!(admin_endpoints_allowed(true, &loopback_v6));
+
+        // opt-in but NOT loopback => not mounted (the #2075 exposure guard)
+        assert!(!admin_endpoints_allowed(true, &all_ifaces));
+        assert!(!admin_endpoints_allowed(true, &routable));
+
+        // no opt-in => not mounted regardless of bind
+        assert!(!admin_endpoints_allowed(false, &loopback_v4));
+        assert!(!admin_endpoints_allowed(false, &all_ifaces));
     }
 
     #[tokio::test]

@@ -53,6 +53,9 @@ use crate::error::{GatewayError, Result};
 pub use ephemeral::{Channel, EphemeralBinding, EphemeralProof, VerifyResult};
 pub use qr::{decode_from_qr, encode_for_qr, QrEstimate};
 pub use verify::EphemeralVerifier;
+// Shared steward-authority check for SDIS institutional acts. Recovery reuses the
+// exact helper enrollment uses (one notion of steward authority, not a parallel one).
+pub(crate) use simple_enrollment::authorize_steward_act;
 
 // ============================================================================
 // Request/Response Models

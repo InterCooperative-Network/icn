@@ -1254,7 +1254,10 @@ const STEWARD_ACT_SCOPES: &[&str] = &[
 /// never determine the actor. Disagreement is refused rather than silently
 /// overridden, so a client that believes it is acting as someone else is told
 /// so instead of having its claim quietly rewritten.
-fn authorize_steward_act(http_req: &HttpRequest, body_did: Option<&str>) -> Result<String> {
+pub(crate) fn authorize_steward_act(
+    http_req: &HttpRequest,
+    body_did: Option<&str>,
+) -> Result<String> {
     crate::middleware::require_any_scope(http_req, STEWARD_ACT_SCOPES)?;
 
     let claims = crate::middleware::get_claims(http_req).ok_or_else(|| {
