@@ -62,6 +62,15 @@ View source on GitHub →
 <li>App crates: runtime app crates under <code>icn/apps/*</code> (canonical) or legacy top-level <code>apps/*</code> during migration</li>
 </ul>
 <p><strong>Rationale</strong>: Direct imports create compile-time coupling. If kernel code can import <code>TrustGraph</code>, it can call domain-specific methods, violating the meaning firewall.</p>
+<p><strong>Crate classes of record</strong>: <code>scripts/firewall-taxonomy.toml</code> is the single source of
+truth for kernel/substrate/api-shell/domain/app/facade classification and for the
+pinned boundary exceptions (each with a machine-checked edge-absent expiry). All
+enforcement mechanisms load it or are sync-checked against it
+(<code>.github/scripts/test_firewall_taxonomy.py</code>). Where older prose in this document
+disagrees with the taxonomy, the taxonomy wins — e.g. the §2.1 diagram below
+historically listed <code>icn-obs</code> in the kernel column; <code>icn-obs</code> is SUBSTRATE class
+(same prohibition, different list), and <code>icn-gateway</code>/<code>icn-rpc</code>/<code>icn-api</code> are
+API-SHELL class, not kernel.</p>
 <p><strong>Enforcement</strong>: CI checks dependency closure via <code>cargo metadata</code> (see <code>.github/scripts/firewall_denylist.py</code>).</p>
 <p><strong>Example Violation</strong>:</p>
 <pre><code class="language-rust">// ❌ FORBIDDEN in icn-core
@@ -533,7 +542,7 @@ icn-obs          ← Metrics, tracing           icn-community ← Membership
              │  ✅ ALLOWED: Through TrustService, PolicyOracle, etc.
              │
 </code></pre>
-<p><strong>CI Enforcement</strong>: The <code>kernel-deps</code> CI job checks that kernel crates don&#39;t depend on forbidden domain crates:</p>
+<p><strong>CI Enforcement</strong>: The <code>kernel-deps</code> CI job checks that kernel crates don&#39;t depend on forbidden domain crates. (The snippet below is illustrative and predates 2026-07-22 — the live step now sources its crate lists from <code>scripts/firewall-taxonomy.toml</code> via <code>firewall_taxonomy.py --bash</code> and fails closed if the taxonomy cannot load; see the workflow for current truth.)</p>
 <pre><code class="language-yaml"># From .github/workflows/ci.yml
 kernel-deps:
   name: Kernel Forbidden Dependencies
