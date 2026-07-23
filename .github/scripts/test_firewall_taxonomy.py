@@ -18,6 +18,15 @@ Checks:
      someone reintroduced a hardcoded list).
   6. scripts/forbidden-deps-allowlist.txt stays retired (no live edge entries;
      exceptions live only in the taxonomy).
+  7. Failure-path battery (F1/F2/F3/F5/F6): the real checkers actually go RED
+     on new/stale/unpinned/unclassified violations.
+  8. D1-D5: optional/direct-vs-resolved dependency semantics in
+     firewall_denylist.check_kernel — a declared direct normal dependency
+     (including optional and target-specific ones) is reported even when
+     inactive in the resolved feature graph; direct+resolved duplicates
+     collapse to one report; transitive-only edges are still detected but
+     never populate observed_direct; a direct exception over a since-removed
+     direct edge with lingering transitive residue is STALE.
 
 Exit codes: 0 ok / 1 drift or malformed / 2 script error.
 """
@@ -30,6 +39,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import firewall_taxonomy as taxonomy  # noqa: E402
+import firewall_denylist as denylist  # noqa: E402
 
 REPO = taxonomy.REPO_ROOT
 FAILURES: list[str] = []
@@ -76,6 +86,142 @@ def run_denylist(taxonomy_path: Path) -> tuple[int, str]:
         cwd=REPO,
     )
     return p.returncode, p.stdout + p.stderr
+
+
+def _synthetic_taxonomy(exceptions: list[dict] | None = None) -> dict:
+    """Minimal one-kernel-crate / one-domain-crate taxonomy for check_kernel unit tests."""
+    return {
+        "classes": {
+            "kernel": ["kernel-a"],
+            "substrate": [],
+            "api-shell": [],
+            "domain": ["domain-a"],
+            "app": [],
+            "facade": [],
+            "tool": [],
+            "bin": [],
+        },
+        "exception": list(exceptions) if exceptions else [],
+        "shells": {},
+    }
+
+
+def _direct_exception(kind: str = "direct") -> dict:
+    return {
+        "from": "kernel-a",
+        "to": "domain-a",
+        "kind": kind,
+        "tracking": "t",
+        "expiry": "edge-absent",
+    }
+
+
+def optional_direct_dependency_tests() -> None:
+    """D1-D5: prove check_kernel's optional/direct-vs-resolved semantics directly
+    against synthetic cargo-metadata fixtures (unit-level, no workspace mutation).
+
+    Root cause under test: `get_transitive_deps` walks the ACTIVATED resolve
+    graph; a declared-but-currently-inactive optional (or target-specific)
+    normal dependency on a denylisted crate is architectural coupling that must
+    still be reported — this is exactly what firewall_denylist.check_kernel's
+    `observed_direct | observed_any` union now guarantees.
+    """
+
+    # D1: unpinned optional direct dep, NOT in the resolve graph -> NEW violation.
+    metadata_d1 = {
+        "packages": [
+            {
+                "id": "kernel-a 0.1.0",
+                "name": "kernel-a",
+                "dependencies": [
+                    {"name": "domain-a", "kind": None, "optional": True, "target": None}
+                ],
+            },
+            {"id": "domain-a 0.1.0", "name": "domain-a", "dependencies": []},
+        ],
+        "workspace_members": ["kernel-a 0.1.0", "domain-a 0.1.0"],
+        "resolve": {
+            "nodes": [
+                {"id": "kernel-a 0.1.0", "dependencies": []},  # optional dep INACTIVE
+                {"id": "domain-a 0.1.0", "dependencies": []},
+            ]
+        },
+    }
+    new_v, known_v, stale = denylist.check_kernel(metadata_d1, _synthetic_taxonomy())
+    if new_v != ["kernel-a -> domain-a"] or known_v or stale:
+        fail(f"D1: unpinned optional direct dep not reported as NEW (new={new_v} known={known_v} stale={stale})")
+
+    # D2: SAME metadata, but now pinned with a direct-kind exception ->
+    # KNOWN (not new), not stale, not duplicated.
+    tax_d2 = _synthetic_taxonomy([_direct_exception()])
+    new_v, known_v, stale = denylist.check_kernel(metadata_d1, tax_d2)
+    if new_v or known_v != ["kernel-a -> domain-a"] or stale:
+        fail(f"D2: pinned optional direct dep mishandled (new={new_v} known={known_v} stale={stale})")
+
+    # D3: direct dep ALSO present in the resolved closure (the common real-world
+    # case, e.g. icn-core -> icn-ledger) -> exactly one report, no duplicate.
+    metadata_d3 = {
+        "packages": [
+            {
+                "id": "kernel-a 0.1.0",
+                "name": "kernel-a",
+                "dependencies": [
+                    {"name": "domain-a", "kind": None, "optional": False, "target": None}
+                ],
+            },
+            {"id": "domain-a 0.1.0", "name": "domain-a", "dependencies": []},
+        ],
+        "workspace_members": ["kernel-a 0.1.0", "domain-a 0.1.0"],
+        "resolve": {
+            "nodes": [
+                {"id": "kernel-a 0.1.0", "dependencies": ["domain-a 0.1.0"]},  # activated
+                {"id": "domain-a 0.1.0", "dependencies": []},
+            ]
+        },
+    }
+    new_v, known_v, stale = denylist.check_kernel(metadata_d3, _synthetic_taxonomy())
+    total_reports = new_v.count("kernel-a -> domain-a") + known_v.count("kernel-a -> domain-a")
+    if total_reports != 1:
+        fail(f"D3: direct+resolved duplicate edge reported {total_reports} times, expected exactly 1 (new={new_v} known={known_v})")
+
+    # D4: domain-a reachable ONLY transitively (via mid-b), never a direct dep
+    # of kernel-a -> still detected via the resolved closure, and confirmed
+    # absent from observed_direct (white-box: get_direct_prod_deps directly).
+    metadata_d4 = {
+        "packages": [
+            {"id": "kernel-a 0.1.0", "name": "kernel-a", "dependencies": [
+                {"name": "mid-b", "kind": None, "optional": False, "target": None}
+            ]},
+            {"id": "mid-b 0.1.0", "name": "mid-b", "dependencies": [
+                {"name": "domain-a", "kind": None, "optional": False, "target": None}
+            ]},
+            {"id": "domain-a 0.1.0", "name": "domain-a", "dependencies": []},
+        ],
+        "workspace_members": ["kernel-a 0.1.0", "mid-b 0.1.0", "domain-a 0.1.0"],
+        "resolve": {
+            "nodes": [
+                {"id": "kernel-a 0.1.0", "dependencies": ["mid-b 0.1.0"]},
+                {"id": "mid-b 0.1.0", "dependencies": ["domain-a 0.1.0"]},
+                {"id": "domain-a 0.1.0", "dependencies": []},
+            ]
+        },
+    }
+    new_v, known_v, stale = denylist.check_kernel(metadata_d4, _synthetic_taxonomy())
+    if new_v != ["kernel-a -> domain-a"]:
+        fail(f"D4: transitive-only edge not detected via resolved closure (new={new_v})")
+    direct_only = denylist.get_direct_prod_deps(metadata_d4, "kernel-a")
+    if "domain-a" in direct_only:
+        fail(f"D4: transitive-only edge incorrectly present in direct deps: {direct_only}")
+
+    # D5: the Codex correction, preserved — a direct-kind exception whose direct
+    # edge was REMOVED (kernel-a no longer declares domain-a directly) but a
+    # transitive path lingers (via mid-b) -> STALE (transitive residue must not
+    # satisfy a "direct" exception), even though the edge is still `known`
+    # (detected) via the resolved closure.
+    tax_d5 = _synthetic_taxonomy([_direct_exception()])
+    new_v, known_v, stale = denylist.check_kernel(metadata_d4, tax_d5)
+    if known_v != ["kernel-a -> domain-a"] or stale != ["kernel-a -> domain-a [direct edge absent]"]:
+        fail(f"D5: direct exception over a now-transitive-only edge not marked stale (known={known_v} stale={stale})")
 
 
 def failure_path_tests() -> None:
@@ -223,7 +369,9 @@ def main() -> int:
             taxonomy.load(tmp)
             fail(f"negative fixture '{label}' was ACCEPTED (loader too permissive)")
         except taxonomy.TaxonomyError:
-            pass
+            # Expected: each negative fixture must be rejected by the loader.
+            # No further action needed — reaching this branch IS the pass case.
+            continue
         finally:
             tmp.unlink()
 
@@ -304,6 +452,11 @@ def main() -> int:
     # 7. Failure-path battery: the real checkers must go RED on real violations.
     failure_path_tests()
 
+    # 8. D1-D5: optional/direct-vs-resolved dependency semantics (unit-level,
+    # synthetic metadata — the review-follow-up regression for the
+    # optional-direct-dependency reporting gap).
+    optional_direct_dependency_tests()
+
     if FAILURES:
         print("❌ FIREWALL TAXONOMY SYNC FAILURES:")
         for f_ in FAILURES:
@@ -316,7 +469,8 @@ def main() -> int:
     print("✅ taxonomy valid; all mechanisms in sync (hook conf, ratchet consts,")
     print("   script+CI runtime loading, allowlist retired); negative fixtures")
     print("   rejected; failure-path battery green (new-edge / stale-direct /")
-    print("   shell-pin / shell-scan violations all provably fail).")
+    print("   shell-pin / shell-scan violations all provably fail); D1-D5")
+    print("   optional/direct-vs-resolved dependency semantics verified.")
     return 0
 
 

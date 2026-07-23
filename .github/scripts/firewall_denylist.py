@@ -151,6 +151,18 @@ def check_kernel(metadata: Dict, tax: Dict) -> Tuple[List[str], List[str], List[
     prohibition is real, not prose: all substrate crates were verified clean at
     introduction (2026-07-22), so no substrate exceptions exist or are accepted
     by the loader.
+
+    A declared direct normal dependency is architectural coupling REGARDLESS of
+    whether its feature is currently activated. `get_transitive_deps` walks
+    `metadata["resolve"]["nodes"]`, which is the ACTIVATED feature graph — an
+    optional (or target-specific, currently-inactive-target) normal dependency
+    on a denylisted crate can be declared in Cargo.toml and pass every gate
+    unnoticed if it never appears in the resolve graph for the current
+    feature/target selection. `observed_direct` (declared deps, independent of
+    activation) is therefore folded into violation reporting, not just stale-
+    exception detection — a single pass over `observed_any` (the union of
+    direct + resolved-transitive edges) drives both NEW/KNOWN classification
+    and guarantees each edge is reported exactly once.
     """
     kernel = taxonomy.enforced_crates(tax)
     denylist = set(taxonomy.denylisted_crates(tax))
@@ -159,8 +171,6 @@ def check_kernel(metadata: Dict, tax: Dict) -> Tuple[List[str], List[str], List[
         (e["from"], e["to"]): e["kind"] for e in taxonomy.exception_entries(tax)
     }
 
-    new_violations: List[str] = []
-    known_violations: List[str] = []
     observed_any: Set[Tuple[str, str]] = set()
     observed_direct: Set[Tuple[str, str]] = set()
 
@@ -169,16 +179,23 @@ def check_kernel(metadata: Dict, tax: Dict) -> Tuple[List[str], List[str], List[
         if not pkg_id:
             print(f"Warning: kernel crate '{kernel_crate}' not found in workspace", file=sys.stderr)
             continue
-        for forbidden in sorted(get_direct_prod_deps(metadata, kernel_crate) & denylist):
-            observed_direct.add((kernel_crate, forbidden))
-        deps = get_transitive_deps(metadata, pkg_id)
-        for forbidden in sorted(deps.intersection(denylist)):
-            edge = (kernel_crate, forbidden)
-            observed_any.add(edge)
-            if edge in known:
-                known_violations.append(f"{kernel_crate} -> {forbidden}")
-            else:
-                new_violations.append(f"{kernel_crate} -> {forbidden}")
+
+        direct_edges = {(kernel_crate, dep) for dep in get_direct_prod_deps(metadata, kernel_crate) & denylist}
+        observed_direct |= direct_edges
+
+        transitive_deps = get_transitive_deps(metadata, pkg_id)
+        transitive_edges = {(kernel_crate, dep) for dep in transitive_deps & denylist}
+
+        observed_any |= direct_edges | transitive_edges
+
+    new_violations: List[str] = []
+    known_violations: List[str] = []
+    for edge in sorted(observed_any):
+        label = f"{edge[0]} -> {edge[1]}"
+        if edge in known:
+            known_violations.append(label)
+        else:
+            new_violations.append(label)
 
     stale: List[str] = []
     for edge in sorted(known):
