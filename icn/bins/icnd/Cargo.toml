@@ -40,7 +40,6 @@ icn-store.workspace = true
 icn-rpc.workspace = true
 icn-obs.workspace = true
 icn-community = { path = "../../crates/icn-community" }
-icn-encoding.workspace = true
 hex = "0.4"
 serde_json.workspace = true
 sha2.workspace = true
@@ -58,6 +57,9 @@ icn-governance.workspace = true
 
 [dev-dependencies]
 tempfile = "3.24"
+# Test-only: encodes gossip payloads in community_wiring's integration test.
+# Runtime decode lives in icn-community (which owns its own icn-encoding dep).
+icn-encoding.workspace = true
 
 [lints]
 workspace = true
