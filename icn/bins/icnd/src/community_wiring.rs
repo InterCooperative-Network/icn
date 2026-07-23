@@ -150,12 +150,19 @@ mod tests {
             .publish(icn_community::COMMUNITY_TOPIC, encoded)
             .await?;
 
-        // Notification callback spawns the merge asynchronously; give it a
-        // bounded window to complete (matches the sleep-after-spawn pattern
-        // used elsewhere in this workspace's integration tests).
-        tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-
-        let synced = handle.get("test-community-1".to_string()).await?;
+        // The notification callback spawns the merge asynchronously; poll with
+        // a bounded deadline instead of a fixed sleep so a loaded CI host can't
+        // flake this (get returns NotFound until the merge lands).
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+        let synced = loop {
+            match handle.get("test-community-1".to_string()).await {
+                Ok(community) => break community,
+                Err(_) if tokio::time::Instant::now() < deadline => {
+                    tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+                }
+                Err(e) => anyhow::bail!("merge did not land within the 5s deadline: {e}"),
+            }
+        };
         assert_eq!(synced.id, "test-community-1");
         assert_eq!(synced.name, "Test Community");
 

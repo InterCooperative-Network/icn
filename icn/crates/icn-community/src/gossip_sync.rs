@@ -254,13 +254,19 @@ mod tests {
         let entry = make_entry(crate::actor::COMMUNITY_TOPIC, encoded);
         callback(crate::actor::COMMUNITY_TOPIC.to_string(), entry, subscriber);
 
-        // The callback spawns the merge; give it a bounded window.
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
-        let fetched = store
-            .get(&"c-4".to_string())
-            .expect("get")
-            .expect("present");
+        // The callback spawns the merge asynchronously; poll with a bounded
+        // deadline instead of a fixed sleep so a loaded CI host can't flake this.
+        let deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(5);
+        let fetched = loop {
+            if let Some(community) = store.get(&"c-4".to_string()).expect("get") {
+                break community;
+            }
+            assert!(
+                tokio::time::Instant::now() < deadline,
+                "spawned merge did not complete within the 5s deadline"
+            );
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        };
         assert_eq!(fetched.name, "Via Callback");
     }
 }
