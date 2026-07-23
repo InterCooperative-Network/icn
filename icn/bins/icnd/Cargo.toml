@@ -39,6 +39,8 @@ icn-ccl.workspace = true
 icn-store.workspace = true
 icn-rpc.workspace = true
 icn-obs.workspace = true
+icn-community = { path = "../../crates/icn-community" }
+icn-encoding.workspace = true
 hex = "0.4"
 serde_json.workspace = true
 sha2.workspace = true

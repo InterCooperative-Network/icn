@@ -399,6 +399,7 @@ async fn spawn_actors_with_identity(
     let contract_actor_handle = handles.contract_actor;
     let protocol_parameter_store_from_daemon = handles.protocol_parameter_store;
     let effect_subscription_factory = handles.effect_subscription_factory;
+    let community_factory = handles.community_factory;
     gateway_handles.charter_accepted_hook = handles.charter_accepted_hook;
     let compute_balance_callback = handles.balance_callback;
     let compute_payment_callback = handles.payment_callback;
@@ -440,12 +441,27 @@ async fn spawn_actors_with_identity(
     let coop_store = coop_services.coop_store.clone();
     let coop_entity_map = coop_services.coop_entity_map.clone();
 
-    // Initialize community services (civic engine)
-    let community_services =
-        super::init_community::init_community_services(config, gossip_handle.clone(), did.clone())
+    // Initialize the community subsystem (civic engine) via the daemon-
+    // provided factory. `icn-core` supplies only generic runtime resources
+    // (gossip handle, node identity, store root) and receives back an opaque
+    // handle — construction, configuration, gossip-topic subscription, and
+    // notification-callback registration live entirely in the daemon
+    // composition root + the community crate (migration B0: the kernel no
+    // longer imports `icn-community`).
+    let community_handle: Option<Box<dyn std::any::Any + Send + Sync>> =
+        if let Some(factory) = community_factory {
+            let handle = factory(super::actors::CommunityFactoryInputs {
+                gossip: gossip_handle.clone(),
+                node_did: did.clone(),
+                store_path: config.store_path(),
+            })
             .await?;
-    icn_obs::metrics::supervisor::actor_spawned_inc("community");
-    let community_store = community_services.community_store.clone();
+            icn_obs::metrics::supervisor::actor_spawned_inc("community");
+            Some(handle)
+        } else {
+            warn!("community_factory not provided — community/civic engine subsystem disabled");
+            None
+        };
 
     // Initialize entity services with gossip synchronization
     let entity_services =
@@ -507,7 +523,7 @@ async fn spawn_actors_with_identity(
 
     // Store handles for gateway integration
     gateway_handles.coop = Some(coop_handle.clone());
-    gateway_handles.community = Some(community_services.community_handle);
+    gateway_handles.community = community_handle;
     gateway_handles.trust_service = trust_service_from_registry.clone();
     gateway_handles.entity = Some(entity_services.entity_handle);
     // A2c: hand the canonical, provenance-aware coop_id↔EntityId store to the gateway
@@ -632,7 +648,6 @@ async fn spawn_actors_with_identity(
         &ledger_handle,
         &coop_store,
         &coop_entity_map,
-        &community_store,
         &snapshot_coordinator,
         &compute_handle_holder,
         &dispute_handle_holder,
@@ -1342,7 +1357,6 @@ async fn configure_gossip_actor(
     ledger_handle: &super::actors::LedgerHandle,
     coop_store: &Arc<icn_coop::CoopStore>,
     coop_entity_map: &icn_coop::CoopEntityMapHandle,
-    community_store: &Arc<icn_community::CommunityStore>,
     snapshot_coordinator: &Arc<RwLock<icn_snapshot::SnapshotCoordinator>>,
     compute_handle_holder: &Arc<RwLock<Option<icn_compute::ComputeHandle>>>,
     dispute_handle_holder: &Arc<RwLock<Option<icn_ccl::DisputeActorHandle>>>,
@@ -1393,7 +1407,6 @@ async fn configure_gossip_actor(
             profile_cache: profile_cache.clone(),
             coop_store: coop_store.clone(),
             coop_entity_map: coop_entity_map.clone(),
-            community_store: community_store.clone(),
             federation_handler: federation_handler.clone(),
             attestation_rate_limiter,
             contract_registry: contract_registry_holder.clone(),

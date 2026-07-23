@@ -7,6 +7,7 @@
 // Allow cfg checks for optional HSM/TPM features defined in Cargo.toml
 #![allow(unexpected_cfgs)]
 
+mod community_wiring;
 mod compute_wiring;
 
 use anyhow::Context;
@@ -356,6 +357,7 @@ async fn build_services(
                 effect_callback(effects, receipt_id);
             })
         })),
+        community_factory: Some(community_wiring::create_community_factory()),
         charter_accepted_hook: Some(charter_accepted_hook),
         balance_callback: Some(balance_callback),
         payment_callback: Some(payment_callback),

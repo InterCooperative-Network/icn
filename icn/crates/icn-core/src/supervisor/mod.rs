@@ -17,7 +17,6 @@ pub mod effect_dispatcher;
 pub mod execution_store;
 pub mod governance_executor;
 pub mod init_bootstrap;
-pub mod init_community;
 pub mod init_compute;
 pub mod init_contract_registry;
 pub mod init_coop;
