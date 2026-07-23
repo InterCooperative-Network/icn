@@ -23,7 +23,10 @@ env:
   GATE_RATCHET_PHASE_COMPLIANCE: blocking
   GATE_RATCHET_PHASE_READINESS: warning
   # Scope controls for staged boundary enforcement
-  GATE_RATCHET_KERNEL_DEPS_SCOPE: core-only
+  # all-kernel = the full taxonomy kernel class (scripts/firewall-taxonomy.toml).
+  # Advanced from core-only 2026-07-22: net/gossip/store/kernel-api verified clean
+  # (firewall_denylist.py transitive check passes with zero exceptions for them).
+  GATE_RATCHET_KERNEL_DEPS_SCOPE: all-kernel
 
 permissions:
   contents: read
@@ -182,36 +185,41 @@ jobs:
       - name: Check kernel crates for forbidden deps (bash version)
         run: |
           set -euo pipefail
+          # Lists come from the single-source taxonomy (scripts/firewall-taxonomy.toml)
+          # via the loader — defines KERNEL_CRATES, FORBIDDEN, ALLOWED_EDGES.
+          # FAIL-CLOSED: capture via bare assignment first — `eval "$(cmd)"` would
+          # swallow a loader failure (empty eval is a no-op → step passes with
+          # ZERO crates checked). Bare assignment propagates the exit code under set -e.
+          TAXONOMY_LISTS="$(python3 ../.github/scripts/firewall_taxonomy.py --bash)"
+          eval "$TAXONOMY_LISTS"
+          if [ "${#KERNEL_CRATES[@]}" -eq 0 ] || [ "${#FORBIDDEN[@]}" -eq 0 ]; then
+            echo "::error title=Taxonomy load produced empty lists::refusing to pass with nothing checked"
+            exit 1
+          fi
           SCOPE="${GATE_RATCHET_KERNEL_DEPS_SCOPE}"
           case "$SCOPE" in
             core-only)
               KERNEL_CRATES=("icn-core")
               ;;
             all-kernel)
-              KERNEL_CRATES=("icn-core" "icn-net" "icn-gossip")
+              : # full taxonomy kernel class, as loaded
               ;;
             *)
               echo "Unknown GATE_RATCHET_KERNEL_DEPS_SCOPE: $SCOPE"
               exit 1
               ;;
           esac
-          FORBIDDEN=("icn-trust" "icn-governance" "icn-ledger" "icn-ccl" "icn-compute" "icn-entity" "icn-community" "icn-federation" "icn-steward")
           PHASE="${GATE_RATCHET_PHASE_KERNEL_DEPS}"
-          ALLOWLIST_FILE="../scripts/forbidden-deps-allowlist.txt"
           violations=()
           echo "Ratchet phase: $PHASE"
           echo "Kernel dependency check scope: $SCOPE (${KERNEL_CRATES[*]})"
-          echo "Accepted scopes: core-only | all-kernel"
-          echo "Rollout: Wave 2 (core-only) enforcement active when scope=core-only and phase=blocking"
-          if [ -f "$ALLOWLIST_FILE" ]; then
-            # Read allowlist, filtering out comments and empty lines
-            mapfile -t ALLOWLIST < <(grep -v '^\s*#' "$ALLOWLIST_FILE" | grep -v '^\s*$')
-          else
-            ALLOWLIST=()
-          fi
+          echo "Accepted scopes: core-only | all-kernel (lists from scripts/firewall-taxonomy.toml)"
+          ALLOWLIST=("${ALLOWED_EDGES[@]}")
           for crate in "${KERNEL_CRATES[@]}"; do
             for dep in "${FORBIDDEN[@]}"; do
-              if cargo tree -p "$crate" --edges normal | grep -q "\\b${dep}\\b"; then
+              # Anchor on the version column: `\b${dep}\b` alone false-matches
+              # icn-ledger inside icn-ledger-app (hyphen is a \b boundary).
+              if cargo tree -p "$crate" --edges normal | grep -qE "\\b${dep} v[0-9]"; then
                 entry="${crate}->${dep}"
                 if printf '%s\n' "${ALLOWLIST[@]}" | grep -qx "$entry"; then
                   echo "Allowed dependency (allowlist): ${entry}"
@@ -237,7 +245,7 @@ jobs:
             echo "Remediation order:"
             echo "  1) Remove the dependency from icn-core (preferred)"
             echo "  2) Move the dependency behind a kernel API/service boundary"
-            echo "  3) If this edge is temporarily unavoidable, add a scoped entry to: $ALLOWLIST_FILE"
+            echo "  3) If this edge is temporarily unavoidable, add a reviewed [[exception]] to scripts/firewall-taxonomy.toml"
             echo
             echo "Reference: docs/ci/GATE_RATCHET_PLAN.md"
             echo
@@ -260,6 +268,9 @@ jobs:
       - uses: actions/checkout@v6
 
       - uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Taxonomy self-test + cross-mechanism sync check
+        run: python3 .github/scripts/test_firewall_taxonomy.py
 
       - name: Run firewall denylist check
         run: |

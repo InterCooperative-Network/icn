@@ -1,0 +1,248 @@
+# ICN Meaning-Firewall Taxonomy — the single AUTHORITATIVE DECLARATION of crate
+# classes and boundary exceptions.
+#
+# Truth mechanism (precise): drift is structurally prevented or CI-detected —
+#   RUNTIME LOADERS (cannot drift; they read this file on every run):
+#     - .github/scripts/firewall_taxonomy.py   (loader; emits bash lists)
+#     - .github/scripts/firewall_denylist.py   (CI: Firewall Contract Enforcement)
+#     - .github/workflows/ci.yml kernel-deps   (CI: Kernel Forbidden Dependencies)
+#     - scripts/check-meaning-firewall.sh      (CI: Meaning Firewall Check)
+#   MIRRORED COPIES (drift-checked in CI by .github/scripts/test_firewall_taxonomy.py):
+#     - .claude/hooks/kernel-crates.conf            (edit hook; hooks can't run python)
+#     - icn/crates/icn-core/src/meaning_firewall.rs (KERNEL_CRATES/DOMAIN_CRATES consts)
+#
+# ENFORCEMENT OWNERSHIP (each mechanism owns a distinct slice; none proves the whole):
+#   - firewall_denylist.py  — Cargo DEPENDENCY EDGES: kernel+substrate transitive
+#     closure vs domain+app; exception staleness (direct vs transitive-or-dev);
+#     api-shell direct-dep pins; taxonomy completeness vs workspace members;
+#     tool-crate isolation.
+#   - ci.yml kernel-deps    — redundant direct/cargo-tree view of the same edges
+#     (defense in depth; catches metadata-vs-tree skew).
+#   - check-meaning-firewall.sh — SOURCE `use <domain>::` imports in exception-free
+#     kernel-class crates only (explicit-import form; qualified paths/aliases/macros
+#     are owned by the Rust ratchets).
+#   - meaning_firewall.rs ratchets — per-edge REFERENCE COUNTS (imports + qualified
+#     paths) in icn-core; api-shell import pins; kernel-api domain-token baseline.
+#   - firewall-guard.sh hook — best-effort edit-time guard (agent sessions only).
+#   None of these proves semantic purity; that is migration Phase A2/F + review.
+#
+# Classes (see docs/architecture/KERNEL_APP_SEPARATION.md; layer-contract ADR pending):
+#   kernel     — domain-blind runtime/contract crates. Domain/app deps FORBIDDEN
+#                (exceptions below, each with a machine-checkable expiry).
+#   substrate  — generic infrastructure. Same prohibition, enforced by
+#                firewall_denylist.py; zero exceptions (verified 2026-07-22).
+#   api-shell  — HTTP/RPC hosting crates. Domain deps are EXPECTED during the
+#                transition and pinned exactly in [shells]; NEW domain/app deps fail CI.
+#   domain     — meaning lives here. May depend on kernel/substrate + peer domain crates.
+#   app        — apps/ crates (actors + PolicyOracle facades).
+#   facade     — re-export shells; audited in migration Phase G.
+#   tool       — test/fixture/dev-support crates. May depend on anything; must NOT
+#                be a production dependency of any non-tool, non-bin member (enforced).
+#   bin        — binaries/composition roots (icnd, icnctl, icn-console). Unrestricted
+#                by design: the composition root is the one place allowed to know
+#                the full app roster.
+#   Every workspace member MUST be classified (completeness enforced vs cargo
+#   metadata) — a new crate cannot evade the firewall by staying unlisted.
+#
+# RULES OF CHANGE:
+#   - Removing an exception requires the edge to be GONE (checker fails on stale entries).
+#   - Adding an exception requires a tracking reference and is a reviewed event.
+#   - Class moves are reviewed events. icn-ledger's 2026-07-22 move from
+#     (contradictory kernel/domain listings) to domain rests on public, checkable
+#     facts: both CI dependency gates already denylisted it; its own icn-trust/
+#     icn-governance deps are dev-only (icn/crates/icn-ledger/Cargo.toml); its
+#     public surface is settlement/credit/treasury semantics (icn/crates/
+#     icn-ledger/src/ledger.rs validate_entry enforces credit policy); and every
+#     workspace reverse-dependency consumes those economic symbols. The PR
+#     introducing this file carries the full evidence summary.
+
+[meta]
+version = "1.0.0"
+updated = "2026-07-22"
+owner = "core-arch"
+adr = "pending (HD-9 layer-contract ADR)"
+
+[classes]
+kernel = ["icn-core", "icn-net", "icn-gossip", "icn-store", "icn-kernel-api"]
+substrate = [
+  "icn-identity", "icn-time", "icn-snapshot", "icn-encoding", "icn-obs",
+  "icn-security", "icn-privacy", "icn-crypto-pq", "icn-naming", "icn-http-kit",
+  "icn-authz", "icn-appliance", "icn-boundary",
+]
+api-shell = ["icn-gateway", "icn-rpc", "icn-api"]
+domain = [
+  "icn-trust", "icn-governance", "icn-ledger", "icn-ccl", "icn-compute",
+  "icn-entity", "icn-community", "icn-federation", "icn-steward", "icn-coop",
+  "icn-commons", "icn-zkp",
+]
+app = [
+  "icn-charter-app", "icn-governance-actor", "icn-governance-app",
+  "icn-ledger-actor", "icn-ledger-app", "icn-membership-app", "icn-trust-app",
+]
+facade = ["icn-protocol", "icn-services", "icn-crypto"]
+tool = ["icn-testkit", "icn-baseline-lock"]
+bin = ["icnd", "icnctl", "icn-console"]
+
+# Classification annotations (NOT enforcement changes; candidates for future review):
+# - icn-ccl: engine is arguably substrate (deterministic evaluation); its domain
+#   stdlib is app material. Kept in `domain` because every current enforcement
+#   mechanism forbids kernel->ccl; reclassification is a Phase-E decision.
+# - icn-identity: carries ~36% domain modules (commons/personhood/vui) — extraction
+#   tracked as migration Phase E1; stays substrate meanwhile.
+# - api-shell crates appear in icn-core's transitive closure (core->gateway/rpc);
+#   shedding those edges is migration Phase B11 — tracked, not yet enforced.
+# - kernel vs substrate binning of icn-net/icn-gossip/icn-store follows the
+#   CURRENT enforcement lists (both classes carry the same prohibition, so the
+#   split is enforcement-neutral today); the target architecture treats them as
+#   substrate — re-binned, if at all, at migration Phase G.
+# - Exception lifecycle nuance: the 9 direct domain edges are ALSO reachable
+#   transitively via core->icn-gateway. When a B-tranche deletes a DIRECT edge,
+#   the stale detector fires on the `direct` entry — the entry is then CONVERTED
+#   to kind="transitive-or-dev" (reviewed event), and fully removed only when
+#   B11 sheds the shell edges. Tranche labels below name the direct-edge removal.
+
+# ---------------------------------------------------------------------------
+# Exceptions: kernel-crate boundary violations that exist TODAY, pinned exactly.
+# expiry = "edge-absent": the checker FAILS when the edge no longer exists,
+# forcing removal of the entry (no silent staleness, I11) — and FAILS on any
+# kernel->domain/app edge NOT listed here (no silent growth, I1).
+# ---------------------------------------------------------------------------
+
+# --- icn-core direct production deps (Cargo [dependencies]) ---
+[[exception]] # supervisor/lifecycle constructs ledger-backed services; B1 tranche removes
+from = "icn-core"
+to = "icn-ledger"
+kind = "direct"
+tracking = "#914"
+expiry = "edge-absent"
+
+[[exception]] # contract execution + dispute actor wiring (32 refs); Phase B7
+from = "icn-core"
+to = "icn-ccl"
+kind = "direct"
+tracking = "#912-family / migration B7"
+expiry = "edge-absent"
+
+[[exception]] # compute/settlement wiring (86 refs); Phase B8
+from = "icn-core"
+to = "icn-compute"
+kind = "direct"
+tracking = "migration B8"
+expiry = "edge-absent"
+
+[[exception]]
+from = "icn-core"
+to = "icn-entity"
+kind = "direct"
+tracking = "migration B3"
+expiry = "edge-absent"
+
+[[exception]]
+from = "icn-core"
+to = "icn-community"
+kind = "direct"
+tracking = "migration B0"
+expiry = "edge-absent"
+
+[[exception]]
+from = "icn-core"
+to = "icn-federation"
+kind = "direct"
+tracking = "migration B6"
+expiry = "edge-absent"
+
+[[exception]]
+from = "icn-core"
+to = "icn-steward"
+kind = "direct"
+tracking = "migration B4"
+expiry = "edge-absent"
+
+[[exception]]
+from = "icn-core"
+to = "icn-coop"
+kind = "direct"
+tracking = "migration B5"
+expiry = "edge-absent"
+
+[[exception]] # on NO prior list (bypass closed 2026-07-22); imports icn-governance
+from = "icn-core"
+to = "icn-commons"
+kind = "direct"
+tracking = "migration B9"
+expiry = "edge-absent"
+
+# --- icn-core direct deps on app crates (bypass closed 2026-07-22) ---
+[[exception]] # supervisor constructs the trust app; Phase B10
+from = "icn-core"
+to = "icn-trust-app"
+kind = "direct"
+tracking = "migration B10"
+expiry = "edge-absent"
+
+[[exception]] # kernel depends on the governance app (wrong direction); Phase B10
+from = "icn-core"
+to = "icn-governance-actor"
+kind = "direct"
+tracking = "migration B10"
+expiry = "edge-absent"
+
+[[exception]] # lifecycle.rs:889 create_stores; Phase B10
+from = "icn-core"
+to = "icn-ledger-actor"
+kind = "direct"
+tracking = "migration B10"
+expiry = "edge-absent"
+
+# --- icn-core transitive-only edges (via dev-deps and via icn-commons/gateway) ---
+[[exception]] # dev-dep only (tests); prod edge gone since #970-era cleanups
+from = "icn-core"
+to = "icn-trust"
+kind = "transitive-or-dev"
+tracking = "test-architecture; migration Phase A2+"
+expiry = "edge-absent"
+
+[[exception]] # dev-dep + transitive via icn-commons->icn-governance
+from = "icn-core"
+to = "icn-governance"
+kind = "transitive-or-dev"
+tracking = "resolved by B9 (commons) + test-architecture"
+expiry = "edge-absent"
+
+[[exception]] # transitive via api-shell edges (core->gateway->zkp); B11 removes
+from = "icn-core"
+to = "icn-zkp"
+kind = "transitive-or-dev"
+tracking = "migration B11"
+expiry = "edge-absent"
+
+[[exception]] # transitive via api-shell edges (gateway->ledger-app et al); B11
+from = "icn-core"
+to = "icn-ledger-app"
+kind = "transitive-or-dev"
+tracking = "migration B11"
+expiry = "edge-absent"
+
+
+
+
+# ---------------------------------------------------------------------------
+# API-shell pins: the EXACT set of direct domain/app deps each shell may have.
+# A new domain/app dep on a shell fails CI; a removed one fails until the pin
+# is updated (same no-silent-change rule as exceptions).
+# ---------------------------------------------------------------------------
+[shells.icn-gateway]
+domain = [
+  "icn-ccl", "icn-commons", "icn-community", "icn-compute", "icn-coop",
+  "icn-entity", "icn-federation", "icn-governance", "icn-ledger", "icn-steward",
+  "icn-trust", "icn-zkp",
+]
+app = ["icn-governance-actor", "icn-ledger-app"]
+
+[shells.icn-rpc]
+domain = ["icn-ccl", "icn-compute", "icn-coop", "icn-federation", "icn-governance", "icn-ledger"]
+app = []
+
+[shells.icn-api]
+domain = ["icn-compute", "icn-governance", "icn-ledger"]
+app = []

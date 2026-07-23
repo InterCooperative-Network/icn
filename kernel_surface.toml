@@ -1,5 +1,12 @@
 # ICN Kernel Surface Inventory
 #
+# ⚠️ CLASSIFICATION SUPERSEDED (2026-07-22): crate CLASSES (kernel/substrate/
+# api-shell/domain/app/facade) are now owned by scripts/firewall-taxonomy.toml,
+# which is sync-checked across all enforcement mechanisms. This file's per-crate
+# `status` fields (clean/infected) remain as a HISTORICAL infection inventory
+# (last audited 2026-02) — useful context, not classification truth. Where this
+# file and the taxonomy disagree (e.g. icn-ledger), the taxonomy wins.
+#
 # This file lists every public API exposed by kernel crates and tracks
 # their "infection" status - whether they contain domain-specific logic
 # that should be extracted to apps.

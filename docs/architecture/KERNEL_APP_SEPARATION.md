@@ -33,6 +33,16 @@ These invariants are mechanically enforced to ensure the kernel remains semantic
 
 **Rationale**: Direct imports create compile-time coupling. If kernel code can import `TrustGraph`, it can call domain-specific methods, violating the meaning firewall.
 
+**Crate classes of record**: `scripts/firewall-taxonomy.toml` is the single source of
+truth for kernel/substrate/api-shell/domain/app/facade classification and for the
+pinned boundary exceptions (each with a machine-checked edge-absent expiry). All
+enforcement mechanisms load it or are sync-checked against it
+(`.github/scripts/test_firewall_taxonomy.py`). Where older prose in this document
+disagrees with the taxonomy, the taxonomy wins — e.g. the §2.1 diagram below
+historically listed `icn-obs` in the kernel column; `icn-obs` is SUBSTRATE class
+(same prohibition, different list), and `icn-gateway`/`icn-rpc`/`icn-api` are
+API-SHELL class, not kernel.
+
 **Enforcement**: CI checks dependency closure via `cargo metadata` (see `.github/scripts/firewall_denylist.py`).
 
 **Example Violation**:
@@ -500,7 +510,7 @@ icn-obs          ← Metrics, tracing           icn-community ← Membership
              │
 ```
 
-**CI Enforcement**: The `kernel-deps` CI job checks that kernel crates don't depend on forbidden domain crates:
+**CI Enforcement**: The `kernel-deps` CI job checks that kernel crates don't depend on forbidden domain crates. (The snippet below is illustrative and predates 2026-07-22 — the live step now sources its crate lists from `scripts/firewall-taxonomy.toml` via `firewall_taxonomy.py --bash` and fails closed if the taxonomy cannot load; see the workflow for current truth.)
 
 ```yaml
 # From .github/workflows/ci.yml
