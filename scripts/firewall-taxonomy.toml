@@ -95,11 +95,14 @@ bin = ["icnd", "icnctl", "icn-console"]
 #   CURRENT enforcement lists (both classes carry the same prohibition, so the
 #   split is enforcement-neutral today); the target architecture treats them as
 #   substrate — re-binned, if at all, at migration Phase G.
-# - Exception lifecycle nuance: the 9 direct domain edges are ALSO reachable
-#   transitively via core->icn-gateway. When a B-tranche deletes a DIRECT edge,
-#   the stale detector fires on the `direct` entry — the entry is then CONVERTED
-#   to kind="transitive-or-dev" (reviewed event), and fully removed only when
-#   B11 sheds the shell edges. Tranche labels below name the direct-edge removal.
+# - Exception lifecycle nuance: the (originally 9, now 8 after B0) direct
+#   domain edges are ALSO reachable transitively via core->icn-gateway. When a
+#   B-tranche deletes a DIRECT edge, the stale detector fires on the `direct`
+#   entry — the entry is then CONVERTED to kind="transitive-or-dev" (reviewed
+#   event), and fully removed only when B11 sheds the shell edges. Tranche
+#   labels below name the direct-edge removal. icn-community is the first
+#   worked example (migration B0, 2026-07-23): direct edge removed, entry
+#   converted, moved to the transitive-only section below.
 
 # ---------------------------------------------------------------------------
 # Exceptions: kernel-crate boundary violations that exist TODAY, pinned exactly.
@@ -135,13 +138,6 @@ from = "icn-core"
 to = "icn-entity"
 kind = "direct"
 tracking = "migration B3"
-expiry = "edge-absent"
-
-[[exception]]
-from = "icn-core"
-to = "icn-community"
-kind = "direct"
-tracking = "migration B0"
 expiry = "edge-absent"
 
 [[exception]]
@@ -195,6 +191,15 @@ tracking = "migration B10"
 expiry = "edge-absent"
 
 # --- icn-core transitive-only edges (via dev-deps and via icn-commons/gateway) ---
+[[exception]] # transitive via api-shell edges (core->gateway->community); B11 removes.
+# Direct edge removed 2026-07-23 (migration B0 — construction moved to the
+# daemon composition root; meaning_firewall.rs community ratchet reached 0).
+from = "icn-core"
+to = "icn-community"
+kind = "transitive-or-dev"
+tracking = "migration B0 COMPLETE (direct edge removed); residual transitive path via icn-gateway remains until B11"
+expiry = "edge-absent"
+
 [[exception]] # dev-dep only (tests); prod edge gone since #970-era cleanups
 from = "icn-core"
 to = "icn-trust"

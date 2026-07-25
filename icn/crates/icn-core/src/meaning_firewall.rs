@@ -554,11 +554,12 @@ mod tests {
     /// Pinned Cargo.toml domain dependency count for icn-core.
     ///
     /// Now measured against the FULL domain class (12 crates). icn-core's
-    /// production deps as of 2026-07-22: icn-ledger, icn-ccl, icn-compute,
-    /// icn-entity, icn-community, icn-federation, icn-steward, icn-coop,
-    /// icn-commons (9). icn-trust/icn-governance are dev-deps only; icn-zkp
-    /// is transitive-only. Each edge has an [[exception]] in
-    /// scripts/firewall-taxonomy.toml with an edge-absent expiry.
+    /// production deps as of 2026-07-23 (post-B0): icn-ledger, icn-ccl,
+    /// icn-compute, icn-entity, icn-federation, icn-steward, icn-coop,
+    /// icn-commons (8). icn-community was removed by migration B0 (construction
+    /// moved to the daemon composition root). icn-trust/icn-governance are
+    /// dev-deps only; icn-zkp is transitive-only. Each remaining edge has an
+    /// [[exception]] in scripts/firewall-taxonomy.toml with an edge-absent expiry.
     ///
     /// Target state: 0 after all domain crate extraction completes (Phases B0–B9).
     #[test]
@@ -572,7 +573,7 @@ mod tests {
             }
         }
 
-        let expected: usize = 9; // ledger,ccl,compute,entity,community,federation,steward,coop,commons
+        let expected: usize = 8; // ledger,ccl,compute,entity,federation,steward,coop,commons (community removed, B0)
 
         assert!(
             actual <= expected,
@@ -599,6 +600,11 @@ mod tests {
     ///
     /// Baselines measured 2026-07-22 at 767ece63. Target: 0 per edge as the
     /// corresponding migration tranche (B0–B9) lands.
+    ///
+    /// icn_community:: reached 0 on 2026-07-23 (migration B0 complete —
+    /// construction moved to the daemon composition root; kept pinned at 0
+    /// as a permanent regression guard, matching the ledger/ccl/governance
+    /// precedent, rather than removed from this array).
     #[test]
     fn strict_core_remaining_domain_reference_ratchets() {
         let expected: &[(&str, usize)] = &[
@@ -608,7 +614,7 @@ mod tests {
             ("icn_steward::", 32),    // migration B4
             ("icn_entity::", 14),     // migration B3
             ("icn_commons::", 10),    // migration B9
-            ("icn_community::", 7),   // migration B0
+            ("icn_community::", 0),   // migration B0 COMPLETE (2026-07-23)
         ];
 
         for &(pattern, expected_count) in expected {

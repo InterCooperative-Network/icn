@@ -54,7 +54,6 @@ icn-trust-app = { path = "../../apps/trust-app" }
 icn-governance-actor = { path = "../../apps/governance" }
 icn-ledger-actor = { path = "../../apps/ledger" }
 icn-coop = { path = "../icn-coop" }
-icn-community = { path = "../icn-community" }
 icn-naming.workspace = true
 
 [dev-dependencies]

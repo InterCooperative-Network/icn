@@ -437,6 +437,34 @@ impl GatewayServer {
         self
     }
 
+    /// Set community handle from an opaque, type-erased value.
+    ///
+    /// `icn-core` (kernel) never imports `icn-community`; it transports the
+    /// handle the daemon's `community_factory` produced as a
+    /// `Box<dyn Any + Send + Sync>` and hands it here, where the concrete
+    /// type is legal to know (`icn-gateway` is api-shell class, already
+    /// pinned to depend on `icn-community`). A downcast failure indicates a
+    /// wiring bug — not a recoverable runtime condition — so it is logged
+    /// and the community surface is left unmounted, the same degraded
+    /// posture as never providing a handle at all.
+    pub fn with_community_handle_any(
+        mut self,
+        handle: Box<dyn std::any::Any + Send + Sync>,
+    ) -> Self {
+        match handle.downcast::<icn_community::CommunityHandle>() {
+            Ok(handle) => {
+                self.community_handle = Some(*handle);
+            }
+            Err(_) => {
+                tracing::error!(
+                    "community handle wiring bug: downcast to CommunityHandle failed; \
+                     community surface will not be mounted"
+                );
+            }
+        }
+        self
+    }
+
     /// Set steward handle for daemon integration
     ///
     /// When set, the StewardManager will delegate all operations to the daemon's
@@ -2788,5 +2816,42 @@ mod tests {
         let server = GatewayServer::new(addr, long_secret.clone());
 
         assert_eq!(server.jwt_secret.len(), 64);
+    }
+
+    // --- with_community_handle_any (migration B0) ---
+    //
+    // `icn-core` transports the community handle as `Box<dyn Any + Send +
+    // Sync>` (it never imports `icn-community`); the gateway is where the
+    // concrete type is legal to know again. These tests prove the downcast
+    // path mounts correctly on a type match, and degrades safely (no panic,
+    // handle stays unmounted) on a type mismatch — the same posture as never
+    // providing a handle at all.
+
+    #[test]
+    fn with_community_handle_any_correct_type_mounts() {
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let tx = tokio::sync::mpsc::channel(1).0;
+        let handle = icn_community::CommunityHandle::new(tx);
+        let boxed: Box<dyn std::any::Any + Send + Sync> = Box::new(handle);
+
+        let server = GatewayServer::new(addr, vec![0u8; 32]).with_community_handle_any(boxed);
+
+        assert!(
+            server.community_handle.is_some(),
+            "correct-type Box must mount the community handle"
+        );
+    }
+
+    #[test]
+    fn with_community_handle_any_wrong_type_does_not_panic_and_stays_unmounted() {
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let boxed: Box<dyn std::any::Any + Send + Sync> = Box::new(42u32);
+
+        let server = GatewayServer::new(addr, vec![0u8; 32]).with_community_handle_any(boxed);
+
+        assert!(
+            server.community_handle.is_none(),
+            "wrong-type Box must leave the community surface unmounted, not panic"
+        );
     }
 }

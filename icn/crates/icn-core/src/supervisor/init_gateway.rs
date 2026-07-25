@@ -21,8 +21,9 @@ pub struct GatewayHandles {
     pub compute: Option<icn_compute::ComputeHandle>,
     /// Cooperative handle for coop management
     pub coop: Option<icn_coop::CoopHandle>,
-    /// Community handle for civic features
-    pub community: Option<icn_community::CommunityHandle>,
+    /// Opaque community-domain handle (see `GatewayActorHandles::community`
+    /// for the rationale). Downcast happens on the gateway side.
+    pub community: Option<Box<dyn std::any::Any + Send + Sync>>,
     /// Trust service for trust queries (kernel/app separated)
     pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     /// Ledger service for treasury nonce queries
@@ -234,7 +235,7 @@ pub async fn spawn_gateway(
             }
 
             if let Some(handle) = community_handle {
-                gateway_server = gateway_server.with_community_handle(handle);
+                gateway_server = gateway_server.with_community_handle_any(handle);
             }
 
             if let Some(service) = trust_service_handle {

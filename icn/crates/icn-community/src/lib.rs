@@ -35,6 +35,7 @@
 
 pub mod actor;
 pub mod error;
+pub mod gossip_sync;
 pub mod handle;
 pub mod lifecycle;
 pub mod membership;
@@ -44,6 +45,7 @@ pub mod types;
 
 pub use actor::{CommunityActor, CommunityMessage, COMMUNITY_TOPIC};
 pub use error::{CommunityError, Result};
+pub use gossip_sync::{apply_gossip_update, gossip_update_callback};
 pub use handle::CommunityHandle;
 pub use lifecycle::{CommunityLifecycle, FormationRequest};
 pub use membership::{MemberApplication, MembershipManager};
