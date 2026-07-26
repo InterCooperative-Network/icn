@@ -2813,7 +2813,7 @@ category = "reference"
 status = "living"
 title = "CI / Ops / Deploy Map"
 description = "GitHub Actions workflows, deploy paths, K3s smoke runbooks, monitoring; routing layer to substantive runbooks under guides/operations/."
-last_updated = "2026-04-29"
+last_updated = "2026-07-26"
 owner = "matt"
 audiences = ["operators", "contributors"]
 truth_class = "operational"
@@ -2822,7 +2822,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation", "ci", "operations", "deployment"]
 recommended_action = "keep"
-last_reviewed = "2026-04-29"
+last_reviewed = "2026-07-26"
 
 [docs."docs/reference/project-index/show-readiness-map.md"]
 category = "reference"
