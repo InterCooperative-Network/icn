@@ -80,8 +80,8 @@ View source on GitHub →
 <td>OpenCode integration workflow.</td>
 </tr>
 <tr>
-<td><code>docker-build-deploy.yml</code></td>
-<td>Builds and deploys Docker images for the daemon and gateway.</td>
+<td><code>oci-image-build.yml</code></td>
+<td>Builds the generic OCI image on GitHub-hosted runners without publishing or deploying it.</td>
 </tr>
 <tr>
 <td><code>release.yml</code></td>
@@ -116,6 +116,10 @@ View source on GitHub →
 <td>Enforces the issue label policy in <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/.github/ISSUE_POLICY">`.github/ISSUE_POLICY.md`</a>.</td>
 </tr>
 </tbody></table>
+<p>Historical ADR, planning, and session records may still name the retired
+<code>docker-build-deploy.yml</code> workflow while describing the state that existed when
+they were written. Those references are evidence, not active routing; this
+table and the current <code>.github/workflows/</code> tree define the live workflow set.</p>
 <h3>CI failure index (compressed)</h3>
 <p>For most CI failures, fix the smallest thing CI is asking for. The full table lives in <a href="https://github.com/InterCooperative-Network/icn/blob/main/CLAUDE">`CLAUDE.md`</a> under &quot;CI Failure Index&quot;; the gist:</p>
 <ul>
@@ -150,8 +154,8 @@ View source on GitHub →
 </tr>
 <tr>
 <td>Kubernetes</td>
-<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/k8s/">`deploy/k8s/`</a>, <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/kubernetes/">`deploy/kubernetes/`</a></td>
-<td>Plain manifests.</td>
+<td><a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/deploy/kubernetes/">`deploy/kubernetes/`</a></td>
+<td>Generic plain manifests for optional operator use. The separate <code>deploy/k8s/</code> tree is legacy homelab-specific material and is not a generic deployment entry point.</td>
 </tr>
 <tr>
 <td>Helm</td>
@@ -164,15 +168,11 @@ View source on GitHub →
 <td>Local dev ICN node image. <code>build-image.sh --real</code> produces a QCOW2 + manifest JSON from a staged Debian base; <code>smoke/smoke-local.sh --real</code> boots it under QEMU user-mode net and verifies <code>/v1/health</code> on 8080. Unsigned, not immutable, no claim flow, no partner federation. See <a href="/docs/architecture/DEBIAN_APPLIANCE_MODEL">`docs/architecture/DEBIAN_APPLIANCE_MODEL.md`</a>.</td>
 </tr>
 <tr>
-<td><strong>Live K3s cluster</strong></td>
-<td>(homelab)</td>
-<td>Deployed since 2025-12-03. See <a href="/docs/operations/deployment/HOMELAB_DEPLOYMENT">`docs/operations/deployment/HOMELAB_DEPLOYMENT.md`</a>.</td>
+<td>Optional Kubernetes/K3s operator deployment</td>
+<td>Generic manifests and Helm paths above</td>
+<td>Private cluster state and deployment automation are external infrastructure concerns; this public map does not assert their current health or liveness.</td>
 </tr>
 </tbody></table>
-<pre><code class="language-bash">cd deploy/k8s &amp;&amp; make full-deploy-dev   # deploy a new image
-make status                              # check pod status
-make logs                                # tail logs
-</code></pre>
 <h2>K3s smoke and proof-path runbooks</h2>
 <table>
 <thead>
