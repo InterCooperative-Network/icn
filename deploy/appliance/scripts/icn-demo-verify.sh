@@ -149,7 +149,7 @@ if [ "${1:-}" = "--rehearsal" ]; then
 
   ORG_JWT="$(mint_jwt "governance:read,governance:pending-publish:review,governance:pending-publish:confirm")"
   MEM_JWT="$(mint_jwt "governance:read,governance:action-item:complete")"
-  { [ -n "$ORG_JWT" ] && [ -n "$MEM_JWT" ]; } || fatal "trusted local token mint failed (icnctl --local-mint). Check ICN_GATEWAY_JWT_SECRET + keystore."
+  { [ -n "$ORG_JWT" ] && [ -n "$MEM_JWT" ]; } || fatal "trusted local credential mint failed (icnctl --local-mint). Check ICN_GATEWAY_JWT_SECRET + keystore."
   log "minted organizer / member tokens (trusted-local; never printed). Setup/init is the seed's job."
 
   s="$(rstatus GET "/v1/gov/domains/$DOMAIN/rehearsal/pending-publish" "$ORG_JWT")"

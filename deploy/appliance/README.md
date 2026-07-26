@@ -357,7 +357,7 @@ loopback demo-session endpoint mints a least-privilege session per **role**
 (`{"role":"organizer"|"member"}` → a fixed `icn-demo-seed --session <role>`
 command; no request bytes reach the command). The no-paste launcher opens the
 organizer surface; the browser's "Continue as the assigned member" link mints a
-**fresh** member session (never a token upgrade). The internal setup credential
+**fresh** member session (never a session upgrade). The internal setup credential
 (`governance:read` + `governance:rehearsal:setup`) initializes the workspace and
 binds the fictional `Example member (fictional)` label to the operator DID (a
 StaticList member of `nycn-federation-gov` via the package) — it is never

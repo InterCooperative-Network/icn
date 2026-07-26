@@ -474,7 +474,12 @@ PYEOF
         --copy-in "$DEMO_RESET_SCRIPT:/usr/local/sbin"
         --copy-in "$DEMO_SESSION_SCRIPT:/usr/local/sbin"
         --copy-in "$DEMO_STATUS_SCRIPT:/usr/local/sbin"
-        --run-command "chmod +x /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-session.py /usr/local/sbin/icn-demo-status.sh"
+        # Host worktrees may use a restrictive umask. Do not preserve those
+        # host ownership/mode details in the guest: the unprivileged static
+        # server and rehearsal commands must be able to traverse and read the
+        # explicitly non-secret DEV/DEMO payload.
+        --run-command "chown -R root:root /usr/share/icn/static/web /usr/share/icn/demo && chmod -R a+rX /usr/share/icn/static/web /usr/share/icn/demo"
+        --run-command "chown root:root /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-session.py /usr/local/sbin/icn-demo-status.sh && chmod 0755 /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-session.py /usr/local/sbin/icn-demo-status.sh"
         --run-command "ln -sf /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-seed && ln -sf /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-verify && ln -sf /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-reset && ln -sf /usr/local/sbin/icn-demo-status.sh /usr/local/sbin/icn-demo-status"
         --run-command "systemctl enable icn-member-shell.service"
         --run-command "systemctl enable icn-demo-session.service"
