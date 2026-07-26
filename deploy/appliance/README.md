@@ -345,7 +345,7 @@ What it adds (and the base image does NOT have):
 | member-shell + pilot-ui fixtures | `/usr/share/icn/static/web/` | static reference client (#2026), fixture + live-local modes |
 | `icn-member-shell.service` | `:8090` | python3 stdlib static server, dev-only |
 | `20-demo-profile.conf` drop-in | `icnd.service.d/` | gateway bind `0.0.0.0:8080` (hostfwd reachability), dev gates (`ICN_ENABLE_ADMIN_ENDPOINTS`, `ICN_GOVERNANCE_BUILD_MODE=rehearsal`), `ICN_CORS_ORIGINS` for the shell |
-| `icn-demo-seed` | `/usr/local/sbin/` | legacy: seeds NYCN fixture + one open action item, prints the dev browser JWT. `--session organizer\|member` (#2386): idempotent Rehearsal Node workspace init + fictional label bind, then a least-privilege per-role session JWT (organizer = read+review+confirm; member = read+complete) |
+| `icn-demo-seed` | `/usr/local/sbin/` | legacy: seeds NYCN fixture + one open action item, prints the dev browser credential. `--session organizer\|member` (#2386): idempotent Rehearsal Node workspace init + fictional label bind, then a least-privilege per-role browser credential (organizer = read+review+confirm; member = read+complete) |
 | `icn-demo-verify` | `/usr/local/sbin/` | receipt binding check; `--chain` runs the bundled 13/13 governed receipt-chain rehearsal; `--rehearsal` (#2386) verifies the organizer→member loop + least-privilege matrix + value-withheld evidence |
 | `icn-demo-reset` | `/usr/local/sbin/` | destructive reset: wipe node state, re-run firstboot, reseed |
 | NYCN package + dogfood kit + 13/13 scripts | `/usr/share/icn/demo/` | fixture institution and bundled evidence tooling |
@@ -357,7 +357,8 @@ loopback demo-session endpoint mints a least-privilege session per **role**
 (`{"role":"organizer"|"member"}` → a fixed `icn-demo-seed --session <role>`
 command; no request bytes reach the command). The no-paste launcher opens the
 organizer surface; the browser's "Continue as the assigned member" link mints a
-**fresh** member session (never a session upgrade). The internal setup credential
+**fresh** member credential (never an upgrade of the organizer credential). The
+internal setup credential
 (`governance:read` + `governance:rehearsal:setup`) initializes the workspace and
 binds the fictional `Example member (fictional)` label to the operator DID (a
 StaticList member of `nycn-federation-gov` via the package) — it is never
