@@ -45,16 +45,10 @@ For most CI failures, fix the smallest thing CI is asking for. The full table li
 | Native / systemd | [`deploy/icnd.service`](../../../deploy/icnd.service), [`deploy/install.sh`](../../../deploy/install.sh) | Single-node systemd unit. |
 | Docker Compose | [`deploy/compose/`](../../../deploy/compose/), [`deploy/docker-compose.yml`](../../../deploy/docker-compose.yml) | Local multi-node deployment. |
 | Local devnet | [`deploy/devnet/`](../../../deploy/devnet/) | Local 3-node Docker Compose cluster. See the `devnet` skill at [`.claude/skills/devnet/SKILL.md`](../../../.claude/skills/devnet/SKILL.md). |
-| Kubernetes | [`deploy/k8s/`](../../../deploy/k8s/), [`deploy/kubernetes/`](../../../deploy/kubernetes/) | Plain manifests. |
+| Kubernetes | [`deploy/kubernetes/`](../../../deploy/kubernetes/) | Generic plain manifests for optional operator use. The separate `deploy/k8s/` tree is legacy homelab-specific material and is not a generic deployment entry point. |
 | Helm | [`deploy/helm/`](../../../deploy/helm/) | Helm chart for ICN. |
 | Debian appliance (**dev image, NOT production**) | [`deploy/appliance/`](../../../deploy/appliance/) | Local dev ICN node image. `build-image.sh --real` produces a QCOW2 + manifest JSON from a staged Debian base; `smoke/smoke-local.sh --real` boots it under QEMU user-mode net and verifies `/v1/health` on 8080. Unsigned, not immutable, no claim flow, no partner federation. See [`docs/architecture/DEBIAN_APPLIANCE_MODEL.md`](../../architecture/DEBIAN_APPLIANCE_MODEL.md). |
 | Optional Kubernetes/K3s operator deployment | Generic manifests and Helm paths above | Private cluster state and deployment automation are external infrastructure concerns; this public map does not assert their current health or liveness. |
-
-```bash
-cd deploy/k8s && make full-deploy-dev   # deploy a new image
-make status                              # check pod status
-make logs                                # tail logs
-```
 
 ## K3s smoke and proof-path runbooks
 
