@@ -477,8 +477,10 @@ PYEOF
         # Host worktrees may use a restrictive umask. Do not preserve those
         # host ownership/mode details in the guest: the unprivileged static
         # server and rehearsal commands must be able to traverse and read the
-        # explicitly non-secret DEV/DEMO payload.
-        --run-command "chown -R root:root /usr/share/icn/static/web /usr/share/icn/demo && chmod -R a+rX /usr/share/icn/static/web /usr/share/icn/demo"
+        # explicitly non-secret DEV/DEMO payload. Normalize rather than merely
+        # add access so a permissive host umask cannot leave guest files
+        # writable by an unprivileged user.
+        --run-command "chown -R root:root /usr/share/icn/static/web /usr/share/icn/demo && chmod -R u=rwX,go=rX /usr/share/icn/static/web /usr/share/icn/demo"
         --run-command "chown root:root /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-session.py /usr/local/sbin/icn-demo-status.sh && chmod 0755 /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-session.py /usr/local/sbin/icn-demo-status.sh"
         --run-command "ln -sf /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-seed && ln -sf /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-verify && ln -sf /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-reset && ln -sf /usr/local/sbin/icn-demo-status.sh /usr/local/sbin/icn-demo-status"
         --run-command "systemctl enable icn-member-shell.service"
