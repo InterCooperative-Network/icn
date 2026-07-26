@@ -1,7 +1,7 @@
 ---
 Status: operational
 Canonical: no
-Last Reviewed: 2026-04-29
+Last Reviewed: 2026-07-26
 ---
 
 # CI / Ops / Deploy Map
@@ -19,7 +19,7 @@ Last Reviewed: 2026-04-29
 | `claude-code-review.yml` | Posts a Claude review comment on PRs. **15-minute timeout; failures here are infra flakes and never block merge.** |
 | `claude.yml` | Auxiliary Claude integration. |
 | `opencode.yml` | OpenCode integration workflow. |
-| `docker-build-deploy.yml` | Builds and deploys Docker images for the daemon and gateway. |
+| `oci-image-build.yml` | Builds the generic OCI image on GitHub-hosted runners without publishing or deploying it. |
 | `release.yml` | Release tagging and artifact publishing. |
 | `npm-publish.yml` | Publishes the TypeScript SDK to npm. |
 | `website-deploy.yml` | Deploys [`intercooperative.network`](https://intercooperative.network). |
@@ -48,7 +48,7 @@ For most CI failures, fix the smallest thing CI is asking for. The full table li
 | Kubernetes | [`deploy/k8s/`](../../../deploy/k8s/), [`deploy/kubernetes/`](../../../deploy/kubernetes/) | Plain manifests. |
 | Helm | [`deploy/helm/`](../../../deploy/helm/) | Helm chart for ICN. |
 | Debian appliance (**dev image, NOT production**) | [`deploy/appliance/`](../../../deploy/appliance/) | Local dev ICN node image. `build-image.sh --real` produces a QCOW2 + manifest JSON from a staged Debian base; `smoke/smoke-local.sh --real` boots it under QEMU user-mode net and verifies `/v1/health` on 8080. Unsigned, not immutable, no claim flow, no partner federation. See [`docs/architecture/DEBIAN_APPLIANCE_MODEL.md`](../../architecture/DEBIAN_APPLIANCE_MODEL.md). |
-| **Live K3s cluster** | (homelab) | Deployed since 2025-12-03. See [`docs/operations/deployment/HOMELAB_DEPLOYMENT.md`](../../operations/deployment/HOMELAB_DEPLOYMENT.md). |
+| Optional Kubernetes/K3s operator deployment | Generic manifests and Helm paths above | Private cluster state and deployment automation are external infrastructure concerns; this public map does not assert their current health or liveness. |
 
 ```bash
 cd deploy/k8s && make full-deploy-dev   # deploy a new image
