@@ -29,6 +29,11 @@ Last Reviewed: 2026-07-26
 | `sync-stats.yml` | Repo statistics sync. |
 | `issue-label-enforcer.yml` | Enforces the issue label policy in [`.github/ISSUE_POLICY.md`](../../../.github/ISSUE_POLICY.md). |
 
+Historical ADR, planning, and session records may still name the retired
+`docker-build-deploy.yml` workflow while describing the state that existed when
+they were written. Those references are evidence, not active routing; this
+table and the current `.github/workflows/` tree define the live workflow set.
+
 ### CI failure index (compressed)
 
 For most CI failures, fix the smallest thing CI is asking for. The full table lives in [`CLAUDE.md`](../../../CLAUDE.md) under "CI Failure Index"; the gist:
