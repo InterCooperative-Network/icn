@@ -481,6 +481,10 @@ PYEOF
         # add access so a permissive host umask cannot leave guest files
         # writable by an unprivileged user.
         --run-command "chown -R root:root /usr/share/icn/static/web /usr/share/icn/demo && chmod -R u=rwX,go=rX /usr/share/icn/static/web /usr/share/icn/demo"
+        # Fail closed if future staging changes weaken the guest-side payload
+        # contract: root ownership, no group/world write, readable files, and
+        # traversable directories.
+        --run-command "test -z \"\$(find /usr/share/icn/static/web /usr/share/icn/demo \\( ! -user root -o ! -group root -o -perm /022 \\) -print -quit)\" && test -z \"\$(find /usr/share/icn/static/web /usr/share/icn/demo -type f ! -perm -0444 -print -quit)\" && test -z \"\$(find /usr/share/icn/static/web /usr/share/icn/demo -type d ! -perm -0111 -print -quit)\""
         --run-command "chown root:root /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-session.py /usr/local/sbin/icn-demo-status.sh && chmod 0755 /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-session.py /usr/local/sbin/icn-demo-status.sh"
         --run-command "ln -sf /usr/local/sbin/icn-demo-seed.sh /usr/local/sbin/icn-demo-seed && ln -sf /usr/local/sbin/icn-demo-verify.sh /usr/local/sbin/icn-demo-verify && ln -sf /usr/local/sbin/icn-demo-reset.sh /usr/local/sbin/icn-demo-reset && ln -sf /usr/local/sbin/icn-demo-status.sh /usr/local/sbin/icn-demo-status"
         --run-command "systemctl enable icn-member-shell.service"
