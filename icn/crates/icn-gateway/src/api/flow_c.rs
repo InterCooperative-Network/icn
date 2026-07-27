@@ -178,6 +178,7 @@ mod tests {
             coop_id: coop_id.to_string(),
             scopes: scopes.into_iter().map(|s| s.to_string()).collect(),
             exp: 9999999999,
+            jti: None,
         }
     }
 

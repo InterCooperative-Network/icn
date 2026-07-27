@@ -85,7 +85,7 @@ R="$(mkpkg "$TMP/mpath")"; sed -i "s#\"image_path\":\"$IMAGE_BASENAME\"#\"image_
 if run "$R"; then no "should reject non-basename image_path"; else ok "rejects non-basename image_path (host path leak)"; fi
 
 # 10. JWT-shaped credential FAILS  (synthetic non-credential fixture)
-R="$(mkpkg "$TMP/jwt")"; printf 'token eyJTWVNURVNU.ZmFrZVRFU1Rml4dHVyZQ\n' >> "$R/docs/RUNBOOK.md"  # sanitize-ok: synthetic test fixture
+R="$(mkpkg "$TMP/jwt")"; printf 'credential eyJTWVNURVNU.ZmFrZVRFU1Rml4dHVyZQ\n' >> "$R/docs/RUNBOOK.md"  # sanitize-ok: synthetic test fixture
 ( cd "$R" && find . -type f ! -name SHA256SUMS -printf '%P\0' | sort -z | xargs -0 sha256sum > SHA256SUMS )
 if run "$R"; then no "should reject JWT-shaped value"; else ok "rejects JWT-shaped credential"; fi
 

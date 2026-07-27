@@ -21,7 +21,7 @@
 # bytes are ever interpolated into it. The shell holds the credential in page
 # memory only (never persisted, never in a URL). A role transition (organizer ->
 # member) calls back here for a FRESH least-privilege session — it never upgrades
-# a token. This service adds no privilege the tunnel-holding operator does not
+# a credential. This service adds no privilege the tunnel-holding operator does not
 # already have (they have SSH + sudo on this throwaway VM).
 #
 # Safety:
@@ -63,9 +63,9 @@ BIND_PORT = int(os.environ.get("ICN_DEMO_SESSION_PORT", "8091"))
 # Two FIXED commands, one per role. The request selects one from this CLOSED set
 # (see resolve_seed_cmd); no request bytes are ever interpolated into a command,
 # so there is no injection surface. Each --session role mints a least-privilege
-# per-role browser JWT (organizer = read+review+confirm; member = read+complete)
+# per-role browser credential (organizer = read+review+confirm; member = read+complete)
 # for the Rehearsal Node loop (#2386). The role transition in the browser calls
-# back here for a FRESH least-privilege session — it never upgrades a token.
+# back here for a FRESH least-privilege session — it never upgrades a credential.
 SEED_CMD_ORGANIZER = ["/usr/local/sbin/icn-demo-seed", "--session", "organizer", "--json"]
 SEED_CMD_MEMBER = ["/usr/local/sbin/icn-demo-seed", "--session", "member", "--json"]
 # "Start a NEW rehearsal": same fixed organizer seed plus --fresh, which makes

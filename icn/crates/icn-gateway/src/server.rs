@@ -37,6 +37,10 @@ use crate::rate_limit::{
     IpRateLimiter, RateLimitConfig, RateLimiter, VelocityLimitConfig, VelocityLimiter,
 };
 use crate::security::{configure_cors, SecurityConfig, SecurityHeaders};
+use crate::session_authority::{
+    AuthorityProfile, InMemoryRevocationAuthority, RevocationAuthority, SessionAuthority,
+    StoreRevocationAuthority, TokenLifetimePolicy,
+};
 use crate::treasury_mgr::{GatewayTreasuryManager, LedgerHandle, TreasuryHandle};
 use crate::trust_mgr::TrustManager;
 use anyhow::Context;
@@ -82,6 +86,16 @@ impl Default for AuditPruneConfig {
 pub struct GatewayServer {
     bind_addr: SocketAddr,
     jwt_secret: Vec<u8>,
+    /// Deployment profile governing which authority guarantees are REQUIRED.
+    /// Defaults to the disposable-evaluator posture; the daemon sets the
+    /// institutional profile when a persistent deployment is configured.
+    authority_profile: AuthorityProfile,
+    /// Persistent store backing session revocation. `None` yields volatile
+    /// revocation, which only the evaluator profile may run (see
+    /// [`AuthorityProfile::validate`]).
+    revocation_store: Option<Arc<dyn icn_store::Store>>,
+    /// Configured session lifetime; `None` uses the default.
+    token_lifetime: Option<TokenLifetimePolicy>,
     data_dir: Option<std::path::PathBuf>,
     event_broadcaster: Option<Arc<EventBroadcaster>>,
     security_config: SecurityConfig,
@@ -184,12 +198,32 @@ fn self_serve_coop_allowed(dev_opt_in: bool, bind_addr: &SocketAddr) -> bool {
     dev_opt_in && bind_addr.ip().is_loopback()
 }
 
+/// Decide whether the admin/dev SDIS endpoints (currently the recovery-approval
+/// simulation) may be mounted (issue #2075).
+///
+/// Same safe-by-construction rule as [`self_serve_coop_allowed`]: BOTH an explicit
+/// opt-in (`ICN_ENABLE_ADMIN_ENDPOINTS`) AND a loopback bind. The loopback
+/// condition is the invariant — a dev/test escape hatch can never be reached from
+/// a routable interface even if the opt-in is mistakenly set on an all-interfaces
+/// listener. Off-loopback the route is simply not registered. Kept as a free
+/// function so the invariant is unit-tested directly.
+fn admin_endpoints_allowed(opt_in: bool, bind_addr: &SocketAddr) -> bool {
+    opt_in && bind_addr.ip().is_loopback()
+}
+
 impl GatewayServer {
     /// Create a new gateway server (uses temporary storage for testing)
     pub fn new(bind_addr: SocketAddr, jwt_secret: Vec<u8>) -> Self {
         GatewayServer {
             bind_addr,
             jwt_secret,
+            // Safe-by-default: assume the disposable posture until a deployment
+            // declares itself institutional. Declaring the stronger profile
+            // without the machinery to back it fails at startup rather than
+            // shipping an authority claim the runtime cannot honor.
+            authority_profile: AuthorityProfile::PortableEvaluator,
+            revocation_store: None,
+            token_lifetime: None,
             data_dir: None,
             event_broadcaster: None,
             security_config: SecurityConfig::development(), // Permissive for tests
@@ -242,6 +276,9 @@ impl GatewayServer {
         GatewayServer {
             bind_addr,
             jwt_secret,
+            authority_profile: AuthorityProfile::PortableEvaluator,
+            revocation_store: None,
+            token_lifetime: None,
             data_dir: Some(data_dir),
             event_broadcaster: None,
             security_config,
@@ -295,6 +332,9 @@ impl GatewayServer {
         GatewayServer {
             bind_addr,
             jwt_secret,
+            authority_profile: AuthorityProfile::PortableEvaluator,
+            revocation_store: None,
+            token_lifetime: None,
             data_dir,
             event_broadcaster: Some(event_broadcaster),
             security_config,
@@ -394,6 +434,34 @@ impl GatewayServer {
     /// CommunityActor, ensuring persistence and gossip synchronization.
     pub fn with_community_handle(mut self, handle: icn_community::CommunityHandle) -> Self {
         self.community_handle = Some(handle);
+        self
+    }
+
+    /// Set community handle from an opaque, type-erased value.
+    ///
+    /// `icn-core` (kernel) never imports `icn-community`; it transports the
+    /// handle the daemon's `community_factory` produced as a
+    /// `Box<dyn Any + Send + Sync>` and hands it here, where the concrete
+    /// type is legal to know (`icn-gateway` is api-shell class, already
+    /// pinned to depend on `icn-community`). A downcast failure indicates a
+    /// wiring bug — not a recoverable runtime condition — so it is logged
+    /// and the community surface is left unmounted, the same degraded
+    /// posture as never providing a handle at all.
+    pub fn with_community_handle_any(
+        mut self,
+        handle: Box<dyn std::any::Any + Send + Sync>,
+    ) -> Self {
+        match handle.downcast::<icn_community::CommunityHandle>() {
+            Ok(handle) => {
+                self.community_handle = Some(*handle);
+            }
+            Err(_) => {
+                tracing::error!(
+                    "community handle wiring bug: downcast to CommunityHandle failed; \
+                     community surface will not be mounted"
+                );
+            }
+        }
         self
     }
 
@@ -614,6 +682,32 @@ impl GatewayServer {
     /// real records (keyed `exec:<decision_hash>`). Standalone/test gateways
     /// that have no runtime store leave this `None` and keep the path-open
     /// fallback (Gap C).
+    /// Install a persistent store for session revocation.
+    ///
+    /// Without this, revocation is in-memory and is lost on restart — a posture
+    /// only [`AuthorityProfile::PortableEvaluator`] may run. Supplying the store
+    /// is what makes [`AuthorityProfile::Institutional`] assemblable.
+    pub fn with_revocation_store(mut self, store: Arc<dyn icn_store::Store>) -> Self {
+        self.revocation_store = Some(store);
+        self
+    }
+
+    /// Declare the deployment profile whose authority guarantees must hold.
+    ///
+    /// A profile is a *requirement*, not a description: declaring
+    /// [`AuthorityProfile::Institutional`] without durable revocation aborts
+    /// startup with an actionable error rather than degrading silently.
+    pub fn with_authority_profile(mut self, profile: AuthorityProfile) -> Self {
+        self.authority_profile = profile;
+        self
+    }
+
+    /// Apply the deployment-configured session lifetime (`token_expiry_hours`).
+    pub fn with_token_lifetime(mut self, lifetime: TokenLifetimePolicy) -> Self {
+        self.token_lifetime = Some(lifetime);
+        self
+    }
+
     pub fn with_execution_query_store(mut self, store: Arc<dyn icn_store::Store>) -> Self {
         self.execution_query_store = Some(store);
         self
@@ -629,8 +723,31 @@ impl GatewayServer {
         self
     }
 
-    /// Run the gateway server
+    /// Run the gateway server.
     pub async fn run(self) -> Result<()> {
+        self.run_inner(None).await
+    }
+
+    /// Run the gateway and acknowledge only after initialization and socket bind.
+    ///
+    /// The supervisor uses this handshake so it cannot report the gateway actor
+    /// active while authority assembly, storage initialization, or binding has
+    /// already failed.
+    pub async fn run_with_startup_signal(
+        self,
+        startup: tokio::sync::oneshot::Sender<()>,
+        supervisor_ack: tokio::sync::oneshot::Receiver<()>,
+    ) -> Result<()> {
+        self.run_inner(Some((startup, supervisor_ack))).await
+    }
+
+    async fn run_inner(
+        self,
+        startup: Option<(
+            tokio::sync::oneshot::Sender<()>,
+            tokio::sync::oneshot::Receiver<()>,
+        )>,
+    ) -> Result<()> {
         info!("Starting ICN Gateway on {}", self.bind_addr);
 
         // Initialize server start time for health check uptime reporting
@@ -680,6 +797,23 @@ impl GatewayServer {
             .unwrap_or(false);
         let dev_opt_in = self.dev_self_serve_auth || dev_mode_env;
         let allow_self_asserted_coop = self_serve_coop_allowed(dev_opt_in, &self.bind_addr);
+
+        // Admin/dev SDIS endpoints (recovery-approval simulation) require an
+        // explicit opt-in AND a loopback bind. Computed once here (bind-address
+        // based, not a per-request IP heuristic) and used to decide whether the
+        // protected recovery route is mounted at all (#2075).
+        let admin_opt_in = std::env::var("ICN_ENABLE_ADMIN_ENDPOINTS")
+            .map(|v| v.trim().eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+        let mount_admin_recovery = admin_endpoints_allowed(admin_opt_in, &self.bind_addr);
+        if admin_opt_in && !mount_admin_recovery {
+            warn!(
+                "ICN_ENABLE_ADMIN_ENDPOINTS is set but the gateway is bound to \
+                 non-loopback {} — the SDIS recovery-approval simulation stays \
+                 UNMOUNTED (fail-closed). Bind to loopback for local dev (#2075).",
+                self.bind_addr
+            );
+        }
         if allow_self_asserted_coop {
             warn!(
                 "⚠️  self-asserted cooperative authority is ENABLED at /auth/verify on loopback \
@@ -697,9 +831,48 @@ impl GatewayServer {
                 self.bind_addr
             );
         }
+        // ---- Session authority composition (issues #2436, #2437) ----------
+        //
+        // The authority subsystem is assembled as ONE explicit value rather than
+        // an implicit set of defaults, so what this deployment guarantees is
+        // constructible, inspectable, and testable through the same path
+        // production uses. `SessionAuthority::new` runs the profile's startup
+        // invariants and refuses to assemble a deployment whose required
+        // guarantees are missing.
+        let lifetime = self.token_lifetime.unwrap_or_default();
         let auth_manager = Arc::new(
-            AuthManager::new(self.jwt_secret).with_self_asserted_coop(allow_self_asserted_coop),
+            AuthManager::new(self.jwt_secret)
+                .with_self_asserted_coop(allow_self_asserted_coop)
+                .with_token_ttl(lifetime.ttl()),
         );
+
+        // Durable when the daemon supplied a revocation store; volatile
+        // otherwise. The profile decides whether volatile is acceptable — it is
+        // never silently upgraded to "revocation supported".
+        let revocation: Arc<dyn RevocationAuthority> = match self.revocation_store.clone() {
+            Some(store) => Arc::new(StoreRevocationAuthority::new(store)?),
+            None => Arc::new(InMemoryRevocationAuthority::new()),
+        };
+
+        let session_authority = Arc::new(SessionAuthority::new(
+            auth_manager.clone(),
+            revocation,
+            lifetime,
+            self.authority_profile,
+        )?);
+
+        let authority_caps = session_authority.capabilities();
+        info!(
+            profile = authority_caps.profile,
+            revocation = ?authority_caps.revocation,
+            revocation_durability = authority_caps.revocation_durability,
+            revocation_backend = authority_caps.revocation_backend,
+            token_ttl_secs = authority_caps.token_ttl_secs,
+            "Session authority assembled"
+        );
+        for note in &authority_caps.notes {
+            warn!("Session authority: {}", note);
+        }
 
         // Create cooperative manager (uses actor if handle available, otherwise in-memory)
         let coop_manager: Arc<CoopManager> = if let Some(handle) = self.coop_handle {
@@ -1927,7 +2100,10 @@ impl GatewayServer {
                         .url("/api-docs/openapi.json", openapi.clone()),
                 )
                 // Shared state
-                .app_data(web::Data::new(auth_manager.clone()))
+                // Authority composition boundary: issuance handlers and every
+                // authenticated request resolve this one object, so a router
+                // cannot install a bare issuer without revocation enforcement.
+                .app_data(web::Data::new(session_authority.clone()))
                 .app_data(web::Data::new(coop_manager.clone()))
                 .app_data(web::Data::new(community_manager.clone()))
                 .app_data(web::Data::new(steward_manager.clone()))
@@ -2034,7 +2210,13 @@ impl GatewayServer {
                         )
                         // Public cooperative statistics (no auth required)
                         .service(api::coops::get_coop_stats)
-                        // Public SDIS endpoints (verification + enrollment)
+                        // SDIS endpoints. The scope is deliberately split by
+                        // authority (issue #2443): public verification and
+                        // enrollment initiation stay reachable without a
+                        // credential, while steward and moderation routes are
+                        // mounted behind `jwt_auth` so they inherit signature
+                        // validation, the configured lifetime ceiling, durable
+                        // revocation, and fail-closed authority construction.
                         .service(
                             web::scope("/sdis")
                                 .service(api::sdis::sdis_health)
@@ -2045,7 +2227,28 @@ impl GatewayServer {
                                 // Note: enrollment::configure disabled - using simple_enrollment as primary API
                                 // .configure(api::sdis::enrollment::configure)
                                 .configure(api::sdis::recovery::configure)
-                                .configure(api::sdis::anchor::configure),
+                                .configure(api::sdis::anchor::configure)
+                                // Steward/moderation surface: same `/sdis`
+                                // prefix, authenticated. Nested last so the
+                                // public routes above keep their unwrapped
+                                // behavior. Recovery steward-approval joins the
+                                // enrollment steward acts behind `jwt_auth`.
+                                .service(
+                                    web::scope("")
+                                        .wrap(auth.clone())
+                                        .configure(
+                                            api::sdis::simple_enrollment::configure_protected,
+                                        )
+                                        // Recovery steward-approval is a dev/test
+                                        // escape hatch: mounted only on an
+                                        // explicit opt-in AND loopback bind
+                                        // (#2075). Off-loopback it is absent.
+                                        .configure(move |cfg| {
+                                            if mount_admin_recovery {
+                                                api::sdis::recovery::configure_protected(cfg);
+                                            }
+                                        }),
+                                ),
                         )
                         // Protected coop endpoints (auth + rate limiting)
                         .service(
@@ -2417,6 +2620,19 @@ impl GatewayServer {
         .bind(self.bind_addr)?
         .run();
 
+        if let Some((startup, supervisor_ack)) = startup {
+            startup.send(()).map_err(|_| {
+                GatewayError::InternalError(
+                    "gateway supervisor dropped startup acknowledgement channel".to_string(),
+                )
+            })?;
+            supervisor_ack.await.map_err(|_| {
+                GatewayError::InternalError(
+                    "gateway supervisor did not acknowledge actor activation".to_string(),
+                )
+            })?;
+        }
+
         // Wait for server to complete and then signal cleanup task to shutdown
         let result = server.await;
 
@@ -2489,6 +2705,29 @@ mod tests {
         assert!(!self_serve_coop_allowed(false, &all_ifaces));
     }
 
+    /// SECURITY (#2075): the admin/dev SDIS recovery-approval simulation may be
+    /// mounted only with BOTH an explicit opt-in AND a loopback bind — never on a
+    /// routable/all-interfaces listener, and never without the opt-in.
+    #[test]
+    fn admin_endpoints_require_optin_and_loopback() {
+        let loopback_v4: SocketAddr = "127.0.0.1:8080".parse().unwrap();
+        let loopback_v6: SocketAddr = "[::1]:8080".parse().unwrap();
+        let all_ifaces: SocketAddr = "0.0.0.0:8080".parse().unwrap();
+        let routable: SocketAddr = "10.0.0.5:8080".parse().unwrap();
+
+        // opt-in + loopback => mountable
+        assert!(admin_endpoints_allowed(true, &loopback_v4));
+        assert!(admin_endpoints_allowed(true, &loopback_v6));
+
+        // opt-in but NOT loopback => not mounted (the #2075 exposure guard)
+        assert!(!admin_endpoints_allowed(true, &all_ifaces));
+        assert!(!admin_endpoints_allowed(true, &routable));
+
+        // no opt-in => not mounted regardless of bind
+        assert!(!admin_endpoints_allowed(false, &loopback_v4));
+        assert!(!admin_endpoints_allowed(false, &all_ifaces));
+    }
+
     #[tokio::test]
     async fn test_jwt_secret_empty_fails_startup() {
         let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
@@ -2501,6 +2740,24 @@ mod tests {
         assert!(
             err_msg.contains("empty JWT secret"),
             "Expected empty JWT secret error, got: {err_msg}"
+        );
+    }
+
+    #[tokio::test]
+    async fn startup_signal_reports_failure_before_readiness() {
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let server = GatewayServer::new(addr, vec![]);
+        let (startup_tx, startup_rx) = tokio::sync::oneshot::channel();
+        let (_supervisor_ack_tx, supervisor_ack_rx) = tokio::sync::oneshot::channel();
+
+        let result = server
+            .run_with_startup_signal(startup_tx, supervisor_ack_rx)
+            .await;
+
+        assert!(result.is_err());
+        assert!(
+            startup_rx.await.is_err(),
+            "a failed server must never acknowledge readiness"
         );
     }
 
@@ -2559,5 +2816,42 @@ mod tests {
         let server = GatewayServer::new(addr, long_secret.clone());
 
         assert_eq!(server.jwt_secret.len(), 64);
+    }
+
+    // --- with_community_handle_any (migration B0) ---
+    //
+    // `icn-core` transports the community handle as `Box<dyn Any + Send +
+    // Sync>` (it never imports `icn-community`); the gateway is where the
+    // concrete type is legal to know again. These tests prove the downcast
+    // path mounts correctly on a type match, and degrades safely (no panic,
+    // handle stays unmounted) on a type mismatch — the same posture as never
+    // providing a handle at all.
+
+    #[test]
+    fn with_community_handle_any_correct_type_mounts() {
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let tx = tokio::sync::mpsc::channel(1).0;
+        let handle = icn_community::CommunityHandle::new(tx);
+        let boxed: Box<dyn std::any::Any + Send + Sync> = Box::new(handle);
+
+        let server = GatewayServer::new(addr, vec![0u8; 32]).with_community_handle_any(boxed);
+
+        assert!(
+            server.community_handle.is_some(),
+            "correct-type Box must mount the community handle"
+        );
+    }
+
+    #[test]
+    fn with_community_handle_any_wrong_type_does_not_panic_and_stays_unmounted() {
+        let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
+        let boxed: Box<dyn std::any::Any + Send + Sync> = Box::new(42u32);
+
+        let server = GatewayServer::new(addr, vec![0u8; 32]).with_community_handle_any(boxed);
+
+        assert!(
+            server.community_handle.is_none(),
+            "wrong-type Box must leave the community surface unmounted, not panic"
+        );
     }
 }

@@ -64,7 +64,7 @@ fn default_gateway_bind_addr() -> String {
 }
 
 fn default_token_expiry_hours() -> u64 {
-    24
+    icn_gateway::session_authority::DEFAULT_TOKEN_TTL.as_secs() / 3600
 }
 
 fn default_challenge_ttl_minutes() -> u64 {

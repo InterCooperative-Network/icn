@@ -653,6 +653,7 @@ mod tests {
             exp: 9_999_999_999,
             coop_id: "test-coop".to_string(),
             scopes: vec![],
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri(&format!("/v1/commons/holder/{did}"))

@@ -1,7 +1,7 @@
 ---
 Status: operational
 Canonical: no
-Last Reviewed: 2026-04-29
+Last Reviewed: 2026-07-26
 ---
 
 # CI / Ops / Deploy Map
@@ -19,7 +19,7 @@ Last Reviewed: 2026-04-29
 | `claude-code-review.yml` | Posts a Claude review comment on PRs. **15-minute timeout; failures here are infra flakes and never block merge.** |
 | `claude.yml` | Auxiliary Claude integration. |
 | `opencode.yml` | OpenCode integration workflow. |
-| `docker-build-deploy.yml` | Builds and deploys Docker images for the daemon and gateway. |
+| `oci-image-build.yml` | Builds the generic OCI image on GitHub-hosted runners without publishing or deploying it. |
 | `release.yml` | Release tagging and artifact publishing. |
 | `npm-publish.yml` | Publishes the TypeScript SDK to npm. |
 | `website-deploy.yml` | Deploys [`intercooperative.network`](https://intercooperative.network). |
@@ -28,6 +28,11 @@ Last Reviewed: 2026-04-29
 | `fuzz.yml` | Fuzz harnesses. |
 | `sync-stats.yml` | Repo statistics sync. |
 | `issue-label-enforcer.yml` | Enforces the issue label policy in [`.github/ISSUE_POLICY.md`](../../../.github/ISSUE_POLICY.md). |
+
+Historical ADR, planning, and session records may still name the retired
+`docker-build-deploy.yml` workflow while describing the state that existed when
+they were written. Those references are evidence, not active routing; this
+table and the current `.github/workflows/` tree define the live workflow set.
 
 ### CI failure index (compressed)
 
@@ -45,16 +50,10 @@ For most CI failures, fix the smallest thing CI is asking for. The full table li
 | Native / systemd | [`deploy/icnd.service`](../../../deploy/icnd.service), [`deploy/install.sh`](../../../deploy/install.sh) | Single-node systemd unit. |
 | Docker Compose | [`deploy/compose/`](../../../deploy/compose/), [`deploy/docker-compose.yml`](../../../deploy/docker-compose.yml) | Local multi-node deployment. |
 | Local devnet | [`deploy/devnet/`](../../../deploy/devnet/) | Local 3-node Docker Compose cluster. See the `devnet` skill at [`.claude/skills/devnet/SKILL.md`](../../../.claude/skills/devnet/SKILL.md). |
-| Kubernetes | [`deploy/k8s/`](../../../deploy/k8s/), [`deploy/kubernetes/`](../../../deploy/kubernetes/) | Plain manifests. |
+| Kubernetes | [`deploy/kubernetes/`](../../../deploy/kubernetes/) | Generic plain manifests for optional operator use. The separate `deploy/k8s/` tree is legacy homelab-specific material and is not a generic deployment entry point. |
 | Helm | [`deploy/helm/`](../../../deploy/helm/) | Helm chart for ICN. |
 | Debian appliance (**dev image, NOT production**) | [`deploy/appliance/`](../../../deploy/appliance/) | Local dev ICN node image. `build-image.sh --real` produces a QCOW2 + manifest JSON from a staged Debian base; `smoke/smoke-local.sh --real` boots it under QEMU user-mode net and verifies `/v1/health` on 8080. Unsigned, not immutable, no claim flow, no partner federation. See [`docs/architecture/DEBIAN_APPLIANCE_MODEL.md`](../../architecture/DEBIAN_APPLIANCE_MODEL.md). |
-| **Live K3s cluster** | (homelab) | Deployed since 2025-12-03. See [`docs/operations/deployment/HOMELAB_DEPLOYMENT.md`](../../operations/deployment/HOMELAB_DEPLOYMENT.md). |
-
-```bash
-cd deploy/k8s && make full-deploy-dev   # deploy a new image
-make status                              # check pod status
-make logs                                # tail logs
-```
+| Optional Kubernetes/K3s operator deployment | Generic manifests and Helm paths above | Private cluster state and deployment automation are external infrastructure concerns; this public map does not assert their current health or liveness. |
 
 ## K3s smoke and proof-path runbooks
 

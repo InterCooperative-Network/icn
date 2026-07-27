@@ -1464,6 +1464,7 @@ mod tests {
             coop_id: coop_id.to_string(),
             scopes: vec!["treasury:read".to_string(), "treasury:write".to_string()],
             exp: 9999999999,
+            jti: None,
         }
     }
 
@@ -1795,6 +1796,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["treasury:read".to_string()], // No write scope
             exp: 9999999999,
+            jti: None,
         };
         req.extensions_mut().insert(claims);
 
@@ -1901,6 +1903,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["treasury:write".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         });
 
         let _resp: serde_json::Value = test::call_and_read_body_json(&app, req).await;

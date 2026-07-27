@@ -1472,6 +1472,7 @@ mod tests {
             coop_id: "coop-alpha".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/clearing/agr-001/position")
@@ -1519,6 +1520,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/clearing/nonexistent-agreement/position")
@@ -1697,6 +1699,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/coops")
@@ -1744,6 +1747,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/coops")
@@ -1784,6 +1788,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
 
         // Known coop → 200
@@ -1829,6 +1834,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/coops/any-coop/vouches")
@@ -1872,6 +1878,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/clearing")
@@ -1923,6 +1930,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
 
         // Known agreement → 200 with correct shape
@@ -1970,6 +1978,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/clearing")
@@ -2011,6 +2020,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/coops")
@@ -2051,6 +2061,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/coops/governance-coop")
@@ -2090,6 +2101,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/coops/any-coop/vouches")
@@ -2129,6 +2141,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/clearing")
@@ -2169,6 +2182,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/clearing/agr-gov-001")
@@ -2233,6 +2247,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:write".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::post()
             .uri("/v1/federation/clearing/does-not-exist/propose-adoption")
@@ -2329,6 +2344,7 @@ mod tests {
             coop_id: "coop-alpha".to_string(),
             scopes: vec!["federation:write".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::post()
             .uri("/v1/federation/clearing/agr-dm-001/propose-adoption")
@@ -2462,6 +2478,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/topology")
@@ -2671,6 +2688,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/topology")
@@ -2740,6 +2758,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/topology")
@@ -2795,6 +2814,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["federation:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
         let req = test::TestRequest::get()
             .uri("/v1/federation/topology")

@@ -747,6 +747,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:write".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -768,6 +769,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:read".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::get().uri(&uri).to_request();
@@ -815,6 +817,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:read".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::get()
@@ -904,6 +907,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:read".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let uri = format!(
@@ -971,6 +975,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:read".to_string()], // Wrong scope!
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -992,6 +997,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:write".to_string()], // Wrong scope!
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::get().uri(&uri).to_request();
@@ -1048,6 +1054,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:write".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -1124,6 +1131,7 @@ mod tests {
             coop_id: "coop-food".to_string(), // Token for coop-food
             scopes: vec!["ledger:write".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -1144,6 +1152,7 @@ mod tests {
             coop_id: "coop-food".to_string(), // Token for coop-food
             scopes: vec!["ledger:read".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let uri = format!("/ledger/coop-tech/position/{}", bob.did()); // Accessing coop-tech
@@ -1208,6 +1217,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:write".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -1259,6 +1269,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:write".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -1309,6 +1320,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:write".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -1360,6 +1372,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:read".to_string()], // Wrong scope!
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -1399,6 +1412,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:read".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -1451,6 +1465,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:write".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -1507,6 +1522,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:write".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -1569,6 +1585,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:read".to_string()],
             exp: 9999999999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -1662,6 +1679,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:write".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
 
         let req = test::TestRequest::post()
@@ -1747,6 +1765,7 @@ mod tests {
             coop_id: "test-coop".to_string(),
             scopes: vec!["ledger:write".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
 
         // No Authorization header — the extraction path must store "http-auth-missing",

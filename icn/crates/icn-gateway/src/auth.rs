@@ -136,6 +136,23 @@ pub struct TokenClaims {
     /// back-compatible contract as `entity_id`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub entity_type: Option<String>,
+
+    /// Unique credential id, enabling individual revocation (issue #2437).
+    ///
+    /// Minted by [`AuthManager::issue_entity_token`] — the one function every
+    /// gateway mint path bottoms out in — so all issuance paths (sessions,
+    /// invites, enrollment, `icnctl --local-mint`) produce revocable
+    /// credentials without call-site changes.
+    ///
+    /// `Option` for wire compatibility: credentials minted before this claim
+    /// existed still decode. A missing `jti` means *not individually
+    /// revocable*, which
+    /// [`SessionAuthority::verify`](crate::session_authority::SessionAuthority::verify)
+    /// refuses under profiles that require durable revocation. Because every
+    /// mint path now sets it, that population drains within one token lifetime
+    /// of an upgrade.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jti: Option<String>,
 }
 
 /// Authentication manager
@@ -185,7 +202,7 @@ impl AuthManager {
             challenges: Arc::new(RwLock::new(HashMap::new())),
             jwt_secret,
             challenge_ttl: Duration::from_secs(300), // 5 minutes
-            token_ttl: Duration::from_secs(3600),    // 1 hour
+            token_ttl: crate::session_authority::DEFAULT_TOKEN_TTL,
             allow_self_asserted_coop: false,
         }
     }
@@ -214,6 +231,24 @@ impl AuthManager {
     pub fn with_self_asserted_coop(mut self, enabled: bool) -> Self {
         self.allow_self_asserted_coop = enabled;
         self
+    }
+
+    /// Apply a deployment-configured session lifetime to issued credentials.
+    ///
+    /// Before this existed, `GatewayConfig::token_expiry_hours` was parsed and
+    /// tested but never reached the issuer, so every credential lived exactly
+    /// one hour regardless of configuration (issue #2437). A configuration field
+    /// that does not change behavior is worse than no field at all: it creates
+    /// false operational confidence. The bound itself is validated by
+    /// [`TokenLifetimePolicy`](crate::session_authority::TokenLifetimePolicy).
+    pub fn with_token_ttl(mut self, ttl: Duration) -> Self {
+        self.token_ttl = ttl;
+        self
+    }
+
+    /// The lifetime applied to credentials this manager issues.
+    pub fn token_ttl(&self) -> Duration {
+        self.token_ttl
     }
 
     /// Generate a challenge for a DID
@@ -374,6 +409,7 @@ impl AuthManager {
             scopes,
             entity_id: entity_id.map(|id| id.to_string()),
             entity_type,
+            jti: Some(Self::generate_jti()),
         };
 
         let token = encode(
@@ -388,7 +424,11 @@ impl AuthManager {
 
     /// Verify a JWT token and extract claims
     pub fn verify_token(&self, token: &str) -> Result<TokenClaims> {
-        let validation = Validation::default();
+        let mut validation = Validation::default();
+        // The configured lifetime is an authorization bound, not a hint. The
+        // jsonwebtoken default permits a 60-second expiry leeway, which would
+        // silently extend every issued credential beyond its reported `exp`.
+        validation.leeway = 0;
 
         let token_data = decode::<TokenClaims>(
             token,
@@ -400,12 +440,35 @@ impl AuthManager {
         Ok(token_data.claims)
     }
 
+    /// Generate a unique credential id (`jti`, 16 random bytes hex-encoded).
+    ///
+    /// Randomness — not a counter or a hash of the claims — so two credentials
+    /// minted for the same subject in the same second are still independently
+    /// revocable, and so an id reveals nothing about issuance order or volume.
+    fn generate_jti() -> String {
+        hex::encode(Self::cryptographic_random_bytes::<16>())
+    }
+
     /// Generate cryptographically random nonce (32 bytes, hex-encoded)
     fn generate_nonce(&self) -> ChallengeNonce {
-        use rand::Rng;
+        hex::encode(Self::cryptographic_random_bytes::<32>())
+    }
+
+    /// Generate bytes from rand's cryptographic thread-local generator.
+    ///
+    /// Under the pinned rand 0.9 contract, `rand::rng()` is ChaCha12,
+    /// automatically seeded and periodically reseeded from `OsRng`. The
+    /// compile-time `CryptoRng` bound prevents a future API substitution with a
+    /// non-cryptographic generator from silently weakening credential IDs or
+    /// challenge nonces.
+    fn cryptographic_random_bytes<const N: usize>() -> [u8; N] {
+        use rand::{CryptoRng, Rng};
+
+        fn require_crypto_rng<R: CryptoRng + ?Sized>(_rng: &R) {}
+
         let mut rng = rand::rng();
-        let nonce_bytes: [u8; 32] = rng.random();
-        hex::encode(nonce_bytes)
+        require_crypto_rng(&rng);
+        rng.random()
     }
 
     /// Get current Unix timestamp

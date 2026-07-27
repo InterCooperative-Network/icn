@@ -1049,6 +1049,7 @@ mod tests {
                 exp: 9_999_999_999,
                 coop_id: "did:icn:test123".to_string(),
                 scopes: vec![scope.to_string()],
+                jti: None,
             };
             let req = actix_test::TestRequest::post()
                 .uri("/registry/meetings")
@@ -1119,6 +1120,7 @@ mod tests {
                 // Validly scoped: passes the scope gate so the coop binding is the
                 // only thing under test.
                 scopes: vec!["governance:meeting:write".to_string()],
+                jti: None,
             };
             let req = actix_test::TestRequest::post()
                 .uri("/registry/meetings")
@@ -1189,6 +1191,7 @@ mod tests {
                 exp: 9_999_999_999,
                 coop_id: "did:icn:test123".to_string(),
                 scopes: vec![scope.to_string()],
+                jti: None,
             };
             let req = actix_test::TestRequest::post()
                 .uri("/registry/decisions")
@@ -1245,6 +1248,7 @@ mod tests {
                 // Validly scoped: passes the scope gate so the coop binding is the
                 // only thing under test.
                 scopes: vec!["governance:proposal:write".to_string()],
+                jti: None,
             };
             let req = actix_test::TestRequest::post()
                 .uri("/registry/decisions")
@@ -1601,6 +1605,7 @@ mod tests {
             coop_id: "did:icn:test123".to_string(),
             scopes: vec!["governance:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
 
         let req = actix_test::TestRequest::get()
@@ -1678,6 +1683,7 @@ mod tests {
             coop_id: coop_id.clone(),
             scopes: vec!["governance:read".to_string(), "ledger:read".to_string()],
             exp: 9_999_999_999,
+            jti: None,
         };
 
         let req = actix_test::TestRequest::get()

@@ -21,8 +21,9 @@ pub struct GatewayHandles {
     pub compute: Option<icn_compute::ComputeHandle>,
     /// Cooperative handle for coop management
     pub coop: Option<icn_coop::CoopHandle>,
-    /// Community handle for civic features
-    pub community: Option<icn_community::CommunityHandle>,
+    /// Opaque community-domain handle (see `GatewayActorHandles::community`
+    /// for the rationale). Downcast happens on the gateway side.
+    pub community: Option<Box<dyn std::any::Any + Send + Sync>>,
     /// Trust service for trust queries (kernel/app separated)
     pub trust_service: Option<Arc<dyn icn_kernel_api::services::TrustService>>,
     /// Ledger service for treasury nonce queries
@@ -79,6 +80,12 @@ pub struct GatewayHandles {
     /// Shared into the gateway receipt-chain read API so audit reads see real
     /// execution records instead of an empty temp-store fallback (Gap C).
     pub execution_query_store: Option<Arc<dyn icn_store::Store>>,
+    /// Persistent store backing session revocation (issue #2437).
+    ///
+    /// Shared with the RPC auth manager so a credential revoked on one
+    /// authenticated surface is rejected on the other. Its presence is what
+    /// lets the gateway assemble the institutional authority profile.
+    pub revocation_store: Option<Arc<dyn icn_store::Store>>,
     /// Execution-record retention cleanup deferred to run after the gateway's
     /// dispatch-evidence backfill (Issue #1987 follow-up), so pruning cannot
     /// delete a terminal record whose evidence the backfill still needs to heal.
@@ -90,8 +97,13 @@ pub struct GatewayHandles {
 /// The gateway runs in a dedicated thread with its own tokio runtime
 /// because actix-web has specific runtime requirements.
 ///
-/// Returns true if the gateway was spawned, false if disabled or failed.
-pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: GatewayHandles) -> bool {
+/// Returns true only after the gateway has initialized and bound its socket;
+/// returns false if disabled or if startup fails before readiness.
+pub async fn spawn_gateway(
+    config: &GatewayConfig,
+    data_dir: PathBuf,
+    handles: GatewayHandles,
+) -> bool {
     if !config.enabled {
         debug!("Gateway API disabled in configuration");
         return false;
@@ -116,8 +128,27 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
         warn!("Gateway enabled but JWT secret not configured - gateway will not start");
         warn!("Set jwt_secret in config or ICN_GATEWAY_JWT_SECRET environment variable");
         icn_obs::metrics::supervisor::error_inc("gateway_jwt_secret_missing");
+        icn_obs::metrics::supervisor::actor_active_set("gateway", false);
         return false;
     }
+
+    // Validate security-sensitive policy before creating a thread. The server
+    // receives the already-validated value, so invalid configuration cannot
+    // race ahead of the supervisor's startup report.
+    let token_lifetime = match icn_gateway::session_authority::TokenLifetimePolicy::from_hours(
+        config.token_expiry_hours,
+    ) {
+        Ok(lifetime) => lifetime,
+        Err(error) => {
+            warn!(
+                "Gateway not started: invalid token_expiry_hours — {}",
+                error
+            );
+            icn_obs::metrics::supervisor::error_inc("gateway_token_lifetime_invalid");
+            icn_obs::metrics::supervisor::actor_active_set("gateway", false);
+            return false;
+        }
+    };
 
     info!("Gateway JWT secret verified, spawning server...");
 
@@ -157,6 +188,7 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     let settlement_engine_handle = handles.settlement_engine;
     let dispatch_evidence_sink_installer = handles.dispatch_evidence_sink_installer;
     let execution_query_store = handles.execution_query_store;
+    let revocation_store = handles.revocation_store;
     let post_backfill_cleanup = handles.post_backfill_cleanup;
     let default_trust_score = config.default_trust_score;
     // Dev/demo posture (issue #2075): carried by config (set for the loopback
@@ -164,11 +196,20 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
     // race threads reading the environment after the runtime has started.
     let dev_self_serve_auth = config.dev_self_serve_auth;
 
-    // Spawn gateway in a dedicated thread (actix-web has its own runtime)
+    // Spawn gateway in a dedicated thread (actix-web has its own runtime). The
+    // supervisor waits for an explicit post-bind acknowledgement before marking
+    // the actor active.
+    let (startup_tx, startup_rx) = tokio::sync::oneshot::channel();
+    let (activation_tx, activation_rx) = tokio::sync::oneshot::channel();
     std::thread::spawn(move || {
-        // SAFETY: Runtime creation only fails with invalid config or resource exhaustion
-        #[allow(clippy::unwrap_used)]
-        let rt = tokio::runtime::Runtime::new().unwrap();
+        let rt = match tokio::runtime::Runtime::new() {
+            Ok(runtime) => runtime,
+            Err(error) => {
+                warn!("Failed to create gateway async runtime: {}", error);
+                icn_obs::metrics::supervisor::error_inc("gateway_server");
+                return;
+            }
+        };
         rt.block_on(async move {
             let mut gateway_server = if let Some(broadcaster) = broadcaster_for_gateway {
                 icn_gateway::GatewayServer::new_with_broadcaster(
@@ -194,7 +235,7 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
             }
 
             if let Some(handle) = community_handle {
-                gateway_server = gateway_server.with_community_handle(handle);
+                gateway_server = gateway_server.with_community_handle_any(handle);
             }
 
             if let Some(service) = trust_service_handle {
@@ -273,20 +314,83 @@ pub fn spawn_gateway(config: &GatewayConfig, data_dir: PathBuf, handles: Gateway
                 gateway_server = gateway_server.with_execution_query_store(store);
             }
 
+            // Session authority (issues #2436, #2437). A daemon deployment is an
+            // operator-run node, so it declares the institutional profile: the
+            // gateway then refuses to start unless durable revocation is
+            // actually installed, rather than serving requests whose credentials
+            // cannot be withdrawn across a restart.
+            if let Some(store) = revocation_store {
+                gateway_server = gateway_server
+                    .with_revocation_store(store)
+                    .with_authority_profile(
+                        icn_gateway::session_authority::AuthorityProfile::Institutional,
+                    );
+            }
+            gateway_server = gateway_server.with_token_lifetime(token_lifetime);
+
             if let Some(cleanup) = post_backfill_cleanup {
                 gateway_server = gateway_server.with_post_backfill_cleanup(cleanup);
             }
 
-            if let Err(e) = gateway_server.run().await {
+            let result = gateway_server
+                .run_with_startup_signal(startup_tx, activation_rx)
+                .await;
+            icn_obs::metrics::supervisor::actor_active_set("gateway", false);
+            if let Err(e) = result {
                 warn!("Gateway server error: {}", e);
                 icn_obs::metrics::supervisor::error_inc("gateway_server");
             }
         });
     });
 
-    icn_obs::metrics::supervisor::actor_spawned_inc("gateway");
-    icn_obs::metrics::supervisor::actor_active_set("gateway", true);
-    info!("Gateway API spawned on {}", gateway_addr);
+    match startup_rx.await {
+        Ok(()) => {
+            icn_obs::metrics::supervisor::actor_spawned_inc("gateway");
+            icn_obs::metrics::supervisor::actor_active_set("gateway", true);
+            if activation_tx.send(()).is_err() {
+                icn_obs::metrics::supervisor::error_inc("gateway_activation_ack");
+                icn_obs::metrics::supervisor::actor_active_set("gateway", false);
+                warn!("Gateway exited before supervisor acknowledged activation");
+                false
+            } else {
+                info!("Gateway API ready on {}", gateway_addr);
+                true
+            }
+        }
+        Err(error) => {
+            icn_obs::metrics::supervisor::error_inc("gateway_startup_ack");
+            icn_obs::metrics::supervisor::actor_active_set("gateway", false);
+            warn!(
+                "Gateway startup thread exited without reporting readiness: {}",
+                error
+            );
+            false
+        }
+    }
+}
 
-    true
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn invalid_token_lifetime_is_rejected_before_gateway_spawn() {
+        let config = GatewayConfig {
+            enabled: true,
+            jwt_secret: "a".repeat(32),
+            token_expiry_hours: 0,
+            ..GatewayConfig::default()
+        };
+        let data_dir = tempfile::tempdir().expect("temporary gateway data directory");
+
+        assert!(
+            !spawn_gateway(
+                &config,
+                data_dir.path().to_path_buf(),
+                GatewayHandles::default()
+            )
+            .await,
+            "invalid authority policy must not report a ready gateway actor"
+        );
+    }
 }

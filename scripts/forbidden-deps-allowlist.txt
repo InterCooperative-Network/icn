@@ -1,22 +1,13 @@
-# Kernel/App boundary violations to be resolved in future waves
-# Each entry represents a dependency that should be removed as part of
-# the kernel/app separation refactor (see docs/ARCHITECTURE.md)
+# RETIRED (2026-07-22) — do not add entries here.
 #
-# COMPLETED - Wave 1A (icn-gossip, icn-net cleaned):
-# - icn-net->icn-trust: REMOVED
-# - icn-gossip->icn-trust: REMOVED
-# - icn-net->icn-ledger: REMOVED
-# - icn-net->icn-entity: REMOVED
+# The kernel/app boundary exception list moved to the single-source taxonomy:
+#   scripts/firewall-taxonomy.toml   ([[exception]] entries, with stale-entry
+#   detection enforced by .github/scripts/firewall_denylist.py)
 #
-# Wave 2 targets: supervisor refactoring (icn-core)
-# These will be removed when supervisor uses AppRuntime instead of direct init
-icn-core->icn-trust
-icn-core->icn-governance
-icn-core->icn-ledger
-icn-core->icn-ccl
-icn-core->icn-compute
-icn-core->icn-entity
-icn-core->icn-community
-icn-core->icn-federation
-icn-core->icn-steward
-icn-core->icn-coop
+# Every edge formerly listed here is preserved there (nothing was un-excepted);
+# the CI kernel-deps job now sources its lists from the taxonomy via
+#   python3 .github/scripts/firewall_taxonomy.py --bash
+#
+# This file remains only so historical references (e.g. ADR-0014 prose,
+# generated file inventories) do not dangle. test_firewall_taxonomy.py fails CI
+# if live entries reappear here.

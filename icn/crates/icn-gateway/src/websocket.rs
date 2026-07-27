@@ -8,8 +8,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 
-use crate::auth::AuthManager;
 use crate::events::{EventBroadcaster, SequencedEvent};
+use crate::session_authority::SessionAuthority;
 use icn_identity::Did;
 use icn_obs::metrics::gateway;
 
@@ -63,12 +63,12 @@ pub enum ServerMessage {
 pub struct WsSession {
     /// Cooperative ID this session is subscribed to
     coop_id: String,
-    /// Authenticated DID (None until authenticated)
-    did: Option<Did>,
+    /// Credential retained for continuing authorization (None until authenticated).
+    authenticated: Option<AuthenticatedCredential>,
     /// Last heartbeat timestamp
     last_heartbeat: Instant,
-    /// Authentication manager
-    auth_manager: Arc<AuthManager>,
+    /// Session authority used for initial and continuing authorization
+    authority: Arc<SessionAuthority>,
     /// Event broadcaster
     event_broadcaster: Arc<EventBroadcaster>,
     /// Event receiver (subscribed after authentication)
@@ -79,18 +79,23 @@ pub struct WsSession {
     connection_tracked: bool,
 }
 
+struct AuthenticatedCredential {
+    token: String,
+    did: Did,
+}
+
 impl WsSession {
     /// Create a new WebSocket session
     pub fn new(
         coop_id: String,
-        auth_manager: Arc<AuthManager>,
+        authority: Arc<SessionAuthority>,
         event_broadcaster: Arc<EventBroadcaster>,
     ) -> Self {
         Self {
             coop_id,
-            did: None,
+            authenticated: None,
             last_heartbeat: Instant::now(),
-            auth_manager,
+            authority,
             event_broadcaster,
             event_rx: None,
             connection_tracked: false,
@@ -111,7 +116,11 @@ impl WsSession {
 
     /// Authenticate user with JWT token
     fn authenticate(&mut self, token: &str, ctx: &mut <Self as Actor>::Context) {
-        match self.auth_manager.verify_token(token) {
+        // Verify through the session authority, NOT the bare AuthManager: this
+        // surface is mounted outside `jwt_auth` and authenticates in-band, so
+        // without this it would honor revoked and jti-less credentials that
+        // every wrapped HTTP route rejects (issue #2437).
+        match self.authority.verify(token) {
             Ok(claims) => {
                 // Verify token is for this cooperative
                 if claims.coop_id != self.coop_id {
@@ -125,7 +134,10 @@ impl WsSession {
                 // Parse DID from claims
                 match claims.sub.parse::<Did>() {
                     Ok(did) => {
-                        self.did = Some(did.clone());
+                        self.authenticated = Some(AuthenticatedCredential {
+                            token: token.to_string(),
+                            did,
+                        });
 
                         // Get current sequence for reconnection support
                         let current_seq = self.event_broadcaster.current_sequence();
@@ -139,16 +151,21 @@ impl WsSession {
                             .map(move |rx_opt, act, ctx| {
                                 match rx_opt {
                                     Some(rx) => {
+                                        // Revocation or expiry may occur while the
+                                        // asynchronous subscription is being created.
+                                        if !act.enforce_continuing_authorization(ctx) {
+                                            return;
+                                        }
                                         act.event_rx = Some(rx);
                                         // Start polling for events
                                         act.poll_events(ctx);
 
                                         // Send success message with current sequence
-                                        // SAFETY: did was set above when auth succeeded
-                                        #[allow(clippy::unwrap_used)]
-                                        let did_str = act.did.as_ref().unwrap().to_string();
+                                        let Some(authenticated) = act.authenticated.as_ref() else {
+                                            return;
+                                        };
                                         let msg = ServerMessage::AuthOk {
-                                            did: did_str,
+                                            did: authenticated.did.to_string(),
                                             current_seq,
                                         };
                                         act.send_message(msg, ctx);
@@ -187,10 +204,45 @@ impl WsSession {
         }
     }
 
+    /// Revalidate the retained credential before each protected operation.
+    ///
+    /// This is deliberately operation-level rather than timer-level: there is no
+    /// stale-revocation window in which polling or backfill may continue merely
+    /// because the next periodic check has not fired.
+    fn continuing_authorization_is_valid(&self) -> bool {
+        let Some(authenticated) = self.authenticated.as_ref() else {
+            return false;
+        };
+
+        self.authority
+            .verify(&authenticated.token)
+            .map(|claims| {
+                claims.coop_id == self.coop_id && claims.sub == authenticated.did.to_string()
+            })
+            .unwrap_or(false)
+    }
+
+    fn enforce_continuing_authorization(&mut self, ctx: &mut <Self as Actor>::Context) -> bool {
+        if self.continuing_authorization_is_valid() {
+            return true;
+        }
+
+        self.authenticated = None;
+        self.event_rx = None;
+        self.send_message(
+            ServerMessage::AuthError {
+                message: "Authentication expired or revoked".to_string(),
+            },
+            ctx,
+        );
+        ctx.stop();
+        false
+    }
+
     /// Poll for events from the event broadcaster
     /// SECURITY: Drains ALL available events per poll to prevent unbounded channel growth
     fn poll_events(&mut self, ctx: &mut <Self as Actor>::Context) {
-        if let Some(ref mut rx) = self.event_rx {
+        if self.event_rx.is_some() {
             // CRITICAL FIX: Drain ALL available events in this poll cycle
             // Previous code only processed ONE event per 100ms, causing unbounded buffer growth
             // when events arrived faster than 10/second (e.g., 100 payments/sec × 1000 subscribers)
@@ -198,8 +250,15 @@ impl WsSession {
             const MAX_EVENTS_PER_POLL: usize = 1000; // Safety limit to prevent starvation
 
             loop {
-                match rx.try_recv() {
+                let Some(event_rx) = self.event_rx.as_mut() else {
+                    return;
+                };
+                let next_event = event_rx.try_recv();
+                match next_event {
                     Ok(sequenced_event) => {
+                        if !self.enforce_continuing_authorization(ctx) {
+                            return;
+                        }
                         // Forward sequenced event to client
                         let msg = ServerMessage::Event {
                             seq: sequenced_event.seq,
@@ -247,12 +306,8 @@ impl WsSession {
     }
 
     /// Handle backfill request
-    fn handle_backfill(&self, after_seq: u64, ctx: &mut <Self as Actor>::Context) {
-        if self.did.is_none() {
-            let msg = ServerMessage::Error {
-                message: "Must authenticate before requesting backfill".to_string(),
-            };
-            self.send_message(msg, ctx);
+    fn handle_backfill(&mut self, after_seq: u64, ctx: &mut <Self as Actor>::Context) {
+        if !self.enforce_continuing_authorization(ctx) {
             return;
         }
 
@@ -262,15 +317,22 @@ impl WsSession {
         let fut = async move { event_broadcaster.get_backfill(&coop_id, after_seq).await }
             .into_actor(self)
             .map(|events, act, ctx| {
-                let count = events.len();
+                let mut count = 0;
                 // Send all backfill events
                 for sequenced in events {
+                    if !act.enforce_continuing_authorization(ctx) {
+                        return;
+                    }
                     let msg = ServerMessage::Event {
                         seq: sequenced.seq,
                         event: sequenced.event,
                     };
                     act.send_message(msg, ctx);
                     gateway::websocket_messages_sent_inc();
+                    count += 1;
+                }
+                if !act.enforce_continuing_authorization(ctx) {
+                    return;
                 }
                 // Send completion message
                 let msg = ServerMessage::BackfillComplete { count };
@@ -330,7 +392,7 @@ impl Actor for WsSession {
         // SECURITY: Enforce authentication deadline (Bug #30 fix)
         // Close connection if not authenticated within 10 seconds
         ctx.run_later(Duration::from_secs(10), |act, ctx| {
-            if act.did.is_none() {
+            if act.authenticated.is_none() {
                 tracing::warn!(
                     "WebSocket authentication timeout for coop '{}' (no auth within 10s)",
                     act.coop_id
@@ -418,15 +480,65 @@ impl StreamHandler<std::result::Result<ws::Message, ws::ProtocolError>> for WsSe
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::auth::AuthManager;
+    use icn_identity::IdentityBundle;
+
+    fn authenticated_session(
+        ttl: Duration,
+    ) -> (WsSession, Arc<SessionAuthority>, crate::auth::TokenClaims) {
+        let auth = Arc::new(
+            AuthManager::new(b"websocket-continuing-auth-test".to_vec()).with_token_ttl(ttl),
+        );
+        let authority = Arc::new(SessionAuthority::evaluator(auth.clone()));
+        let broadcaster = Arc::new(EventBroadcaster::new());
+        let bundle = IdentityBundle::generate().unwrap();
+        let token = auth
+            .issue_token(bundle.did(), "test-coop", vec!["coop:read".to_string()])
+            .unwrap();
+        let claims = auth.verify_token(&token).unwrap();
+        let mut session = WsSession::new("test-coop".to_string(), authority.clone(), broadcaster);
+        session.authenticated = Some(AuthenticatedCredential {
+            token,
+            did: bundle.did().clone(),
+        });
+        (session, authority, claims)
+    }
 
     #[test]
     fn test_create_session() {
-        let auth = Arc::new(AuthManager::new(b"test_secret".to_vec()));
+        let auth = Arc::new(crate::auth::AuthManager::new(b"test_secret".to_vec()));
+        let authority = Arc::new(SessionAuthority::evaluator(auth));
         let broadcaster = Arc::new(EventBroadcaster::new());
 
-        let session = WsSession::new("test-coop".to_string(), auth, broadcaster);
+        let session = WsSession::new("test-coop".to_string(), authority, broadcaster);
         assert_eq!(session.coop_id, "test-coop");
-        assert!(session.did.is_none());
+        assert!(session.authenticated.is_none());
+    }
+
+    #[test]
+    fn protected_operations_reject_a_revoked_retained_credential() {
+        let (session, authority, claims) = authenticated_session(Duration::from_secs(3600));
+        assert!(session.continuing_authorization_is_valid());
+
+        authority.revoke(&claims).unwrap();
+
+        assert!(
+            !session.continuing_authorization_is_valid(),
+            "event polling and backfill must reject a credential revoked after initial auth"
+        );
+    }
+
+    #[actix_web::test]
+    async fn protected_operations_reject_an_expired_retained_credential() {
+        let (session, _authority, _claims) = authenticated_session(Duration::from_secs(1));
+        assert!(session.continuing_authorization_is_valid());
+
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        assert!(
+            !session.continuing_authorization_is_valid(),
+            "event polling and backfill must reject a credential expired after initial auth"
+        );
     }
 
     #[test]

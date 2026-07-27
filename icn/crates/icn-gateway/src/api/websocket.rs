@@ -4,8 +4,8 @@ use actix_web::{get, web, Error, HttpRequest, HttpResponse};
 use actix_web_actors::ws;
 use std::sync::Arc;
 
-use crate::auth::AuthManager;
 use crate::events::EventBroadcaster;
+use crate::session_authority::SessionAuthority;
 use crate::websocket::WsSession;
 
 /// GET /ws/:coop_id - WebSocket connection for real-time updates
@@ -14,12 +14,12 @@ pub async fn websocket(
     req: HttpRequest,
     stream: web::Payload,
     coop_id: web::Path<String>,
-    auth_manager: web::Data<Arc<AuthManager>>,
+    authority: web::Data<Arc<SessionAuthority>>,
     event_broadcaster: web::Data<Arc<EventBroadcaster>>,
 ) -> Result<HttpResponse, Error> {
     let session = WsSession::new(
         coop_id.into_inner(),
-        auth_manager.get_ref().clone(),
+        authority.get_ref().clone(),
         event_broadcaster.get_ref().clone(),
     );
     ws::start(session, &req, stream)
@@ -32,12 +32,13 @@ mod tests {
 
     #[actix_web::test]
     async fn test_websocket_endpoint() {
-        let auth_manager = Arc::new(AuthManager::new(b"test_secret".to_vec()));
+        let auth_manager = Arc::new(crate::auth::AuthManager::new(b"test_secret".to_vec()));
+        let authority = Arc::new(SessionAuthority::evaluator(auth_manager));
         let event_broadcaster = Arc::new(EventBroadcaster::new());
 
         let app = test::init_service(
             actix_web::App::new()
-                .app_data(web::Data::new(auth_manager))
+                .app_data(web::Data::new(authority))
                 .app_data(web::Data::new(event_broadcaster))
                 .service(websocket),
         )

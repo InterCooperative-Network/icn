@@ -714,7 +714,7 @@ category = "reference"
 status = "living"
 title = "ICN Document Registry (human summary)"
 description = "Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh"
-last_updated = "2026-07-17"
+last_updated = "2026-07-27"
 owner = "matt"
 audiences = ["contributors", "agents"]
 truth_class = "descriptive"
@@ -723,7 +723,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["registry", "documentation-control"]
 recommended_action = "keep"
-last_reviewed = "2026-07-17"
+last_reviewed = "2026-07-27"
 
 [docs."docs/planning/documentation-namespace-resolution.md"]
 category = "strategy"
@@ -902,6 +902,22 @@ audiences = ["developers", "architects"]
 depends_on = ["docs/architecture/COOPERATIVE_DOMAIN_INFRASTRUCTURE.md", "docs/rfcs/RFC-0015-public-surface-and-learning-repo-architecture.md", "docs/adr/ADR-0026-receipt-and-provenance-proof-envelope.md"]
 recommended_action = "keep"
 freshness = "current"
+
+[docs."docs/architecture/AUTHORITY_SPINE.md"]
+category = "architecture"
+status = "living"
+title = "The Authority Spine"
+description = "How ICN proves the powers of an assembled runtime: attenuation, expiration, revocation, and capability truth. Documents the gateway session-authority composition boundary implemented for #2436/#2437, the deployment-profile startup invariants, and — as analysis only — how the same lifecycle would extend to compute, storage, economics, federation, policy, and evidence. Explicitly separates technical capacity, institutional legitimacy, and current availability; records the institutional questions (who may approve, who may revoke, what recourse a member has) that remain open."
+last_updated = "2026-07-21"
+owner = "matt"
+audiences = ["developers", "architects"]
+truth_class = "descriptive"
+role = "architecture"
+canonical = "no"
+freshness = "current"
+domain_tags = ["architecture", "security"]
+recommended_action = "keep"
+last_reviewed = "2026-07-21"
 
 [docs."docs/architecture/KERNEL_APP_SEPARATION.md"]
 category = "architecture"
@@ -2797,7 +2813,7 @@ category = "reference"
 status = "living"
 title = "CI / Ops / Deploy Map"
 description = "GitHub Actions workflows, deploy paths, K3s smoke runbooks, monitoring; routing layer to substantive runbooks under guides/operations/."
-last_updated = "2026-04-29"
+last_updated = "2026-07-26"
 owner = "matt"
 audiences = ["operators", "contributors"]
 truth_class = "operational"
@@ -2806,7 +2822,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation", "ci", "operations", "deployment"]
 recommended_action = "keep"
-last_reviewed = "2026-04-29"
+last_reviewed = "2026-07-26"
 
 [docs."docs/reference/project-index/show-readiness-map.md"]
 category = "reference"

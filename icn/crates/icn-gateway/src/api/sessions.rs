@@ -12,7 +12,6 @@
 use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use std::sync::Arc;
 
-use crate::auth::AuthManager;
 use crate::error::{GatewayError, Result};
 use crate::middleware::get_claims;
 use crate::models::{
@@ -20,8 +19,30 @@ use crate::models::{
 };
 use crate::rate_limit::IpRateLimiter;
 use crate::session::{SessionManager, SessionStatus};
+use crate::session_authority::SessionAuthority;
 use crate::validation;
 use icn_identity::Did;
+
+/// The widest authority this flow may ever delegate to an approved web session.
+///
+/// This is a **ceiling, not a grant** (issue #2436). The scopes actually issued
+/// are this set intersected with the approving credential's own scopes, so a
+/// read-only wallet approves a read-only web session. Before attenuation, this
+/// list was issued verbatim to any caller holding any valid credential for the
+/// cooperative, which let a narrowly-scoped member credential mint
+/// `governance:write` for itself.
+///
+/// The ceiling is deliberately unchanged from the historical list: narrowing it
+/// further is a product decision about what a wallet-approved web session is
+/// *for*, not a security fix, and attenuation already removes the escalation.
+const WEB_SESSION_SCOPE_CEILING: &[&str] = &[
+    "coop:read",
+    "coop:write",
+    "ledger:read",
+    "ledger:transact",
+    "governance:read",
+    "governance:write",
+];
 
 /// Extract client IP address from request (for rate limiting)
 fn get_client_ip(req: &HttpRequest) -> String {
@@ -246,84 +267,20 @@ pub async fn get_session_status(
 
 /// POST /v1/sessions/{session_id}/approve - Approve a login session (AUTHENTICATED)
 ///
-/// Called by the mobile wallet to approve a web login session.
-/// Requires valid JWT token from the wallet.
-#[post("/{session_id}/approve")]
-pub async fn approve_session(
-    http_req: HttpRequest,
-    session_mgr: web::Data<Arc<SessionManager>>,
-    auth_mgr: web::Data<Arc<AuthManager>>,
-    path: web::Path<String>,
-) -> Result<HttpResponse> {
-    // session_id comes from the path parameter /{session_id}/approve
-    let session_id = path.into_inner();
-
-    // Get authenticated DID from JWT claims
-    let claims = get_claims(&http_req)
-        .ok_or_else(|| GatewayError::AuthenticationFailed("Authentication required".to_string()))?;
-
-    let did: Did = claims
-        .sub
-        .parse()
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid DID in token: {e}")))?;
-
-    // Get session to validate coop_id
-    let session = session_mgr
-        .get_session(&session_id)
-        .await
-        .map_err(|e| GatewayError::InternalError(format!("Failed to get session: {e}")))?
-        .ok_or_else(|| GatewayError::NotFound("Session not found or expired".to_string()))?;
-
-    // Verify the wallet's token is for the same cooperative
-    if claims.coop_id != session.coop_id {
-        return Err(GatewayError::AuthorizationFailed(format!(
-            "Token coop_id '{}' does not match session coop_id '{}'",
-            claims.coop_id, session.coop_id
-        )));
-    }
-
-    // Issue a new token for the web session
-    // Use standard web session scopes
-    let scopes = vec![
-        "coop:read".to_string(),
-        "coop:write".to_string(),
-        "ledger:read".to_string(),
-        "ledger:transact".to_string(),
-        "governance:read".to_string(),
-        "governance:write".to_string(),
-    ];
-
-    let token = auth_mgr
-        .issue_token(&did, &session.coop_id, scopes.clone())
-        .map_err(|e| GatewayError::InternalError(format!("Failed to issue token: {e}")))?;
-
-    // Approve the session
-    session_mgr
-        .approve_session(&session_id, did.clone(), token, 3600, scopes)
-        .await
-        .map_err(|e| GatewayError::BadRequest(format!("Failed to approve session: {e}")))?;
-
-    tracing::info!(
-        session_id = %session_id,
-        did = %did,
-        coop_id = %session.coop_id,
-        "QR login session approved"
-    );
-
-    Ok(HttpResponse::Ok().json(serde_json::json!({
-        "success": true,
-        "message": "Session approved. Web login will complete shortly."
-    })))
-}
-
-/// Handler wrapper for approve_session (for use with web::resource().to())
+/// Called by the mobile wallet to approve a web login session. Requires a valid
+/// credential from the wallet, and issues a web-session credential **attenuated
+/// to the approver's own authority** (issue #2436): matching `coop_id` alone is
+/// not authorization to mint arbitrary scopes.
+///
+/// This is the only mounted approval handler (`server.rs`, `/sessions` scope).
+/// A second, byte-identical copy carrying the same defect existed here as
+/// unmounted dead code and was removed rather than fixed twice.
 pub async fn approve_session_handler(
     http_req: HttpRequest,
     session_mgr: web::Data<Arc<SessionManager>>,
-    auth_mgr: web::Data<Arc<AuthManager>>,
+    authority: web::Data<Arc<SessionAuthority>>,
     path: web::Path<String>,
 ) -> Result<HttpResponse> {
-    // Delegate to the main implementation
     let session_id = path.into_inner();
 
     // Get authenticated DID from JWT claims
@@ -342,7 +299,8 @@ pub async fn approve_session_handler(
         .map_err(|e| GatewayError::InternalError(format!("Failed to get session: {e}")))?
         .ok_or_else(|| GatewayError::NotFound("Session not found or expired".to_string()))?;
 
-    // Verify the wallet's token is for the same cooperative
+    // Same-cooperative is a NECESSARY condition, not a sufficient one: the
+    // authority actually delegated is bounded by the approver's scopes below.
     if claims.coop_id != session.coop_id {
         return Err(GatewayError::AuthorizationFailed(format!(
             "Token coop_id '{}' does not match session coop_id '{}'",
@@ -350,23 +308,28 @@ pub async fn approve_session_handler(
         )));
     }
 
-    // Issue a new token for the web session
-    let scopes = vec![
-        "coop:read".to_string(),
-        "coop:write".to_string(),
-        "ledger:read".to_string(),
-        "ledger:transact".to_string(),
-        "governance:read".to_string(),
-        "governance:write".to_string(),
-    ];
+    // Attenuate: issued ⊆ approver's scopes ∩ this flow's ceiling. An approver
+    // holding none of the ceiling's scopes has nothing to delegate and is told
+    // so (403) rather than handed a broad credential.
+    let (token, scopes) = authority.issue_delegated(
+        &claims,
+        &did,
+        &session.coop_id,
+        WEB_SESSION_SCOPE_CEILING,
+        None,
+    )?;
 
-    let token = auth_mgr
-        .issue_token(&did, &session.coop_id, scopes.clone())
-        .map_err(|e| GatewayError::InternalError(format!("Failed to issue token: {e}")))?;
+    let session_ttl_secs = authority.lifetime().ttl().as_secs();
 
     // Approve the session
     session_mgr
-        .approve_session(&session_id, did.clone(), token, 3600, scopes)
+        .approve_session(
+            &session_id,
+            did.clone(),
+            token,
+            session_ttl_secs,
+            scopes.clone(),
+        )
         .await
         .map_err(|e| GatewayError::BadRequest(format!("Failed to approve session: {e}")))?;
 
@@ -374,7 +337,8 @@ pub async fn approve_session_handler(
         session_id = %session_id,
         did = %did,
         coop_id = %session.coop_id,
-        "QR login session approved"
+        granted_scopes = ?scopes,
+        "QR login session approved (attenuated to approver authority)"
     );
 
     Ok(HttpResponse::Ok().json(serde_json::json!({

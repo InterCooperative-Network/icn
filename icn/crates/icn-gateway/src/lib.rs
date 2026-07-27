@@ -65,6 +65,7 @@ pub mod security;
 pub mod server;
 pub mod service_discovery_mgr;
 pub mod session;
+pub mod session_authority;
 pub mod steward_mgr;
 pub mod token_authority;
 pub mod treasury_mgr;
