@@ -85,9 +85,19 @@ host_kernel
 libguestfs_version
 ```
 
-`icnctl appliance verify-manifest --root <reviewed-tree>` MUST pass before the
-image is copied or booted. The manifest MUST identify the same Git commit and
-image hash recorded by the runner. The run stops on any mismatch.
+```bash
+icnctl appliance verify-manifest <manifest.json> --root <reviewed-tree>
+```
+
+`<manifest.json>` is a required positional argument, not an option; omitting it
+exits with a clap usage error (`required arguments were not provided:
+<MANIFEST>`) rather than a fail-closed verification, so a runner must not treat
+a bare `--root` invocation as a passing gate. `--root` is optional and defaults
+to the current directory.
+
+This command MUST pass before the image is copied or booted. The manifest MUST
+identify the same Git commit and image hash recorded by the runner. The run
+stops on any mismatch.
 
 ## Isolated topology
 
