@@ -110,9 +110,19 @@ Last Reviewed: 2026-07-27
      and durable workflow evidence. The mandatory prerequisite tranche is
      composition-root consolidation. B2 HAS NOT BEGUN and is not product-critical.
 
-     DEPLOYMENT-PROFILE DECISION STATE (open, human-gated). PR #2458 proposes
-     ADR-0086 (NOT yet present under `docs/adr/` on `main` — it lands only if
-     #2458 merges) with `status: proposed` and
+     QUEUE STATE AS OF THIS BLOCK'S AUTHORSHIP — READ THE DATE. The two
+     paragraphs that follow describe the sibling PR queue as it stood when this
+     block was written, with `main` at `425f513f` and NONE of #2458 / #2435 /
+     #2463 merged. They are a point-in-time record, not standing claims: this
+     block may itself merge after one or more of those PRs. For the live value
+     of anything they describe, the owners are `docs/adr/` for ADR-0086's
+     existence and `status:` field, and
+     `deploy/appliance/evaluator/package-spec.env` for the evaluator package
+     identity. Where a later `[sync edit]` block above records one of these as
+     landed, that newer block wins.
+
+     DEPLOYMENT-PROFILE DECISION STATE (open, human-gated at authorship time).
+     PR #2458 proposes ADR-0086 with `status: proposed` and
      `implementation_status: partially implemented`: (a) the Debian appliance VM as the
      canonical sovereign-node artifact, (b) Docker Compose as the disposable development
      network, (c) Kubernetes/K3s as OPTIONAL hosted operator infrastructure, (d) direct
@@ -125,14 +135,17 @@ Last Reviewed: 2026-07-27
      keystore — treat independent restoration as BLOCKED until an encrypted recovery
      bundle exists. Do not present Compose as sovereign-node proof.
 
-     EVALUATOR NAME AND PROVENANCE STATE (open). Current `main` still ships the foreign
-     package identity: `deploy/appliance/evaluator/package-spec.env` carries
+     EVALUATOR NAME AND PROVENANCE STATE (open at authorship time). At `425f513f`
+     the foreign package identity was still shipping:
+     `deploy/appliance/evaluator/package-spec.env` carried
      `PKG_STEM="icn-common-sense-vertical-slice"`. PR #2435 renames the line to
      `icn-portable-evaluator` (0.0.4) and retitles three release pages with a correction
-     banner; tags/assets at or below 0.0.3 are deliberately RETAINED for checksum
-     continuity and must never be renamed or deleted. #2435 was CONFLICTING at this sync;
-     its only real conflict is the GENERATED file `docs/DOCUMENT_REGISTRY.md`. Until
-     #2435 merges, the repository's evaluator identity is still wrong on `main`.
+     banner. THE DURABLE FACTS, TRUE BEFORE AND AFTER #2435 MERGES: the name was
+     never an ICN-ratified identity; the affected release PAYLOADS are genuine
+     (manifest `git_commit` values are real commits of this repository); and
+     tags/assets at or below 0.0.3 are deliberately RETAINED for checksum
+     continuity and must NEVER be renamed or deleted. For the live value, read
+     `package-spec.env` — do not infer it from this block.
 
      NEXT EXECUTABLE GAPS, SCOPED BUT NOT STARTED. (i) COMMUNITY GOSSIP TOPIC: the
      production runtime still does not create `community:updates` before subscribing —
@@ -1607,7 +1620,9 @@ Last Reviewed: 2026-07-27
 
 **Appliance witness on current-main content (2026-07-26).** The appliance demo-payload mode defect is fixed and merged (`425f513f`, #2456 — merged, not pending). The assembled single-node appliance was witnessed at integrated build head `67a6566e`, whose tree (`d3604c4c…`) is **byte-identical to current `main`**, so the witness covers exactly this content: clean boot and firstboot, `icnd` under systemd returning health, organizer and member rehearsal flows, least-privilege negatives, wrong-digest rejection, completion receipt created and re-fetched, outbound isolation, service restart, and full VM reboot (`check.sh` 40/0). **Durability boundary:** node identity, machine ID, and config/genesis hashes survived reboot (boot ID changed, proving a real reboot) and the completion receipt stayed re-fetchable; the rehearsal **workspace view is intentionally ephemeral** and is reconstructed by reseeding. Durable identity + durable receipt is what was earned — not general workspace durability.
 
-**Deployment profiles and evaluator identity (both open).** PR #2458 **proposes** ADR-0086 (appliance = canonical sovereign node; Compose = disposable devnet; Kubernetes/K3s = optional operator infrastructure; native Linux = advanced install) as `status: proposed`, `implementation_status: partially implemented`. It is not adopted, only the appliance profile has a retained witness, and independent appliance restoration is **blocked** because `icnctl backup` omits `/etc/icn/icnd.env`. PR #2435 (evaluator renamed to `icn-portable-evaluator`) is not merged, so `main` still ships `PKG_STEM="icn-common-sense-vertical-slice"` — a foreign package identity that was never an ICN name. Releases at or below 0.0.3 are retained deliberately for checksum continuity.
+**Deployment profiles: proposed, not adopted.** ADR-0086 (#2458) records the four-profile direction — appliance = canonical sovereign node; Compose = disposable devnet; Kubernetes/K3s = optional operator infrastructure; native Linux = advanced install — at `status: proposed`, `implementation_status: partially implemented`. **Writing or merging that ADR does not adopt it**; adoption is a human decision and the `status:` field in `docs/adr/` is the owner of that fact. Only the appliance profile has a retained build-and-boot witness, and independent appliance restoration is **blocked** because `icnctl backup` omits `/etc/icn/icnd.env`, so a node restored from a backup alone cannot reopen its keystore.
+
+**Evaluator package identity.** The name the evaluator lane shipped under — "Common Sense (bootable) vertical slice" — was **never an ICN-ratified identity**; it arrived with an externally assembled distribution. The correction to `icn-portable-evaluator` is PR #2435. **The live value is `deploy/appliance/evaluator/package-spec.env` (`PKG_STEM`) — read it there rather than inferring it from this file**, since the correction and this snapshot may land in either order. Independent of that ordering: the affected release *payloads* are genuine (manifest `git_commit` values are real commits of this repository), and tags/assets at or below 0.0.3 are **retained unchanged** so published checksums keep verifying — never rename or delete them, and never reintroduce the old name into new material.
 
 **Next executable gaps (scoped, not started).** Community gossip topic `community:updates` is still never created before subscribe in production wiring, so cross-node community gossip is dormant and publish failures are logged after local mutation — a pre-existing defect B0 neither caused nor fixed, filed as **#2457**, which withholds authorization for an opportunistic patch pending topic-ownership and failure-semantics decisions. **No two-node appliance proof has been executed**; two development nodes exchanging data would not be live federation.
 
