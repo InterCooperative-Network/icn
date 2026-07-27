@@ -111,7 +111,8 @@ Last Reviewed: 2026-07-27
      composition-root consolidation. B2 HAS NOT BEGUN and is not product-critical.
 
      DEPLOYMENT-PROFILE DECISION STATE (open, human-gated). PR #2458 proposes
-     `docs/adr/ADR-0086-deployment-profiles.md` with `status: proposed` and
+     ADR-0086 (NOT yet present under `docs/adr/` on `main` — it lands only if
+     #2458 merges) with `status: proposed` and
      `implementation_status: partially implemented`: (a) the Debian appliance VM as the
      canonical sovereign-node artifact, (b) Docker Compose as the disposable development
      network, (c) Kubernetes/K3s as OPTIONAL hosted operator infrastructure, (d) direct
