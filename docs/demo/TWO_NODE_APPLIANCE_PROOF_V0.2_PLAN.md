@@ -14,8 +14,10 @@ establishes an explicit authenticated peer relationship, moves one meaningful
 receipt artifact from the producing node to an independently controlled witness
 node, and then exercises restart, reboot, backup, destruction, and restoration.
 
-It is the acceptance design for proposed ADR-0086 Profile A. It does not adopt
-that ADR or promote its proposed deployment decision.
+It is the acceptance design for the appliance profile of the deployment-profiles
+proposal in PR #2458 (which would land as ADR-0086; that file does **not** exist
+under `docs/adr/` on `main` today, and this plan does not depend on it merging).
+It does not adopt that proposal or promote its deployment decision.
 
 This document is a test design, not a completed witness. It deliberately stops
 at two current product gaps:
