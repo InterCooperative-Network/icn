@@ -26,10 +26,10 @@ published under an externally introduced **"common sense"** name that arrived
 with an externally assembled distribution and was never an ICN-ratified
 identity: it was never proposed, defined, or ratified anywhere in this
 repository, the project owner attests it names a separate unrelated project,
-and its external origin is otherwise undetermined. The *payloads* of those releases are genuine ICN appliance
-images (manifest `git_commit` values are real commits of this repository, and
-0.0.3 was runtime-witnessed on the exact published bytes) — only the name was
-foreign. Release tags and asset filenames for ≤0.0.3 are retained unchanged so
+and its external origin is otherwise undetermined. The *payloads* of those
+releases are genuine ICN appliance images (manifest `git_commit` values are
+real commits of this repository, and 0.0.3 was runtime-witnessed on the exact
+published bytes) — only the name was foreign. Release tags and asset filenames for ≤0.0.3 are retained unchanged so
 published checksums keep verifying; their release pages are retitled and carry
 this correction. From 0.0.4 onward the stem above is the only identity.
 

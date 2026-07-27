@@ -3,7 +3,7 @@
 ## Purpose
 
 This runbook explains how to verify, boot, run, inspect, and stop the ICN
-portable evaluator (bootable vertical slice).
+Portable Evaluator (bootable vertical slice).
 
 The package is local after download. It does not require access to the sender's
 LAN or node.
