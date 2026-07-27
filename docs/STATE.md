@@ -15,9 +15,15 @@ Last Reviewed: 2026-07-19
      an ICN-ratified identity: it was never proposed, defined, or ratified
      anywhere in this repository (the project owner attests it names a separate
      unrelated project; its external origin is otherwise undetermined; repo-wide
-     search: the only occurrences were the package
+     search AS OF THE 2026-07-19 AUDIT, i.e. against `main` BEFORE this PR: the
+     only occurrences were the package
      lane's own titles/stem, this file, and one incidental English use of the
-     phrase in a 2026-05-15 handoff doc). The 2026-07-17 lane work verified the
+     phrase in a 2026-05-15 handoff doc. That inventory is a point-in-time audit
+     finding, not a standing invariant — this PR itself necessarily adds further
+     occurrences, in this sync block and in the lane's own
+     correction/supersession notes, which is expected: the retained historical
+     names are what preserve checksum continuity for released assets at or below
+     0.0.3). The 2026-07-17 lane work verified the
      PAYLOAD provenance rigorously (manifest git_commit = real main commits;
      0.0.3 runtime-witnessed on exact published bytes) but never audited the NAME
      provenance — the foreign identity was carried through into the repo-owned
