@@ -1,10 +1,167 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-07-17
+Last Reviewed: 2026-07-27
 ---
 
 # ICN State (living doc)
+
+<!-- [sync edit] 2026-07-27 (truth-root catch-up for the 2026-07-21 → 2026-07-26 window:
+     architecture tranches A1 + B0, the public/private deployment boundary, the appliance
+     payload repair, and the B1 design NO-GO; branch `docs/truth-sync-20260727`;
+     docs/ops-state-only — no code, schema, route, or auth-decision change lands with it).
+     Append-only/newest-first; the 2026-07-17 evaluator block below remains accurate as of
+     when it was written. THIS BLOCK REPAIRS A TRUTH-SYNC LAPSE: this file's previous
+     `Last Reviewed` was 2026-07-17 and `docs/PHASE_PROGRESS.md` was last updated
+     2026-07-13, while `main` advanced through nine merges to
+     `425f513f24d7f45130273770f346e8b5bdddbf9f`. The rendered `## Current status` section
+     is re-snapshotted to 2026-07-27 and the 2026-07-17 snapshot is relabeled historical
+     (content preserved verbatim, per the 2026-07-13b convention).
+
+     WINDOW COVERED (all four SHAs verified as ancestors of `origin/main` `425f513f`):
+
+     (1) A1 — MEANING-FIREWALL TRUTH RECONCILIATION, MERGED `4bdae326` (PR #2452,
+     2026-07-22). One authoritative crate taxonomy (`scripts/firewall-taxonomy.toml`)
+     now drives every firewall mechanism, replacing 17 hand-copied crate-list variants
+     that disagreed with each other (`icn-ledger` was classified kernel in 5 mechanisms
+     and forbidden-domain in 6). The required "Meaning Firewall Check" was fail-INCAPABLE
+     since 2026-03-24 — its script unconditionally `exit 0`'d behind branch protection —
+     and is now fail-closed, including on taxonomy load failure. All 48 workspace members
+     are classified; 16 boundary-debt edges from `icn-core` are pinned as typed
+     `[[exception]]` entries with tracking and machine-checkable `expiry = "edge-absent"`;
+     stale-exception detection prevents a lingering transitive or dev-only path from
+     masking a removed direct edge. WHAT A1 DOES **NOT** DO: it removes no dependency
+     edge, changes no runtime behavior, and does NOT complete kernel/app separation — it
+     measures that separation truthfully for the first time. A1 is the honest baseline the
+     B-tranches subtract from, not a claim that the boundary is clean.
+
+     (2) B0 — COMMUNITY EDGE INVERSION, MERGED `c1ea355e` (PR #2454, 2026-07-25). The
+     first worked example of the B-tranche pattern. The daemon composition root (`icnd`)
+     now constructs `CommunityActor`/`CommunityStore` and hands `icn-core` a
+     `CommunityFactory` closure; `icn-core` transports an opaque handle it never inspects
+     and `icn-gateway` downcasts it back. Community construction, LWW gossip-merge logic,
+     and domain meaning left the kernel crate. EXACT EDGE CLAIM, re-verified live at
+     `425f513f`: `icn-core/Cargo.toml` declares **zero direct `icn-community`
+     dependency**, and `icn-core/src/` contains **zero direct `icn_community::` source
+     references** (the only textual hits are `#[cfg(test)]` ratchet pins in
+     `meaning_firewall.rs` recording the count as 0). THIS IS NOT GRAPH ISOLATION: a
+     transitive path `icn-core -> icn-gateway -> icn-community` REMAINS, because
+     `icn-core` still depends directly on `icn-gateway` and `icn-gateway` depends on
+     `icn-community`. Do not describe B0 as removing community from the kernel's
+     dependency graph; it removed the direct edge and the ownership.
+
+     (3) PUBLIC/PRIVATE DEPLOYMENT BOUNDARY, MERGED `75d15750` (PR #2455, 2026-07-26).
+     Public `main` no longer runs the automatic private-homelab build/deploy/cleanup
+     workflow: a public merge invokes no private registry, SSH, K3s rollout, self-hosted
+     runner, kubectl, or scheduled homelab cleanup. The replacement
+     (`.github/workflows/oci-image-build.yml`) is a GitHub-hosted generic OCI build with
+     `push: false` — build validation only, no publish and no deploy. The CI/deploy
+     routing map no longer names the deleted workflow or asserts private-cluster
+     liveness. SCOPE OF THE RETIREMENT: only the *automatic private deployment from
+     public CI* was retired. Kubernetes, K3s, and the Helm chart REMAIN available as
+     optional operator deployment material; they are not "removed from ICN". The legacy
+     `deploy/k8s/` tree remains in Git as explicitly non-generic material pending a
+     separate archive/genericize/move tranche.
+
+     (4) APPLIANCE DEMO-PAYLOAD MODE REPAIR, MERGED `425f513f` (PR #2456, 2026-07-26) —
+     current `origin/main`. Defect: a fresh assembled image booted and returned health
+     200 but `icn-member-shell` failed 200/CHDIR because the guest payload inherited
+     restrictive host-checkout modes. The builder now normalizes the explicitly
+     non-secret DEV/DEMO payload to root ownership and `u=rwX,go=rX`, installs demo
+     helpers root-owned 0755, and asserts those modes fail-closed at build time. No Rust
+     runtime, API, protocol, storage-schema, or authority behavior changed. PR #2456 is
+     MERGED, not awaiting auto-merge.
+
+     APPLIANCE WITNESS AND ITS EXACT PROVENANCE. The assembled single-node appliance was
+     witnessed on 2026-07-26 at integrated build head
+     `67a6566e2335be108ca69bb5d60e0cfb761e63b5`. That commit is NOT an ancestor of `main`
+     (it was the PR head that squash-merged as `425f513f`), but its tree is
+     BYTE-IDENTICAL to current `main`: both resolve to tree
+     `d3604c4c3896ff14417336a9a2d352c696d1fe32`. The witness therefore covers exactly the
+     content of `425f513f`. Artifact: `icn-appliance-0.0.2-demo-67a6566e-20260726-amd64.qcow2`,
+     image sha256 `1ef6085b…`, base sha256 `f8573792…`, manifest sha256 `80d4541d…`,
+     typed manifest independently re-verified against image, base, `icnd`, and `icnctl`.
+     Witnessed: clean boot and firstboot; `icnd` under systemd returning health; organizer
+     and member rehearsal flows; least-privilege role negatives; wrong-digest confirm
+     rejected; completion receipt created and re-fetched; outbound isolation; service
+     restart; full VM reboot; `deploy/appliance/check.sh` 40 passed / 0 failed.
+     DURABILITY BOUNDARY — STATE IT EXACTLY: across restart and full reboot the node
+     identity, machine ID, configuration and genesis hashes were UNCHANGED while the
+     kernel boot ID CHANGED (proving a real reboot), and the completion receipt remained
+     re-fetchable. The rehearsal WORKSPACE view and aggregate rehearsal state are
+     process-local and intentionally EPHEMERAL — they reset on daemon restart and are
+     reconstructed by reseeding. Durable identity plus a durable completion receipt is
+     what was earned; general workspace durability was NOT, and must not be reported as
+     such.
+
+     (5) B1 — LEDGER EDGE: DESIGN NO-GO, NOTHING IMPLEMENTED. B1 proposed removing
+     `icn-core -> icn-ledger`. It reached the mandatory architecture gate and was
+     REJECTED at design review on 2026-07-25; no implementation branch, PR, or commit
+     exists, and none should be described as underway. The review found multiple
+     incompatible ledger implementations, multiple composition roots, unclear
+     authoritative ownership, insufficiently typed recovery operations, and inadequate
+     authorization, custody, provenance, idempotency, and durable workflow receipts.
+     BINDING CONSTRAINT: B1 must NOT be implemented by hiding ledger ownership behind
+     `Any`, untyped opaque objects, callbacks, closures, meaning-erasing generic traits,
+     ambient recovery authority, or incomplete receipt/provenance semantics — that is,
+     the B0 opaque-handle pattern does NOT transfer to the ledger edge. B1 may resume
+     only after there is one authoritative application composition root, one
+     authoritative ledger implementation, typed recovery commands, explicit authority,
+     and durable workflow evidence. The mandatory prerequisite tranche is
+     composition-root consolidation. B2 HAS NOT BEGUN and is not product-critical.
+
+     DEPLOYMENT-PROFILE DECISION STATE (open, human-gated). PR #2458 proposes
+     `docs/adr/ADR-0086-deployment-profiles.md` with `status: proposed` and
+     `implementation_status: partially implemented`: (a) the Debian appliance VM as the
+     canonical sovereign-node artifact, (b) Docker Compose as the disposable development
+     network, (c) Kubernetes/K3s as OPTIONAL hosted operator infrastructure, (d) direct
+     native Linux as an advanced installation form. IT IS PROPOSED, NOT ADOPTED — writing
+     or merging the ADR does not adopt it, and only the appliance profile currently has a
+     retained build-and-boot witness. Backup/restoration, artifact signing,
+     reproducibility, two-node institutional operation, and generic Kubernetes
+     reconciliation remain incomplete. A specific gap worth naming: `icnctl backup` omits
+     `/etc/icn/icnd.env`, so an appliance restored from a backup alone cannot reopen its
+     keystore — treat independent restoration as BLOCKED until an encrypted recovery
+     bundle exists. Do not present Compose as sovereign-node proof.
+
+     EVALUATOR NAME AND PROVENANCE STATE (open). Current `main` still ships the foreign
+     package identity: `deploy/appliance/evaluator/package-spec.env` carries
+     `PKG_STEM="icn-common-sense-vertical-slice"`. PR #2435 renames the line to
+     `icn-portable-evaluator` (0.0.4) and retitles three release pages with a correction
+     banner; tags/assets at or below 0.0.3 are deliberately RETAINED for checksum
+     continuity and must never be renamed or deleted. #2435 was CONFLICTING at this sync;
+     its only real conflict is the GENERATED file `docs/DOCUMENT_REGISTRY.md`. Until
+     #2435 merges, the repository's evaluator identity is still wrong on `main`.
+
+     NEXT EXECUTABLE GAPS, SCOPED BUT NOT STARTED. (i) COMMUNITY GOSSIP TOPIC: the
+     production runtime still does not create `community:updates` before subscribing —
+     `icn-community/src/actor.rs` publishes to it, `icnd/src/community_wiring.rs`
+     subscribes without a create, the gossip layer rejects publish to an undeclared topic
+     under the reject policy, and publish failure is logged AFTER local mutation, so peers
+     can diverge. This is a PRE-EXISTING defect that B0 neither introduced nor fixed. It
+     is filed as #2457, which explicitly withholds authorization for an opportunistic
+     patch until topic ownership, access rules, startup ordering, and failure semantics
+     are decided. It does not block the single-node appliance witness. (ii) TWO-NODE
+     APPLIANCE PROOF: NOT EXECUTED. No two-node run has occurred; connectivity between
+     two development nodes would not constitute live federation, and the proof must
+     separate transport connectivity, peer identity, enrollment/authority, state
+     synchronization, receipts, and federation.
+
+     OPEN HUMAN AND INSTITUTIONAL GATES, UNCHANGED BY THIS WINDOW: the real organizer
+     presentation → pilot formalization → first operator rehearsal (#1703/#1746;
+     partner-side nycn#41/#52) and the member-shell human assistive-technology pass
+     (#2041). NYCN's partner repo remains pinned to ICN `8c0fe926` and this window does
+     NOT move that pin. Also open: production trusted issuance (#2080), recurring
+     assembled-image smoke (#2398), provider-boundary slice 3 (#2393), RPC credential
+     lifetime (#2445), SDIS capability-vs-trust authority (#2447), unauthenticated anchor
+     key rotation (#2448).
+
+     NON-CLAIMS: no production readiness, no formal pilot, no organizer acceptance, no
+     human-accessibility sign-off, no live federation, no two-node proof, no signed or
+     immutable appliance (`non_production=true, signed=false`), no independent appliance
+     restoration, no adopted deployment ADR, and no claim that kernel/app separation is
+     complete. Receipts record institutional facts and grant zero authority.
+     Refs #2452 #2454 #2455 #2456 #2457 #2458 #2435 #2398 #2041. No close keywords. -->
 
 <!-- [sync edit] 2026-07-17 (repository-owned portable evaluator lane MERGED + canonical
      release; branch `docs/evaluator-lane-state-sync`; docs/ops-state-only — no
@@ -1439,9 +1596,31 @@ Last Reviewed: 2026-07-17
      Aligned crate list, merged PRs, and metrics to verified repo state.
      Phase model unchanged — phase classification is governance territory (PR C). -->
 
-## Current status (2026-07-17 snapshot)
+## Current status (2026-07-27 snapshot)
 
-**Current phase:** Phase 2 — Pilot Launch (in progress, partner-bound). The **Rehearsal Node organizer→member loop** is merged (#2406 runtime, #2407 browser surface, #2408 appliance wiring, #2409 smoke driver) and was witnessed end-to-end on a fresh assembled image built from clean `main` `8c0fe926` on 2026-07-13: restrict=on boot → organizer no-paste session → review/edit/assign → digest-bound confirm (wrong digest → 409, fail-closed) → real ADR-0026 ladder → member completion → durable receipt → evidence export (`dids_exported=false`) → in-VM steward verify → outbound canary held. Per-PR detail: the newest-first `[sync edit]` blocks above (this file is append-only; the comment blocks ARE the per-PR record).
+**Current phase:** Phase 2 — Pilot Launch (in progress, partner-bound). `origin/main` is `425f513f24d7f45130273770f346e8b5bdddbf9f`. Per-PR detail lives in the newest-first `[sync edit]` blocks above (this file is append-only; the comment blocks ARE the per-PR record).
+
+**Architecture (A1 + B0 merged; B1 no-go; B2 not started).** The meaning firewall now has one authoritative crate taxonomy and a gate that can actually fail (A1, `4bdae326`) — this **measures** kernel/app separation honestly, it does not complete it, and it removes no dependency edge. B0 (`c1ea355e`) inverted the community edge: `icn-core` has **zero direct `icn-community` dependency and zero direct `icn_community::` source references**, with construction and LWW gossip-merge ownership moved to the `icnd` composition root. A transitive path `icn-core → icn-gateway → icn-community` **still exists** — B0 removed the direct edge and the ownership, not the graph reachability. **B1 (removing `icn-core → icn-ledger`) failed its design gate on 2026-07-25 and was never implemented**; it may not be built on the B0 opaque-handle pattern, and resuming it requires one authoritative composition root, one authoritative ledger implementation, typed recovery commands, explicit authority, and durable workflow evidence. Composition-root consolidation is the prerequisite tranche. **B2 has not begun.**
+
+**Deployment boundary (public CI no longer touches private infrastructure).** Public `main` merges no longer invoke a private registry, SSH, K3s rollout, self-hosted runner, or scheduled homelab cleanup (`75d15750`, #2455); the replacement lane is a GitHub-hosted generic OCI build with `push: false` — build validation only. **Only the automatic private deployment from public CI was retired.** Kubernetes, K3s, and Helm remain available as optional operator material and are not removed from ICN.
+
+**Appliance witness on current-main content (2026-07-26).** The appliance demo-payload mode defect is fixed and merged (`425f513f`, #2456 — merged, not pending). The assembled single-node appliance was witnessed at integrated build head `67a6566e`, whose tree (`d3604c4c…`) is **byte-identical to current `main`**, so the witness covers exactly this content: clean boot and firstboot, `icnd` under systemd returning health, organizer and member rehearsal flows, least-privilege negatives, wrong-digest rejection, completion receipt created and re-fetched, outbound isolation, service restart, and full VM reboot (`check.sh` 40/0). **Durability boundary:** node identity, machine ID, and config/genesis hashes survived reboot (boot ID changed, proving a real reboot) and the completion receipt stayed re-fetchable; the rehearsal **workspace view is intentionally ephemeral** and is reconstructed by reseeding. Durable identity + durable receipt is what was earned — not general workspace durability.
+
+**Deployment profiles and evaluator identity (both open).** PR #2458 **proposes** ADR-0086 (appliance = canonical sovereign node; Compose = disposable devnet; Kubernetes/K3s = optional operator infrastructure; native Linux = advanced install) as `status: proposed`, `implementation_status: partially implemented`. It is not adopted, only the appliance profile has a retained witness, and independent appliance restoration is **blocked** because `icnctl backup` omits `/etc/icn/icnd.env`. PR #2435 (evaluator renamed to `icn-portable-evaluator`) is not merged, so `main` still ships `PKG_STEM="icn-common-sense-vertical-slice"` — a foreign package identity that was never an ICN name. Releases at or below 0.0.3 are retained deliberately for checksum continuity.
+
+**Next executable gaps (scoped, not started).** Community gossip topic `community:updates` is still never created before subscribe in production wiring, so cross-node community gossip is dormant and publish failures are logged after local mutation — a pre-existing defect B0 neither caused nor fixed, filed as **#2457**, which withholds authorization for an opportunistic patch pending topic-ownership and failure-semantics decisions. **No two-node appliance proof has been executed**; two development nodes exchanging data would not be live federation.
+
+**NYCN adoption state:** partner repo pinned to ICN `8c0fe926`; this window does not move that pin. NYCN remains the intended first partner — an active track, not a committed pilot.
+
+**Open human gates (the project's primary gates):** the real organizer presentation → pilot formalization → first operator rehearsal (#1703/#1746; partner-side nycn#41/#52), and the member-shell human assistive-technology pass (#2041). Automated and assembled-image evidence closes none of these.
+
+**Open software lanes (selected):** production trusted issuance (#2080); recurring assembled-image smoke (#2398); provider-boundary slice 3 (#2393); RPC credential lifetime (#2445); SDIS capability-vs-trust authority (#2447); unauthenticated anchor key rotation (#2448); community topic ownership (#2457).
+
+**Non-claims:** no production readiness, no formal pilot, no organizer acceptance, no human-accessibility sign-off, no live federation, no two-node proof, no signed or immutable appliance, no independent appliance restoration, no adopted deployment ADR, and no claim that kernel/app separation is complete.
+
+## Historical: Current status (2026-07-17 snapshot)
+
+**Current phase (as of 2026-07-17):** Phase 2 — Pilot Launch (in progress, partner-bound). The **Rehearsal Node organizer→member loop** is merged (#2406 runtime, #2407 browser surface, #2408 appliance wiring, #2409 smoke driver) and was witnessed end-to-end on a fresh assembled image built from clean `main` `8c0fe926` on 2026-07-13: restrict=on boot → organizer no-paste session → review/edit/assign → digest-bound confirm (wrong digest → 409, fail-closed) → real ADR-0026 ladder → member completion → durable receipt → evidence export (`dids_exported=false`) → in-VM steward verify → outbound canary held. Per-PR detail: the newest-first `[sync edit]` blocks above (this file is append-only; the comment blocks ARE the per-PR record).
 
 **LAN workstation witness (2026-07-15, merged-main):** the appliance's LAN single-origin profile is **merged to main** (#2424, #2425) and deployed as a dedicated hypervisor VM on operator-controlled LAN infrastructure from the **merged-main image `icn-appliance-0.0.3-lan-e74a8915`** (git_commit `e74a8915`, non-production, unsigned; supersedes the earlier `916629d7` branch image). A review-caught authority-boundary defect was fixed before merge: the LAN profile's gateway/member-shell/session are now all loopback-bound so the in-VM nginx is the only LAN HTTP surface. The full organizer→member loop was driven from a real Windows workstation browser against the merged-main deployment — one-click role-scoped sessions (no terminal, no credential paste, no credential in any URL), digest-bound confirm with server-verified wrong-digest 409, exactly one action item per confirm, fresh member session, completion, idempotent retry, in-VM steward verify PASS (negative capability matrix + value-withheld evidence), unattended recovery across service restart and VM reboot (node identity + sled durable; the rehearsal workspace view is intentionally ephemeral). A LAN development rehearsal, not production and not any human gate — see the 2026-07-15 sync block above.
 

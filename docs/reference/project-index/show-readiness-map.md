@@ -1,7 +1,7 @@
 ---
 Status: descriptive
 Canonical: no
-Last Reviewed: 2026-07-13
+Last Reviewed: 2026-07-27
 ---
 
 # Show-Readiness Map
@@ -18,6 +18,8 @@ These are real and may be presented honestly:
 - **The public site.** [`intercooperative.network`](https://intercooperative.network) — including [What is ICN](https://intercooperative.network/what-is-icn), [What's Real Now](https://intercooperative.network/whats-real-now), [For Cooperatives](https://intercooperative.network/for-cooperatives), and [Get Involved](https://intercooperative.network/get-involved).
 - **The Rehearsal Node organizer→member loop.** The current show story. On an appliance built from clean `main`: an organizer opens a no-paste browser session, reviews a pending item, edits, assigns, sees an exact preview, and confirms — the confirm is digest-bound (a stale or tampered preview fails closed) and executes the real governance ladder, creating one real action item; a member (fresh least-privilege session) completes it and a durable completion receipt binds the act. Evidence exports without identities or credentials and a steward verifier accepts it (and rejects a tampered packet). Witnessed end-to-end on a fresh assembled image 2026-07-13 (`docs/STATE.md` newest sync block; runbook: [`docs/demo/ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md`](../../demo/ICN_REHEARSAL_NODE_V0.1_RUNBOOK.md)).
 - **The proof-loop story.** Decision → action → receipt is real end-to-end for the three currently emitted action-card source paths (proposal/vote, action_item/complete, meeting/attend), locally and on the assembled appliance image.
+- **The sovereign single node, on current-main content.** An assembled Debian appliance built from a tree byte-identical to `main` `425f513f` was witnessed on 2026-07-26 through clean boot and first boot, `icnd` under systemd returning health, the organizer and member rehearsal flows, least-privilege negatives, wrong-digest rejection, a completion receipt created and re-fetched, outbound isolation, service restart, and a full VM reboot. It is honest to say **the node keeps its identity and its receipts across a real reboot** (boot ID changed; identity, machine ID, config and genesis hashes did not). It is **not** honest to imply general state durability — the rehearsal workspace view is intentionally ephemeral and is reseeded.
+- **An honest architectural boundary, honestly measured.** The meaning firewall now has one authoritative crate taxonomy and a gate that can fail (A1, #2452) — worth showing precisely *because* it publishes 16 pinned boundary-debt edges instead of claiming a clean boundary. B0 (#2454) moved community construction out of `icn-core` into the daemon composition root. Say "we measured the boundary and are paying the debt down one edge at a time," not "the kernel is clean."
 - **Roadmap truth.** Phase 0 done, Phase 1 done, Phase 2 in progress. The software side of the rehearsal wedge is witnessed; the remaining gates are human (organizer presentation, assistive-technology pass). ([`docs/PHASE_PROGRESS.md`](../../PHASE_PROGRESS.md), [`docs/STATE.md`](../../STATE.md).)
 - **NYCN as the intended first cooperative partner.** Active partnership track. The organizer-gate package on the NYCN side is independently steward-operable (facilitator guide, fail-closed validator, closed human-outcome vocabulary). The next step is the presentation itself.
 - **Member-facing standing / action-card / receipt surfaces.** Real and exercised; show the member shell and the receipt loop.
@@ -37,6 +39,12 @@ These are real things that exist in the repo but are not in a finished state. **
 - **A complete mobile app.** React Native SDK and mobile examples are parked until the browser interaction model is organizer-validated.
 - **Action-card runtime as fully expanded.** Two source paths remain RFC-gated (`signal_rule` under #1631/#1711, `obligation_lifecycle` under #1634/#1712). Show three of five, not five of five.
 - **Recurring assembled-image CI.** The appliance walkthrough is protected by a committed harness plus manual witnesses, not yet by a standing scheduled lane (#2398).
+- **Kernel/app separation.** Measured, not achieved. A1 pinned 16 `icn-core` boundary-debt edges; B0 removed one direct edge but `icn-core → icn-gateway → icn-community` still reaches; **B1 (the ledger edge) was refused at design review** and B2 has not begun. Never say the firewall is complete or that the kernel is domain-free.
+- **A two-node or multi-node appliance proof.** None has been executed. Do not demonstrate two development nodes exchanging data and call it federation — a real proof must separate transport connectivity, peer identity, enrollment/authority, state synchronization, receipts, and federation.
+- **Cross-node community gossip.** Dormant: production wiring subscribes to `community:updates` without creating it, so publishes are rejected under the reject policy and the failure is logged after local mutation (#2457). Do not show community sync between nodes.
+- **A chosen deployment story.** ADR-0086 (PR #2458) is `proposed`, not adopted. You may describe the *direction* — appliance as the canonical sovereign node, Compose as a disposable devnet, Kubernetes/K3s as optional operator infrastructure, native Linux as an advanced install — but say it is proposed. **Docker Compose is not sovereign-node proof**, and Kubernetes has **not** been retired from ICN (only the automatic private deployment from public CI was).
+- **Appliance recovery.** `icnctl backup` omits `/etc/icn/icnd.env`, so a node restored from a backup alone cannot reopen its keystore. Independent restoration is blocked; do not present backup/restore as an operator-ready capability.
+- **The evaluator package's name.** `main` still ships `PKG_STEM="icn-common-sense-vertical-slice"` — a foreign identity that was never an ICN name. The correction to `icn-portable-evaluator` is unmerged (PR #2435). Do not introduce the old name into new material; do not rename or delete released assets at or below 0.0.3, which are retained for checksum continuity.
 
 ## Suggested first-demo narrative
 
@@ -62,6 +70,10 @@ These are language or framing choices that should never appear in any external-f
 | **No NYCN commitment claim.** Do not represent NYCN as a launched, formal, or signed pilot. | Truthfulness; partnership is active but not formalized. |
 | **No live-federation claim.** No two cooperatives are federating in production. | Truthfulness. |
 | **No deployment-age / uptime claim.** Current K3s liveness is flagged `NEEDS OPS RE-CONFIRMATION`; a stale "running since <date>" is an overclaim even if it was once true. | Truthfulness; `docs/status.toml` is the owner of this claim. |
+| **No "kernel/app separation is complete" claim.** A1 measured the boundary and pinned 16 debt edges; B0 removed one; B1 was refused. | Truthfulness; `scripts/firewall-taxonomy.toml` is the owner of this claim. |
+| **No "ICN dropped Kubernetes" claim** — and equally, no claim that a K3s cluster is the product. Only the automatic private deployment from public CI was retired; Kubernetes/K3s/Helm remain optional operator material. | Accuracy in both directions; PR #2455 is the owner of this boundary. |
+| **No two-node / multi-node proof claim.** None has been run. Connectivity between development nodes is not federation. | Truthfulness. |
+| **No adopted-deployment-decision claim.** ADR-0086 is `proposed`; merging a proposed ADR does not adopt it. | Truthfulness; ADR status field is the owner. |
 | **No human-validation claim.** No organizer has accepted the loop; no assistive-technology pass has been performed. Automated a11y checks are not the human gate. | Truthfulness; #2041/#1703/#1746 are open. |
 | **No "platform landlord" aesthetics.** ICN is not a SaaS, not a hosted product, not "let us run it for you." | Doctrine ([`THE_COMMONS.md`](../../architecture/THE_COMMONS.md) §Non-Goals). |
 | **No production-readiness claim across the substrate.** Some surfaces are mature; many are uneven; the appliance ships `non_production=true, signed=false`. | Truthfulness; do not generalize from the strongest parts. |
