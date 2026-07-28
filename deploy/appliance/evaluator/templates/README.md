@@ -1,4 +1,4 @@
-# ICN Common Sense Bootable Vertical Slice
+# ICN Portable Evaluator (Bootable Vertical Slice)
 
 This zip is a self-contained bootable vertical slice of what exists today.
 
