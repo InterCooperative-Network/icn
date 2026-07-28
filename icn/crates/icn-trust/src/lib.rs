@@ -461,10 +461,14 @@ impl TrustGraph {
     /// the documented live-local receipt-chain proof depends on.
     ///
     /// The self-attestation guard therefore lives at each *authorization*
-    /// boundary instead, where a caller exists to be refused:
+    /// boundary instead, where a caller exists to be refused. There are three,
+    /// and all three must carry it — a self-edge accepted at any one of them is
+    /// indistinguishable downstream from a genuine vouch:
     /// - the gateway's `TrustManager::add_edge_async` (HTTP `/trust/attest`),
-    /// - `TrustService::submit_attestation` in `apps/trust-app` (the RPC
-    ///   `trust.add` path).
+    /// - `TrustService::submit_attestation` in `apps/trust-app` (RPC `trust.add`),
+    /// - `TrustService::ingest_attestation` in `apps/trust-app` (**gossip ingress**
+    ///   — a peer can correctly self-sign an attestation whose issuer equals its
+    ///   subject, so signature verification alone does not refuse it).
     ///
     /// Callers that legitimately need a self-edge reach this method directly and
     /// are, by construction, composition roots rather than request handlers.
