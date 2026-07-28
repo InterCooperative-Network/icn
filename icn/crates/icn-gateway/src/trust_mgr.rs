@@ -320,6 +320,20 @@ impl TrustManager {
         note = "Use add_edge_async for async contexts to avoid blocking worker threads"
     )]
     pub fn add_edge(&self, edge: TrustEdge) -> Result<(), String> {
+        // Same self-attestation refusal as `add_edge_async` (F-P0-1).
+        //
+        // This deprecated twin currently has no production caller — both call
+        // sites are inside `#[cfg(test)]` modules. It is guarded anyway rather
+        // than left to be "safe because nobody calls it": a `pub` unguarded twin
+        // of a guarded method is precisely the shape that turns into a live
+        // bypass the first time someone reaches for the sync API.
+        if edge.source == edge.target {
+            return Err(TrustMutationError::SelfAttestation {
+                did: edge.source.to_string(),
+            }
+            .to_string());
+        }
+
         if let Some(ref handle) = self.trust_graph {
             tokio::task::block_in_place(|| {
                 let mut graph = handle.blocking_write();
