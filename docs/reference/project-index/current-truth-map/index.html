@@ -55,7 +55,13 @@ View source on GitHub →
 </blockquote>
 <p>The software side of the current wedge — the <strong>Rehearsal Node organizer→member loop</strong> — is merged and witnessed on an assembled image. What remains is human procedure: the real organizer presentation, pilot formalization, and the first operator rehearsal.</p>
 <h2>What is real now</h2>
-<p>These surfaces exist, are merged to <code>main</code>, and were exercised end-to-end in the 2026-07-13 assembled-image KVM witness (image built from clean <code>main</code> <code>8c0fe926</code>, restrict=on boot):</p>
+<blockquote>
+<p>This map is refreshed per truth-sync, not per commit. For the current <code>main</code> SHA read git; for the per-PR record read <a href="/docs/STATE">`docs/STATE.md`</a>&#39;s newest-first <code>[sync edit]</code> blocks. Architecture and deployment facts below were reconciled through the 2026-07-28 merge train (#2458 <code>9ca12148</code>, #2435 <code>1af341cb</code>, #2463 <code>a0b970ac</code>).</p>
+</blockquote>
+<p><strong>Architecture boundary (merged 2026-07-22 → 2026-07-25).</strong> The meaning firewall has one authoritative crate taxonomy and a gate that can actually fail (A1, <code>4bdae326</code>, #2452) — before this, the required check <code>exit 0</code>&#39;d unconditionally and 17 hand-copied crate lists disagreed about which crates were kernel. A1 <strong>measures</strong> kernel/app separation honestly; it completes nothing and removes no dependency edge, and 16 <code>icn-core</code> boundary-debt edges are pinned as admitted debt. B0 (<code>c1ea355e</code>, #2454) inverted the community edge: <code>icn-core</code> has <strong>zero direct <code>icn-community</code> dependency and zero direct <code>icn_community::</code> source references</strong>, with construction and gossip-merge ownership moved to the <code>icnd</code> composition root. <strong>This is not graph isolation</strong> — <code>icn-core → icn-gateway → icn-community</code> still reaches. <strong>B1 (the ledger edge) failed its design gate on 2026-07-25 and was never implemented. B2 has not begun.</strong></p>
+<p><strong>Deployment boundary (merged 2026-07-26).</strong> Public <code>main</code> no longer invokes a private registry, SSH, K3s rollout, self-hosted runner, or homelab cleanup (<code>75d15750</code>, #2455); the public lane is a generic OCI build with <code>push: false</code>. <strong>Only the automatic private deployment from public CI was retired</strong> — Kubernetes, K3s, and Helm remain optional operator material.</p>
+<p><strong>Appliance on current-main content (witnessed 2026-07-26).</strong> The demo-payload mode defect is fixed and merged (<code>425f513f</code>, #2456). The assembled single-node appliance was witnessed at build head <code>67a6566e</code>, whose tree is byte-identical to <code>main</code>: clean boot and firstboot, systemd <code>icnd</code> health, organizer and member rehearsal flows, least-privilege negatives, wrong-digest rejection, completion receipt created and re-fetched, outbound isolation, service restart, full VM reboot (<code>check.sh</code> 40/0). <strong>Durable across reboot:</strong> node identity, machine ID, config/genesis hashes, and the completion receipt (the boot ID changed, proving a real reboot). <strong>Intentionally ephemeral:</strong> the rehearsal workspace view, reconstructed by reseeding — do not read this as general workspace durability.</p>
+<p>These surfaces exist, are merged to <code>main</code>, and were exercised end-to-end in the 2026-07-13 assembled-image KVM witness (image built from clean <code>main</code> <code>8c0fe926</code>, restrict=on boot) and re-exercised in the 2026-07-26 current-main-content witness described above:</p>
 <ul>
 <li><strong>Rehearsal organizer review→confirm runtime</strong> (#2406) — build-mode-gated (<code>ICN_GOVERNANCE_BUILD_MODE=rehearsal</code>; routes 404 in every other mode), three narrow scopes, BLAKE3 <code>preview_digest</code> binding confirm to the exact previewed plan (wrong/stale digest → 409, fail-closed), confirm executes the real ADR-0026 ladder and creates one real action item.</li>
 <li><strong>Member-shell organizer surface</strong> (#2407) — <code>web/member-shell</code> <code>?surface=organizer</code>, live-only guided review→confirm in the browser; axe-clean automated a11y (the human/AT pass is still owed under #2041).</li>
@@ -63,6 +69,7 @@ View source on GitHub →
 <li><strong>Committed reproducible walkthrough driver</strong> (#2409) — <code>deploy/appliance/smoke/smoke-local.sh --demo</code> drives the full loop + role negatives; this is the harness a recurring assembled-image lane (#2398) will run.</li>
 <li><strong>Member completion loop</strong> — standing → action card → completion (narrow <code>governance:action-item:complete</code> scope, #2402) → durable completion receipt (survives restart).</li>
 <li><strong>Evidence export + steward verification</strong> (#2394) — <code>urn:icn:contract:rehearsal-workflow-evidence:v1</code>, no DIDs/credentials exported; tampered packet rejected fail-closed.</li>
+<li><strong>Corrected evaluator package identity</strong> (#2435, <code>1af341cb</code>) — from 0.0.4 forward the portable evaluator ships as <code>icn-portable-evaluator</code>; the owner of this fact is <code>deploy/appliance/evaluator/package-spec.env</code> (<code>PKG_STEM</code>). The previous name was never ICN-ratified. Published tags/assets at or below 0.0.3 keep their original names so existing checksums keep verifying — their payload provenance was always genuine; only the display identity was corrected, not retroactively rewritten.</li>
 <li><strong>Trusted-local appliance issuance</strong> (#2396/#2397) — <code>icnctl … --local-mint</code> signs demo-session JWTs in-process with the node&#39;s own first-boot secret; <code>/auth/verify</code> stays fail-closed (#2075). This is appliance-local operator bootstrap, <strong>not</strong> production trusted issuance (#2080 open).</li>
 </ul>
 <h2>What is not yet real</h2>
@@ -70,7 +77,10 @@ View source on GitHub →
 <li><strong>The human gates.</strong> No organizer presentation has occurred (#1703/#1746; partner-side nycn #41/#52). No human assistive-technology pass (#2041). These are the project&#39;s primary open gates — software polish does not substitute.</li>
 <li><strong>Production trusted issuance</strong> (#2080) — how institutions issue real positive authority remains open; the appliance&#39;s local mint does not generalize.</li>
 <li><strong>Recurring assembled-image CI</strong> (#2398) — the walkthrough is protected manually (witnessed at <code>8c0fe926</code>); no scheduled runner builds and boots a fresh image per main advance yet.</li>
-<li><strong>Live federation / two-node</strong> — Rehearsal Node v0.2 territory; nothing federates in production.</li>
+<li><strong>Live federation / two-node</strong> — Rehearsal Node v0.2 territory; nothing federates in production. <strong>No two-node appliance proof has been executed.</strong> The bounded <em>plan</em> is on <code>main</code> (<code>a0b970ac</code>, #2463) and is not evidence: Gate 4 is BLOCKED pending a reviewed offline receipt-bundle exporter/verifier, Gate 3 (institutional enrollment) is optional and omitting it restricts Node B to &quot;technical witness&quot;, and federation is explicitly not exercised. When one is, it must separate transport connectivity, peer identity, enrollment/authority, state synchronization, receipts, and federation — two development nodes exchanging data is not live federation.</li>
+<li><strong>Cross-node community gossip</strong> — dormant. Production wiring subscribes to <code>community:updates</code> without creating it, the gossip layer rejects publish to an undeclared topic under the reject policy, and publish failure is logged <em>after</em> local mutation, so peers can diverge (#2457). Pre-existing; B0 neither introduced nor fixed it, and #2457 explicitly withholds authorization for an opportunistic patch.</li>
+<li><strong>Kernel/app separation</strong> — measured, not achieved. A1 pinned 16 <code>icn-core</code> boundary-debt edges; B0 removed one direct edge; <strong>B1 was refused at design review</strong> and composition-root consolidation must land before it can be retried.</li>
+<li><strong>An adopted deployment decision</strong> — ADR-0086 (#2458) is <code>proposed</code>, not adopted, and <code>implementation_status: partially implemented</code>. <strong>Merging a proposed ADR does not adopt it</strong>; the <code>status:</code> field in <code>docs/adr/</code> owns that fact. Only the appliance profile has a retained witness. <strong>Independent appliance restoration is blocked</strong>: <code>icnctl backup</code> omits <code>/etc/icn/icnd.env</code>, so a node restored from a backup alone cannot reopen its keystore.</li>
 <li><strong>Disclosure enforcement</strong> — rehearsal privacy is by exclusion; <code>ScopedVault</code>/<code>DisclosurePolicy</code> remain design-only.</li>
 <li><strong>Provider-boundary slice 3</strong> (#2393) — operational config categories (deploy/, scripts/, workflow literals) still carry concrete values.</li>
 <li><strong>K3s/devnet operational liveness</strong> — an ops claim needing re-confirmation (<code>docs/status.toml</code>); do not present as currently proven.</li>
@@ -114,13 +124,31 @@ View source on GitHub →
 <td>Design + human review</td>
 <td>#2080 architecture decision</td>
 </tr>
+<tr>
+<td>Deployment-profile adoption</td>
+<td>Matt (human decision)</td>
+<td>Review and accept or amend ADR-0086 (PR #2458); it is <code>proposed</code>, and merging it does not adopt it</td>
+</tr>
+<tr>
+<td>Community topic ownership</td>
+<td>Design + human review</td>
+<td>#2457 — decide topic owner, access rules, startup ordering, and failure semantics before any code lands</td>
+</tr>
+<tr>
+<td>B1 ledger edge</td>
+<td>Architecture review</td>
+<td>One authoritative composition root, one authoritative ledger implementation, typed recovery commands, explicit authority, durable workflow evidence</td>
+</tr>
 </tbody></table>
 <h2>Active risks</h2>
 <ul>
 <li><strong>Mistaking strategy docs for current state.</strong> <code>docs/strategy/*</code> carries long-arc planning; <code>STATE.md</code> and <code>PHASE_PROGRESS.md</code> carry truth.</li>
 <li><strong>Mistaking archive material for current state.</strong> Anything under <code>docs/archive/</code> or with a snapshot marker is historical.</li>
 <li><strong>Overclaiming NYCN integration.</strong> NYCN is the <em>intended</em> first partner; there is no formal commitment and no live integration.</li>
-<li><strong>Mistaking the witness for validation.</strong> The 2026-07-13 assembled-image witness is automated evidence at one commit; it closes no human gate.</li>
+<li><strong>Mistaking the witness for validation.</strong> The assembled-image witnesses (2026-07-13 at <code>8c0fe926</code>, 2026-07-26 at current-main content) are automated evidence at one commit; they close no human gate.</li>
+<li><strong>Mistaking A1/B0 for finished kernel/app separation.</strong> A1 made the firewall honest and B0 removed one direct edge. Sixteen <code>icn-core</code> boundary-debt edges remain pinned, the community crate is still transitively reachable through <code>icn-gateway</code>, and B1 was refused. &quot;The firewall is clean&quot; is not a claim this repository supports.</li>
+<li><strong>Mistaking the CI boundary change for dropping Kubernetes.</strong> Only the <em>automatic private deployment from public CI</em> was retired. Kubernetes, K3s, and Helm remain optional operator deployment forms.</li>
+<li><strong>Mistaking durable identity for durable state.</strong> The witness showed the appliance keeping its identity and <strong>the one completion receipt that run created</strong> across a real reboot — not receipt durability at large, and not the rehearsal workspace view, which is intentionally ephemeral and is reseeded.</li>
 </ul>
 <h2>Where to go next</h2>
 <table>
