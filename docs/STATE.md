@@ -1,10 +1,56 @@
 ---
 Status: descriptive
 Canonical: yes
-Last Reviewed: 2026-07-27
+Last Reviewed: 2026-07-28
 ---
 
 # ICN State (living doc)
+
+<!-- [sync edit] 2026-07-28 (merge-train addendum to the 2026-07-27 block below; branch
+     `docs/truth-sync-20260727`; docs/ops-state-only). The 2026-07-27 block was written
+     while its three sibling PRs were still open and says so explicitly. Those three have
+     now MERGED, in this order, ahead of this truth-sync:
+
+       #2458 → squash `9ca12148`  proposed deployment-profile record (ADR-0086)
+       #2435 → squash `1af341cb`  evaluator identity correction
+       #2463 → squash `a0b970ac`  two-node appliance proof v0.2 PLAN
+
+     WHAT THAT DOES AND DOES NOT CHANGE:
+     - ADR-0086 now EXISTS in `docs/adr/` and is linked from `docs/INDEX.md`. It remains
+       `status: proposed`, `implementation_status: partially implemented`. **Merging the
+       record did not adopt the decision.** Adoption is a separate human act, and the
+       `status:` field is the owner of that fact — not this file, not the PR history.
+     - The evaluator package identity on `main` is now `icn-portable-evaluator`, version
+       0.0.4, owned by `deploy/appliance/evaluator/package-spec.env`. Published tags and
+       asset filenames at or below 0.0.3 are RETAINED unchanged so existing `.sha256`
+       verification keeps working; their payload provenance was always genuine and only
+       the display identity was foreign. Nothing was retroactively rewritten.
+     - The two-node appliance proof v0.2 PLAN now exists at
+       `docs/demo/TWO_NODE_APPLIANCE_PROOF_V0.2_PLAN.md`. **No two-node proof has been
+       executed.** Gate 4 remains BLOCKED pending a reviewed offline receipt-bundle
+       exporter/verifier; Gate 3 (institutional enrollment) remains OPTIONAL, and omitting
+       it restricts Node B to the title "technical witness"; federation is explicitly not
+       exercised and may not be inferred from any weaker layer. The plan does not depend on
+       `COMMUNITY_TOPIC`.
+     - `docs/registry.toml` `total_entries` was recounted mechanically at each step of the
+       train rather than incremented: the reconciled corpus is 360 explicit rows and the
+       declared value is 360. (Side-picking a branch during conflict resolution would have
+       silently dropped the ADR-0086 and two-node rows and reverted the counter.)
+
+     UNCHANGED BY THE TRAIN: A1 still only MEASURES kernel/app separation and completes
+     nothing; B0's claim is still bounded to zero direct dependency and zero direct source
+     reference with the `icn-core → icn-gateway → icn-community` transitive path intact;
+     B1 remains a design NO-GO with nothing implemented; B2 has not begun; only the
+     AUTOMATIC PRIVATE DEPLOYMENT FROM PUBLIC CI was retired, and Kubernetes/K3s/Helm remain
+     optional operator material; the appliance witness still proves only bounded persistence
+     (identity, machine ID, config/genesis hashes, one completion receipt, restart, real
+     reboot) and NOT rehearsal-workspace durability, signed distribution, independent
+     restoration, production readiness, adoption, or federation; independent appliance
+     restoration remains BLOCKED because `icnctl backup` omits `/etc/icn/icnd.env`; the
+     dormant `community:updates` ownership problem (#2457) was NOT patched; and every human
+     and institutional gate is untouched (#1703/#1746, nycn#41/#52, #2041; the NYCN pin on
+     ICN `8c0fe926` did not move).
+     Refs #2458 #2435 #2463 #2457. No close keywords. -->
 
 <!-- [sync edit] 2026-07-27 (truth-root catch-up for the 2026-07-21 → 2026-07-26 window:
      architecture tranches A1 + B0, the public/private deployment boundary, the appliance
@@ -176,6 +222,41 @@ Last Reviewed: 2026-07-27
      restoration, no adopted deployment ADR, and no claim that kernel/app separation is
      complete. Receipts record institutional facts and grant zero authority.
      Refs #2452 #2454 #2455 #2456 #2457 #2458 #2435 #2398 #2041. No close keywords. -->
+
+<!-- [sync edit] 2026-07-19 (evaluator package IDENTITY CORRECTION; branch
+     `fix/evaluator-identity-correction`; docs + deploy-lane naming only — no
+     code/schema/route/auth-decision change lands with it).
+     WHAT THIS CORRECTS: the portable evaluator package has until now carried the
+     name "Common Sense (bootable) vertical slice". That name arrived with an
+     externally assembled distribution (the ad-hoc 0.0.2 packages) and was never
+     an ICN-ratified identity: it was never proposed, defined, or ratified
+     anywhere in this repository (the project owner attests it names a separate
+     unrelated project; its external origin is otherwise undetermined; repo-wide
+     search AS OF THE 2026-07-19 AUDIT, i.e. against `main` BEFORE this PR: the
+     only occurrences were the package
+     lane's own titles/stem, this file, and one incidental English use of the
+     phrase in a 2026-05-15 handoff doc. That inventory is a point-in-time audit
+     finding, not a standing invariant — this PR itself necessarily adds further
+     occurrences, in this sync block and in the lane's own
+     correction/supersession notes, which is expected: the retained historical
+     names are what preserve checksum continuity for released assets at or below
+     0.0.3). The 2026-07-17 lane work verified the
+     PAYLOAD provenance rigorously (manifest git_commit = real main commits;
+     0.0.3 runtime-witnessed on exact published bytes) but never audited the NAME
+     provenance — the foreign identity was carried through into the repo-owned
+     spec, the release titles, and this file.
+     WHAT CHANGES: `deploy/appliance/evaluator/` PKG_STEM is now
+     `icn-portable-evaluator` (next lane artifact = 0.0.4); template/package
+     titles renamed; a naming-and-provenance section added to the lane README.
+     WHAT DOES NOT CHANGE: published release tags and asset filenames for ≤0.0.3
+     are retained (checksum continuity — renaming assets would break published
+     `.sha256` verification); their release pages are retitled with a correction
+     note. The 0.0.3 KVM runtime witness remains valid — it witnessed ICN bytes;
+     only the display name was wrong. Older sync blocks below record the name as
+     it stood then and are historical record, not current naming.
+     NON-CLAIMS unchanged: unsigned, non-production; NOT a pilot, NOT organizer
+     acceptance, NOT accessibility completion, NOT federation. Human gates
+     unchanged: #2041, #1703/#1746, nycn#41/#52. Refs #2428. No close keywords. -->
 
 <!-- [sync edit] 2026-07-17 (repository-owned portable evaluator lane MERGED + canonical
      release; branch `docs/evaluator-lane-state-sync`; docs/ops-state-only — no
@@ -1620,9 +1701,9 @@ Last Reviewed: 2026-07-27
 
 **Appliance witness on current-main content (2026-07-26).** The appliance demo-payload mode defect is fixed and merged (`425f513f`, #2456 — merged, not pending). The assembled single-node appliance was witnessed at integrated build head `67a6566e`, whose tree (`d3604c4c…`) is **byte-identical to current `main`**, so the witness covers exactly this content: clean boot and firstboot, `icnd` under systemd returning health, organizer and member rehearsal flows, least-privilege negatives, wrong-digest rejection, completion receipt created and re-fetched, outbound isolation, service restart, and full VM reboot (`check.sh` 40/0). **Durability boundary:** node identity, machine ID, and config/genesis hashes survived reboot (boot ID changed, proving a real reboot) and the completion receipt stayed re-fetchable; the rehearsal **workspace view is intentionally ephemeral** and is reconstructed by reseeding. Durable identity + durable receipt is what was earned — not general workspace durability.
 
-**Deployment profiles: proposed, not adopted.** ADR-0086 (#2458) records the four-profile direction — appliance = canonical sovereign node; Compose = disposable devnet; Kubernetes/K3s = optional operator infrastructure; native Linux = advanced install — at `status: proposed`, `implementation_status: partially implemented`. **Writing or merging that ADR does not adopt it**; adoption is a human decision and the `status:` field in `docs/adr/` is the owner of that fact. Only the appliance profile has a retained build-and-boot witness, and independent appliance restoration is **blocked** because `icnctl backup` omits `/etc/icn/icnd.env`, so a node restored from a backup alone cannot reopen its keystore.
+**Deployment profiles: recorded, proposed, not adopted.** ADR-0086 is **on `main`** (merged `9ca12148`, #2458) and linked from `docs/INDEX.md`. It records the four-profile direction — appliance = canonical sovereign node; Compose = disposable devnet; Kubernetes/K3s = optional operator infrastructure; native Linux = advanced install — at `status: proposed`, `implementation_status: partially implemented`. **Writing or merging that ADR does not adopt it**; adoption is a human decision and the `status:` field in `docs/adr/` is the owner of that fact. Only the appliance profile has a retained build-and-boot witness, and independent appliance restoration is **blocked** because `icnctl backup` omits `/etc/icn/icnd.env`, so a node restored from a backup alone cannot reopen its keystore.
 
-**Evaluator package identity.** The name the evaluator lane shipped under — "Common Sense (bootable) vertical slice" — was **never an ICN-ratified identity**; it arrived with an externally assembled distribution. The correction to `icn-portable-evaluator` is PR #2435. **The live value is `deploy/appliance/evaluator/package-spec.env` (`PKG_STEM`) — read it there rather than inferring it from this file**, since the correction and this snapshot may land in either order. Independent of that ordering: the affected release *payloads* are genuine (manifest `git_commit` values are real commits of this repository), and tags/assets at or below 0.0.3 are **retained unchanged** so published checksums keep verifying — never rename or delete them, and never reintroduce the old name into new material.
+**Evaluator package identity: corrected on `main`.** The name the evaluator lane previously shipped under — "Common Sense (bootable) vertical slice" — was **never an ICN-ratified identity**; it arrived with an externally assembled distribution. The correction landed as `1af341cb` (#2435): from **0.0.4** forward the identity is **`icn-portable-evaluator`**. **The owner of this fact is `deploy/appliance/evaluator/package-spec.env` (`PKG_STEM`) — read it there rather than inferring it from this file.** Independent of the correction: the affected release *payloads* are genuine (manifest `git_commit` values are real commits of this repository), and tags/assets at or below 0.0.3 are **retained unchanged** so published checksums keep verifying — never rename or delete them, and never reintroduce the old name into new material.
 
 **Next executable gaps (scoped, not started).** Community gossip topic `community:updates` is still never created before subscribe in production wiring, so cross-node community gossip is dormant and publish failures are logged after local mutation — a pre-existing defect B0 neither caused nor fixed, filed as **#2457**, which withholds authorization for an opportunistic patch pending topic-ownership and failure-semantics decisions. **No two-node appliance proof has been executed**; two development nodes exchanging data would not be live federation.
 
@@ -1640,7 +1721,7 @@ Last Reviewed: 2026-07-27
 
 **LAN workstation witness (2026-07-15, merged-main):** the appliance's LAN single-origin profile is **merged to main** (#2424, #2425) and deployed as a dedicated hypervisor VM on operator-controlled LAN infrastructure from the **merged-main image `icn-appliance-0.0.3-lan-e74a8915`** (git_commit `e74a8915`, non-production, unsigned; supersedes the earlier `916629d7` branch image). A review-caught authority-boundary defect was fixed before merge: the LAN profile's gateway/member-shell/session are now all loopback-bound so the in-VM nginx is the only LAN HTTP surface. The full organizer→member loop was driven from a real Windows workstation browser against the merged-main deployment — one-click role-scoped sessions (no terminal, no credential paste, no credential in any URL), digest-bound confirm with server-verified wrong-digest 409, exactly one action item per confirm, fresh member session, completion, idempotent retry, in-VM steward verify PASS (negative capability matrix + value-withheld evidence), unattended recovery across service restart and VM reboot (node identity + sled durable; the rehearsal workspace view is intentionally ephemeral). A LAN development rehearsal, not production and not any human gate — see the 2026-07-15 sync block above.
 
-**Portable evaluator release (2026-07-17, current-main):** distinct from the LAN Rehearsal Node, the **portable "Common Sense bootable vertical slice"** is now produced by a repository-owned, fail-closed generation lane (`deploy/appliance/evaluator/`, merged `f34f9f29`, PR #2428) rather than assembled ad hoc. The canonical release **`common-sense-vertical-slice-0.0.3-amd64`** was built from a current-main demo-profile image (git_commit `f34f9f29`, `non_production=true, signed=false, demo_profile=true`), generated through the merged lane, and **runtime-witnessed on a real KVM boot of the exact published bytes**: QEMU user-net with localhost-only host forwards (LAN address refused), disposable overlay (source image unchanged), one-command `setup-and-run.sh`, one-click role sessions with no credential in any URL, organizer review/assign/preview/digest-bound confirm (wrong digest → 409; correct → one action item + ADR-0026 ladder), member completion + idempotent retry, clean teardown, repeat run; the downloaded release bytes match the witnessed bytes. This is the reviewer-on-their-own-machine profile — a different threat model and audience from the operator-controlled LAN node, and the two profiles are deliberately not collapsed. The four ad-hoc 0.0.2 pre-releases were reconciled (two recipient-name-contaminated demo releases deleted; the two 0.0.2 vertical-slice releases marked superseded). Unsigned, non-production; not a pilot, not organizer acceptance, not accessibility completion, not federation.
+**Portable evaluator release (2026-07-17, current-main; identity corrected 2026-07-19):** distinct from the LAN Rehearsal Node, the **ICN portable evaluator** (bootable vertical slice) is produced by a repository-owned, fail-closed generation lane (`deploy/appliance/evaluator/`, merged `f34f9f29`, PR #2428) rather than assembled ad hoc. Package stem: `icn-portable-evaluator` (from 0.0.4). The canonical release (tag `common-sense-vertical-slice-0.0.3-amd64` — the tag retains an externally introduced, since-corrected name that was never an ICN-ratified identity; see the 2026-07-19 sync block) was built from a current-main demo-profile image (git_commit `f34f9f29`, `non_production=true, signed=false, demo_profile=true`), generated through the merged lane, and **runtime-witnessed on a real KVM boot of the exact published bytes**: QEMU user-net with localhost-only host forwards (LAN address refused), disposable overlay (source image unchanged), one-command `setup-and-run.sh`, one-click role sessions with no credential in any URL, organizer review/assign/preview/digest-bound confirm (wrong digest → 409; correct → one action item + ADR-0026 ladder), member completion + idempotent retry, clean teardown, repeat run; the downloaded release bytes match the witnessed bytes. This is the reviewer-on-their-own-machine profile — a different threat model and audience from the operator-controlled LAN node, and the two profiles are deliberately not collapsed. The four ad-hoc 0.0.2 pre-releases were reconciled (two recipient-name-contaminated demo releases deleted; the two 0.0.2 vertical-slice releases marked superseded). Unsigned, non-production; not a pilot, not organizer acceptance, not accessibility completion, not federation.
 
 **NYCN adoption state:** partner repo pinned to `8c0fe926`; facilitator gate package independently steward-operable (nycn#100/#101); `human_review: pending`. NYCN remains the intended first partner — an active track, not a committed pilot.
 

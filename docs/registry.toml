@@ -682,7 +682,7 @@ category = "status"
 status = "living"
 title = "ICN State (living doc)"
 description = "Living snapshot of repo layout, decisions, constraints, and current engineering status"
-last_updated = "2026-07-27"
+last_updated = "2026-07-28"
 owner = "matt"
 audiences = ["developers", "agents"]
 truth_class = "descriptive"
@@ -691,7 +691,7 @@ canonical = "yes"
 freshness = "current"
 domain_tags = ["status", "project"]
 recommended_action = "keep"
-last_reviewed = "2026-07-27"
+last_reviewed = "2026-07-28"
 
 [docs."docs/DOCUMENTATION_CONTROL_SYSTEM.md"]
 category = "reference"
@@ -714,7 +714,7 @@ category = "reference"
 status = "living"
 title = "ICN Document Registry (human summary)"
 description = "Auto-generated summary companion to registry.toml; run doc_control_check.py to refresh"
-last_updated = "2026-07-27"
+last_updated = "2026-07-28"
 owner = "matt"
 audiences = ["contributors", "agents"]
 truth_class = "descriptive"
@@ -723,7 +723,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["registry", "documentation-control"]
 recommended_action = "keep"
-last_reviewed = "2026-07-27"
+last_reviewed = "2026-07-28"
 
 [docs."docs/planning/documentation-namespace-resolution.md"]
 category = "strategy"
@@ -2264,6 +2264,22 @@ last_updated = "2026-03-10"
 owner = "matt"
 audiences = ["team"]
 
+[docs."docs/demo/TWO_NODE_APPLIANCE_PROOF_V0.2_PLAN.md"]
+category = "reference"
+status = "draft"
+title = "Two-node appliance proof v0.2 plan"
+description = "Bounded, gated execution plan for a two-node appliance proof: two independently initialized VMs from one reviewed image, distinct sovereign identities, explicit DID-bound peer relationship, one receipt bundle transferred and verified offline with the producer disconnected, restart/reboot continuity, encrypted backup and independent restoration, and clean teardown. Carries a per-layer claim-boundary table; federation is explicitly not exercised and never inferred. Gate 4 is BLOCKED pending an offline receipt-bundle exporter/verifier contract. Does not use COMMUNITY_TOPIC, so the #2457 topic-ownership decision stays independent. Plan only — not an executed proof."
+last_updated = "2026-07-27"
+owner = "matt"
+audiences = ["team", "agents"]
+truth_class = "descriptive"
+role = "reference"
+canonical = "no"
+freshness = "current"
+domain_tags = ["appliance", "deployment", "two-node", "evidence"]
+recommended_action = "keep"
+last_reviewed = "2026-07-27"
+
 [docs."docs/demo/README.md"]
 category = "reference"
 status = "living"
@@ -2733,7 +2749,7 @@ category = "reference"
 status = "living"
 title = "Current Truth Map"
 description = "One-screen routing for what is real now, what is not, what gates remain — pointing at STATE.md and PHASE_PROGRESS.md for the per-PR record."
-last_updated = "2026-07-27"
+last_updated = "2026-07-28"
 owner = "matt"
 audiences = ["all"]
 truth_class = "descriptive"
@@ -2742,7 +2758,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation", "phase"]
 recommended_action = "keep"
-last_reviewed = "2026-07-27"
+last_reviewed = "2026-07-28"
 
 [docs."docs/reference/project-index/source-tree-map.md"]
 category = "reference"
@@ -2829,7 +2845,7 @@ category = "reference"
 status = "living"
 title = "Show-Readiness Map"
 description = "What can be shown now, what should not be shown as finished, suggested first-demo narrative, and red lines for outside-facing material."
-last_updated = "2026-07-27"
+last_updated = "2026-07-28"
 owner = "matt"
 audiences = ["all", "team"]
 truth_class = "descriptive"
@@ -2838,7 +2854,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation", "show-readiness", "communications"]
 recommended_action = "keep"
-last_reviewed = "2026-07-27"
+last_reviewed = "2026-07-28"
 
 [docs."docs/reference/project-index/full-repo-record.md"]
 category = "reference"
@@ -4429,6 +4445,19 @@ last_reviewed = "2026-04-26"
 owner = "matt"
 audiences = ["architects", "developers"]
 
+[docs."docs/adr/ADR-0086-deployment-profiles.md"]
+# DOC status is "living" because ADRs remain institutional memory at their
+# canonical path. The DECISION lifecycle inside the ADR is still "proposed",
+# so the truth class remains descriptive until that decision is adopted.
+category = "architecture"
+status = "living"
+truth_class = "descriptive"
+title = "ADR-0086: ICN Deployment Profiles and Public/Private Infrastructure Boundary"
+description = "Proposed four-profile deployment decision: Debian appliance as the canonical sovereign-node artifact; disposable Compose devnet for development; Kubernetes/K3s as optional hosted/operator infrastructure; advanced native Linux. Separates generic public product artifacts from private deployment automation and preserves explicit recovery, signing, two-node, production, and federation nonclaims."
+last_updated = "2026-07-26"
+owner = "matt"
+audiences = ["architects", "developers", "operators"]
+
 [docs."docs/ci/GATE_RATCHET_PLAN.md"]
 category = "reference"
 status = "living"
@@ -4453,8 +4482,13 @@ audiences = ["developers"]
 
 [registry]
 version = "2.0"
-last_updated = "2026-03-21"
-total_entries = 240
+last_updated = "2026-07-28"
+# Counted mechanically from explicit [docs."…"] sections: 353 under docs/ plus 7
+# top-level entries (README, AGENTS, CHANGELOG, and siblings). This counter is
+# hand-maintained and no script reads or enforces it, so it drifts by design —
+# it had fallen to 240 against 358 actual rows before this correction. Recount
+# rather than increment if it looks stale again.
+total_entries = 360
 categories_covered = ["architecture", "design", "strategy", "guide", "reference", "operations", "security"]
 maintained_by = "matt"
 note = "Comprehensive registry of ICN documentation. Status indicates authority level: canonical (authoritative), living (actively maintained), draft (in development), archived (historical reference only)."

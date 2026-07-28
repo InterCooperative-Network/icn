@@ -1,7 +1,7 @@
 ---
 Status: descriptive
 Canonical: no
-Last Reviewed: 2026-07-27
+Last Reviewed: 2026-07-28
 ---
 
 # Current Truth Map
@@ -22,7 +22,7 @@ The software side of the current wedge — the **Rehearsal Node organizer→memb
 
 ## What is real now
 
-> Current `origin/main` is `425f513f24d7f45130273770f346e8b5bdddbf9f` (2026-07-26).
+> This map is refreshed per truth-sync, not per commit. For the current `main` SHA read git; for the per-PR record read [`docs/STATE.md`](../../STATE.md)'s newest-first `[sync edit]` blocks. Architecture and deployment facts below were reconciled through the 2026-07-28 merge train (#2458 `9ca12148`, #2435 `1af341cb`, #2463 `a0b970ac`).
 
 **Architecture boundary (merged 2026-07-22 → 2026-07-25).** The meaning firewall has one authoritative crate taxonomy and a gate that can actually fail (A1, `4bdae326`, #2452) — before this, the required check `exit 0`'d unconditionally and 17 hand-copied crate lists disagreed about which crates were kernel. A1 **measures** kernel/app separation honestly; it completes nothing and removes no dependency edge, and 16 `icn-core` boundary-debt edges are pinned as admitted debt. B0 (`c1ea355e`, #2454) inverted the community edge: `icn-core` has **zero direct `icn-community` dependency and zero direct `icn_community::` source references**, with construction and gossip-merge ownership moved to the `icnd` composition root. **This is not graph isolation** — `icn-core → icn-gateway → icn-community` still reaches. **B1 (the ledger edge) failed its design gate on 2026-07-25 and was never implemented. B2 has not begun.**
 
@@ -38,6 +38,7 @@ These surfaces exist, are merged to `main`, and were exercised end-to-end in the
 - **Committed reproducible walkthrough driver** (#2409) — `deploy/appliance/smoke/smoke-local.sh --demo` drives the full loop + role negatives; this is the harness a recurring assembled-image lane (#2398) will run.
 - **Member completion loop** — standing → action card → completion (narrow `governance:action-item:complete` scope, #2402) → durable completion receipt (survives restart).
 - **Evidence export + steward verification** (#2394) — `urn:icn:contract:rehearsal-workflow-evidence:v1`, no DIDs/credentials exported; tampered packet rejected fail-closed.
+- **Corrected evaluator package identity** (#2435, `1af341cb`) — from 0.0.4 forward the portable evaluator ships as `icn-portable-evaluator`; the owner of this fact is `deploy/appliance/evaluator/package-spec.env` (`PKG_STEM`). The previous name was never ICN-ratified. Published tags/assets at or below 0.0.3 keep their original names so existing checksums keep verifying — their payload provenance was always genuine; only the display identity was corrected, not retroactively rewritten.
 - **Trusted-local appliance issuance** (#2396/#2397) — `icnctl … --local-mint` signs demo-session JWTs in-process with the node's own first-boot secret; `/auth/verify` stays fail-closed (#2075). This is appliance-local operator bootstrap, **not** production trusted issuance (#2080 open).
 
 ## What is not yet real
@@ -45,11 +46,10 @@ These surfaces exist, are merged to `main`, and were exercised end-to-end in the
 - **The human gates.** No organizer presentation has occurred (#1703/#1746; partner-side nycn #41/#52). No human assistive-technology pass (#2041). These are the project's primary open gates — software polish does not substitute.
 - **Production trusted issuance** (#2080) — how institutions issue real positive authority remains open; the appliance's local mint does not generalize.
 - **Recurring assembled-image CI** (#2398) — the walkthrough is protected manually (witnessed at `8c0fe926`); no scheduled runner builds and boots a fresh image per main advance yet.
-- **Live federation / two-node** — Rehearsal Node v0.2 territory; nothing federates in production. **No two-node appliance proof has been executed.** When one is, it must separate transport connectivity, peer identity, enrollment/authority, state synchronization, receipts, and federation — two development nodes exchanging data is not live federation.
+- **Live federation / two-node** — Rehearsal Node v0.2 territory; nothing federates in production. **No two-node appliance proof has been executed.** The bounded *plan* is on `main` (`a0b970ac`, #2463) and is not evidence: Gate 4 is BLOCKED pending a reviewed offline receipt-bundle exporter/verifier, Gate 3 (institutional enrollment) is optional and omitting it restricts Node B to "technical witness", and federation is explicitly not exercised. When one is, it must separate transport connectivity, peer identity, enrollment/authority, state synchronization, receipts, and federation — two development nodes exchanging data is not live federation.
 - **Cross-node community gossip** — dormant. Production wiring subscribes to `community:updates` without creating it, the gossip layer rejects publish to an undeclared topic under the reject policy, and publish failure is logged *after* local mutation, so peers can diverge (#2457). Pre-existing; B0 neither introduced nor fixed it, and #2457 explicitly withholds authorization for an opportunistic patch.
 - **Kernel/app separation** — measured, not achieved. A1 pinned 16 `icn-core` boundary-debt edges; B0 removed one direct edge; **B1 was refused at design review** and composition-root consolidation must land before it can be retried.
 - **An adopted deployment decision** — ADR-0086 (#2458) is `proposed`, not adopted, and `implementation_status: partially implemented`. **Merging a proposed ADR does not adopt it**; the `status:` field in `docs/adr/` owns that fact. Only the appliance profile has a retained witness. **Independent appliance restoration is blocked**: `icnctl backup` omits `/etc/icn/icnd.env`, so a node restored from a backup alone cannot reopen its keystore.
-- **A settled evaluator package identity** — the lane shipped under "Common Sense (bootable) vertical slice", which was never an ICN-ratified identity; the correction to `icn-portable-evaluator` is PR #2435. **Read the live value from `deploy/appliance/evaluator/package-spec.env` (`PKG_STEM`)**, not from this map. Regardless of that: release payloads are genuine, and tags/assets at or below 0.0.3 are retained unchanged for checksum continuity — never renamed, never deleted.
 - **Disclosure enforcement** — rehearsal privacy is by exclusion; `ScopedVault`/`DisclosurePolicy` remain design-only.
 - **Provider-boundary slice 3** (#2393) — operational config categories (deploy/, scripts/, workflow literals) still carry concrete values.
 - **K3s/devnet operational liveness** — an ops claim needing re-confirmation (`docs/status.toml`); do not present as currently proven.

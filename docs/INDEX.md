@@ -412,6 +412,9 @@ Contributor onboarding materials:
 
 ### Deployment & Operations
 
+**Appliance proof plans (`demo/`):**
+- [TWO_NODE_APPLIANCE_PROOF_V0.2_PLAN.md](demo/TWO_NODE_APPLIANCE_PROOF_V0.2_PLAN.md) - Bounded, gated execution plan for a two-node appliance proof (two independently initialized VMs from one reviewed image, distinct identities, DID-bound peer relationship, receipt bundle verified offline, restart/reboot continuity, backup and independent restoration). Plan only — **not an executed proof**; Gate 4 is `BLOCKED` pending an offline receipt-bundle exporter/verifier contract, and federation is explicitly not exercised
+
 **Deployment Guides (`deployment/`):**
 - Deployment configuration and guides
 
@@ -534,6 +537,7 @@ Live status reports and deployment verification:
 Formal architectural decisions:
 
 - [ADR-0010-app-topology.md](adr/ADR-0010-app-topology.md) - App topology decision
+- [ADR-0086-deployment-profiles.md](adr/ADR-0086-deployment-profiles.md) - Deployment profiles and the public/private infrastructure boundary: Debian appliance as the canonical sovereign-node artifact, Docker Compose as the disposable development network, Kubernetes/K3s as optional hosted operator infrastructure, native Linux as an advanced installation form. **`status: proposed`, `implementation_status: partially implemented`** — merging the record does not adopt the decision, and only the appliance profile has a retained build-and-boot witness
 - Additional ADRs as numbered documents
 
 ### Templates (`templates/`)
