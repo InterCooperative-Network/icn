@@ -1,0 +1,330 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>ADR-0086: ICN deployment profiles and public/private infrastructure boundary | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>adr</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>ADR 0086 deployment profiles</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/adr/ADR-0086-deployment-profiles.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>ADR-0086: ICN deployment profiles and public/private infrastructure boundary</h1>
+<h2>Status</h2>
+<p><code>proposed</code> — this record states the deployment decision for review. It does not
+adopt itself, authorize a production deployment, or certify any profile as
+production-ready.</p>
+<p><code>implementation_status: partially implemented</code> — repository paths exist for all
+four profiles, but only the assembled Debian appliance has a current, retained
+build-and-boot witness. Backup/restoration, artifact signing, reproducibility,
+two-node institutional operation, and generic Kubernetes reconciliation remain
+incomplete.</p>
+<h2>Context</h2>
+<p>ICN currently exposes several overlapping ways to run <code>icnd</code>: a Debian appliance
+builder, multiple Docker Compose stacks, a generic OCI Dockerfile, two
+Kubernetes trees, a Helm chart, and native Linux instructions. Until PR #2455,
+the public repository also had a workflow that automatically deployed to a
+specific private K3s homelab.</p>
+<p>Those paths do not have the same purpose or evidence. Treating them as peers has
+made private cluster liveness look like product readiness, left developers with
+several conflicting Compose entry points, and obscured the custody boundary for
+institution-owned identity and durable state.</p>
+<p>An exact integrated appliance witness at
+<code>67a6566e2335be108ca69bb5d60e0cfb761e63b5</code>, which includes merged K3s-lane
+retirement <code>75d157503f168fb534c34cd16edf9bf6b8721254</code>, established a stronger
+factual baseline:</p>
+<ul>
+<li>one Debian QCOW2 was built from repository code and a pinned base-image hash;</li>
+<li>its typed manifest re-hashed the image, base, <code>icnd</code>, and <code>icnctl</code>;</li>
+<li>a clean VM boot completed first-boot initialization, generated a per-instance
+identity and secrets, started <code>icnd</code> under systemd, and returned health;</li>
+<li>a fixture organizer/member loop and its negative capability checks passed;</li>
+<li>the same retained overlay preserved node identity and a completion receipt
+across <code>icnd</code> restart and VM reboot;</li>
+<li>the rehearsal workspace itself was process-local and did not survive restart;</li>
+<li>the artifact remained explicitly non-production, unsigned, mutable, and
+dependent on networked package installation during the build.</li>
+</ul>
+<p>The decision must preserve those exact claim boundaries.</p>
+<h2>Decision</h2>
+<p>ICN has four deployment profiles with distinct purposes and no implied promotion
+between them.</p>
+<h3>Profile A: sovereign appliance node</h3>
+<p>The Debian appliance VM is the canonical ICN node artifact.</p>
+<p>Its baseline is one role-neutral image running native systemd services. Each
+booted instance creates its own identity and secrets and owns its own durable
+state. Post-boot configuration may specialize that image as an institution node,
+member node, witness/archive node, domain host, or service host. Separate image
+forks are not created for each role unless verified technical evidence requires
+them.</p>
+<p>The canonical appliance contract requires:</p>
+<ol>
+<li>a Debian-based QCOW2 or raw image;</li>
+<li>native systemd startup and restart behavior;</li>
+<li>per-instance identity and secret generation;</li>
+<li>institution-owned durable state;</li>
+<li>explicit genesis, activation, or enrollment;</li>
+<li>local backup and export;</li>
+<li>independent restoration, including the configuration secrets needed to open
+the restored keystore;</li>
+<li>manifest hashes and a release path that states signing and immutability
+honestly;</li>
+<li>no Kubernetes dependency.</li>
+</ol>
+<p>Items 1–5 have partial runtime evidence. Item 6 exists as generic <code>icnctl</code>
+backup tooling, but it writes a data-directory tar archive and is not yet an
+encrypted appliance recovery contract. Item 7 is open: the current data backup
+does not include <code>/etc/icn/icnd.env</code>, so restoring <code>/var/lib/icn</code> alone is not
+an independently operable appliance recovery. Items 8–9 are only partially
+met: manifests exist and Kubernetes is not required, but appliance artifacts
+are not yet signed or reproducibly built.</p>
+<p>Fixture/demo services are optional add-ons. Their state and claims are not the
+sovereign-node durability contract.</p>
+<h3>Profile B: disposable local development network</h3>
+<p><code>deploy/devnet/docker-compose.yml</code> is the proposed canonical Compose entry point
+for fast multi-node development, protocol and gossip tests, integration work,
+and disposable demos.</p>
+<p>This profile carries no institutional-custody, restoration, production,
+adoption, or federation claim. Other Compose files are compatibility or
+historical material until a separate cleanup maps or retires them; this ADR does
+not delete them.</p>
+<h3>Profile C: optional hosted cluster</h3>
+<p>Kubernetes or K3s is optional operator infrastructure. It is appropriate for
+hosted gateways, relays, monitoring, logging, registries, and operators that
+already require orchestration.</p>
+<p>It is not the canonical sovereign-node path and is not required to run ICN.
+Generic Helm/manifests and generic validation may remain public. A Kubernetes
+deployment does not, by itself, prove institutional custody, correct authority,
+state restoration, peer enrollment, or federation.</p>
+<p>The current generic entry points are <code>deploy/kubernetes/</code> and
+<code>deploy/helm/icn/</code>. The separate <code>deploy/k8s/</code> tree contains legacy
+homelab-specific defaults and is not a generic operator entry point. This ADR
+does not migrate or execute that private material; it requires a later bounded
+archive, genericization, or private-repository move.</p>
+<h3>Profile D: advanced native Linux</h3>
+<p>Direct Linux installation remains available for experienced operators. It must
+preserve the same identity, secret, authority, durable-state, backup, and
+restoration invariants as Profile A. It is an advanced installation form, not a
+second canonical artifact.</p>
+<h2>Public/private repository boundary</h2>
+<p>The public ICN repository owns generic product artifacts:</p>
+<ul>
+<li>appliance build, verification, and release logic;</li>
+<li>generic OCI image build and validation;</li>
+<li>generic Kubernetes examples and Helm material;</li>
+<li>disposable development environments;</li>
+<li>documentation and non-private test evidence.</li>
+</ul>
+<p>A private infrastructure repository owns deployment-specific operations:</p>
+<ul>
+<li>private addresses, registries, SSH targets, node names, credentials, and
+storage topology;</li>
+<li>actual private-cluster rollout and rollback automation;</li>
+<li>private monitoring endpoints and operational schedules;</li>
+<li>the current state of any private deployment.</li>
+</ul>
+<p>A merge to public <code>main</code> must not automatically SSH into, push to, restart, or
+otherwise mutate private infrastructure. Private cluster health must not be a
+product build signal. A private repository may invoke a future generic reusable
+workflow, but supplies and protects all deployment-specific values itself.</p>
+<h2>Evidence and claim matrix</h2>
+<table>
+<thead>
+<tr>
+<th>Claim</th>
+<th>Current evidence</th>
+<th>Disposition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Appliance builds and boots</td>
+<td>Exact assembled QCOW2 witness at integrated PR #2456 head <code>67a6566e</code></td>
+<td>Partially proven for local non-production use</td>
+</tr>
+<tr>
+<td>Identity survives restart/reboot</td>
+<td>Stable retained-overlay identity/config/genesis hashes</td>
+<td>Proven for the witnessed bytes</td>
+</tr>
+<tr>
+<td>Durable receipt survives restart/reboot</td>
+<td>Exact completion receipt re-fetched after both transitions</td>
+<td>Proven for the witnessed fixture receipt</td>
+</tr>
+<tr>
+<td>Full demo workspace is durable</td>
+<td>Read-only status became uninitialized after process restart</td>
+<td>Not proven; currently false</td>
+</tr>
+<tr>
+<td>Independent appliance restoration</td>
+<td>Plain data-directory tar omits the secret-bearing environment file</td>
+<td>Open blocker</td>
+</tr>
+<tr>
+<td>Signed immutable appliance release</td>
+<td>Manifest states <code>signed: false</code>, <code>immutable: false</code></td>
+<td>Not implemented</td>
+</tr>
+<tr>
+<td>Generic OCI image builds</td>
+<td>Local cold build plus merged hosted workflow from PR #2455</td>
+<td>Build evidence only</td>
+</tr>
+<tr>
+<td>Kubernetes production readiness</td>
+<td>Conflicting/stale generic and homelab material</td>
+<td>Not claimed</td>
+</tr>
+<tr>
+<td>Two independent institutions operate</td>
+<td>No two-appliance authority/enrollment witness</td>
+<td>Not proven</td>
+</tr>
+<tr>
+<td>Federation</td>
+<td>No qualifying two-institution witness</td>
+<td>Not proven</td>
+</tr>
+</tbody></table>
+<h2>Consequences</h2>
+<ul>
+<li>Product proof centers on an artifact an institution can own, restart, back up,
+and eventually restore without a cluster.</li>
+<li>Developers retain a fast disposable multi-node environment without confusing
+it with institutional custody.</li>
+<li>Hosted operators retain Kubernetes/Helm options without making K3s mandatory.</li>
+<li>Private homelab failures stop presenting as public product failures.</li>
+<li>The repository must reconcile duplicate Compose and Kubernetes paths over time.</li>
+<li>Appliance recovery and signed distribution become explicit product blockers
+rather than undocumented operator assumptions.</li>
+<li>A later acceptance decision may adopt or amend this ADR only after review; the
+current <code>proposed</code> status is deliberate.</li>
+</ul>
+<h2>Alternatives considered</h2>
+<table>
+<thead>
+<tr>
+<th>Alternative</th>
+<th>Disposition</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>K3s as the canonical node</td>
+<td>Rejected: couples sovereign operation to cluster infrastructure and private liveness</td>
+</tr>
+<tr>
+<td>OCI container as the only canonical artifact</td>
+<td>Rejected for now: current image proves a build, not appliance-equivalent identity, systemd, backup, or restoration</td>
+</tr>
+<tr>
+<td>Native Linux as the only canonical path</td>
+<td>Rejected: increases operator variance and weakens artifact-level review evidence</td>
+</tr>
+<tr>
+<td>Keep all deployment paths equal</td>
+<td>Rejected: preserves contradictory purposes and unbounded readiness claims</td>
+</tr>
+<tr>
+<td>Remove generic Kubernetes support</td>
+<td>Rejected: hosted/operator use remains legitimate when kept optional and generic</td>
+</tr>
+</tbody></table>
+<h2>Non-goals</h2>
+<ul>
+<li>No live cluster change and no private infrastructure migration.</li>
+<li>No adoption of this proposed decision without governance review.</li>
+<li>No production-readiness, pilot, institutional-adoption, or federation claim.</li>
+<li>No <code>COMMUNITY_TOPIC</code>, composition-root, ledger, or B1/B2 architecture change.</li>
+<li>No assertion that a fixture rehearsal proves institution-owned durable
+workflow state.</li>
+</ul>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
