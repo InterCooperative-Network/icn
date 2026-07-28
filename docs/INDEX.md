@@ -534,6 +534,7 @@ Live status reports and deployment verification:
 Formal architectural decisions:
 
 - [ADR-0010-app-topology.md](adr/ADR-0010-app-topology.md) - App topology decision
+- [ADR-0086-deployment-profiles.md](adr/ADR-0086-deployment-profiles.md) - Deployment profiles and the public/private infrastructure boundary: Debian appliance as the canonical sovereign-node artifact, Docker Compose as the disposable development network, Kubernetes/K3s as optional hosted operator infrastructure, native Linux as an advanced installation form. **`status: proposed`, `implementation_status: partially implemented`** — merging the record does not adopt the decision, and only the appliance profile has a retained build-and-boot witness
 - Additional ADRs as numbered documents
 
 ### Templates (`templates/`)
