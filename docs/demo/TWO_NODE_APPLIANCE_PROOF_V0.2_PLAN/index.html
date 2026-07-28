@@ -1,0 +1,455 @@
+<!DOCTYPE html><html lang="en"> <head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="description" content="Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure."><meta name="theme-color" content="#06090f"><script type="application/ld+json">{"@context":"https://schema.org","@graph":[{"@type":"Organization","@id":"https://intercooperative.network/#organization","name":"InterCooperative Network","url":"https://intercooperative.network","logo":"https://intercooperative.network/favicon.svg","sameAs":["https://github.com/InterCooperative-Network"]},{"@type":"WebSite","@id":"https://intercooperative.network/#website","url":"https://intercooperative.network","name":"InterCooperative Network","description":"Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination as auditable, member-owned infrastructure.","publisher":{"@id":"https://intercooperative.network/#organization"}}]}</script><link rel="icon" type="image/svg+xml" href="/favicon.svg"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"><title>Two-node appliance proof v0.2 plan | InterCooperative Network</title><script>
+    const theme = (() => {
+      if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) return localStorage.getItem('theme');
+      return 'dark';
+    })();
+    if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+    else document.documentElement.removeAttribute('data-theme');
+  </script><link rel="stylesheet" href="/_astro/about.yFAX6DJQ.css">
+<style>.breadcrumb[data-astro-cid-uadgga6g]{display:flex;align-items:center;gap:var(--space-xs);font-size:.8125rem;margin-bottom:var(--space-lg);flex-wrap:wrap}.breadcrumb[data-astro-cid-uadgga6g] a[data-astro-cid-uadgga6g]{color:var(--accent-teal)}.breadcrumb-sep[data-astro-cid-uadgga6g]{color:var(--text-muted)}.breadcrumb-dir[data-astro-cid-uadgga6g]{color:var(--text-secondary);text-transform:capitalize}.breadcrumb-current[data-astro-cid-uadgga6g]{color:var(--text-primary);text-transform:capitalize}.doc-meta[data-astro-cid-uadgga6g]{margin-bottom:var(--space-xl);padding-bottom:var(--space-md);border-bottom:1px solid var(--border-subtle)}.source-link[data-astro-cid-uadgga6g]{font-size:.8125rem;color:var(--text-muted)}.source-link[data-astro-cid-uadgga6g]:hover{color:var(--accent-teal)}.doc-footer[data-astro-cid-uadgga6g]{margin-top:var(--space-3xl);padding-top:var(--space-xl);border-top:1px solid var(--border-subtle)}
+</style></head> <body> <a href="#main-content" class="skip-link">Skip to main content</a> <nav class="nav" id="main-nav" aria-label="Primary"> <div class="nav-inner"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>ICN</span> </a> <ul class="nav-links" id="nav-links"> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> <li><a href="/docs" class="active" aria-current="page">Explore</a></li> <li class="nav-mobile-only"><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support ICN</a></li> </ul> <div class="nav-cta"> <button id="theme-toggle" class="theme-toggle" aria-label="Toggle theme" data-astro-cid-x3pjskd3> <svg class="sun-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" data-astro-cid-x3pjskd3></path></svg> <svg class="moon-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24" data-astro-cid-x3pjskd3><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" data-astro-cid-x3pjskd3></path></svg> </button>  <script>
+  const theme = (() => {
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('theme')) {
+      return localStorage.getItem('theme');
+    }
+    return 'dark';
+  })();
+
+  if (theme === 'light') {
+    document.documentElement.setAttribute('data-theme', 'light');
+  } else {
+    document.documentElement.removeAttribute('data-theme');
+  }
+
+  window.localStorage.setItem('theme', theme);
+
+  const handleToggleClick = () => {
+    const element = document.documentElement;
+    if (element.getAttribute('data-theme') === 'light') {
+      element.removeAttribute('data-theme');
+      localStorage.setItem('theme', 'dark');
+    } else {
+      element.setAttribute('data-theme', 'light');
+      localStorage.setItem('theme', 'light');
+    }
+  };
+
+  document.getElementById('theme-toggle')?.addEventListener('click', handleToggleClick);
+</script> <a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener" class="nav-support">Support ICN</a> <a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener" class="nav-github" aria-label="InterCooperative Network on GitHub"> <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"></path></svg> </a> </div> <button class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-links"> <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true" focusable="false"><path d="M3 12h18M3 6h18M3 18h18"></path></svg> </button> </div> </nav> <main id="main-content" tabindex="-1">  <section class="section" style="padding-top: calc(64px + var(--space-2xl));" data-astro-cid-uadgga6g> <div class="container-narrow" data-astro-cid-uadgga6g> <!-- Breadcrumb --> <nav class="breadcrumb" data-astro-cid-uadgga6g> <a href="/docs" data-astro-cid-uadgga6g>Docs</a> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span>
+          <span class="breadcrumb-dir" data-astro-cid-uadgga6g>demo</span> <span class="breadcrumb-sep" data-astro-cid-uadgga6g>/</span> <span class="breadcrumb-current" data-astro-cid-uadgga6g>TWO NODE APPLIANCE PROOF V0.2 PLAN</span> </nav> <!-- Source link --> <div class="doc-meta" data-astro-cid-uadgga6g> <a href="https://github.com/InterCooperative-Network/icn/blob/main/docs/demo/TWO_NODE_APPLIANCE_PROOF_V0.2_PLAN.md" target="_blank" class="source-link" data-astro-cid-uadgga6g>
+View source on GitHub →
+</a> </div> <!-- Rendered markdown --> <article class="prose" data-astro-cid-uadgga6g><h1>Two-node appliance proof v0.2 plan</h1>
+<h2>Purpose</h2>
+<p>This is the executable acceptance design for the next ICN appliance proof. It
+uses one reviewed appliance image to create two independently initialized VMs,
+establishes an explicit authenticated peer relationship, moves one meaningful
+receipt artifact from the producing node to an independently controlled witness
+node, and then exercises restart, reboot, backup, destruction, and restoration.</p>
+<p>It is the acceptance design for the appliance profile of the deployment-profiles
+proposal in PR #2458 (which would land as ADR-0086; that file does <strong>not</strong> exist
+under <code>docs/adr/</code> on <code>main</code> today, and this plan does not depend on it merging).
+It does not adopt that proposal or promote its deployment decision.</p>
+<p>This document is a test design, not a completed witness. It deliberately stops
+at two current product gaps:</p>
+<ol>
+<li><code>icnctl audit verify</code> fetches the receipt chain from a gateway; ICN does not
+yet have a reviewed offline receipt-bundle verifier that lets Node B verify
+bytes independently of Node A.</li>
+<li>The appliance data backup does not include <code>/etc/icn/icnd.env</code>, which holds
+the secret needed to open the restored keystore. Copying <code>/var/lib/icn</code>
+alone is not independent recovery.</li>
+</ol>
+<p>The proof MUST remain blocked until both gaps have explicit, reviewed
+implementations. A remote <code>200</code>, a connected peer count, a copied JSON file, or
+a retained QCOW2 overlay does not waive either gate.</p>
+<h2>Claim boundary</h2>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Required evidence</th>
+<th>What it does not establish</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Transport connectivity</td>
+<td>Node A and Node B exchange authenticated network traffic over the isolated test LAN</td>
+<td>enrollment, authority, sync, or federation</td>
+</tr>
+<tr>
+<td>Peer identity</td>
+<td>Each node records the other node&#39;s DID and the authenticated connection binds to that DID</td>
+<td>institutional membership or delegated authority</td>
+</tr>
+<tr>
+<td>Explicit relationship</td>
+<td>Both configurations name the other DID/address and a retained relationship record identifies the intended witness role</td>
+<td>governance ratification or federation agreement</td>
+</tr>
+<tr>
+<td>Institutional enrollment</td>
+<td>A separately signed/ratified enrollment artifact, if exercised</td>
+<td>inferred from transport or bootstrap configuration</td>
+</tr>
+<tr>
+<td>Data synchronization</td>
+<td>Exact named state objects converge and their hashes match</td>
+<td>inferred from peer connectivity or generic gossip counters</td>
+</tr>
+<tr>
+<td>Receipt transfer</td>
+<td>Node B receives a byte-identical receipt bundle produced by Node A</td>
+<td>independent verification by itself</td>
+</tr>
+<tr>
+<td>Independent verification</td>
+<td>Node B verifies the exported bundle locally using pinned Node A identity/key material and no request to Node A</td>
+<td>production, legal, or institutional adoption</td>
+</tr>
+<tr>
+<td>Backup</td>
+<td>A recovery bundle contains Node B data plus the secret/config material required to reopen it</td>
+<td>restoration</td>
+</tr>
+<tr>
+<td>Restoration</td>
+<td>A new overlay created from the original image assumes Node B&#39;s prior identity and state from the recovery bundle</td>
+<td>availability, disaster-recovery SLA, or federation</td>
+</tr>
+<tr>
+<td>Federation</td>
+<td>Not exercised by v0.2</td>
+<td>never inferred from any row above</td>
+</tr>
+</tbody></table>
+<h2>Exact roles</h2>
+<h3>Node A — genesis institution/domain host</h3>
+<p>Node A first-boots independently, owns its identity and state, initializes the
+test domain, and produces the receipt bundle. It is the artifact source.</p>
+<h3>Node B — independent witness/verifier</h3>
+<p>Node B first-boots independently, owns a different identity and state, has no
+write authority on Node A, receives the exported receipt bundle, and verifies
+it locally. Node B is a technical witness in v0.2, not a second institution
+with governance authority.</p>
+<p>Two-institution operation requires a later ratified enrollment/authority
+ceremony. This plan preserves that distinction instead of calling an
+authenticated peer a federation.</p>
+<h2>Inputs pinned before execution</h2>
+<p>The runner MUST record these before creating either VM:</p>
+<pre><code class="language-text">origin_main_commit
+proof_runner_commit
+image_path
+image_sha256
+manifest_path
+manifest_sha256
+base_image_sha256
+icnd_sha256
+icnctl_sha256
+qemu_version
+host_kernel
+libguestfs_version
+</code></pre>
+<pre><code class="language-bash">icnctl appliance verify-manifest &lt;manifest.json&gt; --root &lt;reviewed-tree&gt;
+</code></pre>
+<p><code>&lt;manifest.json&gt;</code> is a required positional argument, not an option; omitting it
+exits with a clap usage error (<code>required arguments were not provided: &lt;MANIFEST&gt;</code>) rather than a fail-closed verification, so a runner must not treat
+a bare <code>--root</code> invocation as a passing gate. <code>--root</code> is optional and defaults
+to the current directory.</p>
+<p>This command MUST pass before the image is copied or booted. The manifest MUST
+identify the same Git commit and image hash recorded by the runner. The run
+stops on any mismatch.</p>
+<h2>Isolated topology</h2>
+<p>The proof changes no host bridge, route, firewall, DNS, K3s, or private
+infrastructure. Each VM has:</p>
+<ul>
+<li>one QEMU user-mode interface with <code>restrict=on</code> and a distinct loopback SSH
+forward for the test runner;</li>
+<li>one QEMU socket interface used only for the two-node LAN;</li>
+<li>a fixed test-only MAC matched by cloud-init;</li>
+<li>a static documentation-range address with no default gateway.</li>
+</ul>
+<pre><code class="language-text">Node A witness LAN: 192.0.2.10/24, MAC 52:54:00:00:02:10
+Node B witness LAN: 192.0.2.11/24, MAC 52:54:00:00:02:11
+QEMU socket link:    listen/connect on 127.0.0.1:19020
+Node A SSH forward:  127.0.0.1:2221 -&gt; guest:22
+Node B SSH forward:  127.0.0.1:2222 -&gt; guest:22
+</code></pre>
+<p>Node A creates the socket link with
+<code>-netdev socket,id=witness,listen=127.0.0.1:19020</code>; Node B joins with
+<code>-netdev socket,id=witness,connect=127.0.0.1:19020</code>. Both use
+<code>-device virtio-net-pci,netdev=witness,mac=&lt;fixed-mac&gt;</code>.</p>
+<p>The runner MUST prove that neither guest has an external default route on the
+witness interface and that the isolated pair cannot reach a host canary that
+the host itself can reach.</p>
+<h2>Evidence directory</h2>
+<p>Every command writes exit status and sanitized output below:</p>
+<pre><code class="language-text">artifacts/icn/two-node-appliance-&lt;git-short&gt;-&lt;UTC-date&gt;/
+  inputs/
+    source.json
+    manifest.json
+    manifest.sha256
+  node-a/
+    firstboot/
+    identity/
+    systemd/
+    relationship/
+    receipt-source/
+    restart/
+    reboot/
+  node-b/
+    firstboot/
+    identity/
+    systemd/
+    relationship/
+    receipt-received/
+    verification/
+    restart/
+    reboot/
+    backup/
+    restore/
+  network/
+    qemu-command-lines.redacted.txt
+    peer-connection.json
+    isolation-canary.json
+  result.json
+  SHA256SUMS
+</code></pre>
+<p>Evidence MUST contain no bearer credential, keystore passphrase, private key,
+private infrastructure address, or unredacted secret environment file. The
+final <code>SHA256SUMS</code> covers every retained non-secret artifact.</p>
+<h2>Procedure and gates</h2>
+<h3>Gate 0 — source and artifact</h3>
+<ol>
+<li>Fetch and record current <code>origin/main</code>.</li>
+<li>Verify the Git worktree is clean and the runner commit is reviewed.</li>
+<li>Re-hash the base image, appliance image, manifest, <code>icnd</code>, and <code>icnctl</code>.</li>
+<li>Run the typed manifest verifier.</li>
+<li>Refuse unsigned/immutable claims when the manifest says <code>signed: false</code> or
+<code>immutable: false</code>.</li>
+</ol>
+<p>Success is exact hash agreement and verifier exit zero. Any mismatch is a hard
+failure.</p>
+<h3>Gate 1 — two independent first boots</h3>
+<ol>
+<li>Create two new QCOW2 overlays from the same immutable input image.</li>
+<li>Create two cloud-init seed ISOs with distinct instance IDs and SSH host
+keys.</li>
+<li>Start Node A, then Node B, on the isolated topology.</li>
+<li>Wait for SSH, first-boot marker, active <code>icnd</code>, and authenticated health.</li>
+<li>Record on each node:<ul>
+<li>machine ID;</li>
+<li>public DID;</li>
+<li>SHA-256 of <code>identity.age</code>, <code>config.toml</code>, and <code>genesis.json</code>;</li>
+<li>filesystem identity of the data volume;</li>
+<li>systemd status and bounded boot timing.</li>
+</ul>
+</li>
+<li>Assert the DIDs, machine IDs, secrets, overlay paths, and stable-state hashes
+are different between A and B.</li>
+</ol>
+<p>Equal identity material, a missing first-boot marker, or a service that becomes
+healthy before first boot completes is a hard failure.</p>
+<h3>Gate 2 — explicit peer relationship</h3>
+<p>After both DIDs are known:</p>
+<ol>
+<li><p>Stop <code>icnd</code> on both nodes.</p>
+</li>
+<li><p>Add reciprocal <code>network.bootstrap_peers</code> entries:</p>
+<pre><code class="language-text">Node A: icn://&lt;node-b-did&gt;@192.0.2.11:7777
+Node B: icn://&lt;node-a-did&gt;@192.0.2.10:7777
+</code></pre>
+</li>
+<li><p>Write a non-secret relationship record on both nodes containing:
+<code>relationship_id</code>, both DIDs, intended roles, configuration hashes, creation
+time, and <code>authority_claim: none</code>.</p>
+</li>
+<li><p>Restart <code>icnd</code>.</p>
+</li>
+<li><p>Require load-bearing logs or an authenticated peer-status API to bind the
+connected address to the expected DID in both directions.</p>
+</li>
+<li><p>Interrupt the QEMU socket link and require both nodes to report the peer
+unavailable; restore the link and require bounded reconnection.</p>
+</li>
+</ol>
+<p>This gate proves an explicit authenticated peer relationship only. If the
+runtime cannot bind peer status to the expected DID, the gate fails even when a
+TCP connection exists.</p>
+<h3>Gate 3 — optional institutional enrollment</h3>
+<p>This gate is required before anyone describes Node B as a second institution.
+It requires a signed authority source, explicit accepting body, scope,
+activation time, expiry/revocation rules, and durable receipt. Bootstrap peer
+configuration and a trusted-local credential are not enrollment.</p>
+<p>v0.2 MAY omit this gate and retain the role name “technical witness.” It MUST
+not substitute an implicit or self-asserted authority path.</p>
+<h3>Gate 4 — meaningful cross-node artifact</h3>
+<ol>
+<li>Node A creates a named governance action and completes the reviewed
+receipt-producing path.</li>
+<li>Node A exports a self-contained receipt bundle that includes:<ul>
+<li>canonical receipt bytes;</li>
+<li>receipt class/version;</li>
+<li>producing Node A DID;</li>
+<li>domain and artifact identifiers;</li>
+<li>parent/provenance references required by the verifier;</li>
+<li>digest manifest;</li>
+<li>signature/key reference sufficient for offline checking.</li>
+</ul>
+</li>
+<li>Transfer the bundle over the witness LAN using a read-only, narrowly scoped
+session. The runner records source and destination hashes.</li>
+<li>Assert the byte hash on Node B equals the exported hash on Node A.</li>
+<li>Disconnect Node A.</li>
+<li>On Node B, run the reviewed offline verifier against only:<ul>
+<li>the retained bundle;</li>
+<li>pinned Node A public identity/key material;</li>
+<li>the declared verification policy.</li>
+</ul>
+</li>
+<li>Tamper one byte and require verification failure; restore the original and
+require success.</li>
+</ol>
+<p>Current stop condition: the repository has gateway-backed
+<code>icnctl audit verify</code>, not this offline bundle contract. Until the exporter and
+offline verifier exist, Gate 4 is <code>BLOCKED</code>, not passed. A Node B <code>curl</code> back to
+Node A is transfer evidence only.</p>
+<p><code>COMMUNITY_TOPIC</code> is not used by this plan. Receipt transfer is explicit and
+bounded, so the dormant topic-ownership decision remains independent.</p>
+<h3>Gate 5 — service restart and VM reboot</h3>
+<p>For both nodes:</p>
+<ol>
+<li>Record identity, config, genesis, relationship, and receipt/bundle hashes.</li>
+<li>Restart <code>icnd</code>; wait for authenticated health and peer reconnection.</li>
+<li>Re-run the accepted receipt verification on Node B while Node A remains
+disconnected.</li>
+<li>Reboot both VMs; wait for first-boot marker, active service, and peer
+reconnection.</li>
+<li>Assert all recorded hashes and DIDs are unchanged.</li>
+<li>Re-run the tamper-negative and valid-positive bundle checks.</li>
+</ol>
+<p>Loss of relationship state, identity drift, receipt drift, verifier dependence
+on Node A, or first-boot regeneration is a hard failure.</p>
+<h3>Gate 6 — backup and independent restoration of Node B</h3>
+<ol>
+<li>Stop Node B cleanly.</li>
+<li>Create and verify an encrypted recovery bundle that contains:<ul>
+<li>the supported <code>icnctl backup</code> of Node B data;</li>
+<li>the secret/config material needed to reopen that data, including the
+effective <code>/etc/icn/icnd.env</code>;</li>
+<li>ownership/mode metadata;</li>
+<li>the relationship record and received receipt bundle;</li>
+<li>a manifest and hashes.</li>
+</ul>
+</li>
+<li>Move the recovery bundle outside Node B&#39;s overlay.</li>
+<li>Power off Node B and retain its overlay only as failure evidence.</li>
+<li>Create a brand-new overlay from the original appliance image and a new
+cloud-init instance ID.</li>
+<li>Boot the replacement in an isolated recovery posture with <code>icnd</code> stopped.</li>
+<li>Restore the verified bundle, ownership, and mode metadata.</li>
+<li>Start <code>icnd</code> and assert:<ul>
+<li>the restored public DID equals the original Node B DID;</li>
+<li>identity/config/genesis/relationship/bundle hashes equal pre-backup values;</li>
+<li>the offline verifier still passes with Node A disconnected;</li>
+<li>Node B reconnects to the expected Node A DID after Node A returns.</li>
+</ul>
+</li>
+<li>Assert the temporary identity generated by the fresh overlay is not active
+after restoration.</li>
+</ol>
+<p>Current stop condition: the appliance lacks a reviewed recovery bundle that
+includes the secret-bearing environment safely. A disk snapshot, copied
+overlay, or data-only tarball does not pass Gate 6.</p>
+<h3>Gate 7 — cleanup</h3>
+<ol>
+<li>Request clean poweroff of both VMs.</li>
+<li>Require both QEMU processes to exit within the bound.</li>
+<li>Run <code>qemu-img check</code> on retained failure/recovery evidence.</li>
+<li>Remove temporary seed ISOs, sockets, credentials, and non-evidence overlays.</li>
+<li>Scan retained logs for credentials, passphrases, private keys, and private
+infrastructure values.</li>
+<li>Emit <code>result.json</code> with one status per gate: <code>pass</code>, <code>fail</code>, or <code>blocked</code>.</li>
+</ol>
+<p>The runner exits zero only when every mandatory gate is <code>pass</code>. A <code>blocked</code>
+prerequisite produces a non-zero “not yet executable to completion” result, not
+a partial success.</p>
+<h2>Acceptance summary</h2>
+<p>The completed proof must establish all of these simultaneously:</p>
+<pre><code class="language-text">one reviewed image
+two independently initialized VMs
+two distinct identities and secrets
+two independent durable stores
+explicit DID-bound peer relationship
+one named receipt bundle transferred A -&gt; B
+offline verification on B with A disconnected
+service restart continuity on both nodes
+VM reboot continuity on both nodes
+encrypted backup of B including recovery secrets
+restore into a new B overlay
+restored identity, state, relationship, and verification continuity
+clean teardown and secret-clean evidence
+</code></pre>
+<p>It still does not establish production readiness, legal/institutional adoption,
+or federation. The next authority-grade proof must add two independently
+governed institutions and a ratified enrollment/relationship ceremony without
+weakening the custody and recovery gates above.</p>
+</article> <!-- Footer nav --> <div class="doc-footer" data-astro-cid-uadgga6g> <a href="/docs" class="btn btn-ghost" data-astro-cid-uadgga6g>← Back to Docs</a> </div> </div> </section>  </main> <footer class="footer"> <div class="container"> <div class="footer-inner"> <div class="footer-brand"> <a href="/" class="nav-logo" aria-label="InterCooperative Network — home"> <span>InterCooperative Network</span> </a> <p>Institutional infrastructure for cooperative and federated organizations. Identity, governance, accounting, and coordination — auditable and member-owned.</p> <p><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">Support the work on GitHub Sponsors</a>.</p> </div> <div class="footer-col"> <h4>Public</h4> <ul> <li><a href="/what-is-icn">What is ICN</a></li> <li><a href="/why-icn">Why ICN</a></li> <li><a href="/how-it-works">How It Works</a></li> <li><a href="/whats-real-now">What's Real Now</a></li> <li><a href="/for-cooperatives">For Cooperatives</a></li> <li><a href="/for-developers">For Developers</a></li> <li><a href="/get-involved">Get Involved</a></li> </ul> </div> <div class="footer-col"> <h4>Technical</h4> <ul> <li><a href="/docs">Documentation</a></li> <li><a href="/architecture">Architecture</a></li> <li><a href="/roadmap">Roadmap</a></li> <li><a href="/about">About the Project</a></li> <li><a href="/docs/glossary">Glossary</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/blob/main/CONTRIBUTING.md">Contributing</a></li> </ul> </div> <div class="footer-col"> <h4>Community</h4> <ul> <li><a href="https://github.com/InterCooperative-Network/icn" target="_blank" rel="noopener">GitHub</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/issues" target="_blank" rel="noopener">Issues</a></li> <li><a href="https://github.com/InterCooperative-Network/icn/discussions" target="_blank" rel="noopener">Discussions</a></li> <li><a href="https://discord.gg/sAEFCnEahn" target="_blank" rel="noopener">Discord</a></li> <li><a href="/community">Community</a></li> <li><a href="https://github.com/sponsors/InterCooperative-Network" target="_blank" rel="noopener">GitHub Sponsors</a></li> <li><a href="/blog">Blog</a></li> </ul> </div> </div> <div class="footer-bottom"> <span>AGPL-3.0 · InterCooperative Network · open infrastructure for cooperative institutions</span> <span>Open source. Open governance.</span> </div> </div> </footer> <script>
+    const navToggle = document.getElementById('nav-toggle');
+    const navLinks = document.getElementById('nav-links');
+
+    function setMenuState(open) {
+      if (!navLinks || !navToggle) return;
+      navLinks.classList.toggle('open', open);
+      navToggle.setAttribute('aria-expanded', String(open));
+      navToggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+    }
+
+    navToggle?.addEventListener('click', () => {
+      const isOpen = navLinks?.classList.contains('open') ?? false;
+      setMenuState(!isOpen);
+    });
+
+    // Close mobile nav when a link is tapped
+    document.querySelectorAll('#nav-links a').forEach(link => {
+      link.addEventListener('click', () => setMenuState(false));
+    });
+
+    // Close mobile nav on Escape
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && navLinks?.classList.contains('open')) {
+        setMenuState(false);
+        navToggle?.focus();
+      }
+    });
+
+    // Respect reduced-motion preferences: if the user has asked for less
+    // motion, skip the reveal animation entirely and mark everything
+    // revealed immediately so no content is hidden behind a transition.
+    const prefersReducedMotion =
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const revealTargets = document.querySelectorAll(
+      '.card, .inst-card, .section-header, .arch-box, .stage-item, .docs-section-card, .primitive, .use-case-card, .demo-step'
+    );
+
+    if (prefersReducedMotion) {
+      revealTargets.forEach(el => {
+        el.classList.add('reveal', 'revealed');
+      });
+    } else {
+      const revealObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed');
+            revealObserver.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+
+      revealTargets.forEach(el => {
+        el.classList.add('reveal');
+        revealObserver.observe(el);
+      });
+    }
+  </script> </body> </html> 
