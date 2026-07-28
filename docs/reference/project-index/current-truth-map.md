@@ -76,7 +76,7 @@ These surfaces exist, are merged to `main`, and were exercised end-to-end in the
 - **Mistaking the witness for validation.** The assembled-image witnesses (2026-07-13 at `8c0fe926`, 2026-07-26 at current-main content) are automated evidence at one commit; they close no human gate.
 - **Mistaking A1/B0 for finished kernel/app separation.** A1 made the firewall honest and B0 removed one direct edge. Sixteen `icn-core` boundary-debt edges remain pinned, the community crate is still transitively reachable through `icn-gateway`, and B1 was refused. "The firewall is clean" is not a claim this repository supports.
 - **Mistaking the CI boundary change for dropping Kubernetes.** Only the *automatic private deployment from public CI* was retired. Kubernetes, K3s, and Helm remain optional operator deployment forms.
-- **Mistaking durable identity for durable state.** The appliance keeps its identity and completion receipts across reboot; the rehearsal workspace view is intentionally ephemeral and is reseeded.
+- **Mistaking durable identity for durable state.** The witness showed the appliance keeping its identity and **the one completion receipt that run created** across a real reboot — not receipt durability at large, and not the rehearsal workspace view, which is intentionally ephemeral and is reseeded.
 
 ## Where to go next
 
