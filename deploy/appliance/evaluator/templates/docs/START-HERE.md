@@ -1,4 +1,4 @@
-# Start Here: ICN Common Sense Bootable Vertical Slice
+# Start Here: ICN Portable Evaluator (Bootable Vertical Slice)
 
 ## What You Have
 

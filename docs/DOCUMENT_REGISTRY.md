@@ -1,7 +1,7 @@
 ---
 Status: descriptive
 Canonical: no
-Last Reviewed: 2026-07-26
+Last Reviewed: 2026-07-28
 ---
 
 # ICN Document Registry (human summary)
