@@ -682,7 +682,7 @@ category = "status"
 status = "living"
 title = "ICN State (living doc)"
 description = "Living snapshot of repo layout, decisions, constraints, and current engineering status"
-last_updated = "2026-07-19"
+last_updated = "2026-07-28"
 owner = "matt"
 audiences = ["developers", "agents"]
 truth_class = "descriptive"
@@ -691,7 +691,7 @@ canonical = "yes"
 freshness = "current"
 domain_tags = ["status", "project"]
 recommended_action = "keep"
-last_reviewed = "2026-07-19"
+last_reviewed = "2026-07-28"
 
 [docs."docs/DOCUMENTATION_CONTROL_SYSTEM.md"]
 category = "reference"
@@ -2749,7 +2749,7 @@ category = "reference"
 status = "living"
 title = "Current Truth Map"
 description = "One-screen routing for what is real now, what is not, what gates remain — pointing at STATE.md and PHASE_PROGRESS.md for the per-PR record."
-last_updated = "2026-07-13"
+last_updated = "2026-07-28"
 owner = "matt"
 audiences = ["all"]
 truth_class = "descriptive"
@@ -2758,7 +2758,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation", "phase"]
 recommended_action = "keep"
-last_reviewed = "2026-07-13"
+last_reviewed = "2026-07-28"
 
 [docs."docs/reference/project-index/source-tree-map.md"]
 category = "reference"
@@ -2845,7 +2845,7 @@ category = "reference"
 status = "living"
 title = "Show-Readiness Map"
 description = "What can be shown now, what should not be shown as finished, suggested first-demo narrative, and red lines for outside-facing material."
-last_updated = "2026-07-13"
+last_updated = "2026-07-28"
 owner = "matt"
 audiences = ["all", "team"]
 truth_class = "descriptive"
@@ -2854,7 +2854,7 @@ canonical = "no"
 freshness = "current"
 domain_tags = ["project-index", "navigation", "show-readiness", "communications"]
 recommended_action = "keep"
-last_reviewed = "2026-07-13"
+last_reviewed = "2026-07-28"
 
 [docs."docs/reference/project-index/full-repo-record.md"]
 category = "reference"
