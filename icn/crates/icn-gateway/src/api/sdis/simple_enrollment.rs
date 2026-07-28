@@ -1235,8 +1235,15 @@ pub struct HistoryQuery {
 /// protected `/vouch/{id}` — it sets `level = 2`, `steward_vouch`,
 /// `steward_did`, and `vouched_at` — but authorizes it with a trust-graph gate
 /// (`effective_trust >= STEWARD_MIN_TRUST_SCORE`) rather than a steward
-/// capability, and applies no cooperative binding. Moving `/vouch/{id}` behind
-/// a capability therefore does not make vouching capability-gated in general.
+/// capability. Moving `/vouch/{id}` behind a capability therefore does not make
+/// vouching capability-gated in general.
+///
+/// Note what *is* now bound and what is not. Since F-P0-1, `/enrollment/verify/level2`
+/// **does** enforce a cooperative binding: the voucher's credential must name the
+/// same `coop_id` as the enrollment, so a credential for coop A can no longer
+/// advance an enrollment into coop B. What remains unreconciled is the
+/// *capability model* — trust-graph gate here versus steward capability on
+/// `/vouch/{id}` — not the cooperative scope.
 /// Reconciling the two authority models is an institutional decision (does
 /// vouching authority derive from the trust graph or from a governance
 /// capability?), deliberately not made here — see the PR discussion for #2443.

@@ -176,8 +176,22 @@ if [ "$enroll_status" = "200" ] || [ "$enroll_status" = "201" ]; then
     echo -e "${GREEN}✓${NC}"
     enrollment_id=$(echo "$enroll_body" | jq -r '.enrollment_id' 2>/dev/null)
     echo "  Enrollment ID: $enrollment_id"
+elif [ "$enroll_status" = "404" ] || [ "$enroll_status" = "401" ]; then
+    # Self-serve enrollment is absent unless the operator declares an isolated
+    # rehearsal deployment (ICN_ENABLE_SELF_SERVE_ENROLLMENT=true). No shipped
+    # profile sets it, so this is the EXPECTED default, not a failure.
+    #
+    # Report it as SKIPPED rather than a warning: this section previously
+    # printed a warning and carried on, so a run against a default gateway
+    # reported the enrollment flow as exercised when no enrollment happened.
+    echo -e "${YELLOW}SKIPPED${NC} ($enroll_status — self-serve enrollment not mounted)"
+    echo "  This is the expected default: no shipped profile sets"
+    echo "  ICN_ENABLE_SELF_SERVE_ENROLLMENT=true. To exercise this flow, point"
+    echo "  the script at a gateway that has explicitly declared an isolated"
+    echo "  rehearsal deployment."
+    enrollment_id=""
 else
-    echo -e "${YELLOW}⚠${NC} ($enroll_status)"
+    echo -e "${RED}✗${NC} ($enroll_status)"
     echo "  Response: $enroll_body" | head -c 200
 fi
 echo ""
