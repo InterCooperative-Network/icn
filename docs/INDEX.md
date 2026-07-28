@@ -412,6 +412,9 @@ Contributor onboarding materials:
 
 ### Deployment & Operations
 
+**Appliance proof plans (`demo/`):**
+- [TWO_NODE_APPLIANCE_PROOF_V0.2_PLAN.md](demo/TWO_NODE_APPLIANCE_PROOF_V0.2_PLAN.md) - Bounded, gated execution plan for a two-node appliance proof (two independently initialized VMs from one reviewed image, distinct identities, DID-bound peer relationship, receipt bundle verified offline, restart/reboot continuity, backup and independent restoration). Plan only — **not an executed proof**; Gate 4 is `BLOCKED` pending an offline receipt-bundle exporter/verifier contract, and federation is explicitly not exercised
+
 **Deployment Guides (`deployment/`):**
 - Deployment configuration and guides
 
