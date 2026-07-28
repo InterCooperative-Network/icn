@@ -211,6 +211,125 @@ fn admin_endpoints_allowed(opt_in: bool, bind_addr: &SocketAddr) -> bool {
     opt_in && bind_addr.ip().is_loopback()
 }
 
+/// Environment variable that mounts the self-serve SDIS enrollment route tree.
+///
+/// Its own variable on purpose. It is **not** `ICN_ENABLE_ADMIN_ENDPOINTS`,
+/// which the demo appliance profile sets
+/// (`deploy/appliance/systemd/icnd.service.d/20-demo-profile.conf`); reusing it
+/// would mount this surface on an image a stranger runs and reaches over a
+/// hostfwd.
+pub(crate) const SELF_SERVE_ENROLLMENT_ENV: &str = "ICN_ENABLE_SELF_SERVE_ENROLLMENT";
+
+/// Decide whether the self-serve SDIS enrollment route tree
+/// (`/v1/sdis/enrollment/*`, plus the unauthenticated status/stats reads) may be
+/// mounted.
+///
+/// # Why this does not test the bind address
+///
+/// Every other dev/escape-hatch gate here pairs an opt-in with
+/// `bind_addr.ip().is_loopback()`, and for those it is the right invariant. It
+/// is the **wrong** invariant for this surface, because a loopback bind is not
+/// evidence of external unreachability once a reverse proxy is in front of it:
+///
+/// - the LAN rehearsal profile binds `127.0.0.1:8080`
+///   (`deploy/appliance/lan/icnd-30-lan-origin.conf.in`) and nginx proxies the
+///   whole of `/v1/` to it from the LAN TLS origin
+///   (`deploy/appliance/lan/nginx-icn-rehearsal-https.conf.in`). `is_loopback()`
+///   is `true` there — on the profile with the *highest* external reachability.
+/// - the demo profile binds `0.0.0.0:8080`, where `is_loopback()` is `false`,
+///   even though that deployment is host-only.
+///
+/// A loopback-keyed gate is therefore inverted with respect to real exposure.
+/// The gate is instead a single explicit declaration by the operator, defaulting
+/// to absent, and **no shipped deployment profile sets it** — so the route tree
+/// is absent on production, LAN, evaluator and demo alike. Setting it is an
+/// assertion that the deployment is an isolated rehearsal, which only the
+/// operator composing the topology can make.
+///
+/// Exact `true` match (case-insensitive, trimmed), matching the surrounding
+/// opt-ins: a typo falls back to absent rather than to mounted.
+fn self_serve_enrollment_allowed(opt_in: Option<&str>) -> bool {
+    opt_in
+        .map(|v| v.trim().eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+}
+
+/// Which conditionally-mounted routes the `/v1/sdis` scope should include.
+///
+/// Both default to `false`: a caller that forgets a field gets the closed
+/// posture, not the open one.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct SdisMountFlags {
+    /// Mount the self-serve enrollment route tree (`/enrollment/*`, plus the
+    /// unauthenticated status and stats reads). See
+    /// [`self_serve_enrollment_allowed`].
+    pub self_serve_enrollment: bool,
+    /// Mount the recovery steward-approval simulation. See
+    /// [`admin_endpoints_allowed`].
+    pub admin_recovery: bool,
+}
+
+/// Build the `/v1/sdis` scope exactly as the running gateway mounts it.
+///
+/// Extracted from the `HttpServer` closure so a test can assemble the **real**
+/// scope — same routes, same nesting order, same `jwt_auth` middleware, same
+/// mount conditions — instead of hand-rebuilding an approximation of it. The
+/// architecture campaign's finding that no gateway test reaches the production
+/// router (#2421) is what makes that distinction matter: a parallel test router
+/// can agree with itself while diverging from what actually serves traffic. This
+/// closes that gap for the SDIS surface only; the rest of the route tree is
+/// still assembled inline and remains #2421's job.
+///
+/// The scope is deliberately split by authority (issue #2443): public
+/// verification stays reachable without a credential, while steward and
+/// moderation routes are mounted behind `jwt_auth` so they inherit signature
+/// validation, the configured lifetime ceiling, durable revocation, and
+/// fail-closed authority construction.
+pub fn sdis_scope(flags: SdisMountFlags) -> actix_web::Scope {
+    let SdisMountFlags {
+        self_serve_enrollment,
+        admin_recovery,
+    } = flags;
+
+    web::scope("/sdis")
+        .service(api::sdis::sdis_health)
+        .service(api::sdis::generate_ephemeral)
+        .service(api::sdis::verify_level1)
+        .service(api::sdis::verify_level2)
+        // Self-serve enrollment is mounted ONLY on an explicit
+        // isolated-rehearsal declaration. It is unauthenticated by construction
+        // and terminates in a credential mint, so on every ordinary profile the
+        // route tree is absent (404) rather than present-and-guarded — there is
+        // no handler left to forget a check. The steward surface in
+        // `configure_protected` below is unaffected.
+        .configure(move |cfg| {
+            if self_serve_enrollment {
+                api::sdis::simple_enrollment::configure(cfg);
+            }
+        })
+        // Note: enrollment::configure disabled - using simple_enrollment as primary API
+        // .configure(api::sdis::enrollment::configure)
+        .configure(api::sdis::recovery::configure)
+        .configure(api::sdis::anchor::configure)
+        // Steward/moderation surface: same `/sdis` prefix, authenticated. Nested
+        // last so the public routes above keep their unwrapped behavior.
+        // Recovery steward-approval joins the enrollment steward acts behind
+        // `jwt_auth`.
+        .service(
+            web::scope("")
+                .wrap(HttpAuthentication::bearer(crate::middleware::jwt_auth))
+                .configure(api::sdis::simple_enrollment::configure_protected)
+                // Recovery steward-approval is a dev/test escape hatch: mounted
+                // only on an explicit opt-in AND loopback bind (#2075).
+                // Off-loopback it is absent.
+                .configure(move |cfg| {
+                    if admin_recovery {
+                        api::sdis::recovery::configure_protected(cfg);
+                    }
+                }),
+        )
+}
+
 impl GatewayServer {
     /// Create a new gateway server (uses temporary storage for testing)
     pub fn new(bind_addr: SocketAddr, jwt_secret: Vec<u8>) -> Self {
@@ -806,6 +925,25 @@ impl GatewayServer {
             .map(|v| v.trim().eq_ignore_ascii_case("true"))
             .unwrap_or(false);
         let mount_admin_recovery = admin_endpoints_allowed(admin_opt_in, &self.bind_addr);
+
+        // Self-serve SDIS enrollment: absent unless the operator explicitly
+        // declares an isolated rehearsal deployment. See
+        // `self_serve_enrollment_allowed` for why this gate is not bind-keyed.
+        let self_serve_enrollment_env = std::env::var(SELF_SERVE_ENROLLMENT_ENV).ok();
+        let mount_self_serve_enrollment =
+            self_serve_enrollment_allowed(self_serve_enrollment_env.as_deref());
+        if mount_self_serve_enrollment {
+            warn!(
+                "⚠️  {}=true — the self-serve SDIS enrollment route tree \
+                 (/v1/sdis/enrollment/*) is MOUNTED WITHOUT AUTHENTICATION on bind {}. \
+                 This surface mints cooperative-scoped credentials for callers who present no \
+                 credential; it is safe only on a deployment that is genuinely unreachable from \
+                 any untrusted network, which a loopback bind alone does NOT establish when a \
+                 reverse proxy fronts the gateway. Never set this on production, LAN or \
+                 evaluator deployments.",
+                SELF_SERVE_ENROLLMENT_ENV, self.bind_addr
+            );
+        }
         if admin_opt_in && !mount_admin_recovery {
             warn!(
                 "ICN_ENABLE_ADMIN_ENDPOINTS is set but the gateway is bound to \
@@ -2210,46 +2348,10 @@ impl GatewayServer {
                         )
                         // Public cooperative statistics (no auth required)
                         .service(api::coops::get_coop_stats)
-                        // SDIS endpoints. The scope is deliberately split by
-                        // authority (issue #2443): public verification and
-                        // enrollment initiation stay reachable without a
-                        // credential, while steward and moderation routes are
-                        // mounted behind `jwt_auth` so they inherit signature
-                        // validation, the configured lifetime ceiling, durable
-                        // revocation, and fail-closed authority construction.
-                        .service(
-                            web::scope("/sdis")
-                                .service(api::sdis::sdis_health)
-                                .service(api::sdis::generate_ephemeral)
-                                .service(api::sdis::verify_level1)
-                                .service(api::sdis::verify_level2)
-                                .configure(api::sdis::simple_enrollment::configure)
-                                // Note: enrollment::configure disabled - using simple_enrollment as primary API
-                                // .configure(api::sdis::enrollment::configure)
-                                .configure(api::sdis::recovery::configure)
-                                .configure(api::sdis::anchor::configure)
-                                // Steward/moderation surface: same `/sdis`
-                                // prefix, authenticated. Nested last so the
-                                // public routes above keep their unwrapped
-                                // behavior. Recovery steward-approval joins the
-                                // enrollment steward acts behind `jwt_auth`.
-                                .service(
-                                    web::scope("")
-                                        .wrap(auth.clone())
-                                        .configure(
-                                            api::sdis::simple_enrollment::configure_protected,
-                                        )
-                                        // Recovery steward-approval is a dev/test
-                                        // escape hatch: mounted only on an
-                                        // explicit opt-in AND loopback bind
-                                        // (#2075). Off-loopback it is absent.
-                                        .configure(move |cfg| {
-                                            if mount_admin_recovery {
-                                                api::sdis::recovery::configure_protected(cfg);
-                                            }
-                                        }),
-                                ),
-                        )
+                        .service(sdis_scope(SdisMountFlags {
+                            self_serve_enrollment: mount_self_serve_enrollment,
+                            admin_recovery: mount_admin_recovery,
+                        }))
                         // Protected coop endpoints (auth + rate limiting)
                         .service(
                             web::scope("/coops")
@@ -2703,6 +2805,55 @@ mod tests {
         // no dev opt-in => disabled regardless of bind
         assert!(!self_serve_coop_allowed(false, &loopback_v4));
         assert!(!self_serve_coop_allowed(false, &all_ifaces));
+    }
+
+    /// SECURITY (F-P0-1): the self-serve SDIS enrollment tree is absent unless
+    /// the operator explicitly declares an isolated rehearsal deployment.
+    ///
+    /// Absent by default is the property that matters: this surface is
+    /// unauthenticated by construction and terminates in a credential mint, so
+    /// "not declared" must mean "no route", not "route with a check".
+    #[test]
+    fn self_serve_enrollment_requires_explicit_declaration() {
+        // Unset => absent. This is what every shipped deployment profile produces.
+        assert!(!self_serve_enrollment_allowed(None));
+
+        // Explicit declaration => mounted.
+        assert!(self_serve_enrollment_allowed(Some("true")));
+        assert!(self_serve_enrollment_allowed(Some("TRUE")));
+        assert!(self_serve_enrollment_allowed(Some("  true  ")));
+
+        // Anything else => absent. A typo must fall back to closed, never open.
+        for v in ["", "1", "yes", "on", "false", "ture", "enabled"] {
+            assert!(
+                !self_serve_enrollment_allowed(Some(v)),
+                "{v:?} must not mount the self-serve enrollment tree"
+            );
+        }
+    }
+
+    /// The gate must NOT be a loopback test.
+    ///
+    /// The LAN rehearsal profile binds `127.0.0.1:8080` and fronts it with an
+    /// nginx that proxies all of `/v1/` from the LAN TLS origin, so a loopback
+    /// bind is the *most* externally reachable configuration, not the least.
+    /// Keying this surface on `is_loopback()` — as the architecture campaign
+    /// originally proposed — would mount it exactly there. This test pins the
+    /// decision to the declaration alone so a later refactor cannot quietly
+    /// reintroduce a bind-address condition.
+    #[test]
+    fn self_serve_enrollment_gate_ignores_bind_address() {
+        // Same answer regardless of what the process is bound to: the predicate
+        // takes no bind argument at all, and that is deliberate.
+        assert!(self_serve_enrollment_allowed(Some("true")));
+        assert!(!self_serve_enrollment_allowed(None));
+
+        // And the environment variable is its own, not the demo profile's.
+        assert_ne!(
+            SELF_SERVE_ENROLLMENT_ENV, "ICN_ENABLE_ADMIN_ENDPOINTS",
+            "the demo appliance profile sets ICN_ENABLE_ADMIN_ENDPOINTS; reusing it would \
+             mount self-serve enrollment on an image strangers run"
+        );
     }
 
     /// SECURITY (#2075): the admin/dev SDIS recovery-approval simulation may be

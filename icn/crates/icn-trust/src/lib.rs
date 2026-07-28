@@ -105,6 +105,20 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, info, instrument, warn};
 
+/// A trust-edge mutation was refused because its source and target are the same DID.
+///
+/// Stable and typed so callers can distinguish "you may not vouch for yourself"
+/// (an authorization outcome) from "that score is out of range" (bad input) and
+/// from a storage failure, without matching on message text. Returned through
+/// `anyhow` by [`TrustGraph::add_edge`]; recover it with
+/// `err.downcast_ref::<SelfAttestationRejected>()`.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("self-attestation rejected: a trust edge may not have {did} as both source and target")]
+pub struct SelfAttestationRejected {
+    /// The DID that appeared as both source and target.
+    pub did: String,
+}
+
 /// Threshold for logging high-fanout cache invalidation events.
 ///
 /// When a trust edge change triggers invalidation of >= this many downstream
@@ -431,7 +445,28 @@ impl TrustGraph {
     }
 
     /// Add or update a trust edge
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SelfAttestationRejected`] if `edge.source == edge.target`. A
+    /// self-edge is not a weaker attestation, it is a *counterfeit* one: every
+    /// consumer of this graph reads an edge as "somebody else vouched", and the
+    /// scoring paths that average incoming edges cannot distinguish the two. One
+    /// self-edge at score 1.0 therefore satisfies any incoming-trust threshold
+    /// permanently and for free (F-P0-1, link 3).
+    ///
+    /// The guard lives here rather than in a handler because every wrapper
+    /// (`TrustGraphFacade`, `TypedTrustGraph`, `MultiTrustGraph`) funnels into
+    /// this method — a transport added later inherits the rejection instead of
+    /// having to remember it.
     pub fn add_edge(&mut self, edge: TrustEdge) -> Result<()> {
+        if edge.source == edge.target {
+            return Err(SelfAttestationRejected {
+                did: edge.source.to_string(),
+            }
+            .into());
+        }
+
         info!(
             "Adding trust edge: {} -> {} (score: {}, prefix: {})",
             edge.source, edge.target, edge.score, self.storage_prefix

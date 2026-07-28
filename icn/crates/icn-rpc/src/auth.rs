@@ -972,6 +972,14 @@ pub mod scopes {
     pub const GOVERNANCE_WRITE: &str = "governance:write";
     pub const COMPUTE_WRITE: &str = "compute:write";
     pub const POLICY_WRITE: &str = "policy:write";
+    /// Authority to mutate the trust graph — create or revise a trust edge
+    /// attesting that one DID vouches for another.
+    ///
+    /// Already enforced on the RPC transport: `method_required_scopes` maps
+    /// `trust.add`/`trust.remove` to this scope. The gateway's
+    /// `POST /v1/trust/attest` performed the same mutation with no capability at
+    /// all until F-P0-1 — the two transports had diverged on the same effect,
+    /// and the unguarded one was reachable with any valid credential.
     pub const TRUST_WRITE: &str = "trust:write";
     pub const RECOVERY_WRITE: &str = "recovery:write";
     pub const DISPUTE_WRITE: &str = "dispute:write";

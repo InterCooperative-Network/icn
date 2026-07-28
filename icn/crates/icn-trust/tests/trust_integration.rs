@@ -1305,3 +1305,56 @@ fn test_fanout_threshold_logging() {
     let score = multi.social().compute_trust_score(hub.did()).unwrap();
     assert!(score >= 0.0);
 }
+
+/// A trust edge may not have the same DID as source and target (F-P0-1).
+///
+/// This is the domain-layer half of the containment. The gateway carries its own
+/// guard because its in-memory backend never reaches `TrustGraph`, but every
+/// graph wrapper — `TrustGraphFacade`, `TypedTrustGraph`, `MultiTrustGraph` —
+/// funnels into `TrustGraph::add_edge`, so a transport added later inherits the
+/// refusal rather than having to remember it.
+///
+/// A self-edge is not a weaker attestation, it is a counterfeit one: consumers
+/// read an edge as "somebody else vouched", and the scoring paths that average
+/// incoming edges cannot tell the difference. One self-edge at 1.0 therefore
+/// satisfies any incoming-trust threshold permanently and for free.
+#[test]
+fn self_edge_is_rejected_with_a_typed_error() {
+    use icn_trust::SelfAttestationRejected;
+
+    let store = Arc::new(SledStore::temporary().unwrap());
+    let alice = KeyPair::generate().unwrap();
+    let mut graph = TrustGraph::new(store, alice.did().clone());
+
+    let err = graph
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            alice.did().clone(),
+            TrustScore::new(1.0).unwrap(),
+        ))
+        .expect_err("TrustGraph must refuse a self-edge");
+
+    assert!(
+        err.downcast_ref::<SelfAttestationRejected>().is_some(),
+        "the refusal must be recoverable as a stable typed error, got: {err}"
+    );
+
+    // And nothing was written: the edge must not be silently stored.
+    assert!(
+        graph
+            .get_incoming_edges(alice.did())
+            .expect("read incoming edges")
+            .is_empty(),
+        "a rejected self-edge must leave the graph unchanged"
+    );
+
+    // An ordinary edge between two distinct DIDs still works.
+    let bob = KeyPair::generate().unwrap();
+    graph
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::new(0.8).unwrap(),
+        ))
+        .expect("a normal edge must still be accepted");
+}

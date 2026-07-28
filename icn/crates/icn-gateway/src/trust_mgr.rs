@@ -61,6 +61,29 @@ use tracing::{debug, warn};
 /// 3. The target DID has no trust edges (neither direct nor transitive)
 pub const DEFAULT_TRUST_SCORE: f64 = 0.5;
 
+/// Why a trust-edge mutation was refused.
+///
+/// Typed rather than a `String` so the API layer can map each cause to the
+/// status code it actually deserves. The distinction that matters for F-P0-1 is
+/// [`Self::SelfAttestation`] vs [`Self::InvalidScore`]: the old signature
+/// returned `String` for both and the handler mapped everything to 400, so a
+/// refusal to grant authority would have been reported as malformed input.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+pub enum TrustMutationError {
+    /// The score was out of range, NaN, or infinite. Invalid input (400).
+    #[error("invalid trust score: {0}")]
+    InvalidScore(String),
+    /// Source and target were the same DID. An authorization outcome (403).
+    #[error("self-attestation is not permitted: {did} may not vouch for itself")]
+    SelfAttestation {
+        /// The DID that appeared as both source and target.
+        did: String,
+    },
+    /// The underlying edge store failed (500).
+    #[error("trust edge storage failed: {0}")]
+    Storage(String),
+}
+
 // Trust class thresholds (single source of truth)
 // These define the trust score boundaries for rate limiting
 /// Threshold below which a peer is considered "Isolated" (untrusted)
@@ -317,12 +340,28 @@ impl TrustManager {
     }
 
     /// Add or update a trust edge (async version)
-    pub async fn add_edge_async(&self, edge: TrustEdge) -> Result<(), String> {
+    pub async fn add_edge_async(&self, edge: TrustEdge) -> Result<(), TrustMutationError> {
+        // Refuse self-attestation before dispatching to either backend.
+        //
+        // `icn_trust::TrustGraph::add_edge` carries the same guard, but this
+        // manager has a second backend: when no `TrustGraph` handle is
+        // installed, edges go straight into the in-memory `edges` map below and
+        // never reach the domain layer. That fallback is the configuration the
+        // gateway actually runs in when trust is served by a `TrustService`
+        // (`with_trust_service` leaves `trust_graph` as `None`), so a
+        // domain-only guard would leave the live path open — which is precisely
+        // how F-P0-1 reached a 1.0 self-edge.
+        if edge.source == edge.target {
+            return Err(TrustMutationError::SelfAttestation {
+                did: edge.source.to_string(),
+            });
+        }
+
         if let Some(ref handle) = self.trust_graph {
             let mut graph = handle.write().await;
             let result = graph
                 .add_edge(edge)
-                .map_err(|e| format!("TrustGraph error: {e}"));
+                .map_err(|e| TrustMutationError::Storage(format!("TrustGraph error: {e}")));
             if result.is_ok() {
                 self.bump_generation();
             }
@@ -339,22 +378,22 @@ impl TrustManager {
     ///
     /// # Errors
     ///
-    /// Returns `Err(String)` if:
-    /// - `score` is outside the valid range [0.0, 1.0]
-    /// - `score` is NaN or infinite
-    /// - The underlying edge storage fails (actor-backed mode only)
-    ///
-    /// These errors should be mapped to HTTP 400 Bad Request at the API layer,
-    /// as they represent invalid user input.
+    /// - [`TrustMutationError::InvalidScore`] if `score` is outside [0.0, 1.0],
+    ///   NaN, or infinite — invalid input, map to 400 at the API layer.
+    /// - [`TrustMutationError::SelfAttestation`] if `from == to` — an
+    ///   authorization outcome, map to 403, not 400.
+    /// - [`TrustMutationError::Storage`] if the underlying edge storage fails
+    ///   (actor-backed mode only) — map to 500.
     pub async fn add_edge_with_score(
         &self,
         from: Did,
         to: Did,
         score: f64,
         memo: Option<String>,
-    ) -> Result<(), String> {
+    ) -> Result<(), TrustMutationError> {
         // TrustScore::new validates the score is in [0.0, 1.0] range
-        let trust_score = TrustScore::new(score).map_err(|e| e.to_string())?;
+        let trust_score =
+            TrustScore::new(score).map_err(|e| TrustMutationError::InvalidScore(e.to_string()))?;
         let mut edge = TrustEdge::new(from, to, trust_score);
 
         if let Some(memo_str) = memo {

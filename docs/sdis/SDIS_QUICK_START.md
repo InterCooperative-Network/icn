@@ -3,6 +3,21 @@
 > Snapshot guidance: this document contains both currently wired endpoints and forward-looking flows.
 > Verify live behavior against `icn/crates/icn-gateway/src/api/sdis/mod.rs` and `docs/sdis/SDIS_STATUS.md`.
 
+> **Self-serve enrollment is not mounted by default.** The
+> `POST /v1/sdis/enrollment/*` routes are unauthenticated by construction and end
+> in a credential mint, so they are registered only when the operator sets
+> `ICN_ENABLE_SELF_SERVE_ENROLLMENT=true` to declare an isolated rehearsal
+> deployment. **No shipped deployment profile sets it** — on production, LAN,
+> evaluator and demo images these routes return 404. Steward and moderation
+> routes under `/v1/sdis` are unaffected and remain mounted behind `jwt_auth`.
+>
+> Two further constraints apply wherever enrollment *is* mounted: a level-2 vouch
+> requires a credential issued for the same cooperative as the enrollment, and
+> completion fails rather than minting a credential if any required institutional
+> write (anchor, holder, jurisdiction join, membership approval) fails. This is a
+> containment tranche, not the final SDIS enrollment authority model — see
+> [`ADR-0085`](../adr/) for the open decision.
+
 ## 🚀 Getting Started with SDIS
 
 SDIS (Secure Distributed Identity System) enables secure multi-device identity management and recovery for ICN.
