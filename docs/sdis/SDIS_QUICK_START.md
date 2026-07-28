@@ -8,8 +8,12 @@
 > in a credential mint, so they are registered only when the operator sets
 > `ICN_ENABLE_SELF_SERVE_ENROLLMENT=true` to declare an isolated rehearsal
 > deployment. **No shipped deployment profile sets it** — on production, LAN,
-> evaluator and demo images these routes return 404. Steward and moderation
-> routes under `/v1/sdis` are unaffected and remain mounted behind `jwt_auth`.
+> evaluator and demo images these routes are absent, returning **404 or 401
+> depending on route fallthrough**: the `/v1/sdis` scope nests an authenticated
+> sub-scope that matches remaining paths, so an unmounted enrollment path may be
+> rejected by `jwt_auth` before routing rather than 404'ing. Either way no
+> enrollment handler runs. Steward and moderation routes under `/v1/sdis` are
+> unaffected and remain mounted behind `jwt_auth`.
 >
 > Two further constraints apply wherever enrollment *is* mounted: a level-2 vouch
 > requires a credential issued for the same cooperative as the enrollment, and

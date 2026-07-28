@@ -620,6 +620,26 @@ impl TrustService for TrustServiceImplTokio {
             .parse()
             .map_err(|e| format!("Invalid target DID: {e}"))?;
 
+        // Refuse self-attestation on the RPC path (F-P0-1).
+        //
+        // This is an authorization boundary: a caller reaches it through
+        // `trust.add`, and the edge it writes is read by every trust threshold
+        // in the system — including the one deciding who may vouch on the
+        // enrollment surface. A self-edge is indistinguishable from a real
+        // vouch to those consumers, so one at score 1.0 satisfies any
+        // incoming-trust gate permanently.
+        //
+        // The guard is here rather than in `TrustGraph::add_edge` because that
+        // storage primitive has no caller to reason about, and because `icnd`
+        // seeds a deliberate `own_did -> own_did` genesis edge under the
+        // `ICN_DEV_SELF_TRUST` dev gate that must keep working.
+        if self.own_did == target_did {
+            return Err(icn_trust::SelfAttestationRejected {
+                did: target_did.to_string(),
+            }
+            .to_string());
+        }
+
         let trust_score =
             icn_trust::TrustScore::new(score).map_err(|e| format!("Invalid trust score: {e}"))?;
         let mut edge = icn_trust::TrustEdge::new(self.own_did.clone(), target_did, trust_score);

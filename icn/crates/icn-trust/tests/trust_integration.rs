@@ -1306,47 +1306,36 @@ fn test_fanout_threshold_logging() {
     assert!(score >= 0.0);
 }
 
-/// A trust edge may not have the same DID as source and target (F-P0-1).
+/// `TrustGraph::add_edge` deliberately ACCEPTS a self-edge (F-P0-1 follow-up).
 ///
-/// This is the domain-layer half of the containment. The gateway carries its own
-/// guard because its in-memory backend never reaches `TrustGraph`, but every
-/// graph wrapper — `TrustGraphFacade`, `TypedTrustGraph`, `MultiTrustGraph` —
-/// funnels into `TrustGraph::add_edge`, so a transport added later inherits the
-/// refusal rather than having to remember it.
+/// Refusing `source == target` is an authorization decision, and this type is
+/// the storage primitive — it has no caller to reason about. Two things depend
+/// on that separation:
 ///
-/// A self-edge is not a weaker attestation, it is a counterfeit one: consumers
-/// read an edge as "somebody else vouched", and the scoring paths that average
-/// incoming edges cannot tell the difference. One self-edge at 1.0 therefore
-/// satisfies any incoming-trust threshold permanently and for free.
+/// 1. `icnd` seeds a genesis `own_did -> own_did` edge under the explicit
+///    `ICN_DEV_SELF_TRUST` dev gate (`bins/icnd/src/main.rs`), which the
+///    documented live-local receipt-chain proof requires. A guard here would
+///    fail the daemon at startup.
+/// 2. `icn-core`'s `ledger_gossip_trust_integration` seeds trust for every node
+///    including itself; a guard here would fail that test.
+///
+/// The self-attestation refusal lives at the authorization boundaries instead —
+/// the gateway's `TrustManager::add_edge_async` and `TrustService::submit_attestation`.
+/// This test pins the separation so a future change does not quietly move policy
+/// back down into storage.
 #[test]
-fn self_edge_is_rejected_with_a_typed_error() {
-    use icn_trust::SelfAttestationRejected;
-
+fn trust_graph_accepts_self_edges_policy_lives_above() {
     let store = Arc::new(SledStore::temporary().unwrap());
     let alice = KeyPair::generate().unwrap();
     let mut graph = TrustGraph::new(store, alice.did().clone());
 
-    let err = graph
+    graph
         .add_edge(TrustEdge::new(
             alice.did().clone(),
             alice.did().clone(),
             TrustScore::new(1.0).unwrap(),
         ))
-        .expect_err("TrustGraph must refuse a self-edge");
-
-    assert!(
-        err.downcast_ref::<SelfAttestationRejected>().is_some(),
-        "the refusal must be recoverable as a stable typed error, got: {err}"
-    );
-
-    // And nothing was written: the edge must not be silently stored.
-    assert!(
-        graph
-            .get_incoming_edges(alice.did())
-            .expect("read incoming edges")
-            .is_empty(),
-        "a rejected self-edge must leave the graph unchanged"
-    );
+        .expect("the storage layer must accept a self-edge; policy belongs above it");
 
     // An ordinary edge between two distinct DIDs still works.
     let bob = KeyPair::generate().unwrap();

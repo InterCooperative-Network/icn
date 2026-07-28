@@ -109,9 +109,13 @@ use tracing::{debug, info, instrument, warn};
 ///
 /// Stable and typed so callers can distinguish "you may not vouch for yourself"
 /// (an authorization outcome) from "that score is out of range" (bad input) and
-/// from a storage failure, without matching on message text. Returned through
-/// `anyhow` by [`TrustGraph::add_edge`]; recover it with
-/// `err.downcast_ref::<SelfAttestationRejected>()`.
+/// from a storage failure, without matching on message text.
+///
+/// Returned by the *authorization* boundaries — `TrustService::submit_attestation`
+/// in `apps/trust-app`, and (as its own typed variant) the gateway's
+/// `TrustManager`. [`TrustGraph::add_edge`] deliberately does not raise it; see
+/// that method's docs for why the policy does not live in the storage layer.
+/// Recover it with `err.downcast_ref::<SelfAttestationRejected>()`.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("self-attestation rejected: a trust edge may not have {did} as both source and target")]
 pub struct SelfAttestationRejected {
@@ -446,27 +450,26 @@ impl TrustGraph {
 
     /// Add or update a trust edge
     ///
-    /// # Errors
+    /// # Self-edges
     ///
-    /// Returns [`SelfAttestationRejected`] if `edge.source == edge.target`. A
-    /// self-edge is not a weaker attestation, it is a *counterfeit* one: every
-    /// consumer of this graph reads an edge as "somebody else vouched", and the
-    /// scoring paths that average incoming edges cannot distinguish the two. One
-    /// self-edge at score 1.0 therefore satisfies any incoming-trust threshold
-    /// permanently and for free (F-P0-1, link 3).
+    /// This method does **not** refuse `source == target`. Refusing a self-edge
+    /// is an *authorization* decision about who asked, and this type is the
+    /// storage primitive — it has no caller identity to reason about. Encoding
+    /// that policy here also breaks a deliberate, composition-root-level
+    /// bootstrap: `icnd` seeds a genesis `own_did -> own_did` edge under the
+    /// explicit `ICN_DEV_SELF_TRUST` dev gate (`bins/icnd/src/main.rs`), which
+    /// the documented live-local receipt-chain proof depends on.
     ///
-    /// The guard lives here rather than in a handler because every wrapper
-    /// (`TrustGraphFacade`, `TypedTrustGraph`, `MultiTrustGraph`) funnels into
-    /// this method — a transport added later inherits the rejection instead of
-    /// having to remember it.
+    /// The self-attestation guard therefore lives at each *authorization*
+    /// boundary instead, where a caller exists to be refused:
+    /// - the gateway's `TrustManager::add_edge_async` (HTTP `/trust/attest`),
+    /// - `TrustService::submit_attestation` in `apps/trust-app` (the RPC
+    ///   `trust.add` path).
+    ///
+    /// Callers that legitimately need a self-edge reach this method directly and
+    /// are, by construction, composition roots rather than request handlers.
+    /// See [`SelfAttestationRejected`] for the error those boundaries return.
     pub fn add_edge(&mut self, edge: TrustEdge) -> Result<()> {
-        if edge.source == edge.target {
-            return Err(SelfAttestationRejected {
-                did: edge.source.to_string(),
-            }
-            .into());
-        }
-
         info!(
             "Adding trust edge: {} -> {} (score: {}, prefix: {})",
             edge.source, edge.target, edge.score, self.storage_prefix
