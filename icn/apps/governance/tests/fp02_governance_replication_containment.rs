@@ -72,6 +72,18 @@ struct Node {
     gossip: Arc<tokio::sync::RwLock<GossipActor>>,
     ops: GovernanceManager,
     state: SledGovernanceStateStore,
+    /// Positive control. Registered on the same fan-out seam as the production
+    /// governance callback (`add_notification_callback`), so if this observer records
+    /// a message the production ingress was invoked for it in the same dispatch loop.
+    ///
+    /// Without this, every negative test below would still pass if the ingress stopped
+    /// being reached at all — a renamed topic filter, a dropped subscription or a
+    /// decode regression would leave the suite green while testing nothing.
+    observed: Arc<std::sync::Mutex<Vec<String>>>,
+    /// Distinguishes otherwise-identical injections. `store_entry` dedups on the
+    /// sender-supplied `entry.hash`, so replays must carry distinct claimed hashes to
+    /// reach the ingress independently — which is exactly the attacker's capability.
+    seq: std::sync::atomic::AtomicU64,
 }
 
 impl Node {
@@ -100,6 +112,23 @@ impl Node {
         .await
         .expect("init_governance_actor");
 
+        let observed: Arc<std::sync::Mutex<Vec<String>>> =
+            Arc::new(std::sync::Mutex::new(Vec::new()));
+        {
+            let obs = observed.clone();
+            gossip.write().await.add_notification_callback(Arc::new(
+                move |topic: String, entry: GossipEntry, _| {
+                    let is_gov = topic == GOVERNANCE_TOPIC
+                        || topic.starts_with(icn_federation::TOPIC_FEDERATION_GOVERNANCE);
+                    if is_gov {
+                        if let Ok(msg) = GovernanceMessage::from_bytes(&entry.data) {
+                            obs.lock().unwrap().push(msg.message_type().to_string());
+                        }
+                    }
+                },
+            ));
+        }
+
         let state = SledGovernanceStateStore::new(services.governance_store.clone());
         let ops = GovernanceManager::with_handle(
             Arc::new(services.governance_handle) as Arc<dyn GovernanceOps + Send + Sync>
@@ -111,6 +140,8 @@ impl Node {
             gossip,
             ops,
             state,
+            observed,
+            seq: std::sync::atomic::AtomicU64::new(0),
         }
     }
 
@@ -126,8 +157,22 @@ impl Node {
         wire_sender: &Did,
         msg: &GovernanceMessage,
     ) {
+        let before = self.observed.lock().unwrap().len();
         self.inject_forged_bytes(topic, claimed_author, wire_sender, msg.to_bytes().unwrap())
-            .await
+            .await;
+
+        // Positive control: prove this injection actually reached the governance
+        // replication ingress rather than being dropped upstream (topic filter, dedup,
+        // missing subscription, decode failure). A refusal is only meaningful if the
+        // message got there to be refused.
+        let seen = self.observed.lock().unwrap();
+        assert_eq!(
+            seen.len(),
+            before + 1,
+            "injected {} never reached the governance replication ingress",
+            msg.message_type()
+        );
+        assert_eq!(seen.last().map(String::as_str), Some(msg.message_type()));
     }
 
     async fn inject_forged_bytes(
@@ -138,11 +183,15 @@ impl Node {
         data: Vec<u8>,
     ) {
         // The attacker picks the hash freely: `store_entry` dedups on this field and
-        // never recomputes it from `data`.
+        // never recomputes it from `data`. Mixing in a per-injection counter models that
+        // freedom and keeps repeated injections of identical bytes from being silently
+        // deduped away before they reach the ingress.
+        let nonce = self.seq.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let mut hash = [0u8; 32];
-        for (i, b) in data.iter().take(32).enumerate() {
+        for (i, b) in data.iter().take(24).enumerate() {
             hash[i] = *b ^ 0xA5;
         }
+        hash[24..32].copy_from_slice(&nonce.to_le_bytes());
 
         let entry = GossipEntry {
             hash,
@@ -698,9 +747,10 @@ async fn replayed_unauthenticated_messages_remain_non_mutating() {
     let vote = Vote::new(proposal_id.clone(), victim.clone(), VoteChoice::Against);
     let msg = GovernanceMessage::vote_cast(vote, None);
 
-    // Same bytes, replayed. `store_entry` dedups on the attacker-chosen hash, so a
-    // replay carrying a different claimed hash is *not* deduped — each one reaches
-    // the ingress independently.
+    // Same payload, replayed three times, each carrying a *different* claimed hash —
+    // which is what an attacker does to defeat `store_entry`'s dedup. Each injection
+    // therefore reaches the ingress independently (asserted by the positive control in
+    // `inject_forged`), and each must still be refused.
     for _ in 0..3 {
         node.inject_forged(GOVERNANCE_TOPIC, &victim, &mallory, &msg)
             .await;
