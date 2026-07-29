@@ -43,6 +43,28 @@ View source on GitHub →
 <p>Snapshot guidance: this document contains both currently wired endpoints and forward-looking flows.
 Verify live behavior against <code>icn/crates/icn-gateway/src/api/sdis/mod.rs</code> and <code>docs/sdis/SDIS_STATUS.md</code>.</p>
 </blockquote>
+<blockquote>
+<p><strong>Self-serve enrollment is not mounted by default.</strong> The
+<code>POST /v1/sdis/enrollment/*</code> routes are unauthenticated by construction and end
+in a credential mint, so they are registered only when the operator sets
+<code>ICN_ENABLE_SELF_SERVE_ENROLLMENT=true</code> to declare an isolated rehearsal
+deployment. <strong>No shipped deployment profile sets it</strong> — on production, LAN,
+evaluator and demo images these routes are absent, returning <strong>404 or 401
+depending on route fallthrough</strong>: the <code>/v1/sdis</code> scope nests an authenticated
+sub-scope that matches remaining paths, so an unmounted enrollment path may be
+rejected by <code>jwt_auth</code> before routing rather than 404&#39;ing. Either way no
+enrollment handler runs. Steward and moderation routes under <code>/v1/sdis</code> are
+unaffected and remain mounted behind <code>jwt_auth</code>.</p>
+<p>Two further constraints apply wherever enrollment <em>is</em> mounted: a level-2 vouch
+requires a credential issued for the same cooperative as the enrollment, and
+completion fails rather than minting a credential if any required institutional
+write (anchor, holder, jurisdiction join, membership approval) fails. This is a
+containment tranche, not the final SDIS enrollment authority model. That decision —
+whether vouching authority derives from the trust graph or from a governance
+capability — is still open and has no accepted ADR. The live proposal is the <strong>draft
+PR</strong> <a href="https://github.com/InterCooperative-Network/icn/pull/2450" target="_blank" rel="noopener">InterCooperative-Network/icn#2450</a>,
+<em>&quot;docs(architecture): propose institution-scoped SDIS vouch authority&quot;</em>.</p>
+</blockquote>
 <h2>🚀 Getting Started with SDIS</h2>
 <p>SDIS (Secure Distributed Identity System) enables secure multi-device identity management and recovery for ICN.</p>
 <hr>
