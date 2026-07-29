@@ -157,6 +157,20 @@ echo -e "${BLUE}Step 4: Test SDIS Enrollment Flow${NC}"
 echo "----------------------------------------"
 
 # Outcome of the enrollment section, consumed by the final summary.
+#
+# States:
+#   completed        the full flow ran and completion returned a credential
+#   initiation_only  /enrollment/start responded, nothing further was exercised
+#   skipped          401/404 — self-serve enrollment is not mounted (the default)
+#   failed           unexpected status, malformed 2xx, or a failed completion
+#
+# NOTE: this script exercises ONLY /enrollment/start. It performs no level-1
+# device proof, no level-2 vouch, and no completion, so it cannot reach
+# "completed". The state exists so the summary can never imply completion was
+# tested, and so a future version that does exercise the full flow has an
+# honest value to set. Reaching completion needs Ed25519 device signing over
+# `complete:{enrollment_id}`; duplicating that in shell is out of scope here.
+#
 # Default to "failed" so an unforeseen path cannot silently read as success.
 enrollment_result="failed"
 
@@ -185,9 +199,15 @@ if [ "$enroll_status" = "200" ] || [ "$enroll_status" = "201" ]; then
         echo "  Response: $enroll_body" | head -c 200
         enrollment_result="failed"
     else
-        echo -e "${GREEN}✓${NC}"
+        # A usable enrollment ID proves the START endpoint answered. It proves
+        # nothing about level-1 verification, level-2 vouching, completion,
+        # credential minting, or the durable anchor/holder/membership records.
+        # Report exactly that.
+        echo -e "${GREEN}✓${NC} (initiation only)"
         echo "  Enrollment ID: $enrollment_id"
-        enrollment_result="operational"
+        echo "  NOTE: completion was NOT exercised — no level-1 proof, no level-2"
+        echo "        vouch, no /enrollment/complete call."
+        enrollment_result="initiation_only"
     fi
 elif [ "$enroll_status" = "404" ] || [ "$enroll_status" = "401" ]; then
     # Self-serve enrollment is absent unless the operator declares an isolated
@@ -226,10 +246,18 @@ echo -e "${GREEN}✓ Governance Endpoints${NC} - Domains and proposals accessibl
 # skipped — and a skipped section must never be summarised as "operational",
 # nor support an unconditional "fully operational" conclusion.
 case "$enrollment_result" in
-    operational)
-        echo -e "${GREEN}✓ SDIS Enrollment${NC} - Enrollment system operational"
+    completed)
+        echo -e "${GREEN}✓ SDIS Enrollment${NC} - Enrollment system operational (completion verified)"
         echo ""
         echo "🎉 Mobile app backend is fully operational!"
+        ;;
+    initiation_only)
+        echo -e "${YELLOW}◐ SDIS Enrollment${NC} - PARTIAL: initiation endpoint available; completion NOT exercised"
+        echo ""
+        echo "✅ Mobile app backend checks passed, with SDIS enrollment only PARTIALLY exercised."
+        echo "   /enrollment/start responded, but this run performed no level-1 device"
+        echo "   proof, no level-2 vouch, and no completion — so it does NOT demonstrate"
+        echo "   credential minting, membership creation, or completion reliability."
         ;;
     skipped)
         echo -e "${YELLOW}⊘ SDIS Enrollment${NC} - SKIPPED (self-serve enrollment not enabled on this gateway)"

@@ -107,15 +107,32 @@ use tracing::{debug, info, instrument, warn};
 
 /// A trust-edge mutation was refused because its source and target are the same DID.
 ///
-/// Stable and typed so callers can distinguish "you may not vouch for yourself"
-/// (an authorization outcome) from "that score is out of range" (bad input) and
-/// from a storage failure, without matching on message text.
+/// # What this type is, and what it is not
 ///
-/// Returned by the *authorization* boundaries — `TrustService::submit_attestation`
-/// in `apps/trust-app`, and (as its own typed variant) the gateway's
-/// `TrustManager`. [`TrustGraph::add_edge`] deliberately does not raise it; see
-/// that method's docs for why the policy does not live in the storage layer.
-/// Recover it with `err.downcast_ref::<SelfAttestationRejected>()`.
+/// It is the **canonical wording** of the self-attestation refusal, so every
+/// ingress reports the same thing and the message is defined in one place.
+///
+/// It is **not** recoverable as a typed value across the `TrustService`
+/// boundary. `TrustService::submit_attestation` and
+/// `TrustService::ingest_attestation` (`apps/trust-app/src/service_tokio.rs`)
+/// both return `Result<_, String>` — a signature owned by the
+/// `icn_kernel_api::services::TrustService` trait — so they construct this type
+/// and immediately `.to_string()` it. The type is erased at that boundary.
+/// **Do not attempt `downcast_ref::<SelfAttestationRejected>()` on a
+/// `TrustService` error; there is no error object to downcast.** A caller that
+/// must distinguish this refusal from other trust failures at that layer has
+/// only the message text today. Giving `TrustService` a typed error is an
+/// API change across the trait and all its implementors, deliberately not made
+/// in the F-P0-1 containment.
+///
+/// Contrast the gateway, where the refusal **is** genuinely typed:
+/// `TrustManager::add_edge_async` returns
+/// `Result<(), crate::trust_mgr::TrustMutationError>`, and the HTTP layer
+/// matches on `TrustMutationError::SelfAttestation` to answer 403 rather than
+/// 400. That path never stringifies until the response is built.
+///
+/// [`TrustGraph::add_edge`] deliberately does not raise this at all — see that
+/// method's docs for why the policy does not live in the storage layer.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("self-attestation rejected: a trust edge may not have {did} as both source and target")]
 pub struct SelfAttestationRejected {
