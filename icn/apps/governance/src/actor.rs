@@ -3932,19 +3932,20 @@ fn refuse_replicated_governance_message(
     let effect = replicated_state_effect(msg);
 
     if effect == ReplicatedStateEffect::WouldMutateGovernanceState {
-        // A node's own publications loop back through this ingress: every local
-        // `GovernanceCommand` persists and then calls `GossipActor::publish`, which
-        // calls `store_entry`, which fires this callback. Without separating them the
-        // quarantine counter would be nonzero during ordinary local governance and
-        // useless as an exploitation signal, and healthy single-node operation would
-        // emit a warning per command.
+        // Every refusal is counted and warned, including this node's own publications
+        // looping back (each local `GovernanceCommand` persists, then calls
+        // `GossipActor::publish`, which calls `store_entry`, which fires this callback).
         //
-        // The split is on the entry's *claimed* author, which is telemetry
-        // classification only — never authentication, and never an input to the
-        // refusal, which is unconditional. A peer may claim this node's DID, so it can
-        // land its entries in the `self` bucket; the counter is therefore a floor for
-        // remote traffic, not a total. Both buckets are still counted, so an unexplained
-        // rise in `self` beyond local command volume remains visible.
+        // The `claimed_origin` label is descriptive only and is derived from
+        // `entry.author`, which the sending peer chooses. It is therefore **not** a
+        // trustworthy local/remote split: a peer can land its entries in the `self`
+        // bucket by claiming this node's DID. Do not alert on one bucket alone — a
+        // reliable split needs trusted ingress provenance from the gossip layer, which
+        // the notification callback does not currently carry (see issue #2469).
+        //
+        // Counting and warning on both buckets keeps a forged entry visible no matter
+        // which DID it claims. Local publications contribute a low, operator-driven
+        // baseline: one per local governance command.
         let claimed_origin = if claimed_author == local_did {
             "self"
         } else {
@@ -3958,20 +3959,13 @@ fn refuse_replicated_governance_message(
             claimed_origin,
         );
 
-        if claimed_origin == "peer" {
-            warn!(
-                local_did = %local_did,
-                claimed_author = %claimed_author,
-                message_type = msg.message_type(),
-                "{REPLICATION_QUARANTINE_REASON}"
-            );
-        } else {
-            debug!(
-                message_type = msg.message_type(),
-                "Local governance publication looped back through the replication \
-                 ingress and was not re-applied (state was already persisted locally)"
-            );
-        }
+        warn!(
+            local_did = %local_did,
+            claimed_author = %claimed_author,
+            claimed_origin,
+            message_type = msg.message_type(),
+            "{REPLICATION_QUARANTINE_REASON}"
+        );
     } else {
         debug!(
             message_type = msg.message_type(),

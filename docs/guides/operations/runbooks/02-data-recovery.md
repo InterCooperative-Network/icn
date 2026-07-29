@@ -99,22 +99,9 @@ ICN_PASSPHRASE="your-passphrase" icnctl --data-dir ~/.icn id show
 icnctl verify-backup /path/to/backup.tar --verify-ledger
 ```
 
-**Governance state must be checked explicitly.** It does not replay from peers (see
-"Replay from Peers" below), and a node with missing governance state starts cleanly and
-reports healthy — the absence is silent. Compare against what this node is expected to
-hold *before* declaring the restore complete:
-
-```bash
-# Domains this node should know about
-icnctl gov domain list
-
-# Proposals per domain (repeat for each expected domain)
-icnctl gov proposal list --domain-id "coop:your-domain"
-```
-
-If either list is short or empty against the expected set, **stop**: the backup predates
-those records, or the governance store was not included. Restore from a governance-bearing
-backup rather than starting the node and waiting for peers to fill the gap — they will not.
+> **Governance state also needs checking, but not here.** `icnctl gov ...` talks to the
+> daemon over RPC and the node is still stopped at this point. The governance verification
+> is in Step 7, after the restart.
 
 ### Step 6: Restart Node
 
@@ -142,8 +129,25 @@ watch -n5 'curl -s http://localhost:9100/metrics | grep icn_gossip'
 # Verify expected data present
 icnctl ledger balance  # If had transactions
 icnctl trust list      # If had trust edges
-icnctl gov domain list # Governance domains -- must match the pre-restore expectation
 ```
+
+**Verify governance state explicitly.** It does not replay from peers (see "Replay from
+Peers" below), and a node with missing governance state starts cleanly and reports healthy —
+the absence is silent, so nothing above will surface it. Compare against what this node is
+expected to hold:
+
+```bash
+# Domains this node should know about
+icnctl gov domain list
+
+# Proposals per domain (repeat for each expected domain)
+icnctl gov proposal list --domain-id "coop:your-domain"
+```
+
+If either list is short or empty against the expected set, **stop and do not treat the
+recovery as complete**: the backup predates those records, or the governance store was not
+included. Stop the node again and restore from a governance-bearing backup — waiting for
+peers to fill the gap will not work.
 
 ## Replay from Peers
 
@@ -164,8 +168,8 @@ If backup is old or unavailable, some data can be recovered from peers via gossi
 > back with *silently incomplete* governance state — it will not error, it will simply
 > never learn the governance records it is missing. **Governance state must be recovered
 > from a backup.** Treat the governance store as backup-only until #2469 lands, and verify
-> it explicitly after any restore — see the governance check in Step 5 and the governance
-> items in the Verification Checklist.
+> it explicitly after any restore — see the governance check in Step 7 (after the daemon is
+> back up) and the governance items in the Verification Checklist.
 
 ```bash
 # After starting with keystore only:

@@ -57,8 +57,11 @@ pub fn init_descriptions() {
         "icn_governance_replication_quarantined_total",
         "Total governance messages refused at the replication ingress because the gossip \
          entry's claimed author is unauthenticated and carries no governance authority. \
-         Labels: message_type, and claimed_origin (self|peer). Local publications loop \
-         back through the same ingress and are labelled self; alert on claimed_origin=peer."
+         Labels: message_type, and claimed_origin (self|peer). claimed_origin is derived \
+         from the entry's attacker-chosen author and is descriptive only -- a peer can \
+         claim this node's DID -- so alert on the TOTAL, not on one bucket. Local \
+         publications loop back through this ingress and contribute a low baseline of \
+         one per local governance command."
     );
 
     // Domain metrics
@@ -214,10 +217,12 @@ pub fn delegated_votes_inc() {
 /// remote peer inflate label cardinality.
 ///
 /// `claimed_origin` is `"self"` or `"peer"` — nothing else, so cardinality stays bounded.
-/// It reflects the entry's *claimed* author and is telemetry classification only, never an
-/// authentication or authorization decision. A node's own publications loop back through
-/// the same ingress, so without this label the counter would be nonzero during ordinary
-/// local governance and useless as an exploitation signal. Alert on `claimed_origin="peer"`.
+/// It is derived from the entry's *claimed* author, which the sending peer chooses, so it
+/// is **descriptive only and not a trustworthy origin split**: a peer can land entries in
+/// the `self` bucket by claiming this node's DID. **Alert on the total**, not on one
+/// bucket. A node's own publications loop back through this ingress and contribute a low,
+/// operator-driven baseline of one per local governance command. A reliable split requires
+/// trusted ingress provenance from the gossip layer (issue #2469).
 pub fn replication_quarantined_inc(message_type: &str, claimed_origin: &str) {
     counter!(
         "icn_governance_replication_quarantined_total",
