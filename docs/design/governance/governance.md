@@ -857,12 +857,12 @@ Timer expires OR icnctl gov proposal close
 
 | Use Case | Component | Notes |
 |----------|-----------|-------|
-| Production deployment | GovernanceActor | Full gossip, persistence, scheduling |
+| Production deployment | GovernanceActor | Persistence, scheduling, **outbound** gossip publication. Inbound governance replication is refused — see §11.3 note and issue #2469 |
 | CLI operations | RPC → GovernanceActor | Via `icnctl gov` commands |
 | Gateway REST API (dev) | GovernanceManager | Quick testing, no persistence |
 | Gateway REST API (prod) | Gateway + Actor handle | Future: full integration |
 | Unit tests | InMemoryGovernanceStore | Direct store operations |
-| Integration tests | GovernanceActor | Multi-node gossip validation |
+| Integration tests | GovernanceActor | Single-node validation. Multi-node governance convergence does not currently occur (inbound replication refused) |
 
 ### 11.5 Source of Truth
 

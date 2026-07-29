@@ -838,7 +838,9 @@ Uses kernel primitives: State, Communication, Coordination, Authorization, Time
 Cooperatives need to make decisions collectively. ICN provides:
 - State: Proposal ledger
 - Communication: Announce proposals, gossip votes
-- Coordination: Tally votes across peers (no consensus needed, just gossip)
+- Coordination: Tally votes across peers (no consensus needed, just gossip) — **note:**
+  inbound governance replication is currently refused, so votes do not propagate between
+  nodes today; tallying is per-node over locally recorded votes. See §4.7 and issue #2469
 - Authorization: Gates voting by membership
 - Time: Voting period (block numbers, not wall time)
 

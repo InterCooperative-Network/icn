@@ -142,12 +142,23 @@ icnctl gov domain list
 
 # Proposals per domain (repeat for each expected domain)
 icnctl gov proposal list --domain-id "coop:your-domain"
+
+# Votes and delegations are stored independently of proposals -- a backup can hold every
+# expected domain and proposal while missing later votes or delegations.
+icnctl gov vote show --proposal-id "<id>"   # repeat for each still-open proposal
+icnctl gov vote delegations                 # delegations given and received
 ```
 
-If either list is short or empty against the expected set, **stop and do not treat the
+If any of these is short or empty against the expected set, **stop and do not treat the
 recovery as complete**: the backup predates those records, or the governance store was not
 included. Stop the node again and restore from a governance-bearing backup — waiting for
 peers to fill the gap will not work.
+
+Votes and delegations matter beyond completeness. They are persisted separately from the
+proposals they belong to, so a backup can restore every expected domain and proposal while
+silently omitting later votes or delegations. A still-open proposal restored that way will
+close on an **incorrect tally or delegation weight** — a wrong governance outcome, not just
+missing data. Check them before allowing any restored proposal to reach its deadline.
 
 ## Replay from Peers
 
@@ -192,6 +203,12 @@ watch -n5 'curl -s http://localhost:9100/metrics | grep -E "icn_ledger_entries|i
 - [ ] Governance domains match the expected set (`icnctl gov domain list`) — these do **not**
       replay from peers, so a short list means data loss, not a pending sync
 - [ ] Governance proposals present per domain (`icnctl gov proposal list --domain-id <id>`)
+- [ ] Votes present on each still-open proposal (`icnctl gov vote show --proposal-id <id>`) —
+      stored separately from proposals, so a backup can hold the proposal but not its votes
+- [ ] Delegations present (`icnctl gov vote delegations`) — a missing delegation silently
+      changes voting weight
+- [ ] No restored proposal is allowed to close before the two checks above pass — an
+      incomplete tally produces a wrong outcome, not an obvious failure
 
 ## Rollback
 
