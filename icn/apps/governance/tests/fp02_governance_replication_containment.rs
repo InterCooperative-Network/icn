@@ -79,7 +79,7 @@ struct Node {
     /// Without this, every negative test below would still pass if the ingress stopped
     /// being reached at all — a renamed topic filter, a dropped subscription or a
     /// decode regression would leave the suite green while testing nothing.
-    observed: Arc<std::sync::Mutex<Vec<String>>>,
+    observed: Arc<std::sync::Mutex<Vec<(String, Did)>>>,
     /// Distinguishes otherwise-identical injections. `store_entry` dedups on the
     /// sender-supplied `entry.hash`, so replays must carry distinct claimed hashes to
     /// reach the ingress independently — which is exactly the attacker's capability.
@@ -112,17 +112,19 @@ impl Node {
         .await
         .expect("init_governance_actor");
 
-        let observed: Arc<std::sync::Mutex<Vec<String>>> =
+        let observed: Arc<std::sync::Mutex<Vec<(String, Did)>>> =
             Arc::new(std::sync::Mutex::new(Vec::new()));
         {
             let obs = observed.clone();
             gossip.write().await.add_notification_callback(Arc::new(
-                move |topic: String, entry: GossipEntry, _| {
+                move |topic: String, entry: GossipEntry, subscriber_did: Did| {
                     let is_gov = topic == GOVERNANCE_TOPIC
                         || topic.starts_with(icn_federation::TOPIC_FEDERATION_GOVERNANCE);
                     if is_gov {
                         if let Ok(msg) = GovernanceMessage::from_bytes(&entry.data) {
-                            obs.lock().unwrap().push(msg.message_type().to_string());
+                            obs.lock()
+                                .unwrap()
+                                .push((msg.message_type().to_string(), subscriber_did));
                         }
                     }
                 },
@@ -157,7 +159,7 @@ impl Node {
         wire_sender: &Did,
         msg: &GovernanceMessage,
     ) {
-        let before = self.observed.lock().unwrap().len();
+        let before = self.local_deliveries();
         self.inject_forged_bytes(topic, claimed_author, wire_sender, msg.to_bytes().unwrap())
             .await;
 
@@ -165,14 +167,28 @@ impl Node {
         // replication ingress rather than being dropped upstream (topic filter, dedup,
         // missing subscription, decode failure). A refusal is only meaningful if the
         // message got there to be refused.
-        let seen = self.observed.lock().unwrap();
         assert_eq!(
-            seen.len(),
+            self.local_deliveries(),
             before + 1,
-            "injected {} never reached the governance replication ingress",
+            "injected {} never reached the governance replication ingress exactly once",
             msg.message_type()
         );
-        assert_eq!(seen.last().map(String::as_str), Some(msg.message_type()));
+    }
+
+    /// Invocations whose `subscriber_did` matches this node — the same predicate the
+    /// production ingress filters on, so this counts real ingress deliveries rather
+    /// than the raw per-subscriber fan-out.
+    fn local_deliveries(&self) -> usize {
+        self.observed
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|(_, sub)| *sub == self.did)
+            .count()
+    }
+
+    fn total_fanout(&self) -> usize {
+        self.observed.lock().unwrap().len()
     }
 
     async fn inject_forged_bytes(
@@ -804,4 +820,53 @@ async fn federation_governance_topic_is_contained_too() {
         node.state.get_domain(&domain_id).unwrap().is_none(),
         "a forged DomainCreated on the federation governance topic created a domain"
     );
+}
+
+// ---------------------------------------------------------------------------
+// 14. One entry is refused once, regardless of how many subscribers a peer adds
+// ---------------------------------------------------------------------------
+
+/// `GossipActor::store_entry` invokes notification callbacks inside a per-subscriber
+/// loop, and an unauthenticated network `Subscribe` can add arbitrary DIDs to that
+/// list. Without a per-entry filter, one forged entry would be refused once per
+/// subscriber, letting a remote peer inflate `icn_governance_replication_quarantined_total`
+/// and the warning volume by up to `MAX_SUBSCRIBERS_PER_TOPIC`.
+#[tokio::test(flavor = "current_thread")]
+async fn one_entry_is_refused_once_regardless_of_subscriber_count() {
+    let node = Node::spawn().await;
+    let mallory = attacker();
+
+    // Simulate what an unauthenticated remote `Subscribe` does.
+    for _ in 0..3 {
+        node.gossip
+            .write()
+            .await
+            .subscribe(GOVERNANCE_TOPIC, attacker())
+            .await
+            .expect("subscribe");
+    }
+
+    let domain = make_domain("fanout-check", vec![mallory.clone()]);
+    let domain_id = domain.id.clone();
+    node.inject_forged(
+        GOVERNANCE_TOPIC,
+        &mallory,
+        &mallory,
+        &GovernanceMessage::domain_created(domain),
+    )
+    .await;
+
+    // The raw gossip fan-out really does hit every subscriber (local + 3 attacker DIDs)...
+    assert_eq!(
+        node.total_fanout(),
+        4,
+        "expected the gossip layer to fan out to every subscriber"
+    );
+    // ...but the governance ingress must act exactly once for the entry.
+    assert_eq!(
+        node.local_deliveries(),
+        1,
+        "the ingress must act once per entry, not once per subscriber"
+    );
+    assert!(node.state.get_domain(&domain_id).unwrap().is_none());
 }
