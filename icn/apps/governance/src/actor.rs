@@ -1277,7 +1277,7 @@ impl GovernanceActor {
         {
             let mut g = gossip.write().await;
             g.add_notification_callback(Arc::new(move |topic, entry, subscriber_did| {
-                if !governance_replication_delivery_applies(&topic, &subscriber_did, &did_notify) {
+                if !should_handle_governance_notification(&topic, &subscriber_did, &did_notify) {
                     return;
                 }
 
@@ -3815,34 +3815,45 @@ pub const REPLICATION_QUARANTINE_REASON: &str =
     "refused: unauthenticated governance replication — the entry's claimed author is not \
      verified and carries no authority over the affected governance domain";
 
-/// Whether the governance replication ingress should act on a given gossip notification.
+/// Whether this gossip notification is the one this node should handle.
 ///
-/// Two conditions, both dispatch/observability concerns rather than authorization — the
-/// refusal in [`refuse_replicated_governance_message`] is unconditional either way:
+/// **This decides dispatch, never authority.** Neither condition authenticates anything
+/// or authorizes any state change: the refusal in
+/// [`refuse_replicated_governance_message`] is unconditional for every message that gets
+/// past this point. A subscriber DID is as attacker-influenced as any other gossip field
+/// and must never be read as governance authority.
 ///
-/// 1. **Topic.** The entry must be on the governance topic or a federation governance
-///    topic (`federation:governance` or `federation:governance:<fed_id>`).
-/// 2. **Once per entry, not once per subscriber.** `GossipActor::store_entry` invokes
-///    every notification callback inside its per-subscriber loop, and a peer can add
-///    arbitrary DIDs to that list with an unauthenticated `Subscribe` (up to
-///    `MAX_SUBSCRIBERS_PER_TOPIC`). Without this, one received entry would be refused
-///    once per subscriber, letting a remote peer inflate the quarantine counter and the
-///    warning volume by orders of magnitude. Subscriber DIDs are deduplicated on insert,
-///    so matching the local DID yields exactly one invocation per entry.
+/// 1. **Deduplication.** `GossipActor::store_entry` invokes every notification callback
+///    inside its per-subscriber loop, and a peer can add arbitrary DIDs to that list with
+///    an unauthenticated `Subscribe` (up to `MAX_SUBSCRIBERS_PER_TOPIC`). Without this,
+///    one received entry would be handled once per subscriber, letting a remote peer
+///    inflate the quarantine counter and the warning volume by orders of magnitude.
+///    Subscriber DIDs are deduplicated on insert, so matching the local DID yields
+///    exactly one handling per entry.
+/// 2. **Topic.** The entry must be on the governance topic, or on
+///    `federation:governance` / `federation:governance:<federation-id>`.
 ///
 /// Extracted as a pure function so both conditions are directly testable; inline in the
 /// closure they could only be exercised indirectly.
-pub fn governance_replication_delivery_applies(
+fn should_handle_governance_notification(
     topic: &str,
     subscriber_did: &Did,
     local_did: &Did,
 ) -> bool {
-    let federation_root = icn_federation::TOPIC_FEDERATION_GOVERNANCE;
-    let is_governance_topic = topic == GOVERNANCE_TOPIC
-        || topic == federation_root
-        || topic.starts_with(&format!("{federation_root}:"));
+    // Subscriber first. This is the cheapest check and it discards the amplified
+    // per-subscriber invocations before any topic comparison or allocation.
+    if subscriber_did != local_did {
+        return false;
+    }
 
-    is_governance_topic && subscriber_did == local_did
+    let federation_root = icn_federation::TOPIC_FEDERATION_GOVERNANCE;
+    topic == GOVERNANCE_TOPIC
+        || topic == federation_root
+        // `federation:governance:<federation-id>` only. Matching on the bare prefix
+        // would also admit look-alikes such as `federation:governanceX`.
+        || topic
+            .strip_prefix(federation_root)
+            .is_some_and(|rest| rest.starts_with(':'))
 }
 
 /// Classify what a replicated governance message would have mutated.
@@ -4129,7 +4140,7 @@ mod tests {
         // Governance topics, this node's own subscription -> act.
         for topic in [GOVERNANCE_TOPIC, fed, fed_scoped.as_str()] {
             assert!(
-                governance_replication_delivery_applies(topic, &local, &local),
+                should_handle_governance_notification(topic, &local, &local),
                 "should act on {topic} for the local subscription"
             );
         }
@@ -4139,7 +4150,7 @@ mod tests {
         // can add arbitrary DIDs, and each one re-invokes this callback for one entry.
         for topic in [GOVERNANCE_TOPIC, fed, fed_scoped.as_str()] {
             assert!(
-                !governance_replication_delivery_applies(topic, &other, &local),
+                !should_handle_governance_notification(topic, &other, &local),
                 "must not act a second time for a non-local subscriber on {topic}"
             );
         }
@@ -4152,8 +4163,24 @@ mod tests {
             "federation",
         ] {
             assert!(
-                !governance_replication_delivery_applies(topic, &local, &local),
+                !should_handle_governance_notification(topic, &local, &local),
                 "must not act on unrelated topic {topic}"
+            );
+        }
+
+        // Look-alikes must not slip through on a bare prefix match.
+        let fed_lookalike = format!("{fed}X");
+        let fed_suffix = format!("{fed}-shadow");
+        for topic in [
+            "governance:proposals",
+            "governance:proposal:extra",
+            "xgovernance:proposal",
+            fed_lookalike.as_str(),
+            fed_suffix.as_str(),
+        ] {
+            assert!(
+                !should_handle_governance_notification(topic, &local, &local),
+                "must not act on look-alike topic {topic}"
             );
         }
     }

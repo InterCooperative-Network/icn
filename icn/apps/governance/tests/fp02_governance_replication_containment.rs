@@ -72,13 +72,18 @@ struct Node {
     gossip: Arc<tokio::sync::RwLock<GossipActor>>,
     ops: GovernanceManager,
     state: SledGovernanceStateStore,
-    /// Positive control. Registered on the same fan-out seam as the production
-    /// governance callback (`add_notification_callback`), so if this observer records
-    /// a message the production ingress was invoked for it in the same dispatch loop.
+    /// Positive control on *delivery*, recorded as `(message_type, subscriber_did)`.
     ///
-    /// Without this, every negative test below would still pass if the ingress stopped
-    /// being reached at all — a renamed topic filter, a dropped subscription or a
-    /// decode regression would leave the suite green while testing nothing.
+    /// Registered on the same `add_notification_callback` fan-out seam the production
+    /// governance callback uses, so it observes the same dispatch loop. Without it, every
+    /// negative test below would still pass if entries stopped being delivered at all —
+    /// a dropped subscription, an uncreated topic or a decode regression would leave the
+    /// suite green while testing nothing.
+    ///
+    /// **What it does not prove:** this observer cannot see how many times the production
+    /// refusal function runs. It records callback invocations, not ingress actions. The
+    /// production dispatch decision is pinned directly by the
+    /// `should_handle_governance_notification` unit tests in `actor.rs`.
     observed: Arc<std::sync::Mutex<Vec<(String, Did)>>>,
     /// Distinguishes otherwise-identical injections. `store_entry` dedups on the
     /// sender-supplied `entry.hash`, so replays must carry distinct claimed hashes to
@@ -163,21 +168,22 @@ impl Node {
         self.inject_forged_bytes(topic, claimed_author, wire_sender, msg.to_bytes().unwrap())
             .await;
 
-        // Positive control: prove this injection actually reached the governance
-        // replication ingress rather than being dropped upstream (topic filter, dedup,
+        // Positive control: prove this injection was actually delivered on this node's
+        // own subscription rather than being dropped upstream (topic filter, dedup,
         // missing subscription, decode failure). A refusal is only meaningful if the
         // message got there to be refused.
         assert_eq!(
             self.local_deliveries(),
             before + 1,
-            "injected {} never reached the governance replication ingress exactly once",
+            "injected {} was not delivered exactly once on the local subscription",
             msg.message_type()
         );
     }
 
-    /// Invocations whose `subscriber_did` matches this node — the same predicate the
-    /// production ingress filters on, so this counts real ingress deliveries rather
-    /// than the raw per-subscriber fan-out.
+    /// Callback invocations whose `subscriber_did` is this node's own.
+    ///
+    /// This is the subset of the raw fan-out that is *eligible* for handling. It is not a
+    /// count of production refusals — the observer cannot see those.
     fn local_deliveries(&self) -> usize {
         self.observed
             .lock()
@@ -856,17 +862,21 @@ async fn one_entry_is_refused_once_regardless_of_subscriber_count() {
     )
     .await;
 
-    // The raw gossip fan-out really does hit every subscriber (local + 3 attacker DIDs)...
+    // The raw gossip fan-out really does invoke callbacks once per subscriber
+    // (local + 3 attacker DIDs) — the amplification this guards against is real...
     assert_eq!(
         node.total_fanout(),
         4,
         "expected the gossip layer to fan out to every subscriber"
     );
-    // ...but the governance ingress must act exactly once for the entry.
+    // ...while exactly one of those invocations carries this node's own subscriber DID,
+    // which is the only one `should_handle_governance_notification` admits. That predicate
+    // is tested directly in `actor.rs`; this assertion establishes the input it sees, not
+    // the number of times the production refusal function ran.
     assert_eq!(
         node.local_deliveries(),
         1,
-        "the ingress must act once per entry, not once per subscriber"
+        "exactly one invocation should be eligible for handling"
     );
     assert!(node.state.get_domain(&domain_id).unwrap().is_none());
 }
