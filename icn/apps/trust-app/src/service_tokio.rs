@@ -396,6 +396,31 @@ impl TrustService for TrustServiceImplTokio {
             return Ok(()); // Silently reject expired attestations
         }
 
+        // Refuse self-attestation on the gossip ingestion boundary (F-P0-1).
+        //
+        // This is the third authorization boundary, and the one most easily missed:
+        // a peer can correctly self-sign an attestation whose issuer equals its
+        // subject. The signature verifies, the expiry check passes, and the edge
+        // would then be persisted as a genuine incoming vouch — which is exactly
+        // what the level-2 enrollment gate averages when deciding who may vouch.
+        //
+        // A remote peer must not be able to raise its own standing by asserting it.
+        // Checked here rather than in `TrustGraph::add_edge` for the same reason as
+        // the HTTP and RPC paths: that storage primitive must keep accepting the
+        // deliberate `own_did -> own_did` genesis seed `icnd` writes under
+        // `ICN_DEV_SELF_TRUST`.
+        if attestation.issuer == attestation.subject {
+            tracing::warn!(
+                source = %source,
+                "Rejected self-attestation from gossip: {} -> {}",
+                attestation.issuer, attestation.subject,
+            );
+            return Err(icn_trust::SelfAttestationRejected {
+                did: attestation.issuer.to_string(),
+            }
+            .to_string());
+        }
+
         // Save sequence info before converting (attestation is consumed)
         let att_issuer = attestation.issuer.clone();
         let att_sequence = attestation.sequence;
@@ -620,6 +645,26 @@ impl TrustService for TrustServiceImplTokio {
             .parse()
             .map_err(|e| format!("Invalid target DID: {e}"))?;
 
+        // Refuse self-attestation on the RPC path (F-P0-1).
+        //
+        // This is an authorization boundary: a caller reaches it through
+        // `trust.add`, and the edge it writes is read by every trust threshold
+        // in the system — including the one deciding who may vouch on the
+        // enrollment surface. A self-edge is indistinguishable from a real
+        // vouch to those consumers, so one at score 1.0 satisfies any
+        // incoming-trust gate permanently.
+        //
+        // The guard is here rather than in `TrustGraph::add_edge` because that
+        // storage primitive has no caller to reason about, and because `icnd`
+        // seeds a deliberate `own_did -> own_did` genesis edge under the
+        // `ICN_DEV_SELF_TRUST` dev gate that must keep working.
+        if self.own_did == target_did {
+            return Err(icn_trust::SelfAttestationRejected {
+                did: target_did.to_string(),
+            }
+            .to_string());
+        }
+
         let trust_score =
             icn_trust::TrustScore::new(score).map_err(|e| format!("Invalid trust score: {e}"))?;
         let mut edge = icn_trust::TrustEdge::new(self.own_did.clone(), target_did, trust_score);
@@ -762,6 +807,84 @@ mod tests {
             keypair,
             store,
         )
+    }
+
+    /// A peer may not raise its own standing by gossiping a self-signed
+    /// self-attestation (F-P0-1, gossip ingress boundary).
+    ///
+    /// The signature on such an attestation is perfectly valid — the peer really
+    /// does own the key — so signature verification alone does not refuse it. The
+    /// resulting edge would be persisted as a genuine incoming vouch, which is
+    /// exactly what the level-2 enrollment gate averages when deciding who may
+    /// vouch. `TrustGraph::add_edge` deliberately accepts self-edges (it must, for
+    /// `icnd`'s `ICN_DEV_SELF_TRUST` genesis seed), so the refusal has to happen
+    /// here.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ingest_rejects_self_attestation_from_gossip() {
+        let (graph, keypair, store) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph.clone(), keypair, store);
+
+        // A remote peer, self-signing an attestation for itself.
+        let peer = icn_identity::KeyPair::generate().unwrap();
+        let peer_did = peer.did().clone();
+        let mut attestation =
+            icn_trust::TrustAttestation::new(peer_did.clone(), peer_did.clone(), 1.0);
+        attestation
+            .sign(&peer)
+            .expect("peer signs its own attestation");
+        attestation
+            .verify()
+            .expect("the signature is genuinely valid");
+
+        let bytes = serde_json::to_vec(&attestation).expect("serialize");
+        let source = icn_kernel_api::types::Did::from(peer_did.to_string());
+
+        let err = service
+            .ingest_attestation(&bytes, &source)
+            .expect_err("a self-attestation must be refused at the gossip boundary");
+        assert!(
+            err.contains("self-attestation"),
+            "expected a typed self-attestation refusal, got: {err}"
+        );
+
+        // And nothing was persisted.
+        let incoming = graph
+            .read()
+            .await
+            .get_incoming_edges(&peer_did)
+            .expect("read incoming edges");
+        assert!(
+            incoming.is_empty(),
+            "a refused self-attestation must not be stored"
+        );
+    }
+
+    /// The guard is specific to self-edges: an ordinary peer-to-peer attestation
+    /// still ingests normally.
+    #[tokio::test(flavor = "multi_thread")]
+    async fn ingest_accepts_normal_peer_attestation() {
+        let (graph, keypair, store) = create_test_graph();
+        let service = TrustServiceImplTokio::new(graph.clone(), keypair, store);
+
+        let issuer = icn_identity::KeyPair::generate().unwrap();
+        let subject = icn_identity::KeyPair::generate().unwrap();
+        let mut attestation =
+            icn_trust::TrustAttestation::new(issuer.did().clone(), subject.did().clone(), 0.6);
+        attestation.sign(&issuer).expect("sign");
+
+        let bytes = serde_json::to_vec(&attestation).expect("serialize");
+        let source = icn_kernel_api::types::Did::from(issuer.did().to_string());
+
+        service
+            .ingest_attestation(&bytes, &source)
+            .expect("a normal peer attestation must still ingest");
+
+        let incoming = graph
+            .read()
+            .await
+            .get_incoming_edges(subject.did())
+            .expect("read incoming edges");
+        assert_eq!(incoming.len(), 1, "the normal edge must be stored");
     }
 
     #[tokio::test(flavor = "multi_thread")]

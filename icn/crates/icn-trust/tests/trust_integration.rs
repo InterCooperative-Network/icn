@@ -1305,3 +1305,45 @@ fn test_fanout_threshold_logging() {
     let score = multi.social().compute_trust_score(hub.did()).unwrap();
     assert!(score >= 0.0);
 }
+
+/// `TrustGraph::add_edge` deliberately ACCEPTS a self-edge (F-P0-1 follow-up).
+///
+/// Refusing `source == target` is an authorization decision, and this type is
+/// the storage primitive — it has no caller to reason about. Two things depend
+/// on that separation:
+///
+/// 1. `icnd` seeds a genesis `own_did -> own_did` edge under the explicit
+///    `ICN_DEV_SELF_TRUST` dev gate (`bins/icnd/src/main.rs`), which the
+///    documented live-local receipt-chain proof requires. A guard here would
+///    fail the daemon at startup.
+/// 2. `icn-core`'s `ledger_gossip_trust_integration` seeds trust for every node
+///    including itself; a guard here would fail that test.
+///
+/// The self-attestation refusal lives at the authorization boundaries instead —
+/// the gateway's `TrustManager::add_edge_async` and `TrustService::submit_attestation`.
+/// This test pins the separation so a future change does not quietly move policy
+/// back down into storage.
+#[test]
+fn trust_graph_accepts_self_edges_policy_lives_above() {
+    let store = Arc::new(SledStore::temporary().unwrap());
+    let alice = KeyPair::generate().unwrap();
+    let mut graph = TrustGraph::new(store, alice.did().clone());
+
+    graph
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            alice.did().clone(),
+            TrustScore::new(1.0).unwrap(),
+        ))
+        .expect("the storage layer must accept a self-edge; policy belongs above it");
+
+    // An ordinary edge between two distinct DIDs still works.
+    let bob = KeyPair::generate().unwrap();
+    graph
+        .add_edge(TrustEdge::new(
+            alice.did().clone(),
+            bob.did().clone(),
+            TrustScore::new(0.8).unwrap(),
+        ))
+        .expect("a normal edge must still be accepted");
+}

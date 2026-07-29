@@ -156,6 +156,24 @@ echo ""
 echo -e "${BLUE}Step 4: Test SDIS Enrollment Flow${NC}"
 echo "----------------------------------------"
 
+# Outcome of the enrollment section, consumed by the final summary.
+#
+# States:
+#   completed        the full flow ran and completion returned a credential
+#   initiation_only  /enrollment/start responded, nothing further was exercised
+#   skipped          401/404 — self-serve enrollment is not mounted (the default)
+#   failed           unexpected status, malformed 2xx, or a failed completion
+#
+# NOTE: this script exercises ONLY /enrollment/start. It performs no level-1
+# device proof, no level-2 vouch, and no completion, so it cannot reach
+# "completed". The state exists so the summary can never imply completion was
+# tested, and so a future version that does exercise the full flow has an
+# honest value to set. Reaching completion needs Ed25519 device signing over
+# `complete:{enrollment_id}`; duplicating that in shell is out of scope here.
+#
+# Default to "failed" so an unforeseen path cannot silently read as success.
+enrollment_result="failed"
+
 echo -n "Starting SDIS enrollment... "
 enroll_response=$(curl -s -w "\n%{http_code}" \
     -H "Content-Type: application/json" \
@@ -173,12 +191,43 @@ enroll_status=$(echo "$enroll_response" | tail -n1)
 enroll_body=$(echo "$enroll_response" | head -n-1)
 
 if [ "$enroll_status" = "200" ] || [ "$enroll_status" = "201" ]; then
-    echo -e "${GREEN}✓${NC}"
     enrollment_id=$(echo "$enroll_body" | jq -r '.enrollment_id' 2>/dev/null)
-    echo "  Enrollment ID: $enrollment_id"
+    if [ -z "$enrollment_id" ] || [ "$enrollment_id" = "null" ]; then
+        # 2xx but no usable enrollment_id: a malformed response is a real
+        # failure, not a skip.
+        echo -e "${RED}✗${NC} ($enroll_status, no enrollment_id in response)"
+        echo "  Response: $enroll_body" | head -c 200
+        enrollment_result="failed"
+    else
+        # A usable enrollment ID proves the START endpoint answered. It proves
+        # nothing about level-1 verification, level-2 vouching, completion,
+        # credential minting, or the durable anchor/holder/membership records.
+        # Report exactly that.
+        echo -e "${GREEN}✓${NC} (initiation only)"
+        echo "  Enrollment ID: $enrollment_id"
+        echo "  NOTE: completion was NOT exercised — no level-1 proof, no level-2"
+        echo "        vouch, no /enrollment/complete call."
+        enrollment_result="initiation_only"
+    fi
+elif [ "$enroll_status" = "404" ] || [ "$enroll_status" = "401" ]; then
+    # Self-serve enrollment is absent unless the operator declares an isolated
+    # rehearsal deployment (ICN_ENABLE_SELF_SERVE_ENROLLMENT=true). No shipped
+    # profile sets it, so this is the EXPECTED default, not a failure.
+    #
+    # Report it as SKIPPED rather than a warning: this section previously
+    # printed a warning and carried on, so a run against a default gateway
+    # reported the enrollment flow as exercised when no enrollment happened.
+    echo -e "${YELLOW}SKIPPED${NC} ($enroll_status — self-serve enrollment not mounted)"
+    echo "  This is the expected default: no shipped profile sets"
+    echo "  ICN_ENABLE_SELF_SERVE_ENROLLMENT=true. To exercise this flow, point"
+    echo "  the script at a gateway that has explicitly declared an isolated"
+    echo "  rehearsal deployment."
+    enrollment_id=""
+    enrollment_result="skipped"
 else
-    echo -e "${YELLOW}⚠${NC} ($enroll_status)"
+    echo -e "${RED}✗${NC} ($enroll_status)"
     echo "  Response: $enroll_body" | head -c 200
+    enrollment_result="failed"
 fi
 echo ""
 
@@ -191,9 +240,39 @@ echo -e "${GREEN}✓ Authentication Flow${NC} - Challenge-response working"
 echo -e "${GREEN}✓ Token Generation${NC} - JWT tokens being issued"
 echo -e "${GREEN}✓ Ledger Endpoints${NC} - Balance and history accessible"
 echo -e "${GREEN}✓ Governance Endpoints${NC} - Domains and proposals accessible"
-echo -e "${GREEN}✓ SDIS Enrollment${NC} - Enrollment system operational"
-echo ""
-echo "🎉 Mobile app backend is fully operational!"
+
+# The enrollment line must reflect what actually happened. Self-serve enrollment
+# is absent on every shipped profile, so on a default gateway this section is
+# skipped — and a skipped section must never be summarised as "operational",
+# nor support an unconditional "fully operational" conclusion.
+case "$enrollment_result" in
+    completed)
+        echo -e "${GREEN}✓ SDIS Enrollment${NC} - Enrollment system operational (completion verified)"
+        echo ""
+        echo "🎉 Mobile app backend is fully operational!"
+        ;;
+    initiation_only)
+        echo -e "${YELLOW}◐ SDIS Enrollment${NC} - PARTIAL: initiation endpoint available; completion NOT exercised"
+        echo ""
+        echo "✅ Mobile app backend checks passed, with SDIS enrollment only PARTIALLY exercised."
+        echo "   /enrollment/start responded, but this run performed no level-1 device"
+        echo "   proof, no level-2 vouch, and no completion — so it does NOT demonstrate"
+        echo "   credential minting, membership creation, or completion reliability."
+        ;;
+    skipped)
+        echo -e "${YELLOW}⊘ SDIS Enrollment${NC} - SKIPPED (self-serve enrollment not enabled on this gateway)"
+        echo ""
+        echo "✅ Mobile app backend checks passed, EXCEPT SDIS enrollment, which was not exercised."
+        echo "   Self-serve enrollment is absent unless the operator sets"
+        echo "   ICN_ENABLE_SELF_SERVE_ENROLLMENT=true. That is the expected default and is"
+        echo "   not a failure — but this run does NOT demonstrate that the enrollment flow works."
+        ;;
+    *)
+        echo -e "${RED}✗ SDIS Enrollment${NC} - FAILED"
+        echo ""
+        echo "❌ Mobile app backend is NOT fully operational: SDIS enrollment failed."
+        ;;
+esac
 echo ""
 echo "To run CoopWallet mobile app:"
 echo "  cd /home/matt/projects/icn/sdk/react-native/examples/CoopWallet"
@@ -205,3 +284,8 @@ echo ""
 
 # Cleanup
 rm -rf "$TEST_DATA_DIR"
+
+# A genuine enrollment failure must fail the run. A skip must not.
+if [ "$enrollment_result" = "failed" ]; then
+    exit 1
+fi

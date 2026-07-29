@@ -105,6 +105,41 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::{debug, info, instrument, warn};
 
+/// A trust-edge mutation was refused because its source and target are the same DID.
+///
+/// # What this type is, and what it is not
+///
+/// It is the **canonical wording** of the self-attestation refusal, so every
+/// ingress reports the same thing and the message is defined in one place.
+///
+/// It is **not** recoverable as a typed value across the `TrustService`
+/// boundary. `TrustService::submit_attestation` and
+/// `TrustService::ingest_attestation` (`apps/trust-app/src/service_tokio.rs`)
+/// both return `Result<_, String>` — a signature owned by the
+/// `icn_kernel_api::services::TrustService` trait — so they construct this type
+/// and immediately `.to_string()` it. The type is erased at that boundary.
+/// **Do not attempt `downcast_ref::<SelfAttestationRejected>()` on a
+/// `TrustService` error; there is no error object to downcast.** A caller that
+/// must distinguish this refusal from other trust failures at that layer has
+/// only the message text today. Giving `TrustService` a typed error is an
+/// API change across the trait and all its implementors, deliberately not made
+/// in the F-P0-1 containment.
+///
+/// Contrast the gateway, where the refusal **is** genuinely typed:
+/// `TrustManager::add_edge_async` returns
+/// `Result<(), crate::trust_mgr::TrustMutationError>`, and the HTTP layer
+/// matches on `TrustMutationError::SelfAttestation` to answer 403 rather than
+/// 400. That path never stringifies until the response is built.
+///
+/// [`TrustGraph::add_edge`] deliberately does not raise this at all — see that
+/// method's docs for why the policy does not live in the storage layer.
+#[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
+#[error("self-attestation rejected: a trust edge may not have {did} as both source and target")]
+pub struct SelfAttestationRejected {
+    /// The DID that appeared as both source and target.
+    pub did: String,
+}
+
 /// Threshold for logging high-fanout cache invalidation events.
 ///
 /// When a trust edge change triggers invalidation of >= this many downstream
@@ -431,6 +466,30 @@ impl TrustGraph {
     }
 
     /// Add or update a trust edge
+    ///
+    /// # Self-edges
+    ///
+    /// This method does **not** refuse `source == target`. Refusing a self-edge
+    /// is an *authorization* decision about who asked, and this type is the
+    /// storage primitive — it has no caller identity to reason about. Encoding
+    /// that policy here also breaks a deliberate, composition-root-level
+    /// bootstrap: `icnd` seeds a genesis `own_did -> own_did` edge under the
+    /// explicit `ICN_DEV_SELF_TRUST` dev gate (`bins/icnd/src/main.rs`), which
+    /// the documented live-local receipt-chain proof depends on.
+    ///
+    /// The self-attestation guard therefore lives at each *authorization*
+    /// boundary instead, where a caller exists to be refused. There are three,
+    /// and all three must carry it — a self-edge accepted at any one of them is
+    /// indistinguishable downstream from a genuine vouch:
+    /// - the gateway's `TrustManager::add_edge_async` (HTTP `/trust/attest`),
+    /// - `TrustService::submit_attestation` in `apps/trust-app` (RPC `trust.add`),
+    /// - `TrustService::ingest_attestation` in `apps/trust-app` (**gossip ingress**
+    ///   — a peer can correctly self-sign an attestation whose issuer equals its
+    ///   subject, so signature verification alone does not refuse it).
+    ///
+    /// Callers that legitimately need a self-edge reach this method directly and
+    /// are, by construction, composition roots rather than request handlers.
+    /// See [`SelfAttestationRejected`] for the error those boundaries return.
     pub fn add_edge(&mut self, edge: TrustEdge) -> Result<()> {
         info!(
             "Adding trust edge: {} -> {} (score: {}, prefix: {})",

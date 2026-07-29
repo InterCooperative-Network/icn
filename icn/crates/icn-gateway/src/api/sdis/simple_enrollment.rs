@@ -446,6 +446,31 @@ pub async fn verify_level2(
         ));
     }
 
+    // Bind the vouch to the cooperative the enrollment names.
+    //
+    // The session's `coop_id` arrives unauthenticated from `start_enrollment`,
+    // and completion turns it into the `coop_id` of a minted credential that
+    // `require_coop_access` then honors by string equality. Without this check
+    // the trust threshold below is the only thing standing between *any* valid
+    // credential and membership in an *arbitrary* cooperative — and a trust
+    // score says nothing about which institution the holder belongs to
+    // (F-P0-1, links 4 and 6).
+    //
+    // Requiring the voucher to already hold authority in the same cooperative
+    // makes the vouch an institution-scoped decision, using the same
+    // credential-to-coop binding every other coop-scoped route enforces. It does
+    // not decide the larger question of where vouching authority ought to come
+    // from — trust graph or governance capability — which is deliberately left
+    // open here. There is no accepted ADR for that decision yet; the live
+    // proposal is the draft PR #2450, "propose institution-scoped SDIS vouch
+    // authority".
+    if claims.coop_id != session.coop_id {
+        return Err(GatewayError::AuthorizationFailed(format!(
+            "credential is for cooperative '{}' and cannot vouch for an enrollment into '{}'",
+            claims.coop_id, session.coop_id
+        )));
+    }
+
     // Verify steward has sufficient trust
     // Stewards need a trust score of at least 0.4 (Partner level) to vouch
     // Self-trust is 1.0, so we check from steward's own perspective
@@ -659,71 +684,88 @@ pub async fn complete_enrollment(
         None
     };
 
-    // Create PersonhoodAnchor and CommonsHolderRecord for the new identity
-    let (anchor_id, holder_id) = match commons_mgr
+    // Create PersonhoodAnchor and CommonsHolderRecord for the new identity.
+    //
+    // FAIL-CLOSED (F-P0-1, link 9). Every step from here to the mint was
+    // previously `warn!`-and-continue, so a completion whose anchor, holder,
+    // jurisdiction join and membership approval had *all* failed still returned
+    // a signed credential carrying `ledger:read`/`ledger:write` for the
+    // cooperative. That credential asserts an institutional standing no durable
+    // record supports, and `require_coop_access` cannot tell the difference — it
+    // sees only the `coop_id` string. A credential that claims authority must
+    // not outlive the writes that justify it, so each failure below aborts the
+    // enrollment instead of degrading it.
+    let anchor = commons_mgr
         .create_anchor_from_enrollment(&ephemeral_did, steward_did_opt.as_ref())
         .await
-    {
-        Ok(anchor) => {
-            let anchor_id_hex = hex::encode(anchor.id());
-            // Get or create holder from anchor (idempotent - safe to call multiple times)
-            match commons_mgr
-                .get_or_create_holder(
-                    &anchor_id_hex,
-                    &ephemeral_did,
-                    Some(session.identity_name.clone()),
-                )
-                .await
-            {
-                Ok(holder) => (Some(anchor_id_hex), Some(hex::encode(holder.id()))),
-                Err(e) => {
-                    tracing::warn!("Failed to create holder for {}: {}", did, e);
-                    (Some(anchor_id_hex), None)
-                }
-            }
-        }
-        Err(e) => {
-            tracing::warn!("Failed to create anchor for {}: {}", did, e);
-            (None, None)
-        }
-    };
+        .map_err(|e| {
+            tracing::error!("Failed to create anchor for {}: {}", did, e);
+            GatewayError::InternalError(
+                "Enrollment failed: identity anchor could not be recorded".to_string(),
+            )
+        })?;
+    let anchor_id_hex = hex::encode(anchor.id());
+
+    // Get or create holder from anchor (idempotent - safe to call multiple times)
+    let holder = commons_mgr
+        .get_or_create_holder(
+            &anchor_id_hex,
+            &ephemeral_did,
+            Some(session.identity_name.clone()),
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to create holder for {}: {}", did, e);
+            GatewayError::InternalError(
+                "Enrollment failed: holder record could not be recorded".to_string(),
+            )
+        })?;
+    let holder_id_hex = hex::encode(holder.id());
 
     // Auto-affiliate the new holder with their enrollment coop
-    let membership_status = if let Some(ref holder_id_hex) = holder_id {
-        let jurisdiction = JurisdictionId::new(format!("coop:{}", session.coop_id));
-        let initial_capabilities = vec![MembershipCapability::Transact, MembershipCapability::Vote];
+    let jurisdiction = JurisdictionId::new(format!("coop:{}", session.coop_id));
+    let initial_capabilities = vec![MembershipCapability::Transact, MembershipCapability::Vote];
 
-        match commons_mgr
-            .join_jurisdiction(holder_id_hex, jurisdiction.clone(), initial_capabilities)
-            .await
-        {
-            Ok(_affiliation) => {
-                // If steward vouched, auto-approve (skip candidate → provisional)
-                if steward_did_opt.is_some() {
-                    if let Err(e) = commons_mgr
-                        .approve_membership(holder_id_hex, &jurisdiction)
-                        .await
-                    {
-                        tracing::warn!("Failed to auto-approve membership: {}", e);
-                    }
-                    Some("provisional".to_string())
-                } else {
-                    Some("candidate".to_string())
-                }
-            }
-            Err(e) => {
-                tracing::warn!(
-                    "Failed to auto-affiliate {} with coop {}: {}",
-                    holder_id_hex,
-                    session.coop_id,
-                    e
-                );
-                None
-            }
-        }
-    } else {
-        None
-    };
+    commons_mgr
+        .join_jurisdiction(&holder_id_hex, jurisdiction.clone(), initial_capabilities)
+        .await
+        .map_err(|e| {
+            tracing::error!(
+                "Failed to affiliate {} with coop {}: {}",
+                holder_id_hex,
+                session.coop_id,
+                e
+            );
+            GatewayError::InternalError(
+                "Enrollment failed: cooperative membership could not be recorded".to_string(),
+            )
+        })?;
+
+    // A level-2 session always carries a steward vouch, so approval is the normal
+    // path. The one way to reach this with no steward is an unparseable
+    // `session.steward_did` above — in which case the enrollment is in a state no
+    // durable record supports, and minting a credential for an unapproved
+    // candidate is exactly the failure this containment exists to prevent.
+    if steward_did_opt.is_none() {
+        return Err(GatewayError::InternalError(
+            "Enrollment failed: level-2 session carried no usable steward vouch".to_string(),
+        ));
+    }
+    commons_mgr
+        .approve_membership(&holder_id_hex, &jurisdiction)
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to approve membership for {}: {}", holder_id_hex, e);
+            GatewayError::InternalError(
+                "Enrollment failed: membership approval could not be recorded".to_string(),
+            )
+        })?;
+
+    // Every institutional write above succeeded, so these are no longer "best
+    // effort" fields that may be absent in a successful response.
+    let anchor_id = Some(anchor_id_hex);
+    let holder_id = Some(holder_id_hex);
+    let membership_status = Some("provisional".to_string());
 
     // Capture coop_id before dropping session
     let coop_id = session.coop_id.clone();
@@ -1196,8 +1238,15 @@ pub struct HistoryQuery {
 /// protected `/vouch/{id}` — it sets `level = 2`, `steward_vouch`,
 /// `steward_did`, and `vouched_at` — but authorizes it with a trust-graph gate
 /// (`effective_trust >= STEWARD_MIN_TRUST_SCORE`) rather than a steward
-/// capability, and applies no cooperative binding. Moving `/vouch/{id}` behind
-/// a capability therefore does not make vouching capability-gated in general.
+/// capability. Moving `/vouch/{id}` behind a capability therefore does not make
+/// vouching capability-gated in general.
+///
+/// Note what *is* now bound and what is not. Since F-P0-1, `/enrollment/verify/level2`
+/// **does** enforce a cooperative binding: the voucher's credential must name the
+/// same `coop_id` as the enrollment, so a credential for coop A can no longer
+/// advance an enrollment into coop B. What remains unreconciled is the
+/// *capability model* — trust-graph gate here versus steward capability on
+/// `/vouch/{id}` — not the cooperative scope.
 /// Reconciling the two authority models is an institutional decision (does
 /// vouching authority derive from the trust graph or from a governance
 /// capability?), deliberately not made here — see the PR discussion for #2443.

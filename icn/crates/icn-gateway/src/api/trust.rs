@@ -2,9 +2,12 @@
 
 use crate::error::{GatewayError, Result};
 use crate::events::{EventBroadcaster, GatewayEvent};
-use crate::trust_mgr::{TrustManager, TRUST_ISOLATED_MAX, TRUST_KNOWN_MAX, TRUST_PARTNER_MAX};
-use actix_web::{get, post, web, HttpResponse};
+use crate::trust_mgr::{
+    TrustManager, TrustMutationError, TRUST_ISOLATED_MAX, TRUST_KNOWN_MAX, TRUST_PARTNER_MAX,
+};
+use actix_web::{get, post, web, HttpRequest, HttpResponse};
 use icn_identity::Did;
+use icn_rpc::auth::scopes::TRUST_WRITE;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use utoipa::ToSchema;
@@ -100,13 +103,28 @@ pub async fn get_trust_edges(
 /// POST /v1/trust/attest - Create a trust attestation
 ///
 /// Creates a trust edge from the authenticated DID to another DID.
+///
+/// # Authority
+///
+/// Requires the [`TRUST_WRITE`] capability. Authentication alone is deliberately
+/// **not** sufficient: this was the only mutating gateway route reachable with
+/// any valid credential and no capability, and the edge it writes feeds the
+/// trust threshold that decides who may vouch on the enrollment surface. A
+/// holder of an arbitrary credential could therefore raise its own standing to
+/// the vouching threshold (F-P0-1, links 1–3).
+///
+/// `from` is the authenticated subject and is never taken from the body, so the
+/// capability authorizes attesting *as yourself*, not as anyone else.
 #[post("/trust/attest")]
 pub async fn create_trust_attestation(
+    http_req: HttpRequest,
     req: web::Json<CreateTrustEdgeRequest>,
     from_did: web::ReqData<Did>,
     trust_manager: web::Data<Arc<TrustManager>>,
     event_broadcaster: web::Data<Arc<EventBroadcaster>>,
 ) -> Result<HttpResponse> {
+    crate::middleware::require_scope(&http_req, TRUST_WRITE)?;
+
     let to_did = req
         .to
         .parse::<Did>()
@@ -117,7 +135,16 @@ pub async fn create_trust_attestation(
     trust_manager
         .add_edge_with_score(from.clone(), to_did.clone(), req.score, req.memo.clone())
         .await
-        .map_err(|e| GatewayError::BadRequest(format!("Invalid trust score: {}", e)))?;
+        .map_err(|e| match e {
+            // A self-edge refusal is an authorization outcome, not bad input:
+            // the request is well-formed and the caller is simply not permitted
+            // to be both ends of its own attestation.
+            TrustMutationError::SelfAttestation { .. } => {
+                GatewayError::AuthorizationFailed(e.to_string())
+            }
+            TrustMutationError::InvalidScore(_) => GatewayError::BadRequest(e.to_string()),
+            TrustMutationError::Storage(_) => GatewayError::InternalError(e.to_string()),
+        })?;
 
     // Broadcast event to target DID (they received a trust attestation)
     // Use target's DID as the "coop_id" for personal notifications

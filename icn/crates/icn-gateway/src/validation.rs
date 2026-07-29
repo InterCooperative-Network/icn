@@ -11,7 +11,7 @@ use icn_rpc::auth::scopes::{
     GOVERNANCE_COMMENT_WRITE, GOVERNANCE_FEDERATION_WRITE, GOVERNANCE_MEETING_WRITE,
     GOVERNANCE_PENDING_PUBLISH_CONFIRM, GOVERNANCE_PENDING_PUBLISH_REVIEW,
     GOVERNANCE_PROCESS_WRITE, GOVERNANCE_PROPOSAL_WRITE, GOVERNANCE_REHEARSAL_SETUP,
-    GOVERNANCE_STEWARD_WRITE,
+    GOVERNANCE_STEWARD_WRITE, TRUST_WRITE,
 };
 
 /// Maximum length for cooperative ID
@@ -90,6 +90,13 @@ pub const ALLOWED_SCOPES: &[&str] = &[
     GOVERNANCE_PENDING_PUBLISH_REVIEW,
     GOVERNANCE_PENDING_PUBLISH_CONFIRM,
     GOVERNANCE_REHEARSAL_SETUP,
+    // Trust-graph mutation. The scope already existed in `icn_rpc::auth::scopes`
+    // and the RPC transport already required it for `trust.add`/`trust.remove`;
+    // it was missing from this allowlist, so no gateway credential could carry
+    // it and `POST /v1/trust/attest` enforced nothing instead (F-P0-1).
+    // Referenced through the constant so the allowlist and the RPC vocabulary
+    // cannot drift; locked by `test_allowed_scopes_contains_trust_write`.
+    TRUST_WRITE,
     // Settlement operations
     "settlements:read",
     "settlements:write",
@@ -895,6 +902,26 @@ mod tests {
     ///
     /// This test asserts membership both at the constant-list level
     /// (`ALLOWED_SCOPES`) and at the public-API level (`validate_scopes`).
+    /// `trust:write` must be issuable at the gateway.
+    ///
+    /// The scope already existed in `icn_rpc::auth::scopes` and the RPC
+    /// transport already required it for `trust.add`/`trust.remove`, but it was
+    /// missing from this allowlist — so no gateway credential could carry it,
+    /// and `POST /v1/trust/attest` enforced nothing instead (F-P0-1). If this
+    /// entry is ever removed, the route becomes permanently unusable rather than
+    /// permanently open, but the divergence returns either way.
+    #[test]
+    fn test_allowed_scopes_contains_trust_write() {
+        assert!(
+            ALLOWED_SCOPES.contains(&TRUST_WRITE),
+            "icn-rpc canonical scope {TRUST_WRITE:?} must be in the gateway ALLOWED_SCOPES"
+        );
+        assert!(
+            validate_scopes(&[TRUST_WRITE.to_string()]).is_ok(),
+            "a credential request for {TRUST_WRITE:?} must validate"
+        );
+    }
+
     #[test]
     fn test_allowed_scopes_contains_governance_class_write() {
         use icn_rpc::auth::scopes::GOVERNANCE_CLASS_WRITE;

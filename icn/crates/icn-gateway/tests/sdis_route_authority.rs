@@ -11,17 +11,16 @@
 //!
 //! These cases drive the protected routes through the **real `jwt_auth`
 //! middleware** over the **same `SessionAuthority`** the production composition
-//! registers, mounted the way `GatewayServer::run` mounts them: one public
-//! `/sdis` scope for enrollment initiation and status, and one wrapped scope for
-//! the steward/moderation surface.
+//! registers, and — since the F-P0-1 containment — through
+//! `icn_gateway::server::sdis_scope`, the same `/sdis` constructor
+//! `GatewayServer::run` calls. The route set, nesting order, middleware and
+//! mount conditions are therefore production's, not a test-local rebuild.
 //!
 //! # What they do NOT prove
 //!
-//! They do not construct the full production router — the gateway's route tree
-//! is still assembled inside a closure in `GatewayServer::run` that no test can
-//! call (issue #2421). What is shared with production is the authority object,
-//! the middleware, the scope vocabulary, and the public/protected split; what is
-//! not shared is the surrounding route table. Closing that gap is #2421's job.
+//! They do not construct the full production router: the *surrounding* route
+//! table is still assembled inline in `GatewayServer::run` (issue #2421). The
+//! `/sdis` subtree is now shared; the rest is not.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -32,6 +31,7 @@ use actix_web_httpauth::middleware::HttpAuthentication;
 use icn_gateway::api::sdis::simple_enrollment::{self, EnrollmentStore};
 use icn_gateway::auth::AuthManager;
 use icn_gateway::middleware::jwt_auth;
+use icn_gateway::server::{sdis_scope, SdisMountFlags};
 use icn_gateway::session_authority::{
     AuthorityProfile, InMemoryRevocationAuthority, SessionAuthority, TokenLifetimePolicy,
 };
@@ -69,24 +69,24 @@ fn authority(ttl_hours: u64) -> Arc<SessionAuthority> {
     )
 }
 
-/// Mount `/sdis` the way production does: the public enrollment surface
-/// unwrapped, the steward/moderation surface behind `jwt_auth`.
+/// Mount `/sdis` the way production does, by calling the same constructor
+/// `GatewayServer::run` calls.
+///
+/// These cases are about *steward* authority, so they declare the isolated
+/// rehearsal profile (`self_serve_enrollment: true`) — that is the only profile
+/// on which the enrollment routes exist at all after F-P0-1 containment. On
+/// every shipped profile the tree is absent; that boundary is proven in
+/// `fp01_credential_holder_escalation.rs`, not here.
 macro_rules! sdis_app {
     ($authority:expr) => {{
-        let auth_mw = HttpAuthentication::bearer(jwt_auth);
         test::init_service(
             App::new()
                 .app_data(web::Data::new($authority))
                 .app_data(web::Data::new(Arc::new(EnrollmentStore::new())))
-                .service(
-                    web::scope("/v1/sdis")
-                        .configure(simple_enrollment::configure)
-                        .service(
-                            web::scope("")
-                                .wrap(auth_mw)
-                                .configure(simple_enrollment::configure_protected),
-                        ),
-                ),
+                .service(web::scope("/v1").service(sdis_scope(SdisMountFlags {
+                    self_serve_enrollment: true,
+                    admin_recovery: false,
+                }))),
         )
         .await
     }};
@@ -547,8 +547,15 @@ async fn restricted_reads_require_steward_capability() {
 // ---------------------------------------------------------------------------
 
 /// The point of a route-authority boundary is not to make enrollment
-/// impossible. A person beginning enrollment has no ICN credential yet, so
-/// initiation must remain reachable anonymously.
+/// impossible. A person beginning enrollment has no ICN credential yet, so on a
+/// profile that mounts enrollment at all, initiation must remain reachable
+/// anonymously.
+///
+/// Scope note (F-P0-1): "mounts enrollment at all" now means an explicitly
+/// declared isolated rehearsal deployment, which `sdis_app!` selects. This case
+/// proves the authority split did not break anonymous initiation *there*; it
+/// deliberately says nothing about whether the tree should be mounted on any
+/// other profile, which is a mount decision, not a route-authority one.
 #[actix_web::test]
 async fn public_enrollment_initiation_remains_anonymous() {
     let authority = authority(1);

@@ -37,16 +37,38 @@ fi
 echo ""
 
 # Step 2: Start Enrollment
+#
+# NOTE: self-serve enrollment is absent unless the gateway operator has declared
+# an isolated rehearsal deployment with ICN_ENABLE_SELF_SERVE_ENROLLMENT=true.
+# No shipped deployment profile sets it, so against a default gateway these
+# routes are simply not mounted and answer 404 (or 401, if the request falls
+# through to the authenticated /sdis sub-scope). That is the expected posture,
+# not a regression — this script requires a gateway that has opted in.
 echo -e "${YELLOW}Step 2: Start Enrollment${NC}"
-ENROLLMENT_RESPONSE=$(curl -s -X POST "$GATEWAY_URL/v1/sdis/enrollment/start" \
+ENROLLMENT_HTTP=$(curl -s -o /tmp/icn-enroll-start.$$ -w "%{http_code}" \
+    -X POST "$GATEWAY_URL/v1/sdis/enrollment/start" \
     -H "Content-Type: application/json" \
     -d "{\"identity_name\":\"$IDENTITY_NAME\",\"coop_id\":\"$COOP_ID\"}")
+ENROLLMENT_RESPONSE=$(cat /tmp/icn-enroll-start.$$ 2>/dev/null)
+rm -f /tmp/icn-enroll-start.$$
+
+if [ "$ENROLLMENT_HTTP" = "404" ] || [ "$ENROLLMENT_HTTP" = "401" ]; then
+    echo -e "${YELLOW}⊘ Self-serve enrollment is not mounted on this gateway (HTTP $ENROLLMENT_HTTP)${NC}"
+    echo ""
+    echo "  This is the expected default. The route tree mounts only when the"
+    echo "  operator sets ICN_ENABLE_SELF_SERVE_ENROLLMENT=true to declare an"
+    echo "  isolated rehearsal deployment, and no shipped profile sets it."
+    echo ""
+    echo "  To run this script, point it at a gateway that has opted in."
+    echo "  Skipping the enrollment flow rather than reporting a false result."
+    exit 0
+fi
 
 ENROLLMENT_ID=$(echo "$ENROLLMENT_RESPONSE" | jq -r '.enrollment_id // empty')
 
 if [ -z "$ENROLLMENT_ID" ]; then
-    echo -e "${RED}✗ Enrollment start failed${NC}"
-    echo "$ENROLLMENT_RESPONSE" | jq .
+    echo -e "${RED}✗ Enrollment start failed (HTTP $ENROLLMENT_HTTP)${NC}"
+    echo "$ENROLLMENT_RESPONSE" | jq . 2>/dev/null || echo "$ENROLLMENT_RESPONSE"
     exit 1
 else
     echo -e "${GREEN}✓ Enrollment started${NC}"
