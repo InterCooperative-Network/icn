@@ -1271,22 +1271,33 @@ impl GovernanceActor {
         // F-P0-2 containment: this closure deliberately captures **no**
         // `GovernanceStateStore` handle. A replicated entry therefore cannot reach
         // governance state by construction, not merely by passing a check that a
-        // later edit could bypass. See `refuse_replicated_governance_message`.
+        // later edit could bypass. See `observe_replicated_governance_message`.
         let did_notify = did.clone();
 
         {
             let mut g = gossip.write().await;
-            g.add_notification_callback(Arc::new(move |topic, entry, subscriber_did| {
-                if !should_handle_governance_notification(&topic, &subscriber_did, &did_notify) {
+            g.add_notification_callback(Arc::new(move |topic, entry, _subscriber_did| {
+                // Accept the governance topic and any federation governance topic
+                // (federation topics have format "federation:governance:<fed_id>").
+                //
+                // This filter is dispatch, never authority: it only decides whether the
+                // diagnostic below is worth emitting. The containment does not depend on
+                // it, because this closure captures no `GovernanceStateStore` and so has
+                // no path to governance state on any topic.
+                let federation_root = icn_federation::TOPIC_FEDERATION_GOVERNANCE;
+                let is_governance_topic = topic == GOVERNANCE_TOPIC
+                    || topic == federation_root
+                    || topic
+                        .strip_prefix(federation_root)
+                        .is_some_and(|rest| rest.starts_with(':'));
+                if !is_governance_topic {
                     return;
                 }
 
                 match GovernanceMessage::from_bytes(&entry.data) {
-                    Ok(msg) => {
-                        refuse_replicated_governance_message(&msg, &entry.author, &did_notify);
-                    }
+                    Ok(msg) => observe_replicated_governance_message(&msg, &did_notify),
                     Err(e) => {
-                        warn!("Failed to deserialize governance message: {}", e);
+                        debug!("Failed to deserialize governance message: {}", e);
                     }
                 }
             }));
@@ -3784,207 +3795,59 @@ impl GovernanceActor {
 
 // ---- Governance replication ingress (F-P0-2 containment) ----
 
-/// What a replicated [`GovernanceMessage`] would have written to durable
-/// governance state before the F-P0-2 containment.
-///
-/// This distinction is **diagnostic only, never an authorization decision**. No
-/// replicated message is applied, whatever its variant — see
-/// [`refuse_replicated_governance_message`]. The classification decides only
-/// whether a refusal is worth reporting (a would-be mutation was stopped) or is
-/// indistinguishable from the previous behavior (the variant already wrote
-/// nothing). Keeping the security property unconditional means a misclassification
-/// here cannot create a bypass.
-///
-/// The match in [`replicated_state_effect`] is exhaustive on purpose: a new
-/// `GovernanceMessage` variant must not silently become an unguarded mutation, so
-/// adding one fails the build until it is classified.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReplicatedStateEffect {
-    /// Applying this variant wrote durable governance state.
-    WouldMutateGovernanceState,
-    /// Applying this variant wrote nothing.
-    NoStateEffect,
-}
-
-/// Fixed diagnostic emitted when a replicated governance mutation is refused.
-///
-/// Deliberately a constant, so the message body carries no attacker-supplied
-/// content. The author is attached as a separate structured field and is always
-/// described as *claimed*, never authenticated.
-pub const REPLICATION_QUARANTINE_REASON: &str =
-    "refused: unauthenticated governance replication — the entry's claimed author is not \
-     verified and carries no authority over the affected governance domain";
-
-/// Whether this gossip notification is the one this node should handle.
-///
-/// **This decides dispatch, never authority.** Neither condition authenticates anything
-/// or authorizes any state change: the refusal in
-/// [`refuse_replicated_governance_message`] is unconditional for every message that gets
-/// past this point. A subscriber DID is as attacker-influenced as any other gossip field
-/// and must never be read as governance authority.
-///
-/// 1. **Deduplication.** `GossipActor::store_entry` invokes every notification callback
-///    inside its per-subscriber loop, and a peer can add arbitrary DIDs to that list with
-///    an unauthenticated `Subscribe` (up to `MAX_SUBSCRIBERS_PER_TOPIC`). Without this,
-///    one received entry would be handled once per subscriber, letting a remote peer
-///    inflate the quarantine counter and the warning volume by orders of magnitude.
-///    Subscriber DIDs are deduplicated on insert, so matching the local DID yields
-///    exactly one handling per entry.
-///
-///    **The subscription list is peer-mutable, so this dedup is not tamper-proof.**
-///    `Unsubscribe` also acts on a self-declared DID (issue #2471), so a peer can drop
-///    this node's own subscription and suppress the quarantine counter and warning
-///    entirely. State containment is unaffected — with no local subscriber the callback
-///    simply never runs, and nothing is applied either way — but the *telemetry* can be
-///    silenced. Do not describe this ingress's detection as tamper-proof.
-///
-///    Neither the subscriber DID nor any other field consulted here is treated as
-///    governance authority. They select *which notification to handle*; the refusal
-///    below is unconditional for everything that reaches it.
-/// 2. **Topic.** The entry must be on the governance topic, or on
-///    `federation:governance` / `federation:governance:<federation-id>`.
-///
-/// Extracted as a pure function so both conditions are directly testable; inline in the
-/// closure they could only be exercised indirectly.
-fn should_handle_governance_notification(
-    topic: &str,
-    subscriber_did: &Did,
-    local_did: &Did,
-) -> bool {
-    // Subscriber first. This is the cheapest check and it discards the amplified
-    // per-subscriber invocations before any topic comparison or allocation.
-    if subscriber_did != local_did {
-        return false;
-    }
-
-    let federation_root = icn_federation::TOPIC_FEDERATION_GOVERNANCE;
-    topic == GOVERNANCE_TOPIC
-        || topic == federation_root
-        // `federation:governance:<federation-id>` only. Matching on the bare prefix
-        // would also admit look-alikes such as `federation:governanceX`.
-        || topic
-            .strip_prefix(federation_root)
-            .is_some_and(|rest| rest.starts_with(':'))
-}
-
-/// Classify what a replicated governance message would have mutated.
-///
-/// See [`ReplicatedStateEffect`] — this is observability, not authorization.
-pub fn replicated_state_effect(msg: &GovernanceMessage) -> ReplicatedStateEffect {
-    use ReplicatedStateEffect::{NoStateEffect, WouldMutateGovernanceState};
-
-    match msg {
-        // These arms wrote durable governance state through the pre-containment
-        // ingress: domains, proposals, votes, delegations and close outcomes.
-        GovernanceMessage::DomainCreated { .. }
-        | GovernanceMessage::DomainUpdated { .. }
-        | GovernanceMessage::ProposalCreated { .. }
-        | GovernanceMessage::ProposalOpened { .. }
-        | GovernanceMessage::VoteCast { .. }
-        | GovernanceMessage::ProposalClosed { .. }
-        | GovernanceMessage::DelegationCreated { .. }
-        | GovernanceMessage::DelegationRevoked { .. } => WouldMutateGovernanceState,
-
-        // These arms reached the ingress but wrote nothing.
-        GovernanceMessage::ProposalCancelled { .. }
-        | GovernanceMessage::DeliberationStarted { .. }
-        | GovernanceMessage::DeliberationEnded { .. }
-        | GovernanceMessage::CommentCreated { .. }
-        | GovernanceMessage::CommentEdited { .. }
-        | GovernanceMessage::CommentDeleted { .. }
-        | GovernanceMessage::ReactionAdded { .. }
-        | GovernanceMessage::ReactionRemoved { .. } => NoStateEffect,
-    }
-}
-
-/// Governance replication ingress — refuses to apply remote governance state.
+/// Governance replication ingress — applies nothing.
 ///
 /// ## Why transport acceptance and state-application authority are separate
 ///
-/// Permission to transport or replicate bytes is not permission to apply those
-/// bytes as governance state.
+/// Permission to transport or replicate bytes is not permission to apply those bytes as
+/// governance state.
 ///
-/// A [`icn_gossip::GossipEntry`] carries a claimed `author` DID and **no
-/// signature binding that DID to the entry contents**. The receive path
-/// (`GossipActor::store_entry`) neither recomputes the entry hash — it dedups on
-/// the sender-supplied `entry.hash` — nor enforces the topic ACL, and the
-/// transport-level policy gate above it evaluates a self-declared sender DID with
-/// no threshold attached. Every value that reaches this function is therefore
-/// attacker-chosen *input*, not authenticated authority. Comparing anything
-/// against `entry.author` is not an authorization check: a peer that wants to be
-/// treated as some DID simply writes that DID into the field.
+/// A [`icn_gossip::GossipEntry`] carries a claimed `author` DID and **no signature binding
+/// that DID to the entry contents**. The receive path (`GossipActor::store_entry`) neither
+/// recomputes the entry hash — it dedups on the sender-supplied `entry.hash` — nor enforces
+/// the topic ACL, and the transport-level policy gate above it evaluates a self-declared
+/// sender DID with no threshold attached. Every value that reaches this function is
+/// attacker-chosen *input*, not authenticated authority. Comparing anything against
+/// `entry.author` is not an authorization check: a peer that wants to be treated as some DID
+/// simply writes that DID into the field.
 ///
-/// So this ingress applies nothing. Until authenticated governance replication
-/// exists (issue #2469), a message that arrives here is *observed*, not *obeyed*.
-/// Entries are
-/// still accepted, stored, clock-merged and gossiped by the generic gossip layer;
-/// only the application of remote governance state is suspended.
+/// So this ingress applies nothing. Until authenticated governance replication exists
+/// (issue #2469), a message that arrives here is *observed*, not *obeyed*. Entries are still
+/// accepted, stored, clock-merged and gossiped by the generic gossip layer; only the
+/// application of remote governance state is suspended.
+///
+/// ## The containment is structural, not procedural
+///
+/// The registered callback captures **no `GovernanceStateStore` handle**, so a replicated
+/// entry has no path to governance state regardless of what this function does, whether it
+/// runs at all, or how often. Nothing here — not the decode, not this diagnostic, not the
+/// topic the entry arrived on, not the subscriber it was dispatched for, not the claimed
+/// author — is an authorization decision. There is deliberately no telemetry to evade,
+/// because there is deliberately nothing to gate.
 ///
 /// ## Why this does not break local governance
 ///
-/// `GossipActor::store_entry` fires notification callbacks identically for
-/// locally published entries and for entries received from the network, and no
-/// field distinguishes them — `publish()` sets `author` to the local DID, but a
-/// remote peer may claim that same DID. There is no trustworthy local/remote
-/// discriminator at this layer, so the containment does not try to invent one.
+/// `GossipActor::store_entry` fires notification callbacks identically for locally published
+/// entries and for entries received from the network, and no field distinguishes them —
+/// `publish()` sets `author` to the local DID, but a remote peer may claim that same DID.
+/// There is no trustworthy local/remote discriminator at this layer, so the containment does
+/// not try to invent one.
 ///
 /// It does not need one: every local `GovernanceCommand` persists through
-/// `GovernanceActor`'s command path *before* it publishes (the delegation arms say
-/// so outright — "failure doesn't roll back the local write"). The loopback copy
-/// this ingress also receives is a redundant re-application of state the node
-/// already wrote, so refusing it costs local governance nothing.
-///
-/// Returns the classification so callers and tests can observe the disposition.
-fn refuse_replicated_governance_message(
-    msg: &GovernanceMessage,
-    claimed_author: &Did,
-    local_did: &Did,
-) -> ReplicatedStateEffect {
-    let effect = replicated_state_effect(msg);
-
-    if effect == ReplicatedStateEffect::WouldMutateGovernanceState {
-        // Every refusal is counted and warned, including this node's own publications
-        // looping back (each local `GovernanceCommand` persists, then calls
-        // `GossipActor::publish`, which calls `store_entry`, which fires this callback).
-        //
-        // The `claimed_origin` label is descriptive only and is derived from
-        // `entry.author`, which the sending peer chooses. It is therefore **not** a
-        // trustworthy local/remote split: a peer can land its entries in the `self`
-        // bucket by claiming this node's DID. Do not alert on one bucket alone — a
-        // reliable split needs trusted ingress provenance from the gossip layer, which
-        // the notification callback does not currently carry (see issue #2469).
-        //
-        // Counting and warning on both buckets keeps a forged entry visible no matter
-        // which DID it claims. Local publications contribute a low, operator-driven
-        // baseline: one per local governance command.
-        let claimed_origin = if claimed_author == local_did {
-            "self"
-        } else {
-            "peer"
-        };
-
-        // `message_type()` is a `&'static str` and `claimed_origin` is one of two fixed
-        // values, so neither label lets a remote peer inflate cardinality.
-        icn_obs::metrics::governance::replication_quarantined_inc(
-            msg.message_type(),
-            claimed_origin,
-        );
-
-        warn!(
-            local_did = %local_did,
-            claimed_author = %claimed_author,
-            claimed_origin,
-            message_type = msg.message_type(),
-            "{REPLICATION_QUARANTINE_REASON}"
-        );
-    } else {
-        debug!(
-            message_type = msg.message_type(),
-            "Replicated governance message observed; this variant applies no state"
-        );
-    }
-
-    effect
+/// `GovernanceActor`'s command path *before* it publishes (the delegation arms say so
+/// outright — "failure doesn't roll back the local write"). The loopback copy this ingress
+/// also receives is a redundant re-application of state the node already wrote, so refusing
+/// it costs local governance nothing.
+fn observe_replicated_governance_message(msg: &GovernanceMessage, local_did: &Did) {
+    // Bounded and deliberately low-severity: `message_type()` is a `&'static str` over a
+    // fixed variant set, and this path fires for ordinary local governance too (each local
+    // command persists, then publishes, and `publish` calls `store_entry`, which calls this
+    // callback). It is a diagnostic, not a security signal — see the note above.
+    debug!(
+        local_did = %local_did,
+        message_type = msg.message_type(),
+        "Replicated governance state application is disabled; message not applied"
+    );
 }
 
 // ---- Utility functions ----
@@ -4038,7 +3901,7 @@ fn validate_secure_v2_proof_for_proposal(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use icn_governance::{CommentId, Delegation, DelegationScope, GovernanceProfileId, Proposal};
+    use icn_governance::{Delegation, DelegationScope, GovernanceProfileId, Proposal};
     use icn_identity::KeyPair;
 
     fn did() -> Did {
@@ -4068,18 +3931,25 @@ mod tests {
         )
     }
 
-    /// Every variant that the pre-containment ingress persisted must still be
-    /// reported as a would-be mutation, so the refusal is visible to operators.
+    /// The replication ingress observes and returns; it must not touch governance state
+    /// for any variant, including the eight that the pre-containment ingress persisted.
     ///
-    /// These eight arms replace the delegation-replication tests that previously
-    /// asserted gossip *could* create and revoke delegations. That behavior was the
-    /// vulnerability: those arms compared the delegation owner against
-    /// `GossipEntry::author`, which is attacker-chosen, so "correct sender accepted"
-    /// only ever meant "correct sender successfully impersonated".
+    /// This replaces the delegation-replication tests that previously asserted gossip
+    /// *could* create and revoke delegations. That behavior was the vulnerability: those
+    /// arms compared the delegation owner against `GossipEntry::author`, which is
+    /// attacker-chosen, so "correct sender accepted" only ever meant "correct sender
+    /// successfully impersonated".
+    ///
+    /// The real containment is structural and is proven at the production boundary in
+    /// `tests/fp02_governance_replication_containment.rs`: the registered callback
+    /// captures no `GovernanceStateStore`, so no replicated entry has a path to
+    /// governance state whatever this function does.
     #[test]
-    fn mutating_variants_are_reported_as_would_be_mutations() {
+    fn observing_a_replicated_message_is_side_effect_free() {
+        let local = did();
         let d = Delegation::new(did(), did(), DelegationScope::Blanket);
-        let mutating = vec![
+
+        let messages = vec![
             GovernanceMessage::domain_created(sample_domain()),
             GovernanceMessage::domain_updated(sample_domain()),
             GovernanceMessage::proposal_created(sample_proposal()),
@@ -4099,139 +3969,11 @@ mod tests {
             GovernanceMessage::delegation_revoked(d.id.clone(), d.delegator.clone(), 4),
         ];
 
-        for msg in mutating {
-            assert_eq!(
-                replicated_state_effect(&msg),
-                ReplicatedStateEffect::WouldMutateGovernanceState,
-                "{} must be reported as a would-be governance mutation",
-                msg.message_type()
-            );
+        // The function takes no store and returns nothing: there is no value to assert on
+        // and no state to inspect. Exercising every mutating variant pins that it stays
+        // that way — if a future edit reintroduces a store parameter, this stops compiling.
+        for msg in &messages {
+            observe_replicated_governance_message(msg, &local);
         }
-    }
-
-    /// Variants the ingress never applied stay classified as inert, so the refusal
-    /// diagnostic does not cry wolf on ordinary deliberation traffic.
-    #[test]
-    fn inert_variants_are_reported_as_no_state_effect() {
-        let inert = vec![
-            GovernanceMessage::deliberation_started(ProposalId("p".to_string()), 1, 2),
-            GovernanceMessage::comment_deleted(
-                ProposalId("p".to_string()),
-                CommentId("c".to_string()),
-                1,
-            ),
-            GovernanceMessage::reaction_removed(
-                ProposalId("p".to_string()),
-                CommentId("c".to_string()),
-                did(),
-                "+1".to_string(),
-            ),
-        ];
-
-        for msg in inert {
-            assert_eq!(
-                replicated_state_effect(&msg),
-                ReplicatedStateEffect::NoStateEffect,
-                "{} must be reported as applying no state",
-                msg.message_type()
-            );
-        }
-    }
-
-    /// The refusal itself must not depend on the classification: both dispositions
-    /// return without touching governance state. `refuse_replicated_governance_message`
-    /// has no store handle at all, which is what makes that unconditional.
-    #[test]
-    fn refusal_returns_the_classification_for_both_dispositions() {
-        let local = did();
-        let claimed = did();
-
-        assert_eq!(
-            refuse_replicated_governance_message(
-                &GovernanceMessage::domain_created(sample_domain()),
-                &claimed,
-                &local,
-            ),
-            ReplicatedStateEffect::WouldMutateGovernanceState
-        );
-        assert_eq!(
-            refuse_replicated_governance_message(
-                &GovernanceMessage::deliberation_started(ProposalId("p".to_string()), 1, 2),
-                &claimed,
-                &local,
-            ),
-            ReplicatedStateEffect::NoStateEffect
-        );
-    }
-
-    /// The ingress must act on governance topics only, and exactly once per entry
-    /// rather than once per subscriber.
-    #[test]
-    fn delivery_predicate_is_topic_scoped_and_once_per_entry() {
-        let local = did();
-        let other = did();
-        let fed = icn_federation::TOPIC_FEDERATION_GOVERNANCE;
-        let fed_scoped = format!("{fed}:fed-1");
-
-        // Governance topics, this node's own subscription -> act.
-        for topic in [GOVERNANCE_TOPIC, fed, fed_scoped.as_str()] {
-            assert!(
-                should_handle_governance_notification(topic, &local, &local),
-                "should act on {topic} for the local subscription"
-            );
-        }
-
-        // Same entry, some other subscriber's notification -> do not act again.
-        // This is the per-subscriber amplification guard: an unauthenticated `Subscribe`
-        // can add arbitrary DIDs, and each one re-invokes this callback for one entry.
-        for topic in [GOVERNANCE_TOPIC, fed, fed_scoped.as_str()] {
-            assert!(
-                !should_handle_governance_notification(topic, &other, &local),
-                "must not act a second time for a non-local subscriber on {topic}"
-            );
-        }
-
-        // Unrelated topics are not ours, even for the local subscription.
-        for topic in [
-            "ledger:entries",
-            "trust:attestations",
-            "governance",
-            "federation",
-        ] {
-            assert!(
-                !should_handle_governance_notification(topic, &local, &local),
-                "must not act on unrelated topic {topic}"
-            );
-        }
-
-        // Look-alikes must not slip through on a bare prefix match.
-        let fed_lookalike = format!("{fed}X");
-        let fed_suffix = format!("{fed}-shadow");
-        for topic in [
-            "governance:proposals",
-            "governance:proposal:extra",
-            "xgovernance:proposal",
-            fed_lookalike.as_str(),
-            fed_suffix.as_str(),
-        ] {
-            assert!(
-                !should_handle_governance_notification(topic, &local, &local),
-                "must not act on look-alike topic {topic}"
-            );
-        }
-    }
-
-    /// The operator-facing reason must describe the author as *claimed* and must
-    /// never imply the sender was authenticated.
-    #[test]
-    fn quarantine_reason_calls_the_author_claimed() {
-        let reason = REPLICATION_QUARANTINE_REASON.to_ascii_lowercase();
-        assert!(
-            reason.contains("claimed"),
-            "{REPLICATION_QUARANTINE_REASON}"
-        );
-        assert!(!reason.contains("authenticated sender"));
-        assert!(!reason.contains("verified author"));
-        assert!(REPLICATION_QUARANTINE_REASON.len() < 256);
     }
 }

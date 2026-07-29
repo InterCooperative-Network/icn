@@ -80,10 +80,10 @@ struct Node {
     /// a dropped subscription, an uncreated topic or a decode regression would leave the
     /// suite green while testing nothing.
     ///
-    /// **What it does not prove:** this observer cannot see how many times the production
-    /// refusal function runs. It records callback invocations, not ingress actions. The
-    /// production dispatch decision is pinned directly by the
-    /// `should_handle_governance_notification` unit tests in `actor.rs`.
+    /// **What it does not prove:** this observer cannot see the production ingress at all.
+    /// That ingress deliberately has no observable effect — it captures no store and emits
+    /// only a bounded `debug!` — which is precisely why the containment holds. The negative
+    /// assertions below inspect durable governance state directly.
     observed: Arc<std::sync::Mutex<Vec<(String, Did)>>>,
     /// Distinguishes otherwise-identical injections. `store_entry` dedups on the
     /// sender-supplied `entry.hash`, so replays must carry distinct claimed hashes to
@@ -164,7 +164,7 @@ impl Node {
         wire_sender: &Did,
         msg: &GovernanceMessage,
     ) {
-        let before = self.local_deliveries();
+        let before = self.deliveries_to_this_node();
         self.inject_forged_bytes(topic, claimed_author, wire_sender, msg.to_bytes().unwrap())
             .await;
 
@@ -173,7 +173,7 @@ impl Node {
         // missing subscription, decode failure). A refusal is only meaningful if the
         // message got there to be refused.
         assert_eq!(
-            self.local_deliveries(),
+            self.deliveries_to_this_node(),
             before + 1,
             "injected {} was not delivered exactly once on the local subscription",
             msg.message_type()
@@ -182,19 +182,16 @@ impl Node {
 
     /// Callback invocations whose `subscriber_did` is this node's own.
     ///
-    /// This is the subset of the raw fan-out that is *eligible* for handling. It is not a
-    /// count of production refusals — the observer cannot see those.
-    fn local_deliveries(&self) -> usize {
+    /// Used only to prove the injection was delivered. It counts *this test's* observer,
+    /// not the production ingress — the production ingress has no observable effect by
+    /// design, which is the point of the containment.
+    fn deliveries_to_this_node(&self) -> usize {
         self.observed
             .lock()
             .unwrap()
             .iter()
             .filter(|(_, sub)| *sub == self.did)
             .count()
-    }
-
-    fn total_fanout(&self) -> usize {
-        self.observed.lock().unwrap().len()
     }
 
     async fn inject_forged_bytes(
@@ -714,48 +711,6 @@ async fn quarantine_does_not_stop_generic_gossip_transport() {
 }
 
 // ---------------------------------------------------------------------------
-// 11. A quarantined message yields a bounded, observable disposition
-// ---------------------------------------------------------------------------
-
-#[test]
-fn quarantine_disposition_is_bounded_and_marks_the_author_as_claimed() {
-    use icn_governance_actor::actor::{
-        replicated_state_effect, ReplicatedStateEffect, REPLICATION_QUARANTINE_REASON,
-    };
-
-    let mallory = attacker();
-    let domain = make_domain("d", vec![mallory]);
-
-    // State-mutating variants are reported as such.
-    assert_eq!(
-        replicated_state_effect(&GovernanceMessage::domain_created(domain)),
-        ReplicatedStateEffect::WouldMutateGovernanceState
-    );
-    // Variants that applied nothing before containment stay quiet.
-    assert_eq!(
-        replicated_state_effect(&GovernanceMessage::comment_deleted(
-            ProposalId("p".to_string()),
-            icn_governance::CommentId("c".to_string()),
-            1,
-        )),
-        ReplicatedStateEffect::NoStateEffect
-    );
-
-    // The diagnostic never describes the claimed author as authenticated.
-    let reason = REPLICATION_QUARANTINE_REASON.to_ascii_lowercase();
-    assert!(
-        reason.contains("claimed"),
-        "quarantine reason must call the author claimed: {REPLICATION_QUARANTINE_REASON}"
-    );
-    assert!(
-        !reason.contains("authenticated sender") && !reason.contains("verified author"),
-        "quarantine reason must not imply the author was authenticated: {REPLICATION_QUARANTINE_REASON}"
-    );
-    // Bounded: a fixed-size constant, not attacker-controlled content.
-    assert!(REPLICATION_QUARANTINE_REASON.len() < 256);
-}
-
-// ---------------------------------------------------------------------------
 // 12. Replay of the same unauthenticated message remains non-mutating
 // ---------------------------------------------------------------------------
 
@@ -826,57 +781,4 @@ async fn federation_governance_topic_is_contained_too() {
         node.state.get_domain(&domain_id).unwrap().is_none(),
         "a forged DomainCreated on the federation governance topic created a domain"
     );
-}
-
-// ---------------------------------------------------------------------------
-// 14. One entry is refused once, regardless of how many subscribers a peer adds
-// ---------------------------------------------------------------------------
-
-/// `GossipActor::store_entry` invokes notification callbacks inside a per-subscriber
-/// loop, and an unauthenticated network `Subscribe` can add arbitrary DIDs to that
-/// list. Without a per-entry filter, one forged entry would be refused once per
-/// subscriber, letting a remote peer inflate `icn_governance_replication_quarantined_total`
-/// and the warning volume by up to `MAX_SUBSCRIBERS_PER_TOPIC`.
-#[tokio::test(flavor = "current_thread")]
-async fn one_entry_is_refused_once_regardless_of_subscriber_count() {
-    let node = Node::spawn().await;
-    let mallory = attacker();
-
-    // Simulate what an unauthenticated remote `Subscribe` does.
-    for _ in 0..3 {
-        node.gossip
-            .write()
-            .await
-            .subscribe(GOVERNANCE_TOPIC, attacker())
-            .await
-            .expect("subscribe");
-    }
-
-    let domain = make_domain("fanout-check", vec![mallory.clone()]);
-    let domain_id = domain.id.clone();
-    node.inject_forged(
-        GOVERNANCE_TOPIC,
-        &mallory,
-        &mallory,
-        &GovernanceMessage::domain_created(domain),
-    )
-    .await;
-
-    // The raw gossip fan-out really does invoke callbacks once per subscriber
-    // (local + 3 attacker DIDs) — the amplification this guards against is real...
-    assert_eq!(
-        node.total_fanout(),
-        4,
-        "expected the gossip layer to fan out to every subscriber"
-    );
-    // ...while exactly one of those invocations carries this node's own subscriber DID,
-    // which is the only one `should_handle_governance_notification` admits. That predicate
-    // is tested directly in `actor.rs`; this assertion establishes the input it sees, not
-    // the number of times the production refusal function ran.
-    assert_eq!(
-        node.local_deliveries(),
-        1,
-        "exactly one invocation should be eligible for handling"
-    );
-    assert!(node.state.get_domain(&domain_id).unwrap().is_none());
 }

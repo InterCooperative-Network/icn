@@ -52,18 +52,6 @@ pub fn init_descriptions() {
         "Number of proposals scanned in last cleanup run"
     );
 
-    // Replication containment metrics (F-P0-2)
-    describe_counter!(
-        "icn_governance_replication_quarantined_total",
-        "Total governance messages refused at the replication ingress because the gossip \
-         entry's claimed author is unauthenticated and carries no governance authority. \
-         Labels: message_type, and claimed_origin (self|peer). claimed_origin is derived \
-         from the entry's attacker-chosen author and is descriptive only -- a peer can \
-         claim this node's DID -- so alert on the TOTAL, not on one bucket. Local \
-         publications loop back through this ingress and contribute a low baseline of \
-         one per local governance command."
-    );
-
     // Domain metrics
     describe_counter!(
         "icn_governance_domains_created_total",
@@ -205,41 +193,6 @@ pub fn votes_cast_inc(vote_type: &str) {
 /// Increment delegated votes counter
 pub fn delegated_votes_inc() {
     counter!("icn_governance_delegated_votes_total").increment(1);
-}
-
-// Replication containment metrics (F-P0-2)
-
-/// Increment the counter of governance messages refused at the replication ingress for
-/// lack of authenticated authority.
-///
-/// `message_type` must be a fixed variant name (e.g. `GovernanceMessage::message_type`,
-/// which returns `&'static str`) — never an attacker-supplied value, which would let a
-/// remote peer inflate label cardinality.
-///
-/// `claimed_origin` is `"self"` or `"peer"` — nothing else, so cardinality stays bounded.
-/// It is derived from the entry's *claimed* author, which the sending peer chooses, so it
-/// is **descriptive only and not a trustworthy origin split**: a peer can land entries in
-/// the `self` bucket by claiming this node's DID. **Alert on the total**, not on one
-/// bucket. A node's own publications loop back through this ingress and contribute a low,
-/// operator-driven baseline of one per local governance command. A reliable split requires
-/// trusted ingress provenance from the gossip layer (issue #2469).
-///
-/// This counter can also be **silenced** by a peer: gossip dispatch is driven by a
-/// peer-mutable subscription list, and an unauthenticated `Unsubscribe` can drop this
-/// node's own subscription (issue #2471), after which this ingress stops being invoked.
-/// Absence of this metric is therefore not evidence of absence of forged governance
-/// traffic. State containment is unaffected either way: the ingress callback captures no
-/// governance store, so no replicated governance state is applied whether or not the
-/// callback runs, and no unauthenticated field is ever treated as governance authority.
-///
-/// Treat this as best-effort diagnostic telemetry, not a non-evadable exploitation measure.
-pub fn replication_quarantined_inc(message_type: &str, claimed_origin: &str) {
-    counter!(
-        "icn_governance_replication_quarantined_total",
-        "message_type" => message_type.to_string(),
-        "claimed_origin" => claimed_origin.to_string()
-    )
-    .increment(1);
 }
 
 // Cleanup metrics
