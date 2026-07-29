@@ -223,6 +223,16 @@ pub fn delegated_votes_inc() {
 /// bucket. A node's own publications loop back through this ingress and contribute a low,
 /// operator-driven baseline of one per local governance command. A reliable split requires
 /// trusted ingress provenance from the gossip layer (issue #2469).
+///
+/// This counter can also be **silenced** by a peer: gossip dispatch is driven by a
+/// peer-mutable subscription list, and an unauthenticated `Unsubscribe` can drop this
+/// node's own subscription (issue #2471), after which this ingress stops being invoked.
+/// Absence of this metric is therefore not evidence of absence of forged governance
+/// traffic. State containment is unaffected either way: the ingress callback captures no
+/// governance store, so no replicated governance state is applied whether or not the
+/// callback runs, and no unauthenticated field is ever treated as governance authority.
+///
+/// Treat this as best-effort diagnostic telemetry, not a non-evadable exploitation measure.
 pub fn replication_quarantined_inc(message_type: &str, claimed_origin: &str) {
     counter!(
         "icn_governance_replication_quarantined_total",

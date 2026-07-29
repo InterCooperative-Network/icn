@@ -3830,6 +3830,17 @@ pub const REPLICATION_QUARANTINE_REASON: &str =
 ///    inflate the quarantine counter and the warning volume by orders of magnitude.
 ///    Subscriber DIDs are deduplicated on insert, so matching the local DID yields
 ///    exactly one handling per entry.
+///
+///    **The subscription list is peer-mutable, so this dedup is not tamper-proof.**
+///    `Unsubscribe` also acts on a self-declared DID (issue #2471), so a peer can drop
+///    this node's own subscription and suppress the quarantine counter and warning
+///    entirely. State containment is unaffected — with no local subscriber the callback
+///    simply never runs, and nothing is applied either way — but the *telemetry* can be
+///    silenced. Do not describe this ingress's detection as tamper-proof.
+///
+///    Neither the subscriber DID nor any other field consulted here is treated as
+///    governance authority. They select *which notification to handle*; the refusal
+///    below is unconditional for everything that reaches it.
 /// 2. **Topic.** The entry must be on the governance topic, or on
 ///    `federation:governance` / `federation:governance:<federation-id>`.
 ///
