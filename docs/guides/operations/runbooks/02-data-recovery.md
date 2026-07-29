@@ -129,13 +129,24 @@ icnctl trust list      # If had trust edges
 
 ## Replay from Peers
 
-If backup is old or unavailable, data can be recovered from peers via gossip:
+If backup is old or unavailable, some data can be recovered from peers via gossip:
 
 1. **Start fresh node** with same identity (keystore)
 2. **Connect to peers** - they will sync:
    - Ledger entries (via gossip)
    - Trust edges (via gossip)
-   - Governance proposals (via gossip)
+
+> **Governance state does NOT replay from peers.** Domains, proposals, votes and
+> delegations arriving over gossip are refused before they are applied, because a
+> `GossipEntry` carries no signature binding its claimed author to its contents, so a
+> replicated governance message cannot be distinguished from a forged one. See
+> issue #2469 for the authenticated-replication work that will restore this.
+>
+> **Consequence for recovery:** a node restored from an old or missing backup will come
+> back with *silently incomplete* governance state — it will not error, it will simply
+> never learn the governance records it is missing. **Governance state must be recovered
+> from a backup.** Treat the governance store as backup-only until #2469 lands, and verify
+> it explicitly after any restore (see the verification step above).
 
 ```bash
 # After starting with keystore only:
