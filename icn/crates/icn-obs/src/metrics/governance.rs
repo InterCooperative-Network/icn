@@ -52,6 +52,13 @@ pub fn init_descriptions() {
         "Number of proposals scanned in last cleanup run"
     );
 
+    // Replication containment metrics (F-P0-2)
+    describe_counter!(
+        "icn_governance_replication_quarantined_total",
+        "Total replicated governance messages refused because the gossip entry's claimed \
+         author is unauthenticated and carries no governance authority (by message_type label)"
+    );
+
     // Domain metrics
     describe_counter!(
         "icn_governance_domains_created_total",
@@ -193,6 +200,22 @@ pub fn votes_cast_inc(vote_type: &str) {
 /// Increment delegated votes counter
 pub fn delegated_votes_inc() {
     counter!("icn_governance_delegated_votes_total").increment(1);
+}
+
+// Replication containment metrics (F-P0-2)
+
+/// Increment the counter of replicated governance messages refused for lack of
+/// authenticated authority.
+///
+/// `message_type` must be a fixed variant name (e.g. `GovernanceMessage::message_type`,
+/// which returns `&'static str`) — never an attacker-supplied value, which would let a
+/// remote peer inflate label cardinality.
+pub fn replication_quarantined_inc(message_type: &str) {
+    counter!(
+        "icn_governance_replication_quarantined_total",
+        "message_type" => message_type.to_string()
+    )
+    .increment(1);
 }
 
 // Cleanup metrics
