@@ -156,6 +156,10 @@ echo ""
 echo -e "${BLUE}Step 4: Test SDIS Enrollment Flow${NC}"
 echo "----------------------------------------"
 
+# Outcome of the enrollment section, consumed by the final summary.
+# Default to "failed" so an unforeseen path cannot silently read as success.
+enrollment_result="failed"
+
 echo -n "Starting SDIS enrollment... "
 enroll_response=$(curl -s -w "\n%{http_code}" \
     -H "Content-Type: application/json" \
@@ -173,9 +177,18 @@ enroll_status=$(echo "$enroll_response" | tail -n1)
 enroll_body=$(echo "$enroll_response" | head -n-1)
 
 if [ "$enroll_status" = "200" ] || [ "$enroll_status" = "201" ]; then
-    echo -e "${GREEN}✓${NC}"
     enrollment_id=$(echo "$enroll_body" | jq -r '.enrollment_id' 2>/dev/null)
-    echo "  Enrollment ID: $enrollment_id"
+    if [ -z "$enrollment_id" ] || [ "$enrollment_id" = "null" ]; then
+        # 2xx but no usable enrollment_id: a malformed response is a real
+        # failure, not a skip.
+        echo -e "${RED}✗${NC} ($enroll_status, no enrollment_id in response)"
+        echo "  Response: $enroll_body" | head -c 200
+        enrollment_result="failed"
+    else
+        echo -e "${GREEN}✓${NC}"
+        echo "  Enrollment ID: $enrollment_id"
+        enrollment_result="operational"
+    fi
 elif [ "$enroll_status" = "404" ] || [ "$enroll_status" = "401" ]; then
     # Self-serve enrollment is absent unless the operator declares an isolated
     # rehearsal deployment (ICN_ENABLE_SELF_SERVE_ENROLLMENT=true). No shipped
@@ -190,9 +203,11 @@ elif [ "$enroll_status" = "404" ] || [ "$enroll_status" = "401" ]; then
     echo "  the script at a gateway that has explicitly declared an isolated"
     echo "  rehearsal deployment."
     enrollment_id=""
+    enrollment_result="skipped"
 else
     echo -e "${RED}✗${NC} ($enroll_status)"
     echo "  Response: $enroll_body" | head -c 200
+    enrollment_result="failed"
 fi
 echo ""
 
@@ -205,9 +220,31 @@ echo -e "${GREEN}✓ Authentication Flow${NC} - Challenge-response working"
 echo -e "${GREEN}✓ Token Generation${NC} - JWT tokens being issued"
 echo -e "${GREEN}✓ Ledger Endpoints${NC} - Balance and history accessible"
 echo -e "${GREEN}✓ Governance Endpoints${NC} - Domains and proposals accessible"
-echo -e "${GREEN}✓ SDIS Enrollment${NC} - Enrollment system operational"
-echo ""
-echo "🎉 Mobile app backend is fully operational!"
+
+# The enrollment line must reflect what actually happened. Self-serve enrollment
+# is absent on every shipped profile, so on a default gateway this section is
+# skipped — and a skipped section must never be summarised as "operational",
+# nor support an unconditional "fully operational" conclusion.
+case "$enrollment_result" in
+    operational)
+        echo -e "${GREEN}✓ SDIS Enrollment${NC} - Enrollment system operational"
+        echo ""
+        echo "🎉 Mobile app backend is fully operational!"
+        ;;
+    skipped)
+        echo -e "${YELLOW}⊘ SDIS Enrollment${NC} - SKIPPED (self-serve enrollment not enabled on this gateway)"
+        echo ""
+        echo "✅ Mobile app backend checks passed, EXCEPT SDIS enrollment, which was not exercised."
+        echo "   Self-serve enrollment is absent unless the operator sets"
+        echo "   ICN_ENABLE_SELF_SERVE_ENROLLMENT=true. That is the expected default and is"
+        echo "   not a failure — but this run does NOT demonstrate that the enrollment flow works."
+        ;;
+    *)
+        echo -e "${RED}✗ SDIS Enrollment${NC} - FAILED"
+        echo ""
+        echo "❌ Mobile app backend is NOT fully operational: SDIS enrollment failed."
+        ;;
+esac
 echo ""
 echo "To run CoopWallet mobile app:"
 echo "  cd /home/matt/projects/icn/sdk/react-native/examples/CoopWallet"
@@ -219,3 +256,8 @@ echo ""
 
 # Cleanup
 rm -rf "$TEST_DATA_DIR"
+
+# A genuine enrollment failure must fail the run. A skip must not.
+if [ "$enrollment_result" = "failed" ]; then
+    exit 1
+fi

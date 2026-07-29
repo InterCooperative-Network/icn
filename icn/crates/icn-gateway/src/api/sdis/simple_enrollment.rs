@@ -460,7 +460,10 @@ pub async fn verify_level2(
     // makes the vouch an institution-scoped decision, using the same
     // credential-to-coop binding every other coop-scoped route enforces. It does
     // not decide the larger question of where vouching authority ought to come
-    // from — that is ADR-0085's, and is deliberately left open here.
+    // from — trust graph or governance capability — which is deliberately left
+    // open here. There is no accepted ADR for that decision yet; the live
+    // proposal is the draft PR #2450, "propose institution-scoped SDIS vouch
+    // authority".
     if claims.coop_id != session.coop_id {
         return Err(GatewayError::AuthorizationFailed(format!(
             "credential is for cooperative '{}' and cannot vouch for an enrollment into '{}'",

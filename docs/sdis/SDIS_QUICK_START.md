@@ -19,8 +19,11 @@
 > requires a credential issued for the same cooperative as the enrollment, and
 > completion fails rather than minting a credential if any required institutional
 > write (anchor, holder, jurisdiction join, membership approval) fails. This is a
-> containment tranche, not the final SDIS enrollment authority model — see
-> [`ADR-0085`](../adr/) for the open decision.
+> containment tranche, not the final SDIS enrollment authority model. That decision —
+> whether vouching authority derives from the trust graph or from a governance
+> capability — is still open and has no accepted ADR. The live proposal is the **draft
+> PR** [InterCooperative-Network/icn#2450](https://github.com/InterCooperative-Network/icn/pull/2450),
+> *"docs(architecture): propose institution-scoped SDIS vouch authority"*.
 
 ## 🚀 Getting Started with SDIS
 
