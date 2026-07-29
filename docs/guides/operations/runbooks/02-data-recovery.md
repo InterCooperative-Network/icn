@@ -143,22 +143,49 @@ icnctl gov domain list
 # Proposals per domain (repeat for each expected domain)
 icnctl gov proposal list --domain-id "coop:your-domain"
 
-# Votes and delegations are stored independently of proposals -- a backup can hold every
-# expected domain and proposal while missing later votes or delegations.
-icnctl gov vote show --proposal-id "<id>"   # repeat for each still-open proposal
-icnctl gov vote delegations                 # delegations given and received
 ```
+
+> **These two listings are partial checks, not proof of completeness.** Votes
+> (`gov:vote:*`) and delegations (`gov:delegation:*`) are persisted independently of the
+> proposals they belong to, so a backup can hold every expected domain and proposal while
+> silently omitting later votes or delegations. **There is currently no supported way to
+> verify that a restored governance store contains every vote and delegation** — see the
+> limitation below.
 
 If any of these is short or empty against the expected set, **stop and do not treat the
 recovery as complete**: the backup predates those records, or the governance store was not
 included. Stop the node again and restore from a governance-bearing backup — waiting for
 peers to fill the gap will not work.
 
-Votes and delegations matter beyond completeness. They are persisted separately from the
-proposals they belong to, so a backup can restore every expected domain and proposal while
-silently omitting later votes or delegations. A still-open proposal restored that way will
-close on an **incorrect tally or delegation weight** — a wrong governance outcome, not just
-missing data. Check them before allowing any restored proposal to reach its deadline.
+### Governance completeness cannot currently be verified
+
+**The available CLI and RPC surfaces cannot prove a restored governance store holds every
+vote and delegation.** Verified against the implementation, not the command definitions:
+
+| Surface | Why it does not work |
+|---|---|
+| `icnctl gov vote show --proposal-id` | Unimplemented — exits with "Vote show command not yet supported via RPC" |
+| `icnctl gov vote delegations` | Returns only the **authenticated caller's own** delegations; delegations between other members are invisible |
+| `GET /gov/delegations` | Same caller-scoped restriction |
+| votes over RPC / gateway | No such method or route exists |
+
+Tracked in **#2472**.
+
+**What this means operationally.** A restore that silently omits votes or delegations leaves
+a still-open proposal to close on an **incorrect tally or delegation weight** — a wrong
+governance outcome that looks like a normal decision, not an error. Inbound replication is
+refused (#2469), so peers will not refill the gap, and nothing above will detect it.
+
+**Required policy until #2472 lands:**
+
+1. Restore governance only from a **known-complete governance-bearing backup** whose
+   provenance and completeness were established *before* the failure — not inferred
+   afterwards from the restored node.
+2. If backup completeness is uncertain, **do not use that node to resume or close
+   still-open proposals.** Recovery from an unverified backup is not supported for open
+   governance processes.
+3. Treat the domain and proposal listings above as useful partial checks only. They can
+   prove state is *missing*; they cannot prove it is *complete*.
 
 ## Replay from Peers
 
@@ -178,9 +205,9 @@ If backup is old or unavailable, some data can be recovered from peers via gossi
 > **Consequence for recovery:** a node restored from an old or missing backup will come
 > back with *silently incomplete* governance state — it will not error, it will simply
 > never learn the governance records it is missing. **Governance state must be recovered
-> from a backup.** Treat the governance store as backup-only until #2469 lands, and verify
-> it explicitly after any restore — see the governance check in Step 7 (after the daemon is
-> back up) and the governance items in the Verification Checklist.
+> from a backup.** Treat the governance store as backup-only until #2469 lands. Note that
+> vote and delegation completeness cannot currently be verified after a restore (#2472), so
+> backup provenance must be established beforehand — see Step 7 and the Verification Checklist.
 
 ```bash
 # After starting with keystore only:
@@ -203,12 +230,10 @@ watch -n5 'curl -s http://localhost:9100/metrics | grep -E "icn_ledger_entries|i
 - [ ] Governance domains match the expected set (`icnctl gov domain list`) — these do **not**
       replay from peers, so a short list means data loss, not a pending sync
 - [ ] Governance proposals present per domain (`icnctl gov proposal list --domain-id <id>`)
-- [ ] Votes present on each still-open proposal (`icnctl gov vote show --proposal-id <id>`) —
-      stored separately from proposals, so a backup can hold the proposal but not its votes
-- [ ] Delegations present (`icnctl gov vote delegations`) — a missing delegation silently
-      changes voting weight
-- [ ] No restored proposal is allowed to close before the two checks above pass — an
-      incomplete tally produces a wrong outcome, not an obvious failure
+- [ ] Backup provenance established **before** the failure as governance-complete — vote and
+      delegation completeness **cannot be verified after the fact** with current surfaces (#2472)
+- [ ] If backup completeness is uncertain: this node is **not** used to resume or close
+      still-open proposals (an incomplete tally produces a wrong outcome, not a visible failure)
 
 ## Rollback
 
