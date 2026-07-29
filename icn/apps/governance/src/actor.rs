@@ -3932,15 +3932,46 @@ fn refuse_replicated_governance_message(
     let effect = replicated_state_effect(msg);
 
     if effect == ReplicatedStateEffect::WouldMutateGovernanceState {
-        // `message_type()` is a `&'static str`, so it is safe both as a log field
-        // and as a metric label — an attacker cannot inflate label cardinality.
-        icn_obs::metrics::governance::replication_quarantined_inc(msg.message_type());
-        warn!(
-            local_did = %local_did,
-            claimed_author = %claimed_author,
-            message_type = msg.message_type(),
-            "{REPLICATION_QUARANTINE_REASON}"
+        // A node's own publications loop back through this ingress: every local
+        // `GovernanceCommand` persists and then calls `GossipActor::publish`, which
+        // calls `store_entry`, which fires this callback. Without separating them the
+        // quarantine counter would be nonzero during ordinary local governance and
+        // useless as an exploitation signal, and healthy single-node operation would
+        // emit a warning per command.
+        //
+        // The split is on the entry's *claimed* author, which is telemetry
+        // classification only — never authentication, and never an input to the
+        // refusal, which is unconditional. A peer may claim this node's DID, so it can
+        // land its entries in the `self` bucket; the counter is therefore a floor for
+        // remote traffic, not a total. Both buckets are still counted, so an unexplained
+        // rise in `self` beyond local command volume remains visible.
+        let claimed_origin = if claimed_author == local_did {
+            "self"
+        } else {
+            "peer"
+        };
+
+        // `message_type()` is a `&'static str` and `claimed_origin` is one of two fixed
+        // values, so neither label lets a remote peer inflate cardinality.
+        icn_obs::metrics::governance::replication_quarantined_inc(
+            msg.message_type(),
+            claimed_origin,
         );
+
+        if claimed_origin == "peer" {
+            warn!(
+                local_did = %local_did,
+                claimed_author = %claimed_author,
+                message_type = msg.message_type(),
+                "{REPLICATION_QUARANTINE_REASON}"
+            );
+        } else {
+            debug!(
+                message_type = msg.message_type(),
+                "Local governance publication looped back through the replication \
+                 ingress and was not re-applied (state was already persisted locally)"
+            );
+        }
     } else {
         debug!(
             message_type = msg.message_type(),

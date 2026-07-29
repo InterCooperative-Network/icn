@@ -55,8 +55,10 @@ pub fn init_descriptions() {
     // Replication containment metrics (F-P0-2)
     describe_counter!(
         "icn_governance_replication_quarantined_total",
-        "Total replicated governance messages refused because the gossip entry's claimed \
-         author is unauthenticated and carries no governance authority (by message_type label)"
+        "Total governance messages refused at the replication ingress because the gossip \
+         entry's claimed author is unauthenticated and carries no governance authority. \
+         Labels: message_type, and claimed_origin (self|peer). Local publications loop \
+         back through the same ingress and are labelled self; alert on claimed_origin=peer."
     );
 
     // Domain metrics
@@ -204,16 +206,23 @@ pub fn delegated_votes_inc() {
 
 // Replication containment metrics (F-P0-2)
 
-/// Increment the counter of replicated governance messages refused for lack of
-/// authenticated authority.
+/// Increment the counter of governance messages refused at the replication ingress for
+/// lack of authenticated authority.
 ///
 /// `message_type` must be a fixed variant name (e.g. `GovernanceMessage::message_type`,
 /// which returns `&'static str`) — never an attacker-supplied value, which would let a
 /// remote peer inflate label cardinality.
-pub fn replication_quarantined_inc(message_type: &str) {
+///
+/// `claimed_origin` is `"self"` or `"peer"` — nothing else, so cardinality stays bounded.
+/// It reflects the entry's *claimed* author and is telemetry classification only, never an
+/// authentication or authorization decision. A node's own publications loop back through
+/// the same ingress, so without this label the counter would be nonzero during ordinary
+/// local governance and useless as an exploitation signal. Alert on `claimed_origin="peer"`.
+pub fn replication_quarantined_inc(message_type: &str, claimed_origin: &str) {
     counter!(
         "icn_governance_replication_quarantined_total",
-        "message_type" => message_type.to_string()
+        "message_type" => message_type.to_string(),
+        "claimed_origin" => claimed_origin.to_string()
     )
     .increment(1);
 }
