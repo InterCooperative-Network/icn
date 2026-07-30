@@ -289,7 +289,9 @@ impl TestNode {
                                 let mut g = gossip.write().await;
                                 let mut acked = Vec::new();
                                 for topic in &topics {
-                                    if g.subscribe(topic, sender.clone()).await.is_ok() {
+                                    // Network-originated: must use the own-DID-guarded
+                                    // entry point so the harness matches production (#2471).
+                                    if g.subscribe_from_network(topic, sender.clone()).await.is_ok() {
                                         acked.push(topic.clone());
                                     }
                                 }
@@ -343,7 +345,7 @@ impl TestNode {
                             _ = async {
                                 let mut g = gossip.write().await;
                                 for topic in &topics {
-                                    if let Err(e) = g.unsubscribe(topic, &sender) {
+                                    if let Err(e) = g.unsubscribe_from_network(topic, &sender) {
                                         debug!("Failed to unsubscribe {} from {}: {}", sender, topic, e);
                                     }
                                 }

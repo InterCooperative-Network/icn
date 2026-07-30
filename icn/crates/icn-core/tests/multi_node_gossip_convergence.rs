@@ -119,7 +119,7 @@ impl TestNode {
                         let mut acked_topics = Vec::new();
 
                         for topic in &topics {
-                            match gossip.subscribe(topic, sender.clone()).await {
+                            match gossip.subscribe_from_network(topic, sender.clone()).await {
                                 Ok(_) => {
                                     info!("Subscribed {} to topic: {}", sender, topic);
                                     acked_topics.push(topic.clone());
@@ -161,7 +161,7 @@ impl TestNode {
                     tokio::spawn(async move {
                         let mut gossip = gossip_handle.write().await;
                         for topic in &topics {
-                            if let Err(e) = gossip.unsubscribe(topic, &sender) {
+                            if let Err(e) = gossip.unsubscribe_from_network(topic, &sender) {
                                 warn!(
                                     "Failed to unsubscribe {} from topic {}: {}",
                                     sender, topic, e

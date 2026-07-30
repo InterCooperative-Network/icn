@@ -254,9 +254,11 @@ pub trait TrustService: Send + Sync {
     /// but the trust service owns deserialization, signature verification,
     /// and state updates.
     ///
-    /// `source` is the DID of the peer that forwarded this attestation
-    /// (the gossip subscriber, not necessarily the attestation issuer).
-    /// The trust service decides whether to accept or reject it.
+    /// `source` is the local delivery target reported by the gossip notification —
+    /// this node's own DID. It is **not** the forwarding peer and **not** the issuer,
+    /// and it carries no authentication. Treat it as a log label only; authorization
+    /// must come from the attestation's own signature. (Before #2471 this was the
+    /// gossip subscriber DID, which any peer could set.)
     ///
     /// Default implementation does nothing (no attestation support).
     fn ingest_attestation(&self, _bytes: &[u8], _source: &Did) -> Result<(), String> {
@@ -269,9 +271,9 @@ pub trait TrustService: Send + Sync {
     /// The trust service owns deserialization, signature verification,
     /// supersedence checks, and edge removal.
     ///
-    /// `source` is the DID of the peer that forwarded this revocation
-    /// (the gossip subscriber, not necessarily the revocation issuer).
-    /// The trust service decides whether to accept or reject it.
+    /// `source` is the local delivery target reported by the gossip notification —
+    /// this node's own DID, not the forwarding peer and not the issuer. It carries no
+    /// authentication; treat it as a log label only. (See `ingest_attestation`, #2471.)
     ///
     /// Default implementation does nothing (no revocation support).
     fn ingest_revocation(&self, _bytes: &[u8], _source: &Did) -> Result<(), String> {
