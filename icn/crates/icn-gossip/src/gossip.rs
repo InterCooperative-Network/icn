@@ -2363,6 +2363,25 @@ mod tests {
         );
         assert!(gossip.is_subscribed("test:guard", &owner));
 
+        // The refusal is typed, so handlers can keep this remotely-triggerable rejection
+        // out of their operational `warn!` path instead of letting a peer drive log volume.
+        let spoof = gossip
+            .subscribe_from_network("test:guard", owner.clone())
+            .await
+            .unwrap_err();
+        assert!(
+            GossipActor::is_subscription_control_spoof(&spoof),
+            "spoof rejection must be distinguishable from an operational failure"
+        );
+        let operational = gossip
+            .subscribe_from_network("no:such:topic", peer.clone())
+            .await
+            .unwrap_err();
+        assert!(
+            !GossipActor::is_subscription_control_spoof(&operational),
+            "an ordinary subscribe failure must not be classified as a spoof rejection"
+        );
+
         // A peer acting on itself is unaffected.
         gossip
             .subscribe_from_network("test:guard", peer.clone())

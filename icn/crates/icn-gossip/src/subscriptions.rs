@@ -33,6 +33,7 @@
 //! - [`GossipActor::is_subscribed`] - Check if a DID is subscribed to a topic
 //! - [`GossipActor::is_locally_subscribed`] - Check this node's own, non-peer-mutable subscription
 
+use crate::error::GossipError;
 use crate::gossip::{spawn_violation_recording, GossipActor, MAX_SUBSCRIBERS_PER_TOPIC};
 use crate::types::{AccessControl, ResourceLimits, Subscription};
 use anyhow::{bail, Context as _, Result};
@@ -310,9 +311,13 @@ impl GossipActor {
 
     /// Refuse a network-originated subscription-control request that claims this node's DID.
     ///
-    /// Observability is a counter plus a `debug!` line: this is remotely triggerable, so it
-    /// must not be able to drive log volume. The counter is the durable signal.
-    fn reject_own_did_claim(&self, topic: &str, claimed: &Did, action: &str) -> Result<()> {
+    /// Observability is a counter plus a `debug!` line: this is remotely triggerable and
+    /// repeatable, so it must not be able to drive log volume. The counter is the durable
+    /// signal. The returned error is the typed
+    /// [`GossipError::SubscriptionControlSpoofRejected`] rather than an opaque one,
+    /// specifically so callers can tell a spoof rejection apart from an operational
+    /// subscribe/unsubscribe failure and avoid re-logging it at `warn!`.
+    fn reject_own_did_claim(&self, topic: &str, claimed: &Did, action: &'static str) -> Result<()> {
         if *claimed != self.own_did {
             return Ok(());
         }
@@ -323,7 +328,24 @@ impl GossipActor {
             action = %action,
             "Refused network subscription-control request claiming this node's own DID"
         );
-        bail!("Refusing network {action} claiming this node's own DID for topic {topic}")
+        Err(GossipError::SubscriptionControlSpoofRejected {
+            topic: topic.to_string(),
+            action,
+        }
+        .into())
+    }
+
+    /// Whether `err` is the spoof rejection from [`GossipActor::subscribe_from_network`] or
+    /// [`GossipActor::unsubscribe_from_network`].
+    ///
+    /// Network message handlers use this to keep a remotely-triggerable, expected rejection
+    /// out of their operational `warn!` paths — otherwise a peer can batch many topics per
+    /// forged request and drive warning-level log volume.
+    pub fn is_subscription_control_spoof(err: &anyhow::Error) -> bool {
+        matches!(
+            err.downcast_ref::<GossipError>(),
+            Some(GossipError::SubscriptionControlSpoofRejected { .. })
+        )
     }
 
     /// Whether this node has subscribed **itself** to `topic`.

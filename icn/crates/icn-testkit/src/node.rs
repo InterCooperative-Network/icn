@@ -550,6 +550,25 @@ impl TestNode {
 
     /// Subscribe to a topic on a remote node
     pub async fn subscribe_to(&self, topic: &str, remote: &TestNode) -> Result<()> {
+        // Establish our own local subscription first. Since #2471 local notification
+        // dispatch is gated on `local_topic_subscriptions`, which only the node itself
+        // can write; telling a *remote* peer we are interested does not make our own
+        // callbacks fire. Production does both too — every subsystem subscribes its own
+        // DID alongside registering its callback — so doing only the network half here
+        // would leave tests silently observing nothing.
+        //
+        // Best-effort: the topic may not exist locally in tests that only mirror a
+        // remote's topic, and that is not a reason to fail the subscribe.
+        {
+            let mut g = self.gossip.write().await;
+            if let Err(e) = g.subscribe(topic, self.did.clone()).await {
+                debug!(
+                    "Local subscribe to {} failed (continuing with remote subscribe): {}",
+                    topic, e
+                );
+            }
+        }
+
         let msg = NetworkMessage::subscribe(
             self.did.clone(),
             remote.did.clone(),
