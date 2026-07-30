@@ -278,7 +278,7 @@ impl SledGovernanceStateStore {
     ///
     /// This used to name the gossip ingress (`handle_incoming`) as the motivating
     /// caller. That ingress no longer applies replicated state and holds no store
-    /// handle at all — see `actor::refuse_replicated_governance_message`.
+    /// handle at all — see `actor::observe_replicated_governance_message`.
     pub fn as_store(&self) -> &dyn Store {
         self.store.as_ref()
     }
