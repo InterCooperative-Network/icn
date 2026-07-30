@@ -2128,6 +2128,13 @@ pub mod gossip {
         counter!("icn_gossip_subscribe_acks_sent_total").increment(1);
     }
 
+    /// A network-originated Subscribe/Unsubscribe claimed this node's own DID and was
+    /// refused (#2471). Non-zero means a peer attempted subscription-control spoofing;
+    /// it is a counter rather than a log line because the trigger is remote.
+    pub fn subscription_control_spoof_rejected_inc() {
+        counter!("icn_gossip_subscription_control_spoof_rejected_total").increment(1);
+    }
+
     pub fn digests_sent_inc() {
         counter!("icn_gossip_digests_sent_total").increment(1);
     }

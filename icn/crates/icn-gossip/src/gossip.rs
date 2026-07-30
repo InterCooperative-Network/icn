@@ -21,9 +21,20 @@ use tracing::{debug, info, instrument, warn};
 /// If recipient_did is None, broadcast to all peers
 pub type SendMessageCallback = Arc<dyn Fn(Option<Did>, GossipMessage) + Send + Sync>;
 
-/// Callback for notifying subscribers of new entries
-/// Parameters: (topic, entry, subscriber_did)
-/// Called when a new entry is stored in a topic that has subscribers
+/// Callback for local notification of newly stored entries.
+///
+/// Parameters: `(topic, entry, recipient_did)`.
+///
+/// Dispatch is **entry-driven**: each accepted stored entry invokes each registered
+/// callback exactly once, provided this node has locally subscribed to the topic
+/// (see [`GossipActor::is_locally_subscribed`]). `recipient_did` is therefore always
+/// this node's own DID — it identifies the local delivery target, not the entry's
+/// author and not the peer that forwarded it.
+///
+/// Before #2471 this fired once *per subscriber per callback*, which let any peer
+/// both multiply and zero local delivery by mutating the (unauthenticated) subscriber
+/// list. Callbacks must not treat the third argument as an authority or as a peer
+/// identity; it carries no authentication.
 pub type EntryNotificationCallback = Arc<dyn Fn(String, GossipEntry, Did) + Send + Sync>;
 
 /// Callback for sampling peers based on scope
@@ -88,8 +99,24 @@ pub struct GossipActor {
     /// Bloom filters (topic -> filter)
     pub(crate) bloom_filters: HashMap<String, BloomFilter>,
 
-    /// Subscriptions (topic -> subscribers)
+    /// Network subscription state (topic -> subscribers).
+    ///
+    /// This list is peer-mutable by design: a remote peer may add or remove **itself**
+    /// via `Subscribe`/`Unsubscribe`, and `NetworkMessage.from` is self-declared. It
+    /// drives propagation/network bookkeeping only. It must never be the sole gate on
+    /// local notification delivery — see [`GossipActor::local_topic_subscriptions`].
     pub(crate) subscriptions: HashMap<String, Vec<Did>>,
+
+    /// Topics this node has subscribed **itself** to, via the local
+    /// [`GossipActor::subscribe`] path or snapshot restore.
+    ///
+    /// Deliberately separate from [`GossipActor::subscriptions`] (#2471). Every mutation
+    /// of this set is guarded by `subscriber == self.own_did`, and the network-facing
+    /// entry points ([`GossipActor::subscribe_from_network`] /
+    /// [`GossipActor::unsubscribe_from_network`]) refuse any request claiming this node's
+    /// own DID. So no peer-supplied DID can reach this set, and local notification
+    /// delivery cannot be suppressed or amplified from the network.
+    pub(crate) local_topic_subscriptions: HashSet<String>,
 
     /// Policy Oracle for authorization and resource limits
     pub(crate) oracle: Option<Arc<dyn PolicyOracle>>,
@@ -176,6 +203,7 @@ impl GossipActor {
             entries: HashMap::new(),
             bloom_filters: HashMap::new(),
             subscriptions: HashMap::new(),
+            local_topic_subscriptions: HashSet::new(),
             oracle,
             send_callback: None,
             notification_callbacks: Vec::new(),
@@ -1058,18 +1086,25 @@ impl GossipActor {
         // Merge vector clock
         self.clock.merge(&entry.clock);
 
-        // Notify subscribers about the new entry (fan-out to all registered callbacks)
-        if !self.notification_callbacks.is_empty() {
-            if let Some(subscribers) = self.subscriptions.get(topic) {
-                for subscriber in subscribers {
-                    debug!(
-                        "Notifying subscriber {} about new entry in topic {}",
-                        subscriber, topic
-                    );
-                    for callback in &self.notification_callbacks {
-                        callback(topic.clone(), entry.clone(), subscriber.clone());
-                    }
-                }
+        // Local notification dispatch is **entry-driven** (#2471): one accepted entry
+        // invokes each registered callback exactly once.
+        //
+        // It is gated on `local_topic_subscriptions` — this node's own, locally-owned
+        // record of what it subscribed itself to — and never on `self.subscriptions`,
+        // which any peer can mutate by sending an unauthenticated Subscribe/Unsubscribe.
+        // Gating on the peer-mutable list is what let a peer both multiply local work by
+        // the subscriber count and silence delivery entirely by removing our own entry.
+        //
+        // Storage and vector-clock merge above are deliberately unconditional: an entry
+        // is retained and propagated whether or not anything locally observes it.
+        if self.local_topic_subscriptions.contains(topic) {
+            debug!(
+                topic = %topic,
+                callbacks = self.notification_callbacks.len(),
+                "Dispatching local entry notification"
+            );
+            for callback in &self.notification_callbacks {
+                callback(topic.clone(), entry.clone(), self.own_did.clone());
             }
         }
 
@@ -1372,12 +1407,20 @@ impl GossipActor {
                 let did =
                     Did::from_str(&sub_str).context("Failed to parse DID from subscription")?;
 
+                // Restore the locally-owned delivery record too, so local notification
+                // dispatch survives a restart (#2471). Only our own DID qualifies.
+                let is_own = did == self.own_did;
+
                 // Ensure subscription list exists for this topic (create if missing)
                 let sub_list = self.subscriptions.entry(topic.clone()).or_default();
 
                 // Add subscription without access control check (we trust persisted state)
                 if !sub_list.contains(&did) {
                     sub_list.push(did.clone());
+                }
+
+                if is_own {
+                    self.local_topic_subscriptions.insert(topic.clone());
                 }
             }
         }
@@ -2182,8 +2225,15 @@ mod tests {
         );
     }
 
+    /// Local notification dispatch is entry-driven, not subscriber-driven (#2471).
+    ///
+    /// This test previously asserted one notification *per subscriber*. That shape made
+    /// local delivery a function of `subscriptions`, which any peer can mutate with an
+    /// unauthenticated `Subscribe`/`Unsubscribe` — so remote peers could multiply local
+    /// callback work and, by removing our own entry, silence it. Delivery now depends
+    /// only on this node's own locally-owned subscription, and fires once per entry.
     #[tokio::test]
-    async fn test_subscription_notifications() {
+    async fn test_entry_notification_is_once_per_entry_not_per_subscriber() {
         use std::sync::Mutex;
 
         let owner = KeyPair::generate().unwrap().did().clone();
@@ -2203,13 +2253,19 @@ mod tests {
         let notifications_clone = notifications.clone();
 
         // Set up notification callback
-        let callback: EntryNotificationCallback = Arc::new(move |topic, entry, subscriber| {
+        let callback: EntryNotificationCallback = Arc::new(move |topic, entry, recipient| {
             let mut notifs = notifications_clone.lock().unwrap();
-            notifs.push((topic, entry.hash, subscriber));
+            notifs.push((topic, entry.hash, recipient));
         });
         gossip.add_notification_callback(callback);
 
-        // Subscribe both users to the topic
+        // This node subscribes itself — this, and only this, enables local delivery.
+        gossip
+            .subscribe("test:notifications", owner.clone())
+            .await
+            .unwrap();
+
+        // Two remote peers also subscribe. They affect propagation bookkeeping only.
         gossip
             .subscribe("test:notifications", subscriber1.clone())
             .await
@@ -2223,30 +2279,104 @@ mod tests {
         let data = b"Test notification".to_vec();
         let hash = gossip.publish("test:notifications", data).await.unwrap();
 
-        // Verify both subscribers were notified
         let notifs = notifications.lock().unwrap();
         assert_eq!(
             notifs.len(),
-            2,
-            "Should have 2 notifications (one per subscriber)"
+            1,
+            "one stored entry must produce exactly one notification per callback, \
+             independent of the remote subscriber count"
         );
 
-        // Check that both subscribers received the notification
-        let subscriber_dids: Vec<_> = notifs.iter().map(|(_, _, did)| did.clone()).collect();
-        assert!(
-            subscriber_dids.contains(&subscriber1),
-            "subscriber1 should be notified"
+        let (topic, notif_hash, recipient) = &notifs[0];
+        assert_eq!(topic, "test:notifications");
+        assert_eq!(*notif_hash, hash);
+        assert_eq!(
+            recipient, &owner,
+            "the recipient argument identifies the local delivery target"
         );
-        assert!(
-            subscriber_dids.contains(&subscriber2),
-            "subscriber2 should be notified"
-        );
+    }
 
-        // Verify all notifications are for the correct topic and hash
-        for (topic, notif_hash, _) in notifs.iter() {
-            assert_eq!(topic, "test:notifications");
-            assert_eq!(*notif_hash, hash);
-        }
+    /// Remote subscribers alone must not enable local delivery: without this node's own
+    /// subscription there is nothing locally interested in the topic, and the remote
+    /// subscriber list is attacker-writable.
+    #[tokio::test]
+    async fn test_remote_subscribers_alone_do_not_enable_local_delivery() {
+        use std::sync::Mutex;
+
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let remote = KeyPair::generate().unwrap().did().clone();
+
+        let mut gossip = GossipActor::new(owner.clone(), create_test_oracle());
+        gossip.create_topic(Topic::new(
+            "test:remote-only".to_string(),
+            AccessControl::Public,
+        ));
+
+        let count = Arc::new(Mutex::new(0u32));
+        let c = count.clone();
+        gossip.add_notification_callback(Arc::new(move |_, _, _| {
+            *c.lock().unwrap() += 1;
+        }));
+
+        gossip
+            .subscribe("test:remote-only", remote.clone())
+            .await
+            .unwrap();
+        assert!(gossip.is_subscribed("test:remote-only", &remote));
+        assert!(!gossip.is_locally_subscribed("test:remote-only"));
+
+        gossip
+            .publish("test:remote-only", b"payload".to_vec())
+            .await
+            .unwrap();
+
+        assert_eq!(
+            *count.lock().unwrap(),
+            0,
+            "a remote subscriber must not by itself trigger local callbacks"
+        );
+    }
+
+    /// The network-facing entry points refuse requests claiming this node's own DID,
+    /// while still allowing a peer to subscribe and unsubscribe itself.
+    #[tokio::test]
+    async fn test_network_subscription_control_refuses_own_did_claim() {
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let peer = KeyPair::generate().unwrap().did().clone();
+
+        let mut gossip = GossipActor::new(owner.clone(), create_test_oracle());
+        gossip.create_topic(Topic::new("test:guard".to_string(), AccessControl::Public));
+
+        gossip.subscribe("test:guard", owner.clone()).await.unwrap();
+
+        // Spoofed subscribe/unsubscribe claiming our own DID: both refused.
+        assert!(gossip
+            .subscribe_from_network("test:guard", owner.clone())
+            .await
+            .is_err());
+        assert!(gossip
+            .unsubscribe_from_network("test:guard", &owner)
+            .is_err());
+        assert!(
+            gossip.is_locally_subscribed("test:guard"),
+            "a forged network request must not touch the local subscription record"
+        );
+        assert!(gossip.is_subscribed("test:guard", &owner));
+
+        // A peer acting on itself is unaffected.
+        gossip
+            .subscribe_from_network("test:guard", peer.clone())
+            .await
+            .unwrap();
+        assert!(gossip.is_subscribed("test:guard", &peer));
+        gossip
+            .unsubscribe_from_network("test:guard", &peer)
+            .unwrap();
+        assert!(!gossip.is_subscribed("test:guard", &peer));
+        assert!(
+            gossip.is_locally_subscribed("test:guard"),
+            "peer activity must not disturb the local subscription record"
+        );
     }
 
     #[tokio::test]
@@ -2324,11 +2454,17 @@ mod tests {
 
         let mut gossip = GossipActor::new(owner.clone(), create_test_oracle());
 
-        // Create topic and subscribe
+        // Create topic and subscribe. This node subscribes itself — that is what enables
+        // local delivery (#2471). The extra remote subscriber is present to prove it does
+        // not change the notification count.
         gossip.create_topic(Topic::new(
             "test:response".to_string(),
             AccessControl::Public,
         ));
+        gossip
+            .subscribe("test:response", owner.clone())
+            .await
+            .unwrap();
         gossip
             .subscribe("test:response", subscriber.clone())
             .await
@@ -2377,16 +2513,19 @@ mod tests {
             .await;
         assert!(result.is_ok(), "Response handler should succeed");
 
-        // Verify notification was sent to subscriber
+        // Verify exactly one local notification was dispatched for the stored entry
         let notifs = notifications.lock().unwrap();
         assert_eq!(
             notifs.len(),
             1,
-            "Should have 1 notification for the subscriber"
+            "Should have exactly 1 notification for the stored entry"
         );
         assert_eq!(notifs[0].0, "test:response");
         assert_eq!(notifs[0].1, hash);
-        assert_eq!(notifs[0].2, subscriber);
+        assert_eq!(
+            notifs[0].2, owner,
+            "the recipient argument is the local node, not a remote subscriber"
+        );
     }
 
     #[tokio::test]
