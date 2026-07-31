@@ -134,7 +134,7 @@ impl TestNode {
                         let mut acked_topics = Vec::new();
 
                         for topic in &topics {
-                            match gossip.subscribe(topic, sender.clone()).await {
+                            match gossip.subscribe_from_network(topic, sender.clone()).await {
                                 Ok(_) => acked_topics.push(topic.clone()),
                                 Err(e) => {
                                     warn!("Failed to subscribe {} to {}: {}", sender, topic, e)
