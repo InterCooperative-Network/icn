@@ -2346,6 +2346,65 @@ mod tests {
         );
     }
 
+    /// A peer can fill a public topic's subscriber list to `MAX_SUBSCRIBERS_PER_TOPIC` with
+    /// distinct claimed DIDs. That must not be able to make the node's own later subscribe
+    /// fail, which would leave local delivery unset — the same remote suppression this
+    /// change closes, arriving via the capacity check instead of via `Unsubscribe`.
+    #[tokio::test]
+    async fn test_filled_topic_cannot_block_the_local_nodes_own_subscription() {
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let mut gossip = GossipActor::new(owner.clone(), create_test_oracle());
+        gossip.create_topic(Topic::new("test:filled".to_string(), AccessControl::Public));
+
+        // Saturate the topic with peer-claimed DIDs, as an unauthenticated peer could.
+        {
+            let subscribers = gossip.subscriptions.get_mut("test:filled").unwrap();
+            while subscribers.len() < MAX_SUBSCRIBERS_PER_TOPIC {
+                subscribers.push(KeyPair::generate().unwrap().did().clone());
+            }
+        }
+        assert_eq!(
+            gossip.get_subscribers("test:filled").len(),
+            MAX_SUBSCRIBERS_PER_TOPIC
+        );
+
+        // A further *peer* subscribe is still refused — the cap still does its job.
+        let peer = KeyPair::generate().unwrap().did().clone();
+        assert!(
+            gossip
+                .subscribe_from_network("test:filled", peer)
+                .await
+                .is_err(),
+            "the per-topic cap must still bound peer-driven growth"
+        );
+
+        // The node's own subscribe must still succeed and must establish local delivery.
+        gossip
+            .subscribe("test:filled", owner.clone())
+            .await
+            .expect("a saturated subscriber list must not block our own subscription");
+        assert!(
+            gossip.is_locally_subscribed("test:filled"),
+            "a peer must not be able to suppress local delivery by filling the topic"
+        );
+
+        // And delivery actually happens.
+        let count = Arc::new(std::sync::Mutex::new(0u32));
+        let c = count.clone();
+        gossip.add_notification_callback(Arc::new(move |_, _, _| {
+            *c.lock().unwrap() += 1;
+        }));
+        gossip
+            .publish("test:filled", b"payload".to_vec())
+            .await
+            .unwrap();
+        assert_eq!(
+            *count.lock().unwrap(),
+            1,
+            "exactly one local notification, despite 10000 remote subscribers"
+        );
+    }
+
     /// A snapshot written by a pre-fix node can contain an own-DID subscription that a peer
     /// forged over the unauthenticated Subscribe path. Restoring it must not enable local
     /// delivery for that topic, or the upgrade would launder the compromise past the guard.

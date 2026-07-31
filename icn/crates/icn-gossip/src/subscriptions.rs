@@ -186,8 +186,19 @@ impl GossipActor {
         let subscribers = self.subscriptions.entry(topic.to_string()).or_default();
 
         if !subscribers.contains(&subscriber) {
-            // Check per-topic subscriber limit to prevent unbounded growth
-            if subscribers.len() >= MAX_SUBSCRIBERS_PER_TOPIC {
+            // Check per-topic subscriber limit to prevent unbounded growth.
+            //
+            // The local node's own DID is exempt, matching the per-peer limit above
+            // (#2471). This list is fillable by unauthenticated peers: `Subscribe` accepts
+            // any claimed DID, so a peer can push it to MAX_SUBSCRIBERS_PER_TOPIC with
+            // distinct claimed DIDs. Without the exemption, that peer could make the
+            // node's own later `subscribe` — during subsystem startup, or for a topic
+            // created at runtime — fail, leaving `local_topic_subscriptions` unset and
+            // silencing local delivery. That is the same remote suppression this change
+            // exists to close, arriving through the capacity check instead of through
+            // `Unsubscribe`. The exemption costs at most one entry over the cap, for our
+            // own DID only.
+            if !is_own_did && subscribers.len() >= MAX_SUBSCRIBERS_PER_TOPIC {
                 // Record misbehavior violation (fire-and-forget, non-blocking)
                 if let Some(ref detector) = self.misbehavior_detector {
                     use sha2::{Digest, Sha256};
