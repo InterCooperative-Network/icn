@@ -75,7 +75,7 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                         // `sender_did` is `NetworkMessage.from` — self-declared, not
                         // authenticated. `subscribe_from_network` refuses any claim of
                         // this node's own DID (#2471); a peer subscribing itself is
-                        // still allowed, and still unauthenticated (#2469).
+                        // still allowed, and still unauthenticated (#2480).
                         match gossip
                             .subscribe_from_network(topic, sender_did.clone())
                             .await

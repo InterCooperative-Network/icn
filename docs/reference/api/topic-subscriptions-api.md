@@ -451,8 +451,10 @@ authority.
 
 **What this does not provide.** None of the above authenticates gossip. A peer may still
 subscribe and unsubscribe itself under any DID it asserts, and may still grow a topic's
-subscriber list up to `MAX_SUBSCRIBERS_PER_TOPIC`. Authenticating the requests is tracked
-separately (issue #2469).
+subscriber list up to `MAX_SUBSCRIBERS_PER_TOPIC`. Authenticating the requests — binding
+`NetworkMessage.from` to the authenticated identity of the connection that delivered it — is
+tracked separately as issue #2480. Issue #2469 covers the distinct question of authenticating
+`GossipEntry.author` on the governance apply path; neither primitive supplies the other.
 
 ---
 

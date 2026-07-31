@@ -298,7 +298,9 @@ impl GossipActor {
     /// copy away from reopening the hole.
     ///
     /// This is containment, not authentication: it does not verify that the claimed peer
-    /// DID belongs to the sender. Authenticated gossip remains unresolved (#2469).
+    /// DID belongs to the sender. Binding `NetworkMessage.from` to the authenticated
+    /// identity of the delivering connection remains unresolved (#2480). The separate
+    /// question of authenticating `GossipEntry.author` on the apply path is #2469.
     pub async fn subscribe_from_network(
         &mut self,
         topic: &str,
