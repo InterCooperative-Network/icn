@@ -55,6 +55,7 @@ View source on GitHub →
 <li><a href="#network-protocol">Network Protocol</a></li>
 <li><a href="#usage-examples">Usage Examples</a></li>
 <li><a href="#access-control">Access Control</a></li>
+<li><a href="#security-network-originated-requests">Security: network-originated requests</a></li>
 <li><a href="#metrics">Metrics</a></li>
 <li><a href="#testing">Testing</a></li>
 </ol>
@@ -64,6 +65,12 @@ View source on GitHub →
 <pre><code class="language-rust">pub fn subscribe(&amp;mut self, topic: &amp;str, subscriber: Did) -&gt; Result&lt;Subscription&gt;
 </code></pre>
 <p>Subscribe a DID to a topic. Performs ACL checks based on the topic&#39;s <code>AccessControl</code> policy.</p>
+<blockquote>
+<p><strong>This is the LOCAL API.</strong> It acts on whatever DID the caller supplies and is how a node
+subscribes <strong>itself</strong>. Handlers processing a <em>received</em> <code>Subscribe</code> must use
+<a href="#handle-a-received-subscribe">`subscribe_from_network`</a> instead — see
+<a href="#security-network-originated-requests">Security</a>.</p>
+</blockquote>
 <p><strong>Parameters:</strong></p>
 <ul>
 <li><code>topic</code>: Topic name (e.g., &quot;global:identity&quot;, &quot;contract:abc123&quot;)</li>
@@ -171,6 +178,33 @@ for topic in subscriptions {
 }
 </code></pre>
 <hr>
+<h3>Handle a Received Subscribe</h3>
+<pre><code class="language-rust">pub async fn subscribe_from_network(
+    &amp;mut self,
+    topic: &amp;str,
+    claimed_subscriber: Did,
+) -&gt; Result&lt;Subscription&gt;
+</code></pre>
+<p>The <strong>only</strong> entry point a network message handler may use for a received <code>Subscribe</code>.
+Refuses any request whose claimed subscriber is this node&#39;s own DID, then delegates to
+<code>subscribe</code>. A peer subscribing itself is unaffected.</p>
+<p><strong>Returns:</strong></p>
+<ul>
+<li><code>Ok(Subscription)</code>: as <code>subscribe</code></li>
+<li><code>Err(GossipError::SubscriptionControlSpoofRejected)</code>: the request claimed this node&#39;s own
+DID. Match with <code>GossipActor::is_subscription_control_spoof()</code> and log at <code>debug!</code>.</li>
+<li><code>Err(_)</code>: any ordinary subscribe failure (topic missing, ACL, policy, capacity)</li>
+</ul>
+<h3>Handle a Received Unsubscribe</h3>
+<pre><code class="language-rust">pub fn unsubscribe_from_network(&amp;mut self, topic: &amp;str, claimed_subscriber: &amp;Did) -&gt; Result&lt;()&gt;
+</code></pre>
+<p>The network-facing counterpart to <code>unsubscribe</code>, with the same own-DID refusal.</p>
+<h3>Check This Node&#39;s Own Subscription</h3>
+<pre><code class="language-rust">pub fn is_locally_subscribed(&amp;self, topic: &amp;str) -&gt; bool
+</code></pre>
+<p>Whether this node subscribed <strong>itself</strong> to <code>topic</code>. This is the gate on local notification
+delivery. Unlike <code>is_subscribed</code>, it cannot be influenced by any network message.</p>
+<hr>
 <h2>Network Protocol</h2>
 <h3>Subscribe Message</h3>
 <p>Send a <code>Subscribe</code> message to request subscription to one or more topics on a peer.</p>
@@ -187,7 +221,9 @@ network_handle.send_message(peer_did, subscribe_msg).await?;
 <li>Node A sends <code>Subscribe {topics: [...]}</code> to Node B</li>
 <li>Node B&#39;s supervisor receives message</li>
 <li>For each topic:<ul>
-<li>Call <code>gossip.subscribe(topic, sender_did)</code></li>
+<li>Call <code>gossip.subscribe_from_network(topic, sender_did)</code> — <strong>never</strong> the local
+<code>gossip.subscribe</code>; see <a href="#security-network-originated-requests">Security</a> below</li>
+<li>Refused outright if <code>sender_did</code> claims Node B&#39;s own DID</li>
 <li>ACL check performed</li>
 <li>Add to subscribers if authorized</li>
 </ul>
@@ -210,7 +246,9 @@ network_handle.send_message(peer_did, unsubscribe_msg).await?;
 <li>Node A sends <code>Unsubscribe {topics: [...]}</code> to Node B</li>
 <li>Node B&#39;s supervisor receives message</li>
 <li>For each topic:<ul>
-<li>Call <code>gossip.unsubscribe(topic, &amp;sender_did)</code></li>
+<li>Call <code>gossip.unsubscribe_from_network(topic, &amp;sender_did)</code> — <strong>never</strong> the local
+<code>gossip.unsubscribe</code>; see <a href="#security-network-originated-requests">Security</a> below</li>
+<li>Refused outright if <code>sender_did</code> claims Node B&#39;s own DID</li>
 <li>Remove from subscribers</li>
 </ul>
 </li>
@@ -258,8 +296,16 @@ let incoming_handler = Arc::new(move |net_msg| {
                 let mut acked_topics = Vec::new();
 
                 for topic in &amp;topics {
-                    match gossip.subscribe(topic, sender.clone()).await {
+                    // `sender` is `NetworkMessage.from` — self-declared and unauthenticated.
+                    // Network handlers MUST use `subscribe_from_network`, which refuses any
+                    // request claiming this node&#39;s own DID (#2471). Using the local
+                    // `gossip.subscribe` here reintroduces the spoofing vulnerability.
+                    match gossip.subscribe_from_network(topic, sender.clone()).await {
                         Ok(_) =&gt; acked_topics.push(topic.clone()),
+                        Err(e) if GossipActor::is_subscription_control_spoof(&amp;e) =&gt; {
+                            // Remotely triggerable and repeatable — keep it out of `warn!`.
+                            debug!(&quot;{}&quot;, e);
+                        }
                         Err(e) =&gt; warn!(&quot;Subscription denied for {}: {}&quot;, topic, e),
                     }
                 }
@@ -330,6 +376,55 @@ gossip.create_topic(topic);
 gossip.subscribe(&quot;contract:abc123&quot;, alice_did)?; // Succeeds
 gossip.subscribe(&quot;contract:abc123&quot;, charlie_did)?; // Fails - not in whitelist
 </code></pre>
+<hr>
+<h2>Security: network-originated requests</h2>
+<p><code>NetworkMessage.from</code> is <strong>self-declared</strong>. TLS is TOFU with
+<code>client_auth_mandatory() = false</code>, and nothing rebinds a per-message <code>from</code> to the identity
+established by the <code>Hello</code> exchange. A syntactically valid DID is not proof that the sender
+holds its private key, and a transport connection is not subscription authority.</p>
+<p>Therefore:</p>
+<table>
+<thead>
+<tr>
+<th>Caller</th>
+<th>Use</th>
+<th>Never use</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Local code subscribing <strong>this node</strong></td>
+<td><code>subscribe</code> / <code>unsubscribe</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td>A handler processing a <strong>received</strong> <code>Subscribe</code>/<code>Unsubscribe</code></td>
+<td><code>subscribe_from_network</code> / <code>unsubscribe_from_network</code></td>
+<td><code>subscribe</code> / <code>unsubscribe</code></td>
+</tr>
+</tbody></table>
+<p><code>subscribe_from_network</code> and <code>unsubscribe_from_network</code> refuse any request whose claimed
+subscriber is this node&#39;s own DID. A peer subscribing or unsubscribing <strong>itself</strong> is
+unaffected — that is the intended protocol. Without the guard, a peer could send
+<code>Unsubscribe</code> with <code>from</code> set to the receiving node&#39;s own DID and drop that node&#39;s own
+subscription (issue #2471).</p>
+<p>Refusals increment <code>icn_gossip_subscription_control_spoof_rejected_total</code> and return
+<code>GossipError::SubscriptionControlSpoofRejected</code>. Match it with
+<code>GossipActor::is_subscription_control_spoof()</code> and log at <code>debug!</code>: the trigger is remote and
+repeatable, and a single forged request can batch many topics, so routing it to <code>warn!</code> lets a
+peer drive log volume.</p>
+<h3>Local delivery is not the subscriber list</h3>
+<p>Notification callbacks fire <strong>once per accepted stored entry per callback</strong>, gated on
+<code>is_locally_subscribed(topic)</code> — this node&#39;s own subscription record, which no network message
+can write. The subscriber list returned by <code>get_subscribers</code> is network/propagation
+bookkeeping; it is peer-mutable and must never gate local delivery. Registering a callback
+without also subscribing this node&#39;s own DID to the topic yields no local delivery.</p>
+<p>The third callback argument is this node&#39;s own DID — the local delivery target. It is not the
+entry&#39;s author, not the forwarding peer, and carries no authentication. Never treat it as
+authority.</p>
+<p><strong>What this does not provide.</strong> None of the above authenticates gossip. A peer may still
+subscribe and unsubscribe itself under any DID it asserts, and may still grow a topic&#39;s
+subscriber list up to <code>MAX_SUBSCRIBERS_PER_TOPIC</code>. Authenticating the requests is tracked
+separately (issue #2469).</p>
 <hr>
 <h2>Metrics</h2>
 <p>The subscription system exports Prometheus metrics:</p>
