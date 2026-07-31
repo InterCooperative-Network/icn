@@ -1407,10 +1407,6 @@ impl GossipActor {
                 let did =
                     Did::from_str(&sub_str).context("Failed to parse DID from subscription")?;
 
-                // Restore the locally-owned delivery record too, so local notification
-                // dispatch survives a restart (#2471). Only our own DID qualifies.
-                let is_own = did == self.own_did;
-
                 // Ensure subscription list exists for this topic (create if missing)
                 let sub_list = self.subscriptions.entry(topic.clone()).or_default();
 
@@ -1419,9 +1415,22 @@ impl GossipActor {
                     sub_list.push(did.clone());
                 }
 
-                if is_own {
-                    self.local_topic_subscriptions.insert(topic.clone());
-                }
+                // Deliberately NOT promoted into `local_topic_subscriptions`, even when
+                // `did == self.own_did` (#2471).
+                //
+                // Snapshot subscription records carry no provenance: a snapshot taken by a
+                // node running the pre-fix handler can contain an own-DID entry that a peer
+                // forged via the unauthenticated Subscribe path. Promoting it here would
+                // launder that record across the upgrade and permanently enable local
+                // delivery for an attacker-chosen topic — the exact request the patched
+                // network path now refuses.
+                //
+                // Nothing is lost by dropping it: restore runs before subsystem startup
+                // (`init_gossip.rs` restore_state -> `lifecycle.rs` subscribe_standard_topics
+                // and the per-subsystem init_* subscribes), so every legitimately configured
+                // topic re-establishes its own local subscription on this boot. The local
+                // set therefore derives only from code-path decisions made now, never from
+                // persisted peer-influenced state.
             }
         }
 
@@ -2334,6 +2343,51 @@ mod tests {
             *count.lock().unwrap(),
             0,
             "a remote subscriber must not by itself trigger local callbacks"
+        );
+    }
+
+    /// A snapshot written by a pre-fix node can contain an own-DID subscription that a peer
+    /// forged over the unauthenticated Subscribe path. Restoring it must not enable local
+    /// delivery for that topic, or the upgrade would launder the compromise past the guard.
+    #[tokio::test]
+    async fn test_restore_does_not_promote_snapshot_own_did_to_local_subscription() {
+        let owner = KeyPair::generate().unwrap().did().clone();
+
+        // Build a snapshot as a pre-fix node would have written it: the attacker forged
+        // `Subscribe { from: owner }` for a topic the node never subscribed itself to.
+        let mut victim = GossipActor::new(owner.clone(), create_test_oracle());
+        victim.create_topic(Topic::new(
+            "attacker:chosen".to_string(),
+            AccessControl::Public,
+        ));
+        victim
+            .subscribe("attacker:chosen", owner.clone())
+            .await
+            .unwrap();
+        let state = victim.export_state();
+        assert!(
+            state.subscriptions["attacker:chosen"].contains(&owner.to_string()),
+            "precondition: the forged own-DID record is in the snapshot"
+        );
+
+        // Upgraded node restores that snapshot.
+        let mut upgraded = GossipActor::new(owner.clone(), create_test_oracle());
+        upgraded.restore_state(state).unwrap();
+
+        assert!(
+            !upgraded.is_locally_subscribed("attacker:chosen"),
+            "a snapshot subscription record must never establish local delivery — it has no \
+             provenance separating a local subscribe from a forged network one"
+        );
+
+        // The legitimate path still works: subsystem startup re-subscribes after restore.
+        upgraded
+            .subscribe("attacker:chosen", owner.clone())
+            .await
+            .unwrap();
+        assert!(
+            upgraded.is_locally_subscribed("attacker:chosen"),
+            "an explicit local subscribe after restore must establish local delivery"
         );
     }
 
