@@ -115,7 +115,7 @@ View source on GitHub →
 <h3>3.6 Retry / restart / partial-effect ambiguity</h3>
 <p>A high-impact effect partially applies before a restart. The substrate retries. One subsystem no-ops correctly; another mutates a second time; a third returns opaque evidence. The current idempotency key for institutional effects is at institutional-effect granularity, not per-effect granularity; the stronger <code>(decision_hash, manifest_hash, effect_index)</code> key named by <a href="/docs/spec/effect-dispatch-contract">`../spec/effect-dispatch-contract.md`</a> is future schema work and is not yet in the dispatch path.</p>
 <h3>3.7 The fake-domain factory</h3>
-<p>A domain is created with technically valid but institutionally garbage governance parameters — quorum 1, approval threshold 1, voting period zero, no challenge window, no notification requirement. Current CCL governance validation (<code>icn/crates/icn-ccl/src/governance.rs:146-163</code>) is semantic-only; there are no pilot-readiness sanity bounds and no escape-hatch labeling for fixture-mode permissive configs.</p>
+<p>A domain is created with technically valid but institutionally garbage governance parameters — quorum 1, approval threshold 1, a one-day voting period, no challenge window, no notification requirement. The validation actually reached on the create-domain route (<code>validate_governance_params</code> in <code>icn/apps/governance/src/http/validation.rs</code>, called from <code>create_domain</code> in <code>icn/apps/governance/src/http/handlers.rs</code>) is range-only: it rejects percentages above 100, a zero voting period, and a voting period beyond one year. Quorum 1 and approval threshold 1 pass. There are no pilot-readiness sanity bounds and no escape-hatch labeling for fixture-mode permissive configs. Two structural gaps widen the story rather than narrow it. First, <code>GovernanceParams::validate</code> (<code>icn/crates/icn-governance/src/config.rs</code>) carries stricter deliberation and execution-delay bounds but is compiled and unit-tested with no production caller. Second, the HTTP route is not the only way to create a domain: the JSON-RPC handler <code>handle_governance_domain_create</code> (<code>icn/crates/icn-rpc/src/handler/governance.rs</code>) builds <code>GovernanceParams</code> straight from the request and calls <code>GovernanceHandle::create_domain</code> with <strong>no parameter validation at all</strong>, bypassing the HTTP validator entirely. Neither terminus validates either — <code>GovernanceManager::create_domain</code> (<code>icn/apps/governance/src/manager.rs</code>) accepts a <code>GovernanceParams</code> value as given, and the actor&#39;s <code>GovernanceCommand::CreateDomain</code> arm (<code>icn/apps/governance/src/actor.rs</code>) builds a <code>GovernanceConfig</code> from it unchecked. Challenge window and notification requirement are not <code>GovernanceParams</code> fields at all, so no band test can currently read them.</p>
 <h3>3.8 Visual greenwashing</h3>
 <p>Implementation drift between <a href="/docs/spec/member-shell-v0">`../spec/member-shell-v0.md`</a> and <a href="/docs/spec/steward-cockpit-v0">`../spec/steward-cockpit-v0.md`</a> lets a degraded, partial, stale, or disputed state render as a clean green checkmark in member shell while the cockpit shows red. The v0 spec already flags this as a failure-table violation; the fixture matrix that catches it before merge does not yet exist.</p>
 <h3>3.9 Surveillance by debug</h3>
@@ -238,7 +238,7 @@ View source on GitHub →
 <p><strong>Draft design.</strong> Candidate key <code>decision_hash + manifest_hash + effect_index</code>. Per-subsystem contract: idempotent / read-after-write idempotent / not idempotent (requires governance decision before retry). Evidence records distinguish first application from duplicate.</p>
 <p><strong>Anchors.</strong> <code>icn/apps/governance/src/dispatch_evidence.rs:34-87</code> (<code>EffectDispatchEvidence</code> struct, current granularity), <a href="/docs/spec/effect-dispatch-contract">`../spec/effect-dispatch-contract.md`</a> (spec calling for the stronger key).</p>
 <h3>4.7 Governance parameter sanity bounds</h3>
-<p><strong>Problem.</strong> CCL governance parameter validation is semantic-only; pilot-readiness sanity bounds do not exist and there is no explicit fixture-mode escape hatch.</p>
+<p><strong>Problem.</strong> Governance parameter validation on the create-domain route is range-only — percentage bounds and a non-zero, under-one-year voting period. Pilot-readiness sanity bounds do not exist, there is no explicit fixture-mode escape hatch, the stricter bounds that do exist in <code>GovernanceParams::validate</code> are not wired into any create path, and the JSON-RPC create path validates nothing at all.</p>
 <p><strong>Hardening goal.</strong> Governance configs are classified into bands: <code>technically-valid</code>, <code>fixture-valid</code>, <code>pilot-valid</code>, <code>production-valid</code>. Member-facing institutions whose configs fail the band test render as <code>Degraded/InsufficientGovernanceConfig</code> and refuse member-facing operation until corrected.</p>
 <p><strong>Doctrine.</strong> <em>A technically valid institution can still be democratically fake.</em></p>
 <p><strong>Draft design.</strong> Per-band bounds (numbers explicitly draft):</p>
@@ -252,7 +252,37 @@ View source on GitHub →
 <li>notification requirement: at least one notification path bound for each band above <code>fixture-valid</code>.</li>
 </ul>
 <p>Fixture / dev / test bands are explicit and labeled in every surface that touches them.</p>
-<p><strong>Anchors.</strong> <code>icn/crates/icn-ccl/src/governance.rs:146-163</code> (current quorum check).</p>
+<p><strong>Anchors.</strong> Distinguish four states, because only the first is enforcement:</p>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Anchor</th>
+<th>Note</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>Active validation</strong></td>
+<td><code>validate_governance_params</code> in <code>icn/apps/governance/src/http/validation.rs</code>, called from <code>create_domain</code> in <code>icn/apps/governance/src/http/handlers.rs</code></td>
+<td>The only parameter validation any production path reaches. Range-only; the handler adds the whole-day voting-period floor. The gateway mounts this handler under <code>/gov</code> (<code>icn/crates/icn-gateway/src/server.rs</code>), so the HTTP route resolves here.</td>
+</tr>
+<tr>
+<td><strong>Compiled but unwired</strong></td>
+<td><code>GovernanceParams::validate</code> in <code>icn/crates/icn-governance/src/config.rs</code></td>
+<td>Stricter deliberation / execution-delay bounds; <strong>no production caller</strong>. A band gate should wire this in rather than re-derive it.</td>
+</tr>
+<tr>
+<td><strong>Duplicate but unused</strong></td>
+<td><code>validate_governance_params</code> in <code>icn/crates/icn-gateway/src/validation.rs</code></td>
+<td>Byte-equivalent range check with <strong>no in-repo caller outside its own unit tests</strong>. It is not a second route and must not be treated as one — extending band logic into it would grow logic nothing calls. It is <code>pub</code> in a <code>pub mod</code>, so removing it is a public-surface change and belongs in a separate cleanup, not in a band-gate change.</td>
+</tr>
+<tr>
+<td><strong>Creation paths that validate nothing</strong></td>
+<td><code>handle_governance_domain_create</code> in <code>icn/crates/icn-rpc/src/handler/governance.rs</code>; <code>GovernanceManager::create_domain</code> and <code>create_domain_simple</code> in <code>icn/apps/governance/src/manager.rs</code>; the <code>GovernanceCommand::CreateDomain</code> arm in <code>icn/apps/governance/src/actor.rs</code></td>
+<td>The JSON-RPC handler calls <code>GovernanceHandle::create_domain</code> <strong>directly, bypassing <code>GovernanceManager</code></strong>, so a gate placed only on the manager would still miss it.</td>
+</tr>
+</tbody></table>
+<p><strong>Where the gate has to go.</strong> There is no single composition root today. In actor-backed deployments the HTTP and JSON-RPC paths converge only at the actor&#39;s <code>GovernanceCommand::CreateDomain</code> arm; in standalone mode the manager&#39;s in-memory branch is a separate terminus that the actor never sees. A band gate must therefore cover both termini, or the domain-creation entry points must first be funnelled through one.</p>
 <h3>4.8 Shell / cockpit fixture matrix (no greenwashing)</h3>
 <p><strong>Problem.</strong> Implementation drift between member shell and cockpit can let degraded / partial / stale / disputed states render as clean.</p>
 <p><strong>Hardening goal.</strong> A fixture matrix asserts member-shell rendering against cockpit rendering for every degraded state, every administrative shortcut, every pending challenge, every emitted-only effect, every stale resolver answer. If cockpit shows degraded, member shell must show degraded — in member vocabulary.</p>
@@ -640,9 +670,9 @@ View source on GitHub →
 </tr>
 </thead>
 <tbody><tr>
-<td><code>feat(ccl): pilot-ready governance profile bands and gate</code></td>
+<td><code>feat(governance): pilot-ready governance profile bands and gate</code></td>
 <td>§4.7, §10</td>
-<td><code>icn/crates/icn-ccl/src/governance.rs:146-163</code></td>
+<td><code>validate_governance_params</code> in <code>icn/apps/governance/src/http/validation.rs</code>; <code>GovernanceParams::validate</code> in <code>icn/crates/icn-governance/src/config.rs</code>; the two unvalidated termini <code>GovernanceManager::create_domain</code> (<code>icn/apps/governance/src/manager.rs</code>) and the <code>GovernanceCommand::CreateDomain</code> arm (<code>icn/apps/governance/src/actor.rs</code>); and the bypassing <code>handle_governance_domain_create</code> (<code>icn/crates/icn-rpc/src/handler/governance.rs</code>)</td>
 </tr>
 <tr>
 <td><code>chore(receipts): typed receipt write-path atomicity inventory</code></td>
