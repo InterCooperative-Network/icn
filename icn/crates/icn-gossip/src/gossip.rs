@@ -296,6 +296,12 @@ impl GossipActor {
         );
         self.entries.insert(topic.name.clone(), HashMap::new());
         self.subscriptions.insert(topic.name.clone(), Vec::new());
+        // Recreating a topic already resets its subscriber list, so it must reset this
+        // node's own subscription too (#2471) — otherwise `is_locally_subscribed` would
+        // stay true while `is_subscribed(topic, own_did)` went false, and local delivery
+        // would continue under a replacement ACL that might now deny us. Re-subscribing
+        // after a recreate is explicit, and goes through the ACL like any other subscribe.
+        self.local_topic_subscriptions.remove(&topic.name);
         self.topics.insert(topic.name.clone(), topic);
     }
 
@@ -2419,6 +2425,73 @@ mod tests {
             *count.lock().unwrap(),
             1,
             "exactly one local notification, despite 10000 remote subscribers"
+        );
+    }
+
+    /// Recreating a topic resets its subscriber list, so it must reset this node's own
+    /// subscription too — otherwise local delivery would continue under a replacement ACL
+    /// that has not authorised it, and the two records would disagree.
+    #[tokio::test]
+    async fn test_recreating_a_topic_clears_local_delivery() {
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let mut gossip = GossipActor::new(owner.clone(), create_test_oracle());
+
+        gossip.create_topic(Topic::new("reconfig:me".to_string(), AccessControl::Public));
+        gossip
+            .subscribe("reconfig:me", owner.clone())
+            .await
+            .unwrap();
+        assert!(gossip.is_locally_subscribed("reconfig:me"));
+
+        let count = Arc::new(std::sync::Mutex::new(0u32));
+        let c = count.clone();
+        gossip.add_notification_callback(Arc::new(move |_, _, _| {
+            *c.lock().unwrap() += 1;
+        }));
+
+        // Recreate under a different ACL, as runtime reconfiguration would.
+        gossip.create_topic(Topic::new(
+            "reconfig:me".to_string(),
+            AccessControl::Participants(vec![]),
+        ));
+
+        assert!(
+            !gossip.is_subscribed("reconfig:me", &owner),
+            "precondition: recreating already resets the subscriber list"
+        );
+        assert!(
+            !gossip.is_locally_subscribed("reconfig:me"),
+            "recreating a topic must also reset this node's own subscription, so the two \
+             records cannot disagree"
+        );
+
+        // Deliver through the receive path — the case that matters, and one the replacement
+        // ACL does not gate (`store_entry` accepts entries regardless of publish rights).
+        let sender = KeyPair::generate().unwrap().did().clone();
+        let entry = GossipEntry {
+            hash: [11u8; 32],
+            author: sender.clone(),
+            clock: VectorClock::new(),
+            topic: "reconfig:me".to_string(),
+            data: b"after recreate".to_vec(),
+            compressed: false,
+            timestamp: 1_700_000_000_000,
+            replica_offered: None,
+        };
+        gossip
+            .handle_message(&sender, GossipMessage::Response { entry })
+            .await
+            .unwrap();
+
+        assert_eq!(
+            *count.lock().unwrap(),
+            0,
+            "local delivery must not continue under a replacement ACL without a fresh subscribe"
+        );
+        assert_eq!(
+            gossip.get_entries("reconfig:me").len(),
+            1,
+            "the entry is still stored — only local delivery is gated"
         );
     }
 
