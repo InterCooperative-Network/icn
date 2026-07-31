@@ -127,7 +127,7 @@ A high-impact effect partially applies before a restart. The substrate retries. 
 
 ### 3.7 The fake-domain factory
 
-A domain is created with technically valid but institutionally garbage governance parameters — quorum 1, approval threshold 1, a one-day voting period, no challenge window, no notification requirement. The validation actually reached on the create-domain route (`validate_governance_params` in `icn/apps/governance/src/http/validation.rs`, called from `create_domain` in `icn/apps/governance/src/http/handlers.rs`) is range-only: it rejects percentages above 100, a zero voting period, and a voting period beyond one year. Quorum 1 and approval threshold 1 pass. There are no pilot-readiness sanity bounds and no escape-hatch labeling for fixture-mode permissive configs. Two structural gaps widen the story rather than narrow it: `GovernanceParams::validate` (`icn/crates/icn-governance/src/config.rs`) carries stricter deliberation and execution-delay bounds but is compiled and unit-tested with no production caller, and `GovernanceManager::create_domain` (`icn/apps/governance/src/manager.rs`) accepts a `GovernanceParams` value without validating it, so non-HTTP creation paths bypass even the range checks. Challenge window and notification requirement are not `GovernanceParams` fields at all, so no band test can currently read them.
+A domain is created with technically valid but institutionally garbage governance parameters — quorum 1, approval threshold 1, a one-day voting period, no challenge window, no notification requirement. The validation actually reached on the create-domain route (`validate_governance_params` in `icn/apps/governance/src/http/validation.rs`, called from `create_domain` in `icn/apps/governance/src/http/handlers.rs`) is range-only: it rejects percentages above 100, a zero voting period, and a voting period beyond one year. Quorum 1 and approval threshold 1 pass. There are no pilot-readiness sanity bounds and no escape-hatch labeling for fixture-mode permissive configs. Two structural gaps widen the story rather than narrow it. First, `GovernanceParams::validate` (`icn/crates/icn-governance/src/config.rs`) carries stricter deliberation and execution-delay bounds but is compiled and unit-tested with no production caller. Second, the HTTP route is not the only way to create a domain: the JSON-RPC handler `handle_governance_domain_create` (`icn/crates/icn-rpc/src/handler/governance.rs`) builds `GovernanceParams` straight from the request and calls `GovernanceHandle::create_domain` with **no parameter validation at all**, bypassing the HTTP validator entirely. Neither terminus validates either — `GovernanceManager::create_domain` (`icn/apps/governance/src/manager.rs`) accepts a `GovernanceParams` value as given, and the actor's `GovernanceCommand::CreateDomain` arm (`icn/apps/governance/src/actor.rs`) builds a `GovernanceConfig` from it unchecked. Challenge window and notification requirement are not `GovernanceParams` fields at all, so no band test can currently read them.
 
 ### 3.8 Visual greenwashing
 
@@ -296,7 +296,7 @@ Where this vocabulary lives — kernel-api proofs vs governance-app types — is
 
 ### 4.7 Governance parameter sanity bounds
 
-**Problem.** Governance parameter validation on the create-domain route is range-only — percentage bounds and a non-zero, under-one-year voting period. Pilot-readiness sanity bounds do not exist, there is no explicit fixture-mode escape hatch, the stricter bounds that do exist in `GovernanceParams::validate` are not wired into any create path, and the non-HTTP create path validates nothing.
+**Problem.** Governance parameter validation on the create-domain route is range-only — percentage bounds and a non-zero, under-one-year voting period. Pilot-readiness sanity bounds do not exist, there is no explicit fixture-mode escape hatch, the stricter bounds that do exist in `GovernanceParams::validate` are not wired into any create path, and the JSON-RPC create path validates nothing at all.
 
 **Hardening goal.** Governance configs are classified into bands: `technically-valid`, `fixture-valid`, `pilot-valid`, `production-valid`. Member-facing institutions whose configs fail the band test render as `Degraded/InsufficientGovernanceConfig` and refuse member-facing operation until corrected.
 
@@ -314,7 +314,16 @@ Where this vocabulary lives — kernel-api proofs vs governance-app types — is
 
 Fixture / dev / test bands are explicit and labeled in every surface that touches them.
 
-**Anchors.** `validate_governance_params` in `icn/apps/governance/src/http/validation.rs` (the range check actually reached on the create-domain route) and its call site `create_domain` in `icn/apps/governance/src/http/handlers.rs` (which adds the whole-day voting-period floor); `GovernanceParams::validate` in `icn/crates/icn-governance/src/config.rs` (stricter deliberation / execution-delay bounds, currently with no production caller — a band gate should wire this in rather than re-derive it); `GovernanceManager::create_domain` in `icn/apps/governance/src/manager.rs` (the unvalidated non-HTTP entry point a band gate must also cover); `validate_governance_params` in `icn/crates/icn-gateway/src/validation.rs` (a second copy of the same range check — band logic must not land in only one of the two).
+**Anchors.** Distinguish four states, because only the first is enforcement:
+
+| State | Anchor | Note |
+|---|---|---|
+| **Active validation** | `validate_governance_params` in `icn/apps/governance/src/http/validation.rs`, called from `create_domain` in `icn/apps/governance/src/http/handlers.rs` | The only parameter validation any production path reaches. Range-only; the handler adds the whole-day voting-period floor. The gateway mounts this handler under `/gov` (`icn/crates/icn-gateway/src/server.rs`), so the HTTP route resolves here. |
+| **Compiled but unwired** | `GovernanceParams::validate` in `icn/crates/icn-governance/src/config.rs` | Stricter deliberation / execution-delay bounds; **no production caller**. A band gate should wire this in rather than re-derive it. |
+| **Duplicate but unused** | `validate_governance_params` in `icn/crates/icn-gateway/src/validation.rs` | Byte-equivalent range check with **no in-repo caller outside its own unit tests**. It is not a second route and must not be treated as one — extending band logic into it would grow logic nothing calls. It is `pub` in a `pub mod`, so removing it is a public-surface change and belongs in a separate cleanup, not in a band-gate change. |
+| **Creation paths that validate nothing** | `handle_governance_domain_create` in `icn/crates/icn-rpc/src/handler/governance.rs`; `GovernanceManager::create_domain` and `create_domain_simple` in `icn/apps/governance/src/manager.rs`; the `GovernanceCommand::CreateDomain` arm in `icn/apps/governance/src/actor.rs` | The JSON-RPC handler calls `GovernanceHandle::create_domain` **directly, bypassing `GovernanceManager`**, so a gate placed only on the manager would still miss it. |
+
+**Where the gate has to go.** There is no single composition root today. In actor-backed deployments the HTTP and JSON-RPC paths converge only at the actor's `GovernanceCommand::CreateDomain` arm; in standalone mode the manager's in-memory branch is a separate terminus that the actor never sees. A band gate must therefore cover both termini, or the domain-creation entry points must first be funnelled through one.
 
 ### 4.8 Shell / cockpit fixture matrix (no greenwashing)
 
@@ -580,7 +589,7 @@ Candidate follow-up issues, grouped by priority. **Names are descriptive; no iss
 
 | Candidate title | Track | Anchor |
 |---|---|---|
-| `feat(governance): pilot-ready governance profile bands and gate` | §4.7, §10 | `validate_governance_params` in `icn/apps/governance/src/http/validation.rs`; `GovernanceParams::validate` in `icn/crates/icn-governance/src/config.rs`; `GovernanceManager::create_domain` in `icn/apps/governance/src/manager.rs` |
+| `feat(governance): pilot-ready governance profile bands and gate` | §4.7, §10 | `validate_governance_params` in `icn/apps/governance/src/http/validation.rs`; `GovernanceParams::validate` in `icn/crates/icn-governance/src/config.rs`; the two unvalidated termini `GovernanceManager::create_domain` (`icn/apps/governance/src/manager.rs`) and the `GovernanceCommand::CreateDomain` arm (`icn/apps/governance/src/actor.rs`); and the bypassing `handle_governance_domain_create` (`icn/crates/icn-rpc/src/handler/governance.rs`) |
 | `chore(receipts): typed receipt write-path atomicity inventory` | §4.10, §13 | `icn/apps/governance/src/receipt_backend.rs:42-248` |
 | `feat(receipts): repair scans for index skew on typed paths` | §4.10, §13 | same |
 | `refactor(receipts): migrate typed paths toward opaque-store-grade atomicity` | §4.10, §13 | same |
