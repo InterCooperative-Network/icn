@@ -1280,6 +1280,16 @@ impl GossipActor {
         icn_snapshot::GossipState {
             vector_clock,
             subscriptions,
+            // Persisted separately from `subscriptions` because only this set has
+            // provenance: it is written solely by local `subscribe(topic, own_did)`
+            // calls (#2471). Restoring it is what keeps local notification delivery
+            // alive across a restart for embeddings and runtime-created topics, which
+            // have no subsystem-startup re-subscribe to fall back on.
+            local_subscriptions: {
+                let mut v: Vec<String> = self.local_topic_subscriptions.iter().cloned().collect();
+                v.sort(); // deterministic snapshot output
+                v
+            },
             topics,
         }
     }
@@ -1418,20 +1428,27 @@ impl GossipActor {
                 // Deliberately NOT promoted into `local_topic_subscriptions`, even when
                 // `did == self.own_did` (#2471).
                 //
-                // Snapshot subscription records carry no provenance: a snapshot taken by a
-                // node running the pre-fix handler can contain an own-DID entry that a peer
-                // forged via the unauthenticated Subscribe path. Promoting it here would
-                // launder that record across the upgrade and permanently enable local
-                // delivery for an attacker-chosen topic — the exact request the patched
-                // network path now refuses.
+                // Records in `subscriptions` carry no provenance: a snapshot taken by a node
+                // running the pre-fix handler can contain an own-DID entry that a peer forged
+                // via the unauthenticated Subscribe path. Promoting it here would launder
+                // that record across the upgrade and permanently enable local delivery for an
+                // attacker-chosen topic — the exact request the patched network path refuses.
                 //
-                // Nothing is lost by dropping it: restore runs before subsystem startup
-                // (`init_gossip.rs` restore_state -> `lifecycle.rs` subscribe_standard_topics
-                // and the per-subsystem init_* subscribes), so every legitimately configured
-                // topic re-establishes its own local subscription on this boot. The local
-                // set therefore derives only from code-path decisions made now, never from
-                // persisted peer-influenced state.
+                // The genuinely-local set is restored from `state.local_subscriptions` below,
+                // which is written only from `local_topic_subscriptions` and therefore only
+                // ever from a local `subscribe(topic, own_did)` call.
             }
+        }
+
+        // Restore this node's own subscriptions from the provenance-safe field.
+        //
+        // A pre-#2471 snapshot has no such field and deserializes to empty, so a legacy
+        // (possibly forged) own-DID record grants nothing. A post-fix snapshot restores
+        // exactly what this node subscribed itself to — which matters for embeddings and
+        // runtime-created topics, where there is no subsystem startup to re-subscribe and
+        // entries would otherwise be stored silently without ever being processed.
+        for topic in state.local_subscriptions {
+            self.local_topic_subscriptions.insert(topic);
         }
 
         info!("✅ Gossip state restored successfully");
@@ -2405,6 +2422,64 @@ mod tests {
         );
     }
 
+    /// A post-#2471 snapshot must carry this node's own subscriptions and restore local
+    /// delivery across a restart. Embeddings and runtime-created topics have no
+    /// subsystem-startup re-subscribe to fall back on, so without this an entry would be
+    /// stored after restart and silently never processed.
+    #[tokio::test]
+    async fn test_own_subscriptions_survive_snapshot_round_trip_and_still_deliver() {
+        let owner = KeyPair::generate().unwrap().did().clone();
+        let sender = KeyPair::generate().unwrap().did().clone();
+
+        let mut before = GossipActor::new(owner.clone(), create_test_oracle());
+        before.create_topic(Topic::new(
+            "runtime:created".to_string(),
+            AccessControl::Public,
+        ));
+        before
+            .subscribe("runtime:created", owner.clone())
+            .await
+            .unwrap();
+        assert!(before.is_locally_subscribed("runtime:created"));
+
+        // (The JSON-level back-compat of this field — a legacy snapshot lacking it
+        // deserializing to empty — is pinned in icn-snapshot, which owns the format.)
+        let state = before.export_state();
+
+        let mut after = GossipActor::new(owner.clone(), create_test_oracle());
+        after.restore_state(state).unwrap();
+        assert!(
+            after.is_locally_subscribed("runtime:created"),
+            "this node's own subscription must survive a snapshot round trip"
+        );
+
+        // And delivery actually resumes.
+        let count = Arc::new(std::sync::Mutex::new(0u32));
+        let c = count.clone();
+        after.add_notification_callback(Arc::new(move |_, _, _| {
+            *c.lock().unwrap() += 1;
+        }));
+        let entry = GossipEntry {
+            hash: [9u8; 32],
+            author: sender.clone(),
+            clock: VectorClock::new(),
+            topic: "runtime:created".to_string(),
+            data: b"after restart".to_vec(),
+            compressed: false,
+            timestamp: 1_700_000_000_000,
+            replica_offered: None,
+        };
+        after
+            .handle_message(&sender, GossipMessage::Response { entry })
+            .await
+            .unwrap();
+        assert_eq!(
+            *count.lock().unwrap(),
+            1,
+            "local delivery must resume after restore, exactly once for the entry"
+        );
+    }
+
     /// A snapshot written by a pre-fix node can contain an own-DID subscription that a peer
     /// forged over the unauthenticated Subscribe path. Restoring it must not enable local
     /// delivery for that topic, or the upgrade would launder the compromise past the guard.
@@ -2423,7 +2498,10 @@ mod tests {
             .subscribe("attacker:chosen", owner.clone())
             .await
             .unwrap();
-        let state = victim.export_state();
+        let mut state = victim.export_state();
+        // A pre-#2471 snapshot has no `local_subscriptions` field at all; serde's default
+        // gives an empty vec on load. Reproduce that exactly.
+        state.local_subscriptions.clear();
         assert!(
             state.subscriptions["attacker:chosen"].contains(&owner.to_string()),
             "precondition: the forged own-DID record is in the snapshot"
@@ -2435,8 +2513,8 @@ mod tests {
 
         assert!(
             !upgraded.is_locally_subscribed("attacker:chosen"),
-            "a snapshot subscription record must never establish local delivery — it has no \
-             provenance separating a local subscribe from a forged network one"
+            "a legacy snapshot subscription record must never establish local delivery — it \
+             has no provenance separating a local subscribe from a forged network one"
         );
 
         // The legitimate path still works: subsystem startup re-subscribes after restore.
@@ -3018,6 +3096,7 @@ mod tests {
         let state = GossipState {
             vector_clock: HashMap::new(),
             subscriptions,
+            local_subscriptions: Vec::new(),
             topics: HashMap::new(), // No topics in snapshot
         };
 
