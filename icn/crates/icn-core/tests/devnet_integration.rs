@@ -244,9 +244,17 @@ async fn test_three_node_gossip_convergence() {
     node_b.create_topic(topic).await;
     node_c.create_topic(topic).await;
 
-    // B and C subscribe on A (so A's notification callback fires for them)
+    // B and C register as remote subscribers on A — this is A's propagation state.
     node_a.add_subscriber(topic, &node_b.did).await;
     node_a.add_subscriber(topic, &node_c.did).await;
+
+    // Each node also subscribes itself. Since #2471 that, and only that, is what
+    // enables a node's own notification callbacks: local delivery is entry-driven
+    // and gated on the node's own locally-owned subscription, never on the
+    // peer-mutable remote subscriber list.
+    node_a.add_subscriber(topic, &node_a.did).await;
+    node_b.add_subscriber(topic, &node_b.did).await;
+    node_c.add_subscriber(topic, &node_c.did).await;
 
     // Verify subscriptions
     let subs = node_a.get_subscribers(topic).await;
@@ -301,13 +309,27 @@ async fn test_three_node_gossip_convergence() {
     assert_eq!(b_entry.author, node_a.did, "B's entry author should be A");
     assert_eq!(c_entry.author, node_a.did, "C's entry author should be A");
 
-    // Verify notifications fired on A (from store_entry when publishing).
-    // A has subscribers B and C, so store_entry fires notifications for them.
-    let a_notifications = node_a.notification_count().await;
-    assert!(
-        a_notifications >= 2,
-        "A should have fired at least 2 notifications (for B and C), got {}",
-        a_notifications
+    // Exactly one local notification per node for the one entry that converged.
+    //
+    // Before #2471 A fired one notification *per remote subscriber* — two here, and
+    // up to MAX_SUBSCRIBERS_PER_TOPIC (10000) for an attacker willing to send that
+    // many unauthenticated Subscribe messages. Dispatch is now per accepted entry,
+    // so the count tracks entries rather than peer-controlled subscriber state.
+    assert_eq!(
+        node_a.notification_count().await,
+        1,
+        "A published one entry and must observe exactly one local notification, \
+         independent of how many remote subscribers it has"
+    );
+    assert_eq!(
+        node_b.notification_count().await,
+        1,
+        "B stored the converged entry once and must be notified exactly once"
+    );
+    assert_eq!(
+        node_c.notification_count().await,
+        1,
+        "C stored the converged entry once and must be notified exactly once"
     );
 }
 

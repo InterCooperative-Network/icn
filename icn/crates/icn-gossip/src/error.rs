@@ -20,6 +20,14 @@ pub enum GossipError {
         actual: String,
     },
 
+    /// A network-originated subscription-control request claimed this node's own DID.
+    ///
+    /// Distinct from an operational subscribe/unsubscribe failure so callers can log it
+    /// at a level a remote peer cannot use to drive log volume. `NetworkMessage.from` is
+    /// self-declared, so this is fully remote-triggerable and repeatable.
+    #[error("refusing network {action} claiming this node's own DID for topic {topic}")]
+    SubscriptionControlSpoofRejected { topic: String, action: &'static str },
+
     /// Entry not found
     #[error("entry not found: {0}")]
     EntryNotFound(String),

@@ -174,7 +174,25 @@ pub struct GossipState {
     pub vector_clock: HashMap<String, u64>,
 
     /// Topic subscriptions (topic name -> list of subscriber DID strings)
+    ///
+    /// Peer-influenced: remote peers add and remove themselves here, and on nodes predating
+    /// #2471 a peer could also forge an entry under the node's own DID. Records here carry
+    /// **no provenance** and must never be treated as evidence that this node subscribed
+    /// itself — see [`GossipState::local_subscriptions`].
     pub subscriptions: HashMap<String, Vec<String>>,
+
+    /// Topics this node subscribed **itself** to (#2471).
+    ///
+    /// Written only from `GossipActor::local_topic_subscriptions`, which by construction can
+    /// only be reached by a caller passing the node's own DID — the network-facing entry
+    /// points refuse exactly that. So unlike [`GossipState::subscriptions`] this field is
+    /// provenance-safe, and it is what restores local notification delivery.
+    ///
+    /// `#[serde(default)]` handles legacy snapshots: one written before #2471 has no such
+    /// field and deserializes to empty, so its possibly-forged own-DID records in
+    /// `subscriptions` grant no local delivery. Old snapshots still load.
+    #[serde(default)]
+    pub local_subscriptions: Vec<String>,
 
     /// Topic metadata (topic name -> TopicMetadata)
     pub topics: HashMap<String, TopicMetadata>,
@@ -923,6 +941,7 @@ mod tests {
                 .cloned()
                 .collect(),
             topics: HashMap::new(),
+            local_subscriptions: Vec::new(),
         });
 
         // Save
@@ -1328,6 +1347,7 @@ mod tests {
                         scope,
                     })
                 }).collect(),
+                local_subscriptions: Vec::new(),
             }
         }
     }
@@ -1483,6 +1503,7 @@ mod tests {
                 vector_clock: HashMap::new(),
                 subscriptions: HashMap::new(),
                 topics: HashMap::new(),
+                local_subscriptions: Vec::new(),
             };
 
             // Create large vector clock
@@ -1534,6 +1555,7 @@ mod tests {
             vector_clock: HashMap::new(),
             subscriptions: HashMap::new(),
             topics: HashMap::new(),
+            local_subscriptions: Vec::new(),
         });
         snapshot.network_state = Some(NetworkState {
             peer_connections: HashMap::new(),
@@ -1619,6 +1641,7 @@ mod tests {
             vector_clock: HashMap::new(),
             subscriptions: HashMap::new(),
             topics: HashMap::new(),
+            local_subscriptions: Vec::new(),
         };
 
         let long_did = "a".repeat(10000);
@@ -1891,6 +1914,7 @@ mod tests {
             vector_clock: HashMap::new(),
             subscriptions: HashMap::new(),
             topics: HashMap::new(),
+            local_subscriptions: Vec::new(),
         });
 
         // Save
@@ -1903,5 +1927,52 @@ mod tests {
 
         // Cleanup
         std::fs::remove_dir_all(&temp).unwrap();
+    }
+
+    /// A snapshot written before #2471 has no `local_subscriptions` field. It must still
+    /// load, and must deserialize to an empty local set — so its own-DID records in
+    /// `subscriptions`, which a peer could have forged over the unauthenticated Subscribe
+    /// path, grant the upgraded node no local notification delivery.
+    #[test]
+    fn legacy_gossip_state_without_local_subscriptions_loads_as_empty() {
+        let legacy_json = r#"{
+            "vector_clock": {"did:icn:alice": 7},
+            "subscriptions": {"coop:updates": ["did:icn:victim"]},
+            "topics": {}
+        }"#;
+
+        let state: GossipState =
+            serde_json::from_str(legacy_json).expect("a pre-#2471 snapshot must still load");
+
+        assert_eq!(state.vector_clock.get("did:icn:alice"), Some(&7));
+        assert_eq!(
+            state.subscriptions.get("coop:updates").map(Vec::len),
+            Some(1),
+            "the legacy subscriber record still loads into the propagation list"
+        );
+        assert!(
+            state.local_subscriptions.is_empty(),
+            "a legacy snapshot must grant no local delivery"
+        );
+    }
+
+    /// Round trip: a post-#2471 snapshot carries the local set through serialization.
+    #[test]
+    fn local_subscriptions_survive_json_round_trip() {
+        let mut state = GossipState {
+            vector_clock: HashMap::new(),
+            subscriptions: HashMap::new(),
+            local_subscriptions: Vec::new(),
+            topics: HashMap::new(),
+        };
+        state.local_subscriptions = vec!["coop:updates".to_string(), "entity:updates".to_string()];
+
+        let json = serde_json::to_string(&state).expect("serialize");
+        let back: GossipState = serde_json::from_str(&json).expect("deserialize");
+
+        assert_eq!(
+            back.local_subscriptions,
+            vec!["coop:updates".to_string(), "entity:updates".to_string()]
+        );
     }
 }
