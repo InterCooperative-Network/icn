@@ -289,7 +289,10 @@ Three-layer security model:
 3. Subscribe in relevant actor: `gossip.subscribe(topic, access_control)`
 4. Implement message serialization (use `bincode` or `serde_json`)
 5. Set up notification callback to receive new entries
-6. Handle incoming messages in gossip actor's message handler
+6. Handle incoming messages in gossip actor's message handler. Handlers for a *received*
+   `Subscribe`/`Unsubscribe` must call `subscribe_from_network`/`unsubscribe_from_network`,
+   never the local `subscribe`/`unsubscribe` — `NetworkMessage.from` is self-declared
+   (see `docs/reference/api/topic-subscriptions-api.md`, issue #2471)
 
 ### Adding Metrics
 
