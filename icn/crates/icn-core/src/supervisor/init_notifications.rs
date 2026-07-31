@@ -82,9 +82,13 @@ pub struct NotificationDeps {
 }
 
 /// Handle trust attestation entries via TrustService
+///
+/// `local_recipient` is the local delivery target from entry-driven gossip dispatch
+/// (this node's own DID, #2471). It is unauthenticated and is used only as a log label —
+/// every authorization decision here rests on the attestation's own signature.
 pub async fn handle_trust_attestation_via_service(
     entry: &GossipEntry,
-    forwarding_peer: &str,
+    local_recipient: &str,
     trust_service: &Arc<dyn icn_kernel_api::services::TrustService>,
     rate_limiter: &AttestationRateLimiterHandle,
 ) {
@@ -126,16 +130,19 @@ pub async fn handle_trust_attestation_via_service(
         }
     }
 
-    let source = forwarding_peer.to_string();
+    let source = local_recipient.to_string();
     if let Err(e) = trust_service.ingest_attestation(&data, &source) {
         warn!("Failed to ingest trust attestation: {}", e);
     }
 }
 
 /// Handle trust revocation entries via TrustService
+///
+/// `local_recipient` carries the same meaning and the same non-authority as in
+/// [`handle_trust_attestation_via_service`].
 pub async fn handle_trust_revocation_via_service(
     entry: &GossipEntry,
-    forwarding_peer: &str,
+    local_recipient: &str,
     trust_service: &Arc<dyn icn_kernel_api::services::TrustService>,
 ) {
     // Extract data from gossip entry
@@ -147,7 +154,7 @@ pub async fn handle_trust_revocation_via_service(
         }
     };
 
-    let source = forwarding_peer.to_string();
+    let source = local_recipient.to_string();
     if let Err(e) = trust_service.ingest_revocation(&data, &source) {
         warn!("Failed to ingest trust revocation: {}", e);
     }
@@ -873,7 +880,10 @@ pub async fn handle_resource_revocation(entry_data: Vec<u8>) {
 pub fn create_notification_callback(
     deps: NotificationDeps,
 ) -> icn_gossip::EntryNotificationCallback {
-    Arc::new(move |topic, entry, subscriber_did| {
+    // `recipient_did` is the local delivery target supplied by entry-driven gossip
+    // dispatch (#2471) — this node's own DID. It is not the forwarding peer and is not
+    // authenticated; it is passed through to the trust service purely as a log label.
+    Arc::new(move |topic, entry, recipient_did| {
         // Clone dependencies for the async task
         let deps = deps.clone();
         let topic = topic.to_string();
@@ -897,19 +907,24 @@ pub fn create_notification_callback(
         if topic == crate::trust_propagation::TRUST_ATTESTATIONS_TOPIC {
             if let Some(trust_svc) = deps.trust_service.clone() {
                 let rate_limiter = deps.attestation_rate_limiter.clone();
-                let peer = subscriber_did.to_string();
+                let recipient = recipient_did.to_string();
                 tokio::spawn(async move {
-                    handle_trust_attestation_via_service(&entry, &peer, &trust_svc, &rate_limiter)
-                        .await;
+                    handle_trust_attestation_via_service(
+                        &entry,
+                        &recipient,
+                        &trust_svc,
+                        &rate_limiter,
+                    )
+                    .await;
                 });
             } else {
                 warn!("Trust attestation received but no TrustService available");
             }
         } else if topic == crate::trust_propagation::TRUST_REVOCATIONS_TOPIC {
             if let Some(trust_svc) = deps.trust_service.clone() {
-                let peer = subscriber_did.to_string();
+                let recipient = recipient_did.to_string();
                 tokio::spawn(async move {
-                    handle_trust_revocation_via_service(&entry, &peer, &trust_svc).await;
+                    handle_trust_revocation_via_service(&entry, &recipient, &trust_svc).await;
                 });
             } else {
                 warn!("Trust revocation received but no TrustService available");

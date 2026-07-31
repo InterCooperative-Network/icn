@@ -2128,6 +2128,13 @@ pub mod gossip {
         counter!("icn_gossip_subscribe_acks_sent_total").increment(1);
     }
 
+    /// A network-originated Subscribe/Unsubscribe claimed this node's own DID and was
+    /// refused (#2471). Non-zero means a peer attempted subscription-control spoofing;
+    /// it is a counter rather than a log line because the trigger is remote.
+    pub fn subscription_control_spoof_rejected_inc() {
+        counter!("icn_gossip_subscription_control_spoof_rejected_total").increment(1);
+    }
+
     pub fn digests_sent_inc() {
         counter!("icn_gossip_digests_sent_total").increment(1);
     }
@@ -2165,7 +2172,10 @@ pub mod gossip {
     /// DEPRECATED: Per-peer deficit tracking has been removed to avoid high-cardinality
     /// metrics. This function is now a no-op. Callers should aggregate deficit across
     /// all peers and use `total_deficit_bytes_set()` instead. See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Use total_deficit_bytes_set() instead to avoid high-cardinality metrics")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use total_deficit_bytes_set() instead to avoid high-cardinality metrics"
+    )]
     pub fn peer_deficit_bytes_set(_peer: &str, _deficit: i64) {
         // Intentionally a no-op. Per-peer tracking removed; callers should
         // aggregate and use `total_deficit_bytes_set()` instead.
@@ -2329,8 +2339,7 @@ pub mod scalability {
             .increment(total_downstream_count);
 
         // Track actual invalidations performed (after selective optimization).
-        counter!("icn_trust_cache_actual_invalidations_total")
-            .increment(invalidated_count);
+        counter!("icn_trust_cache_actual_invalidations_total").increment(invalidated_count);
 
         // Record distribution of total downstream fanout for hub detection.
         // Use histogram p99 in Grafana instead of gauge for accurate max tracking.
@@ -2673,7 +2682,8 @@ pub mod governance {
     ///
     /// This metric helps identify performance issues with large delegation graphs.
     pub fn delegation_reconciliation_duration_observe(duration_secs: f64) {
-        histogram!("icn_governance_delegation_reconciliation_duration_seconds").record(duration_secs);
+        histogram!("icn_governance_delegation_reconciliation_duration_seconds")
+            .record(duration_secs);
     }
 
     /// Record when a storage error occurs during scope overlap checking
@@ -3289,7 +3299,10 @@ pub mod gateway {
     ///
     /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
     /// For auditing specific DIDs, use structured logs. See Issue #494.
-    #[deprecated(since = "0.2.0", note = "DID label removed for cardinality; use logs for audit")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "DID label removed for cardinality; use logs for audit"
+    )]
     pub fn rate_limit_exceeded_inc(_did: &str) {
         counter!("icn_gateway_rate_limit_exceeded_total").increment(1);
     }
@@ -3670,7 +3683,10 @@ pub mod compute {
     /// DEPRECATED: Per-executor load tracking has been removed to avoid high-cardinality
     /// metrics. This function is now a no-op. Callers should compute the aggregate load
     /// across all executors and use `average_executor_load_set()` instead. See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Use average_executor_load_set() instead to avoid high-cardinality metrics")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use average_executor_load_set() instead to avoid high-cardinality metrics"
+    )]
     pub fn executor_load_set(_executor_did: &str, _load: f64) {
         // Intentionally a no-op. Per-executor tracking removed; callers should
         // aggregate and use `average_executor_load_set()` instead.
@@ -4194,7 +4210,10 @@ pub mod storage_quotas {
     ///
     /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
     /// Use `exceeded_inc()` instead. See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Use exceeded_inc() instead to avoid high-cardinality metrics")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use exceeded_inc() instead to avoid high-cardinality metrics"
+    )]
     pub fn quota_exceeded_inc(_did: &str) {
         counter!("icn_storage_quota_exceeded_total").increment(1);
     }
@@ -4224,7 +4243,10 @@ pub mod storage_quotas {
     /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
     /// Per-DID quota tracking causes unbounded metric growth in large networks.
     /// Use `global_usage_set()` for aggregate tracking. See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Per-DID quota tracking removed for cardinality; use global_usage_set()")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Per-DID quota tracking removed for cardinality; use global_usage_set()"
+    )]
     pub fn did_quota_usage_set(_did: &str, _bytes: u64) {
         // No-op: per-DID tracking removed for cardinality
     }
@@ -4234,7 +4256,10 @@ pub mod storage_quotas {
     /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
     /// Per-DID quota tracking causes unbounded metric growth in large networks.
     /// Use `global_usage_percentage_set()` for aggregate tracking. See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Per-DID quota tracking removed for cardinality; use global_usage_percentage_set()")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Per-DID quota tracking removed for cardinality; use global_usage_percentage_set()"
+    )]
     pub fn did_quota_percentage_set(_did: &str, _percentage: f64) {
         // No-op: per-DID tracking removed for cardinality
     }
@@ -4322,7 +4347,10 @@ pub mod contribution {
     ///
     /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
     /// Use `total_compute_cpu_seconds_add()` instead. See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Use total_compute_cpu_seconds_add() instead to avoid high-cardinality metrics")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use total_compute_cpu_seconds_add() instead to avoid high-cardinality metrics"
+    )]
     pub fn compute_cpu_seconds_add(_did: &str, cpu_seconds: u64) {
         counter!("icn_contribution_compute_cpu_seconds_total").increment(cpu_seconds);
     }
@@ -4336,7 +4364,10 @@ pub mod contribution {
     ///
     /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
     /// Use `total_compute_job_completed()` instead. See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Use total_compute_job_completed() instead to avoid high-cardinality metrics")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use total_compute_job_completed() instead to avoid high-cardinality metrics"
+    )]
     pub fn compute_job_completed(_did: &str, duration_secs: f64) {
         gauge!("icn_contribution_compute_jobs_completed_total").increment(1.0);
         histogram!("icn_contribution_compute_job_duration_seconds").record(duration_secs);
@@ -4354,7 +4385,10 @@ pub mod contribution {
     /// metrics. This function is now a no-op. Callers should aggregate job counts
     /// across all DIDs and use `total_compute_jobs_completed_set()` instead.
     /// See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Use total_compute_jobs_completed_set() instead to avoid high-cardinality metrics")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use total_compute_jobs_completed_set() instead to avoid high-cardinality metrics"
+    )]
     pub fn compute_jobs_completed_set(_did: &str, _count: u64) {
         // Intentionally a no-op. Per-DID tracking removed; callers should
         // aggregate and use `total_compute_jobs_completed_set()` instead.
@@ -4373,7 +4407,10 @@ pub mod contribution {
     ///
     /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
     /// Use `total_storage_byte_seconds_add()` instead. See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Use total_storage_byte_seconds_add() instead to avoid high-cardinality metrics")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use total_storage_byte_seconds_add() instead to avoid high-cardinality metrics"
+    )]
     pub fn storage_byte_seconds_add(_did: &str, byte_seconds: u64) {
         counter!("icn_contribution_storage_byte_seconds_total").increment(byte_seconds);
     }
@@ -4389,7 +4426,10 @@ pub mod contribution {
     /// metrics. This function is now a no-op. Callers should aggregate replica counts
     /// across all providers and use `total_storage_replicas_healthy_set()` instead.
     /// See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Use total_storage_replicas_healthy_set() instead to avoid high-cardinality metrics")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use total_storage_replicas_healthy_set() instead to avoid high-cardinality metrics"
+    )]
     pub fn storage_replicas_healthy_set(_did: &str, _count: u64) {
         // Intentionally a no-op. Per-provider tracking removed; callers should
         // aggregate and use `total_storage_replicas_healthy_set()` instead.
@@ -4404,7 +4444,10 @@ pub mod contribution {
     ///
     /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
     /// Use `total_storage_replicas_healthy_inc()` instead. See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Use total_storage_replicas_healthy_inc() instead to avoid high-cardinality metrics")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use total_storage_replicas_healthy_inc() instead to avoid high-cardinality metrics"
+    )]
     pub fn storage_replicas_healthy_inc(_did: &str) {
         gauge!("icn_contribution_storage_replicas_healthy_total").increment(1.0);
     }
@@ -4418,7 +4461,10 @@ pub mod contribution {
     ///
     /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
     /// Use `total_storage_replicas_healthy_dec()` instead. See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Use total_storage_replicas_healthy_dec() instead to avoid high-cardinality metrics")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use total_storage_replicas_healthy_dec() instead to avoid high-cardinality metrics"
+    )]
     pub fn storage_replicas_healthy_dec(_did: &str) {
         gauge!("icn_contribution_storage_replicas_healthy_total").decrement(1.0);
     }
@@ -4436,7 +4482,10 @@ pub mod contribution {
     ///
     /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
     /// Use `total_bandwidth_bytes_add()` instead. See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Use total_bandwidth_bytes_add() instead to avoid high-cardinality metrics")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use total_bandwidth_bytes_add() instead to avoid high-cardinality metrics"
+    )]
     pub fn bandwidth_bytes_add(_did: &str, bytes: u64) {
         counter!("icn_contribution_bandwidth_bytes_total").increment(bytes);
     }
@@ -4459,7 +4508,10 @@ pub mod contribution {
     ///
     /// DEPRECATED: The `did` parameter is ignored to avoid high-cardinality metrics.
     /// Use `total_uptime_seconds_add()` instead. See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Use total_uptime_seconds_add() instead to avoid high-cardinality metrics")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use total_uptime_seconds_add() instead to avoid high-cardinality metrics"
+    )]
     pub fn uptime_seconds_add(_did: &str, seconds: u64) {
         counter!("icn_contribution_uptime_seconds_total").increment(seconds);
     }
@@ -4473,7 +4525,10 @@ pub mod contribution {
     ///
     /// DEPRECATED: Per-DID heartbeat tracking causes unbounded metric growth.
     /// Use `heartbeats_received_inc()` for aggregate tracking. See Issue #494.
-    #[deprecated(since = "0.2.0", note = "Use heartbeats_received_inc() instead to avoid high-cardinality metrics")]
+    #[deprecated(
+        since = "0.2.0",
+        note = "Use heartbeats_received_inc() instead to avoid high-cardinality metrics"
+    )]
     pub fn uptime_heartbeat_record(_did: &str, _timestamp: u64) {
         // No-op: per-DID tracking removed for cardinality
         counter!("icn_contribution_uptime_heartbeats_total").increment(1);

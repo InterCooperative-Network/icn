@@ -72,10 +72,26 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                     let mut acked_topics = Vec::new();
 
                     for topic in &topics {
-                        match gossip.subscribe(topic, sender_did.clone()).await {
+                        // `sender_did` is `NetworkMessage.from` — self-declared, not
+                        // authenticated. `subscribe_from_network` refuses any claim of
+                        // this node's own DID (#2471); a peer subscribing itself is
+                        // still allowed, and still unauthenticated (#2469).
+                        match gossip
+                            .subscribe_from_network(topic, sender_did.clone())
+                            .await
+                        {
                             Ok(_) => {
                                 info!("Subscribed {} to topic: {}", sender_did, topic);
                                 acked_topics.push(topic.clone());
+                            }
+                            Err(e)
+                                if icn_gossip::GossipActor::is_subscription_control_spoof(&e) =>
+                            {
+                                // Expected, remotely triggerable and repeatable — a peer
+                                // can batch many topics per forged request. Keep it out of
+                                // the operational warn! path; the durable signal is
+                                // icn_gossip_subscription_control_spoof_rejected_total.
+                                debug!("{}", e);
                             }
                             Err(e) => {
                                 warn!(
@@ -114,9 +130,18 @@ pub fn create_incoming_handler(deps: MessageHandlerDeps) -> icn_net::IncomingMes
                 tokio::spawn(async move {
                     let mut gossip = gossip.write().await;
                     for topic in &topics {
-                        match gossip.unsubscribe(topic, &sender_did) {
+                        // Guarded for the same reason as Subscribe above: a peer must not
+                        // be able to drop this node's own subscription (#2471).
+                        match gossip.unsubscribe_from_network(topic, &sender_did) {
                             Ok(_) => {
                                 info!("Unsubscribed {} from topic: {}", sender_did, topic);
+                            }
+                            Err(e)
+                                if icn_gossip::GossipActor::is_subscription_control_spoof(&e) =>
+                            {
+                                // See the Subscribe arm: remotely triggerable, so it must
+                                // not be able to drive warning-level log volume.
+                                debug!("{}", e);
                             }
                             Err(e) => {
                                 warn!(
