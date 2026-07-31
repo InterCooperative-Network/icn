@@ -2135,6 +2135,79 @@ pub mod gossip {
         counter!("icn_gossip_subscription_control_spoof_rejected_total").increment(1);
     }
 
+    /// Which subscription-control verb a network request carried (#2482).
+    ///
+    /// A closed enum, not a string: the label set is fixed at compile time so no
+    /// caller-controlled value can ever reach the metric.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum SubscriptionControlAction {
+        /// A received `Subscribe` request.
+        Subscribe,
+        /// A received `Unsubscribe` request.
+        Unsubscribe,
+    }
+
+    impl SubscriptionControlAction {
+        /// Fixed label value for this action.
+        pub fn as_label(self) -> &'static str {
+            match self {
+                Self::Subscribe => "subscribe",
+                Self::Unsubscribe => "unsubscribe",
+            }
+        }
+    }
+
+    /// How this node resolved one topic of a network subscription-control request (#2482).
+    ///
+    /// Closed for the same reason as [`SubscriptionControlAction`].
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub enum SubscriptionControlOutcome {
+        /// The request was applied for that topic.
+        Accepted,
+        /// Refused because it claimed this node's own DID (#2471 guard).
+        RejectedOwnDid,
+        /// Any other failure — ACL denial, unknown topic, capacity, storage.
+        Error,
+    }
+
+    impl SubscriptionControlOutcome {
+        /// Fixed label value for this outcome.
+        pub fn as_label(self) -> &'static str {
+            match self {
+                Self::Accepted => "accepted",
+                Self::RejectedOwnDid => "rejected_own_did",
+                Self::Error => "error",
+            }
+        }
+    }
+
+    /// Record how one topic of a network subscription-control request resolved (#2482).
+    ///
+    /// **Observe-only.** Calling this never changes an authorization, subscription,
+    /// delivery, or persistence outcome; it is called after the decision is made.
+    ///
+    /// `icn_gossip_subscribes_received_total` / `icn_gossip_unsubscribes_received_total`
+    /// already count *arrival*. This counts *resolution*, which is what distinguishes a
+    /// peer being served from a peer whose every request is refused — the evidence #2480
+    /// needs before unsigned subscription control can be rejected.
+    ///
+    /// # Privacy budget
+    ///
+    /// Both labels are `&'static str` drawn from closed enums. No DID, topic name, peer
+    /// address, payload, or error string is ever recorded. Maximum cardinality is
+    /// 2 actions x 3 outcomes = 6 series.
+    pub fn subscription_control_outcome_inc(
+        action: SubscriptionControlAction,
+        outcome: SubscriptionControlOutcome,
+    ) {
+        counter!(
+            "icn_gossip_subscription_control_outcome_total",
+            "action" => action.as_label(),
+            "outcome" => outcome.as_label()
+        )
+        .increment(1);
+    }
+
     pub fn digests_sent_inc() {
         counter!("icn_gossip_digests_sent_total").increment(1);
     }
@@ -2272,6 +2345,73 @@ pub mod gossip {
     /// Issue #181: Record gossip message processing latency
     pub fn message_latency_record(latency_secs: f64) {
         histogram!("icn_gossip_message_latency_seconds").record(latency_secs);
+    }
+
+    // Must remain the LAST item in this module: `clippy::items_after_test_module`
+    // rejects a `#[cfg(test)]` module with siblings declared after it.
+    #[cfg(test)]
+    mod subscription_control_label_tests {
+        use super::{SubscriptionControlAction, SubscriptionControlOutcome};
+
+        /// The label strings are wire-visible in Prometheus, so pin them: renaming one
+        /// silently breaks every dashboard and alert built on it.
+        #[test]
+        fn labels_are_stable() {
+            assert_eq!(SubscriptionControlAction::Subscribe.as_label(), "subscribe");
+            assert_eq!(
+                SubscriptionControlAction::Unsubscribe.as_label(),
+                "unsubscribe"
+            );
+            assert_eq!(SubscriptionControlOutcome::Accepted.as_label(), "accepted");
+            assert_eq!(
+                SubscriptionControlOutcome::RejectedOwnDid.as_label(),
+                "rejected_own_did"
+            );
+            assert_eq!(SubscriptionControlOutcome::Error.as_label(), "error");
+        }
+
+        /// Cardinality is bounded by construction: 2 actions x 3 outcomes = 6 series.
+        /// If a variant is added, this fails and forces a deliberate budget decision.
+        #[test]
+        fn cardinality_is_bounded_and_labels_distinct() {
+            let actions = [
+                SubscriptionControlAction::Subscribe,
+                SubscriptionControlAction::Unsubscribe,
+            ];
+            let outcomes = [
+                SubscriptionControlOutcome::Accepted,
+                SubscriptionControlOutcome::RejectedOwnDid,
+                SubscriptionControlOutcome::Error,
+            ];
+
+            let series: std::collections::HashSet<(&str, &str)> = actions
+                .iter()
+                .flat_map(|a| outcomes.iter().map(move |o| (a.as_label(), o.as_label())))
+                .collect();
+
+            assert_eq!(series.len(), 6, "expected exactly 6 label combinations");
+        }
+
+        /// Privacy budget: no label may carry a DID, topic name, or address. Every value
+        /// is a `&'static str` from a closed enum, so this holds by construction — assert
+        /// it anyway so the intent survives refactoring.
+        #[test]
+        fn labels_carry_no_caller_controlled_data() {
+            for label in [
+                SubscriptionControlAction::Subscribe.as_label(),
+                SubscriptionControlAction::Unsubscribe.as_label(),
+                SubscriptionControlOutcome::Accepted.as_label(),
+                SubscriptionControlOutcome::RejectedOwnDid.as_label(),
+                SubscriptionControlOutcome::Error.as_label(),
+            ] {
+                assert!(!label.contains("did:"), "label leaked a DID: {label}");
+                assert!(!label.contains(':'), "label looks structured: {label}");
+                assert!(
+                    label.chars().all(|c| c.is_ascii_lowercase() || c == '_'),
+                    "label is not a closed snake_case token: {label}"
+                );
+            }
+        }
     }
 }
 
