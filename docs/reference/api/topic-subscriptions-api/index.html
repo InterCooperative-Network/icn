@@ -423,8 +423,10 @@ entry&#39;s author, not the forwarding peer, and carries no authentication. Neve
 authority.</p>
 <p><strong>What this does not provide.</strong> None of the above authenticates gossip. A peer may still
 subscribe and unsubscribe itself under any DID it asserts, and may still grow a topic&#39;s
-subscriber list up to <code>MAX_SUBSCRIBERS_PER_TOPIC</code>. Authenticating the requests is tracked
-separately (issue #2469).</p>
+subscriber list up to <code>MAX_SUBSCRIBERS_PER_TOPIC</code>. Authenticating the requests — binding
+<code>NetworkMessage.from</code> to the authenticated identity of the connection that delivered it — is
+tracked separately as issue #2480. Issue #2469 covers the distinct question of authenticating
+<code>GossipEntry.author</code> on the governance apply path; neither primitive supplies the other.</p>
 <hr>
 <h2>Metrics</h2>
 <p>The subscription system exports Prometheus metrics:</p>
