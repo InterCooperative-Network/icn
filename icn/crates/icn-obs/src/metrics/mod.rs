@@ -17,13 +17,13 @@
 //! metrics::gateway::websocket_connections_total_inc();
 //! ```
 
-// Include the legacy metrics file directly
-// This keeps backwards compatibility while allowing gradual migration
+// Declare the legacy metrics file as a module via #[path] rather than include!().
+// This keeps backwards compatibility while allowing gradual migration, and unlike
+// include!() it is traversed by rustfmt, so the file stays under `cargo fmt --all`.
 // Allow missing docs and dead_code for legacy metrics - being migrated to submodules
 #[allow(missing_docs, dead_code)]
-mod legacy {
-    include!("../metrics_legacy.rs");
-}
+#[path = "../metrics_legacy.rs"]
+mod legacy;
 
 pub use legacy::*;
 
