@@ -456,15 +456,48 @@ tracked separately as issue #2480. Issue #2469 covers the distinct question of a
 <li>Description: Total SubscribeAck messages sent</li>
 <li>Increments: When supervisor sends SubscribeAck</li>
 </ul>
+<p><strong><code>icn_gossip_subscription_control_spoof_rejected_total</code></strong></p>
+<ul>
+<li>Type: Counter</li>
+<li>Description: Network Subscribe/Unsubscribe requests refused for claiming this node&#39;s own DID (#2471)</li>
+<li>Increments: Per topic, when the own-DID guard refuses a request</li>
+</ul>
+<p><strong><code>icn_gossip_subscription_control_outcome_total{action, outcome}</code></strong></p>
+<ul>
+<li>Type: Counter</li>
+<li>Description: How each topic of a received subscription-control request resolved (#2482)</li>
+<li>Increments: Per <strong>topic</strong>, after the accept/reject decision — unlike the <code>*_received_total</code>
+counters above, which increment once per <strong>message</strong></li>
+<li>Labels (closed sets; never a DID, topic name, or address):<ul>
+<li><code>action</code>: <code>subscribe</code> | <code>unsubscribe</code></li>
+<li><code>outcome</code>:<ul>
+<li><code>processed</code> — the handler returned success. <strong>This does not mean the subscriber set
+changed</strong>: unsubscribing a DID that was not subscribed, and subscribing one that already
+was, both return success and are counted here.</li>
+<li><code>rejected_own_did</code> — refused by the own-DID guard (also counted by the spoof counter above)</li>
+<li><code>rejected_or_error</code> — any other non-success: topic-ACL denial, unknown topic, per-topic
+capacity refusal, or a genuine fault. Expected policy denials and faults are not
+distinguished, because the underlying refusals are untyped error strings.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
 <h3>Querying Metrics</h3>
-<pre><code class="language-bash"># View all subscription metrics
-curl http://localhost:9100/metrics | grep icn_gossip_subscribe
+<pre><code class="language-bash"># View all subscription metrics.
+# Note the `subscri` prefix: it matches both the `subscribe*` and `subscription*`
+# metric families. `grep icn_gossip_subscribe` alone would miss the control metrics.
+curl http://localhost:9100/metrics | grep icn_gossip_subscri
 
 # Example output:
 # icn_gossip_subscriptions_total 15
 # icn_gossip_subscribes_received_total 42
 # icn_gossip_unsubscribes_received_total 7
 # icn_gossip_subscribe_acks_sent_total 38
+# icn_gossip_subscription_control_spoof_rejected_total 3
+# icn_gossip_subscription_control_outcome_total{action=&quot;subscribe&quot;,outcome=&quot;processed&quot;} 39
+# icn_gossip_subscription_control_outcome_total{action=&quot;subscribe&quot;,outcome=&quot;rejected_own_did&quot;} 3
+# icn_gossip_subscription_control_outcome_total{action=&quot;unsubscribe&quot;,outcome=&quot;processed&quot;} 7
 </code></pre>
 <hr>
 <h2>Testing</h2>
