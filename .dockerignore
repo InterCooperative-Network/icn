@@ -20,3 +20,10 @@ monitoring/
 !config/
 !contracts/
 !scripts/
+
+# Rust build artifacts. The bare `target/` rule above only matches the context
+# root, and `!icn/` re-includes the whole workspace tree — so without this the
+# 38G icn/target/ directory is tarred into the build context on every build.
+# Must come after `!icn/`: in .dockerignore the last matching rule wins.
+icn/target/
+**/target/
