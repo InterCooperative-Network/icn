@@ -266,9 +266,9 @@ pub async fn run_supervisor(
 ///
 /// This is the composition root's complete set of domain registrations. It is a
 /// standalone function so that the set can be asserted in tests: once the registry
-/// reaches [`BootstrapPhase::Running`], any domain that is *not* registered here is
-/// denied by default, so an omission silently disables a whole subsystem rather
-/// than failing loudly.
+/// reaches [`icn_kernel_api::bootstrap::BootstrapPhase::Running`], any domain that
+/// is *not* registered here is denied by default, so an omission silently disables
+/// a whole subsystem rather than failing loudly.
 ///
 /// That is exactly how #2488 happened. Oracles were registered by
 /// `oracle.domain()`, which covered `trust` and `charter` but never `net` — the

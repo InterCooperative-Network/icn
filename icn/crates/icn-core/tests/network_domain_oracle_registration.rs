@@ -83,9 +83,14 @@ fn registry_without_network_domain() -> Arc<OracleRegistry> {
 }
 
 /// The same, plus the network-domain registration that `#2488` adds.
+///
+/// Both domains are served by the *same* oracle instance, as production does —
+/// using two instances here would hide any state or caching the oracle carries
+/// across domains.
 fn registry_with_network_domain() -> Arc<OracleRegistry> {
-    let registry = registry_without_network_domain();
+    let registry = Arc::new(OracleRegistry::new());
     let oracle: Arc<dyn PolicyOracle> = Arc::new(TrustLikeOracle);
+    registry.register(oracle.domain(), oracle.clone());
     registry.register(Domain::new(NETWORK_DOMAIN), oracle);
     registry
 }
