@@ -1,28 +1,39 @@
 // Matches the convention used by the other integration tests in this crate.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-//! Behavioural coverage for the node keypair on `RpcServer` (#2497).
+//! The node identity is a construction requirement of `RpcServer` (#2497).
 //!
 //! # What broke
 //!
-//! `RpcServer::set_own_keypair` had consumers in the trust, recovery and
-//! federation handlers but **no caller anywhere in the workspace**, so
-//! `own_keypair` was `None` for the daemon's entire lifetime.
+//! `own_keypair` was an `Option` filled by `RpcServer::set_own_keypair`, and that
+//! setter had **no caller anywhere in the workspace**. It stayed `None` for the
+//! daemon's entire lifetime. Trust and recovery RPC answered
+//! "Node keypair not available", and `handler/federation.rs` took the `else`
+//! branch of `if let Some(keypair)` — emitting **unsigned** vouches while still
+//! reporting success.
 //!
-//! Two handlers failed loudly (`-32000: Node keypair not available`). The third
-//! failed silently: `handler/federation.rs` signs a vouch with
-//! `if let Some(keypair) = state.own_keypair()` and falls through to the
-//! unsigned value otherwise, so every RPC-issued vouch went out **unsigned**
-//! while the response still reported success.
+//! # Why these tests look thin
 //!
-//! These tests pin the observable difference between a server that has the
-//! keypair and one that does not. The wiring itself is guaranteed structurally:
-//! `RpcDeps::identity_bundle` in `icn-core` is a required (non-`Option`) field,
-//! so no caller can construct the deps without supplying an identity, and
-//! `spawn_rpc_server` installs it unconditionally.
+//! Most of the guarantee is now carried by the type system rather than by
+//! assertions. `own_keypair` is a required constructor argument and the field is
+//! no longer an `Option`, so:
+//!
+//! - there is no "unconfigured" state a handler can fall through,
+//! - the unsigned branch in `federation.rs` no longer exists to be taken,
+//! - and the setter that was never called is gone entirely.
+//!
+//! Deleting the production wiring is now a **compile error**, not a silent
+//! regression — which is a stronger guard than any runtime test, and is
+//! deliberately preferred over a test that mirrors the implementation.
+//!
+//! What remains worth asserting at runtime is that the identity a caller supplies
+//! is the one handlers actually observe.
 
 use std::net::SocketAddr;
+use std::sync::Arc;
 
+use ed25519_dalek::Verifier;
+use icn_identity::KeyPair;
 use icn_rpc::RpcServer;
 
 fn addr() -> SocketAddr {
@@ -30,63 +41,85 @@ fn addr() -> SocketAddr {
     "[::1]:0".parse().unwrap()
 }
 
-/// A freshly constructed server has no identity. This is the state the daemon
-/// ran in for its whole lifetime before #2497.
-#[test]
-fn a_new_server_has_no_own_keypair() {
-    let server = RpcServer::new(addr());
-
-    assert!(
-        server.own_keypair().is_none(),
-        "a bare RpcServer must start without an identity - if this ever defaults \
-         to Some, the fail-closed wiring in spawn_rpc_server stops being meaningful"
-    );
-}
-
-/// Installing the keypair makes it observable to handlers.
+/// The identity handed to the constructor is the identity handlers read.
 ///
-/// Fails if `set_own_keypair` stops taking effect, which is what every
-/// identity-dependent handler reads.
+/// `handler/trust.rs` derives the node's own DID from exactly this value, and
+/// `handler/federation.rs` signs with it.
 #[test]
-fn installing_the_keypair_makes_it_available_to_handlers() {
-    let keypair = icn_identity::KeyPair::generate().unwrap();
+fn the_constructed_identity_is_what_handlers_observe() {
+    let keypair = KeyPair::generate().unwrap();
     let expected_did = keypair.did().to_string();
 
-    let mut server = RpcServer::new(addr());
-    server.set_own_keypair(std::sync::Arc::new(keypair));
-
-    let installed = server
-        .own_keypair()
-        .expect("keypair must be present after set_own_keypair");
+    let server = RpcServer::new(addr(), Arc::new(keypair));
 
     assert_eq!(
-        installed.did().to_string(),
+        server.own_keypair().did().to_string(),
         expected_did,
-        "the installed keypair must be the one the node actually holds - \
-         handler/trust.rs derives the node's own DID from exactly this value"
+        "the server must expose the identity it was constructed with"
     );
 }
 
-/// The signing path federation vouches depend on.
+/// The authenticated constructor carries the identity too.
 ///
-/// `handler/federation.rs` signs only when `own_keypair()` is `Some`, and
-/// silently emits an unsigned vouch otherwise. This asserts the two branches are
-/// actually distinguishable, so an unwired server cannot be mistaken for a
-/// signing one.
+/// Both constructors previously defaulted `own_keypair` to `None`; a fix that
+/// only covered one of them would leave the auth-enabled daemon — the production
+/// configuration — still broken.
 #[test]
-fn signing_capability_is_present_only_when_the_keypair_is_installed() {
-    let unwired = RpcServer::new(addr());
-    assert!(
-        unwired.own_keypair().is_none(),
-        "without wiring, federation vouches take the unsigned branch"
-    );
+fn the_authenticated_constructor_also_carries_the_identity() {
+    let keypair = KeyPair::generate().unwrap();
+    let expected_did = keypair.did().to_string();
 
-    let mut wired = RpcServer::new(addr());
-    wired.set_own_keypair(std::sync::Arc::new(
-        icn_identity::KeyPair::generate().unwrap(),
-    ));
+    let server = RpcServer::new_with_auth(addr(), b"test-secret".to_vec(), Arc::new(keypair));
+
+    assert_eq!(
+        server.own_keypair().did().to_string(),
+        expected_did,
+        "new_with_auth must carry the identity as well - this is the constructor \
+         the production daemon uses when the gateway is enabled"
+    );
+}
+
+/// Distinct nodes keep distinct identities.
+///
+/// Guards against a regression that returns some shared or default keypair,
+/// which would make every node's signatures indistinguishable.
+#[test]
+fn distinct_nodes_expose_distinct_identities() {
+    let a = RpcServer::new(addr(), Arc::new(KeyPair::generate().unwrap()));
+    let b = RpcServer::new(addr(), Arc::new(KeyPair::generate().unwrap()));
+
+    assert_ne!(
+        a.own_keypair().did().to_string(),
+        b.own_keypair().did().to_string(),
+        "two independently constructed servers must not share an identity"
+    );
+}
+
+/// The signing key is usable, not merely present.
+///
+/// `own_keypair()` returning something is not enough — `federation.rs` calls
+/// `vouch.sign(...)` with it, so the key has to actually produce a verifiable
+/// signature.
+#[test]
+fn the_identity_can_produce_a_verifiable_signature() {
+    let keypair = KeyPair::generate().unwrap();
+    let server = RpcServer::new(addr(), Arc::new(keypair));
+
+    let message = b"federation vouch payload";
+    let signature = server.own_keypair().sign(message);
+
+    // Verify against the DID's public key, not the keypair object: this is what
+    // a remote peer would actually do with a received vouch.
+    let verifying_key = server
+        .own_keypair()
+        .did()
+        .to_verifying_key()
+        .expect("the node DID must yield a verifying key");
+
     assert!(
-        wired.own_keypair().is_some(),
-        "with wiring, federation vouches take the signing branch"
+        verifying_key.verify(message, &signature).is_ok(),
+        "the installed identity must produce a signature that verifies against \
+         the public key its DID advertises - this is what a peer receiving a \
+         federation vouch checks"
     );
 }

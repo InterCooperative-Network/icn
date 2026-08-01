@@ -107,7 +107,9 @@ pub struct RpcServer {
     store_handle: Option<Arc<dyn Store>>,
     dispute_manager: Option<Arc<RwLock<DisputeManager>>>,
     federation_registry: Option<Arc<CooperativeRegistry>>,
-    own_keypair: Option<Arc<icn_identity::KeyPair>>,
+    /// The node's own identity. Required at construction so an RpcServer
+    /// cannot exist without one — see `own_keypair()`.
+    own_keypair: Arc<icn_identity::KeyPair>,
     receipt_store: Arc<ReceiptStore>,
     auth_manager: Option<Arc<RpcAuthManager>>,
     /// Trust-gated rate limiter for API requests (C8: Trust-based API rate limiting)
@@ -121,7 +123,7 @@ pub struct RpcServer {
 
 impl RpcServer {
     /// Create a new RPC server (without authentication - for backward compatibility/dev mode)
-    pub fn new(listen_addr: SocketAddr) -> Self {
+    pub fn new(listen_addr: SocketAddr, own_keypair: Arc<icn_identity::KeyPair>) -> Self {
         RpcServer {
             network_handle: None,
             ledger_handle: None,
@@ -136,7 +138,7 @@ impl RpcServer {
             store_handle: None,
             dispute_manager: None,
             federation_registry: None,
-            own_keypair: None,
+            own_keypair,
             receipt_store: Arc::new(ReceiptStore::new(10_000, 86400)), // 10k receipts, 24h TTL
             auth_manager: None,
             rate_limiter: None,
@@ -151,7 +153,11 @@ impl RpcServer {
     /// # Arguments
     /// * `listen_addr` - Address to bind the server
     /// * `jwt_secret` - Secret for signing JWT tokens (should be at least 32 bytes)
-    pub fn new_with_auth(listen_addr: SocketAddr, jwt_secret: Vec<u8>) -> Self {
+    pub fn new_with_auth(
+        listen_addr: SocketAddr,
+        jwt_secret: Vec<u8>,
+        own_keypair: Arc<icn_identity::KeyPair>,
+    ) -> Self {
         RpcServer {
             network_handle: None,
             ledger_handle: None,
@@ -166,7 +172,7 @@ impl RpcServer {
             store_handle: None,
             dispute_manager: None,
             federation_registry: None,
-            own_keypair: None,
+            own_keypair,
             receipt_store: Arc::new(ReceiptStore::new(10_000, 86400)),
             auth_manager: Some(Arc::new(RpcAuthManager::new(jwt_secret, true))),
             rate_limiter: None,
@@ -272,11 +278,6 @@ impl RpcServer {
         self.store_handle = Some(handle);
     }
 
-    /// Set the own keypair handle (for signing recovery attestations)
-    pub fn set_own_keypair(&mut self, keypair: Arc<icn_identity::KeyPair>) {
-        self.own_keypair = Some(keypair);
-    }
-
     /// Set the dispute manager handle (for ledger dispute operations)
     pub fn set_dispute_manager(&mut self, manager: Arc<RwLock<DisputeManager>>) {
         self.dispute_manager = Some(manager);
@@ -373,9 +374,15 @@ impl RpcServer {
         self.store_handle.clone()
     }
 
-    /// Get own keypair (for handler modules)
-    pub fn own_keypair(&self) -> Option<&Arc<icn_identity::KeyPair>> {
-        self.own_keypair.as_ref()
+    /// The node's own keypair.
+    ///
+    /// Infallible by construction: `own_keypair` is a required constructor
+    /// argument, so there is no "unconfigured" state for a handler to fall
+    /// through. Before #2497 this returned an `Option` that was *always* `None`
+    /// in production, because the setter that filled it had no caller — which
+    /// made `handler/federation.rs` emit unsigned vouches via its `else` branch.
+    pub fn own_keypair(&self) -> &Arc<icn_identity::KeyPair> {
+        &self.own_keypair
     }
 
     /// Get dispute manager (for handler modules)

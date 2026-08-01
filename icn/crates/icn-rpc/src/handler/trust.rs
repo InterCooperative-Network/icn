@@ -127,12 +127,7 @@ pub async fn handle_trust_list(
     };
 
     // Get the node's own DID for listing outgoing edges
-    let own_did = match state.own_keypair() {
-        Some(kp) => kp.did().to_string(),
-        None => {
-            return RpcResponse::error(id, -32000, "Node keypair not available".to_string());
-        }
-    };
+    let own_did = state.own_keypair().did().to_string();
 
     let edges = trust_service.get_edges(&own_did);
     RpcResponse::success(id, serde_json::json!(edges))

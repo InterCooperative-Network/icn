@@ -305,12 +305,10 @@ pub async fn handle_federation_vouch_issue(
         params.trust_score,
     );
 
-    // Sign if we have a keypair
-    let signed_vouch = if let Some(keypair) = state.own_keypair() {
-        vouch.sign(keypair)
-    } else {
-        vouch
-    };
+    // Always signed: `own_keypair` is required at construction, so there is no
+    // unsigned fallback to fall through to. Before #2497 the `else` branch here
+    // was the one always taken, emitting unsigned vouches while reporting success.
+    let signed_vouch = vouch.sign(state.own_keypair());
 
     match registry.add_vouch(&signed_vouch) {
         Ok(()) => {

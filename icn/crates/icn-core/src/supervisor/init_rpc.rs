@@ -41,13 +41,8 @@ pub struct RpcDeps {
     /// When provided, this should be used instead of trust_graph for policy decisions.
     /// This enables proper kernel/app separation (trust semantics stay in apps/trust).
     pub policy_oracle: Option<Arc<dyn PolicyOracle>>,
-    /// The node's identity, used to answer RPC calls that need the node's own
-    /// DID or must sign on the node's behalf.
-    ///
-    /// Without this, `RpcServer::own_keypair()` is `None` for the daemon's whole
-    /// lifetime: `trust.list` and the recovery handlers fail with
-    /// "Node keypair not available", and `federation.rs` silently issues
-    /// **unsigned** vouches while still reporting success (issue #2497).
+    /// The node's identity. Required — `RpcServer` cannot be constructed without
+    /// it, so RPC can never run with an absent node key (issue #2497).
     pub identity_bundle: IdentityBundle,
 }
 
@@ -106,31 +101,30 @@ pub fn spawn_rpc_server(
     deps: RpcDeps,
     background_tasks: &mut tokio::task::JoinSet<()>,
 ) -> anyhow::Result<ComputeHandle> {
-    // Create RPC server with optional auth
-    let mut rpc_server = if let Some(ref jwt_secret) = config.jwt_secret {
-        RpcServer::new_with_auth(config.addr, jwt_secret.clone())
-    } else {
-        RpcServer::new(config.addr)
-    };
+    // The node's own identity is a construction requirement, not something
+    // installed afterwards (#2497).
+    //
+    // It used to be an `Option` filled by `RpcServer::set_own_keypair`, which had
+    // no caller anywhere in the workspace — so `own_keypair` stayed `None` for the
+    // daemon's whole lifetime. Trust and recovery RPC answered "Node keypair not
+    // available", and `handler/federation.rs` took the unsigned branch of
+    // `if let Some(keypair)` and emitted vouches with no signature while still
+    // reporting success.
+    //
+    // Passing it to the constructor removes the "unconfigured" state entirely, so
+    // that class of omission cannot recur here: there is no server to misconfigure.
+    // Fail-closed: a node that cannot load its own keypair does not serve RPC.
+    let own_keypair = Arc::new(
+        deps.identity_bundle
+            .keypair()
+            .context("failed to load node keypair for RPC server")?,
+    );
 
-    // Install the node's own keypair so handlers that need the node identity
-    // actually have it (issue #2497).
-    //
-    // `RpcServer::set_own_keypair` existed with consumers in the trust, recovery
-    // and federation handlers, but had no caller anywhere in the workspace, so
-    // `own_keypair` stayed `None` forever. Two of those handlers returned
-    // "Node keypair not available"; `federation.rs` took the `else` branch of
-    // `if let Some(keypair)` and issued vouches **unsigned**, reporting success.
-    //
-    // Fail-closed, matching the revocation-store wiring below: a node that
-    // cannot load its own keypair must not serve RPC that silently drops
-    // signatures.
-    let own_keypair = deps
-        .identity_bundle
-        .keypair()
-        .context("failed to load node keypair for RPC server")?;
-    rpc_server.set_own_keypair(Arc::new(own_keypair));
-    info!("RPC server: installed node keypair for identity-dependent handlers");
+    let mut rpc_server = if let Some(ref jwt_secret) = config.jwt_secret {
+        RpcServer::new_with_auth(config.addr, jwt_secret.clone(), own_keypair)
+    } else {
+        RpcServer::new(config.addr, own_keypair)
+    };
 
     // Install the store-backed auth manager so token revocation actually exists
     // in the assembled daemon (issue #2437).

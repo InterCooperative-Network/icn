@@ -135,12 +135,7 @@ pub async fn handle_recovery_attest(
         }
     };
 
-    let keypair = match state.own_keypair() {
-        Some(kp) => kp.clone(),
-        None => {
-            return RpcResponse::error(id, -32000, "Keypair not configured".to_string());
-        }
-    };
+    let keypair = state.own_keypair().clone();
 
     #[derive(serde::Deserialize)]
     struct AttestParams {

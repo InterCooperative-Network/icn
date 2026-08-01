@@ -1263,7 +1263,10 @@ mod delegation_auth_tests {
 
     fn test_state(gov: RecordingGovernance) -> Arc<RpcServer> {
         let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
-        let mut server = RpcServer::new(addr);
+        let mut server = RpcServer::new(
+            addr,
+            std::sync::Arc::new(icn_identity::KeyPair::generate().unwrap()),
+        );
         server.set_governance_handle(gov);
         Arc::new(server)
     }
@@ -1319,7 +1322,10 @@ mod delegation_auth_tests {
         let bob = new_did();
         let suspended_alice = alice.clone();
         let addr: SocketAddr = "127.0.0.1:0".parse().unwrap();
-        let mut server = RpcServer::new(addr);
+        let mut server = RpcServer::new(
+            addr,
+            std::sync::Arc::new(icn_identity::KeyPair::generate().unwrap()),
+        );
         server.set_governance_handle(gov.clone());
         server.set_suspension_checker(Arc::new(move |did, domain_id| {
             let suspended_alice = suspended_alice.clone();
