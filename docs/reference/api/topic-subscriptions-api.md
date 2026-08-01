@@ -486,17 +486,44 @@ The subscription system exports Prometheus metrics:
 - Description: Total SubscribeAck messages sent
 - Increments: When supervisor sends SubscribeAck
 
+**`icn_gossip_subscription_control_spoof_rejected_total`**
+- Type: Counter
+- Description: Network Subscribe/Unsubscribe requests refused for claiming this node's own DID (#2471)
+- Increments: Per topic, when the own-DID guard refuses a request
+
+**`icn_gossip_subscription_control_outcome_total{action, outcome}`**
+- Type: Counter
+- Description: How each topic of a received subscription-control request resolved (#2482)
+- Increments: Per **topic**, after the accept/reject decision — unlike the `*_received_total`
+  counters above, which increment once per **message**
+- Labels (closed sets; never a DID, topic name, or address):
+  - `action`: `subscribe` | `unsubscribe`
+  - `outcome`:
+    - `processed` — the handler returned success. **This does not mean the subscriber set
+      changed**: unsubscribing a DID that was not subscribed, and subscribing one that already
+      was, both return success and are counted here.
+    - `rejected_own_did` — refused by the own-DID guard (also counted by the spoof counter above)
+    - `rejected_or_error` — any other non-success: topic-ACL denial, unknown topic, per-topic
+      capacity refusal, or a genuine fault. Expected policy denials and faults are not
+      distinguished, because the underlying refusals are untyped error strings.
+
 ### Querying Metrics
 
 ```bash
-# View all subscription metrics
-curl http://localhost:9100/metrics | grep icn_gossip_subscribe
+# View all subscription metrics.
+# Note the `subscri` prefix: it matches both the `subscribe*` and `subscription*`
+# metric families. `grep icn_gossip_subscribe` alone would miss the control metrics.
+curl http://localhost:9100/metrics | grep icn_gossip_subscri
 
 # Example output:
 # icn_gossip_subscriptions_total 15
 # icn_gossip_subscribes_received_total 42
 # icn_gossip_unsubscribes_received_total 7
 # icn_gossip_subscribe_acks_sent_total 38
+# icn_gossip_subscription_control_spoof_rejected_total 3
+# icn_gossip_subscription_control_outcome_total{action="subscribe",outcome="processed"} 39
+# icn_gossip_subscription_control_outcome_total{action="subscribe",outcome="rejected_own_did"} 3
+# icn_gossip_subscription_control_outcome_total{action="unsubscribe",outcome="processed"} 7
 ```
 
 ---
