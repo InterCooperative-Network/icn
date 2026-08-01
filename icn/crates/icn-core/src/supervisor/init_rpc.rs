@@ -3,6 +3,7 @@
 //! Initializes the gRPC server for daemon communication and the REST/WebSocket
 //! gateway for cooperative applications.
 
+use anyhow::Context;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -13,6 +14,7 @@ use icn_ccl::ContractRuntime;
 use icn_compute::ComputeHandle;
 use icn_coop::{CoopHandle, MemberStatus};
 use icn_gossip::GossipActor;
+use icn_identity::IdentityBundle;
 use icn_kernel_api::authz::PolicyOracle;
 use icn_kernel_api::services::TrustService;
 use icn_net::NetworkHandle;
@@ -39,6 +41,14 @@ pub struct RpcDeps {
     /// When provided, this should be used instead of trust_graph for policy decisions.
     /// This enables proper kernel/app separation (trust semantics stay in apps/trust).
     pub policy_oracle: Option<Arc<dyn PolicyOracle>>,
+    /// The node's identity, used to answer RPC calls that need the node's own
+    /// DID or must sign on the node's behalf.
+    ///
+    /// Without this, `RpcServer::own_keypair()` is `None` for the daemon's whole
+    /// lifetime: `trust.list` and the recovery handlers fail with
+    /// "Node keypair not available", and `federation.rs` silently issues
+    /// **unsigned** vouches while still reporting success (issue #2497).
+    pub identity_bundle: IdentityBundle,
 }
 
 /// Configuration for RPC server
@@ -102,6 +112,25 @@ pub fn spawn_rpc_server(
     } else {
         RpcServer::new(config.addr)
     };
+
+    // Install the node's own keypair so handlers that need the node identity
+    // actually have it (issue #2497).
+    //
+    // `RpcServer::set_own_keypair` existed with consumers in the trust, recovery
+    // and federation handlers, but had no caller anywhere in the workspace, so
+    // `own_keypair` stayed `None` forever. Two of those handlers returned
+    // "Node keypair not available"; `federation.rs` took the `else` branch of
+    // `if let Some(keypair)` and issued vouches **unsigned**, reporting success.
+    //
+    // Fail-closed, matching the revocation-store wiring below: a node that
+    // cannot load its own keypair must not serve RPC that silently drops
+    // signatures.
+    let own_keypair = deps
+        .identity_bundle
+        .keypair()
+        .context("failed to load node keypair for RPC server")?;
+    rpc_server.set_own_keypair(Arc::new(own_keypair));
+    info!("RPC server: installed node keypair for identity-dependent handlers");
 
     // Install the store-backed auth manager so token revocation actually exists
     // in the assembled daemon (issue #2437).
