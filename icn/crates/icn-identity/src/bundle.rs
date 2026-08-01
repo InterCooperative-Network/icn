@@ -59,7 +59,7 @@
 //! let signature = bundle.sign(message).unwrap();
 //! ```
 
-use crate::{Did, DidKey, DidSigner, KeyPair};
+use crate::{Did, DidKey, DidSigner, KeyPair, SoftwareSigner};
 use anyhow::{Context, Result};
 use rcgen::CertificateParams;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
@@ -591,6 +591,38 @@ impl IdentityBundle {
         self.did_key.is_hardware_backed()
     }
 
+    /// Obtain this identity's signing capability, whatever backs it.
+    ///
+    /// This is the private-key-free counterpart to [`Self::keypair`], and the
+    /// method a composition root should use when it needs to hand a long-lived
+    /// signing capability to a subsystem (#2501).
+    ///
+    /// Unlike [`Self::signer`], this never returns `None` for a usable identity:
+    /// software bundles carry no signer because they don't need one, so one is
+    /// constructed on demand. The distinction between "hardware, delegates to a
+    /// secure element" and "software, signs directly" stays inside the returned
+    /// object rather than leaking to the caller.
+    ///
+    /// # Errors
+    /// Returns an error if the bundle is hardware-backed but carries no signer.
+    /// Construction already rejects that combination, so this is a defensive
+    /// check against a bundle built by bypassing the public API.
+    pub fn signing_capability(&self) -> Result<Arc<dyn DidSigner>> {
+        if let Some(signer) = &self.signer {
+            return Ok(Arc::clone(signer));
+        }
+
+        if self.did_key.is_hardware_backed() {
+            anyhow::bail!(
+                "Invariant violation: hardware-backed key without signer. \
+                 This indicates a bug in IdentityBundle construction or \
+                 manual struct creation bypassing the public API."
+            )
+        }
+
+        Ok(Arc::new(SoftwareSigner::new(self.did_key.clone())?))
+    }
+
     /// Sign a message using the appropriate signing method
     ///
     /// This method delegates signing to:
@@ -1044,6 +1076,85 @@ mod tests {
         use ed25519_dalek::Verifier;
         let verifying_key = bundle.did().to_verifying_key().unwrap();
         assert!(verifying_key.verify(message, &signature).is_ok());
+    }
+
+    /// A software bundle yields a usable signing capability even though it
+    /// carries no signer.
+    ///
+    /// `signer()` returns `None` for software keys by design — they sign
+    /// directly. A composition root that needs a long-lived capability must not
+    /// have to care about that distinction, or it will reach for `keypair()`
+    /// instead and lock out hardware identities (#2501).
+    #[test]
+    fn signing_capability_is_available_for_software_bundles() {
+        use ed25519_dalek::Verifier;
+
+        let bundle = IdentityBundle::generate().unwrap();
+        assert!(
+            bundle.signer().is_none(),
+            "precondition: software bundles carry no signer"
+        );
+
+        let capability = bundle.signing_capability().unwrap();
+
+        assert_eq!(capability.did(), bundle.did());
+        assert!(!capability.is_hardware_backed());
+        assert_eq!(capability.backend_type(), "software");
+
+        let message = b"node-authenticated rpc artifact";
+        let signature = capability.sign(message).unwrap();
+        let verifying_key = bundle.did().to_verifying_key().unwrap();
+        assert!(
+            verifying_key.verify(message, &signature).is_ok(),
+            "the capability must sign as the bundle's own identity"
+        );
+    }
+
+    /// A hardware bundle hands back its own signer, not a reconstructed key.
+    ///
+    /// This is the case `keypair()` cannot serve at all. If this returned an
+    /// error, fail-closed RPC startup would refuse to run on PKCS#11/TPM nodes —
+    /// the regression #2501 was filed for.
+    #[test]
+    fn signing_capability_delegates_to_the_hardware_signer() {
+        use crate::SoftwareSigner;
+        use ed25519_dalek::Verifier;
+        use rand_core::OsRng;
+
+        let signing_key = SigningKey::generate(&mut OsRng);
+        let software_did_key = DidKey::from_software_bytes(
+            signing_key.to_bytes(),
+            signing_key.verifying_key().to_bytes(),
+        )
+        .unwrap();
+        // Stands in for a real HSM signer: the bundle's DidKey is Hardware, so no
+        // private key material is reachable through it.
+        let signer = Arc::new(SoftwareSigner::new(software_did_key).unwrap());
+
+        let hardware_did_key = DidKey::from_hardware(
+            signing_key.verifying_key(),
+            "test-hsm".to_string(),
+            "slot-0".to_string(),
+        );
+        let bundle =
+            IdentityBundle::from_did_key_with_signer(hardware_did_key, Some(signer)).unwrap();
+
+        assert!(
+            bundle.keypair().is_err(),
+            "precondition: a hardware bundle cannot produce a KeyPair - this is \
+             exactly why RpcServer must not require one"
+        );
+
+        let capability = bundle.signing_capability().unwrap();
+
+        assert_eq!(capability.did(), bundle.did());
+        let message = b"node-authenticated rpc artifact";
+        let signature = capability.sign(message).unwrap();
+        let verifying_key = bundle.did().to_verifying_key().unwrap();
+        assert!(
+            verifying_key.verify(message, &signature).is_ok(),
+            "a hardware-backed bundle must still produce verifiable signatures"
+        );
     }
 
     #[test]

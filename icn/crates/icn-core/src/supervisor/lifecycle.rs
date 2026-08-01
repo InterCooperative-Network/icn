@@ -1077,6 +1077,7 @@ async fn spawn_actors_with_identity(
     let rpc_compute_handle = super::init_rpc::spawn_rpc_server(
         rpc_config,
         super::init_rpc::RpcDeps {
+            identity_bundle: identity_bundle.clone(),
             network_handle: network_handle.clone(),
             ledger_handle: ledger_handle.clone(),
             contract_runtime: contract_runtime_handle.clone(),

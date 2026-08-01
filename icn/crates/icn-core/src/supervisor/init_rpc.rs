@@ -3,6 +3,7 @@
 //! Initializes the gRPC server for daemon communication and the REST/WebSocket
 //! gateway for cooperative applications.
 
+use anyhow::Context;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -13,6 +14,7 @@ use icn_ccl::ContractRuntime;
 use icn_compute::ComputeHandle;
 use icn_coop::{CoopHandle, MemberStatus};
 use icn_gossip::GossipActor;
+use icn_identity::IdentityBundle;
 use icn_kernel_api::authz::PolicyOracle;
 use icn_kernel_api::services::TrustService;
 use icn_net::NetworkHandle;
@@ -39,6 +41,9 @@ pub struct RpcDeps {
     /// When provided, this should be used instead of trust_graph for policy decisions.
     /// This enables proper kernel/app separation (trust semantics stay in apps/trust).
     pub policy_oracle: Option<Arc<dyn PolicyOracle>>,
+    /// The node's identity. Required — `RpcServer` cannot be constructed without
+    /// it, so RPC can never run with an absent node key (issue #2497).
+    pub identity_bundle: IdentityBundle,
 }
 
 /// Configuration for RPC server
@@ -96,11 +101,34 @@ pub fn spawn_rpc_server(
     deps: RpcDeps,
     background_tasks: &mut tokio::task::JoinSet<()>,
 ) -> anyhow::Result<ComputeHandle> {
-    // Create RPC server with optional auth
+    // The node's own identity is a construction requirement, not something
+    // installed afterwards (#2497).
+    //
+    // It used to be an `Option` filled by `RpcServer::set_own_keypair`, which had
+    // no caller anywhere in the workspace — so it stayed `None` for the daemon's
+    // whole lifetime. Trust and recovery RPC answered "Node keypair not
+    // available", and `handler/federation.rs` took the unsigned branch of
+    // `if let Some(keypair)` and emitted vouches with no signature while still
+    // reporting success.
+    //
+    // Passing it to the constructor removes the "unconfigured" state entirely, so
+    // that class of omission cannot recur here: there is no server to misconfigure.
+    // Fail-closed: a node that cannot obtain a signing capability does not serve RPC.
+    //
+    // What is required is the *capability*, not the key (#2501). The first fix
+    // asked for `IdentityBundle::keypair()`, which fails by design on a
+    // hardware-backed bundle — so fail-closed startup would have turned PKCS#11
+    // and TPM identities into a daemon that refuses to serve RPC. No handler ever
+    // needed the private bytes; they need a DID and a `sign()`.
+    let own_signer = deps
+        .identity_bundle
+        .signing_capability()
+        .context("failed to obtain node signing capability for RPC server")?;
+
     let mut rpc_server = if let Some(ref jwt_secret) = config.jwt_secret {
-        RpcServer::new_with_auth(config.addr, jwt_secret.clone())
+        RpcServer::new_with_auth(config.addr, jwt_secret.clone(), own_signer)
     } else {
-        RpcServer::new(config.addr)
+        RpcServer::new(config.addr, own_signer)
     };
 
     // Install the store-backed auth manager so token revocation actually exists

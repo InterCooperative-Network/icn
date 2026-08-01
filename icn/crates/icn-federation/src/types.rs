@@ -657,14 +657,23 @@ impl Vouch {
         bytes
     }
 
-    /// Sign this vouch using the provided keypair
+    /// Sign this vouch using the provided signing capability
     ///
     /// Returns a new Vouch with the signature field populated.
-    pub fn sign(mut self, keypair: &icn_identity::KeyPair) -> Self {
+    ///
+    /// Takes `&dyn DidSigner` rather than a [`icn_identity::KeyPair`] so a
+    /// cooperative whose identity lives in an HSM or TPM can issue vouches
+    /// without exporting private key material (#2501). `&KeyPair` coerces to
+    /// `&dyn DidSigner`, so software callers need no change beyond handling the
+    /// `Result` — signing can fail when a hardware backend is unavailable, and
+    /// that failure must not be silently swallowed into an unsigned vouch.
+    pub fn sign(mut self, signer: &dyn icn_identity::DidSigner) -> Result<Self, String> {
         let bytes = self.signing_bytes();
-        let signature = keypair.sign(&bytes);
+        let signature = signer
+            .sign(&bytes)
+            .map_err(|e| format!("Failed to sign vouch: {e}"))?;
         self.signature = signature.to_vec();
-        self
+        Ok(self)
     }
 
     /// Verify the signature on this vouch

@@ -12,7 +12,7 @@
 //! 6. **Finalize**: After delay expires, new DID inherits old identity
 //! 7. **Cancel**: Original owner can cancel fraudulent recovery attempts
 
-use crate::{Did, KeyPair};
+use crate::{Did, DidSigner};
 use anyhow::{bail, Result};
 use ed25519_dalek::Signature;
 use serde::{Deserialize, Serialize};
@@ -284,8 +284,13 @@ impl RecoveryEvent {
 
 impl RecoveryAttestation {
     /// Create a new recovery attestation
+    ///
+    /// Takes a signing *capability* rather than a [`KeyPair`] so trustees holding
+    /// hardware-backed identities can attest without exporting private key
+    /// material (#2501). `&KeyPair` still coerces to `&dyn DidSigner`, so
+    /// software callers are unaffected.
     pub fn new(
-        trustee_keypair: &KeyPair,
+        trustee_signer: &dyn DidSigner,
         old_did: Did,
         new_did: Did,
         verification_method: String,
@@ -296,10 +301,10 @@ impl RecoveryAttestation {
         let message = Self::signing_message(&old_did, &new_did, timestamp);
 
         // Sign message
-        let signature = trustee_keypair.sign(&message);
+        let signature = trustee_signer.sign(&message)?;
 
         Ok(RecoveryAttestation {
-            trustee: trustee_keypair.did().clone(),
+            trustee: trustee_signer.did().clone(),
             old_did,
             new_did,
             signature: signature.to_vec(),
@@ -505,6 +510,7 @@ impl RecoveryMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::KeyPair;
 
     #[test]
     fn test_recovery_message_serialization() {

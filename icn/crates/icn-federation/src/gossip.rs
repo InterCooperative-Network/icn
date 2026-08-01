@@ -542,12 +542,24 @@ impl FederationGossipHandler {
             trust_score,
         );
 
-        // Sign the vouch if keypair is available
-        let signed_vouch = if let Some(ref kp) = *keypair {
-            vouch.sign(kp)
-        } else {
-            warn!("No keypair set - sending unsigned vouch");
-            vouch
+        // Sign the vouch if keypair is available.
+        //
+        // NOTE: the `None` arm is pre-existing behaviour and is *not* endorsed —
+        // `FederationGossip::set_keypair` has no caller in the workspace, so this
+        // path emits unsigned vouches in production today. That is the same
+        // built-but-never-installed defect #2497 fixed for `RpcServer`, tracked
+        // as a class in #2500; fixing it here needs its own composition-root
+        // change and is deliberately out of scope for #2501.
+        //
+        // What did change: a signing *failure* now propagates instead of being
+        // impossible to express. A key that exists but cannot sign must not
+        // silently downgrade to an unsigned vouch.
+        let signed_vouch = match *keypair {
+            Some(ref kp) => vouch.sign(kp).map_err(FederationError::InvalidSignature)?,
+            None => {
+                warn!("No keypair set - sending unsigned vouch");
+                vouch
+            }
         };
 
         let message = FederationMessage::Vouch(signed_vouch);
@@ -816,7 +828,9 @@ mod tests {
         );
 
         // Sign the vouch
-        let signed_vouch = vouch.sign(&keypair);
+        let signed_vouch = vouch
+            .sign(&keypair)
+            .expect("signing with a software keypair must succeed");
         assert!(!signed_vouch.signature.is_empty());
 
         // Verify signature

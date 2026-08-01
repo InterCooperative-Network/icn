@@ -40,9 +40,16 @@ async fn start_test_server(with_auth: bool) -> Result<(SocketAddr, tokio::task::
 
         let server = if with_auth {
             let jwt_secret = b"test-secret-for-rpc-integration-tests-32bytes".to_vec();
-            RpcServer::new_with_auth(addr, jwt_secret)
+            RpcServer::new_with_auth(
+                addr,
+                jwt_secret,
+                std::sync::Arc::new(icn_identity::KeyPair::generate().unwrap()),
+            )
         } else {
-            RpcServer::new(addr)
+            RpcServer::new(
+                addr,
+                std::sync::Arc::new(icn_identity::KeyPair::generate().unwrap()),
+            )
         };
 
         // Use a channel to detect if the server started successfully
@@ -1212,7 +1219,10 @@ async fn start_test_server_with_revocation() -> Result<(SocketAddr, tokio::task:
         drop(listener);
 
         let store = Arc::new(icn_store::SledStore::temporary().unwrap());
-        let mut server = RpcServer::new(addr);
+        let mut server = RpcServer::new(
+            addr,
+            std::sync::Arc::new(icn_identity::KeyPair::generate().unwrap()),
+        );
         let jwt_secret = b"test-secret-for-rpc-revocation-tests-32b".to_vec();
         if server
             .set_auth_manager_with_store(jwt_secret, store)
